@@ -1,0 +1,474 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================
+// Authentication & Users
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  role          String    @default("STAFF")
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// ============================================
+// Coaches
+// ============================================
+
+model Coach {
+  id                  String    @id @default(cuid())
+  hubspotId           String?   @unique
+  circleId            String?   @unique
+  email               String    @unique
+  firstName           String
+  lastName            String
+  phone               String?
+  company             String?
+  bio                 String?
+  profileImage        String?
+  certificationStatus String    @default("PENDING")
+  certificationExpiry DateTime?
+  paymentStatus       String    @default("PENDING")
+  territory           String?
+  performanceMetrics  String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  syncedAt            DateTime?
+
+  workshops       Workshop[]
+  certifications  CoachCertification[]
+  approvals       ApprovalQueue[]
+  followUpReports FollowUpReport[]
+
+  @@map("coaches")
+}
+
+model CoachCertification {
+  id             String    @id @default(cuid())
+  coachId        String
+  workshopTypeId String
+  certifiedAt    DateTime  @default(now())
+  expiresAt      DateTime?
+  status         String    @default("ACTIVE")
+
+  coach        Coach        @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  workshopType WorkshopType @relation(fields: [workshopTypeId], references: [id])
+
+  @@unique([coachId, workshopTypeId])
+  @@map("coach_certifications")
+}
+
+// ============================================
+// Workshop Types (Templates)
+// ============================================
+
+model WorkshopType {
+  id                      String   @id @default(cuid())
+  name                    String
+  slug                    String   @unique
+  description             String?
+  shortDescription        String?
+  durationOptions         String // JSON string
+  materials               String? // JSON string
+  marketingTemplates      String? // JSON string
+  pricingTiers            String? // JSON string
+  preWorkshopInstructions String?
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  workshops      Workshop[]
+  certifications CoachCertification[]
+
+  @@map("workshop_types")
+}
+
+// ============================================
+// Workshops (Events)
+// ============================================
+
+model Workshop {
+  id             String @id @default(cuid())
+  coachId        String
+  workshopTypeId String
+
+  // Event Details
+  title        String
+  description  String?
+  format       String // IN_PERSON, VIRTUAL, HYBRID
+  duration     String // 'full-day', 'half-day', 'virtual-2hr'
+  eventDate    DateTime
+  eventEndDate DateTime?
+  eventTime    String?
+  timezone     String    @default("America/New_York")
+
+  // Location (for in-person)
+  venueName           String?
+  venueAddress        String? // JSON string
+  parkingInstructions String?
+
+  // Virtual (for online)
+  virtualPlatform String? // 'zoom', 'teams', 'meet'
+  virtualLink     String?
+
+  // Pricing
+  isFree              Boolean   @default(false)
+  priceCents          Int?
+  earlyBirdPriceCents Int?
+  earlyBirdDeadline   DateTime?
+
+  // Status & Pipeline
+  status String @default("REQUESTED")
+
+  // Generated Assets
+  landingPageSlug String? @unique
+
+  // External IDs
+  hubspotCampaignId String?
+  stripeProductId   String?
+  stripePriceId     String?
+
+  // Capacity
+  maxAttendees Int @default(50)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coach           Coach               @relation(fields: [coachId], references: [id])
+  workshopType    WorkshopType        @relation(fields: [workshopTypeId], references: [id])
+  registrations   Registration[]
+  campaigns       MarketingCampaign[]
+  tasks           AutomationTask[]
+  surveys         Survey[]
+  approvals       ApprovalQueue[]
+  landingPage     LandingPage?
+  followUpReports FollowUpReport[]
+
+  @@index([coachId])
+  @@index([status])
+  @@index([eventDate])
+  @@map("workshops")
+}
+
+// ============================================
+// Registrations
+// ============================================
+
+model Registration {
+  id         String @id @default(cuid())
+  workshopId String
+
+  // Attendee Info
+  email     String
+  firstName String
+  lastName  String
+  company   String?
+  jobTitle  String?
+  phone     String?
+
+  // Payment
+  paymentStatus   String  @default("PENDING")
+  stripePaymentId String?
+  stripeSessionId String?
+  amountPaidCents Int?
+
+  // External Sync
+  hubspotContactId String?
+
+  // Status
+  status      String    @default("REGISTERED")
+  checkedInAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  surveys  Survey[]
+
+  @@index([workshopId])
+  @@index([email])
+  @@map("registrations")
+}
+
+// ============================================
+// Marketing Campaigns
+// ============================================
+
+model MarketingCampaign {
+  id           String @id @default(cuid())
+  workshopId   String
+  campaignType String // COACH_PROMO, SCALING_UP_EMAIL, etc.
+
+  // Content
+  content String? // JSON string
+  assets  String? // JSON string
+
+  // Scheduling
+  scheduledSends String? // JSON string
+
+  // Tracking
+  hubspotCampaignId String?
+  metrics           String? // JSON string
+
+  status    String   @default("DRAFT")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@map("marketing_campaigns")
+}
+
+// ============================================
+// Automation Tasks
+// ============================================
+
+model AutomationTask {
+  id         String @id @default(cuid())
+  workshopId String
+  taskType   String // 'validate_coach', 'generate_landing_page', etc.
+  status     String @default("PENDING")
+
+  inputData    String? // JSON string
+  outputData   String? // JSON string
+  errorMessage String?
+
+  attempts    Int @default(0)
+  maxAttempts Int @default(3)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@index([workshopId])
+  @@map("automation_tasks")
+}
+
+// ============================================
+// Surveys & Feedback
+// ============================================
+
+model Survey {
+  id             String  @id @default(cuid())
+  registrationId String?
+  workshopId     String
+  surveyType     String // PRE_WORKSHOP, POST_WORKSHOP, NPS
+
+  responses String? // JSON string
+  npsScore  Int?
+
+  sentAt      DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  registration Registration? @relation(fields: [registrationId], references: [id])
+  workshop     Workshop      @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@map("surveys")
+}
+
+// ============================================
+// V2: Approval Queue (Human-in-the-Loop)
+// ============================================
+
+model ApprovalQueue {
+  id          String         @id @default(cuid())
+  type        ApprovalType
+  workshopId  String?
+  coachId     String
+  requestData String // JSON string
+  status      ApprovalStatus @default(PENDING)
+  requestedAt DateTime       @default(now())
+  requestedBy String?        // Name/email of person who requested
+  respondedAt DateTime?
+  respondedBy String?        // User who responded (email or "SYSTEM")
+  decision    String?
+  notes       String?
+  responseReason String?     // Reason for approval/denial
+  escalatedAt DateTime?      // When escalated to higher authority
+
+  workshop Workshop? @relation(fields: [workshopId], references: [id])
+  coach    Coach     @relation(fields: [coachId], references: [id])
+
+  @@index([status])
+  @@index([coachId])
+  @@map("approval_queue")
+}
+
+// ============================================
+// V2: Audit Logging
+// ============================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  entityType  String // 'Workshop', 'Registration', 'Coach', etc.
+  entityId    String
+  action      String // 'CREATE', 'UPDATE', 'DELETE', 'APPROVE', 'DENY'
+  performedBy String? // User email or 'SYSTEM'
+  changes     String // JSON string of changed fields
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+// ============================================
+// V2: Email Templates
+// ============================================
+
+model EmailTemplate {
+  id         String    @id @default(cuid())
+  name       String    @unique
+  subject    String
+  body       String // HTML template with {{ variables }}
+  variables  String // JSON array of variable names
+  type       EmailType
+  timingDays Int? // Days before/after event (negative = before)
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("email_templates")
+}
+
+// ============================================
+// V2: Landing Pages
+// ============================================
+
+model LandingPage {
+  id          String     @id @default(cuid())
+  workshopId  String     @unique
+  slug        String     @unique
+  content     String // JSON with rendered template data
+  coachPhoto  String? // URL to headshot
+  graphicUrl  String? // URL to workshop graphic
+  status      PageStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@map("landing_pages")
+}
+
+// ============================================
+// V2: 90-Day Follow-Up Reports
+// ============================================
+
+model FollowUpReport {
+  id            String       @id @default(cuid())
+  workshopId    String
+  coachId       String
+  dueDate       DateTime // Event date + 90 days
+  submittedAt   DateTime?
+  reportData    String? // JSON with participant outcomes
+  status        ReportStatus @default(PENDING)
+  remindersSent Int          @default(0)
+  createdAt     DateTime     @default(now())
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  coach    Coach    @relation(fields: [coachId], references: [id])
+
+  @@index([dueDate])
+  @@index([status])
+  @@map("follow_up_reports")
+}
+
+// ============================================
+// V2: Enums
+// ============================================
+
+enum ApprovalType {
+  WORKSHOP_REQUEST
+  CUSTOM_PRICING
+  CANCELLATION
+  DATE_CHANGE
+  REFUND
+  CERTIFICATION_EDGE_CASE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
+}
+
+enum EmailType {
+  REGISTRATION_CONFIRMATION
+  PRE_EVENT_5_DAYS
+  PRE_EVENT_1_DAY
+  PRE_EVENT_2_HOURS
+  PRE_EVENT_1_HOUR
+  POST_EVENT_SURVEY
+  COACH_FEEDBACK_REQUEST
+  CANCELLATION_NOTICE
+  DATE_CHANGE_NOTICE
+  FOLLOWUP_REMINDER
+}
+
+enum PageStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+}
+
+enum ReportStatus {
+  PENDING
+  SUBMITTED
+  OVERDUE
+}

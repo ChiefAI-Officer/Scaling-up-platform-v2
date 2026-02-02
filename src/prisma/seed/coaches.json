@@ -1,0 +1,158 @@
+{
+    "coaches": [
+        {
+            "id": "coach-jeff-donaldson",
+            "email": "jeff@jeffdonaldson.net",
+            "firstName": "Jeff",
+            "lastName": "Donaldson",
+            "company": "Scaling Up",
+            "bio": "Scaling Up Coach with Advanced Certification in AI. Featured insights from Verne Harnish (Scaling Up founder) and contributions from Geoff Woods (AI Driven Leader).",
+            "certificationStatus": "ACTIVE",
+            "territory": "Denver, CO / San Diego, CA",
+            "workshopTypes": [
+                "scaling-up-ai",
+                "finish-strong"
+            ],
+            "profileImage": null,
+            "bookingLink": "https://jeffdonaldson.net/booking"
+        },
+        {
+            "id": "coach-lisa-foulger",
+            "email": "lisa@scalingupexcellence.com",
+            "firstName": "Lisa",
+            "lastName": "Foulger",
+            "company": "Scaling Up Excellence",
+            "bio": "Experienced Scaling Up coach specializing in AI integration and strategic planning for leadership teams.",
+            "certificationStatus": "ACTIVE",
+            "territory": "Puerto Rico / Virtual",
+            "workshopTypes": [
+                "scaling-up-ai",
+                "finish-strong",
+                "finish-strong-virtual"
+            ],
+            "profileImage": null,
+            "bookingLink": "https://scalingupexcellence.com/booking"
+        },
+        {
+            "id": "coach-juletta-broomfield",
+            "email": "juletta@scalingup.com",
+            "firstName": "Juletta",
+            "lastName": "Broomfield",
+            "company": "Scaling Up",
+            "bio": "Scaling Up Certified Coach specializing in Finish Strong workshops for business owners preparing for growth or exit.",
+            "certificationStatus": "ACTIVE",
+            "territory": "Virtual",
+            "workshopTypes": [
+                "finish-strong",
+                "finish-strong-virtual"
+            ],
+            "profileImage": null,
+            "bookingLink": null
+        },
+        {
+            "id": "coach-claire-mula",
+            "email": "claire@scalingup.com",
+            "firstName": "Claire",
+            "lastName": "Mula",
+            "company": "Scaling Up",
+            "bio": "Scaling Up coach with expertise in strategic planning and business growth.",
+            "certificationStatus": "ACTIVE",
+            "territory": "Virtual",
+            "workshopTypes": [
+                "finish-strong-virtual"
+            ],
+            "profileImage": null,
+            "bookingLink": null
+        },
+        {
+            "id": "coach-zahir-ladhani",
+            "email": "zahir@scalingup.com",
+            "firstName": "Zahir",
+            "lastName": "Ladhani",
+            "company": "Scaling Up",
+            "bio": "Scaling Up coach focused on helping businesses finish strong with strategic planning.",
+            "certificationStatus": "ACTIVE",
+            "territory": "Virtual",
+            "workshopTypes": [
+                "finish-strong-virtual"
+            ],
+            "profileImage": null,
+            "bookingLink": null
+        },
+        {
+            "id": "coach-rob-williams",
+            "email": "rob.williams@scalingup.com",
+            "firstName": "Rob",
+            "lastName": "Williams",
+            "company": "Scaling Up",
+            "bio": "Scaling Up Certified Coach with expertise in virtual workshops and team development.",
+            "certificationStatus": "ACTIVE",
+            "territory": "Virtual",
+            "workshopTypes": [
+                "finish-strong-virtual"
+            ],
+            "profileImage": null,
+            "bookingLink": null
+        },
+        {
+            "id": "coach-rob-morris",
+            "email": "rob.morris@scalingup.com",
+            "firstName": "Rob",
+            "lastName": "Morris",
+            "company": "Scaling Up",
+            "bio": "Scaling Up coach specializing in strategic planning and business growth.",
+            "certificationStatus": "ACTIVE",
+            "territory": "Virtual",
+            "workshopTypes": [
+                "finish-strong-virtual"
+            ],
+            "profileImage": null,
+            "bookingLink": null
+        },
+        {
+            "id": "coach-samantha-doyle",
+            "email": "samantha@scalingup.com",
+            "firstName": "Samantha",
+            "lastName": "Doyle",
+            "company": "Scaling Up",
+            "bio": "Scaling Up coach with experience in virtual workshop facilitation.",
+            "certificationStatus": "ACTIVE",
+            "territory": "Virtual",
+            "workshopTypes": [
+                "finish-strong-virtual"
+            ],
+            "profileImage": null,
+            "bookingLink": null
+        },
+        {
+            "id": "coach-deb-thompson",
+            "email": "deb@scalingup.com",
+            "firstName": "Deb",
+            "lastName": "Thompson",
+            "company": "Scaling Up",
+            "bio": "Scaling Up coach focused on helping teams scale effectively.",
+            "certificationStatus": "ACTIVE",
+            "territory": "Virtual",
+            "workshopTypes": [
+                "finish-strong-virtual"
+            ],
+            "profileImage": null,
+            "bookingLink": null
+        },
+        {
+            "id": "coach-chris-kobran",
+            "email": "chris@scalingup.com",
+            "firstName": "Chris",
+            "lastName": "Kobran",
+            "company": "Scaling Up",
+            "bio": "Scaling Up coach with in-person workshop expertise.",
+            "certificationStatus": "ACTIVE",
+            "territory": "In-Person",
+            "workshopTypes": [
+                "finish-strong"
+            ],
+            "profileImage": null,
+            "bookingLink": null
+        }
+    ]
+}

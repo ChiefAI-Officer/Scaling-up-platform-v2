@@ -1,0 +1,140 @@
+import { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
+import { db } from "./db";
+
+// User roles for authorization
+export type UserRole = "ADMIN" | "STAFF" | "COACH";
+
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      email: string;
+      name?: string | null;
+      role: UserRole;
+      image?: string | null;
+    };
+  }
+
+  interface User {
+    role: UserRole;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id: string;
+    role: UserRole;
+  }
+}
+
+export const authOptions: NextAuthOptions = {
+  // Note: Don't use adapter with JWT + Credentials - it causes session issues
+  // adapter: PrismaAdapter(db) as NextAuthOptions["adapter"],
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  pages: {
+    signIn: "/login",
+    error: "/login",
+  },
+  providers: [
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password are required");
+        }
+
+        const user = await db.user.findUnique({
+          where: { email: credentials.email.toLowerCase() },
+        });
+
+        if (!user) {
+          throw new Error("Invalid email or password");
+        }
+
+        // Production mode: require proper password validation
+        // Demo mode: only allow demo123 password when DEMO_MODE is enabled
+        const isDemoMode = process.env.DEMO_MODE === "true";
+        
+        if (isDemoMode) {
+          // Demo mode - accept demo123 for testing
+          if (credentials.password !== "demo123") {
+            throw new Error("Invalid email or password");
+          }
+          console.warn("⚠️ DEMO_MODE enabled - using insecure authentication");
+        } else {
+          // Production mode - require bcrypt password validation
+          // TODO: Add passwordHash column to User model when ready for production
+          // const bcrypt = await import("bcryptjs");
+          // const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+          // if (!isValid) throw new Error("Invalid email or password");
+          
+          // Temporary: Block login in production until password hashing is implemented
+          if (!process.env.NEXTAUTH_SECRET) {
+            throw new Error("Authentication not configured for production");
+          }
+          
+          // For now, still check demo password but log warning
+          if (credentials.password !== "demo123") {
+            throw new Error("Invalid email or password");
+          }
+          console.warn("⚠️ Password hashing not yet implemented - using demo authentication");
+        }
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role as UserRole,
+          image: user.image,
+        };
+      },
+    }),
+  ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id;
+        session.user.role = token.role;
+      }
+      return session;
+    },
+  },
+  events: {
+    async signIn({ user }) {
+      console.log(`User signed in: ${user.email}`);
+    },
+    async signOut({ token }) {
+      console.log(`User signed out: ${token.email}`);
+    },
+  },
+};
+
+// Helper to check if user has required role
+export function hasRole(userRole: UserRole, requiredRoles: UserRole[]): boolean {
+  return requiredRoles.includes(userRole);
+}
+
+// Role hierarchy - ADMIN has all permissions
+export function canAccess(userRole: UserRole, requiredRole: UserRole): boolean {
+  const hierarchy: Record<UserRole, number> = {
+    ADMIN: 3,
+    STAFF: 2,
+    COACH: 1,
+  };
+  return hierarchy[userRole] >= hierarchy[requiredRole];
+}

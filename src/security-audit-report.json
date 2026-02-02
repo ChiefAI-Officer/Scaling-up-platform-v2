@@ -1,0 +1,72 @@
+{
+  "timestamp": "2026-02-02T09:33:26.659Z",
+  "target": "http://localhost:3000",
+  "score": 82,
+  "summary": {
+    "passed": 9,
+    "warnings": 2,
+    "failed": 0
+  },
+  "results": {
+    "passed": [
+      {
+        "category": "Environment",
+        "check": ".env in .gitignore",
+        "details": ""
+      },
+      {
+        "category": "Environment",
+        "check": "No hardcoded secrets in source",
+        "details": ""
+      },
+      {
+        "category": "Environment",
+        "check": ".env.example provided",
+        "details": ""
+      },
+      {
+        "category": "Validation",
+        "check": "Zod validation coverage",
+        "details": "81% (13/16 routes)"
+      },
+      {
+        "category": "Rate Limiting",
+        "check": "Rate limit module exists",
+        "details": ""
+      },
+      {
+        "category": "Rate Limiting",
+        "check": "Uses Redis (distributed)",
+        "details": ""
+      },
+      {
+        "category": "Authentication",
+        "check": "NextAuth configured",
+        "details": ""
+      },
+      {
+        "category": "Authentication",
+        "check": "Admin routes protected",
+        "details": ""
+      },
+      {
+        "category": "Authentication",
+        "check": "Portal routes exist",
+        "details": ""
+      }
+    ],
+    "warnings": [
+      {
+        "category": "Headers",
+        "check": "Server reachable",
+        "details": "Server not running - skipping header checks"
+      },
+      {
+        "category": "Rate Limiting",
+        "check": "Applied in middleware",
+        "details": "Consider global rate limiting"
+      }
+    ],
+    "failed": []
+  }
+}

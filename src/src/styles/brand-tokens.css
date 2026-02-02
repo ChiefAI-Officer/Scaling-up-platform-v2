@@ -1,0 +1,217 @@
+/**
+ * Scaling Up Brand Design Tokens
+ * 
+ * Extracted from: Exit Workshop Marketing Kit 1 - November 2025.pdf
+ * and Kajabi Landing Page Materials screenshots
+ */
+
+:root {
+  /* Primary Colors - Purple/Blue Brand Palette */
+  --su-purple-900: #4C1D95;
+  --su-purple-800: #5B21B6;
+  --su-purple-700: #6D28D9;
+  --su-purple-600: #7C3AED;
+  --su-purple: #6B21A8;      /* Primary brand purple */
+  
+  --su-blue-900: #1E3A8A;
+  --su-blue-800: #1E40AF;
+  --su-blue-700: #1D4ED8;
+  --su-blue-600: #2563EB;
+  --su-blue: #2563EB;        /* Primary CTA blue */
+  --su-blue-400: #60A5FA;
+  
+  /* Accent Colors */
+  --su-orange: #F97316;      /* Accents, badges */
+  --su-green: #10B981;       /* Success states */
+  --su-red: #EF4444;         /* Errors, warnings */
+  
+  /* Neutral Colors */
+  --su-gray-900: #111827;
+  --su-gray-800: #1F2937;
+  --su-gray-700: #374151;
+  --su-gray-600: #4B5563;
+  --su-gray-500: #6B7280;
+  --su-gray-400: #9CA3AF;
+  --su-gray-300: #D1D5DB;
+  --su-gray-200: #E5E7EB;
+  --su-gray-100: #F3F4F6;
+  --su-gray-50: #F9FAFB;
+  --su-white: #FFFFFF;
+  
+  /* Text Colors */
+  --su-text-primary: #1F2937;
+  --su-text-secondary: #6B7280;
+  --su-text-muted: #9CA3AF;
+  --su-text-inverse: #FFFFFF;
+  
+  /* Gradients */
+  --su-gradient-hero: linear-gradient(135deg, var(--su-purple) 0%, var(--su-purple-900) 100%);
+  --su-gradient-cta: linear-gradient(135deg, var(--su-purple) 0%, var(--su-blue) 100%);
+  --su-gradient-light: linear-gradient(180deg, var(--su-gray-50) 0%, var(--su-white) 100%);
+  
+  /* Typography */
+  --su-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --su-font-display: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  
+  /* Font Sizes */
+  --su-text-xs: 0.75rem;     /* 12px */
+  --su-text-sm: 0.875rem;    /* 14px */
+  --su-text-base: 1rem;      /* 16px */
+  --su-text-lg: 1.125rem;    /* 18px */
+  --su-text-xl: 1.25rem;     /* 20px */
+  --su-text-2xl: 1.5rem;     /* 24px */
+  --su-text-3xl: 1.875rem;   /* 30px */
+  --su-text-4xl: 2.25rem;    /* 36px */
+  --su-text-5xl: 3rem;       /* 48px */
+  
+  /* Font Weights */
+  --su-font-normal: 400;
+  --su-font-medium: 500;
+  --su-font-semibold: 600;
+  --su-font-bold: 700;
+  --su-font-extrabold: 800;
+  
+  /* Line Heights */
+  --su-leading-tight: 1.25;
+  --su-leading-normal: 1.5;
+  --su-leading-relaxed: 1.625;
+  --su-leading-loose: 2;
+  
+  /* Spacing */
+  --su-space-1: 0.25rem;     /* 4px */
+  --su-space-2: 0.5rem;      /* 8px */
+  --su-space-3: 0.75rem;     /* 12px */
+  --su-space-4: 1rem;        /* 16px */
+  --su-space-5: 1.25rem;     /* 20px */
+  --su-space-6: 1.5rem;      /* 24px */
+  --su-space-8: 2rem;        /* 32px */
+  --su-space-10: 2.5rem;     /* 40px */
+  --su-space-12: 3rem;       /* 48px */
+  --su-space-16: 4rem;       /* 64px */
+  --su-space-20: 5rem;       /* 80px */
+  
+  /* Border Radius */
+  --su-radius-sm: 0.25rem;   /* 4px */
+  --su-radius-md: 0.5rem;    /* 8px */
+  --su-radius-lg: 0.75rem;   /* 12px */
+  --su-radius-xl: 1rem;      /* 16px */
+  --su-radius-2xl: 1.5rem;   /* 24px */
+  --su-radius-full: 9999px;
+  
+  /* Shadows */
+  --su-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --su-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --su-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --su-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --su-shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Transitions */
+  --su-transition-fast: 150ms ease;
+  --su-transition-normal: 300ms ease;
+  --su-transition-slow: 500ms ease;
+  
+  /* Z-Index Scale */
+  --su-z-dropdown: 1000;
+  --su-z-sticky: 1020;
+  --su-z-fixed: 1030;
+  --su-z-modal-backdrop: 1040;
+  --su-z-modal: 1050;
+  --su-z-tooltip: 1070;
+}
+
+/* Utility Classes */
+.su-text-primary { color: var(--su-text-primary); }
+.su-text-secondary { color: var(--su-text-secondary); }
+.su-text-muted { color: var(--su-text-muted); }
+.su-text-inverse { color: var(--su-text-inverse); }
+
+.su-bg-purple { background-color: var(--su-purple); }
+.su-bg-blue { background-color: var(--su-blue); }
+.su-bg-gradient-hero { background: var(--su-gradient-hero); }
+.su-bg-gradient-cta { background: var(--su-gradient-cta); }
+
+.su-btn-primary {
+  background: var(--su-blue);
+  color: var(--su-white);
+  padding: var(--su-space-3) var(--su-space-6);
+  border-radius: var(--su-radius-md);
+  font-weight: var(--su-font-semibold);
+  transition: background var(--su-transition-fast);
+  cursor: pointer;
+  border: none;
+}
+.su-btn-primary:hover {
+  background: var(--su-blue-700);
+}
+
+.su-btn-secondary {
+  background: var(--su-white);
+  color: var(--su-purple);
+  padding: var(--su-space-3) var(--su-space-6);
+  border-radius: var(--su-radius-md);
+  font-weight: var(--su-font-semibold);
+  border: 2px solid var(--su-purple);
+  transition: all var(--su-transition-fast);
+  cursor: pointer;
+}
+.su-btn-secondary:hover {
+  background: var(--su-purple);
+  color: var(--su-white);
+}
+
+.su-card {
+  background: var(--su-white);
+  border-radius: var(--su-radius-lg);
+  box-shadow: var(--su-shadow-md);
+  padding: var(--su-space-6);
+}
+
+.su-badge {
+  display: inline-block;
+  padding: var(--su-space-1) var(--su-space-3);
+  border-radius: var(--su-radius-full);
+  font-size: var(--su-text-xs);
+  font-weight: var(--su-font-semibold);
+  text-transform: uppercase;
+}
+.su-badge-purple {
+  background: var(--su-purple);
+  color: var(--su-white);
+}
+.su-badge-orange {
+  background: var(--su-orange);
+  color: var(--su-white);
+}
+.su-badge-green {
+  background: var(--su-green);
+  color: var(--su-white);
+}
+
+/* Typography Helpers */
+.su-heading-1 {
+  font-size: var(--su-text-5xl);
+  font-weight: var(--su-font-extrabold);
+  line-height: var(--su-leading-tight);
+}
+.su-heading-2 {
+  font-size: var(--su-text-4xl);
+  font-weight: var(--su-font-bold);
+  line-height: var(--su-leading-tight);
+}
+.su-heading-3 {
+  font-size: var(--su-text-2xl);
+  font-weight: var(--su-font-semibold);
+  line-height: var(--su-leading-tight);
+}
+.su-body-lg {
+  font-size: var(--su-text-lg);
+  line-height: var(--su-leading-relaxed);
+}
+.su-body {
+  font-size: var(--su-text-base);
+  line-height: var(--su-leading-normal);
+}
+.su-caption {
+  font-size: var(--su-text-sm);
+  color: var(--su-text-secondary);
+}

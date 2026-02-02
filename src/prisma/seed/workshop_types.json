@@ -1,0 +1,55 @@
+{
+    "workshopTypes": [
+        {
+            "id": "wt-scaling-up-ai",
+            "name": "Scaling Up with AI Virtual Workshop",
+            "slug": "scaling-up-ai",
+            "description": "A Virtual Workshop for Business Owners and Leadership Teams. Learn to use AI as a true thought partner that challenges assumptions, clarifies ideas, and strengthens decisions.",
+            "basePriceCents": 49500,
+            "format": "VIRTUAL",
+            "durationHours": 4,
+            "certificationRequired": "Scaling Up AI Certified",
+            "active": true,
+            "features": [
+                "Apply the CHIT framework so every leadership conversation becomes a structured thinking session",
+                "Pressure test your strategy in real time and identify blind spots",
+                "Turn AI into a weekly practice so you protect thinking time",
+                "Find at least five hours per week you can redeploy toward work that drives enterprise value",
+                "Build a culture where every team member can think at a higher level"
+            ]
+        },
+        {
+            "id": "wt-finish-strong",
+            "name": "Scaling Up to Finish Strong Workshop",
+            "slug": "finish-strong",
+            "description": "Full-day intensive workshop on the 4 Decisions framework. Exit planning and scaling strategies for business owners.",
+            "basePriceCents": 49500,
+            "format": "IN_PERSON",
+            "durationHours": 8,
+            "certificationRequired": "Scaling Up Certified Coach",
+            "active": true,
+            "features": [
+                "Strategic planning for growth",
+                "Cash acceleration strategies",
+                "People and execution alignment",
+                "Exit planning fundamentals"
+            ]
+        },
+        {
+            "id": "wt-finish-strong-virtual",
+            "name": "Scaling Up to Finish Strong Virtual Workshop",
+            "slug": "finish-strong-virtual",
+            "description": "Virtual version of the Finish Strong workshop. Half-day strategic planning session.",
+            "basePriceCents": 29500,
+            "format": "VIRTUAL",
+            "durationHours": 4,
+            "certificationRequired": "Scaling Up Certified Coach",
+            "active": true,
+            "features": [
+                "Strategic planning for growth",
+                "Cash acceleration strategies",
+                "Virtual collaboration exercises"
+            ]
+        }
+    ]
+}

@@ -1,0 +1,412 @@
+// This is the production-ready PostgreSQL schema
+// Copy this to schema.prisma when deploying to production
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Authentication & Users
+// ============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  role          UserRole  @default(STAFF)
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// ============================================
+// Enums (PostgreSQL supports native enums)
+// ============================================
+
+enum UserRole {
+  ADMIN
+  STAFF
+  COACH
+}
+
+enum WorkshopStatus {
+  REQUESTED
+  VALIDATING
+  APPROVED
+  SETUP_IN_PROGRESS
+  MARKETING_ACTIVE
+  REGISTRATION_OPEN
+  REGISTRATION_CLOSED
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkshopFormat {
+  IN_PERSON
+  VIRTUAL
+  HYBRID
+}
+
+enum CertificationStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum PaymentStatus {
+  PENDING
+  CURRENT
+  OVERDUE
+  SUSPENDED
+}
+
+enum RegistrationStatus {
+  REGISTERED
+  CONFIRMED
+  CHECKED_IN
+  NO_SHOW
+  CANCELLED
+}
+
+enum RegistrationPaymentStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  FAILED
+  FREE
+}
+
+enum CampaignType {
+  COACH_PROMO
+  SCALING_UP_EMAIL
+  SOCIAL_MEDIA
+  LANDING_PAGE
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum SurveyType {
+  PRE_WORKSHOP
+  POST_WORKSHOP
+  NPS
+}
+
+// ============================================
+// Coaches
+// ============================================
+
+model Coach {
+  id                   String              @id @default(cuid())
+  hubspotId            String?             @unique
+  circleId             String?             @unique
+  email                String              @unique
+  firstName            String
+  lastName             String
+  phone                String?
+  company              String?
+  bio                  String?             @db.Text
+  profileImage         String?
+  certificationStatus  CertificationStatus @default(PENDING)
+  certificationExpiry  DateTime?
+  paymentStatus        PaymentStatus       @default(PENDING)
+  territory            Json?
+  performanceMetrics   Json?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  syncedAt             DateTime?
+
+  workshops      Workshop[]
+  certifications CoachCertification[]
+
+  @@index([email])
+  @@index([certificationStatus])
+  @@map("coaches")
+}
+
+model CoachCertification {
+  id             String              @id @default(cuid())
+  coachId        String
+  workshopTypeId String
+  certifiedAt    DateTime            @default(now())
+  expiresAt      DateTime?
+  status         CertificationStatus @default(ACTIVE)
+
+  coach        Coach        @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  workshopType WorkshopType @relation(fields: [workshopTypeId], references: [id])
+
+  @@unique([coachId, workshopTypeId])
+  @@index([status])
+  @@map("coach_certifications")
+}
+
+// ============================================
+// Workshop Types (Templates)
+// ============================================
+
+model WorkshopType {
+  id                      String   @id @default(cuid())
+  name                    String
+  slug                    String   @unique
+  description             String?  @db.Text
+  shortDescription        String?
+  durationOptions         Json
+  materials               Json?
+  marketingTemplates      Json?
+  pricingTiers            Json?
+  preWorkshopInstructions String?  @db.Text
+  isActive                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  workshops      Workshop[]
+  certifications CoachCertification[]
+
+  @@map("workshop_types")
+}
+
+// ============================================
+// Workshops (Events)
+// ============================================
+
+model Workshop {
+  id             String         @id @default(cuid())
+  coachId        String
+  workshopTypeId String
+
+  // Event Details
+  title        String
+  description  String?        @db.Text
+  format       WorkshopFormat
+  duration     String
+  eventDate    DateTime
+  eventEndDate DateTime?
+  eventTime    String?
+  timezone     String         @default("America/New_York")
+
+  // Location (for in-person)
+  venueName           String?
+  venueAddress        Json?
+  parkingInstructions String? @db.Text
+
+  // Virtual (for online)
+  virtualPlatform String?
+  virtualLink     String?
+
+  // Pricing
+  isFree              Boolean   @default(false)
+  priceCents          Int?
+  earlyBirdPriceCents Int?
+  earlyBirdDeadline   DateTime?
+
+  // Status & Pipeline
+  status WorkshopStatus @default(REQUESTED)
+
+  // Generated Assets
+  landingPageSlug String? @unique
+
+  // External IDs
+  hubspotCampaignId String?
+  stripeProductId   String?
+  stripePriceId     String?
+
+  // Capacity
+  maxAttendees Int @default(50)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coach         Coach               @relation(fields: [coachId], references: [id])
+  workshopType  WorkshopType        @relation(fields: [workshopTypeId], references: [id])
+  registrations Registration[]
+  campaigns     MarketingCampaign[]
+  tasks         AutomationTask[]
+  surveys       Survey[]
+
+  @@index([coachId])
+  @@index([status])
+  @@index([eventDate])
+  @@index([landingPageSlug])
+  @@map("workshops")
+}
+
+// ============================================
+// Registrations
+// ============================================
+
+model Registration {
+  id         String @id @default(cuid())
+  workshopId String
+
+  // Attendee Info
+  email     String
+  firstName String
+  lastName  String
+  company   String?
+  jobTitle  String?
+  phone     String?
+
+  // Payment
+  paymentStatus   RegistrationPaymentStatus @default(PENDING)
+  stripePaymentId String?
+  stripeSessionId String?
+  amountPaidCents Int?
+
+  // External Sync
+  hubspotContactId String?
+
+  // Status
+  status      RegistrationStatus @default(REGISTERED)
+  checkedInAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  surveys  Survey[]
+
+  @@index([workshopId])
+  @@index([email])
+  @@index([status])
+  @@map("registrations")
+}
+
+// ============================================
+// Marketing Campaigns
+// ============================================
+
+model MarketingCampaign {
+  id           String       @id @default(cuid())
+  workshopId   String
+  campaignType CampaignType
+
+  // Content
+  content String? @db.Text
+  assets  Json?
+
+  // Scheduling
+  scheduledSends Json?
+
+  // Tracking
+  hubspotCampaignId String?
+  metrics           Json?
+
+  status    CampaignStatus @default(DRAFT)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@index([workshopId])
+  @@index([status])
+  @@map("marketing_campaigns")
+}
+
+// ============================================
+// Automation Tasks
+// ============================================
+
+model AutomationTask {
+  id         String     @id @default(cuid())
+  workshopId String
+  taskType   String
+  status     TaskStatus @default(PENDING)
+
+  inputData    Json?
+  outputData   Json?
+  errorMessage String? @db.Text
+
+  attempts    Int @default(0)
+  maxAttempts Int @default(3)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@index([workshopId])
+  @@index([status])
+  @@index([taskType])
+  @@map("automation_tasks")
+}
+
+// ============================================
+// Surveys & Feedback
+// ============================================
+
+model Survey {
+  id             String     @id @default(cuid())
+  registrationId String?
+  workshopId     String
+  surveyType     SurveyType
+
+  responses Json?
+  npsScore  Int?
+
+  sentAt      DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  registration Registration? @relation(fields: [registrationId], references: [id])
+  workshop     Workshop      @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@index([workshopId])
+  @@index([surveyType])
+  @@map("surveys")
+}

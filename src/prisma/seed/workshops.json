@@ -1,0 +1,201 @@
+{
+    "workshops": {
+        "upcoming": [
+            {
+                "id": "ws-2026-02-19-claire",
+                "title": "Virtual Scaling Up to Finish Strong Workshop",
+                "workshopTypeSlug": "finish-strong-virtual",
+                "coachId": "coach-claire-mula",
+                "eventDate": "2026-02-19",
+                "eventTime": "09:00",
+                "timezone": "America/New_York",
+                "format": "VIRTUAL",
+                "status": "SCHEDULED",
+                "priceCents": 29500,
+                "maxAttendees": 30
+            },
+            {
+                "id": "ws-2026-02-19-zahir",
+                "title": "Virtual Scaling Up to Finish Strong Workshop",
+                "workshopTypeSlug": "finish-strong-virtual",
+                "coachId": "coach-zahir-ladhani",
+                "eventDate": "2026-02-19",
+                "eventTime": "09:00",
+                "timezone": "America/New_York",
+                "format": "VIRTUAL",
+                "status": "SCHEDULED",
+                "priceCents": 29500,
+                "maxAttendees": 30
+            },
+            {
+                "id": "ws-2026-02-24-jeff-lisa",
+                "title": "Scaling Up with AI Virtual Workshop",
+                "workshopTypeSlug": "scaling-up-ai",
+                "coachId": "coach-jeff-donaldson",
+                "coCoachId": "coach-lisa-foulger",
+                "eventDate": "2026-02-24",
+                "eventTime": "11:00",
+                "timezone": "America/Puerto_Rico",
+                "format": "VIRTUAL",
+                "status": "SCHEDULED",
+                "priceCents": 49500,
+                "maxAttendees": 50,
+                "venue": {
+                    "name": "Numbers CPA 420",
+                    "address": "Ponce de Leon Ave Midtown Building Suite 103",
+                    "city": "San Juan",
+                    "state": "PR",
+                    "zip": "00918"
+                }
+            },
+            {
+                "id": "ws-2026-02-26-lisa",
+                "title": "Scaling Up to Finish Strong Workshop",
+                "workshopTypeSlug": "finish-strong",
+                "coachId": "coach-lisa-foulger",
+                "eventDate": "2026-02-26",
+                "eventTime": "09:00",
+                "timezone": "America/New_York",
+                "format": "IN_PERSON",
+                "status": "SCHEDULED",
+                "priceCents": 49500,
+                "maxAttendees": 25
+            },
+            {
+                "id": "ws-2026-03-04-rob-williams",
+                "title": "Virtual Scaling Up to Finish Strong Workshop",
+                "workshopTypeSlug": "finish-strong-virtual",
+                "coachId": "coach-rob-williams",
+                "eventDate": "2026-03-04",
+                "eventTime": "09:00",
+                "timezone": "America/New_York",
+                "format": "VIRTUAL",
+                "status": "SCHEDULED",
+                "priceCents": 29500,
+                "maxAttendees": 30
+            },
+            {
+                "id": "ws-2026-03-05-rob-morris",
+                "title": "Virtual Scaling Up to Finish Strong Workshop",
+                "workshopTypeSlug": "finish-strong-virtual",
+                "coachId": "coach-rob-morris",
+                "eventDate": "2026-03-05",
+                "eventTime": "09:00",
+                "timezone": "America/New_York",
+                "format": "VIRTUAL",
+                "status": "SCHEDULED",
+                "priceCents": 29500,
+                "maxAttendees": 30
+            },
+            {
+                "id": "ws-2026-03-16-puerto-rico",
+                "title": "Scaling Up with AI Workshop",
+                "workshopTypeSlug": "scaling-up-ai",
+                "coachId": "coach-jeff-donaldson",
+                "coCoachId": "coach-lisa-foulger",
+                "eventDate": "2026-03-16",
+                "eventTime": "09:00",
+                "timezone": "America/Puerto_Rico",
+                "format": "IN_PERSON",
+                "status": "SCHEDULED",
+                "priceCents": 49500,
+                "maxAttendees": 40,
+                "venue": {
+                    "name": "Puerto Rico Convention Center",
+                    "city": "San Juan",
+                    "state": "PR"
+                }
+            },
+            {
+                "id": "ws-2026-03-17-lisa",
+                "title": "Scaling Up to Finish Strong Workshop",
+                "workshopTypeSlug": "finish-strong",
+                "coachId": "coach-lisa-foulger",
+                "eventDate": "2026-03-17",
+                "eventTime": "09:00",
+                "timezone": "America/New_York",
+                "format": "IN_PERSON",
+                "status": "SCHEDULED",
+                "priceCents": 49500,
+                "maxAttendees": 25
+            },
+            {
+                "id": "ws-2026-03-18-claire",
+                "title": "Scaling Up to Finish Strong Workshop",
+                "workshopTypeSlug": "finish-strong",
+                "coachId": "coach-claire-mula",
+                "eventDate": "2026-03-18",
+                "eventTime": "09:00",
+                "timezone": "America/New_York",
+                "format": "IN_PERSON",
+                "status": "SCHEDULED",
+                "priceCents": 49500,
+                "maxAttendees": 25
+            }
+        ],
+        "past": [
+            {
+                "id": "ws-2025-11-18-juletta",
+                "title": "Scaling Up to Finish Strong Virtual Workshop",
+                "workshopTypeSlug": "finish-strong-virtual",
+                "coachId": "coach-juletta-broomfield",
+                "eventDate": "2025-11-18",
+                "format": "VIRTUAL",
+                "status": "COMPLETED"
+            },
+            {
+                "id": "ws-2025-12-02-lisa",
+                "title": "Scaling Up to Finish Strong Virtual Workshop",
+                "workshopTypeSlug": "finish-strong-virtual",
+                "coachId": "coach-lisa-foulger",
+                "eventDate": "2025-12-02",
+                "format": "VIRTUAL",
+                "status": "COMPLETED"
+            },
+            {
+                "id": "ws-2025-12-16-jeff",
+                "title": "AI Virtual Workshop",
+                "workshopTypeSlug": "scaling-up-ai",
+                "coachId": "coach-jeff-donaldson",
+                "eventDate": "2025-12-16",
+                "format": "VIRTUAL",
+                "status": "COMPLETED"
+            },
+            {
+                "id": "ws-2026-01-07-jeff-brad",
+                "title": "AI Virtual Workshop",
+                "workshopTypeSlug": "scaling-up-ai",
+                "coachId": "coach-jeff-donaldson",
+                "eventDate": "2026-01-07",
+                "format": "VIRTUAL",
+                "status": "COMPLETED"
+            },
+            {
+                "id": "ws-2026-01-15-denver",
+                "title": "Denver Scaling Up AI Workshop",
+                "workshopTypeSlug": "scaling-up-ai",
+                "coachId": "coach-jeff-donaldson",
+                "eventDate": "2026-01-15",
+                "format": "IN_PERSON",
+                "status": "COMPLETED",
+                "venue": {
+                    "city": "Denver",
+                    "state": "CO"
+                }
+            },
+            {
+                "id": "ws-2026-01-20-san-diego",
+                "title": "San Diego Scaling Up AI Workshop",
+                "workshopTypeSlug": "scaling-up-ai",
+                "coachId": "coach-jeff-donaldson",
+                "eventDate": "2026-01-20",
+                "format": "IN_PERSON",
+                "status": "COMPLETED",
+                "venue": {
+                    "city": "San Diego",
+                    "state": "CA"
+                }
+            }
+        ]
+    }
+}

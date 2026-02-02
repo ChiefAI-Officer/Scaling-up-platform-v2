@@ -1,0 +1,180 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+interface RegistrationFormProps {
+  workshopId: string;
+  isFree: boolean;
+}
+
+export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    company: "",
+    jobTitle: "",
+    phone: "",
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Create registration
+      const registrationResponse = await fetch("/api/registrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workshopId,
+          ...formData,
+        }),
+      });
+
+      const registrationData = await registrationResponse.json();
+
+      if (!registrationData.success) {
+        throw new Error(registrationData.error || "Registration failed");
+      }
+
+      if (isFree) {
+        // For free workshops, redirect to success page
+        router.push(`/registration/success?id=${registrationData.data.id}`);
+      } else {
+        // For paid workshops, create checkout session
+        const checkoutResponse = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            registrationId: registrationData.data.id,
+          }),
+        });
+
+        const checkoutData = await checkoutResponse.json();
+
+        if (!checkoutData.success) {
+          throw new Error(checkoutData.error || "Failed to create checkout");
+        }
+
+        // Redirect to Stripe Checkout
+        window.location.href = checkoutData.data.url;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label htmlFor="firstName">First Name *</Label>
+          <Input
+            id="firstName"
+            name="firstName"
+            value={formData.firstName}
+            onChange={handleChange}
+            required
+            className="mt-1"
+          />
+        </div>
+        <div>
+          <Label htmlFor="lastName">Last Name *</Label>
+          <Input
+            id="lastName"
+            name="lastName"
+            value={formData.lastName}
+            onChange={handleChange}
+            required
+            className="mt-1"
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="email">Email *</Label>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          value={formData.email}
+          onChange={handleChange}
+          required
+          className="mt-1"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="company">Company</Label>
+        <Input
+          id="company"
+          name="company"
+          value={formData.company}
+          onChange={handleChange}
+          className="mt-1"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="jobTitle">Job Title</Label>
+        <Input
+          id="jobTitle"
+          name="jobTitle"
+          value={formData.jobTitle}
+          onChange={handleChange}
+          className="mt-1"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="phone">Phone</Label>
+        <Input
+          id="phone"
+          name="phone"
+          type="tel"
+          value={formData.phone}
+          onChange={handleChange}
+          className="mt-1"
+        />
+      </div>
+
+      <Button type="submit" className="w-full" size="lg" disabled={loading}>
+        {loading ? (
+          "Processing..."
+        ) : isFree ? (
+          "Register Now"
+        ) : (
+          "Continue to Payment"
+        )}
+      </Button>
+
+      <p className="text-xs text-gray-500 text-center">
+        By registering, you agree to receive communications about this workshop.
+      </p>
+    </form>
+  );
+}
