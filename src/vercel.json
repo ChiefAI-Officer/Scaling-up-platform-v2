@@ -66,25 +66,5 @@
       "path": "/api/cron/check-followup-reports",
       "schedule": "0 9 * * *"
     }
-  ],
-  "env": [
-    "DATABASE_URL",
-    "DIRECT_URL",
-    "NEXTAUTH_URL",
-    "NEXTAUTH_SECRET",
-    "HUBSPOT_ACCESS_TOKEN",
-    "STRIPE_SECRET_KEY",
-    "STRIPE_WEBHOOK_SECRET",
-    "CIRCLE_API_KEY",
-    "ANTHROPIC_API_KEY",
-    "GEMINI_API_KEY",
-    "OPENAI_API_KEY",
-    "SMTP_HOST",
-    "SMTP_USER",
-    "SMTP_PASSWORD",
-    "TEAMS_WEBHOOK_URL",
-    "REDIS_URL",
-    "APPROVAL_LINK_SECRET",
-    "DEMO_MODE"
   ]
 }
