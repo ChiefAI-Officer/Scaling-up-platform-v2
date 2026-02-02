@@ -1,0 +1,136 @@
+{
+  "version": "1.0.0",
+  "description": "Multi-Gateway LLM Router Configuration",
+  
+  "routing_strategy": {
+    "claude_tasks": [
+      "planning",
+      "orchestration", 
+      "self_annealing",
+      "complex_reasoning",
+      "internal_coordination"
+    ],
+    "gemini_tasks": [
+      "creative",
+      "brand_assets",
+      "landing_pages",
+      "api_integration",
+      "visual_content"
+    ],
+    "codex_tasks": [
+      "implementation",
+      "debugging",
+      "code_execution",
+      "refactoring"
+    ]
+  },
+
+  "providers": {
+    "claude_opus": {
+      "model": "claude-opus-4-20250514",
+      "use_for": ["critical_planning", "complex_orchestration"],
+      "cost_tier": "premium",
+      "enabled": true
+    },
+    "claude_sonnet": {
+      "model": "claude-sonnet-4-20250514",
+      "use_for": ["general_planning", "coordination", "self_annealing"],
+      "cost_tier": "standard",
+      "enabled": true
+    },
+    "gemini_pro": {
+      "model": "gemini-2.5-pro-preview-06-05",
+      "use_for": ["creative", "landing_pages", "api_connections"],
+      "cost_tier": "standard",
+      "enabled": true
+    },
+    "gemini_flash": {
+      "model": "gemini-2.5-flash-preview-05-20",
+      "use_for": ["quick_creative", "simple_content"],
+      "cost_tier": "economy",
+      "enabled": true
+    },
+    "openai_codex": {
+      "model": "o3",
+      "use_for": ["code_execution", "implementation", "debugging"],
+      "cost_tier": "premium",
+      "enabled": true
+    },
+    "openai_gpt4o": {
+      "model": "gpt-4o",
+      "use_for": ["fallback", "general"],
+      "cost_tier": "standard",
+      "enabled": true
+    },
+    "openai_gpt4o_mini": {
+      "model": "gpt-4o-mini",
+      "use_for": ["economy_fallback", "simple_tasks"],
+      "cost_tier": "economy",
+      "enabled": true
+    }
+  },
+
+  "routes": {
+    "planning": {
+      "description": "Architecture, strategy, roadmaps",
+      "chain": ["claude_opus", "claude_sonnet", "openai_gpt4o"],
+      "brain": "Claude"
+    },
+    "orchestration": {
+      "description": "Agent coordination, workflow design",
+      "chain": ["claude_sonnet", "claude_opus", "openai_gpt4o"],
+      "brain": "Claude"
+    },
+    "self_annealing": {
+      "description": "Learning, optimization, reflection",
+      "chain": ["claude_sonnet", "openai_gpt4o", "gemini_pro"],
+      "brain": "Claude"
+    },
+    "creative": {
+      "description": "Brand assets, landing pages, copy",
+      "chain": ["gemini_pro", "gemini_flash", "claude_sonnet"],
+      "brain": "Gemini"
+    },
+    "api_integration": {
+      "description": "Hard-coding API endpoints, webhooks",
+      "chain": ["gemini_pro", "openai_codex", "claude_sonnet"],
+      "brain": "Gemini"
+    },
+    "implementation": {
+      "description": "Code writing, feature building",
+      "chain": ["openai_codex", "claude_sonnet", "gemini_pro"],
+      "brain": "Codex"
+    },
+    "debugging": {
+      "description": "Bug fixing, error analysis",
+      "chain": ["openai_codex", "claude_sonnet", "openai_gpt4o_mini"],
+      "brain": "Codex"
+    },
+    "generic": {
+      "description": "Unclassified tasks - balanced chain",
+      "chain": ["claude_sonnet", "openai_gpt4o", "gemini_flash"],
+      "brain": "Claude"
+    }
+  },
+
+  "cost_optimization": {
+    "prefer_economy_for": [
+      "simple_queries",
+      "status_checks",
+      "formatting"
+    ],
+    "require_premium_for": [
+      "critical_decisions",
+      "complex_planning",
+      "debugging_production"
+    ],
+    "daily_budget_alert_usd": 50.0,
+    "monthly_budget_limit_usd": 500.0
+  },
+
+  "env_vars_required": [
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY", 
+    "OPENAI_API_KEY"
+  ]
+}
