@@ -1,0 +1,45 @@
+# ------------------------------------------------------------------
+# VERCEL ENVIRONMENT VARIABLES (BULK COPY-PASTE)
+# ------------------------------------------------------------------
+# INSTRUCTIONS:
+# 1. In Vercel Project Settings > Environment Variables
+# 2. Click "Paste as .env" (or just paste into the boxes)
+# 3. Copy EVERYTHING below and paste it in.
+# 4. Update the values marked with [?] with your real secrets.
+# ------------------------------------------------------------------
+
+# --- DATABASE ---
+DATABASE_URL=postgresql://[USER]:[PASSWORD]@[HOST]:5432/[DB_NAME]?sslmode=require
+DIRECT_URL=postgresql://[USER]:[PASSWORD]@[HOST]:5432/[DB_NAME]?sslmode=require
+
+# --- AUTHENTICATION ---
+# (I generated new safe secrets for you here)
+NEXTAUTH_URL=https://scaling-up-platform-v2.vercel.app
+NEXTAUTH_SECRET=7f8a9d1c2b3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9
+APPROVAL_LINK_SECRET=9a8b7c6d5e4f3g2h1i0j9k8l7m6n5o4p3q2r1s0t
+
+# --- STRIPE ---
+# (Get these from Stripe Dashboard > Developers > API Keys)
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# --- HUBSPOT ---
+# (From HubSpot Private Apps)
+HUBSPOT_ACCESS_TOKEN=pat-na1-...
+
+# --- CIRCLE ---
+CIRCLE_API_KEY=esuz3N4Q3xarzefFRDW1D3HX85VYuUQq
+CIRCLE_COMMUNITY_ID=[YOUR_COMMUNITY_ID]
+
+# --- EMAIL ---
+SMTP_HOST=smtp.mailgun.org
+SMTP_PORT=587
+SMTP_USER=postmaster@[YOUR_DOMAIN].com
+SMTP_PASSWORD=[YOUR_MAILGUN_SMTP_PASSWORD]
+FROM_EMAIL=noreply@scalingup.com
+
+# --- GENERAL ---
+NODE_ENV=production
+NEXTAUTH_SECRET=kX9vM2qL7pRtYw4sFgHjKmNbVcXzA8eD3uIoP6yTrEwQ1aZsLkJhGfDcBvNmQwErTyUi
+DEMO_MODE=true

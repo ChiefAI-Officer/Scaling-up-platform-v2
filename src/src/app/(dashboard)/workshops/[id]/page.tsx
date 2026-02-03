@@ -14,6 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { WorkshopActions } from "./workshop-actions";
+import { QuickActions } from "./quick-actions";
 
 interface WorkshopDetailPageProps {
   params: Promise<{ id: string }>;
@@ -34,6 +35,13 @@ export default async function WorkshopDetailPage({
       },
       tasks: {
         orderBy: { createdAt: "desc" },
+      },
+      landingPages: {
+        select: {
+          id: true,
+          slug: true,
+          status: true,
+        },
       },
     },
   });
@@ -118,8 +126,8 @@ export default async function WorkshopDetailPage({
               {workshop.format === "VIRTUAL"
                 ? "Virtual"
                 : workshop.format === "HYBRID"
-                ? "Hybrid"
-                : "In-Person"}
+                  ? "Hybrid"
+                  : "In-Person"}
             </p>
             <p className="text-gray-600">{workshop.duration}</p>
           </CardContent>
@@ -248,7 +256,7 @@ export default async function WorkshopDetailPage({
                             <Badge
                               variant={
                                 reg.paymentStatus === "COMPLETED" ||
-                                reg.paymentStatus === "FREE"
+                                  reg.paymentStatus === "FREE"
                                   ? "success"
                                   : "warning"
                               }
@@ -292,8 +300,8 @@ export default async function WorkshopDetailPage({
                           task.status === "COMPLETED"
                             ? "success"
                             : task.status === "FAILED"
-                            ? "destructive"
-                            : "secondary"
+                              ? "destructive"
+                              : "secondary"
                         }
                       >
                         {task.status}
@@ -311,21 +319,11 @@ export default async function WorkshopDetailPage({
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {workshop.landingPageSlug && (
-                <Link
-                  href={`/workshop/${workshop.landingPageSlug}`}
-                  target="_blank"
-                  className="block w-full text-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  View Landing Page
-                </Link>
-              )}
-              <button className="block w-full text-center bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
-                Export Registrations
-              </button>
-              <button className="block w-full text-center bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
-                Send Reminder Email
-              </button>
+              <QuickActions
+                workshopId={workshop.id}
+                landingPageSlug={workshop.landingPageSlug}
+                landingPages={workshop.landingPages}
+              />
             </CardContent>
           </Card>
         </div>

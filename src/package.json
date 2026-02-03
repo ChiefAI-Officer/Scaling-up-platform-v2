@@ -80,5 +80,8 @@
     "tsx": "^4.21.0",
     "typescript": "^5",
     "wrangler": "^4.58.0"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   }
 }

@@ -65,6 +65,15 @@ Paste it somewhere safe (Notepad, sticky note). You'll need it in Step 2.
 3. Check ALL environment boxes.
 4. Click **"Save"**.
 
+### 2.5 Add Variable #4: DEMO_MODE (Critical for Login!)
+1. In the **"Key"** box, type: `DEMO_MODE`
+2. In the **"Value"** box, type: `true`
+3. Check ALL environment boxes.
+4. Click **"Save"**.
+
+> [!IMPORTANT]
+> This variable enables demo authentication with password `demo123`. Remove this in production!
+
 ---
 
 ## Step 3: Redeploy the App (2 mins)

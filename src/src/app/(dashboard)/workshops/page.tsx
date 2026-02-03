@@ -129,6 +129,9 @@ export default async function WorkshopsPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Format
                 </th>
+                <th className="relative px-6 py-3">
+                  <span className="sr-only">Edit</span>
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -179,8 +182,16 @@ export default async function WorkshopsPage() {
                       {workshop.format === "VIRTUAL"
                         ? "Virtual"
                         : workshop.format === "HYBRID"
-                        ? "Hybrid"
-                        : "In-Person"}
+                          ? "Hybrid"
+                          : "In-Person"}
+                    </td>
+                    <td className="px-6 py-4 text-right text-sm">
+                      <Link
+                        href={`/workshops/${workshop.id}/landing-pages`}
+                        className="text-gray-500 hover:text-blue-600 font-medium"
+                      >
+                        Edit
+                      </Link>
                     </td>
                   </tr>
                 ))
