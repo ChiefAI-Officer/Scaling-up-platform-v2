@@ -36,6 +36,7 @@ export default function NewWorkshopPage() {
   const [formData, setFormData] = useState({
     coachId: "",
     workshopTypeId: "",
+    workshopCategory: "AI" as "AI" | "EXIT_AND_VALUATION",
     title: "",
     description: "",
     format: "IN_PERSON",
@@ -100,6 +101,7 @@ export default function NewWorkshopPage() {
       const payload = {
         coachId: formData.coachId,
         workshopTypeId: formData.workshopTypeId,
+        category: formData.workshopCategory,
         title: formData.title,
         description: formData.description || undefined,
         format: formData.format,
@@ -145,7 +147,7 @@ export default function NewWorkshopPage() {
         );
       }
 
-      router.push(`/workshops/${data.data.id}`);
+      router.push(`/workshops/${data.data.id}/landing-pages`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -228,6 +230,26 @@ export default function NewWorkshopPage() {
                   This coach has no active certifications
                 </p>
               )}
+            </div>
+
+            <div>
+              <Label htmlFor="workshopCategory">Workshop Category *</Label>
+              <select
+                id="workshopCategory"
+                name="workshopCategory"
+                value={formData.workshopCategory}
+                onChange={handleChange}
+                required
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="AI">AI Workshop</option>
+                <option value="EXIT_AND_VALUATION">Exit and Valuation Workshop</option>
+              </select>
+              <p className="text-sm text-gray-500 mt-1">
+                {formData.workshopCategory === "AI" 
+                  ? "AI workshops help business owners understand and leverage AI strategically" 
+                  : "Exit & Valuation workshops help owners maximize business value and plan their exit"}
+              </p>
             </div>
 
             <div>
@@ -548,7 +570,7 @@ export default function NewWorkshopPage() {
             Cancel
           </Button>
           <Button type="submit" disabled={loading} className="flex-1">
-            {loading ? "Creating..." : "Create Workshop"}
+            {loading ? "Creating..." : "Continue to Landing Pages"}
           </Button>
         </div>
       </form>

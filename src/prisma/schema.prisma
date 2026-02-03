@@ -136,9 +136,10 @@ model WorkshopType {
 // ============================================
 
 model Workshop {
-  id             String @id @default(cuid())
+  id             String           @id @default(cuid())
   coachId        String
   workshopTypeId String
+  category       WorkshopCategory @default(AI)
 
   // Event Details
   title        String
@@ -189,7 +190,7 @@ model Workshop {
   tasks           AutomationTask[]
   surveys         Survey[]
   approvals       ApprovalQueue[]
-  landingPage     LandingPage?
+  landingPages    LandingPage[]
   followUpReports FollowUpReport[]
 
   @@index([coachId])
@@ -389,19 +390,19 @@ model EmailTemplate {
 // ============================================
 
 model LandingPage {
-  id          String     @id @default(cuid())
-  workshopId  String     @unique
-  slug        String     @unique
-  content     String // JSON with rendered template data
-  coachPhoto  String? // URL to headshot
-  graphicUrl  String? // URL to workshop graphic
-  status      PageStatus @default(DRAFT)
-  publishedAt DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id           String              @id @default(cuid())
+  workshopId   String
+  template     LandingPageTemplate
+  slug         String              @unique
+  content      String              // JSON with all dynamic variables
+  status       PageStatus          @default(DRAFT)
+  publishedAt  DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
   workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
 
+  @@unique([workshopId, template])
   @@map("landing_pages")
 }
 
@@ -471,4 +472,44 @@ enum ReportStatus {
   PENDING
   SUBMITTED
   OVERDUE
+}
+
+enum WorkshopCategory {
+  AI
+  EXIT_AND_VALUATION
+}
+
+enum LandingPageTemplate {
+  BIO_PAGE
+  SOLO_LANDING
+  DUO_LANDING
+  REGISTRATION
+  THANK_YOU
+}
+
+// ============================================
+// V2: Contacts (CRM)
+// ============================================
+
+model Contact {
+  id             String   @id @default(cuid())
+  kajabiId       String?  @unique // "Member ID" from CSV
+  name           String
+  firstName      String?
+  lastName       String?
+  email          String   @unique
+  emailMarketing String   @default("Never subscribed")
+  lifetimeValue  Float    @default(0.0)
+  addedAt        DateTime @default(now()) // "Created At" from CSV
+  lastActivityAt DateTime? // "Last Activity" from CSV
+  
+  // Additional fields from CSV
+  tags           String?
+  products       String?
+  avatar         String?
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("contacts")
 }

@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
         workshopTypeId: data.workshopTypeId,
         title: data.title,
         description: data.description,
+        category: body.category || "AI",
         format: data.format,
         duration: data.duration || "full-day",
         eventDate: new Date(data.eventDate),

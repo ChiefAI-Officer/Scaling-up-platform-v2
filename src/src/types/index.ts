@@ -38,6 +38,15 @@ export type TaskStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
 
 export type SurveyType = "PRE_WORKSHOP" | "POST_WORKSHOP" | "NPS";
 
+export type WorkshopCategory = "AI" | "EXIT_AND_VALUATION";
+
+export type LandingPageTemplate = 
+  | "BIO_PAGE" 
+  | "SOLO_LANDING" 
+  | "DUO_LANDING" 
+  | "REGISTRATION" 
+  | "THANK_YOU";
+
 // Re-export Prisma types
 export type {
   Workshop,

@@ -21,6 +21,14 @@ export async function GET(
         tasks: {
           orderBy: { createdAt: "desc" },
         },
+        landingPages: {
+          select: {
+            id: true,
+            template: true,
+            slug: true,
+            status: true,
+          },
+        },
       },
     });
 

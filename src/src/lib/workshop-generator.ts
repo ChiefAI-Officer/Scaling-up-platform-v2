@@ -113,10 +113,9 @@ export async function generateWorkshop(
     await db.landingPage.create({
         data: {
             workshopId: workshop.id,
+            template: "SOLO_LANDING",
             slug,
             content: landingPageContent,
-            coachPhoto: input.useCoachPhoto ? coach.profileImage : null,
-            graphicUrl: input.workshopGraphicUrl,
             status: "PUBLISHED",
             publishedAt: new Date(),
         }

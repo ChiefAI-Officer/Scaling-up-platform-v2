@@ -94,8 +94,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Check if landing page already exists
-        let landingPage = await db.landingPage.findUnique({
+        // Check if landing page already exists (use the first/default template for legacy support)
+        let landingPage = await db.landingPage.findFirst({
             where: { workshopId }
         });
 
@@ -137,13 +137,13 @@ export async function POST(request: NextRequest) {
                 }
             });
         } else {
-            // Create new
+            // Create new with default SOLO_LANDING template
             landingPage = await db.landingPage.create({
                 data: {
                     workshopId,
+                    template: "SOLO_LANDING",
                     slug,
                     content,
-                    coachPhoto: workshop.coach.profileImage,
                     status: "PUBLISHED",
                     publishedAt: new Date(),
                 }
