@@ -3,6 +3,27 @@
  * Handles embedding and linking to Typeform surveys for workshop feedback.
  */
 
+import type { SurveyType } from "@/types";
+
+/**
+ * Map a Typeform form ID to a SurveyType for database storage.
+ * Returns null if the form ID is not recognized.
+ */
+export function getSurveyTypeFromFormId(formId: string): SurveyType | null {
+    const mapping: Record<string, SurveyType> = {
+        [process.env.TYPEFORM_READINESS_SURVEY_ID || ""]: "PRE_WORKSHOP",
+        [process.env.TYPEFORM_EXIT_READINESS_SURVEY_ID || ""]: "PRE_WORKSHOP",
+        [process.env.TYPEFORM_POST_WORKSHOP_SURVEY_ID || ""]: "POST_WORKSHOP",
+        [process.env.TYPEFORM_AI_POST_WORKSHOP_SURVEY_ID || ""]: "POST_WORKSHOP",
+        [process.env.TYPEFORM_COACH_FEEDBACK_SURVEY_ID || ""]: "POST_WORKSHOP",
+    };
+
+    // Remove empty-string key that appears when env var is unset
+    delete mapping[""];
+
+    return mapping[formId] || null;
+}
+
 interface TypeformConfig {
     formId: string;
     hiddenFields?: Record<string, string>;
@@ -90,6 +111,7 @@ const typeform = {
     generateEmbedCode,
     generateIframeEmbed,
     createWorkshopSurveyConfig,
+    getSurveyTypeFromFormId,
 };
 
 export default typeform;
