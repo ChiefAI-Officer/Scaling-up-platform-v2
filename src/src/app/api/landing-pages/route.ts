@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { canManageCoachData, getApiActor } from "@/lib/authorization";
 
 // Request validation schema
 const CreateLandingPageSchema = z.object({
@@ -15,6 +16,14 @@ const CreateLandingPageSchema = z.object({
  */
 export async function GET(request: NextRequest) {
     try {
+        const actor = await getApiActor();
+        if (!actor) {
+            return NextResponse.json(
+                { error: "Authentication required" },
+                { status: 401 }
+            );
+        }
+
         const { searchParams } = new URL(request.url);
         const slug = searchParams.get("slug");
         const workshopId = searchParams.get("workshopId");
@@ -45,6 +54,13 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        if (!canManageCoachData(actor, landingPage.workshop.coachId)) {
+            return NextResponse.json(
+                { error: "Landing page not found" },
+                { status: 404 }
+            );
+        }
+
         return NextResponse.json({
             id: landingPage.id,
             slug: landingPage.slug,
@@ -58,7 +74,7 @@ export async function GET(request: NextRequest) {
                     name: `${landingPage.workshop.coach.firstName} ${landingPage.workshop.coach.lastName}`,
                 }
             },
-            url: `${process.env.APP_URL}/workshops/${landingPage.slug}`,
+            url: `${process.env.APP_URL}/workshop/${landingPage.slug}`,
         });
     } catch (error) {
         console.error("Landing page GET error:", error);
@@ -75,6 +91,14 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
     try {
+        const actor = await getApiActor();
+        if (!actor) {
+            return NextResponse.json(
+                { error: "Authentication required" },
+                { status: 401 }
+            );
+        }
+
         const body = await request.json();
         const { workshopId } = CreateLandingPageSchema.parse(body);
 
@@ -94,10 +118,18 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        if (!canManageCoachData(actor, workshop.coachId)) {
+            return NextResponse.json(
+                { error: "Workshop not found" },
+                { status: 404 }
+            );
+        }
+
         // Check if landing page already exists (use the first/default template for legacy support)
         let landingPage = await db.landingPage.findFirst({
             where: { workshopId }
         });
+        const existingPage = !!landingPage;
 
         const slug = generateSlug(
             workshop.coach.firstName,
@@ -154,15 +186,15 @@ export async function POST(request: NextRequest) {
         await logAudit({
             entityType: "LandingPage",
             entityId: landingPage.id,
-            action: landingPage ? "UPDATE" : "CREATE",
-            performedBy: "SYSTEM",
+            action: existingPage ? "UPDATE" : "CREATE",
+            performedBy: actor.email,
             changes: { slug, status: "PUBLISHED" }
         });
 
         return NextResponse.json({
             id: landingPage.id,
             slug: landingPage.slug,
-            url: `${process.env.APP_URL}/workshops/${landingPage.slug}`,
+            url: `${process.env.APP_URL}/workshop/${landingPage.slug}`,
             status: "PUBLISHED",
         });
     } catch (error) {

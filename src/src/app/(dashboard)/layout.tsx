@@ -14,6 +14,10 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  if (!session.user?.role || session.user.role === "COACH") {
+    redirect("/unauthorized");
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Skip to main content link for accessibility */}

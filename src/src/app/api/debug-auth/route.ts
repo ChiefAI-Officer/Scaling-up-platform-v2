@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 
 export async function GET() {
+    if (process.env.NODE_ENV === "production") {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const actor = await getApiActor();
+    if (!actor) {
+        return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+    if (!isPrivilegedRole(actor.role)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const report: Record<string, unknown> = {
         timestamp: new Date().toISOString(),
     };
@@ -12,9 +25,7 @@ export async function GET() {
         DEMO_MODE_IS_TRUE: process.env.DEMO_MODE === "true",
         NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? "(not set)",
         NEXTAUTH_SECRET_EXISTS: !!process.env.NEXTAUTH_SECRET,
-        DATABASE_URL_PATTERN: process.env.DATABASE_URL
-            ? `${process.env.DATABASE_URL.substring(0, 20)}...${process.env.DATABASE_URL.slice(-15)}`
-            : "(MISSING!)",
+        DATABASE_URL_EXISTS: !!process.env.DATABASE_URL,
         NODE_ENV: process.env.NODE_ENV,
     };
 

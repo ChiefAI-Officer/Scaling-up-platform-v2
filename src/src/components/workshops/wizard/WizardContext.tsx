@@ -1,0 +1,205 @@
+"use client";
+
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/use-toast";
+
+// --- Types ---
+
+export interface WorkshopFormData {
+    // Step 1: Details
+    workshopTypeId: string;
+    title: string;
+    description: string;
+    useCoachPhoto: boolean;
+
+    // Step 2: Logistics
+    eventDate: string;
+    eventTime: string;
+    venueName: string;
+    venueAddress: string;
+    venueCity: string;
+    venueState: string;
+    venueZip: string;
+
+    // Step 3: Pricing
+    customPricing: boolean;
+    customPrice?: number;
+}
+
+interface WizardContextType {
+    currentStep: number;
+    totalSteps: number;
+    formData: WorkshopFormData;
+    updateField: <K extends keyof WorkshopFormData>(field: K, value: WorkshopFormData[K]) => void;
+    nextStep: () => void;
+    prevStep: () => void;
+    isSaving: boolean;
+    lastSavedAt: Date | null;
+    submitWorkshop: () => Promise<void>;
+    isLoading: boolean;
+}
+
+const WizardContext = createContext<WizardContextType | undefined>(undefined);
+
+// --- Default State ---
+
+const defaultFormData: WorkshopFormData = {
+    workshopTypeId: "",
+    title: "",
+    description: "",
+    useCoachPhoto: true,
+    eventDate: "",
+    eventTime: "09:00",
+    venueName: "",
+    venueAddress: "",
+    venueCity: "",
+    venueState: "",
+    venueZip: "",
+    customPricing: false,
+};
+
+// --- Provider Component ---
+
+export function WizardProvider({ children }: { children: React.ReactNode }) {
+    const [formData, setFormData] = useState<WorkshopFormData>(defaultFormData);
+    const [currentStep, setCurrentStep] = useState(1);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+    const router = useRouter();
+    const { toast } = useToast();
+    const totalSteps = 3;
+
+    // Load draft on mount
+    useEffect(() => {
+        async function loadDraft() {
+            try {
+                const response = await fetch("/api/workshop-drafts");
+                if (response.ok) {
+                    const draft = await response.json();
+                    if (draft && draft.stepsData) {
+                        const parsedData = JSON.parse(draft.stepsData);
+                        // Merge valid draft data
+                        setFormData(prev => ({ ...prev, ...parsedData }));
+                        setCurrentStep(draft.currentStep || 1);
+                        setLastSavedAt(new Date(draft.updatedAt));
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to load draft", error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        loadDraft();
+    }, []);
+
+    // Auto-save effect (Debounced)
+    useEffect(() => {
+        if (isLoading) return; // Don't save while loading initial state
+
+        const timer = setTimeout(async () => {
+            setIsSaving(true);
+            try {
+                await fetch("/api/workshop-drafts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        step: currentStep,
+                        data: formData,
+                    }),
+                });
+                setLastSavedAt(new Date());
+            } catch (error) {
+                console.error("Auto-save failed", error);
+            } finally {
+                setIsSaving(false);
+            }
+        }, 2000); // 2 second debounce
+
+        return () => clearTimeout(timer);
+    }, [formData, currentStep, isLoading]);
+
+    const updateField = <K extends keyof WorkshopFormData>(field: K, value: WorkshopFormData[K]) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const nextStep = () => {
+        if (currentStep < totalSteps) {
+            setCurrentStep(prev => prev + 1);
+            window.scrollTo(0, 0);
+        }
+    };
+
+    const prevStep = () => {
+        if (currentStep > 1) {
+            setCurrentStep(prev => prev - 1);
+            window.scrollTo(0, 0);
+        }
+    };
+
+    const submitWorkshop = async () => {
+        try {
+            const response = await fetch("/api/approvals", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    type: formData.customPricing ? "CUSTOM_PRICING" : "WORKSHOP_REQUEST",
+                    workshopTypeSlug: formData.workshopTypeId,
+                    details: `Workshop: ${formData.title} on ${formData.eventDate}`,
+                    ...formData, // Send all form data
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) throw new Error(data.error || "Submission failed");
+
+            toast({
+                title: "Workshop Created!",
+                description: data.autoApproved
+                    ? "Your workshop has been automatically approved."
+                    : "Your request has been submitted for review.",
+                variant: "default", // Success
+            });
+
+            router.push("/portal/workshops");
+
+        } catch (error) {
+            toast({
+                title: "Submission Failed",
+                description: "Please check your inputs and try again.",
+                variant: "destructive",
+            });
+        }
+    };
+
+    return (
+        <WizardContext.Provider
+            value={{
+                currentStep,
+                totalSteps,
+                formData,
+                updateField,
+                nextStep,
+                prevStep,
+                isSaving,
+                lastSavedAt,
+                submitWorkshop,
+                isLoading,
+            }}
+        >
+            {children}
+        </WizardContext.Provider>
+    );
+}
+
+export function useWizard() {
+    const context = useContext(WizardContext);
+    if (context === undefined) {
+        throw new Error("useWizard must be used within a WizardProvider");
+    }
+    return context;
+}

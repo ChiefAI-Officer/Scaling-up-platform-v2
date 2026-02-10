@@ -1,9 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createWorkshopTypeSchema } from "@/lib/validations";
+import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+
+function parseJsonField<T>(raw: string | null): T | null {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
 
 export async function GET() {
   try {
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
+    }
+
     const workshopTypes = await db.workshopType.findMany({
       where: { isActive: true },
       orderBy: { name: "asc" },
@@ -12,10 +30,10 @@ export async function GET() {
     // Parse JSON fields before returning
     const parsed = workshopTypes.map((wt) => ({
       ...wt,
-      durationOptions: wt.durationOptions ? JSON.parse(wt.durationOptions) : [],
-      materials: wt.materials ? JSON.parse(wt.materials) : null,
-      marketingTemplates: wt.marketingTemplates ? JSON.parse(wt.marketingTemplates) : null,
-      pricingTiers: wt.pricingTiers ? JSON.parse(wt.pricingTiers) : null,
+      durationOptions: parseJsonField<string[]>(wt.durationOptions) || [],
+      materials: parseJsonField<Record<string, unknown>>(wt.materials),
+      marketingTemplates: parseJsonField<Record<string, unknown>>(wt.marketingTemplates),
+      pricingTiers: parseJsonField<Record<string, unknown>>(wt.pricingTiers),
     }));
 
     return NextResponse.json({
@@ -33,6 +51,14 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
+    }
+    if (!isPrivilegedRole(actor.role)) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await request.json();
     const validation = createWorkshopTypeSchema.safeParse(body);
 

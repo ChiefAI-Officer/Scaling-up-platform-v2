@@ -47,8 +47,10 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        const INVALID_CREDENTIALS = "Invalid email or password";
+
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email and password are required");
+          throw new Error(INVALID_CREDENTIALS);
         }
 
         const user = await db.user.findUnique({
@@ -56,36 +58,34 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user) {
-          throw new Error("Invalid email or password");
+          throw new Error(INVALID_CREDENTIALS);
         }
 
         // Production mode: require proper password validation
         // Demo mode: only allow demo123 password when DEMO_MODE is enabled
         const isDemoMode = process.env.DEMO_MODE === "true";
-        
+
         if (isDemoMode) {
           // Demo mode - accept demo123 for testing
           if (credentials.password !== "demo123") {
-            throw new Error("Invalid email or password");
+            throw new Error(INVALID_CREDENTIALS);
           }
           console.warn("⚠️ DEMO_MODE enabled - using insecure authentication");
         } else {
           // Production mode - require bcrypt password validation
-          // TODO: Add passwordHash column to User model when ready for production
-          // const bcrypt = await import("bcryptjs");
-          // const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
-          // if (!isValid) throw new Error("Invalid email or password");
-          
-          // Temporary: Block login in production until password hashing is implemented
-          if (!process.env.NEXTAUTH_SECRET) {
-            throw new Error("Authentication not configured for production");
+          const bcrypt = await import("bcryptjs");
+
+          if (!user.passwordHash) {
+            console.error(
+              `User ${user.email} is missing passwordHash while DEMO_MODE is disabled`
+            );
+            throw new Error(INVALID_CREDENTIALS);
           }
-          
-          // For now, still check demo password but log warning
-          if (credentials.password !== "demo123") {
-            throw new Error("Invalid email or password");
+
+          const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+          if (!isValid) {
+            throw new Error(INVALID_CREDENTIALS);
           }
-          console.warn("⚠️ Password hashing not yet implemented - using demo authentication");
         }
 
         return {

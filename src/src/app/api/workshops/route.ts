@@ -2,19 +2,47 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createWorkshopSchema } from "@/lib/validations";
 import { generateSlug } from "@/lib/utils";
+import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { validateLeadTime } from "@/lib/lead-time-validator";
 
 export async function GET(request: NextRequest) {
   try {
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get("status");
-    const coachId = searchParams.get("coachId");
-    const page = parseInt(searchParams.get("page") || "1");
-    const pageSize = parseInt(searchParams.get("pageSize") || "20");
+    const requestedCoachId = searchParams.get("coachId");
+    const parsedPage = parseInt(searchParams.get("page") || "1", 10);
+    const parsedPageSize = parseInt(searchParams.get("pageSize") || "20", 10);
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+    const pageSize =
+      Number.isFinite(parsedPageSize) && parsedPageSize > 0
+        ? Math.min(100, parsedPageSize)
+        : 20;
 
-    const where = {
-      ...(status && { status }),
-      ...(coachId && { coachId }),
-    };
+    const where: { status?: string; coachId?: string } = {};
+    if (status) {
+      where.status = status;
+    }
+
+    if (isPrivilegedRole(actor.role)) {
+      if (requestedCoachId) {
+        where.coachId = requestedCoachId;
+      }
+    } else {
+      if (!actor.coachId) {
+        return NextResponse.json({ success: false, error: "Coach profile required" }, { status: 403 });
+      }
+
+      if (requestedCoachId && requestedCoachId !== actor.coachId) {
+        return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      }
+
+      where.coachId = actor.coachId;
+    }
 
     const [workshops, total] = await Promise.all([
       db.workshop.findMany({
@@ -54,6 +82,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
+    }
+    if (!isPrivilegedRole(actor.role)) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+
     const body = await request.json();
     const validation = createWorkshopSchema.safeParse(body);
 
@@ -65,6 +101,18 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validation.data;
+    const leadTimeValidation = validateLeadTime(new Date(data.eventDate));
+    if (!leadTimeValidation.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: leadTimeValidation.reason || "Invalid event date",
+          requiresApproval: leadTimeValidation.requiresApproval,
+          leadTimeDays: leadTimeValidation.leadTimeDays,
+        },
+        { status: leadTimeValidation.requiresApproval ? 409 : 400 }
+      );
+    }
 
     // Verify coach exists and is eligible
     const coach = await db.coach.findUnique({
@@ -108,13 +156,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Create workshop
+    const category = body.category === "EXIT_AND_VALUATION" ? "EXIT_AND_VALUATION" : "AI";
+
     const workshop = await db.workshop.create({
       data: {
         coachId: data.coachId,
         workshopTypeId: data.workshopTypeId,
         title: data.title,
         description: data.description,
-        category: body.category || "AI",
+        category,
         format: data.format,
         duration: data.duration || "full-day",
         eventDate: new Date(data.eventDate),

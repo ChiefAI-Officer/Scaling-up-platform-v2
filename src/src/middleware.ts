@@ -24,6 +24,7 @@ export default withAuth(
       if (
         pathname.startsWith("/api/registrations") ||
         pathname.startsWith("/api/webhooks") ||
+        pathname.startsWith("/api/inngest") ||
         pathname.startsWith("/api/health") ||
         pathname.startsWith("/api/docs") ||
         pathname.match(/^\/api\/workshops\/[^/]+\/register$/)
@@ -56,9 +57,11 @@ export default withAuth(
           pathname.startsWith("/api/auth") ||
           pathname.startsWith("/api/public") ||
           pathname.startsWith("/api/webhooks") ||
+          pathname.startsWith("/api/inngest") ||
           pathname.startsWith("/api/health") ||
           pathname.startsWith("/api/docs") ||
           pathname.startsWith("/api/registrations") ||
+          pathname.startsWith("/api/") ||
           pathname.startsWith("/_next") ||
           pathname.includes(".")
         ) {

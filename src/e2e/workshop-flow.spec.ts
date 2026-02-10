@@ -1,12 +1,14 @@
 import { test, expect } from "@playwright/test";
+import { loginAs } from "./helpers/auth";
 
 test.describe("Workshop Public Pages", () => {
   test("should display workshop landing page", async ({ page }) => {
     await page.goto("/workshop/ai-workshop-chicago-march-2025");
 
     // Check for workshop details
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByText(/chicago/i)).toBeVisible();
+    const heading = page.getByRole("heading", { level: 1 });
+    await expect(heading).toBeVisible();
+    await expect(heading).toContainText(/chicago/i);
   });
 
   test("should show registration form on workshop page", async ({ page }) => {
@@ -21,24 +23,17 @@ test.describe("Workshop Public Pages", () => {
   test("should validate required fields", async ({ page }) => {
     await page.goto("/workshop/ai-workshop-chicago-march-2025");
 
-    // Try to submit without filling required fields
-    const submitButton = page.getByRole("button", { name: /register|continue|submit/i });
-
-    if (await submitButton.isVisible()) {
-      await submitButton.click();
-
-      // Check for validation messages or that form wasn't submitted
-      // The form should require fields to be filled
-      const emailInput = page.getByLabel(/email/i);
-      await expect(emailInput).toBeVisible();
-    }
+    // Browser-level required attributes prevent empty submission.
+    await expect(page.getByLabel(/first name/i)).toHaveAttribute("required", "");
+    await expect(page.getByLabel(/last name/i)).toHaveAttribute("required", "");
+    await expect(page.getByLabel(/email/i)).toHaveAttribute("required", "");
   });
 
   test("should display venue information for in-person workshops", async ({ page }) => {
     await page.goto("/workshop/ai-workshop-chicago-march-2025");
 
     // Check for venue details
-    await expect(page.getByText(/marriott|location/i)).toBeVisible();
+    await expect(page.getByText(/marriott chicago downtown/i)).toBeVisible();
   });
 
   test("should display pricing information", async ({ page }) => {
@@ -73,33 +68,35 @@ test.describe("Workshop Registration", () => {
 
 test.describe("Dashboard Workshops (Authenticated)", () => {
   test.beforeEach(async ({ page }) => {
-    // Login before each test
-    await page.goto("/login");
-    await page.getByLabel(/email/i).fill("admin@scalingup.com");
-    await page.getByLabel(/password/i).fill("demo123");
-    await page.getByRole("button", { name: /sign in/i }).click();
-    await expect(page).toHaveURL(/.*dashboard/);
+    await loginAs(page, {
+      email: "admin@scalingup.com",
+      password: "demo123",
+      expectedUrl: /\/dashboard/,
+    });
   });
 
   test("should display workshop list after login", async ({ page }) => {
     await page.goto("/workshops");
 
     // Should show workshop heading
-    await expect(page.getByRole("heading", { name: /workshops/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Workshops", exact: true })).toBeVisible();
   });
 
   test("should have create workshop button", async ({ page }) => {
     await page.goto("/workshops");
 
     // Look for create button
-    await expect(page.getByRole("link", { name: /new workshop|create/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /create new workshop/i }).first()).toBeVisible();
   });
 
   test("should navigate to workshop details", async ({ page }) => {
     await page.goto("/workshops");
 
-    // Click on a workshop
-    const workshopLink = page.getByRole("link", { name: /ai workshop|exit planning|virtual/i }).first();
+    const workshopLink = page
+      .locator('a[href^="/workshops/"]')
+      .filter({ hasNotText: "New Workshop" })
+      .first();
+
     if (await workshopLink.isVisible()) {
       await workshopLink.click();
 

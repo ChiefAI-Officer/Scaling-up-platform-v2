@@ -26,7 +26,7 @@ test.describe("Authentication", () => {
     await page.getByRole("button", { name: /sign in/i }).click();
 
     // Should show error message
-    await expect(page.getByRole("alert")).toContainText(/invalid/i);
+    await expect(page.getByText(/invalid email or password/i)).toBeVisible();
   });
 
   test("should login successfully with valid credentials", async ({ page }) => {

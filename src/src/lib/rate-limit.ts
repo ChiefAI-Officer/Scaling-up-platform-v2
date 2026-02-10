@@ -48,9 +48,13 @@ function getRedisClient(): Redis | null {
 // In-memory store for development fallback only
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
+const globalForRateLimit = globalThis as unknown as {
+  rateLimitCleanupIntervalStarted?: boolean;
+};
+
 // Clean up expired entries periodically (only for in-memory)
-if (typeof setInterval !== "undefined") {
-  setInterval(() => {
+if (typeof setInterval !== "undefined" && !globalForRateLimit.rateLimitCleanupIntervalStarted) {
+  const interval = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of rateLimitStore.entries()) {
       if (entry.resetAt < now) {
@@ -58,6 +62,13 @@ if (typeof setInterval !== "undefined") {
       }
     }
   }, 60000); // Clean up every minute
+
+  // Avoid keeping Node alive just for this interval.
+  if (typeof interval.unref === "function") {
+    interval.unref();
+  }
+
+  globalForRateLimit.rateLimitCleanupIntervalStarted = true;
 }
 
 export interface RateLimitResult {

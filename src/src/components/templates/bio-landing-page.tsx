@@ -67,7 +67,7 @@ export function BioLandingPage({ data }: { data: LandingPageData }) {
                                 {!coach.bio && (
                                     <>
                                         <p>
-                                            [Insert detailed bio here. This section should copy the style and content format from the 'Bio-Page Sample.png'.]
+                                            [Insert detailed bio here. This section should copy the style and content format from the &lsquo;Bio-Page Sample.png&rsquo;.]
                                         </p>
                                         <p>
                                             As a Scaling Up Certified Coach, I help leadership teams...

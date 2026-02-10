@@ -79,42 +79,10 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                         </li>
                         <li>
                             <Link 
-                                href="/admin/workshops"
+                                href="/dashboard"
                                 className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
                             >
-                                📅 All Workshops
-                            </Link>
-                        </li>
-                        <li>
-                            <Link 
-                                href="/admin/coaches"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
-                            >
-                                👤 Coaches
-                            </Link>
-                        </li>
-                        <li>
-                            <Link 
-                                href="/admin/email-templates"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
-                            >
-                                📧 Email Templates
-                            </Link>
-                        </li>
-                        <li>
-                            <Link 
-                                href="/admin/reports"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
-                            >
-                                📈 Reports
-                            </Link>
-                        </li>
-                        <li>
-                            <Link 
-                                href="/admin/settings"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
-                            >
-                                ⚙️ Settings
+                                🧭 Operations Dashboard
                             </Link>
                         </li>
                     </ul>

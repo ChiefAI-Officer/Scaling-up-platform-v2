@@ -1,211 +1,204 @@
-"use client";
-
-import React from "react";
 import Link from "next/link";
+import { db } from "@/lib/db";
 
-interface DashboardStats {
-    pendingApprovals: number;
-    activeWorkshops: number;
-    totalCoaches: number;
-    registrationsThisMonth: number;
-    revenueThisMonth: number;
-}
-
-interface RecentActivity {
-    id: string;
-    type: string;
-    description: string;
-    timestamp: string;
-}
-
-// Mock data
-const stats: DashboardStats = {
-    pendingApprovals: 3,
-    activeWorkshops: 12,
-    totalCoaches: 45,
-    registrationsThisMonth: 128,
-    revenueThisMonth: 6340000, // cents
+type ActivityItem = {
+  id: string;
+  type: "APPROVAL" | "REGISTRATION" | "WORKSHOP";
+  description: string;
+  timestamp: Date;
 };
 
-const recentActivity: RecentActivity[] = [
-    { id: "1", type: "APPROVAL", description: "Workshop request from Coach John Smith", timestamp: "2 hours ago" },
-    { id: "2", type: "REGISTRATION", description: "New registration for Scaling Up Master Class", timestamp: "4 hours ago" },
-    { id: "3", type: "WORKSHOP", description: "Exit Planning Workshop published", timestamp: "Yesterday" },
-    { id: "4", type: "REFUND", description: "Refund processed for $250", timestamp: "Yesterday" },
-];
+function formatRelativeTime(date: Date): string {
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
-export default function AdminDashboardPage() {
-    return (
-        <div className="admin-dashboard">
-            <style jsx>{`
-        .admin-dashboard h2 {
-          margin-bottom: 1.5rem;
-          color: #44337a;
-        }
-        
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 1.5rem;
-          margin-bottom: 2rem;
-        }
-        
-        .stat-card {
-          background: white;
-          padding: 1.5rem;
-          border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        
-        .stat-card.urgent {
-          border-left: 4px solid #e53e3e;
-        }
-        
-        .stat-card .label {
-          font-size: 0.875rem;
-          color: #718096;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        
-        .stat-card .value {
-          font-size: 2.5rem;
-          font-weight: 700;
-          color: #44337a;
-          margin-top: 0.5rem;
-        }
-        
-        .stat-card.urgent .value {
-          color: #e53e3e;
-        }
-        
-        .quick-actions {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 2rem;
-        }
-        
-        .action-btn {
-          background: #805ad5;
-          color: white;
-          padding: 0.75rem 1.5rem;
-          border: none;
-          border-radius: 8px;
-          font-weight: 500;
-          cursor: pointer;
-          text-decoration: none;
-          display: inline-block;
-        }
-        
-        .action-btn:hover {
-          background: #6b46c1;
-        }
-        
-        .action-btn.secondary {
-          background: #e2e8f0;
-          color: #4a5568;
-        }
-        
-        .activity-section {
-          background: white;
-          padding: 1.5rem;
-          border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        
-        .activity-section h3 {
-          margin-bottom: 1rem;
-          color: #2d3748;
-        }
-        
-        .activity-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-        }
-        
-        .activity-item {
-          display: flex;
-          justify-content: space-between;
-          padding: 0.75rem 0;
-          border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .activity-item:last-child {
-          border-bottom: none;
-        }
-        
-        .activity-type {
-          display: inline-block;
-          padding: 0.25rem 0.5rem;
-          border-radius: 4px;
-          font-size: 0.75rem;
-          font-weight: 500;
-          margin-right: 0.5rem;
-        }
-        
-        .activity-type.APPROVAL { background: #fed7d7; color: #822727; }
-        .activity-type.REGISTRATION { background: #c6f6d5; color: #22543d; }
-        .activity-type.WORKSHOP { background: #bee3f8; color: #2a4365; }
-        .activity-type.REFUND { background: #feebc8; color: #744210; }
-        
-        .activity-time {
-          color: #718096;
-          font-size: 0.875rem;
-        }
-      `}</style>
+  if (diffMinutes < 1) return "just now";
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
 
-            <h2>Admin Dashboard</h2>
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
 
-            <div className="stats-grid">
-                <div className={`stat-card ${stats.pendingApprovals > 0 ? 'urgent' : ''}`}>
-                    <div className="label">Pending Approvals</div>
-                    <div className="value">{stats.pendingApprovals}</div>
-                </div>
-                <div className="stat-card">
-                    <div className="label">Active Workshops</div>
-                    <div className="value">{stats.activeWorkshops}</div>
-                </div>
-                <div className="stat-card">
-                    <div className="label">Total Coaches</div>
-                    <div className="value">{stats.totalCoaches}</div>
-                </div>
-                <div className="stat-card">
-                    <div className="label">Registrations (Month)</div>
-                    <div className="value">{stats.registrationsThisMonth}</div>
-                </div>
-                <div className="stat-card">
-                    <div className="label">Revenue (Month)</div>
-                    <div className="value">${(stats.revenueThisMonth / 100).toLocaleString()}</div>
-                </div>
-            </div>
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+}
 
-            <div className="quick-actions">
-                <Link href="/admin/approvals" className="action-btn">
-                    Review Pending Approvals
-                </Link>
-                <Link href="/admin/workshops" className="action-btn secondary">
-                    View All Workshops
-                </Link>
-                <Link href="/admin/reports" className="action-btn secondary">
-                    Generate Report
-                </Link>
-            </div>
+export default async function AdminDashboardPage() {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-            <div className="activity-section">
-                <h3>Recent Activity</h3>
-                <ul className="activity-list">
-                    {recentActivity.map((activity) => (
-                        <li key={activity.id} className="activity-item">
-                            <div>
-                                <span className={`activity-type ${activity.type}`}>{activity.type}</span>
-                                {activity.description}
-                            </div>
-                            <span className="activity-time">{activity.timestamp}</span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </div>
-    );
+  const [
+    pendingApprovals,
+    activeWorkshops,
+    totalCoaches,
+    registrationsThisMonth,
+    revenueThisMonth,
+    recentApprovals,
+    recentRegistrations,
+    recentWorkshops,
+  ] = await Promise.all([
+    db.approvalQueue.count({ where: { status: "PENDING" } }),
+    db.workshop.count({
+      where: {
+        status: {
+          in: [
+            "REQUESTED",
+            "VALIDATING",
+            "APPROVED",
+            "SCHEDULED",
+            "LIVE",
+            "MARKETING_ACTIVE",
+            "REGISTRATION_OPEN",
+            "SETUP_IN_PROGRESS",
+          ],
+        },
+      },
+    }),
+    db.coach.count(),
+    db.registration.count({
+      where: {
+        createdAt: { gte: monthStart },
+      },
+    }),
+    db.registration.aggregate({
+      _sum: {
+        amountPaidCents: true,
+      },
+      where: {
+        paymentStatus: "COMPLETED",
+        createdAt: { gte: monthStart },
+      },
+    }),
+    db.approvalQueue.findMany({
+      take: 4,
+      orderBy: { requestedAt: "desc" },
+      include: {
+        coach: {
+          select: {
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    }),
+    db.registration.findMany({
+      take: 4,
+      orderBy: { createdAt: "desc" },
+      include: {
+        workshop: {
+          select: { title: true },
+        },
+      },
+    }),
+    db.workshop.findMany({
+      take: 4,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+      },
+    }),
+  ]);
+
+  const activities: ActivityItem[] = [
+    ...recentApprovals.map((item) => ({
+      id: `approval-${item.id}`,
+      type: "APPROVAL" as const,
+      description: `${item.type.replace(/_/g, " ")} request from ${item.coach.firstName} ${item.coach.lastName}`,
+      timestamp: item.requestedAt,
+    })),
+    ...recentRegistrations.map((item) => ({
+      id: `registration-${item.id}`,
+      type: "REGISTRATION" as const,
+      description: `New registration for ${item.workshop.title}`,
+      timestamp: item.createdAt,
+    })),
+    ...recentWorkshops.map((item) => ({
+      id: `workshop-${item.id}`,
+      type: "WORKSHOP" as const,
+      description: `${item.title} is now ${item.status.replace(/_/g, " ")}`,
+      timestamp: item.createdAt,
+    })),
+  ]
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    .slice(0, 8);
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <StatCard label="Pending Approvals" value={pendingApprovals} urgent />
+        <StatCard label="Active Workshops" value={activeWorkshops} />
+        <StatCard label="Total Coaches" value={totalCoaches} />
+        <StatCard label="Registrations (Month)" value={registrationsThisMonth} />
+        <StatCard
+          label="Revenue (Month)"
+          value={`$${((revenueThisMonth._sum.amountPaidCents || 0) / 100).toLocaleString()}`}
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/admin/approvals"
+          className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+        >
+          Review Pending Approvals
+        </Link>
+        <Link
+          href="/dashboard"
+          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Open Operations Dashboard
+        </Link>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <h3 className="mb-3 text-lg font-semibold text-gray-900">Recent Activity</h3>
+        {activities.length === 0 ? (
+          <p className="text-sm text-gray-500">No recent activity found.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {activities.map((activity) => (
+              <li key={activity.id} className="flex items-start justify-between py-3">
+                <div className="pr-4">
+                  <span className="mr-2 inline-flex rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
+                    {activity.type}
+                  </span>
+                  <span className="text-sm text-gray-800">{activity.description}</span>
+                </div>
+                <span className="shrink-0 text-xs text-gray-500">
+                  {formatRelativeTime(activity.timestamp)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  urgent = false,
+}: {
+  label: string;
+  value: string | number;
+  urgent?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border bg-white p-4 shadow-sm ${
+        urgent ? "border-red-200" : "border-gray-200"
+      }`}
+    >
+      <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
+      <p className={`mt-2 text-2xl font-semibold ${urgent ? "text-red-600" : "text-gray-900"}`}>
+        {value}
+      </p>
+    </div>
+  );
 }

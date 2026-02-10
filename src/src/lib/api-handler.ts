@@ -9,7 +9,7 @@ import { authOptions, UserRole, canAccess } from "./auth";
 import { AppError, Errors, formatErrorResponse, getErrorStatusCode } from "./errors";
 import { logger } from "./logger";
 import {
-  checkRateLimit,
+  checkRateLimitAsync,
   getClientIdentifier,
   RateLimits,
   RateLimitResult,
@@ -69,7 +69,7 @@ export function createApiHandler<T>(
         const clientId = getClientIdentifier(request);
         const rateLimitKey = `${options.rateLimit}:${clientId}:${path}`;
         const rateLimitConfig = RateLimits[options.rateLimit];
-        const result: RateLimitResult = checkRateLimit(rateLimitKey, rateLimitConfig);
+        const result: RateLimitResult = await checkRateLimitAsync(rateLimitKey, rateLimitConfig);
 
         if (!result.success) {
           throw Errors.rateLimited(result.retryAfter);

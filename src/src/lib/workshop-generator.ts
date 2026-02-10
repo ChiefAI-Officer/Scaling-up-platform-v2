@@ -145,7 +145,7 @@ export async function generateWorkshop(
         }
     });
 
-    const landingPageUrl = `${process.env.APP_URL}/workshops/${slug}`;
+    const landingPageUrl = `${process.env.APP_URL}/workshop/${slug}`;
 
     return {
         workshopId: workshop.id,

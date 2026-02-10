@@ -17,6 +17,7 @@ async function getDashboardMetrics() {
     workshopsByStatus,
     recentWorkshops,
     totalCoaches,
+    pendingApprovals,
   ] = await Promise.all([
     db.workshop.count(),
     db.workshop.count({
@@ -46,6 +47,10 @@ async function getDashboardMetrics() {
       },
     }),
     db.coach.count(),
+    // Sprint 1: Pending approvals for Figma urgency widget
+    db.approvalQueue.count({
+      where: { status: "PENDING" },
+    }),
   ]);
 
   return {
@@ -58,6 +63,7 @@ async function getDashboardMetrics() {
     ),
     recentWorkshops,
     totalCoaches,
+    pendingApprovals,
   };
 }
 
@@ -70,6 +76,29 @@ export default async function DashboardPage() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-600">Overview of workshop operations</p>
       </div>
+
+      {/* Sprint 1: Pending Approvals Urgency Banner */}
+      {metrics.pendingApprovals > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="font-medium text-orange-800">
+                {metrics.pendingApprovals} pending approval{metrics.pendingApprovals > 1 ? "s" : ""} require attention
+              </p>
+              <p className="text-sm text-orange-600">
+                Workshop requests or custom pricing awaiting your review.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/workshops?status=REQUESTED"
+            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors whitespace-nowrap"
+          >
+            Review Now
+          </Link>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

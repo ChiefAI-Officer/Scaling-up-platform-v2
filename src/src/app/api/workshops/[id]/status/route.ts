@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 
 // Valid workshop statuses (since we're using SQLite with string fields)
 const WORKSHOP_STATUSES = [
@@ -33,6 +34,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
+    }
+    if (!isPrivilegedRole(actor.role)) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+
     const { id } = await params;
     const { status: newStatus } = await request.json();
 

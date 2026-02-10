@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -192,9 +193,9 @@ export default function SoloLandingEditor() {
     <div className="max-w-7xl mx-auto">
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <a href="/workshops" className="hover:text-gray-700">Workshops</a>
+          <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
           <span>/</span>
-          <a href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Landing Pages</a>
+          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Landing Pages</Link>
           <span>/</span>
           <span className="text-gray-900">Solo Landing Page</span>
         </div>
@@ -367,7 +368,7 @@ export default function SoloLandingEditor() {
                 />
               </div>
               <div>
-                <Label>Benefits (What You'll Learn)</Label>
+                <Label>Benefits (What You&rsquo;ll Learn)</Label>
                 <div className="space-y-2 mt-2">
                   {formData.benefits.map((benefit, index) => (
                     <div key={index} className="flex gap-2">
@@ -519,7 +520,7 @@ export default function SoloLandingEditor() {
                       </div>
                     )}
 
-                    <h3 className="font-bold text-purple-700 mb-3">What You'll Learn</h3>
+                    <h3 className="font-bold text-purple-700 mb-3">What You&rsquo;ll Learn</h3>
                     <ul className="space-y-2 text-sm text-gray-700">
                       {formData.benefits.map((b, i) => (
                         <li key={i} className="flex items-start gap-2">

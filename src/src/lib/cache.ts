@@ -54,7 +54,7 @@ function getRedisClient(): Redis | null {
 const memoryCache = new Map<string, { value: string; expiresAt: number }>();
 
 // Clean up expired entries periodically
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of memoryCache.entries()) {
     if (entry.expiresAt < now) {
@@ -62,6 +62,10 @@ setInterval(() => {
     }
   }
 }, 60000); // Clean every minute
+
+if (typeof cleanupInterval.unref === "function") {
+  cleanupInterval.unref();
+}
 
 /**
  * Cache interface

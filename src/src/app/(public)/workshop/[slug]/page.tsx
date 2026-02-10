@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
+import { RegistrationForm } from "./registration-form";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -81,6 +82,38 @@ interface WorkshopData {
   isFree?: boolean;
 }
 
+interface WorkshopFallbackData {
+  id: string;
+  title: string;
+  description: string | null;
+  eventDate: Date;
+  eventTime: string | null;
+  timezone: string;
+  format: string;
+  venueName: string | null;
+  venueAddress: string | null;
+  isFree: boolean;
+  priceCents: number | null;
+  earlyBirdPriceCents: number | null;
+  coach: {
+    firstName: string;
+    lastName: string;
+  };
+}
+
+function parseVenueAddress(raw: string | null): { city?: string; state?: string } {
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as { city?: string; state?: string };
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   
@@ -95,15 +128,26 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
   });
 
-  if (!landingPage) {
+  if (landingPage) {
+    const content = JSON.parse(landingPage.content) as Record<string, string>;
+
+    return {
+      title: content.heroTitle || content.workshopTitle || landingPage.workshop.title,
+      description: content.heroSubtitle || content.description || landingPage.workshop.description || "",
+    };
+  }
+
+  const workshop = await db.workshop.findUnique({
+    where: { landingPageSlug: slug },
+  });
+
+  if (!workshop) {
     return { title: "Page Not Found" };
   }
 
-  const content = JSON.parse(landingPage.content) as Record<string, string>;
-  
   return {
-    title: content.heroTitle || content.workshopTitle || landingPage.workshop.title,
-    description: content.heroSubtitle || content.description || landingPage.workshop.description || "",
+    title: workshop.title,
+    description: workshop.description || "Workshop registration details",
   };
 }
 
@@ -122,27 +166,110 @@ export default async function LandingPageView({ params }: PageProps) {
     },
   });
 
-  if (!landingPage || landingPage.status !== "PUBLISHED") {
+  if (landingPage) {
+    if (landingPage.status !== "PUBLISHED") {
+      notFound();
+    }
+
+    const content = JSON.parse(landingPage.content);
+    const workshop = landingPage.workshop;
+
+    switch (landingPage.template) {
+      case "BIO_PAGE":
+        return <BioPageTemplate content={content as BioContent} />;
+      case "SOLO_LANDING":
+        return <SoloLandingTemplate content={content as SoloContent} workshop={workshop} />;
+      case "DUO_LANDING":
+        return <DuoLandingTemplate content={content as DuoContent} workshop={workshop} />;
+      case "REGISTRATION":
+        return <RegistrationTemplate content={content as RegistrationContent} workshop={workshop} />;
+      case "THANK_YOU":
+        return <ThankYouTemplate content={content as ThankYouContent} />;
+      default:
+        notFound();
+    }
+  }
+
+  const workshop = await db.workshop.findUnique({
+    where: { landingPageSlug: slug },
+    include: {
+      coach: true,
+    },
+  });
+
+  if (!workshop) {
     notFound();
   }
 
-  const content = JSON.parse(landingPage.content);
-  const workshop = landingPage.workshop;
+  return <DefaultWorkshopTemplate workshop={workshop} />;
+}
 
-  switch (landingPage.template) {
-    case "BIO_PAGE":
-      return <BioPageTemplate content={content as BioContent} />;
-    case "SOLO_LANDING":
-      return <SoloLandingTemplate content={content as SoloContent} workshop={workshop} />;
-    case "DUO_LANDING":
-      return <DuoLandingTemplate content={content as DuoContent} workshop={workshop} />;
-    case "REGISTRATION":
-      return <RegistrationTemplate content={content as RegistrationContent} workshop={workshop} />;
-    case "THANK_YOU":
-      return <ThankYouTemplate content={content as ThankYouContent} />;
-    default:
-      notFound();
-  }
+function DefaultWorkshopTemplate({ workshop }: { workshop: WorkshopFallbackData }) {
+  const eventDate = new Date(workshop.eventDate).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const venueAddress = parseVenueAddress(workshop.venueAddress);
+  const locationLabel =
+    workshop.format === "VIRTUAL"
+      ? "Virtual Workshop"
+      : [
+          workshop.venueName,
+          [venueAddress.city, venueAddress.state].filter(Boolean).join(", "),
+        ]
+          .filter(Boolean)
+          .join(" · ");
+  const effectivePriceCents = workshop.earlyBirdPriceCents ?? workshop.priceCents ?? 0;
+  const priceLabel = workshop.isFree
+    ? "Free"
+    : new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(effectivePriceCents / 100);
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-10 px-4">
+      <div className="max-w-5xl mx-auto grid gap-8 lg:grid-cols-3">
+        <section className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-8 space-y-6">
+          <p className="text-sm font-semibold tracking-wide text-blue-600 uppercase">Workshop</p>
+          <h1 className="text-3xl font-bold text-gray-900">{workshop.title}</h1>
+          <p className="text-gray-600">
+            {workshop.description || "Join this workshop to learn practical frameworks you can apply immediately."}
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Date</p>
+              <p className="mt-1 text-sm text-gray-900">{eventDate}</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Time</p>
+              <p className="mt-1 text-sm text-gray-900">
+                {workshop.eventTime || "TBD"} {workshop.timezone}
+              </p>
+            </div>
+            <div className="sm:col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Location</p>
+              <p className="mt-1 text-sm text-gray-900">{locationLabel || "Location to be announced"}</p>
+            </div>
+          </div>
+        </section>
+
+        <aside className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-gray-900">Register</h2>
+          <p className="mt-2 text-sm text-gray-500">
+            Hosted by {workshop.coach.firstName} {workshop.coach.lastName}
+          </p>
+          <p className="mt-4 text-2xl font-bold text-blue-700">{priceLabel}</p>
+          <div className="mt-6">
+            <RegistrationForm workshopId={workshop.id} isFree={workshop.isFree} />
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
 }
 
 function BioPageTemplate({ content }: { content: BioContent }) {
@@ -464,27 +591,59 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
               <div className="text-purple-200 text-sm">with {coachName}</div>
             </div>
             <form className="p-6 space-y-4" action={`/api/workshops/${workshop.id}/register`} method="POST">
-              <input
-                type="email"
-                name="email"
-                placeholder={emailPlaceholder}
-                required
-                className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
-              />
-              <label className="flex items-start gap-2 text-sm text-gray-600">
-                <input type="checkbox" name="optIn" defaultChecked className="mt-1 rounded" />
+              <div className="space-y-2">
+                <label htmlFor="registrationEmail" className="text-sm font-medium text-gray-700">
+                  Email
+                </label>
+                <input
+                  id="registrationEmail"
+                  type="email"
+                  name="email"
+                  placeholder={emailPlaceholder}
+                  required
+                  className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label htmlFor="registrationFirstName" className="text-sm font-medium text-gray-700">
+                    First Name
+                  </label>
+                  <input
+                    id="registrationFirstName"
+                    type="text"
+                    name="firstName"
+                    placeholder="First name"
+                    required
+                    className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="registrationLastName" className="text-sm font-medium text-gray-700">
+                    Last Name
+                  </label>
+                  <input
+                    id="registrationLastName"
+                    type="text"
+                    name="lastName"
+                    placeholder={namePlaceholder}
+                    required
+                    className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <label htmlFor="registrationOptIn" className="flex items-start gap-2 text-sm text-gray-600">
+                <input id="registrationOptIn" type="checkbox" name="optIn" defaultChecked className="mt-1 rounded" />
                 <span>{optInText}</span>
               </label>
-              <input
-                type="text"
-                name="fullName"
-                placeholder={namePlaceholder}
-                required
-                className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
-              />
-              <div>
-                <div className="text-sm text-gray-500 mb-2">Additional information</div>
+              <div className="space-y-2">
+                <label htmlFor="registrationCompany" className="text-sm font-medium text-gray-700">
+                  Company
+                </label>
                 <input
+                  id="registrationCompany"
                   type="text"
                   name="company"
                   placeholder={companyPlaceholder}

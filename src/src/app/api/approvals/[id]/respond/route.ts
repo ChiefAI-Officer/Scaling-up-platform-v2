@@ -3,6 +3,10 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import crypto from "crypto";
+import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+
+const DEFAULT_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+const MAX_APPROVAL_LINK_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days guardrail
 
 // Request schema
 const RespondSchema = z.object({
@@ -24,6 +28,7 @@ export async function GET(
         const { searchParams } = new URL(request.url);
         const action = searchParams.get("action");
         const token = searchParams.get("token");
+        const expiresParam = searchParams.get("expires");
 
         if (!action || !["approve", "deny"].includes(action)) {
             return NextResponse.json(
@@ -51,9 +56,39 @@ export async function GET(
             );
         }
 
-        // Validate signed token
-        const expectedToken = generateToken(approval.id, action);
-        if (token !== expectedToken) {
+        // Validate signed token (supports expiring links; legacy links without expires still work).
+        let expectedToken: string;
+        if (expiresParam) {
+            const expiresAt = Number.parseInt(expiresParam, 10);
+            if (!Number.isFinite(expiresAt) || expiresAt <= 0) {
+                return NextResponse.json(
+                    { error: "Invalid link" },
+                    { status: 403 }
+                );
+            }
+
+            const now = Math.floor(Date.now() / 1000);
+            if (expiresAt <= now) {
+                return new NextResponse(
+                    `<html><body><h1>Link Expired</h1><p>This approval link has expired. Please request a new one.</p></body></html>`,
+                    { status: 410, headers: { "Content-Type": "text/html" } }
+                );
+            }
+
+            // Reject suspiciously long-lived links.
+            if (expiresAt - now > MAX_APPROVAL_LINK_TTL_SECONDS) {
+                return NextResponse.json(
+                    { error: "Invalid link" },
+                    { status: 403 }
+                );
+            }
+
+            expectedToken = generateToken(approval.id, action, expiresAt);
+        } else {
+            expectedToken = generateToken(approval.id, action);
+        }
+
+        if (!token || !safeTokenCompare(token, expectedToken)) {
             return NextResponse.json(
                 { error: "Invalid or expired link" },
                 { status: 403 }
@@ -114,8 +149,25 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const actor = await getApiActor();
+        if (!actor) {
+            return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+        }
+
+        if (!isPrivilegedRole(actor.role)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
         const { id } = await params;
-        const body = await request.json();
+        let body: unknown;
+        try {
+            body = await request.json();
+        } catch {
+            return NextResponse.json(
+                { error: "Invalid JSON payload" },
+                { status: 400 }
+            );
+        }
         const { action, reason } = RespondSchema.parse(body);
 
         const approval = await db.approvalQueue.findUnique({
@@ -142,7 +194,7 @@ export async function POST(
             where: { id },
             data: {
                 status: newStatus,
-                respondedBy: "ADMIN_DASHBOARD", // TODO: Use actual user ID
+                respondedBy: actor.email,
                 respondedAt: new Date(),
                 responseReason: reason,
             }
@@ -152,7 +204,7 @@ export async function POST(
             entityType: "ApprovalQueue",
             entityId: id,
             action,
-            performedBy: "ADMIN",
+            performedBy: actor.email,
             changes: { previousStatus: "PENDING", newStatus, reason }
         });
 
@@ -181,18 +233,33 @@ export async function POST(
 /**
  * Generate a signed token for one-click approve/deny links
  */
-function generateToken(approvalId: string, action: string): string {
+function generateToken(approvalId: string, action: string, expiresAt?: number): string {
     const secret = process.env.APPROVAL_LINK_SECRET;
 
     if (!secret) {
         throw new Error("APPROVAL_LINK_SECRET environment variable is required for secure approval links");
     }
 
+    const payload = expiresAt
+        ? `${approvalId}:${action}:${expiresAt}`
+        : `${approvalId}:${action}`;
+
     return crypto
         .createHmac("sha256", secret)
-        .update(`${approvalId}:${action}`)
+        .update(payload)
         .digest("hex")
         .substring(0, 32);
+}
+
+function safeTokenCompare(received: string, expected: string): boolean {
+    const receivedBuffer = Buffer.from(received);
+    const expectedBuffer = Buffer.from(expected);
+
+    if (receivedBuffer.length !== expectedBuffer.length) {
+        return false;
+    }
+
+    return crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
 }
 
 /**
@@ -203,11 +270,20 @@ export function generateApprovalLinks(approvalId: string): {
     denyUrl: string;
 } {
     const baseUrl = `${process.env.APP_URL}/api/approvals/${approvalId}/respond`;
-    const approveToken = generateToken(approvalId, "approve");
-    const denyToken = generateToken(approvalId, "deny");
+    const configuredTtl = Number.parseInt(
+        process.env.APPROVAL_LINK_TTL_SECONDS || `${DEFAULT_APPROVAL_LINK_TTL_SECONDS}`,
+        10
+    );
+    const ttlSeconds = Number.isFinite(configuredTtl) && configuredTtl > 0
+        ? Math.min(configuredTtl, MAX_APPROVAL_LINK_TTL_SECONDS)
+        : DEFAULT_APPROVAL_LINK_TTL_SECONDS;
+    const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds;
+
+    const approveToken = generateToken(approvalId, "approve", expiresAt);
+    const denyToken = generateToken(approvalId, "deny", expiresAt);
 
     return {
-        approveUrl: `${baseUrl}?action=approve&token=${approveToken}`,
-        denyUrl: `${baseUrl}?action=deny&token=${denyToken}`,
+        approveUrl: `${baseUrl}?action=approve&expires=${expiresAt}&token=${approveToken}`,
+        denyUrl: `${baseUrl}?action=deny&expires=${expiresAt}&token=${denyToken}`,
     };
 }

@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log(`Stripe webhook received: ${event.id} (${event.type})`);
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -62,9 +64,38 @@ export async function POST(request: NextRequest) {
 
 async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const { registrationId } = session.metadata || {};
+  const paymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id || null;
 
   if (!registrationId) {
     console.error("No registrationId in session metadata");
+    return;
+  }
+
+  const existing = await db.registration.findUnique({
+    where: { id: registrationId },
+    select: {
+      id: true,
+      email: true,
+      paymentStatus: true,
+      stripePaymentId: true,
+    },
+  });
+
+  if (!existing) {
+    console.warn(`Registration not found for webhook session ${session.id}: ${registrationId}`);
+    return;
+  }
+
+  if (
+    existing.paymentStatus === "COMPLETED" &&
+    existing.stripePaymentId &&
+    paymentIntentId &&
+    existing.stripePaymentId === paymentIntentId
+  ) {
+    console.log(`Duplicate checkout.session.completed ignored for registration ${registrationId}`);
     return;
   }
 
@@ -73,7 +104,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     where: { id: registrationId },
     data: {
       paymentStatus: "COMPLETED",
-      stripePaymentId: session.payment_intent as string,
+      stripePaymentId: paymentIntentId,
       amountPaidCents: session.amount_total || 0,
       status: "CONFIRMED",
     },
@@ -88,29 +119,33 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   });
 
   // Sync to HubSpot
-  try {
-    const hubspotContactId = await createOrUpdateContact({
-      email: registration.email,
-      firstname: registration.firstName,
-      lastname: registration.lastName,
-      company: registration.company || undefined,
-      jobtitle: registration.jobTitle || undefined,
-      phone: registration.phone || undefined,
-      workshop_name: registration.workshop.title,
-      workshop_date: registration.workshop.eventDate.toISOString(),
-      coach_name: `${registration.workshop.coach.firstName} ${registration.workshop.coach.lastName}`,
-    });
+  if (!process.env.HUBSPOT_ACCESS_TOKEN) {
+    console.warn("HUBSPOT_ACCESS_TOKEN is not set; skipping HubSpot sync");
+  } else {
+    try {
+      const hubspotContactId = await createOrUpdateContact({
+        email: registration.email,
+        firstname: registration.firstName,
+        lastname: registration.lastName,
+        company: registration.company || undefined,
+        jobtitle: registration.jobTitle || undefined,
+        phone: registration.phone || undefined,
+        workshop_name: registration.workshop.title,
+        workshop_date: registration.workshop.eventDate.toISOString(),
+        coach_name: `${registration.workshop.coach.firstName} ${registration.workshop.coach.lastName}`,
+      });
 
-    // Update registration with HubSpot contact ID
-    await db.registration.update({
-      where: { id: registrationId },
-      data: { hubspotContactId },
-    });
+      // Update registration with HubSpot contact ID
+      await db.registration.update({
+        where: { id: registrationId },
+        data: { hubspotContactId },
+      });
 
-    console.log(`HubSpot contact synced: ${hubspotContactId}`);
-  } catch (error) {
-    console.error("Failed to sync to HubSpot:", error);
-    // Don't fail the webhook - HubSpot sync can be retried
+      console.log(`HubSpot contact synced: ${hubspotContactId}`);
+    } catch (error) {
+      console.error("Failed to sync to HubSpot:", error);
+      // Don't fail the webhook - HubSpot sync can be retried
+    }
   }
 
   console.log(`Payment completed for registration: ${registrationId}`);
@@ -121,6 +156,25 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
 
   if (!registrationId) {
     console.error("No registrationId in payment intent metadata");
+    return;
+  }
+
+  const existing = await db.registration.findUnique({
+    where: { id: registrationId },
+    select: {
+      id: true,
+      paymentStatus: true,
+    },
+  });
+
+  if (!existing) {
+    console.warn(`Registration not found for failed payment ${paymentIntent.id}: ${registrationId}`);
+    return;
+  }
+
+  // Don't downgrade a completed payment on out-of-order webhook delivery.
+  if (existing.paymentStatus === "COMPLETED") {
+    console.log(`Ignoring payment_intent.payment_failed for already-completed registration ${registrationId}`);
     return;
   }
 

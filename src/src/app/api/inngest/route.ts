@@ -1,12 +1,12 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/inngest/client";
-// Import functions here as we create them
-// import { workshopCreated } from "@/inngest/functions/workshop-created";
+import { checkStaleApprovals } from "@/inngest/functions/check-stale-approvals";
+import { scheduleEmailSequence } from "@/inngest/functions/schedule-emails";
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
     functions: [
-        // Add functions here
-        // workshopCreated,
+        checkStaleApprovals,
+        scheduleEmailSequence,
     ],
 });

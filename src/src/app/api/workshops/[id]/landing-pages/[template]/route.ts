@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { canManageCoachData, getApiActor } from "@/lib/authorization";
 
 const VALID_TEMPLATES = ["BIO_PAGE", "SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] as const;
 type TemplateType = typeof VALID_TEMPLATES[number];
@@ -26,6 +27,14 @@ function generateSlug(workshopId: string, template: TemplateType, workshopTitle?
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const { id, template } = await params;
     const normalizedTemplate = normalizeTemplate(template);
 
@@ -33,6 +42,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json(
         { success: false, error: "Invalid template type" },
         { status: 400 }
+      );
+    }
+
+    const workshopAccess = await db.workshop.findUnique({
+      where: { id },
+      select: { coachId: true },
+    });
+
+    if (!workshopAccess || !canManageCoachData(actor, workshopAccess.coachId)) {
+      return NextResponse.json(
+        { success: false, error: "Workshop not found" },
+        { status: 404 }
       );
     }
 
@@ -61,6 +82,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const { id, template } = await params;
     const normalizedTemplate = normalizeTemplate(template);
 
@@ -84,10 +113,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // Check if workshop exists
     const workshop = await db.workshop.findUnique({
       where: { id },
-      select: { id: true, title: true },
+      select: { id: true, title: true, coachId: true },
     });
 
-    if (!workshop) {
+    if (!workshop || !canManageCoachData(actor, workshop.coachId)) {
       return NextResponse.json(
         { success: false, error: "Workshop not found" },
         { status: 404 }

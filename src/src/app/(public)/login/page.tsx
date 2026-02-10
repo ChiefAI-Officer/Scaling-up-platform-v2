@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const requestedCallbackUrl = searchParams.get("callbackUrl");
   const error = searchParams.get("error");
+  const showDemoCredentials = process.env.NODE_ENV !== "production";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,13 +30,18 @@ function LoginForm() {
         email,
         password,
         redirect: false,
-        callbackUrl,
+        callbackUrl: requestedCallbackUrl || "/dashboard",
       });
 
       if (result?.error) {
         setErrorMessage("Invalid email or password");
       } else if (result?.ok) {
-        router.push(callbackUrl);
+        const session = await getSession();
+        const role = (session?.user as { role?: string } | undefined)?.role;
+        const destination =
+          requestedCallbackUrl || (role === "COACH" ? "/portal/home" : "/dashboard");
+
+        router.push(destination);
         router.refresh();
       }
     } catch {
@@ -106,11 +112,13 @@ function LoginForm() {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-800 font-medium mb-2">Demo Credentials:</p>
-            <p className="text-xs text-blue-700">Email: admin@scalingup.com</p>
-            <p className="text-xs text-blue-700">Password: demo123</p>
-          </div>
+          {showDemoCredentials && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800 font-medium mb-2">Demo Credentials:</p>
+              <p className="text-xs text-blue-700">Email: admin@scalingup.com</p>
+              <p className="text-xs text-blue-700">Password: demo123</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

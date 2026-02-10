@@ -1,176 +1,201 @@
-/**
- * Integration Tests: Approvals API
- * Tests the /api/approvals routes.
- */
+jest.mock("next/server", () => ({
+  NextResponse: {
+    json: (body: unknown, init?: ResponseInit) =>
+      new Response(JSON.stringify(body), {
+        status: init?.status || 200,
+        headers: init?.headers,
+      }),
+  },
+}));
 
-// Mock Prisma
-jest.mock("@prisma/client", () => ({
-    PrismaClient: jest.fn().mockImplementation(() => ({
-        approvalQueue: {
-            findMany: jest.fn().mockResolvedValue([
-                {
-                    id: "apr-1",
-                    type: "WORKSHOP_REQUEST",
-                    status: "PENDING",
-                    requestData: JSON.stringify({ details: "Test workshop" }),
-                    requestedAt: new Date("2026-01-28"),
-                    coach: { firstName: "John", lastName: "Smith", email: "john@test.com" },
-                    workshop: { title: "Test Workshop", eventDate: new Date("2026-02-15") },
-                },
-            ]),
-            create: jest.fn().mockResolvedValue({ id: "new-approval-id" }),
-        },
-    })),
+jest.mock("@/lib/db", () => ({
+  db: {
+    approvalQueue: {
+      findMany: jest.fn(),
+    },
+  },
 }));
 
 jest.mock("@/lib/approval-engine", () => ({
-    evaluateApproval: jest.fn().mockResolvedValue({
-        autoApproved: false,
-        reason: "Requires manual review",
-        approvalId: "apr-new",
-        routeTo: "suzanne@test.com",
-    }),
-    ApprovalType: {},
+  evaluateApproval: jest.fn(),
 }));
 
-jest.mock("@/lib/audit", () => ({
-    logAudit: jest.fn().mockResolvedValue(undefined),
-}));
-
-// Mock the route handlers directly to avoid NextRequest issues
-jest.mock("@/app/api/approvals/route", () => ({
-    GET: jest.fn().mockImplementation(async (request: unknown) => {
-        const url = new URL((request as { url: string }).url);
-        const status = url.searchParams.get("status");
-
-        return new Response(
-            JSON.stringify({
-                approvals: [
-                    {
-                        id: "apr-1",
-                        type: "WORKSHOP_REQUEST",
-                        status: status || "PENDING",
-                        requestData: { details: "Test workshop" },
-                    },
-                ],
-            }),
-            { status: 200 }
-        );
-    }),
-    POST: jest.fn().mockImplementation(async (request: unknown) => {
-        const body = await (request as { json: () => Promise<{ type: string; coachId?: string; coachEmail?: string }> }).json();
-
-        // Validate required fields
-        const validTypes = [
-            "WORKSHOP_REQUEST",
-            "CUSTOM_PRICING",
-            "CANCELLATION",
-            "DATE_CHANGE",
-            "REFUND",
-        ];
-
-        if (!validTypes.includes(body.type)) {
-            return new Response(JSON.stringify({ error: "Invalid type" }), {
-                status: 400,
-            });
-        }
-
-        if (!body.coachId || !body.coachEmail) {
-            return new Response(JSON.stringify({ error: "Missing required fields" }), {
-                status: 400,
-            });
-        }
-
-        return new Response(
-            JSON.stringify({
-                autoApproved: false,
-                reason: "Requires manual review",
-                approvalId: "apr-new",
-            }),
-            { status: 200 }
-        );
-    }),
+jest.mock("@/lib/authorization", () => ({
+  getApiActor: jest.fn(),
+  isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
 }));
 
 import { GET, POST } from "@/app/api/approvals/route";
-import { NextRequest } from "next/server";
+import { db } from "@/lib/db";
+import { evaluateApproval } from "@/lib/approval-engine";
+import { getApiActor } from "@/lib/authorization";
+
+function buildRequest(url: string, init?: RequestInit): Request {
+  return new Request(url, init);
+}
+
+function asGetRequest(request: Request): Parameters<typeof GET>[0] {
+  return request as unknown as Parameters<typeof GET>[0];
+}
+
+function asPostRequest(request: Request): Parameters<typeof POST>[0] {
+  return request as unknown as Parameters<typeof POST>[0];
+}
 
 describe("Approvals API", () => {
-    describe("GET /api/approvals", () => {
-        it("should return list of pending approvals", async () => {
-            const mockRequest = {
-                url: "http://localhost/api/approvals?status=PENDING",
-            };
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (evaluateApproval as jest.Mock).mockResolvedValue({
+      autoApproved: false,
+      reason: "Queued for review",
+      approvalId: "apr-1",
+      routeTo: "admin@scalingup.com",
+    });
+  });
 
-            const response = await GET(mockRequest as unknown as NextRequest);
-            const data = await response.json();
+  describe("GET /api/approvals", () => {
+    it("returns 401 when unauthenticated", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(null);
 
-            expect(response.status).toBe(200);
-            expect(data.approvals).toBeDefined();
-            expect(Array.isArray(data.approvals)).toBe(true);
-        });
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
 
-        it("should filter by status parameter", async () => {
-            const mockRequest = {
-                url: "http://localhost/api/approvals?status=APPROVED",
-            };
-
-            const response = await GET(mockRequest as unknown as NextRequest);
-
-            expect(response.status).toBe(200);
-        });
+      expect(response.status).toBe(401);
     });
 
-    describe("POST /api/approvals", () => {
-        it("should create approval request with valid input", async () => {
-            const mockRequest = {
-                url: "http://localhost/api/approvals",
-                method: "POST",
-                json: async () => ({
-                    type: "WORKSHOP_REQUEST",
-                    coachId: "coach-123",
-                    coachEmail: "coach@example.com",
-                    details: "New workshop request",
-                    requestedBy: "Coach Name",
-                }),
-            };
+    it("returns 403 for coach users", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-1",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
 
-            const response = await POST(mockRequest as unknown as NextRequest);
-            const data = await response.json();
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
 
-            expect(response.status).toBe(200);
-            expect(data.autoApproved).toBeDefined();
-            expect(data.reason).toBeDefined();
-        });
-
-        it("should return 400 for invalid input", async () => {
-            const mockRequest = {
-                url: "http://localhost/api/approvals",
-                method: "POST",
-                json: async () => ({
-                    type: "INVALID_TYPE",
-                    coachId: "coach-123",
-                }),
-            };
-
-            const response = await POST(mockRequest as unknown as NextRequest);
-
-            expect(response.status).toBe(400);
-        });
-
-        it("should return 400 for missing required fields", async () => {
-            const mockRequest = {
-                url: "http://localhost/api/approvals",
-                method: "POST",
-                json: async () => ({
-                    type: "WORKSHOP_REQUEST",
-                    // Missing coachId, coachEmail, etc.
-                }),
-            };
-
-            const response = await POST(mockRequest as unknown as NextRequest);
-
-            expect(response.status).toBe(400);
-        });
+      expect(response.status).toBe(403);
     });
+
+    it("sanitizes invalid status and caps limit", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-1",
+          type: "WORKSHOP_REQUEST",
+          status: "PENDING",
+          requestData: "{invalid-json}",
+          coachId: "coach-1",
+          workshopId: "ws-1",
+          requestedAt: new Date("2026-02-01T10:00:00.000Z"),
+          escalatedAt: null,
+        },
+      ]);
+
+      const response = await GET(
+        asGetRequest(buildRequest("http://localhost/api/approvals?status=bad-status&limit=999"))
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(db.approvalQueue.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: "PENDING" },
+          take: 100,
+        })
+      );
+      expect(body.total).toBe(1);
+      expect(body.approvals[0].requestData).toBeNull();
+    });
+  });
+
+  describe("POST /api/approvals", () => {
+    it("returns 400 when admin/staff request omits coach identity", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "staff-1",
+        email: "staff@example.com",
+        role: "STAFF",
+        coachId: null,
+      });
+
+      const response = await POST(
+        asPostRequest(
+          buildRequest("http://localhost/api/approvals", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              type: "WORKSHOP_REQUEST",
+              details: "Needs approval",
+            }),
+          })
+        )
+      );
+
+      expect(response.status).toBe(400);
+      expect(evaluateApproval).not.toHaveBeenCalled();
+    });
+
+    it("blocks coach identity spoofing", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "coach-user",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
+
+      const response = await POST(
+        asPostRequest(
+          buildRequest("http://localhost/api/approvals", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              type: "WORKSHOP_REQUEST",
+              coachId: "coach-2",
+            }),
+          })
+        )
+      );
+
+      expect(response.status).toBe(403);
+      expect(evaluateApproval).not.toHaveBeenCalled();
+    });
+
+    it("derives coach identity from session actor and builds fallback details", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "coach-user",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
+
+      const response = await POST(
+        asPostRequest(
+          buildRequest("http://localhost/api/approvals", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              type: "WORKSHOP_REQUEST",
+              workshopTypeId: "scaling-up",
+              title: "Q2 Growth Intensive",
+              eventDate: "2026-04-10",
+            }),
+          })
+        )
+      );
+
+      expect(response.status).toBe(200);
+      expect(evaluateApproval).toHaveBeenCalledWith(
+        expect.objectContaining({
+          coachId: "coach-1",
+          coachEmail: "coach@example.com",
+          requestedBy: "coach@example.com",
+          workshopTypeSlug: "scaling-up",
+          details: "Workshop: Q2 Growth Intensive on 2026-04-10",
+        })
+      );
+    });
+  });
 });

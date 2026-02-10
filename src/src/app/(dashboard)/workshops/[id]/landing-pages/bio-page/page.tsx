@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -163,9 +164,9 @@ export default function BioPageEditor() {
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <a href="/workshops" className="hover:text-gray-700">Workshops</a>
+          <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
           <span>/</span>
-          <a href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Landing Pages</a>
+          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Landing Pages</Link>
           <span>/</span>
           <span className="text-gray-900">Bio Page</span>
         </div>

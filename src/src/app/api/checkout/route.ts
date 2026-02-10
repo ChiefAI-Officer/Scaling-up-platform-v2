@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createCheckoutSession } from "@/services/stripe";
 import { z } from "zod";
+import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 
 const checkoutSchema = z.object({
   registrationId: z.string().min(1, "Registration ID is required"),
@@ -9,13 +10,21 @@ const checkoutSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimit = await withRateLimit(request, RateLimits.registration);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: "Too many requests. Please try again shortly." },
+        { status: 429, headers: rateLimit.headers }
+      );
+    }
+
     const body = await request.json();
     const validation = checkoutSchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
         { success: false, error: validation.error.issues },
-        { status: 400 }
+        { status: 400, headers: rateLimit.headers }
       );
     }
 
@@ -35,26 +44,32 @@ export async function POST(request: NextRequest) {
     if (!registration) {
       return NextResponse.json(
         { success: false, error: "Registration not found" },
-        { status: 404 }
+        { status: 404, headers: rateLimit.headers }
       );
     }
 
     if (registration.workshop.isFree) {
       return NextResponse.json(
         { success: false, error: "This workshop is free, no payment required" },
-        { status: 400 }
+        { status: 400, headers: rateLimit.headers }
       );
     }
 
     if (registration.paymentStatus === "COMPLETED") {
       return NextResponse.json(
         { success: false, error: "Payment already completed" },
-        { status: 400 }
+        { status: 400, headers: rateLimit.headers }
       );
     }
 
     const appUrl = process.env.APP_URL || "http://localhost:3000";
     const priceCents = registration.workshop.priceCents || 0;
+    if (priceCents <= 0) {
+      return NextResponse.json(
+        { success: false, error: "Workshop pricing is not configured" },
+        { status: 400, headers: rateLimit.headers }
+      );
+    }
 
     const session = await createCheckoutSession({
       workshopId: registration.workshop.id,
@@ -63,7 +78,9 @@ export async function POST(request: NextRequest) {
       registrationId: registration.id,
       customerEmail: registration.email,
       successUrl: `${appUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${appUrl}/workshop/${registration.workshop.landingPageSlug}?cancelled=true`,
+      cancelUrl: registration.workshop.landingPageSlug
+        ? `${appUrl}/workshop/${registration.workshop.landingPageSlug}?cancelled=true`
+        : `${appUrl}/`,
     });
 
     // Save session ID to registration
@@ -72,13 +89,20 @@ export async function POST(request: NextRequest) {
       data: { stripeSessionId: session.id },
     });
 
+    if (!session.url) {
+      return NextResponse.json(
+        { success: false, error: "Failed to initialize checkout session" },
+        { status: 500, headers: rateLimit.headers }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         sessionId: session.id,
         url: session.url,
       },
-    });
+    }, { headers: rateLimit.headers });
   } catch (error) {
     console.error("Error creating checkout session:", error);
     return NextResponse.json(

@@ -1,18 +1,84 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createRegistrationSchema } from "@/lib/validations";
+import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { inngest } from "@/inngest/client";
+import {
+  createWorkshopRegistration,
+  RegistrationServiceError,
+} from "@/lib/registration-service";
+
+async function publishRegistrationCreatedEvent(registration: {
+  id: string;
+  workshopId: string;
+  email: string;
+  firstName: string;
+}) {
+  if (process.env.NODE_ENV === "test" || !process.env.INNGEST_EVENT_KEY) {
+    return;
+  }
+
+  try {
+    await inngest.send({
+      name: "registration/created",
+      data: {
+        registrationId: registration.id,
+        workshopId: registration.workshopId,
+        email: registration.email,
+        firstName: registration.firstName,
+      },
+    });
+  } catch (error) {
+    // Preserve registration success even if async workflow emission fails.
+    console.error("Failed to publish registration/created event:", error);
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const workshopId = searchParams.get("workshopId");
-    const page = parseInt(searchParams.get("page") || "1");
-    const pageSize = parseInt(searchParams.get("pageSize") || "50");
+    const parsedPage = parseInt(searchParams.get("page") || "1", 10);
+    const parsedPageSize = parseInt(searchParams.get("pageSize") || "50", 10);
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+    const pageSize =
+      Number.isFinite(parsedPageSize) && parsedPageSize > 0
+        ? Math.min(100, parsedPageSize)
+        : 50;
 
     if (!workshopId) {
       return NextResponse.json(
         { success: false, error: "workshopId is required" },
         { status: 400 }
+      );
+    }
+
+    const workshop = await db.workshop.findUnique({
+      where: { id: workshopId },
+      select: { id: true, coachId: true },
+    });
+
+    if (!workshop) {
+      return NextResponse.json(
+        { success: false, error: "Workshop not found" },
+        { status: 404 }
+      );
+    }
+
+    if (!canManageCoachData(actor, workshop.coachId)) {
+      // Hide existence if user is not allowed.
+      return NextResponse.json(
+        { success: false, error: "Workshop not found" },
+        { status: 404 }
       );
     }
 
@@ -56,6 +122,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimit = await withRateLimit(request, RateLimits.registration);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please try again shortly." },
+      { status: 429, headers: rateLimit.headers }
+    );
+  }
+
   try {
     const body = await request.json();
     const validation = createRegistrationSchema.safeParse(body);
@@ -63,79 +137,19 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json(
         { success: false, error: validation.error.issues },
-        { status: 400 }
+        { status: 400, headers: rateLimit.headers }
       );
     }
 
-    const data = validation.data;
-
-    // Verify workshop exists and is open for registration
-    const workshop = await db.workshop.findUnique({
-      where: { id: data.workshopId },
-      include: {
-        _count: { select: { registrations: true } },
-      },
+    const { registration } = await createWorkshopRegistration(validation.data, {
+      includeWorkshopDetails: true,
     });
 
-    if (!workshop) {
-      return NextResponse.json(
-        { success: false, error: "Workshop not found" },
-        { status: 404 }
-      );
-    }
-
-    if (!["REGISTRATION_OPEN", "MARKETING_ACTIVE"].includes(workshop.status)) {
-      return NextResponse.json(
-        { success: false, error: "Workshop is not open for registration" },
-        { status: 400 }
-      );
-    }
-
-    // Check capacity
-    if (workshop._count.registrations >= workshop.maxAttendees) {
-      return NextResponse.json(
-        { success: false, error: "Workshop is at full capacity" },
-        { status: 400 }
-      );
-    }
-
-    // Check for duplicate registration
-    const existing = await db.registration.findFirst({
-      where: {
-        workshopId: data.workshopId,
-        email: data.email,
-        status: { not: "CANCELLED" },
-      },
-    });
-
-    if (existing) {
-      return NextResponse.json(
-        { success: false, error: "You are already registered for this workshop" },
-        { status: 400 }
-      );
-    }
-
-    // Create registration
-    const registration = await db.registration.create({
-      data: {
-        workshopId: data.workshopId,
-        email: data.email,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        company: data.company,
-        jobTitle: data.jobTitle,
-        phone: data.phone,
-        paymentStatus: workshop.isFree ? "FREE" : "PENDING",
-        status: "REGISTERED",
-      },
-      include: {
-        workshop: {
-          include: {
-            workshopType: true,
-            coach: true,
-          },
-        },
-      },
+    await publishRegistrationCreatedEvent({
+      id: registration.id,
+      workshopId: registration.workshopId,
+      email: registration.email,
+      firstName: registration.firstName,
     });
 
     return NextResponse.json(
@@ -144,9 +158,16 @@ export async function POST(request: NextRequest) {
         data: registration,
         message: "Registration successful",
       },
-      { status: 201 }
+      { status: 201, headers: rateLimit.headers }
     );
   } catch (error) {
+    if (error instanceof RegistrationServiceError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: error.status, headers: rateLimit.headers }
+      );
+    }
+
     console.error("Error creating registration:", error);
     return NextResponse.json(
       { success: false, error: "Failed to create registration" },
