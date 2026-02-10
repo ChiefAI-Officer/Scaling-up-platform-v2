@@ -20,6 +20,15 @@ export const dateSchema = z.coerce.date();
 
 export const idSchema = z.string().min(1, "ID is required");
 
+export const strongPasswordSchema = z
+    .string()
+    .min(12, "Password must be at least 12 characters")
+    .max(128, "Password must be 128 characters or less")
+    .regex(/[a-z]/, "Password must include at least one lowercase letter")
+    .regex(/[A-Z]/, "Password must include at least one uppercase letter")
+    .regex(/[0-9]/, "Password must include at least one number")
+    .regex(/[^A-Za-z0-9]/, "Password must include at least one special character");
+
 // ============================================================
 // Workshop Schemas
 // ============================================================
@@ -163,6 +172,32 @@ export const createCoachSchema = z.object({
 });
 
 export const updateCoachSchema = createCoachSchema.partial();
+
+export const coachSignupSchema = z
+    .object({
+        email: emailSchema,
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+        company: z.string().optional(),
+        phone: phoneSchema,
+        password: strongPasswordSchema,
+        confirmPassword: z.string().min(1, "Please confirm your password"),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+        path: ["confirmPassword"],
+        message: "Passwords do not match",
+    });
+
+export const changePasswordSchema = z
+    .object({
+        currentPassword: z.string().min(1, "Current password is required"),
+        newPassword: strongPasswordSchema,
+        confirmNewPassword: z.string().min(1, "Please confirm your new password"),
+    })
+    .refine((data) => data.newPassword === data.confirmNewPassword, {
+        path: ["confirmNewPassword"],
+        message: "New passwords do not match",
+    });
 
 // ============================================================
 // Landing Page Schemas

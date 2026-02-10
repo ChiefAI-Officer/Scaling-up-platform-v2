@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { createCheckoutSession } from "@/services/stripe";
+import { createCheckoutSession, StripeDiscountCodeError } from "@/services/stripe";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import {
   createWorkshopRegistration,
@@ -14,6 +14,7 @@ interface RegistrationInput {
   company?: string;
   jobTitle?: string;
   phone?: string;
+  discountCode?: string;
 }
 
 function normalizeOptionalString(value: unknown): string | undefined {
@@ -78,6 +79,7 @@ async function parseRegistrationInput(request: NextRequest): Promise<Registratio
     company: normalizeOptionalString(payload.company),
     jobTitle: normalizeOptionalString(payload.jobTitle),
     phone: normalizeOptionalString(payload.phone),
+    discountCode: normalizeOptionalString(payload.discountCode),
   };
 }
 
@@ -124,8 +126,10 @@ export async function POST(
       return jsonError("Missing required registration fields", 400, rateLimit.headers);
     }
 
+    const { discountCode, ...registrationInput } = input;
+
     const { registration, workshop } = await createWorkshopRegistration({
-      ...input,
+      ...registrationInput,
       workshopId,
     });
 
@@ -155,6 +159,7 @@ export async function POST(
       priceCents,
       registrationId: registration.id,
       customerEmail: registration.email,
+      discountCode,
       successUrl: `${appUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: workshop.landingPageSlug
         ? `${appUrl}/workshop/${workshop.landingPageSlug}?cancelled=true`
@@ -184,6 +189,10 @@ export async function POST(
       { status: 201, headers: rateLimit.headers }
     );
   } catch (error) {
+    if (error instanceof StripeDiscountCodeError) {
+      return jsonError(error.message, 400, rateLimit.headers);
+    }
+
     if (error instanceof RegistrationServiceError) {
       return jsonError(error.message, error.status, rateLimit.headers);
     }

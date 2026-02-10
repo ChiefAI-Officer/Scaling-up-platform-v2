@@ -33,6 +33,12 @@ export default function Home() {
           >
             Access Dashboard
           </Link>
+          <Link
+            href="/register"
+            className="bg-white text-blue-700 border border-blue-200 px-8 py-4 rounded-lg text-lg font-medium hover:bg-blue-50 transition-colors"
+          >
+            Coach Sign Up
+          </Link>
         </div>
 
         {/* Features */}

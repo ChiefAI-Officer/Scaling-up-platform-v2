@@ -19,8 +19,32 @@ interface CreateCheckoutSessionParams {
   priceCents: number;
   registrationId: string;
   customerEmail: string;
+  discountCode?: string;
   successUrl: string;
   cancelUrl: string;
+}
+
+export class StripeDiscountCodeError extends Error {
+  constructor(message: string = "Discount code is invalid or expired") {
+    super(message);
+    this.name = "StripeDiscountCodeError";
+  }
+}
+
+function isPromotionCodeRedeemable(code: Stripe.PromotionCode): boolean {
+  if (!code.active) {
+    return false;
+  }
+
+  if (typeof code.max_redemptions === "number" && code.times_redeemed >= code.max_redemptions) {
+    return false;
+  }
+
+  if (typeof code.expires_at === "number" && code.expires_at * 1000 <= Date.now()) {
+    return false;
+  }
+
+  return true;
 }
 
 export async function createCheckoutSession({
@@ -29,10 +53,40 @@ export async function createCheckoutSession({
   priceCents,
   registrationId,
   customerEmail,
+  discountCode,
   successUrl,
   cancelUrl,
 }: CreateCheckoutSessionParams): Promise<Stripe.Checkout.Session> {
   const stripe = getStripeClient();
+  const normalizedDiscountCode = discountCode?.trim();
+  let discounts: Stripe.Checkout.SessionCreateParams.Discount[] | undefined;
+
+  if (normalizedDiscountCode) {
+    const promotionCodeLookup = await stripe.promotionCodes.list({
+      code: normalizedDiscountCode,
+      active: true,
+      limit: 10,
+    });
+
+    const promotionCode = promotionCodeLookup.data.find((item) =>
+      isPromotionCodeRedeemable(item)
+    );
+
+    if (!promotionCode) {
+      throw new StripeDiscountCodeError();
+    }
+
+    discounts = [{ promotion_code: promotionCode.id }];
+  }
+
+  const metadata: Record<string, string> = {
+    workshopId,
+    registrationId,
+  };
+  if (normalizedDiscountCode) {
+    metadata.discountCode = normalizedDiscountCode;
+  }
+
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
     line_items: [
@@ -49,16 +103,22 @@ export async function createCheckoutSession({
       },
     ],
     mode: "payment",
+    allow_promotion_codes: true,
+    discounts,
     success_url: successUrl,
     cancel_url: cancelUrl,
     customer_email: customerEmail,
-    metadata: {
-      workshopId,
-      registrationId,
-    },
+    metadata,
   });
 
   return session;
+}
+
+export async function retrieveCheckoutSession(
+  sessionId: string
+): Promise<Stripe.Checkout.Session> {
+  const stripe = getStripeClient();
+  return stripe.checkout.sessions.retrieve(sessionId);
 }
 
 export async function createProductAndPrice(

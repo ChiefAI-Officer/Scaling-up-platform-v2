@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatDate, parseJsonField, VenueAddress } from "@/lib/utils";
+import { retrieveCheckoutSession } from "@/services/stripe";
+import { IdevTracking } from "@/components/affiliate/idev-tracking";
 
 interface SuccessPageProps {
   searchParams: Promise<{ id?: string; session_id?: string }>;
@@ -39,6 +41,22 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
     });
   }
 
+  let checkoutAmountCents: number | null = null;
+  let checkoutCurrency = "usd";
+  if (session_id) {
+    try {
+      const checkoutSession = await retrieveCheckoutSession(session_id);
+      if (typeof checkoutSession.amount_total === "number") {
+        checkoutAmountCents = checkoutSession.amount_total;
+      }
+      if (checkoutSession.currency) {
+        checkoutCurrency = checkoutSession.currency;
+      }
+    } catch (error) {
+      console.error("Unable to retrieve checkout session for affiliate tracking:", error);
+    }
+  }
+
   if (!registration) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -61,8 +79,40 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
     );
   }
 
+  const idevScriptUrl = process.env.IDEV_SCRIPT_URL?.trim();
+  const isPaidWorkshop = !registration.workshop.isFree;
+  const paidAmountCents =
+    registration.amountPaidCents ??
+    checkoutAmountCents ??
+    registration.workshop.priceCents ??
+    0;
+
+  const shouldTrackAffiliate =
+    Boolean(idevScriptUrl) &&
+    /^https?:\/\//i.test(idevScriptUrl || "") &&
+    isPaidWorkshop &&
+    paidAmountCents > 0;
+
+  const affiliateProductCode =
+    registration.workshop.workshopType.slug || registration.workshop.workshopType.name;
+  const affiliateOrderNumber =
+    registration.stripePaymentId ||
+    registration.stripeSessionId ||
+    session_id ||
+    registration.id;
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
+      {shouldTrackAffiliate && idevScriptUrl && (
+        <IdevTracking
+          scriptUrl={idevScriptUrl}
+          saleAmount={(paidAmountCents / 100).toFixed(2)}
+          orderNumber={affiliateOrderNumber}
+          productCode={affiliateProductCode}
+          customerEmail={registration.email}
+          currency={checkoutCurrency}
+        />
+      )}
       <div className="max-w-2xl mx-auto px-4">
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           {/* Success Header */}

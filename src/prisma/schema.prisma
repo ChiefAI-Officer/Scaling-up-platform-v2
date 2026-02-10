@@ -18,12 +18,14 @@ model User {
   name          String?
   role          String    @default("STAFF")
   image         String?
+  passwordHash  String?   // Sprint 1: Password hashing for credentials auth
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts Account[]
-  sessions Session[]
+  accounts     Account[]
+  sessions     Session[]
+  coachProfile Coach?     // Sprint 1: User↔Coach FK
 
   @@map("users")
 }
@@ -65,6 +67,7 @@ model Session {
 
 model Coach {
   id                  String    @id @default(cuid())
+  userId              String?   @unique  // Sprint 1: Link to User for auth
   hubspotId           String?   @unique
   circleId            String?   @unique
   email               String    @unique
@@ -83,6 +86,7 @@ model Coach {
   updatedAt           DateTime  @updatedAt
   syncedAt            DateTime?
 
+  user            User?            @relation(fields: [userId], references: [id])  // Sprint 1: User relation
   workshops       Workshop[]
   certifications  CoachCertification[]
   approvals       ApprovalQueue[]
@@ -179,6 +183,11 @@ model Workshop {
 
   // Capacity
   maxAttendees Int @default(50)
+
+  // Sprint 1: Workshop Locking (48h before event)
+  isLocked  Boolean   @default(false)
+  lockedAt  DateTime?
+  lockedBy  String?   // User ID who locked it, or 'SYSTEM'
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -404,6 +413,24 @@ model LandingPage {
 
   @@unique([workshopId, template])
   @@map("landing_pages")
+}
+
+// ============================================
+// V2: Workshop Drafts (Auto-Save for Wizard)
+// ============================================
+
+model WorkshopDraft {
+  id          String   @id @default(cuid())
+  userId      String   // User who started the draft
+  workshopId  String?  @unique // Null if not yet saved, linked to Workshop if resumed
+  currentStep Int      @default(1) // 1=Details, 2=Schedule, 3=Pricing
+  stepsData   String   // JSON containing all form data across steps
+  lastSavedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@map("workshop_drafts")
 }
 
 // ============================================

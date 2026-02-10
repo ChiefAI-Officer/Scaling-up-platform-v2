@@ -7,6 +7,8 @@ import {
   updateWorkshopSchema,
   createCoachSchema,
   createRegistrationSchema,
+  coachSignupSchema,
+  changePasswordSchema,
 } from "@/lib/validations";
 
 describe("Workshop Validation Schemas", () => {
@@ -224,5 +226,66 @@ describe("Registration Validation Schema", () => {
       const { workshopId: ___, ...withoutWorkshopId } = validRegistration; void ___;
       const result = createRegistrationSchema.safeParse(withoutWorkshopId);
       expect(result.success).toBe(false);
+  });
+});
+
+describe("Authentication Validation Schemas", () => {
+  describe("coachSignupSchema", () => {
+    const strongSecret = "SecurePass123!";
+    const weakSecret = "weakpass";
+    const differentSecret = "SecurePass123@";
+    const validSignup = {
+      email: "new.coach@example.com",
+      firstName: "New",
+      lastName: "Coach",
+      password: strongSecret,
+      confirmPassword: strongSecret,
+    };
+
+    it("should accept valid coach signup data", () => {
+      const result = coachSignupSchema.safeParse(validSignup);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject weak password", () => {
+      const result = coachSignupSchema.safeParse({
+        ...validSignup,
+        password: weakSecret,
+        confirmPassword: weakSecret,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject mismatched passwords", () => {
+      const result = coachSignupSchema.safeParse({
+        ...validSignup,
+        confirmPassword: differentSecret,
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("changePasswordSchema", () => {
+    const currentSecret = "CurrentPass123!";
+    const nextSecret = "NewSecurePass123!";
+    const wrongConfirmSecret = "WrongConfirm123!";
+    const validPayload = {
+      currentPassword: currentSecret,
+      newPassword: nextSecret,
+      confirmNewPassword: nextSecret,
+    };
+
+    it("should accept valid password change payload", () => {
+      const result = changePasswordSchema.safeParse(validPayload);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject mismatched new password confirmation", () => {
+      const result = changePasswordSchema.safeParse({
+        ...validPayload,
+        confirmNewPassword: wrongConfirmSecret,
+      });
+      expect(result.success).toBe(false);
+    });
   });
 });

@@ -5,6 +5,11 @@ import { db } from "./db";
 // User roles for authorization
 export type UserRole = "ADMIN" | "STAFF" | "COACH";
 
+function isCanonicalAdminEmail(email: string): boolean {
+  const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  return !configuredAdminEmail || email.toLowerCase() === configuredAdminEmail;
+}
+
 declare module "next-auth" {
   interface Session {
     user: {
@@ -86,6 +91,13 @@ export const authOptions: NextAuthOptions = {
           if (!isValid) {
             throw new Error(INVALID_CREDENTIALS);
           }
+        }
+
+        if (user.role === "ADMIN" && !isCanonicalAdminEmail(user.email)) {
+          console.error(
+            `Blocked non-canonical admin login for ${user.email}. Expected ${process.env.ADMIN_EMAIL}.`
+          );
+          throw new Error(INVALID_CREDENTIALS);
         }
 
         return {

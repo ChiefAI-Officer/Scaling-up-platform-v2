@@ -57,12 +57,23 @@ export default function RegistrationPageEditor() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [workshopRes, pageRes] = await Promise.all([
+        const [workshopRes, pageRes, bioPageRes] = await Promise.all([
           fetch(`/api/workshops/${workshopId}`),
           fetch(`/api/workshops/${workshopId}/landing-pages/REGISTRATION`),
+          fetch(`/api/workshops/${workshopId}/landing-pages/BIO_PAGE`),
         ]);
 
         const workshopData = await workshopRes.json();
+        const bioPageData = await bioPageRes.json();
+        const bioPageContent = bioPageData.success && bioPageData.data
+          ? JSON.parse(bioPageData.data.content)
+          : null;
+
+        const bioProfileImage =
+          typeof bioPageContent?.profileImageUrl === "string"
+            ? bioPageContent.profileImageUrl
+            : "";
+
         if (workshopData.success) {
           const w = workshopData.data;
           const eventDate = new Date(w.eventDate);
@@ -70,7 +81,7 @@ export default function RegistrationPageEditor() {
           setFormData((prev) => ({
             ...prev,
             coachName: `${w.coach.firstName} ${w.coach.lastName}`,
-            coachPhoto: w.coach.profileImage || "",
+            coachPhoto: bioProfileImage || w.coach.profileImage || "",
             workshopTitle: w.title,
             eventDate: eventDate.toLocaleDateString("en-US", { 
               weekday: "long", month: "long", day: "numeric", year: "numeric" 
@@ -167,10 +178,9 @@ export default function RegistrationPageEditor() {
                 <Label htmlFor="coachTitle">Coach Title</Label>
                 <Input id="coachTitle" name="coachTitle" value={formData.coachTitle} onChange={handleChange} className="mt-1" />
               </div>
-              <div>
-                <Label htmlFor="coachPhoto">Coach Photo URL</Label>
-                <Input id="coachPhoto" name="coachPhoto" value={formData.coachPhoto} onChange={handleChange} className="mt-1" />
-              </div>
+              <p className="text-xs text-gray-500">
+                Coach photo is automatically sourced from the coach bio page profile image.
+              </p>
             </CardContent>
           </Card>
 

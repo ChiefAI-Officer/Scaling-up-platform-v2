@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { createCheckoutSession } from "@/services/stripe";
+import { createCheckoutSession, StripeDiscountCodeError } from "@/services/stripe";
 import { z } from "zod";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 
 const checkoutSchema = z.object({
   registrationId: z.string().min(1, "Registration ID is required"),
+  discountCode: z.preprocess(
+    (value) => {
+      if (typeof value !== "string") {
+        return undefined;
+      }
+
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : undefined;
+    },
+    z.string().max(64, "Discount code is too long").optional()
+  ),
 });
 
 export async function POST(request: NextRequest) {
@@ -28,7 +39,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { registrationId } = validation.data;
+    const { registrationId, discountCode } = validation.data;
 
     const registration = await db.registration.findUnique({
       where: { id: registrationId },
@@ -77,6 +88,7 @@ export async function POST(request: NextRequest) {
       priceCents,
       registrationId: registration.id,
       customerEmail: registration.email,
+      discountCode,
       successUrl: `${appUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: registration.workshop.landingPageSlug
         ? `${appUrl}/workshop/${registration.workshop.landingPageSlug}?cancelled=true`
@@ -104,6 +116,13 @@ export async function POST(request: NextRequest) {
       },
     }, { headers: rateLimit.headers });
   } catch (error) {
+    if (error instanceof StripeDiscountCodeError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 400 }
+      );
+    }
+
     console.error("Error creating checkout session:", error);
     return NextResponse.json(
       { success: false, error: "Failed to create checkout session" },

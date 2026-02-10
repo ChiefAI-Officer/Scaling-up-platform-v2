@@ -22,6 +22,7 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
     company: "",
     jobTitle: "",
     phone: "",
+    discountCode: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,6 +64,7 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             registrationId: registrationData.data.id,
+            discountCode: formData.discountCode.trim() || undefined,
           }),
         });
 
@@ -161,6 +163,19 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
           className="mt-1"
         />
       </div>
+
+      {!isFree && (
+        <div>
+          <Label htmlFor="discountCode">Discount Code (optional)</Label>
+          <Input
+            id="discountCode"
+            name="discountCode"
+            value={formData.discountCode}
+            onChange={handleChange}
+            className="mt-1"
+          />
+        </div>
+      )}
 
       <Button type="submit" className="w-full" size="lg" disabled={loading}>
         {loading ? (

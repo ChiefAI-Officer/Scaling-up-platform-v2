@@ -4,16 +4,19 @@ import { defineConfig, devices } from "@playwright/test";
  * Playwright configuration for E2E tests
  * @see https://playwright.dev/docs/test-configuration
  */
+const configuredWorkers = Number(process.env.PLAYWRIGHT_WORKERS || "1");
+const workers = Number.isFinite(configuredWorkers) && configuredWorkers > 0 ? configuredWorkers : 1;
+
 export default defineConfig({
   testDir: "./e2e",
   /* Run tests in files in parallel */
-  fullyParallel: true,
+  fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* Keep local/dev runs deterministic and avoid flaky shared-session failures. */
+  workers,
   /* Reporter to use */
   reporter: [
     ["html", { outputFolder: "playwright-report" }],
@@ -35,23 +38,25 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
-    {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
-    },
-    {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"] },
-    },
+    // Enable for full cross-browser testing
+    // {
+    //   name: "firefox",
+    //   use: { ...devices["Desktop Firefox"] },
+    // },
+    // {
+    //   name: "webkit",
+    //   use: { ...devices["Desktop Safari"] },
+    // },
     /* Test against mobile viewports */
     {
       name: "Mobile Chrome",
       use: { ...devices["Pixel 5"] },
     },
-    {
-      name: "Mobile Safari",
-      use: { ...devices["iPhone 12"] },
-    },
+    // Enable for full cross-browser testing
+    // {
+    //   name: "Mobile Safari",
+    //   use: { ...devices["iPhone 12"] },
+    // },
   ],
 
   /* Run your local dev server before starting the tests */

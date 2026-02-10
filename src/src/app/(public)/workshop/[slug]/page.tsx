@@ -13,6 +13,7 @@ interface BioContent {
   coachName?: string;
   coachTitle?: string;
   biography?: string;
+  showCtaButton?: boolean;
   ctaButtonUrl?: string;
   ctaButtonText?: string;
 }
@@ -277,6 +278,7 @@ function BioPageTemplate({ content }: { content: BioContent }) {
   const title = content.coachTitle || "";
   const bio = content.biography || "";
   const profileImage = content.profileImageUrl || "";
+  const showCtaButton = content.showCtaButton !== false;
   const ctaUrl = content.ctaButtonUrl || "";
   const ctaText = content.ctaButtonText || "Book a Call";
 
@@ -304,7 +306,7 @@ function BioPageTemplate({ content }: { content: BioContent }) {
           ))}
         </div>
 
-        {ctaUrl && (
+        {showCtaButton && ctaUrl && (
           <a
             href={ctaUrl}
             className="inline-block bg-purple-600 text-white px-8 py-4 rounded-full font-semibold hover:bg-purple-700 transition"

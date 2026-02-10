@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useState } from "react";
 import { getSession, signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,6 +14,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const requestedCallbackUrl = searchParams.get("callbackUrl");
   const error = searchParams.get("error");
+  const wasRegistered = searchParams.get("registered") === "true";
   const showDemoCredentials = process.env.NODE_ENV !== "production";
 
   const [email, setEmail] = useState("");
@@ -64,6 +66,14 @@ function LoginForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {wasRegistered && (
+              <div
+                className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm"
+              >
+                Coach account created. Sign in with your new credentials.
+              </div>
+            )}
+
             {errorMessage && (
               <div
                 role="alert"
@@ -110,6 +120,13 @@ function LoginForm() {
             >
               {isLoading ? "Signing in..." : "Sign in"}
             </Button>
+
+            <p className="text-center text-sm text-gray-600">
+              New coach?{" "}
+              <Link href="/register" className="font-medium text-blue-600 hover:text-blue-700">
+                Create an account
+              </Link>
+            </p>
           </form>
 
           {showDemoCredentials && (

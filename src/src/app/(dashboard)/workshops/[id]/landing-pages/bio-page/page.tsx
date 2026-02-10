@@ -13,6 +13,7 @@ interface BioPageData {
   coachTitle: string;
   biography: string;
   profileImageUrl: string;
+  showCtaButton: boolean;
   ctaButtonText: string;
   ctaButtonUrl: string;
 }
@@ -45,6 +46,7 @@ export default function BioPageEditor() {
     coachTitle: "Scaling Up Certified Coach",
     biography: "",
     profileImageUrl: "",
+    showCtaButton: true,
     ctaButtonText: "Book a Free Call",
     ctaButtonUrl: "",
   });
@@ -90,8 +92,10 @@ export default function BioPageEditor() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target;
+    const nextValue =
+      type === "checkbox" ? (e.target as HTMLInputElement).checked : value;
+    setFormData((prev) => ({ ...prev, [name]: nextValue }));
     setSuccess(false);
   };
 
@@ -276,6 +280,17 @@ export default function BioPageEditor() {
               <CardTitle>Call to Action</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center gap-2">
+                <input
+                  id="showCtaButton"
+                  name="showCtaButton"
+                  type="checkbox"
+                  checked={formData.showCtaButton}
+                  onChange={handleChange}
+                  className="rounded border-gray-300"
+                />
+                <Label htmlFor="showCtaButton">Show CTA button on bio page</Label>
+              </div>
               <div>
                 <Label htmlFor="ctaButtonText">Button Text</Label>
                 <Input
@@ -296,6 +311,7 @@ export default function BioPageEditor() {
                   onChange={handleChange}
                   placeholder="https://calendly.com/..."
                   className="mt-1"
+                  disabled={!formData.showCtaButton}
                 />
               </div>
             </CardContent>
@@ -367,9 +383,11 @@ export default function BioPageEditor() {
                   </div>
 
                   {/* CTA Button */}
-                  <button className="bg-purple-600 text-white px-6 py-3 rounded-full font-medium hover:bg-purple-700 transition">
-                    {formData.ctaButtonText || "Book a Free Call"}
-                  </button>
+                  {formData.showCtaButton && (
+                    <button className="bg-purple-600 text-white px-6 py-3 rounded-full font-medium hover:bg-purple-700 transition">
+                      {formData.ctaButtonText || "Book a Free Call"}
+                    </button>
+                  )}
                 </div>
 
                 {/* Footer */}

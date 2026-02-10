@@ -85,6 +85,14 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                                 🧭 Operations Dashboard
                             </Link>
                         </li>
+                        <li>
+                            <Link
+                                href="/admin/settings"
+                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                            >
+                                🔐 Settings
+                            </Link>
+                        </li>
                     </ul>
                 </nav>
             </aside>

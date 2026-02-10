@@ -1,33 +1,55 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("Seeding database...");
 
+  const passwordHash = await bcrypt.hash("demo123", 10);
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() || "admin@scalingup.com";
+
   // Create admin user for authentication
   const adminUser = await prisma.user.upsert({
-    where: { email: "admin@scalingup.com" },
-    update: {},
+    where: { email: adminEmail },
+    update: { passwordHash },
     create: {
-      email: "admin@scalingup.com",
+      email: adminEmail,
       name: "Admin User",
       role: "ADMIN",
+      passwordHash,
     },
   });
 
   // Create staff user
   const staffUser = await prisma.user.upsert({
     where: { email: "staff@scalingup.com" },
-    update: {},
+    update: { passwordHash },
     create: {
       email: "staff@scalingup.com",
       name: "Staff User",
       role: "STAFF",
+      passwordHash,
     },
   });
 
-  console.log("Created users:", { admin: adminUser.email, staff: staffUser.email });
+  // Create coach user (for E2E tests — coach@example.com / demo123)
+  const coachUser = await prisma.user.upsert({
+    where: { email: "coach@example.com" },
+    update: { passwordHash },
+    create: {
+      email: "coach@example.com",
+      name: "Demo Coach",
+      role: "COACH",
+      passwordHash,
+    },
+  });
+
+  console.log("Created users:", {
+    admin: adminUser.email,
+    staff: staffUser.email,
+    coach: coachUser.email,
+  });
 
   // Create workshop types
   const aiWorkshop = await prisma.workshopType.upsert({
@@ -89,6 +111,26 @@ async function main() {
     },
   });
 
+  const masterClassWorkshop = await prisma.workshopType.upsert({
+    where: { slug: "scaling-up-master-class" },
+    update: {},
+    create: {
+      name: "Scaling Up Master Class",
+      slug: "scaling-up-master-class",
+      description:
+        "An advanced, intensive workshop covering all four decisions of the Scaling Up methodology at a deeper level. For experienced leaders ready to accelerate growth.",
+      shortDescription: "Advanced Scaling Up methodology",
+      durationOptions: JSON.stringify(["full-day", "two-day"]),
+      pricingTiers: JSON.stringify({
+        "full-day": 69900,
+        "two-day": 119900,
+      }),
+      preWorkshopInstructions:
+        "Complete the Scaling Up Basics workshop or have equivalent experience before attending.",
+      isActive: true,
+    },
+  });
+
   console.log("Created workshop types");
 
   // Create coaches
@@ -140,6 +182,25 @@ async function main() {
       certificationExpiry: new Date("2025-09-30"),
       paymentStatus: "CURRENT",
       territory: JSON.stringify({ regions: ["New York", "Northeast"] }),
+    },
+  });
+
+  // Create coach linked to coach@example.com user (for E2E tests)
+  const demoCoach = await prisma.coach.upsert({
+    where: { email: "coach@example.com" },
+    update: { userId: coachUser.id },
+    create: {
+      email: "coach@example.com",
+      firstName: "Demo",
+      lastName: "Coach",
+      phone: "+1 555-0199",
+      company: "Demo Coaching Inc.",
+      bio: "Demo coach account for testing and development.",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: new Date("2027-12-31"),
+      paymentStatus: "CURRENT",
+      territory: JSON.stringify({ regions: ["National"] }),
+      userId: coachUser.id,
     },
   });
 
@@ -223,6 +284,23 @@ async function main() {
       workshopTypeId: aiWorkshop.id,
       status: "ACTIVE",
       expiresAt: new Date("2025-09-30"),
+    },
+  });
+
+  // Demo coach certified for master class
+  await prisma.coachCertification.upsert({
+    where: {
+      coachId_workshopTypeId: {
+        coachId: demoCoach.id,
+        workshopTypeId: masterClassWorkshop.id,
+      },
+    },
+    update: {},
+    create: {
+      coachId: demoCoach.id,
+      workshopTypeId: masterClassWorkshop.id,
+      status: "ACTIVE",
+      expiresAt: new Date("2027-12-31"),
     },
   });
 
@@ -353,13 +431,12 @@ async function main() {
   ];
 
   for (const reg of registrations) {
-    await prisma.registration.upsert({
-      where: {
-        id: `seed-${reg.email}-${reg.workshopId}`.slice(0, 25),
-      },
-      update: {},
-      create: reg,
+    const existing = await prisma.registration.findFirst({
+      where: { workshopId: reg.workshopId, email: reg.email },
     });
+    if (!existing) {
+      await prisma.registration.create({ data: reg });
+    }
   }
 
   console.log("Created registrations");

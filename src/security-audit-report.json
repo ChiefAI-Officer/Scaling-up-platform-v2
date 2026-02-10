@@ -1,10 +1,10 @@
 {
-  "timestamp": "2026-02-02T09:33:26.659Z",
+  "timestamp": "2026-02-10T11:34:40.536Z",
   "target": "http://localhost:3000",
-  "score": 82,
+  "score": 73,
   "summary": {
-    "passed": 9,
-    "warnings": 2,
+    "passed": 8,
+    "warnings": 3,
     "failed": 0
   },
   "results": {
@@ -23,11 +23,6 @@
         "category": "Environment",
         "check": ".env.example provided",
         "details": ""
-      },
-      {
-        "category": "Validation",
-        "check": "Zod validation coverage",
-        "details": "81% (13/16 routes)"
       },
       {
         "category": "Rate Limiting",
@@ -60,6 +55,11 @@
         "category": "Headers",
         "check": "Server reachable",
         "details": "Server not running - skipping header checks"
+      },
+      {
+        "category": "Validation",
+        "check": "Zod validation coverage",
+        "details": "69% (18/26 routes)"
       },
       {
         "category": "Rate Limiting",
