@@ -97,6 +97,7 @@ export async function PATCH(
         ...(data.phone !== undefined && { phone: data.phone }),
         ...(data.company !== undefined && { company: data.company }),
         ...(data.bio !== undefined && { bio: data.bio }),
+        ...(data.profileImage !== undefined && { profileImage: data.profileImage }),
         ...(data.hubspotId !== undefined && { hubspotId: data.hubspotId }),
         ...(data.circleId !== undefined && { circleId: data.circleId }),
       },

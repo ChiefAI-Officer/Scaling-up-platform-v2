@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,48 @@ interface WorkshopType {
   id: string;
   name: string;
   slug: string;
-  durationOptions: string[];
+}
+
+interface SessionResponse {
+  user?: {
+    email?: string;
+    role?: string;
+  };
+}
+
+const COUPON_PRESETS = [
+  { value: "25", label: "25% discount" },
+  { value: "50", label: "50% discount" },
+  { value: "100", label: "100% discount (free access)" },
+];
+
+function normalizeToken(input: string): string {
+  return input.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
+}
+
+function workshopTypeMatchesCategory(
+  type: WorkshopType,
+  category: "AI" | "EXIT_AND_VALUATION"
+): boolean {
+  const token = normalizeToken(`${type.slug} ${type.name}`);
+
+  if (category === "AI") {
+    return token.includes(" ai ") || token.startsWith("ai ") || token.endsWith(" ai") || token.includes("artificial intelligence");
+  }
+
+  return token.includes("exit") || token.includes("valuation");
+}
+
+function generateCouponCode(discountPercent: string, title: string): string {
+  const prefix = `SU${discountPercent}`;
+  const titleToken = title
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "")
+    .slice(0, 6);
+
+  const randomToken = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `${prefix}-${titleToken || "WORK"}-${randomToken}`;
 }
 
 export default function NewWorkshopPage() {
@@ -32,17 +73,20 @@ export default function NewWorkshopPage() {
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [workshopTypes, setWorkshopTypes] = useState<WorkshopType[]>([]);
   const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
+  const [sessionUser, setSessionUser] = useState<SessionResponse["user"]>(undefined);
 
   const [formData, setFormData] = useState({
     coachId: "",
+    secondaryCoachId: "",
+    isDuoWorkshop: false,
     workshopTypeId: "",
     workshopCategory: "AI" as "AI" | "EXIT_AND_VALUATION",
     title: "",
     description: "",
     format: "IN_PERSON",
-    duration: "",
     eventDate: "",
     eventTime: "",
+    eventEndTime: "",
     timezone: "America/New_York",
     venueName: "",
     venueStreet: "",
@@ -57,47 +101,169 @@ export default function NewWorkshopPage() {
     earlyBirdPriceCents: "",
     earlyBirdDeadline: "",
     maxAttendees: "50",
+    couponDiscountPercent: "",
+    couponCode: "",
   });
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [coachesRes, typesRes] = await Promise.all([
+        const [coachesRes, typesRes, sessionRes] = await Promise.all([
           fetch("/api/coaches"),
           fetch("/api/workshop-types"),
+          fetch("/api/auth/session"),
         ]);
+
         const coachesData = await coachesRes.json();
         const typesData = await typesRes.json();
+        const sessionData = (await sessionRes.json()) as SessionResponse;
 
-        if (coachesData.success) setCoaches(coachesData.data);
-        if (typesData.success) setWorkshopTypes(typesData.data);
-      } catch (err) {
-        console.error("Failed to load data:", err);
+        const coachesList: Coach[] = coachesData.success ? coachesData.data : [];
+        const workshopTypeList: WorkshopType[] = typesData.success ? typesData.data : [];
+
+        setCoaches(coachesList);
+        setWorkshopTypes(workshopTypeList);
+        setSessionUser(sessionData.user);
+
+        if (sessionData.user?.role === "COACH" && sessionData.user.email) {
+          const matchingCoach = coachesList.find(
+            (coach) => coach.email.toLowerCase() === sessionData.user?.email?.toLowerCase()
+          );
+
+          if (matchingCoach) {
+            setSelectedCoach(matchingCoach);
+            setFormData((prev) => ({
+              ...prev,
+              coachId: matchingCoach.id,
+            }));
+          }
+        }
+      } catch (loadError) {
+        console.error("Failed to load data:", loadError);
       }
     }
-    loadData();
+
+    void loadData();
   }, []);
 
+  const availableWorkshopTypes = useMemo(() => {
+    if (!selectedCoach) {
+      return workshopTypes;
+    }
+
+    return workshopTypes.filter((type) =>
+      selectedCoach.certifications.some(
+        (cert) => cert.workshopTypeId === type.id && cert.status === "ACTIVE"
+      )
+    );
+  }, [selectedCoach, workshopTypes]);
+
+  const recommendedWorkshopType = useMemo(() => {
+    const categoryMatchedTypes = availableWorkshopTypes.filter((type) =>
+      workshopTypeMatchesCategory(type, formData.workshopCategory)
+    );
+
+    return categoryMatchedTypes[0] || availableWorkshopTypes[0] || null;
+  }, [availableWorkshopTypes, formData.workshopCategory]);
+
+  const recommendedWorkshopTypeId = recommendedWorkshopType?.id || "";
+
+  useEffect(() => {
+    setFormData((prev) => {
+      if (prev.workshopTypeId === recommendedWorkshopTypeId) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        workshopTypeId: recommendedWorkshopTypeId,
+      };
+    });
+  }, [recommendedWorkshopTypeId]);
+
+  const secondaryCoachOptions = coaches.filter(
+    (coach) => coach.id !== formData.coachId
+  );
+
+  const coachIsAutoFilled = sessionUser?.role === "COACH" && Boolean(formData.coachId);
+
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
-    const { name, value, type } = e.target;
-    const newValue = type === "checkbox" ? (e.target as HTMLInputElement).checked : value;
+    const { name, value, type } = event.target;
+    const nextValue =
+      type === "checkbox" ? (event.target as HTMLInputElement).checked : value;
 
-    setFormData((prev) => ({ ...prev, [name]: newValue }));
+    setFormData((prev) => {
+      const next = { ...prev, [name]: nextValue };
 
-    if (name === "coachId") {
-      const coach = coaches.find((c) => c.id === value);
+      if (name === "coachId") {
+        if (typeof nextValue === "string" && next.secondaryCoachId === nextValue) {
+          next.secondaryCoachId = "";
+        }
+      }
+
+      if (name === "isDuoWorkshop" && nextValue === false) {
+        next.secondaryCoachId = "";
+      }
+
+      if (name === "format" && nextValue === "VIRTUAL") {
+        next.maxAttendees = "50";
+      }
+
+      if (name === "isFree" && nextValue === true) {
+        next.couponDiscountPercent = "";
+        next.couponCode = "";
+      }
+
+      if (name === "couponDiscountPercent") {
+        const discount = String(nextValue);
+        if (!discount) {
+          next.couponCode = "";
+        } else if (!prev.couponCode) {
+          next.couponCode = generateCouponCode(discount, prev.title);
+        }
+      }
+
+      return next;
+    });
+
+    if (name === "coachId" && typeof nextValue === "string") {
+      const coach = coaches.find((item) => item.id === nextValue);
       setSelectedCoach(coach || null);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
+      if (!formData.workshopTypeId) {
+        throw new Error("No certified workshop type is available for the selected coach and category.");
+      }
+
+      if (formData.isDuoWorkshop && !formData.secondaryCoachId) {
+        throw new Error("Please select Coach 2 for a duo workshop.");
+      }
+
+      if (formData.eventEndTime && !formData.eventTime) {
+        throw new Error("Please provide a start time before setting an end time.");
+      }
+
+      const parsedPrice = Number.parseInt(formData.priceCents || "0", 10);
+      const parsedEarlyBirdPrice = Number.parseInt(formData.earlyBirdPriceCents || "0", 10);
+      const parsedMaxAttendees = Number.parseInt(formData.maxAttendees || "50", 10);
+
+      const startTime = formData.eventTime.trim();
+      const endTime = formData.eventEndTime.trim();
+      const eventTime = startTime
+        ? endTime
+          ? `${startTime} - ${endTime}`
+          : startTime
+        : undefined;
+
       const payload = {
         coachId: formData.coachId,
         workshopTypeId: formData.workshopTypeId,
@@ -105,9 +271,10 @@ export default function NewWorkshopPage() {
         title: formData.title,
         description: formData.description || undefined,
         format: formData.format,
-        duration: formData.duration,
+        duration: formData.format === "VIRTUAL" ? "virtual-session" : "full-day",
         eventDate: formData.eventDate,
-        eventTime: formData.eventTime || undefined,
+        eventTime,
+        eventEndTime: endTime || undefined,
         timezone: formData.timezone,
         venueName: formData.venueName || undefined,
         venueAddress:
@@ -123,12 +290,27 @@ export default function NewWorkshopPage() {
         virtualPlatform: formData.virtualPlatform || undefined,
         virtualLink: formData.virtualLink || undefined,
         isFree: formData.isFree,
-        priceCents: formData.isFree ? undefined : parseInt(formData.priceCents) * 100,
-        earlyBirdPriceCents: formData.earlyBirdPriceCents
-          ? parseInt(formData.earlyBirdPriceCents) * 100
-          : undefined,
+        priceCents: formData.isFree ? undefined : Math.max(0, parsedPrice) * 100,
+        earlyBirdPriceCents:
+          !formData.isFree && formData.earlyBirdPriceCents
+            ? Math.max(0, parsedEarlyBirdPrice) * 100
+            : undefined,
         earlyBirdDeadline: formData.earlyBirdDeadline || undefined,
-        maxAttendees: parseInt(formData.maxAttendees),
+        maxAttendees:
+          formData.format === "VIRTUAL"
+            ? undefined
+            : Number.isFinite(parsedMaxAttendees) && parsedMaxAttendees > 0
+              ? parsedMaxAttendees
+              : 50,
+        isDuoWorkshop: formData.isDuoWorkshop,
+        secondaryCoachId:
+          formData.isDuoWorkshop && formData.secondaryCoachId
+            ? formData.secondaryCoachId
+            : undefined,
+        couponDiscountPercent: formData.couponDiscountPercent
+          ? Number.parseInt(formData.couponDiscountPercent, 10)
+          : undefined,
+        couponCode: formData.couponCode || undefined,
       };
 
       const response = await fetch("/api/workshops", {
@@ -138,7 +320,6 @@ export default function NewWorkshopPage() {
       });
 
       const data = await response.json();
-
       if (!data.success) {
         throw new Error(
           typeof data.error === "string"
@@ -147,26 +328,28 @@ export default function NewWorkshopPage() {
         );
       }
 
+      if (formData.isDuoWorkshop && formData.secondaryCoachId) {
+        const params = new URLSearchParams();
+        params.set("coach2Id", formData.secondaryCoachId);
+
+        if (formData.couponCode) {
+          params.set("couponCode", formData.couponCode);
+        }
+        if (formData.couponDiscountPercent) {
+          params.set("couponDiscountPercent", formData.couponDiscountPercent);
+        }
+
+        router.push(`/workshops/${data.data.id}/landing-pages/duo-landing?${params.toString()}`);
+        return;
+      }
+
       router.push(`/workshops/${data.data.id}/landing-pages`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
-
-  const selectedWorkshopType = workshopTypes.find(
-    (t) => t.id === formData.workshopTypeId
-  );
-
-  // Filter workshop types based on coach certifications
-  const availableWorkshopTypes = selectedCoach
-    ? workshopTypes.filter((type) =>
-        selectedCoach.certifications.some(
-          (cert) => cert.workshopTypeId === type.id && cert.status === "ACTIVE"
-        )
-      )
-    : workshopTypes;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -182,7 +365,6 @@ export default function NewWorkshopPage() {
           </div>
         )}
 
-        {/* Coach & Type Selection */}
         <Card>
           <CardHeader>
             <CardTitle>Workshop Details</CardTitle>
@@ -196,7 +378,8 @@ export default function NewWorkshopPage() {
                 value={formData.coachId}
                 onChange={handleChange}
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                disabled={coachIsAutoFilled}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100"
               >
                 <option value="">Select a coach...</option>
                 {coaches.map((coach) => (
@@ -205,31 +388,55 @@ export default function NewWorkshopPage() {
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <Label htmlFor="workshopTypeId">Workshop Type *</Label>
-              <select
-                id="workshopTypeId"
-                name="workshopTypeId"
-                value={formData.workshopTypeId}
-                onChange={handleChange}
-                required
-                disabled={!formData.coachId}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100"
-              >
-                <option value="">Select workshop type...</option>
-                {availableWorkshopTypes.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
-                ))}
-              </select>
-              {formData.coachId && availableWorkshopTypes.length === 0 && (
-                <p className="text-sm text-red-600 mt-1">
-                  This coach has no active certifications
+              {coachIsAutoFilled && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Coach is auto-filled from login.
                 </p>
               )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="isDuoWorkshop"
+                name="isDuoWorkshop"
+                type="checkbox"
+                checked={formData.isDuoWorkshop}
+                onChange={handleChange}
+                className="rounded border-gray-300"
+              />
+              <Label htmlFor="isDuoWorkshop">Duo workshop (add Coach 2)</Label>
+            </div>
+
+            {formData.isDuoWorkshop && (
+              <div>
+                <Label htmlFor="secondaryCoachId">Coach 2 *</Label>
+                <select
+                  id="secondaryCoachId"
+                  name="secondaryCoachId"
+                  value={formData.secondaryCoachId}
+                  onChange={handleChange}
+                  required={formData.isDuoWorkshop}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                >
+                  <option value="">Select Coach 2...</option>
+                  {secondaryCoachOptions.map((coach) => (
+                    <option key={coach.id} value={coach.id}>
+                      {coach.firstName} {coach.lastName} ({coach.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <Label>Workshop Type *</Label>
+              <div className="mt-1 rounded-md border border-gray-300 px-3 py-2 bg-gray-50 text-gray-900">
+                {recommendedWorkshopType?.name || "No active workshop type available"}
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                Workshop type is assigned automatically from coach certification + category.
+              </p>
+              <input type="hidden" name="workshopTypeId" value={formData.workshopTypeId} />
             </div>
 
             <div>
@@ -246,8 +453,8 @@ export default function NewWorkshopPage() {
                 <option value="EXIT_AND_VALUATION">Exit and Valuation Workshop</option>
               </select>
               <p className="text-sm text-gray-500 mt-1">
-                {formData.workshopCategory === "AI" 
-                  ? "AI workshops help business owners understand and leverage AI strategically" 
+                {formData.workshopCategory === "AI"
+                  ? "AI workshops help business owners understand and leverage AI strategically"
                   : "Exit & Valuation workshops help owners maximize business value and plan their exit"}
               </p>
             </div>
@@ -266,7 +473,7 @@ export default function NewWorkshopPage() {
             </div>
 
             <div>
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">Internal Description</Label>
               <textarea
                 id="description"
                 name="description"
@@ -274,13 +481,15 @@ export default function NewWorkshopPage() {
                 onChange={handleChange}
                 rows={4}
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-                placeholder="Describe what attendees will learn..."
+                placeholder="Internal notes for operations and setup..."
               />
+              <p className="text-sm text-gray-500 mt-1">
+                Internal only. Not shown in landing page editors.
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Schedule & Format */}
         <Card>
           <CardHeader>
             <CardTitle>Schedule & Format</CardTitle>
@@ -304,31 +513,6 @@ export default function NewWorkshopPage() {
               </div>
 
               <div>
-                <Label htmlFor="duration">Duration *</Label>
-                <select
-                  id="duration"
-                  name="duration"
-                  value={formData.duration}
-                  onChange={handleChange}
-                  required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-                >
-                  <option value="">Select duration...</option>
-                  {(selectedWorkshopType?.durationOptions || [
-                    "full-day",
-                    "half-day",
-                    "virtual-2hr",
-                  ]).map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
                 <Label htmlFor="eventDate">Event Date *</Label>
                 <Input
                   id="eventDate"
@@ -340,7 +524,9 @@ export default function NewWorkshopPage() {
                   className="mt-1"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="eventTime">Start Time</Label>
                 <Input
@@ -352,24 +538,37 @@ export default function NewWorkshopPage() {
                   className="mt-1"
                 />
               </div>
+
+              <div>
+                <Label htmlFor="eventEndTime">End Time</Label>
+                <Input
+                  id="eventEndTime"
+                  name="eventEndTime"
+                  type="time"
+                  value={formData.eventEndTime}
+                  onChange={handleChange}
+                  className="mt-1"
+                />
+              </div>
             </div>
 
-            <div>
-              <Label htmlFor="maxAttendees">Maximum Attendees</Label>
-              <Input
-                id="maxAttendees"
-                name="maxAttendees"
-                type="number"
-                min="1"
-                value={formData.maxAttendees}
-                onChange={handleChange}
-                className="mt-1"
-              />
-            </div>
+            {formData.format !== "VIRTUAL" && (
+              <div>
+                <Label htmlFor="maxAttendees">Maximum Attendees</Label>
+                <Input
+                  id="maxAttendees"
+                  name="maxAttendees"
+                  type="number"
+                  min="1"
+                  value={formData.maxAttendees}
+                  onChange={handleChange}
+                  className="mt-1"
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Location */}
         {formData.format !== "VIRTUAL" && (
           <Card>
             <CardHeader>
@@ -448,7 +647,6 @@ export default function NewWorkshopPage() {
           </Card>
         )}
 
-        {/* Virtual Details */}
         {(formData.format === "VIRTUAL" || formData.format === "HYBRID") && (
           <Card>
             <CardHeader>
@@ -468,7 +666,6 @@ export default function NewWorkshopPage() {
                   <option value="zoom">Zoom</option>
                   <option value="teams">Microsoft Teams</option>
                   <option value="meet">Google Meet</option>
-                  <option value="webex">Webex</option>
                 </select>
               </div>
 
@@ -488,7 +685,6 @@ export default function NewWorkshopPage() {
           </Card>
         )}
 
-        {/* Pricing */}
         <Card>
           <CardHeader>
             <CardTitle>Pricing</CardTitle>
@@ -554,12 +750,48 @@ export default function NewWorkshopPage() {
                     />
                   </div>
                 )}
+
+                <div className="rounded-lg border border-gray-200 p-4 space-y-4">
+                  <div>
+                    <Label htmlFor="couponDiscountPercent">Coach Coupon Discount</Label>
+                    <select
+                      id="couponDiscountPercent"
+                      name="couponDiscountPercent"
+                      value={formData.couponDiscountPercent}
+                      onChange={handleChange}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                    >
+                      <option value="">No coupon</option>
+                      {COUPON_PRESETS.map((preset) => (
+                        <option key={preset.value} value={preset.value}>
+                          {preset.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {formData.couponDiscountPercent && (
+                    <div>
+                      <Label htmlFor="couponCode">Coupon Code</Label>
+                      <Input
+                        id="couponCode"
+                        name="couponCode"
+                        value={formData.couponCode}
+                        onChange={handleChange}
+                        placeholder="e.g., SU50-DETROIT"
+                        className="mt-1"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        Share this code with registrants. Checkout already supports discount codes.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </CardContent>
         </Card>
 
-        {/* Submit */}
         <div className="flex gap-4">
           <Button
             type="button"
@@ -577,3 +809,4 @@ export default function NewWorkshopPage() {
     </div>
   );
 }
+

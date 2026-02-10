@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
         phone: data.phone,
         company: data.company,
         bio: data.bio,
+        profileImage: data.profileImage,
         hubspotId: data.hubspotId,
         circleId: data.circleId,
         certificationStatus: "PENDING",

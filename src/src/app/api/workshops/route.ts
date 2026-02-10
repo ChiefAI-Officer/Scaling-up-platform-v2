@@ -5,6 +5,35 @@ import { generateSlug } from "@/lib/utils";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 import { validateLeadTime } from "@/lib/lead-time-validator";
 
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseOptionalPercentage(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (value > 0 && value <= 100) {
+      return Math.round(value);
+    }
+    return undefined;
+  }
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 100) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const actor = await getApiActor();
@@ -101,6 +130,26 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validation.data;
+    const isDuoWorkshop = body.isDuoWorkshop === true || body.isDuoWorkshop === "true";
+    const secondaryCoachId = normalizeOptionalString(body.secondaryCoachId);
+    const eventEndTime = normalizeOptionalString(body.eventEndTime);
+    const couponCode = normalizeOptionalString(body.couponCode);
+    const couponDiscountPercent = parseOptionalPercentage(body.couponDiscountPercent);
+
+    if (isDuoWorkshop && !secondaryCoachId) {
+      return NextResponse.json(
+        { success: false, error: "Secondary coach is required for duo workshops" },
+        { status: 400 }
+      );
+    }
+
+    if (secondaryCoachId && secondaryCoachId === data.coachId) {
+      return NextResponse.json(
+        { success: false, error: "Coach 2 must be different from the primary coach" },
+        { status: 400 }
+      );
+    }
+
     const leadTimeValidation = validateLeadTime(new Date(data.eventDate));
     if (!leadTimeValidation.valid) {
       return NextResponse.json(
@@ -155,6 +204,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let secondaryCoachSnapshot:
+      | {
+          id: string;
+          firstName: string;
+          lastName: string;
+          email: string;
+          profileImage: string | null;
+          company: string | null;
+        }
+      | null = null;
+
+    if (secondaryCoachId) {
+      const secondaryCoach = await db.coach.findUnique({
+        where: { id: secondaryCoachId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          profileImage: true,
+          company: true,
+        },
+      });
+
+      if (!secondaryCoach) {
+        return NextResponse.json(
+          { success: false, error: "Secondary coach not found" },
+          { status: 404 }
+        );
+      }
+
+      secondaryCoachSnapshot = secondaryCoach;
+    }
+
     // Create workshop
     const category = body.category === "EXIT_AND_VALUATION" ? "EXIT_AND_VALUATION" : "AI";
 
@@ -197,10 +280,51 @@ export async function POST(request: NextRequest) {
       data: { landingPageSlug: slug },
     });
 
+    if (isDuoWorkshop || secondaryCoachSnapshot || eventEndTime || couponCode || couponDiscountPercent) {
+      await db.automationTask.create({
+        data: {
+          workshopId: workshop.id,
+          taskType: "WORKSHOP_SETUP_METADATA",
+          status: "PENDING",
+          inputData: JSON.stringify({
+            isDuoWorkshop,
+            secondaryCoachId: secondaryCoachSnapshot?.id ?? secondaryCoachId ?? null,
+            secondaryCoach: secondaryCoachSnapshot
+              ? {
+                  id: secondaryCoachSnapshot.id,
+                  name: `${secondaryCoachSnapshot.firstName} ${secondaryCoachSnapshot.lastName}`,
+                  title: secondaryCoachSnapshot.company || "Scaling Up Certified Coach",
+                  photo: secondaryCoachSnapshot.profileImage,
+                }
+              : null,
+            schedule: {
+              startTime: data.eventTime ?? null,
+              endTime: eventEndTime ?? null,
+            },
+            coupon: couponCode
+              ? {
+                  code: couponCode,
+                  discountPercent: couponDiscountPercent ?? null,
+                }
+              : null,
+          }),
+        },
+      });
+    }
+
     return NextResponse.json(
       {
         success: true,
-        data: { ...workshop, landingPageSlug: slug },
+        data: {
+          ...workshop,
+          landingPageSlug: slug,
+          workshopSetup: {
+            isDuoWorkshop,
+            secondaryCoachId: secondaryCoachSnapshot?.id ?? secondaryCoachId ?? null,
+            couponCode: couponCode ?? null,
+            couponDiscountPercent: couponDiscountPercent ?? null,
+          },
+        },
         message: "Workshop created successfully",
       },
       { status: 201 }

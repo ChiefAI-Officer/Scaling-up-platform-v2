@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
 
         const content = JSON.stringify({
             title: workshop.title,
-            description: workshop.description,
+            description: "",
             coachName: `${workshop.coach.firstName} ${workshop.coach.lastName}`,
             coachBio: workshop.coach.bio,
             coachPhotoUrl: workshop.coach.profileImage,

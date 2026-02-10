@@ -164,45 +164,9 @@ export default function RegistrationPageEditor() {
       <div className="grid grid-cols-2 gap-6">
         {/* Editor */}
         <div className="space-y-6">
-          <Card>
-            <CardHeader><CardTitle>Coach Information (Auto-mapped)</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-gray-500 bg-blue-50 p-3 rounded">
-                Coach info is automatically mapped from the workshop. You can override it below.
-              </p>
-              <div>
-                <Label htmlFor="coachName">Coach Name</Label>
-                <Input id="coachName" name="coachName" value={formData.coachName} onChange={handleChange} className="mt-1" />
-              </div>
-              <div>
-                <Label htmlFor="coachTitle">Coach Title</Label>
-                <Input id="coachTitle" name="coachTitle" value={formData.coachTitle} onChange={handleChange} className="mt-1" />
-              </div>
-              <p className="text-xs text-gray-500">
-                Coach photo is automatically sourced from the coach bio page profile image.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Workshop Details</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="workshopTitle">Workshop Title</Label>
-                <Input id="workshopTitle" name="workshopTitle" value={formData.workshopTitle} onChange={handleChange} className="mt-1" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="eventDate">Event Date</Label>
-                  <Input id="eventDate" name="eventDate" value={formData.eventDate} onChange={handleChange} className="mt-1" />
-                </div>
-                <div>
-                  <Label htmlFor="eventTime">Event Time</Label>
-                  <Input id="eventTime" name="eventTime" value={formData.eventTime} onChange={handleChange} className="mt-1" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Coach information and workshop details are auto-mapped from the workshop and coach BIO profile.
+          </div>
 
           <Card>
             <CardHeader><CardTitle>Hero Section</CardTitle></CardHeader>

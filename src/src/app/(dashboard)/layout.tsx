@@ -59,14 +59,35 @@ export default async function DashboardLayout({
                   className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   role="menuitem"
                 >
-                  Workshops
+                  All Workshops
                 </Link>
                 <Link
-                  href="/coaches"
+                  href="/bio"
                   className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   role="menuitem"
                 >
-                  Coaches
+                  BIO
+                </Link>
+                <Link
+                  href="/templates"
+                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  role="menuitem"
+                >
+                  Templates
+                </Link>
+                <Link
+                  href="/surveys"
+                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  role="menuitem"
+                >
+                  Surveys
+                </Link>
+                <Link
+                  href="/partners"
+                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  role="menuitem"
+                >
+                  Partners
                 </Link>
               </div>
             </div>
@@ -74,13 +95,6 @@ export default async function DashboardLayout({
               <span className="text-sm text-gray-600" aria-label="Logged in user">
                 {session.user.email}
               </span>
-              <Link
-                href="/workshops/new"
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                aria-label="Create new workshop"
-              >
-                + New Workshop
-              </Link>
             </div>
           </div>
         </div>

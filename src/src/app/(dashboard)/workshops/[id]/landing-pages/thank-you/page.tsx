@@ -9,22 +9,18 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface ThankYouPageData {
-  workshopTitle: string;
   headline: string;
   subheadline: string;
   videoUrl: string;
   additionalMessage: string;
-  showSocialLinks: boolean;
   calendarReminderText: string;
 }
 
 const DEFAULT_DATA: ThankYouPageData = {
-  workshopTitle: "",
   headline: "Thank you for Registering for the",
   subheadline: "You'll receive an email shortly with instructions and details for the workshop.",
   videoUrl: "",
   additionalMessage: "",
-  showSocialLinks: true,
   calendarReminderText: "Add this event to your calendar so you don't miss it!",
 };
 
@@ -41,18 +37,7 @@ export default function ThankYouPageEditor() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [workshopRes, pageRes] = await Promise.all([
-          fetch(`/api/workshops/${workshopId}`),
-          fetch(`/api/workshops/${workshopId}/landing-pages/THANK_YOU`),
-        ]);
-
-        const workshopData = await workshopRes.json();
-        if (workshopData.success) {
-          setFormData((prev) => ({
-            ...prev,
-            workshopTitle: workshopData.data.title,
-          }));
-        }
+        const pageRes = await fetch(`/api/workshops/${workshopId}/landing-pages/THANK_YOU`);
 
         const pageData = await pageRes.json();
         if (pageData.success && pageData.data) {
@@ -69,9 +54,8 @@ export default function ThankYouPageEditor() {
   }, [workshopId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    const newValue = type === "checkbox" ? (e.target as HTMLInputElement).checked : value;
-    setFormData((prev) => ({ ...prev, [name]: newValue }));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setSuccess(false);
   };
 
@@ -133,11 +117,6 @@ export default function ThankYouPageEditor() {
             <CardHeader><CardTitle>Content</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="workshopTitle">Workshop Title</Label>
-                <Input id="workshopTitle" name="workshopTitle" value={formData.workshopTitle} onChange={handleChange} className="mt-1" />
-                <p className="text-xs text-gray-500 mt-1">This appears after the headline</p>
-              </div>
-              <div>
                 <Label htmlFor="headline">Headline</Label>
                 <Input id="headline" name="headline" value={formData.headline} onChange={handleChange} className="mt-1" />
               </div>
@@ -170,9 +149,9 @@ export default function ThankYouPageEditor() {
                 <Label htmlFor="calendarReminderText">Calendar Reminder Text</Label>
                 <Input id="calendarReminderText" name="calendarReminderText" value={formData.calendarReminderText} onChange={handleChange} className="mt-1" />
               </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="showSocialLinks" name="showSocialLinks" checked={formData.showSocialLinks} onChange={handleChange} className="rounded" />
-                <Label htmlFor="showSocialLinks">Show social sharing links</Label>
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                iDevAffiliate tracking fires automatically on this Thank You page for paid workshops only
+                using the hidden image tag format (sale amount + workshop title order number).
               </div>
             </CardContent>
           </Card>
@@ -228,9 +207,6 @@ export default function ThankYouPageEditor() {
                   <h1 className="text-2xl font-serif mb-2">
                     {formData.headline}
                   </h1>
-                  <h2 className="text-xl font-serif font-bold mb-4">
-                    {formData.workshopTitle} Workshop
-                  </h2>
 
                   {/* Sub-headline */}
                   <p className="text-purple-200 italic mb-8 max-w-md mx-auto text-sm">
@@ -278,21 +254,6 @@ export default function ThankYouPageEditor() {
                       Outlook
                     </button>
                   </div>
-
-                  {/* Social Links */}
-                  {formData.showSocialLinks && (
-                    <div className="mt-6 flex gap-3 justify-center">
-                      <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                        <span className="text-xs">f</span>
-                      </div>
-                      <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                        <span className="text-xs">in</span>
-                      </div>
-                      <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                        <span className="text-xs">X</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </CardContent>

@@ -9,6 +9,8 @@ import {
   createRegistrationSchema,
   coachSignupSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from "@/lib/validations";
 
 describe("Workshop Validation Schemas", () => {
@@ -285,6 +287,47 @@ describe("Authentication Validation Schemas", () => {
         ...validPayload,
         confirmNewPassword: wrongConfirmSecret,
       });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("forgotPasswordSchema", () => {
+    it("should accept valid forgot password payload", () => {
+      const result = forgotPasswordSchema.safeParse({
+        email: "admin@scalingup.com",
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject invalid email", () => {
+      const result = forgotPasswordSchema.safeParse({
+        email: "not-an-email",
+      });
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("resetPasswordSchema", () => {
+    const validPayload = {
+      email: "admin@scalingup.com",
+      token: "abc123",
+      newPassword: "NewSecurePass123!",
+      confirmNewPassword: "NewSecurePass123!",
+    };
+
+    it("should accept valid reset password payload", () => {
+      const result = resetPasswordSchema.safeParse(validPayload);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject mismatched password confirmation", () => {
+      const result = resetPasswordSchema.safeParse({
+        ...validPayload,
+        confirmNewPassword: "WrongConfirm123!",
+      });
+
       expect(result.success).toBe(false);
     });
   });

@@ -209,7 +209,7 @@ export default async function WorkshopDetailPage({
           </Card>
 
           {/* Registrations */}
-          <Card>
+          <Card id="registrations">
             <CardHeader>
               <CardTitle>Registrations ({workshop.registrations.length})</CardTitle>
             </CardHeader>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,10 @@ interface SoloLandingData {
   bodyContent: string;
   aboutTitle: string;
   aboutDescription: string;
+  partnerId: string;
+  partnerName: string;
+  partnerTagline: string;
+  partnerLogoUrl: string;
   benefits: string[];
   videoUrl: string;
   ctaText: string;
@@ -41,6 +45,28 @@ interface Workshop {
   };
 }
 
+interface PartnerProfile {
+  id: string;
+  name: string;
+  tagline: string;
+  logoUrl: string;
+  isActive: boolean;
+}
+
+interface PartnerToggle {
+  partnerId: string;
+  workshopId: string;
+  enabled: boolean;
+}
+
+interface PartnersResponse {
+  success: boolean;
+  data?: {
+    partners: PartnerProfile[];
+    toggles: PartnerToggle[];
+  };
+}
+
 const DEFAULT_BENEFITS = [
   "Identify the 9 value drivers of enterprise value",
   "Strategize the next 90 days for your business goals",
@@ -50,7 +76,6 @@ const DEFAULT_BENEFITS = [
 
 export default function SoloLandingEditor() {
   const params = useParams();
-  const router = useRouter();
   const workshopId = params.id as string;
 
   const [workshop, setWorkshop] = useState<Workshop | null>(null);
@@ -58,6 +83,7 @@ export default function SoloLandingEditor() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [availablePartners, setAvailablePartners] = useState<PartnerProfile[]>([]);
 
   const [formData, setFormData] = useState<SoloLandingData>({
     coachPhoto: "",
@@ -70,8 +96,12 @@ export default function SoloLandingEditor() {
     heroTitle: "Scaling Up to Finish Strong Virtual Workshop",
     heroSubtitle: "Build Value. Scale Up. Finish Strong.",
     bodyContent: "",
-    aboutTitle: "About the Workshop",
+    aboutTitle: "Join us for the Scaling Up to Finish Strong Virtual Workshop",
     aboutDescription: "This free virtual, coach-led strategic workshop is designed for business owners who want to maximize the value of their company over the next 3-5 years.",
+    partnerId: "",
+    partnerName: "",
+    partnerTagline: "",
+    partnerLogoUrl: "",
     benefits: DEFAULT_BENEFITS,
     videoUrl: "",
     ctaText: "Register Here",
@@ -81,9 +111,10 @@ export default function SoloLandingEditor() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [workshopRes, pageRes] = await Promise.all([
+        const [workshopRes, pageRes, partnersRes] = await Promise.all([
           fetch(`/api/workshops/${workshopId}`),
           fetch(`/api/workshops/${workshopId}/landing-pages/SOLO_LANDING`),
+          fetch("/api/partners"),
         ]);
 
         const workshopData = await workshopRes.json();
@@ -109,6 +140,52 @@ export default function SoloLandingEditor() {
           const content = JSON.parse(pageData.data.content);
           setFormData((prev) => ({ ...prev, ...content }));
         }
+
+        const partnersData = (await partnersRes.json()) as PartnersResponse;
+        if (partnersRes.ok && partnersData.success && partnersData.data) {
+          const activePartners = partnersData.data.partners.filter((partner) => partner.isActive);
+          const toggledPartnerIds = new Set(
+            partnersData.data.toggles
+              .filter((toggle) => toggle.workshopId === workshopId && toggle.enabled)
+              .map((toggle) => toggle.partnerId)
+          );
+
+          const filteredPartners =
+            toggledPartnerIds.size > 0
+              ? activePartners.filter((partner) => toggledPartnerIds.has(partner.id))
+              : activePartners;
+
+          setAvailablePartners(filteredPartners);
+
+          setFormData((prev) => {
+            if (prev.partnerId) {
+              const selectedPartner = filteredPartners.find((partner) => partner.id === prev.partnerId);
+              if (selectedPartner) {
+                return {
+                  ...prev,
+                  partnerName: selectedPartner.name,
+                  partnerTagline: selectedPartner.tagline || "",
+                  partnerLogoUrl: selectedPartner.logoUrl || "",
+                };
+              }
+            }
+
+            const firstPartner = filteredPartners[0];
+            if (!firstPartner) {
+              return prev;
+            }
+
+            return {
+              ...prev,
+              partnerId: firstPartner.id,
+              partnerName: firstPartner.name,
+              partnerTagline: firstPartner.tagline || "",
+              partnerLogoUrl: firstPartner.logoUrl || "",
+            };
+          });
+        } else {
+          setAvailablePartners([]);
+        }
       } catch {
         setError("Failed to load data");
       } finally {
@@ -123,6 +200,19 @@ export default function SoloLandingEditor() {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setSuccess(false);
+  };
+
+  const handlePartnerSelect = (partnerId: string) => {
+    const selectedPartner = availablePartners.find((partner) => partner.id === partnerId);
+
+    setFormData((prev) => ({
+      ...prev,
+      partnerId,
+      partnerName: selectedPartner?.name || "",
+      partnerTagline: selectedPartner?.tagline || "",
+      partnerLogoUrl: selectedPartner?.logoUrl || "",
+    }));
     setSuccess(false);
   };
 
@@ -248,101 +338,6 @@ export default function SoloLandingEditor() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Coach Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="coachName">Coach Name</Label>
-                <Input
-                  id="coachName"
-                  name="coachName"
-                  value={formData.coachName}
-                  onChange={handleChange}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="coachTitle">Coach Title</Label>
-                <Input
-                  id="coachTitle"
-                  name="coachTitle"
-                  value={formData.coachTitle}
-                  onChange={handleChange}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="coachPhoto">Coach Photo URL</Label>
-                <Input
-                  id="coachPhoto"
-                  name="coachPhoto"
-                  value={formData.coachPhoto}
-                  onChange={handleChange}
-                  placeholder="https://..."
-                  className="mt-1"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Event Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="eventDay">Day</Label>
-                  <Input
-                    id="eventDay"
-                    name="eventDay"
-                    value={formData.eventDay}
-                    onChange={handleChange}
-                    placeholder="Wednesday"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="eventDate">Date</Label>
-                  <Input
-                    id="eventDate"
-                    name="eventDate"
-                    value={formData.eventDate}
-                    onChange={handleChange}
-                    placeholder="February 25, 2026"
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="eventTime">Time</Label>
-                  <Input
-                    id="eventTime"
-                    name="eventTime"
-                    value={formData.eventTime}
-                    onChange={handleChange}
-                    placeholder="12:30 PM - 1:30 PM"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="eventTimezone">Timezone</Label>
-                  <Input
-                    id="eventTimezone"
-                    name="eventTimezone"
-                    value={formData.eventTimezone}
-                    onChange={handleChange}
-                    placeholder="MST"
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle>Content</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -367,6 +362,31 @@ export default function SoloLandingEditor() {
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
+              <div>
+                <Label htmlFor="partnerId">Partner (Optional)</Label>
+                <select
+                  id="partnerId"
+                  value={formData.partnerId}
+                  onChange={(e) => handlePartnerSelect(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                >
+                  <option value="">No partner</option>
+                  {availablePartners.map((partner) => (
+                    <option key={partner.id} value={partner.id}>
+                      {partner.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Pulls partner logo and tagline from the Partners module.
+                </p>
+              </div>
+              {formData.partnerId ? (
+                <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                  <p><span className="font-medium">Tagline:</span> {formData.partnerTagline || "No tagline"}</p>
+                  <p className="truncate"><span className="font-medium">Logo URL:</span> {formData.partnerLogoUrl || "No logo URL"}</p>
+                </div>
+              ) : null}
               <div>
                 <Label>Benefits (What You&rsquo;ll Learn)</Label>
                 <div className="space-y-2 mt-2">
@@ -420,16 +440,6 @@ export default function SoloLandingEditor() {
                   id="ctaText"
                   name="ctaText"
                   value={formData.ctaText}
-                  onChange={handleChange}
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="registrationUrl">Registration URL</Label>
-                <Input
-                  id="registrationUrl"
-                  name="registrationUrl"
-                  value={formData.registrationUrl}
                   onChange={handleChange}
                   className="mt-1"
                 />
@@ -504,6 +514,26 @@ export default function SoloLandingEditor() {
                       )}
                       <div className="font-bold">{formData.coachName}</div>
                       <div className="text-purple-200 text-sm">{formData.coachTitle}</div>
+                      {formData.partnerId && (formData.partnerName || formData.partnerLogoUrl || formData.partnerTagline) ? (
+                        <div className="mt-4 border-t border-white/20 pt-4">
+                          <div className="text-[10px] uppercase tracking-wide text-purple-200 mb-2">
+                            In Partnership With
+                          </div>
+                          {formData.partnerLogoUrl ? (
+                            <img
+                              src={formData.partnerLogoUrl}
+                              alt={formData.partnerName || "Partner"}
+                              className="mx-auto h-10 w-auto object-contain rounded bg-white p-1"
+                            />
+                          ) : null}
+                          {formData.partnerName ? (
+                            <div className="mt-2 text-sm font-semibold text-white">{formData.partnerName}</div>
+                          ) : null}
+                          {formData.partnerTagline ? (
+                            <div className="text-xs text-purple-200">{formData.partnerTagline}</div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -511,7 +541,9 @@ export default function SoloLandingEditor() {
                 {/* Content */}
                 <div className="p-6 grid grid-cols-3 gap-6">
                   <div className="col-span-2">
-                    <h2 className="text-xl font-bold mb-4">Join us for the {formData.heroTitle}</h2>
+                    <h2 className="text-xl font-bold mb-4">
+                      {formData.aboutTitle || `Join us for the ${formData.heroTitle}`}
+                    </h2>
                     <p className="text-gray-600 mb-6">{formData.aboutDescription}</p>
 
                     {formData.videoUrl && (

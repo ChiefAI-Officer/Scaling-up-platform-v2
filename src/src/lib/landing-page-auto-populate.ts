@@ -74,7 +74,7 @@ export async function getAutoPopulatedContent(workshopId: string): Promise<AutoP
     return {
         // Auto-populated from workshop
         heading: workshop.title,
-        subheading: workshop.description?.slice(0, 150) || `Join ${coach.firstName} ${coach.lastName} for this transformative workshop.`,
+        subheading: `Join ${coach.firstName} ${coach.lastName} for this transformative workshop.`,
 
         // Auto-populated from coach
         coachName: `${coach.firstName} ${coach.lastName}`,

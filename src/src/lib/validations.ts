@@ -166,6 +166,7 @@ export const createCoachSchema = z.object({
     phone: phoneSchema,
     company: z.string().optional(),
     bio: z.string().optional(),
+    profileImage: z.string().optional(),
     territory: z.string().optional(),
     hubspotId: z.string().optional(),
     circleId: z.string().optional(),
@@ -191,6 +192,22 @@ export const coachSignupSchema = z
 export const changePasswordSchema = z
     .object({
         currentPassword: z.string().min(1, "Current password is required"),
+        newPassword: strongPasswordSchema,
+        confirmNewPassword: z.string().min(1, "Please confirm your new password"),
+    })
+    .refine((data) => data.newPassword === data.confirmNewPassword, {
+        path: ["confirmNewPassword"],
+        message: "New passwords do not match",
+    });
+
+export const forgotPasswordSchema = z.object({
+    email: emailSchema,
+});
+
+export const resetPasswordSchema = z
+    .object({
+        email: emailSchema,
+        token: z.string().min(1, "Reset token is required"),
         newPassword: strongPasswordSchema,
         confirmNewPassword: z.string().min(1, "Please confirm your new password"),
     })

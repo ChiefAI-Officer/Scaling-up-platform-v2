@@ -28,7 +28,12 @@ interface SoloContent {
   coachPhoto?: string;
   coachName?: string;
   coachTitle?: string;
+  aboutTitle?: string;
   aboutDescription?: string;
+  partnerId?: string;
+  partnerName?: string;
+  partnerTagline?: string;
+  partnerLogoUrl?: string;
   videoUrl?: string;
   benefits?: string[];
   registrationUrl?: string;
@@ -71,7 +76,6 @@ interface RegistrationContent {
 
 interface ThankYouContent {
   headline?: string;
-  workshopTitle?: string;
   subheadline?: string;
   videoUrl?: string;
   additionalMessage?: string;
@@ -80,7 +84,10 @@ interface ThankYouContent {
 
 interface WorkshopData {
   id: string;
-  isFree?: boolean;
+  title: string;
+  isFree: boolean;
+  priceCents: number | null;
+  earlyBirdPriceCents: number | null;
 }
 
 interface WorkshopFallbackData {
@@ -134,7 +141,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
     return {
       title: content.heroTitle || content.workshopTitle || landingPage.workshop.title,
-      description: content.heroSubtitle || content.description || landingPage.workshop.description || "",
+      description: content.heroSubtitle || content.description || "Workshop details and registration",
     };
   }
 
@@ -148,7 +155,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return {
     title: workshop.title,
-    description: workshop.description || "Workshop registration details",
+    description: "Workshop registration details",
   };
 }
 
@@ -185,7 +192,7 @@ export default async function LandingPageView({ params }: PageProps) {
       case "REGISTRATION":
         return <RegistrationTemplate content={content as RegistrationContent} workshop={workshop} />;
       case "THANK_YOU":
-        return <ThankYouTemplate content={content as ThankYouContent} />;
+        return <ThankYouTemplate content={content as ThankYouContent} workshop={workshop} />;
       default:
         notFound();
     }
@@ -237,7 +244,7 @@ function DefaultWorkshopTemplate({ workshop }: { workshop: WorkshopFallbackData 
           <p className="text-sm font-semibold tracking-wide text-blue-600 uppercase">Workshop</p>
           <h1 className="text-3xl font-bold text-gray-900">{workshop.title}</h1>
           <p className="text-gray-600">
-            {workshop.description || "Join this workshop to learn practical frameworks you can apply immediately."}
+            {"Join this workshop to learn practical frameworks you can apply immediately."}
           </p>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -333,7 +340,11 @@ function SoloLandingTemplate({ content, workshop }: { content: SoloContent; work
   const coachPhoto = content.coachPhoto || "";
   const coachName = content.coachName || "";
   const coachTitle = content.coachTitle || "";
+  const aboutTitle = content.aboutTitle || `Join us for the ${heroTitle}`;
   const aboutDescription = content.aboutDescription || "";
+  const partnerName = content.partnerName || "";
+  const partnerTagline = content.partnerTagline || "";
+  const partnerLogoUrl = content.partnerLogoUrl || "";
   const videoUrl = content.videoUrl || "";
   const benefits = content.benefits || [];
   const registrationUrl = content.registrationUrl || "#";
@@ -374,13 +385,29 @@ function SoloLandingTemplate({ content, workshop }: { content: SoloContent; work
             )}
             <div className="text-xl font-bold">{coachName}</div>
             <div className="text-purple-200">{coachTitle}</div>
+            {partnerName || partnerTagline || partnerLogoUrl ? (
+              <div className="mt-5 border-t border-white/20 pt-4">
+                <div className="text-xs uppercase tracking-wide text-purple-200 mb-2">
+                  In Partnership With
+                </div>
+                {partnerLogoUrl ? (
+                  <img
+                    src={partnerLogoUrl}
+                    alt={partnerName || "Partner"}
+                    className="mx-auto h-12 w-auto rounded bg-white p-1 object-contain"
+                  />
+                ) : null}
+                {partnerName ? <div className="mt-2 text-sm font-semibold">{partnerName}</div> : null}
+                {partnerTagline ? <div className="text-xs text-purple-200">{partnerTagline}</div> : null}
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
 
       <main className="max-w-5xl mx-auto py-16 px-4 grid md:grid-cols-3 gap-12">
         <div className="md:col-span-2">
-          <h2 className="text-3xl font-bold mb-6">Join us for the {heroTitle}</h2>
+          <h2 className="text-3xl font-bold mb-6">{aboutTitle}</h2>
           <p className="text-gray-600 mb-8">{aboutDescription}</p>
 
           {videoUrl && (
@@ -664,24 +691,37 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
   );
 }
 
-function ThankYouTemplate({ content }: { content: ThankYouContent }) {
+function ThankYouTemplate({ content, workshop }: { content: ThankYouContent; workshop: WorkshopData }) {
   const headline = content.headline || "";
-  const workshopTitle = content.workshopTitle || "";
   const subheadline = content.subheadline || "";
   const videoUrl = content.videoUrl || "";
   const additionalMessage = content.additionalMessage || "";
   const calendarReminderText = content.calendarReminderText || "";
+  const effectivePriceCents = workshop.earlyBirdPriceCents ?? workshop.priceCents ?? 0;
+  const shouldTrackAffiliateSale = !workshop.isFree && effectivePriceCents > 0;
+  const affiliateSaleAmount = (effectivePriceCents / 100).toFixed(2);
+  const affiliateOrderNumber = workshop.title || workshop.id;
+  const affiliateTrackingUrl = `https://scalingup.idevaffiliate.com/sale.php?profile=72198&idev_saleamt=${encodeURIComponent(
+    affiliateSaleAmount
+  )}&idev_ordernum=${encodeURIComponent(affiliateOrderNumber)}`;
 
   return (
     <div
       className="min-h-screen flex items-center justify-center"
       style={{ background: "linear-gradient(135deg, #6B21A8 0%, #7C3AED 50%, #6B21A8 100%)" }}
     >
+      {shouldTrackAffiliateSale ? (
+        <img
+          src={affiliateTrackingUrl}
+          style={{ height: "0px", width: "0px", border: "0px", position: "absolute" }}
+          alt=""
+          aria-hidden="true"
+        />
+      ) : null}
       <div className="text-white text-center px-4 max-w-2xl">
         <div className="font-bold text-2xl tracking-wider mb-12">SCALING UP</div>
 
         <h1 className="text-3xl font-serif mb-2">{headline}</h1>
-        <h2 className="text-2xl font-serif font-bold mb-6">{workshopTitle} Workshop</h2>
 
         <p className="text-purple-200 italic mb-10">{subheadline}</p>
 

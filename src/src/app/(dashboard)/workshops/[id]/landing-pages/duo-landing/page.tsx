@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,12 +14,23 @@ interface Coach {
   title: string;
 }
 
+interface CoachBioProfile {
+  id: string;
+  name: string;
+  title: string;
+  photoUrl: string;
+  createdAt: string;
+  editUrl: string;
+}
+
 interface Benefit {
   title: string;
   points: string[];
 }
 
 interface DuoLandingData {
+  coach1BioId: string;
+  coach2BioId: string;
   coach1: Coach;
   coach2: Coach;
   eventDate: string;
@@ -38,6 +49,8 @@ interface DuoLandingData {
 }
 
 const DEFAULT_DATA: DuoLandingData = {
+  coach1BioId: "",
+  coach2BioId: "",
   coach1: { name: "", photo: "", title: "Scaling Up Certified Coach" },
   coach2: { name: "", photo: "", title: "Scaling Up Certified Coach" },
   eventDate: "",
@@ -94,49 +107,142 @@ const DEFAULT_DATA: DuoLandingData = {
   registrationUrl: "",
 };
 
+function mapProfileToCoach(profile: CoachBioProfile): Coach {
+  return {
+    name: profile.name,
+    title: profile.title || "Scaling Up Certified Coach",
+    photo: profile.photoUrl || "",
+  };
+}
+
+function formatCreatedDate(value: string): string {
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function DuoLandingEditor() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const workshopId = params.id as string;
+  const coach2IdFromQuery = searchParams.get("coach2Id");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState<DuoLandingData>(DEFAULT_DATA);
+  const [bioProfiles, setBioProfiles] = useState<CoachBioProfile[]>([]);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [workshopRes, pageRes] = await Promise.all([
+        const [workshopRes, pageRes, bioProfilesRes] = await Promise.all([
           fetch(`/api/workshops/${workshopId}`),
           fetch(`/api/workshops/${workshopId}/landing-pages/DUO_LANDING`),
+          fetch("/api/bio/profiles"),
         ]);
+
+        const nextData: DuoLandingData = { ...DEFAULT_DATA };
+        let workshopPrimaryCoachId = "";
+        let metadataSecondaryCoachId: string | null = null;
 
         const workshopData = await workshopRes.json();
         if (workshopData.success) {
           const w = workshopData.data;
           const eventDate = new Date(w.eventDate);
-          
-          setFormData((prev) => ({
-            ...prev,
-            coach1: {
-              ...prev.coach1,
-              name: `${w.coach.firstName} ${w.coach.lastName}`,
-              photo: w.coach.profileImage || "",
-            },
-            eventDate: eventDate.toLocaleDateString("en-US", { 
-              weekday: "long", month: "long", day: "numeric", year: "numeric" 
-            }),
-            eventTime: w.eventTime || "11am - 12pm",
-            registrationUrl: `/workshop/${workshopId}/register`,
-          }));
+          workshopPrimaryCoachId = w.coach.id || "";
+          const metadataTask = Array.isArray(w.tasks)
+            ? w.tasks.find(
+                (task: { taskType?: string; inputData?: string | null }) =>
+                  task.taskType === "WORKSHOP_SETUP_METADATA" && Boolean(task.inputData)
+              )
+            : null;
+
+          let metadataSecondaryCoach:
+            | { id?: string; name?: string; title?: string; photo?: string }
+            | null = null;
+
+          if (metadataTask?.inputData) {
+            try {
+              const parsedMetadata = JSON.parse(metadataTask.inputData) as {
+                secondaryCoachId?: string;
+                secondaryCoach?: { id?: string; name?: string; title?: string; photo?: string };
+              };
+              metadataSecondaryCoachId = parsedMetadata.secondaryCoachId || null;
+              metadataSecondaryCoach = parsedMetadata.secondaryCoach || null;
+            } catch {
+              metadataSecondaryCoachId = null;
+              metadataSecondaryCoach = null;
+            }
+          }
+
+          nextData.coach1BioId = workshopPrimaryCoachId;
+          nextData.coach1 = {
+            name: `${w.coach.firstName} ${w.coach.lastName}`.trim(),
+            photo: w.coach.profileImage || "",
+            title: w.coach.company || "Scaling Up Certified Coach",
+          };
+          nextData.eventDate = eventDate.toLocaleDateString("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          });
+          nextData.eventTime = w.eventTime || "11am - 12pm";
+          nextData.registrationUrl = `/workshop/${workshopId}/register`;
+
+          if (metadataSecondaryCoach?.name || metadataSecondaryCoach?.photo || metadataSecondaryCoach?.title) {
+            nextData.coach2 = {
+              name: metadataSecondaryCoach?.name || nextData.coach2.name,
+              photo: metadataSecondaryCoach?.photo || nextData.coach2.photo,
+              title: metadataSecondaryCoach?.title || nextData.coach2.title,
+            };
+          }
+
+          if (metadataSecondaryCoachId) {
+            nextData.coach2BioId = metadataSecondaryCoachId;
+          }
         }
 
         const pageData = await pageRes.json();
         if (pageData.success && pageData.data) {
           const content = JSON.parse(pageData.data.content);
-          setFormData((prev) => ({ ...prev, ...content }));
+          Object.assign(nextData, content);
         }
+
+        const bioProfilesData = await bioProfilesRes.json();
+        const availableProfiles: CoachBioProfile[] =
+          bioProfilesRes.ok && bioProfilesData.success && Array.isArray(bioProfilesData.data)
+            ? (bioProfilesData.data as CoachBioProfile[])
+            : [];
+        setBioProfiles(availableProfiles);
+
+        const preferredCoach1Id = nextData.coach1BioId || workshopPrimaryCoachId;
+        if (preferredCoach1Id) {
+          const coach1Profile = availableProfiles.find((profile) => profile.id === preferredCoach1Id);
+          if (coach1Profile) {
+            nextData.coach1BioId = coach1Profile.id;
+            nextData.coach1 = mapProfileToCoach(coach1Profile);
+          }
+        }
+
+        const preferredCoach2Id = nextData.coach2BioId || coach2IdFromQuery || metadataSecondaryCoachId;
+        if (preferredCoach2Id) {
+          const coach2Profile = availableProfiles.find((profile) => profile.id === preferredCoach2Id);
+          if (coach2Profile) {
+            nextData.coach2BioId = coach2Profile.id;
+            nextData.coach2 = mapProfileToCoach(coach2Profile);
+          }
+        }
+
+        if (!nextData.registrationUrl) {
+          nextData.registrationUrl = `/workshop/${workshopId}/register`;
+        }
+
+        setFormData(nextData);
       } catch {
         setError("Failed to load data");
       } finally {
@@ -144,18 +250,32 @@ export default function DuoLandingEditor() {
       }
     }
     loadData();
-  }, [workshopId]);
+  }, [workshopId, coach2IdFromQuery]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     setSuccess(false);
   };
 
-  const handleCoachChange = (coach: "coach1" | "coach2", field: keyof Coach, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [coach]: { ...prev[coach], [field]: value },
-    }));
+  const handleCoachProfileChange = (slot: "coach1" | "coach2", profileId: string) => {
+    const selectedProfile = bioProfiles.find((profile) => profile.id === profileId);
+
+    setFormData((prev) => {
+      if (slot === "coach1") {
+        return {
+          ...prev,
+          coach1BioId: profileId,
+          coach1: selectedProfile ? mapProfileToCoach(selectedProfile) : prev.coach1,
+        };
+      }
+
+      return {
+        ...prev,
+        coach2BioId: profileId,
+        coach2: selectedProfile ? mapProfileToCoach(selectedProfile) : prev.coach2,
+      };
+    });
+    setSuccess(false);
   };
 
   const handleArrayChange = (field: "whatItIs" | "whatItIsNot" | "whoIsFor" | "whoShouldSkip", index: number, value: string) => {
@@ -230,39 +350,90 @@ export default function DuoLandingEditor() {
       <div className="grid grid-cols-5 gap-6">
         {/* Editor Panel */}
         <div className="col-span-2 space-y-6 max-h-[calc(100vh-150px)] overflow-y-auto pr-2">
-          {/* Coaches */}
           <Card>
-            <CardHeader><CardTitle>Coaches</CardTitle></CardHeader>
-            <CardContent className="space-y-6">
-              {(["coach1", "coach2"] as const).map((coach, idx) => (
-                <div key={coach} className="space-y-3 pb-4 border-b last:border-0">
-                  <h4 className="font-medium">Coach {idx + 1}</h4>
-                  <div>
-                    <Label>Name</Label>
-                    <Input
-                      value={formData[coach].name}
-                      onChange={(e) => handleCoachChange(coach, "name", e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label>Title</Label>
-                    <Input
-                      value={formData[coach].title}
-                      onChange={(e) => handleCoachChange(coach, "title", e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label>Photo URL</Label>
-                    <Input
-                      value={formData[coach].photo}
-                      onChange={(e) => handleCoachChange(coach, "photo", e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
+            <CardHeader>
+              <CardTitle>Coach Mapping via BIO Pages</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="coach1BioId">Coach 1 Source</Label>
+                <select
+                  id="coach1BioId"
+                  value={formData.coach1BioId}
+                  onChange={(event) => handleCoachProfileChange("coach1", event.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                >
+                  <option value="">Select coach bio page...</option>
+                  {bioProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name} ({formatCreatedDate(profile.createdAt)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label htmlFor="coach2BioId">Coach 2 Source</Label>
+                <select
+                  id="coach2BioId"
+                  value={formData.coach2BioId}
+                  onChange={(event) => handleCoachProfileChange("coach2", event.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                >
+                  <option value="">Select coach bio page...</option>
+                  {bioProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name} ({formatCreatedDate(profile.createdAt)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="rounded-md border border-gray-200">
+                <div className="border-b bg-gray-50 px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Available Bio Pages
                 </div>
-              ))}
+                {bioProfiles.length === 0 ? (
+                  <p className="px-3 py-3 text-sm text-gray-500">
+                    No coach bio pages found. Create or update coach bios first.
+                  </p>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-white">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                            Name
+                          </th>
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                            Created
+                          </th>
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                            Edit
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {bioProfiles.map((profile) => (
+                          <tr key={profile.id}>
+                            <td className="px-3 py-2">{profile.name}</td>
+                            <td className="px-3 py-2 text-gray-600">{formatCreatedDate(profile.createdAt)}</td>
+                            <td className="px-3 py-2">
+                              <Link
+                                href={profile.editUrl}
+                                className="text-blue-600 hover:underline"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                Edit
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -340,7 +511,6 @@ export default function DuoLandingEditor() {
             <CardContent className="space-y-4">
               <div><Label>Why This Matters Now</Label><textarea value={formData.whyNow} onChange={(e) => handleChange("whyNow", e.target.value)} rows={3} className="mt-1 w-full border rounded-md px-3 py-2" /></div>
               <div><Label>CTA Button Text</Label><Input value={formData.ctaText} onChange={(e) => handleChange("ctaText", e.target.value)} className="mt-1" /></div>
-              <div><Label>Registration URL</Label><Input value={formData.registrationUrl} onChange={(e) => handleChange("registrationUrl", e.target.value)} className="mt-1" /></div>
             </CardContent>
           </Card>
 

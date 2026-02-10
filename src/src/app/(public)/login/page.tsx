@@ -99,7 +99,15 @@ function LoginForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -126,6 +134,10 @@ function LoginForm() {
               <Link href="/register" className="font-medium text-blue-600 hover:text-blue-700">
                 Create an account
               </Link>
+            </p>
+
+            <p className="text-center text-xs text-gray-500">
+              Circle (SunHub) SSO is planned for a later phase.
             </p>
           </form>
 

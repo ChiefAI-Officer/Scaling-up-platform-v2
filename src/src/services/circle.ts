@@ -10,16 +10,27 @@ const CIRCLE_API_BASE = "https://app.circle.so/api/v1";
 // Types for Circle.so API responses
 interface CircleMember {
     id: number;
-    user_id: number;
-    name: string;
-    email: string;
-    avatar_url: string;
-    created_at: string;
-    topics_count: number;
-    comments_count: number;
+    user_id?: number;
+    name?: string;
+    email?: string;
+    avatar_url?: string;
+    created_at?: string;
+    topics_count?: number;
+    comments_count?: number;
+    [key: string]: unknown;
 }
 
-
+export interface CircleProfile {
+    memberId?: string;
+    email?: string;
+    fullName?: string;
+    firstName?: string;
+    lastName?: string;
+    title?: string;
+    bio?: string;
+    avatarUrl?: string;
+    createdAt?: string;
+}
 
 // Zod schema for verification result
 export const CertificationResultSchema = z.object({
@@ -33,6 +44,137 @@ export const CertificationResultSchema = z.object({
 });
 
 export type CertificationResult = z.infer<typeof CertificationResultSchema>;
+
+function getCircleApiKey(): string {
+    const apiKey = process.env.CIRCLE_API_KEY;
+    if (!apiKey) {
+        throw new Error("CIRCLE_API_KEY is not configured");
+    }
+    return apiKey;
+}
+
+async function searchCommunityMembers(query: string): Promise<CircleMember[]> {
+    const apiKey = getCircleApiKey();
+    const searchUrl = `${CIRCLE_API_BASE}/community_members/search?query=${encodeURIComponent(query)}`;
+
+    const response = await fetch(searchUrl, {
+        method: "GET",
+        headers: {
+            Authorization: `Token ${apiKey}`,
+            "Content-Type": "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Circle API Error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    if (Array.isArray(data)) {
+        return data as CircleMember[];
+    }
+
+    if (data && typeof data === "object") {
+        const record = data as Record<string, unknown>;
+        if (Array.isArray(record.results)) {
+            return record.results as CircleMember[];
+        }
+        if (Array.isArray(record.community_members)) {
+            return record.community_members as CircleMember[];
+        }
+    }
+
+    return [];
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+    return value as Record<string, unknown>;
+}
+
+function pickString(record: Record<string, unknown> | null, keys: string[]): string | undefined {
+    if (!record) {
+        return undefined;
+    }
+
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === "string" && value.trim().length > 0) {
+            return value.trim();
+        }
+    }
+
+    return undefined;
+}
+
+function splitName(fullName?: string): { firstName?: string; lastName?: string } {
+    if (!fullName) {
+        return {};
+    }
+
+    const parts = fullName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) {
+        return {};
+    }
+
+    if (parts.length === 1) {
+        return { firstName: parts[0], lastName: undefined };
+    }
+
+    return {
+        firstName: parts[0],
+        lastName: parts.slice(1).join(" "),
+    };
+}
+
+function mapCircleMember(member: CircleMember): CircleProfile {
+    const memberRecord = toRecord(member);
+    const userRecord = toRecord(memberRecord?.user);
+    const fullName = pickString(memberRecord, ["name"]) ?? pickString(userRecord, ["name"]);
+    const nameParts = splitName(fullName);
+
+    const memberIdValue = memberRecord?.id ?? userRecord?.id ?? memberRecord?.user_id;
+    const memberId = typeof memberIdValue === "number"
+        ? String(memberIdValue)
+        : typeof memberIdValue === "string" && memberIdValue.length > 0
+            ? memberIdValue
+            : undefined;
+
+    return {
+        memberId,
+        email: pickString(memberRecord, ["email"]) ?? pickString(userRecord, ["email"]),
+        fullName,
+        firstName: nameParts.firstName,
+        lastName: nameParts.lastName,
+        title: pickString(memberRecord, ["headline", "title", "job_title", "jobTitle"])
+            ?? pickString(userRecord, ["headline", "title", "job_title", "jobTitle"]),
+        bio: pickString(memberRecord, ["bio", "about", "description", "summary"])
+            ?? pickString(userRecord, ["bio", "about", "description", "summary"]),
+        avatarUrl: pickString(memberRecord, ["avatar_url", "avatarUrl", "profile_image_url", "profileImageUrl"])
+            ?? pickString(userRecord, ["avatar_url", "avatarUrl", "profile_image_url", "profileImageUrl"]),
+        createdAt: pickString(memberRecord, ["created_at", "createdAt"])
+            ?? pickString(userRecord, ["created_at", "createdAt"]),
+    };
+}
+
+/**
+ * Fetch a coach profile from Circle by email for pre-filling coach bios.
+ */
+export async function getCircleProfileByEmail(email: string): Promise<CircleProfile | null> {
+    const members = await searchCommunityMembers(email);
+    if (members.length === 0) {
+        return null;
+    }
+
+    const normalizedMembers = members.map(mapCircleMember);
+    const exactMatch = normalizedMembers.find(
+        (member) => member.email?.toLowerCase() === email.toLowerCase()
+    );
+
+    return exactMatch ?? normalizedMembers[0] ?? null;
+}
 
 /**
  * Verify a coach's certification status in Circle.so
@@ -65,35 +207,9 @@ export async function verifyCertification(
     }
 
     try {
-        // Step 1: Find member by email
-        // Circle API doesn't have a direct "get by email" endpoint documented publicly identical to CRM
-        // but typically we search community members.
-        // Efficient approach: Search community members list.
-        const searchUrl = `${CIRCLE_API_BASE}/community_members/search?query=${encodeURIComponent(
-            email
-        )}`;
+        const profile = await getCircleProfileByEmail(email);
 
-        const response = await fetch(searchUrl, {
-            method: "GET",
-            headers: {
-                Authorization: `Token ${apiKey}`,
-                "Content-Type": "application/json",
-            },
-        });
-
-        if (!response.ok) {
-            throw new Error(`Circle API Error: ${response.status} ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        // API returns array of members or paginated result?
-        // Assuming typical structure: { results: [...] } or just [...]
-        // Let's safe handle list.
-        const members: CircleMember[] = Array.isArray(data) ? data : data.results || [];
-
-        const member = members.find((m) => m.email.toLowerCase() === email.toLowerCase());
-
-        if (!member) {
+        if (!profile) {
             return {
                 verified: false,
                 termsAccepted: false,
@@ -112,11 +228,11 @@ export async function verifyCertification(
 
         return {
             verified: true,
-            certificationDate: new Date(member.created_at), // Proxy: Member since
+            certificationDate: profile.createdAt ? new Date(profile.createdAt) : undefined,
             expiryDate: null, // Lifetime for now? or check custom fields
             termsAccepted: true, // Assumed true if in community
             confidence: 90, // High confidence found
-            circleMemberId: String(member.id),
+            circleMemberId: profile.memberId,
             issues: [],
         };
     } catch (error) {
