@@ -1,0 +1,188 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import Link from "next/link";
+import { Search, SlidersHorizontal, X } from "lucide-react";
+import { StatusPill } from "@/components/ui/status-pill";
+import { CheckCircle2, Circle } from "lucide-react";
+
+interface WorkshopItem {
+    id: string;
+    title: string;
+    workshopCode: string | null;
+    status: string;
+    eventDate: string;
+    maxAttendees: number;
+    workshopType: { name: string } | null;
+    _count: { registrations: number };
+}
+
+interface PortalWorkshopListProps {
+    workshops: WorkshopItem[];
+}
+
+const STATUS_OPTIONS = [
+    { value: "", label: "All Statuses" },
+    { value: "REQUESTED", label: "Requested" },
+    { value: "AWAITING_APPROVAL", label: "Awaiting Approval" },
+    { value: "PRE_EVENT", label: "Pre-Event" },
+    { value: "POST_EVENT", label: "Post-Event" },
+    { value: "COMPLETED", label: "Completed" },
+    { value: "CANCELED", label: "Canceled" },
+];
+
+export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
+    const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [showFilters, setShowFilters] = useState(false);
+
+    const filtered = useMemo(() => {
+        return workshops.filter((w) => {
+            const matchesSearch =
+                !search ||
+                w.title.toLowerCase().includes(search.toLowerCase()) ||
+                (w.workshopType?.name || "").toLowerCase().includes(search.toLowerCase());
+            const matchesStatus = !statusFilter || w.status === statusFilter;
+            return matchesSearch && matchesStatus;
+        });
+    }, [workshops, search, statusFilter]);
+
+    const hasActiveFilters = search || statusFilter;
+
+    return (
+        <>
+            {/* Filters & Search */}
+            <div className="flex gap-4 mb-6">
+                <div className="relative flex-1 max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Search workshops..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+                <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${
+                        showFilters || statusFilter
+                            ? "border-blue-500 text-blue-600 bg-blue-50"
+                            : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                    }`}
+                >
+                    <SlidersHorizontal className="w-4 h-4" /> Filters
+                </button>
+                {hasActiveFilters && (
+                    <button
+                        onClick={() => { setSearch(""); setStatusFilter(""); }}
+                        className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+                    >
+                        <X className="w-4 h-4" /> Clear
+                    </button>
+                )}
+            </div>
+
+            {/* Filter Panel */}
+            {showFilters && (
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-4">
+                        <label className="text-sm font-medium text-gray-700">Status:</label>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            {STATUS_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+            )}
+
+            {/* Results count */}
+            {hasActiveFilters && (
+                <p className="text-sm text-gray-500 mb-3">
+                    Showing {filtered.length} of {workshops.length} workshops
+                </p>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Workshop</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Registrations</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Validated</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Approved</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {filtered.length === 0 ? (
+                            <tr>
+                                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                                    {hasActiveFilters
+                                        ? "No workshops match your search."
+                                        : "No workshops found. Request your first one above!"}
+                                </td>
+                            </tr>
+                        ) : (
+                            filtered.map((workshop) => {
+                                const isValidated = ["AWAITING_APPROVAL", "PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(workshop.status);
+                                const isApproved = ["PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(workshop.status);
+
+                                return (
+                                    <tr key={workshop.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="font-medium text-gray-900">{workshop.title}</div>
+                                            <div className="text-sm text-gray-500">
+                                                {workshop.workshopCode && <span className="font-mono mr-2">{workshop.workshopCode}</span>}
+                                                {workshop.workshopType?.name}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-600">
+                                            {new Date(workshop.eventDate).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="font-medium">{workshop._count.registrations}</div>
+                                            <div className="text-xs text-gray-400">of {workshop.maxAttendees} max</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {isValidated ? (
+                                                <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" />
+                                            ) : (
+                                                <Circle className="w-5 h-5 text-gray-300 mx-auto" />
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {isApproved ? (
+                                                <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" />
+                                            ) : (
+                                                <Circle className="w-5 h-5 text-gray-300 mx-auto" />
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <StatusPill status={workshop.status} />
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <Link
+                                                href={`/portal/workshops/${workshop.id}`}
+                                                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                                            >
+                                                Manage
+                                            </Link>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </>
+    );
+}

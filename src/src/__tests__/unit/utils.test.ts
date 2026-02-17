@@ -105,14 +105,11 @@ describe("generateSlug", () => {
 describe("getWorkshopStatusLabel", () => {
   it("should return human-readable labels for all statuses", () => {
     expect(getWorkshopStatusLabel("REQUESTED")).toBe("Requested");
-    expect(getWorkshopStatusLabel("VALIDATING")).toBe("Validating");
-    expect(getWorkshopStatusLabel("APPROVED")).toBe("Approved");
-    expect(getWorkshopStatusLabel("SETUP_IN_PROGRESS")).toBe("Setup in Progress");
-    expect(getWorkshopStatusLabel("MARKETING_ACTIVE")).toBe("Marketing Active");
-    expect(getWorkshopStatusLabel("REGISTRATION_OPEN")).toBe("Registration Open");
-    expect(getWorkshopStatusLabel("REGISTRATION_CLOSED")).toBe("Registration Closed");
+    expect(getWorkshopStatusLabel("AWAITING_APPROVAL")).toBe("Awaiting Approval");
+    expect(getWorkshopStatusLabel("PRE_EVENT")).toBe("Pre-Event");
+    expect(getWorkshopStatusLabel("POST_EVENT")).toBe("Post-Event");
     expect(getWorkshopStatusLabel("COMPLETED")).toBe("Completed");
-    expect(getWorkshopStatusLabel("CANCELLED")).toBe("Cancelled");
+    expect(getWorkshopStatusLabel("CANCELED")).toBe("Canceled");
   });
 
   it("should return original status for unknown status", () => {

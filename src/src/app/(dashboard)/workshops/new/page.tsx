@@ -24,6 +24,20 @@ interface WorkshopType {
   slug: string;
 }
 
+interface CategoryData {
+  id: string;
+  name: string;
+  slug: string;
+  pricingTiers: PricingTierData[];
+}
+
+interface PricingTierData {
+  id: string;
+  name: string;
+  amountCents: number;
+  description: string | null;
+}
+
 interface SessionResponse {
   user?: {
     email?: string;
@@ -43,15 +57,20 @@ function normalizeToken(input: string): string {
 
 function workshopTypeMatchesCategory(
   type: WorkshopType,
-  category: "AI" | "EXIT_AND_VALUATION"
+  categorySlug: string
 ): boolean {
   const token = normalizeToken(`${type.slug} ${type.name}`);
+  const catToken = normalizeToken(categorySlug);
 
-  if (category === "AI") {
+  if (catToken.includes("ai") || catToken.includes("artificial")) {
     return token.includes(" ai ") || token.startsWith("ai ") || token.endsWith(" ai") || token.includes("artificial intelligence");
   }
 
-  return token.includes("exit") || token.includes("valuation");
+  if (catToken.includes("exit") || catToken.includes("valuation")) {
+    return token.includes("exit") || token.includes("valuation");
+  }
+
+  return catToken.length > 0 && token.includes(catToken);
 }
 
 function generateCouponCode(discountPercent: string, title: string): string {
@@ -72,15 +91,17 @@ export default function NewWorkshopPage() {
   const [error, setError] = useState<string | null>(null);
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [workshopTypes, setWorkshopTypes] = useState<WorkshopType[]>([]);
+  const [categories, setCategories] = useState<CategoryData[]>([]);
   const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionResponse["user"]>(undefined);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [formData, setFormData] = useState({
     coachId: "",
     secondaryCoachId: "",
     isDuoWorkshop: false,
     workshopTypeId: "",
-    workshopCategory: "AI" as "AI" | "EXIT_AND_VALUATION",
+    categoryId: "",
     title: "",
     description: "",
     format: "IN_PERSON",
@@ -97,6 +118,7 @@ export default function NewWorkshopPage() {
     virtualPlatform: "",
     virtualLink: "",
     isFree: false,
+    pricingTierId: "",
     priceCents: "",
     earlyBirdPriceCents: "",
     earlyBirdDeadline: "",
@@ -108,22 +130,34 @@ export default function NewWorkshopPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [coachesRes, typesRes, sessionRes] = await Promise.all([
+        const [coachesRes, typesRes, sessionRes, categoriesRes] = await Promise.all([
           fetch("/api/coaches"),
           fetch("/api/workshop-types"),
           fetch("/api/auth/session"),
+          fetch("/api/categories"),
         ]);
 
         const coachesData = await coachesRes.json();
         const typesData = await typesRes.json();
         const sessionData = (await sessionRes.json()) as SessionResponse;
+        const categoriesData = await categoriesRes.json();
 
         const coachesList: Coach[] = coachesData.success ? coachesData.data : [];
         const workshopTypeList: WorkshopType[] = typesData.success ? typesData.data : [];
+        const categoriesList: CategoryData[] = Array.isArray(categoriesData) ? categoriesData : [];
 
         setCoaches(coachesList);
         setWorkshopTypes(workshopTypeList);
+        setCategories(categoriesList);
         setSessionUser(sessionData.user);
+
+        // Auto-select first category
+        if (categoriesList.length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            categoryId: prev.categoryId || categoriesList[0].id,
+          }));
+        }
 
         if (sessionData.user?.role === "COACH" && sessionData.user.email) {
           const matchingCoach = coachesList.find(
@@ -158,13 +192,24 @@ export default function NewWorkshopPage() {
     );
   }, [selectedCoach, workshopTypes]);
 
+  const selectedCategory = useMemo(
+    () => categories.find((c) => c.id === formData.categoryId) || null,
+    [categories, formData.categoryId]
+  );
+
+  const availablePricingTiers = useMemo(
+    () => selectedCategory?.pricingTiers || [],
+    [selectedCategory]
+  );
+
   const recommendedWorkshopType = useMemo(() => {
+    const slug = selectedCategory?.slug || "";
     const categoryMatchedTypes = availableWorkshopTypes.filter((type) =>
-      workshopTypeMatchesCategory(type, formData.workshopCategory)
+      workshopTypeMatchesCategory(type, slug)
     );
 
     return categoryMatchedTypes[0] || availableWorkshopTypes[0] || null;
-  }, [availableWorkshopTypes, formData.workshopCategory]);
+  }, [availableWorkshopTypes, selectedCategory]);
 
   const recommendedWorkshopTypeId = recommendedWorkshopType?.id || "";
 
@@ -211,9 +256,24 @@ export default function NewWorkshopPage() {
         next.maxAttendees = "50";
       }
 
+      if (name === "categoryId") {
+        next.pricingTierId = "";
+        next.priceCents = "";
+      }
+
+      if (name === "pricingTierId" && typeof nextValue === "string" && nextValue) {
+        const selectedCat = categories.find((c) => c.id === next.categoryId);
+        const tier = selectedCat?.pricingTiers.find((t) => t.id === nextValue);
+        if (tier) {
+          next.priceCents = String(Math.round(tier.amountCents / 100));
+        }
+      }
+
       if (name === "isFree" && nextValue === true) {
         next.couponDiscountPercent = "";
         next.couponCode = "";
+        next.pricingTierId = "";
+        next.priceCents = "";
       }
 
       if (name === "couponDiscountPercent") {
@@ -240,6 +300,10 @@ export default function NewWorkshopPage() {
     setError(null);
 
     try {
+      if (!termsAccepted) {
+        throw new Error("You must accept the terms and conditions before creating a workshop.");
+      }
+
       if (!formData.workshopTypeId) {
         throw new Error("No certified workshop type is available for the selected coach and category.");
       }
@@ -267,7 +331,8 @@ export default function NewWorkshopPage() {
       const payload = {
         coachId: formData.coachId,
         workshopTypeId: formData.workshopTypeId,
-        category: formData.workshopCategory,
+        categoryId: formData.categoryId || undefined,
+        pricingTierId: formData.pricingTierId || undefined,
         title: formData.title,
         description: formData.description || undefined,
         format: formData.format,
@@ -440,23 +505,27 @@ export default function NewWorkshopPage() {
             </div>
 
             <div>
-              <Label htmlFor="workshopCategory">Workshop Category *</Label>
+              <Label htmlFor="categoryId">Workshop Category *</Label>
               <select
-                id="workshopCategory"
-                name="workshopCategory"
-                value={formData.workshopCategory}
+                id="categoryId"
+                name="categoryId"
+                value={formData.categoryId}
                 onChange={handleChange}
                 required
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
               >
-                <option value="AI">AI Workshop</option>
-                <option value="EXIT_AND_VALUATION">Exit and Valuation Workshop</option>
+                <option value="">Select a category...</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
               </select>
-              <p className="text-sm text-gray-500 mt-1">
-                {formData.workshopCategory === "AI"
-                  ? "AI workshops help business owners understand and leverage AI strategically"
-                  : "Exit & Valuation workshops help owners maximize business value and plan their exit"}
-              </p>
+              {categories.length === 0 && (
+                <p className="text-sm text-amber-600 mt-1">
+                  No categories found. An admin must create categories first.
+                </p>
+              )}
             </div>
 
             <div>
@@ -704,7 +773,32 @@ export default function NewWorkshopPage() {
 
             {!formData.isFree && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                {availablePricingTiers.length > 0 ? (
+                  <div>
+                    <Label htmlFor="pricingTierId">Pricing Tier *</Label>
+                    <select
+                      id="pricingTierId"
+                      name="pricingTierId"
+                      value={formData.pricingTierId}
+                      onChange={handleChange}
+                      required={!formData.isFree}
+                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                    >
+                      <option value="">Select a pricing tier...</option>
+                      {availablePricingTiers.map((tier) => (
+                        <option key={tier.id} value={tier.id}>
+                          {tier.name} — ${(tier.amountCents / 100).toFixed(0)}
+                          {tier.description ? ` (${tier.description})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {formData.pricingTierId && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        Price: ${formData.priceCents || "0"}
+                      </p>
+                    )}
+                  </div>
+                ) : (
                   <div>
                     <Label htmlFor="priceCents">Price ($) *</Label>
                     <Input
@@ -719,22 +813,25 @@ export default function NewWorkshopPage() {
                       placeholder="299"
                       className="mt-1"
                     />
+                    <p className="text-sm text-amber-600 mt-1">
+                      No pricing tiers configured for this category. Enter price manually.
+                    </p>
                   </div>
+                )}
 
-                  <div>
-                    <Label htmlFor="earlyBirdPriceCents">Early Bird Price ($)</Label>
-                    <Input
-                      id="earlyBirdPriceCents"
-                      name="earlyBirdPriceCents"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={formData.earlyBirdPriceCents}
-                      onChange={handleChange}
-                      placeholder="249"
-                      className="mt-1"
-                    />
-                  </div>
+                <div>
+                  <Label htmlFor="earlyBirdPriceCents">Early Bird Price ($)</Label>
+                  <Input
+                    id="earlyBirdPriceCents"
+                    name="earlyBirdPriceCents"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.earlyBirdPriceCents}
+                    onChange={handleChange}
+                    placeholder="249"
+                    className="mt-1"
+                  />
                 </div>
 
                 {formData.earlyBirdPriceCents && (
@@ -792,6 +889,24 @@ export default function NewWorkshopPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <input
+                id="termsAccepted"
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                className="mt-1 rounded border-gray-300"
+              />
+              <Label htmlFor="termsAccepted" className="text-sm text-gray-700 leading-relaxed">
+                I confirm that all workshop details are accurate and I agree to the Scaling Up
+                workshop terms and conditions, including the cancellation and refund policies.
+              </Label>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="flex gap-4">
           <Button
             type="button"
@@ -801,8 +916,8 @@ export default function NewWorkshopPage() {
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={loading} className="flex-1">
-            {loading ? "Creating..." : "Continue to Landing Pages"}
+          <Button type="submit" disabled={loading || !termsAccepted} className="flex-1">
+            {loading ? "Creating..." : "Continue to Workshop Editor"}
           </Button>
         </div>
       </form>

@@ -92,7 +92,7 @@ export async function getAutoPopulatedContent(workshopId: string): Promise<AutoP
         price,
 
         // Workshop type
-        workshopTypeName: workshopType.name,
+        workshopTypeName: workshopType?.name || "",
     };
 }
 

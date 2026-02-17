@@ -9,11 +9,13 @@ import { useToast } from "@/components/ui/use-toast";
 export interface WorkshopFormData {
     // Step 1: Details
     workshopTypeId: string;
+    categoryId: string;
     title: string;
     description: string;
     useCoachPhoto: boolean;
 
     // Step 2: Logistics
+    format: "IN_PERSON" | "VIRTUAL" | "HYBRID";
     eventDate: string;
     eventTime: string;
     venueName: string;
@@ -21,10 +23,14 @@ export interface WorkshopFormData {
     venueCity: string;
     venueState: string;
     venueZip: string;
+    virtualPlatform: string;
+    virtualLink: string;
 
-    // Step 3: Pricing
+    // Step 3: Pricing & Terms
+    pricingTierId: string;
     customPricing: boolean;
     customPrice?: number;
+    termsAccepted: boolean;
 }
 
 interface WizardContextType {
@@ -46,9 +52,11 @@ const WizardContext = createContext<WizardContextType | undefined>(undefined);
 
 const defaultFormData: WorkshopFormData = {
     workshopTypeId: "",
+    categoryId: "",
     title: "",
     description: "",
     useCoachPhoto: true,
+    format: "IN_PERSON",
     eventDate: "",
     eventTime: "09:00",
     venueName: "",
@@ -56,7 +64,11 @@ const defaultFormData: WorkshopFormData = {
     venueCity: "",
     venueState: "",
     venueZip: "",
+    virtualPlatform: "",
+    virtualLink: "",
+    pricingTierId: "",
     customPricing: false,
+    termsAccepted: false,
 };
 
 // --- Provider Component ---
@@ -149,7 +161,8 @@ export function WizardProvider({ children }: { children: React.ReactNode }) {
                     type: formData.customPricing ? "CUSTOM_PRICING" : "WORKSHOP_REQUEST",
                     workshopTypeSlug: formData.workshopTypeId,
                     details: `Workshop: ${formData.title} on ${formData.eventDate}`,
-                    ...formData, // Send all form data
+                    ...formData,
+                    termsAcceptedAt: formData.termsAccepted ? new Date().toISOString() : null,
                 }),
             });
 
@@ -158,19 +171,24 @@ export function WizardProvider({ children }: { children: React.ReactNode }) {
             if (!response.ok) throw new Error(data.error || "Submission failed");
 
             toast({
-                title: "Workshop Created!",
+                title: "Workshop Submitted!",
                 description: data.autoApproved
-                    ? "Your workshop has been automatically approved."
-                    : "Your request has been submitted for review.",
-                variant: "default", // Success
+                    ? "Your workshop has been approved and is now visible in your workshops."
+                    : "Your request has been submitted for review. You can track it in your workshops.",
+                variant: "default",
             });
 
-            router.push("/portal/workshops");
+            // Navigate to the created workshop if available, otherwise to workshops list
+            if (data.workshopId) {
+                router.push(`/portal/workshops/${data.workshopId}`);
+            } else {
+                router.push("/portal/workshops");
+            }
 
         } catch (error) {
             toast({
                 title: "Submission Failed",
-                description: "Please check your inputs and try again.",
+                description: error instanceof Error ? error.message : "Please check your inputs and try again.",
                 variant: "destructive",
             });
         }

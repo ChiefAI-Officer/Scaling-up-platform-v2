@@ -6,6 +6,13 @@ import {
   createWorkshopRegistration,
   RegistrationServiceError,
 } from "@/lib/registration-service";
+import { sendRegistrationNotification } from "@/services/notifications";
+import {
+  generateIcsContent,
+  parseDurationHours,
+  buildLocationString,
+} from "@/lib/ics-generator";
+import { createPreWorkshopSurvey, sendSurveyEmail } from "@/lib/survey-automation";
 
 interface RegistrationInput {
   email: string;
@@ -132,6 +139,57 @@ export async function POST(
       ...registrationInput,
       workshopId,
     });
+
+    // JV-26 + JV-18: Send registration notification + ICS calendar attachment (fire-and-forget)
+    db.coach.findFirst({ where: { id: workshop.coachId }, select: { email: true, firstName: true, lastName: true } })
+      .then((coach) => {
+        if (coach) {
+          // JV-18: Generate ICS calendar file for the registrant
+          const icsContent = generateIcsContent({
+            uid: workshop.id,
+            title: workshop.title,
+            description: workshop.description,
+            eventDate: workshop.eventDate,
+            eventTime: workshop.eventTime,
+            timezone: workshop.timezone,
+            durationHours: parseDurationHours(workshop.duration),
+            location: buildLocationString(workshop),
+            url: workshop.landingPageSlug
+              ? `${process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app"}/workshop/${workshop.landingPageSlug}`
+              : undefined,
+            organizer: { name: `${coach.firstName} ${coach.lastName}`, email: coach.email },
+          });
+
+          const safeTitle = workshop.title.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-").substring(0, 50);
+
+          sendRegistrationNotification({
+            workshopTitle: workshop.title,
+            workshopCode: workshop.workshopCode,
+            coachEmail: coach.email,
+            coachName: `${coach.firstName} ${coach.lastName}`,
+            registrantName: `${registrationInput.firstName} ${registrationInput.lastName}`,
+            registrantEmail: registrationInput.email,
+            registrantCompany: registrationInput.company,
+            icsAttachment: { filename: `${safeTitle}.ics`, content: icsContent },
+          }).catch((err) => console.error("Registration notification failed:", err));
+        }
+      })
+      .catch((err) => console.error("Coach lookup for notification failed:", err));
+
+    // JV-13: Auto-create pre-workshop survey for this registration (fire-and-forget)
+    createPreWorkshopSurvey({ workshopId, registrationId: registration.id })
+      .then((result) => {
+        if (result) {
+          sendSurveyEmail({
+            to: registrationInput.email,
+            registrantName: `${registrationInput.firstName} ${registrationInput.lastName}`,
+            workshopTitle: workshop.title,
+            surveyUrl: result.surveyUrl,
+            surveyType: "PRE_WORKSHOP",
+          }).catch((err) => console.error("Pre-workshop survey email failed:", err));
+        }
+      })
+      .catch((err) => console.error("Pre-workshop survey creation failed:", err));
 
     const appUrl = process.env.APP_URL || "http://localhost:3000";
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireCoach, canAccessWorkshop } from "@/lib/authorization";
 import { generateSlug } from "@/lib/utils";
+import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
 
 /**
  * POST /api/workshops/[id]/clone
@@ -41,11 +42,17 @@ export async function POST(
         // Create cloned workshop
         const newTitle = `${sourceWorkshop.title} (Copy)`;
 
+        // JV-03: Generate unique workshop code for cloned workshop
+        const workshopCode = await generateUniqueWorkshopCode(
+            async (code) => !!(await db.workshop.findUnique({ where: { workshopCode: code }, select: { id: true } }))
+        );
+
         const clonedWorkshop = await db.workshop.create({
             data: {
                 // Core relationships
                 coachId: coach.id,
                 workshopTypeId: sourceWorkshop.workshopTypeId,
+                workshopCode,
                 category: sourceWorkshop.category,
 
                 // Event details (title modified, date cleared)

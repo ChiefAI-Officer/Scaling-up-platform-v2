@@ -2,6 +2,18 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
+
+const navLinks = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/workshops", label: "Workshops" },
+  { href: "/coaches", label: "Coaches" },
+  { href: "/templates", label: "Templates" },
+  { href: "/admin/workflows", label: "Workflows" },
+  { href: "/admin/surveys", label: "Surveys" },
+  { href: "/admin/files", label: "Files" },
+  { href: "/partners", label: "Partners" },
+];
 
 export default async function DashboardLayout({
   children,
@@ -36,7 +48,7 @@ export default async function DashboardLayout({
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex">
+            <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
                 <Link
                   href="/dashboard"
@@ -46,55 +58,38 @@ export default async function DashboardLayout({
                   Scaling Up
                 </Link>
               </div>
-              <div className="hidden sm:ml-8 sm:flex sm:space-x-8" role="menubar">
-                <Link
-                  href="/dashboard"
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  role="menuitem"
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  href="/workshops"
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  role="menuitem"
-                >
-                  All Workshops
-                </Link>
-                <Link
-                  href="/bio"
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  role="menuitem"
-                >
-                  BIO
-                </Link>
-                <Link
-                  href="/templates"
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  role="menuitem"
-                >
-                  Templates
-                </Link>
-                <Link
-                  href="/surveys"
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  role="menuitem"
-                >
-                  Surveys
-                </Link>
-                <Link
-                  href="/partners"
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                  role="menuitem"
-                >
-                  Partners
-                </Link>
+              {/* Desktop nav */}
+              <div className="hidden md:ml-8 md:flex md:space-x-6" role="menubar">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    role="menuitem"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600" aria-label="Logged in user">
+              <span className="hidden sm:inline text-sm text-gray-600" aria-label="Logged in user">
                 {session.user.email}
               </span>
+              <Link
+                href="/admin/settings"
+                className="hidden md:inline text-sm text-gray-500 hover:text-gray-700"
+              >
+                Settings
+              </Link>
+              <Link
+                href="/api/auth/signout"
+                className="hidden md:inline text-sm text-red-500 hover:text-red-700"
+              >
+                Sign Out
+              </Link>
+              {/* Mobile hamburger */}
+              <AdminMobileNav links={navLinks} email={session.user.email || ""} />
             </div>
           </div>
         </div>

@@ -83,12 +83,11 @@ export default async function DashboardPage() {
           <div className="flex flex-wrap gap-4">
             {[
               "REQUESTED",
-              "VALIDATING",
-              "APPROVED",
-              "SETUP_IN_PROGRESS",
-              "MARKETING_ACTIVE",
-              "REGISTRATION_OPEN",
+              "AWAITING_APPROVAL",
+              "PRE_EVENT",
+              "POST_EVENT",
               "COMPLETED",
+              "CANCELED",
             ].map((status) => (
               <div
                 key={status}
@@ -168,7 +167,7 @@ export default async function DashboardPage() {
                           {workshop.title}
                         </Link>
                         <p className="text-xs text-gray-500">
-                          {workshop.workshopType.name} · {workshop.coach.firstName}{" "}
+                          {workshop.workshopType?.name} · {workshop.coach.firstName}{" "}
                           {workshop.coach.lastName}
                         </p>
                       </td>

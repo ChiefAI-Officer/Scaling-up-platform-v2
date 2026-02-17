@@ -14,6 +14,7 @@ interface CancellationRequestPayload {
   stripeCustomerId?: string;
   stripePaymentMethodId?: string;
   cancellationFeeCents?: number;
+  acknowledgeFee?: boolean;
 }
 
 async function parseCancellationRequest(
@@ -221,9 +222,6 @@ export async function DELETE(
     if (!actor) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
-    if (!isPrivilegedRole(actor.role)) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-    }
 
     const { id } = await params;
 
@@ -232,6 +230,19 @@ export async function DELETE(
       return NextResponse.json(
         { success: false, error: "Workshop not found" },
         { status: 404 }
+      );
+    }
+
+    // JV-28: Allow coaches to cancel their own workshops
+    if (!isPrivilegedRole(actor.role) && !canManageCoachData(actor, existing.coachId)) {
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+
+    // Prevent cancellation of already canceled or completed workshops
+    if (existing.status === "CANCELED" || existing.status === "COMPLETED") {
+      return NextResponse.json(
+        { success: false, error: `Cannot cancel a workshop with status: ${existing.status}` },
+        { status: 400 }
       );
     }
 
@@ -304,27 +315,32 @@ export async function DELETE(
             { status: 502 }
           );
         }
+      } else if (cancellationRequest.acknowledgeFee) {
+        // JV-28: Coach acknowledges the fee — cancellation proceeds, fee billed separately
+        cancellationFee.amountCents = DEFAULT_CANCELLATION_FEE_CENTS;
       } else {
         return NextResponse.json(
           {
             success: false,
             error: `Cancellation within ${MINIMUM_LEAD_TIME_DAYS} days requires cancellation fee handling`,
             cancellationFee,
+            daysUntilEvent,
+            feeAmountCents: DEFAULT_CANCELLATION_FEE_CENTS,
           },
           { status: 400 }
         );
       }
     }
 
-    // Soft delete by setting status to CANCELLED
+    // Soft delete by setting status to CANCELED
     await db.workshop.update({
       where: { id },
-      data: { status: "CANCELLED" },
+      data: { status: "CANCELED" },
     });
 
     return NextResponse.json({
       success: true,
-      message: "Workshop cancelled successfully",
+      message: "Workshop canceled successfully",
       cancellationFee,
     });
   } catch (error) {

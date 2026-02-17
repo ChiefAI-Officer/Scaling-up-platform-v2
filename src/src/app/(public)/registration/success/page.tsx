@@ -4,6 +4,11 @@ import { db } from "@/lib/db";
 import { formatDate, parseJsonField, VenueAddress } from "@/lib/utils";
 import { retrieveCheckoutSession } from "@/services/stripe";
 import { IdevTracking } from "@/components/affiliate/idev-tracking";
+import {
+  buildGoogleCalendarUrl,
+  parseDurationHours,
+  buildLocationString,
+} from "@/lib/ics-generator";
 
 interface SuccessPageProps {
   searchParams: Promise<{ id?: string; session_id?: string }>;
@@ -94,7 +99,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
     paidAmountCents > 0;
 
   const affiliateProductCode =
-    registration.workshop.workshopType.slug || registration.workshop.workshopType.name;
+    registration.workshop.workshopType?.slug || registration.workshop.workshopType?.name || "";
   const affiliateOrderNumber =
     registration.stripePaymentId ||
     registration.stripeSessionId ||
@@ -145,7 +150,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
                 {registration.workshop.title}
               </h2>
               <p className="text-gray-600">
-                {registration.workshop.workshopType.name}
+                {registration.workshop.workshopType?.name}
               </p>
             </div>
 
@@ -245,9 +250,38 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
                       d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                     />
                   </svg>
-                  <span>Add this event to your calendar</span>
+                  <span className="flex flex-col gap-1">
+                    <span>Add this event to your calendar:</span>
+                    <span className="flex gap-2">
+                      <a
+                        href={`/api/workshops/${registration.workshop.id}/ics`}
+                        download
+                        className="text-blue-600 hover:text-blue-700 text-sm font-medium underline"
+                      >
+                        Download .ics
+                      </a>
+                      <span className="text-gray-400">|</span>
+                      <a
+                        href={buildGoogleCalendarUrl({
+                          uid: registration.workshop.id,
+                          title: registration.workshop.title,
+                          description: registration.workshop.description,
+                          eventDate: registration.workshop.eventDate,
+                          eventTime: registration.workshop.eventTime,
+                          timezone: registration.workshop.timezone,
+                          durationHours: parseDurationHours(registration.workshop.duration),
+                          location: buildLocationString(registration.workshop),
+                        })}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-700 text-sm font-medium underline"
+                      >
+                        Google Calendar
+                      </a>
+                    </span>
+                  </span>
                 </li>
-                {registration.workshop.workshopType.preWorkshopInstructions && (
+                {registration.workshop.workshopType?.preWorkshopInstructions && (
                   <li className="flex items-start gap-2">
                     <svg
                       className="w-5 h-5 text-green-500 mt-0.5"
@@ -263,7 +297,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
                       />
                     </svg>
                     <span>
-                      {registration.workshop.workshopType.preWorkshopInstructions}
+                      {registration.workshop.workshopType?.preWorkshopInstructions}
                     </span>
                   </li>
                 )}

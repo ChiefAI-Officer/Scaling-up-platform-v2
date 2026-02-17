@@ -7,7 +7,8 @@ import {
 } from "@prisma/client";
 import { db } from "@/lib/db";
 
-const OPEN_REGISTRATION_STATUSES = new Set(["REGISTRATION_OPEN", "MARKETING_ACTIVE"]);
+// JV-02: PRE_EVENT is when registration is open in Jeff's 6-stage model
+const OPEN_REGISTRATION_STATUSES = new Set(["PRE_EVENT"]);
 
 export type RegistrationServiceErrorCode =
   | "WORKSHOP_NOT_FOUND"

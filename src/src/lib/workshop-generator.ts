@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { createProductAndPrice } from "@/services/stripe";
 import { logAudit } from "@/lib/audit";
 import { inngest } from "@/inngest/client";
+import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
 
 interface WorkshopGenerationInput {
     coachId: string;
@@ -68,11 +69,17 @@ export async function generateWorkshop(
     // 4. Generate URL Slug
     const slug = generateSlug(coach.firstName, coach.lastName, workshopType.slug, input.eventDate);
 
-    // 5. Create Workshop Record
+    // 5. Generate unique workshop code (JV-03)
+    const workshopCode = await generateUniqueWorkshopCode(
+        async (code) => !!(await db.workshop.findUnique({ where: { workshopCode: code }, select: { id: true } }))
+    );
+
+    // 6. Create Workshop Record
     const workshop = await db.workshop.create({
         data: {
             coachId: input.coachId,
             workshopTypeId: input.workshopTypeId,
+            workshopCode,
             title: input.title,
             description: input.description,
             format: "IN_PERSON",
@@ -89,7 +96,7 @@ export async function generateWorkshop(
                 state: input.venue.state,
                 zip: input.venue.zip,
             }),
-            status: "SETUP_IN_PROGRESS",
+            status: "PRE_EVENT",
         }
     });
 

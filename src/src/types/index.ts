@@ -8,17 +8,14 @@ import type {
   Survey,
 } from "@prisma/client";
 
-// Define status types as string literals (SQLite doesn't support enums)
+// JV-02: Jeff Verdun's 6 workshop stages
 export type WorkshopStatus =
   | "REQUESTED"
-  | "VALIDATING"
-  | "APPROVED"
-  | "SETUP_IN_PROGRESS"
-  | "MARKETING_ACTIVE"
-  | "REGISTRATION_OPEN"
-  | "REGISTRATION_CLOSED"
+  | "AWAITING_APPROVAL"
+  | "PRE_EVENT"
+  | "POST_EVENT"
   | "COMPLETED"
-  | "CANCELLED";
+  | "CANCELED";
 
 export type WorkshopFormat = "IN_PERSON" | "VIRTUAL" | "HYBRID";
 
@@ -38,6 +35,7 @@ export type TaskStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "FAILED";
 
 export type SurveyType = "PRE_WORKSHOP" | "POST_WORKSHOP" | "NPS";
 
+// JV-16: Categories are now dynamic (from Category model), but keep type for backwards compat
 export type WorkshopCategory = "AI" | "EXIT_AND_VALUATION";
 
 export type LandingPageTemplate = 
@@ -61,7 +59,7 @@ export type {
 // Extended types with relations
 export type WorkshopWithRelations = Workshop & {
   coach: Coach;
-  workshopType: WorkshopType;
+  workshopType?: WorkshopType | null; // JV-16: Optional during migration
   registrations?: Registration[];
   campaigns?: MarketingCampaign[];
   tasks?: AutomationTask[];
@@ -107,7 +105,9 @@ export interface PaginatedResponse<T> {
 // Form input types
 export interface CreateWorkshopInput {
   coachId: string;
-  workshopTypeId: string;
+  workshopTypeId?: string; // JV-16: Optional during migration
+  categoryId?: string;     // JV-16: Dynamic category FK
+  pricingTierId?: string;  // JV-17: Pricing tier FK
   title: string;
   description?: string;
   format: WorkshopFormat;

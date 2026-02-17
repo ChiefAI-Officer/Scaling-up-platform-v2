@@ -5,44 +5,35 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import type { Workshop } from "@prisma/client";
 
-// Workshop status type (using strings since SQLite doesn't support enums)
+// JV-02: Jeff Verdun's 6 workshop stages
 type WorkshopStatus =
   | "REQUESTED"
-  | "VALIDATING"
-  | "APPROVED"
-  | "SETUP_IN_PROGRESS"
-  | "MARKETING_ACTIVE"
-  | "REGISTRATION_OPEN"
-  | "REGISTRATION_CLOSED"
+  | "AWAITING_APPROVAL"
+  | "PRE_EVENT"
+  | "POST_EVENT"
   | "COMPLETED"
-  | "CANCELLED";
+  | "CANCELED";
 
 interface WorkshopActionsProps {
   workshop: Workshop;
 }
 
 const statusTransitions: Record<WorkshopStatus, WorkshopStatus[]> = {
-  REQUESTED: ["VALIDATING", "CANCELLED"],
-  VALIDATING: ["APPROVED", "REQUESTED", "CANCELLED"],
-  APPROVED: ["SETUP_IN_PROGRESS", "CANCELLED"],
-  SETUP_IN_PROGRESS: ["MARKETING_ACTIVE", "APPROVED", "CANCELLED"],
-  MARKETING_ACTIVE: ["REGISTRATION_OPEN", "SETUP_IN_PROGRESS", "CANCELLED"],
-  REGISTRATION_OPEN: ["REGISTRATION_CLOSED", "MARKETING_ACTIVE", "CANCELLED"],
-  REGISTRATION_CLOSED: ["COMPLETED", "REGISTRATION_OPEN", "CANCELLED"],
+  REQUESTED: ["AWAITING_APPROVAL", "CANCELED"],
+  AWAITING_APPROVAL: ["PRE_EVENT", "REQUESTED", "CANCELED"],
+  PRE_EVENT: ["POST_EVENT", "CANCELED"],
+  POST_EVENT: ["COMPLETED"],
   COMPLETED: [],
-  CANCELLED: ["REQUESTED"],
+  CANCELED: ["REQUESTED"],
 };
 
 const statusLabels: Record<WorkshopStatus, string> = {
   REQUESTED: "Requested",
-  VALIDATING: "Validating",
-  APPROVED: "Approved",
-  SETUP_IN_PROGRESS: "Setup in Progress",
-  MARKETING_ACTIVE: "Marketing Active",
-  REGISTRATION_OPEN: "Registration Open",
-  REGISTRATION_CLOSED: "Registration Closed",
+  AWAITING_APPROVAL: "Awaiting Approval",
+  PRE_EVENT: "Pre-Event",
+  POST_EVENT: "Post-Event",
   COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
+  CANCELED: "Canceled",
 };
 
 export function WorkshopActions({ workshop }: WorkshopActionsProps) {
@@ -92,7 +83,7 @@ export function WorkshopActions({ workshop }: WorkshopActionsProps) {
       {availableTransitions.map((status) => (
         <Button
           key={status}
-          variant={status === "CANCELLED" ? "destructive" : "outline"}
+          variant={status === "CANCELED" ? "destructive" : "outline"}
           size="sm"
           onClick={() => handleStatusChange(status)}
           disabled={loading}

@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         const slug = generateSlug(
             workshop.coach.firstName,
             workshop.coach.lastName,
-            workshop.workshopType.slug,
+            workshop.workshopType?.slug || "workshop",
             workshop.eventDate
         );
 

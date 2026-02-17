@@ -1,6 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+interface Workshop {
+    id: string;
+    title: string;
+    workshopCode: string | null;
+    eventDate: string;
+    followUpStatus: string | null;
+}
 
 interface FollowUpFormData {
     workshopId: string;
@@ -8,7 +20,6 @@ interface FollowUpFormData {
     challenges: string;
     successes: string;
     recommendationScore: number;
-    wouldRecommend: boolean;
     additionalComments: string;
 }
 
@@ -24,257 +35,234 @@ const scalingUpTools = [
     "Customer Feedback Systems",
 ];
 
-// Mock past workshops
-const pastWorkshops = [
-    { id: "ws-1", title: "Scaling Up Master Class - December 2025", eventDate: "2025-12-15" },
-    { id: "ws-2", title: "Exit Planning Workshop - November 2025", eventDate: "2025-11-20" },
-];
-
 export default function FollowUpPage() {
+    const [workshops, setWorkshops] = useState<Workshop[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
     const [formData, setFormData] = useState<FollowUpFormData>({
         workshopId: "",
         implementedTools: [],
         challenges: "",
         successes: "",
         recommendationScore: 8,
-        wouldRecommend: true,
         additionalComments: "",
     });
 
-    const [submitted, setSubmitted] = useState(false);
+    useEffect(() => {
+        fetch("/api/portal/follow-up")
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.success) {
+                    setWorkshops(data.data);
+                } else {
+                    setError(data.error || "Failed to load workshops");
+                }
+            })
+            .catch(() => setError("Failed to connect to server"))
+            .finally(() => setLoading(false));
+    }, []);
 
     const handleToolToggle = (tool: string) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             implementedTools: prev.implementedTools.includes(tool)
-                ? prev.implementedTools.filter(t => t !== tool)
-                : [...prev.implementedTools, tool]
+                ? prev.implementedTools.filter((t) => t !== tool)
+                : [...prev.implementedTools, tool],
         }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!formData.workshopId) return;
 
-        // In production, would POST to /api/follow-up-reports
-        console.log("Follow-up submitted:", formData);
-        setSubmitted(true);
+        setSubmitting(true);
+        setError(null);
+
+        try {
+            const res = await fetch("/api/portal/follow-up", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                setSubmitted(true);
+            } else {
+                setError(data.error || "Failed to submit report");
+            }
+        } catch {
+            setError("Network error. Please try again.");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     if (submitted) {
         return (
-            <div className="follow-up-page">
-                <style jsx>{`
-          .success-message {
-            background: white;
-            padding: 3rem;
-            border-radius: 12px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-          }
-          .success-message h2 {
-            color: #38a169;
-            margin-bottom: 1rem;
-          }
-        `}</style>
-                <div className="success-message">
-                    <h2>✅ Thank You!</h2>
-                    <p>Your 90-day follow-up report has been submitted successfully.</p>
-                    <p>This feedback helps us improve our workshops and track your progress.</p>
-                </div>
+            <div className="max-w-2xl mx-auto py-8">
+                <Card>
+                    <CardContent className="pt-8 pb-8 text-center">
+                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span className="text-green-600 text-2xl">&#10003;</span>
+                        </div>
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">Thank You!</h2>
+                        <p className="text-gray-600 mb-1">Your 90-day follow-up report has been submitted successfully.</p>
+                        <p className="text-gray-500 text-sm">This feedback helps us improve our workshops and track progress.</p>
+                        <Button
+                            className="mt-6"
+                            variant="outline"
+                            onClick={() => {
+                                setSubmitted(false);
+                                setFormData({ workshopId: "", implementedTools: [], challenges: "", successes: "", recommendationScore: 8, additionalComments: "" });
+                            }}
+                        >
+                            Submit Another Report
+                        </Button>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
 
+    if (loading) {
+        return (
+            <div className="max-w-2xl">
+                <h1 className="text-2xl font-bold text-gray-900 mb-6">90-Day Follow-Up Report</h1>
+                <Card>
+                    <CardContent className="py-12 text-center text-gray-500">Loading workshops...</CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    const availableWorkshops = workshops.filter((w) => w.followUpStatus !== "SUBMITTED");
+
     return (
-        <div className="follow-up-page">
-            <style jsx>{`
-        .follow-up-page h2 {
-          margin-bottom: 1.5rem;
-          color: #1a365d;
-        }
-        
-        .follow-up-form {
-          background: white;
-          padding: 2rem;
-          border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-          max-width: 800px;
-        }
-        
-        .form-section {
-          margin-bottom: 2rem;
-        }
-        
-        .form-section h3 {
-          margin-bottom: 1rem;
-          color: #2d3748;
-          font-size: 1.125rem;
-        }
-        
-        .form-group {
-          margin-bottom: 1rem;
-        }
-        
-        .form-group label {
-          display: block;
-          margin-bottom: 0.5rem;
-          font-weight: 500;
-          color: #4a5568;
-        }
-        
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-          width: 100%;
-          padding: 0.75rem;
-          border: 1px solid #e2e8f0;
-          border-radius: 6px;
-          font-size: 1rem;
-        }
-        
-        .form-group textarea {
-          min-height: 120px;
-        }
-        
-        .tools-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-          gap: 0.75rem;
-        }
-        
-        .tool-checkbox {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.5rem;
-          background: #f7fafc;
-          border-radius: 6px;
-        }
-        
-        .tool-checkbox input {
-          width: auto;
-        }
-        
-        .nps-slider {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-        }
-        
-        .nps-slider input[type="range"] {
-          flex: 1;
-        }
-        
-        .nps-value {
-          font-size: 1.5rem;
-          font-weight: bold;
-          color: #3182ce;
-          min-width: 3rem;
-          text-align: center;
-        }
-        
-        .submit-btn {
-          background: #3182ce;
-          color: white;
-          padding: 1rem 2rem;
-          border: none;
-          border-radius: 8px;
-          font-size: 1rem;
-          font-weight: 600;
-          cursor: pointer;
-        }
-        
-        .submit-btn:hover {
-          background: #2b6cb0;
-        }
-      `}</style>
+        <div className="max-w-2xl">
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">90-Day Follow-Up Report</h1>
 
-            <h2>90-Day Follow-Up Report</h2>
-
-            <form className="follow-up-form" onSubmit={handleSubmit}>
-                <div className="form-section">
-                    <div className="form-group">
-                        <label>Select Workshop</label>
-                        <select
-                            value={formData.workshopId}
-                            onChange={(e) => setFormData({ ...formData, workshopId: e.target.value })}
-                            required
-                        >
-                            <option value="">Choose a workshop...</option>
-                            {pastWorkshops.map(ws => (
-                                <option key={ws.id} value={ws.id}>{ws.title}</option>
-                            ))}
-                        </select>
-                    </div>
+            {error && (
+                <div className="mb-4 px-4 py-3 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200">
+                    {error}
                 </div>
+            )}
 
-                <div className="form-section">
-                    <h3>Which Scaling Up tools have you implemented?</h3>
-                    <div className="tools-grid">
-                        {scalingUpTools.map(tool => (
-                            <label key={tool} className="tool-checkbox">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.implementedTools.includes(tool)}
-                                    onChange={() => handleToolToggle(tool)}
+            {availableWorkshops.length === 0 ? (
+                <Card>
+                    <CardContent className="py-12 text-center">
+                        <p className="text-gray-500">No workshops pending a follow-up report.</p>
+                        <p className="text-gray-400 text-sm mt-1">Follow-up reports are available after workshops reach Post-Event or Completed status.</p>
+                    </CardContent>
+                </Card>
+            ) : (
+                <form onSubmit={handleSubmit}>
+                    <Card className="mb-6">
+                        <CardHeader>
+                            <CardTitle>Select Workshop</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <select
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                value={formData.workshopId}
+                                onChange={(e) => setFormData({ ...formData, workshopId: e.target.value })}
+                                required
+                            >
+                                <option value="">Choose a workshop...</option>
+                                {availableWorkshops.map((ws) => (
+                                    <option key={ws.id} value={ws.id}>
+                                        {ws.title} {ws.workshopCode ? `(${ws.workshopCode})` : ""} — {new Date(ws.eventDate).toLocaleDateString()}
+                                    </option>
+                                ))}
+                            </select>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="mb-6">
+                        <CardHeader>
+                            <CardTitle>Which Scaling Up tools have you implemented?</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {scalingUpTools.map((tool) => (
+                                    <label key={tool} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                        <input
+                                            type="checkbox"
+                                            className="rounded border-gray-300"
+                                            checked={formData.implementedTools.includes(tool)}
+                                            onChange={() => handleToolToggle(tool)}
+                                        />
+                                        <span className="text-sm text-gray-700">{tool}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="mb-6">
+                        <CardHeader>
+                            <CardTitle>Your Journey</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>What challenges have you faced implementing these tools?</Label>
+                                <Textarea
+                                    value={formData.challenges}
+                                    onChange={(e) => setFormData({ ...formData, challenges: e.target.value })}
+                                    placeholder="Describe any obstacles or difficulties..."
                                 />
-                                {tool}
-                            </label>
-                        ))}
-                    </div>
-                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>What successes have you experienced?</Label>
+                                <Textarea
+                                    value={formData.successes}
+                                    onChange={(e) => setFormData({ ...formData, successes: e.target.value })}
+                                    placeholder="Share your wins and achievements..."
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                <div className="form-section">
-                    <h3>Your Journey</h3>
-                    <div className="form-group">
-                        <label>What challenges have you faced implementing these tools?</label>
-                        <textarea
-                            value={formData.challenges}
-                            onChange={(e) => setFormData({ ...formData, challenges: e.target.value })}
-                            placeholder="Describe any obstacles or difficulties..."
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label>What successes have you experienced?</label>
-                        <textarea
-                            value={formData.successes}
-                            onChange={(e) => setFormData({ ...formData, successes: e.target.value })}
-                            placeholder="Share your wins and achievements..."
-                        />
-                    </div>
-                </div>
+                    <Card className="mb-6">
+                        <CardHeader>
+                            <CardTitle>How likely are you to recommend this workshop? (NPS)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-gray-500">0</span>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="10"
+                                    className="flex-1"
+                                    value={formData.recommendationScore}
+                                    onChange={(e) => setFormData({ ...formData, recommendationScore: parseInt(e.target.value) })}
+                                    aria-label="Recommendation score from 0 to 10"
+                                />
+                                <span className="text-sm text-gray-500">10</span>
+                                <span className="text-2xl font-bold text-blue-600 min-w-[3rem] text-center">{formData.recommendationScore}</span>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-                <div className="form-section">
-                    <h3>How likely are you to recommend this workshop? (NPS)</h3>
-                    <div className="nps-slider">
-                        <span>0</span>
-                        <input
-                            type="range"
-                            min="0"
-                            max="10"
-                            value={formData.recommendationScore}
-                            onChange={(e) => setFormData({ ...formData, recommendationScore: parseInt(e.target.value) })}
-                        />
-                        <span>10</span>
-                        <div className="nps-value">{formData.recommendationScore}</div>
-                    </div>
-                </div>
+                    <Card className="mb-6">
+                        <CardContent className="pt-6 space-y-2">
+                            <Label>Additional Comments</Label>
+                            <Textarea
+                                value={formData.additionalComments}
+                                onChange={(e) => setFormData({ ...formData, additionalComments: e.target.value })}
+                                placeholder="Any other feedback or suggestions..."
+                            />
+                        </CardContent>
+                    </Card>
 
-                <div className="form-section">
-                    <div className="form-group">
-                        <label>Additional Comments</label>
-                        <textarea
-                            value={formData.additionalComments}
-                            onChange={(e) => setFormData({ ...formData, additionalComments: e.target.value })}
-                            placeholder="Any other feedback or suggestions..."
-                        />
-                    </div>
-                </div>
-
-                <button type="submit" className="submit-btn">
-                    Submit Follow-Up Report
-                </button>
-            </form>
+                    <Button type="submit" disabled={submitting || !formData.workshopId} className="w-full sm:w-auto">
+                        {submitting ? "Submitting..." : "Submit Follow-Up Report"}
+                    </Button>
+                </form>
+            )}
         </div>
     );
 }

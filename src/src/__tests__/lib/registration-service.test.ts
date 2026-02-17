@@ -22,7 +22,7 @@ const mockTx = {
 function makeWorkshop(overrides: Record<string, unknown> = {}) {
   return {
     id: "ws-1",
-    status: "REGISTRATION_OPEN",
+    status: "PRE_EVENT",
     maxAttendees: 25,
     isFree: false,
     ...overrides,

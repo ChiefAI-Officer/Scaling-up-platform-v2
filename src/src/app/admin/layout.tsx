@@ -78,7 +78,31 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                             </Link>
                         </li>
                         <li>
-                            <Link 
+                            <Link
+                                href="/admin/categories"
+                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                            >
+                                🏷️ Categories
+                            </Link>
+                        </li>
+                        <li>
+                            <Link
+                                href="/admin/pricing"
+                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                            >
+                                💰 Pricing Tiers
+                            </Link>
+                        </li>
+                        <li>
+                            <Link
+                                href="/admin/financials"
+                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                            >
+                                💵 Financials
+                            </Link>
+                        </li>
+                        <li>
+                            <Link
                                 href="/dashboard"
                                 className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
                             >

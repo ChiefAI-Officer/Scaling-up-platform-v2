@@ -1,0 +1,285 @@
+/**
+ * Workflow Service (JV-11 + JV-22)
+ *
+ * CRUD operations for workflows, steps, and assignments.
+ * Handles variable interpolation and schedule calculation.
+ */
+
+import { db } from "@/lib/db";
+import type { StepType, TriggerType } from "@/lib/workflow-types";
+
+// ============================================
+// Types
+// ============================================
+
+export interface CreateWorkflowInput {
+  name: string;
+  description?: string;
+  isTemplate?: boolean;
+  createdBy: string;
+}
+
+export interface CreateWorkflowStepInput {
+  workflowId: string;
+  sortOrder: number;
+  stepType: StepType;
+  triggerType: TriggerType;
+  emailTemplateId?: string;
+  subject?: string;
+  body?: string;
+  customRecipients?: string[];
+  offsetDays?: number;
+  offsetHours?: number;
+  sendTimeOfDay?: string;
+}
+
+export interface AssignWorkflowInput {
+  workflowId: string;
+  workshopId: string;
+  assignedBy: string;
+}
+
+// ============================================
+// Workflow CRUD
+// ============================================
+
+export async function createWorkflow(input: CreateWorkflowInput) {
+  return db.workflow.create({
+    data: {
+      name: input.name,
+      description: input.description,
+      isTemplate: input.isTemplate ?? false,
+      createdBy: input.createdBy,
+    },
+    include: { steps: true },
+  });
+}
+
+export async function getWorkflow(id: string) {
+  return db.workflow.findUnique({
+    where: { id },
+    include: {
+      steps: {
+        orderBy: { sortOrder: "asc" },
+        include: { emailTemplate: true },
+      },
+      assignments: {
+        include: {
+          workshop: {
+            select: { id: true, title: true, workshopCode: true, eventDate: true, status: true },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function listWorkflows(options?: { templatesOnly?: boolean; createdBy?: string }) {
+  return db.workflow.findMany({
+    where: {
+      ...(options?.templatesOnly ? { isTemplate: true } : {}),
+      ...(options?.createdBy ? { createdBy: options.createdBy } : {}),
+    },
+    include: {
+      steps: { orderBy: { sortOrder: "asc" } },
+      _count: { select: { assignments: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+}
+
+export async function updateWorkflow(id: string, data: Partial<Pick<CreateWorkflowInput, "name" | "description" | "isTemplate">>) {
+  return db.workflow.update({
+    where: { id },
+    data,
+    include: { steps: { orderBy: { sortOrder: "asc" } } },
+  });
+}
+
+export async function deleteWorkflow(id: string) {
+  return db.workflow.delete({ where: { id } });
+}
+
+export async function duplicateWorkflow(id: string, createdBy: string, newName?: string) {
+  const source = await db.workflow.findUnique({
+    where: { id },
+    include: { steps: { orderBy: { sortOrder: "asc" } } },
+  });
+
+  if (!source) throw new Error("Workflow not found");
+
+  return db.workflow.create({
+    data: {
+      name: newName || `${source.name} (Copy)`,
+      description: source.description,
+      isTemplate: false,
+      createdBy,
+      steps: {
+        create: source.steps.map((step) => ({
+          sortOrder: step.sortOrder,
+          stepType: step.stepType,
+          triggerType: step.triggerType,
+          emailTemplateId: step.emailTemplateId,
+          subject: step.subject,
+          body: step.body,
+          customRecipients: step.customRecipients,
+          offsetDays: step.offsetDays,
+          offsetHours: step.offsetHours,
+          sendTimeOfDay: step.sendTimeOfDay,
+          attachments: step.attachments,
+        })),
+      },
+    },
+    include: { steps: { orderBy: { sortOrder: "asc" } } },
+  });
+}
+
+// ============================================
+// WorkflowStep CRUD
+// ============================================
+
+export async function addWorkflowStep(input: CreateWorkflowStepInput) {
+  return db.workflowStep.create({
+    data: {
+      workflowId: input.workflowId,
+      sortOrder: input.sortOrder,
+      stepType: input.stepType,
+      triggerType: input.triggerType,
+      emailTemplateId: input.emailTemplateId,
+      subject: input.subject,
+      body: input.body,
+      customRecipients: input.customRecipients ? JSON.stringify(input.customRecipients) : undefined,
+      offsetDays: input.offsetDays,
+      offsetHours: input.offsetHours,
+      sendTimeOfDay: input.sendTimeOfDay,
+    },
+  });
+}
+
+export async function updateWorkflowStep(
+  stepId: string,
+  data: Partial<Omit<CreateWorkflowStepInput, "workflowId">>
+) {
+  return db.workflowStep.update({
+    where: { id: stepId },
+    data: {
+      ...data,
+      customRecipients: data.customRecipients ? JSON.stringify(data.customRecipients) : undefined,
+    },
+  });
+}
+
+export async function deleteWorkflowStep(stepId: string) {
+  return db.workflowStep.delete({ where: { id: stepId } });
+}
+
+export async function reorderWorkflowSteps(workflowId: string, stepIds: string[]) {
+  const updates = stepIds.map((id, index) =>
+    db.workflowStep.update({ where: { id }, data: { sortOrder: index } })
+  );
+  return db.$transaction(updates);
+}
+
+// ============================================
+// Workflow Assignment (link to workshops)
+// ============================================
+
+export async function assignWorkflowToWorkshop(input: AssignWorkflowInput) {
+  const workshop = await db.workshop.findUnique({
+    where: { id: input.workshopId },
+    select: { workshopCode: true },
+  });
+
+  if (!workshop) throw new Error("Workshop not found");
+
+  return db.workflowAssignment.create({
+    data: {
+      workflowId: input.workflowId,
+      workshopId: input.workshopId,
+      workshopCode: workshop.workshopCode,
+      assignedBy: input.assignedBy,
+    },
+    include: {
+      workflow: { include: { steps: { orderBy: { sortOrder: "asc" } } } },
+      workshop: { select: { id: true, title: true, workshopCode: true } },
+    },
+  });
+}
+
+export async function unassignWorkflow(assignmentId: string) {
+  return db.workflowAssignment.delete({ where: { id: assignmentId } });
+}
+
+export async function getWorkshopWorkflows(workshopId: string) {
+  return db.workflowAssignment.findMany({
+    where: { workshopId, isActive: true },
+    include: {
+      workflow: {
+        include: { steps: { orderBy: { sortOrder: "asc" }, where: { isActive: true } } },
+      },
+    },
+  });
+}
+
+// ============================================
+// Variable Interpolation
+// ============================================
+
+export interface WorkflowContext {
+  workshopTitle: string;
+  workshopCode: string;
+  workshopDate: string;
+  workshopTime: string;
+  workshopLocation: string;
+  workshopUrl: string;
+  coachName: string;
+  coachEmail: string;
+  registrantName?: string;
+  registrantEmail?: string;
+  registrantCompany?: string;
+}
+
+export function interpolateTemplate(template: string, context: WorkflowContext): string {
+  return template
+    .replace(/\{\{workshopTitle\}\}/g, context.workshopTitle)
+    .replace(/\{\{workshopCode\}\}/g, context.workshopCode)
+    .replace(/\{\{workshopDate\}\}/g, context.workshopDate)
+    .replace(/\{\{workshopTime\}\}/g, context.workshopTime)
+    .replace(/\{\{workshopLocation\}\}/g, context.workshopLocation)
+    .replace(/\{\{workshopUrl\}\}/g, context.workshopUrl)
+    .replace(/\{\{coachName\}\}/g, context.coachName)
+    .replace(/\{\{coachEmail\}\}/g, context.coachEmail)
+    .replace(/\{\{registrantName\}\}/g, context.registrantName || "")
+    .replace(/\{\{registrantEmail\}\}/g, context.registrantEmail || "")
+    .replace(/\{\{registrantCompany\}\}/g, context.registrantCompany || "");
+}
+
+// ============================================
+// Schedule Calculation (JV-22)
+// ============================================
+
+export function calculateSendDate(
+  eventDate: Date,
+  offsetDays: number,
+  offsetHours?: number | null,
+  sendTimeOfDay?: string | null,
+  timezone?: string
+): Date {
+  const sendDate = new Date(eventDate);
+
+  // Apply day offset
+  sendDate.setDate(sendDate.getDate() + offsetDays);
+
+  // Apply hour offset if specified
+  if (offsetHours) {
+    sendDate.setHours(sendDate.getHours() + offsetHours);
+  }
+
+  // Override time-of-day if specified (e.g., "09:00")
+  if (sendTimeOfDay) {
+    const [hours, minutes] = sendTimeOfDay.split(":").map(Number);
+    sendDate.setHours(hours, minutes, 0, 0);
+  }
+
+  return sendDate;
+}

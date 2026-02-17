@@ -2,6 +2,11 @@ import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { RegistrationForm } from "./registration-form";
+import {
+  buildGoogleCalendarUrl,
+  parseDurationHours,
+  buildLocationString,
+} from "@/lib/ics-generator";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -85,6 +90,16 @@ interface ThankYouContent {
 interface WorkshopData {
   id: string;
   title: string;
+  description?: string | null;
+  eventDate: Date;
+  eventTime?: string | null;
+  timezone: string;
+  duration?: string | null;
+  format: string;
+  venueName?: string | null;
+  venueAddress?: string | null;
+  virtualLink?: string | null;
+  virtualPlatform?: string | null;
   isFree: boolean;
   priceCents: number | null;
   earlyBirdPriceCents: number | null;
@@ -738,12 +753,30 @@ function ThankYouTemplate({ content, workshop }: { content: ThankYouContent; wor
         <p className="text-purple-200 text-sm mb-4">{calendarReminderText}</p>
 
         <div className="flex gap-3 justify-center">
-          <button className="bg-white/20 text-white px-4 py-2 rounded hover:bg-white/30 transition">
+          <a
+            href={buildGoogleCalendarUrl({
+              uid: workshop.id,
+              title: workshop.title || "Scaling Up Workshop",
+              description: workshop.description,
+              eventDate: workshop.eventDate,
+              eventTime: workshop.eventTime,
+              timezone: workshop.timezone,
+              durationHours: parseDurationHours(workshop.duration),
+              location: buildLocationString(workshop),
+            })}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white/20 text-white px-4 py-2 rounded hover:bg-white/30 transition"
+          >
             Add to Google Calendar
-          </button>
-          <button className="bg-white/20 text-white px-4 py-2 rounded hover:bg-white/30 transition">
-            Add to Outlook
-          </button>
+          </a>
+          <a
+            href={`/api/workshops/${workshop.id}/ics`}
+            download
+            className="bg-white/20 text-white px-4 py-2 rounded hover:bg-white/30 transition"
+          >
+            Download .ics (Outlook)
+          </a>
         </div>
       </div>
     </div>

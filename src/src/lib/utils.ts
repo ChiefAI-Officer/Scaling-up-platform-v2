@@ -42,17 +42,15 @@ export function generateSlug(title: string, id?: string): string {
   return id ? `${baseSlug}-${id.slice(0, 8)}` : baseSlug;
 }
 
+// JV-02: Jeff Verdun's 6 workshop stages
 export function getWorkshopStatusColor(status: string): string {
   const colors: Record<string, string> = {
     REQUESTED: "bg-yellow-100 text-yellow-800",
-    VALIDATING: "bg-blue-100 text-blue-800",
-    APPROVED: "bg-green-100 text-green-800",
-    SETUP_IN_PROGRESS: "bg-purple-100 text-purple-800",
-    MARKETING_ACTIVE: "bg-indigo-100 text-indigo-800",
-    REGISTRATION_OPEN: "bg-emerald-100 text-emerald-800",
-    REGISTRATION_CLOSED: "bg-gray-100 text-gray-800",
+    AWAITING_APPROVAL: "bg-blue-100 text-blue-800",
+    PRE_EVENT: "bg-green-100 text-green-800",
+    POST_EVENT: "bg-purple-100 text-purple-800",
     COMPLETED: "bg-slate-100 text-slate-800",
-    CANCELLED: "bg-red-100 text-red-800",
+    CANCELED: "bg-red-100 text-red-800",
   };
   return colors[status] || "bg-gray-100 text-gray-800";
 }
@@ -60,14 +58,11 @@ export function getWorkshopStatusColor(status: string): string {
 export function getWorkshopStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     REQUESTED: "Requested",
-    VALIDATING: "Validating",
-    APPROVED: "Approved",
-    SETUP_IN_PROGRESS: "Setup in Progress",
-    MARKETING_ACTIVE: "Marketing Active",
-    REGISTRATION_OPEN: "Registration Open",
-    REGISTRATION_CLOSED: "Registration Closed",
+    AWAITING_APPROVAL: "Awaiting Approval",
+    PRE_EVENT: "Pre-Event",
+    POST_EVENT: "Post-Event",
     COMPLETED: "Completed",
-    CANCELLED: "Cancelled",
+    CANCELED: "Canceled",
   };
   return labels[status] || status;
 }

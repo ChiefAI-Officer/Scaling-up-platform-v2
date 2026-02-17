@@ -336,11 +336,11 @@ export default function DuoLandingEditor() {
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
           <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
           <span>/</span>
-          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Landing Pages</Link>
+          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Workshop Editor</Link>
           <span>/</span>
           <span className="text-gray-900">Duo Landing Page</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Duo Workshop Landing Page Editor</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Duo Workshop Landing Page</h1>
         <p className="text-gray-600">AI Workshop template with two coaches</p>
       </div>
 

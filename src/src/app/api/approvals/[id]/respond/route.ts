@@ -107,6 +107,14 @@ export async function GET(
             }
         });
 
+        // JV-20: When approving a workshop request, advance the workshop status
+        if (newStatus === "APPROVED" && approval.workshopId) {
+            await db.workshop.update({
+                where: { id: approval.workshopId },
+                data: { status: "AWAITING_APPROVAL" },
+            });
+        }
+
         await logAudit({
             entityType: "ApprovalQueue",
             entityId: id,
@@ -199,6 +207,14 @@ export async function POST(
                 responseReason: reason,
             }
         });
+
+        // JV-20: When approving a workshop request, advance the workshop status
+        if (newStatus === "APPROVED" && approval.workshopId) {
+            await db.workshop.update({
+                where: { id: approval.workshopId },
+                data: { status: "AWAITING_APPROVAL" },
+            });
+        }
 
         await logAudit({
             entityType: "ApprovalQueue",

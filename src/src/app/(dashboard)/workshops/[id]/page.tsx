@@ -13,6 +13,9 @@ import {
 } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CopyUrlButton } from "@/components/ui/copy-url-button";
+
+const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 import { WorkshopActions } from "./workshop-actions";
 import { QuickActions } from "./quick-actions";
 
@@ -58,6 +61,10 @@ export default async function WorkshopDetailPage({
     0
   );
 
+  // S3-08: Auto-lock 48h before event
+  const hoursUntilEvent = (new Date(workshop.eventDate).getTime() - Date.now()) / (1000 * 60 * 60);
+  const isLocked = workshop.isLocked || (hoursUntilEvent >= 0 && hoursUntilEvent <= 48);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -73,13 +80,23 @@ export default async function WorkshopDetailPage({
           </div>
           <h1 className="text-2xl font-bold text-gray-900">{workshop.title}</h1>
           <div className="flex items-center gap-3 mt-2">
+            {workshop.workshopCode && (
+              <span className="font-mono text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                {workshop.workshopCode}
+              </span>
+            )}
             <Badge
               className={getWorkshopStatusColor(workshop.status)}
               variant="secondary"
             >
               {getWorkshopStatusLabel(workshop.status)}
             </Badge>
-            <span className="text-gray-500">{workshop.workshopType.name}</span>
+            {isLocked && (
+              <Badge className="bg-red-100 text-red-800" variant="secondary">
+                Locked
+              </Badge>
+            )}
+            <span className="text-gray-500">{workshop.workshopType?.name}</span>
           </div>
         </div>
         <WorkshopActions workshop={workshop} />
@@ -196,13 +213,7 @@ export default async function WorkshopDetailPage({
               {workshop.landingPageSlug && (
                 <div>
                   <p className="text-sm font-medium text-gray-500">Landing Page</p>
-                  <Link
-                    href={`/workshop/${workshop.landingPageSlug}`}
-                    className="text-blue-600 hover:text-blue-700"
-                    target="_blank"
-                  >
-                    /workshop/{workshop.landingPageSlug}
-                  </Link>
+                  <CopyUrlButton url={`${APP_URL}/workshop/${workshop.landingPageSlug}`} />
                 </div>
               )}
             </CardContent>

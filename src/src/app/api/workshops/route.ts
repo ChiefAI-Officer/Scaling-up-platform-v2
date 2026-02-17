@@ -4,6 +4,7 @@ import { createWorkshopSchema } from "@/lib/validations";
 import { generateSlug } from "@/lib/utils";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 import { validateLeadTime } from "@/lib/lead-time-validator";
+import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
 
 function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -238,16 +239,48 @@ export async function POST(request: NextRequest) {
       secondaryCoachSnapshot = secondaryCoach;
     }
 
-    // Create workshop
-    const category = body.category === "EXIT_AND_VALUATION" ? "EXIT_AND_VALUATION" : "AI";
+    // JV-16: Resolve category from categoryId or fall back to body.category enum
+    let category: "AI" | "EXIT_AND_VALUATION" = "AI";
+    let resolvedCategoryId: string | null = null;
+
+    if (data.categoryId) {
+      const cat = await db.category.findUnique({ where: { id: data.categoryId } });
+      if (cat) {
+        resolvedCategoryId = cat.id;
+        // Map slug to enum for backward compat
+        category = cat.slug.includes("exit") || cat.slug.includes("valuation")
+          ? "EXIT_AND_VALUATION"
+          : "AI";
+      }
+    } else if (body.category === "EXIT_AND_VALUATION") {
+      category = "EXIT_AND_VALUATION";
+    }
+
+    // JV-17: Resolve pricing tier
+    let resolvedPricingTierId: string | null = null;
+    if (data.pricingTierId) {
+      const tier = await db.pricingTier.findUnique({ where: { id: data.pricingTierId } });
+      if (tier) {
+        resolvedPricingTierId = tier.id;
+      }
+    }
+
+    // JV-03: Generate unique workshop code
+    const workshopCode = await generateUniqueWorkshopCode(
+      async (code) => !!(await db.workshop.findUnique({ where: { workshopCode: code }, select: { id: true } }))
+    );
 
     const workshop = await db.workshop.create({
       data: {
         coachId: data.coachId,
         workshopTypeId: data.workshopTypeId,
+        workshopCode,
         title: data.title,
         description: data.description,
         category,
+        categoryId: resolvedCategoryId,
+        pricingTierId: resolvedPricingTierId,
+        termsAcceptedAt: new Date(),
         format: data.format,
         duration: data.duration || "full-day",
         eventDate: new Date(data.eventDate),

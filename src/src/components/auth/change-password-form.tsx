@@ -17,7 +17,7 @@ const initialForm: PasswordFormData = {
   confirmNewPassword: "",
 };
 
-export default function ChangeAdminPasswordForm() {
+export default function ChangePasswordForm() {
   const [formData, setFormData] = useState<PasswordFormData>(initialForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -131,7 +131,7 @@ export default function ChangeAdminPasswordForm() {
 
       <div className="flex justify-end">
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Updating..." : "Update password"}
+          {isSubmitting ? "Updating..." : "Update Password"}
         </Button>
       </div>
     </form>

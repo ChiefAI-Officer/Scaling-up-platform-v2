@@ -1,0 +1,288 @@
+/**
+ * Survey Service (JV-13)
+ *
+ * CRUD for survey templates, questions, and response handling.
+ */
+
+import { db } from "@/lib/db";
+import type { QuestionType, SurveyType } from "@/lib/survey-types";
+
+// ============================================
+// Types
+// ============================================
+
+export interface CreateTemplateInput {
+  name: string;
+  description?: string;
+  surveyType: SurveyType;
+  categoryId?: string;
+  createdBy: string;
+}
+
+export interface CreateQuestionInput {
+  templateId: string;
+  sortOrder: number;
+  questionType: QuestionType;
+  label: string;
+  description?: string;
+  isRequired?: boolean;
+  options?: string[];
+}
+
+// ============================================
+// Template CRUD
+// ============================================
+
+export async function createSurveyTemplate(input: CreateTemplateInput) {
+  return db.surveyTemplate.create({
+    data: {
+      name: input.name,
+      description: input.description,
+      surveyType: input.surveyType,
+      categoryId: input.categoryId,
+      createdBy: input.createdBy,
+    },
+    include: { questions: { orderBy: { sortOrder: "asc" } } },
+  });
+}
+
+export async function getSurveyTemplate(id: string) {
+  return db.surveyTemplate.findUnique({
+    where: { id },
+    include: { questions: { orderBy: { sortOrder: "asc" } } },
+  });
+}
+
+export async function listSurveyTemplates() {
+  return db.surveyTemplate.findMany({
+    include: {
+      questions: { orderBy: { sortOrder: "asc" } },
+      _count: { select: { surveys: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+}
+
+export async function updateSurveyTemplate(
+  id: string,
+  data: Partial<Pick<CreateTemplateInput, "name" | "description" | "surveyType">> & { isActive?: boolean }
+) {
+  return db.surveyTemplate.update({
+    where: { id },
+    data,
+    include: { questions: { orderBy: { sortOrder: "asc" } } },
+  });
+}
+
+export async function deleteSurveyTemplate(id: string) {
+  return db.surveyTemplate.delete({ where: { id } });
+}
+
+// ============================================
+// Question CRUD
+// ============================================
+
+export async function addQuestion(input: CreateQuestionInput) {
+  return db.surveyQuestion.create({
+    data: {
+      templateId: input.templateId,
+      sortOrder: input.sortOrder,
+      questionType: input.questionType,
+      label: input.label,
+      description: input.description,
+      isRequired: input.isRequired ?? true,
+      options: input.options ? JSON.stringify(input.options) : undefined,
+    },
+  });
+}
+
+export async function updateQuestion(
+  questionId: string,
+  data: Partial<Omit<CreateQuestionInput, "templateId">>
+) {
+  return db.surveyQuestion.update({
+    where: { id: questionId },
+    data: {
+      ...data,
+      options: data.options ? JSON.stringify(data.options) : undefined,
+    },
+  });
+}
+
+export async function deleteQuestion(questionId: string) {
+  return db.surveyQuestion.delete({ where: { id: questionId } });
+}
+
+export async function reorderQuestions(templateId: string, questionIds: string[]) {
+  const updates = questionIds.map((id, index) =>
+    db.surveyQuestion.update({ where: { id }, data: { sortOrder: index } })
+  );
+  return db.$transaction(updates);
+}
+
+// ============================================
+// Survey Instance (assign template to workshop)
+// ============================================
+
+export async function createSurveyForWorkshop(input: {
+  templateId: string;
+  workshopId: string;
+  registrationId?: string;
+}) {
+  const workshop = await db.workshop.findUnique({
+    where: { id: input.workshopId },
+    select: { workshopCode: true },
+  });
+
+  const template = await db.surveyTemplate.findUnique({
+    where: { id: input.templateId },
+    select: { surveyType: true },
+  });
+
+  if (!workshop || !template) throw new Error("Workshop or template not found");
+
+  return db.survey.create({
+    data: {
+      templateId: input.templateId,
+      workshopId: input.workshopId,
+      workshopCode: workshop.workshopCode,
+      registrationId: input.registrationId,
+      surveyType: template.surveyType,
+    },
+  });
+}
+
+// ============================================
+// Response Submission (public)
+// ============================================
+
+export async function submitSurveyResponse(
+  surveyId: string,
+  answers: { questionId: string; value: string; numValue?: number }[]
+) {
+  const survey = await db.survey.findUnique({
+    where: { id: surveyId },
+    select: { id: true, completedAt: true },
+  });
+
+  if (!survey) throw new Error("Survey not found");
+  if (survey.completedAt) throw new Error("Survey already completed");
+
+  // Upsert answers + mark survey complete in a transaction
+  const operations = answers.map((answer) =>
+    db.surveyAnswer.upsert({
+      where: { surveyId_questionId: { surveyId, questionId: answer.questionId } },
+      create: {
+        surveyId,
+        questionId: answer.questionId,
+        value: answer.value,
+        numValue: answer.numValue,
+      },
+      update: {
+        value: answer.value,
+        numValue: answer.numValue,
+      },
+    })
+  );
+
+  // Extract NPS score if present
+  const npsAnswer = answers.find((a) => a.numValue !== undefined && a.numValue >= 0 && a.numValue <= 10);
+
+  await db.$transaction([
+    ...operations,
+    db.survey.update({
+      where: { id: surveyId },
+      data: {
+        completedAt: new Date(),
+        npsScore: npsAnswer?.numValue ?? undefined,
+      },
+    }),
+  ]);
+
+  return { success: true };
+}
+
+// ============================================
+// Analytics / Aggregation
+// ============================================
+
+export async function getSurveyResults(templateId: string, workshopId?: string) {
+  const whereClause = {
+    templateId,
+    completedAt: { not: null },
+    ...(workshopId ? { workshopId } : {}),
+  };
+
+  const surveys = await db.survey.findMany({
+    where: whereClause,
+    include: {
+      answers: { include: { question: true } },
+      workshop: { select: { title: true, workshopCode: true } },
+      registration: { select: { firstName: true, lastName: true, email: true } },
+    },
+    orderBy: { completedAt: "desc" },
+  });
+
+  // Aggregate per question
+  const template = await db.surveyTemplate.findUnique({
+    where: { id: templateId },
+    include: { questions: { orderBy: { sortOrder: "asc" } } },
+  });
+
+  if (!template) return null;
+
+  const questionStats = template.questions.map((question) => {
+    const allAnswers = surveys.flatMap((s) =>
+      s.answers.filter((a) => a.questionId === question.id)
+    );
+
+    const stats: {
+      questionId: string;
+      label: string;
+      type: string;
+      totalResponses: number;
+      avgNumeric?: number;
+      distribution?: Record<string, number>;
+    } = {
+      questionId: question.id,
+      label: question.label,
+      type: question.questionType,
+      totalResponses: allAnswers.length,
+    };
+
+    // Numeric average for RATING and NPS
+    if (question.questionType === "RATING" || question.questionType === "NPS") {
+      const nums = allAnswers.filter((a) => a.numValue !== null).map((a) => a.numValue!);
+      stats.avgNumeric = nums.length > 0 ? nums.reduce((sum, n) => sum + n, 0) / nums.length : undefined;
+    }
+
+    // Distribution for choice questions
+    if (["SINGLE_CHOICE", "MULTI_CHOICE", "YES_NO", "RATING", "NPS"].includes(question.questionType)) {
+      const dist: Record<string, number> = {};
+      for (const answer of allAnswers) {
+        const val = answer.value || "No answer";
+        if (question.questionType === "MULTI_CHOICE") {
+          try {
+            const choices = JSON.parse(val) as string[];
+            for (const c of choices) dist[c] = (dist[c] || 0) + 1;
+          } catch {
+            dist[val] = (dist[val] || 0) + 1;
+          }
+        } else {
+          dist[val] = (dist[val] || 0) + 1;
+        }
+      }
+      stats.distribution = dist;
+    }
+
+    return stats;
+  });
+
+  return {
+    templateName: template.name,
+    surveyType: template.surveyType,
+    totalResponses: surveys.length,
+    questionStats,
+    responses: surveys,
+  };
+}

@@ -14,6 +14,13 @@ import workshopsData from "./seed/workshops.json";
 
 const prisma = new PrismaClient();
 
+// JV-03: Generate workshop codes for seed data
+let seedCodeCounter = 0;
+function nextWorkshopCode(year: string): string {
+    seedCodeCounter++;
+    return `WS-${year}-${String(seedCodeCounter).padStart(4, "0")}`;
+}
+
 async function main() {
     console.log("🚀 Seeding real Scaling Up workshop data...\n");
 
@@ -133,6 +140,7 @@ async function main() {
             create: {
                 coachId,
                 workshopTypeId,
+                workshopCode: nextWorkshopCode(ws.eventDate.slice(0, 4)),
                 title: ws.title,
                 description: `${ws.title} with expert Scaling Up coaches.`,
                 format: ws.format,
@@ -175,6 +183,7 @@ async function main() {
             create: {
                 coachId,
                 workshopTypeId,
+                workshopCode: nextWorkshopCode(ws.eventDate.slice(0, 4)),
                 title: ws.title,
                 description: `${ws.title} - Historical record.`,
                 format: ws.format,
@@ -202,7 +211,7 @@ async function main() {
         workshopTypes: await prisma.workshopType.count(),
         coaches: await prisma.coach.count(),
         workshops: await prisma.workshop.count(),
-        upcomingWorkshops: await prisma.workshop.count({ where: { status: "SCHEDULED" } }),
+        upcomingWorkshops: await prisma.workshop.count({ where: { status: "PRE_EVENT" } }),
         completedWorkshops: await prisma.workshop.count({ where: { status: "COMPLETED" } }),
     };
 

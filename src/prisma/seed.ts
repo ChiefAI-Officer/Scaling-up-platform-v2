@@ -133,6 +133,92 @@ async function main() {
 
   console.log("Created workshop types");
 
+  // Create categories (JV-16: Dynamic workshop categories)
+  const aiCategory = await prisma.category.upsert({
+    where: { slug: "ai" },
+    update: {},
+    create: {
+      name: "AI",
+      slug: "ai",
+      description: "AI-focused workshops covering practical AI implementation, automation, and building AI-ready organizations.",
+    },
+  });
+
+  const exitCategory = await prisma.category.upsert({
+    where: { slug: "exit-and-valuation" },
+    update: {},
+    create: {
+      name: "Exit & Valuation",
+      slug: "exit-and-valuation",
+      description: "Workshops focused on business valuation, exit planning, and M&A preparation.",
+    },
+  });
+
+  console.log("Created categories");
+
+  // Create pricing tiers (JV-17: Replaces freeform price input)
+  const aiFullDay = await prisma.pricingTier.upsert({
+    where: { id: "ai-full-day-seed" },
+    update: {},
+    create: {
+      id: "ai-full-day-seed",
+      categoryId: aiCategory.id,
+      name: "Full-Day",
+      amountCents: 49900,
+      description: "Full-day AI workshop",
+    },
+  });
+
+  const aiHalfDay = await prisma.pricingTier.upsert({
+    where: { id: "ai-half-day-seed" },
+    update: {},
+    create: {
+      id: "ai-half-day-seed",
+      categoryId: aiCategory.id,
+      name: "Half-Day",
+      amountCents: 29900,
+      description: "Half-day AI workshop",
+    },
+  });
+
+  const aiVirtual = await prisma.pricingTier.upsert({
+    where: { id: "ai-virtual-2hr-seed" },
+    update: {},
+    create: {
+      id: "ai-virtual-2hr-seed",
+      categoryId: aiCategory.id,
+      name: "Virtual 2hr",
+      amountCents: 9900,
+      description: "2-hour virtual AI workshop",
+    },
+  });
+
+  await prisma.pricingTier.upsert({
+    where: { id: "exit-full-day-seed" },
+    update: {},
+    create: {
+      id: "exit-full-day-seed",
+      categoryId: exitCategory.id,
+      name: "Full-Day",
+      amountCents: 59900,
+      description: "Full-day Exit & Valuation workshop",
+    },
+  });
+
+  await prisma.pricingTier.upsert({
+    where: { id: "exit-half-day-seed" },
+    update: {},
+    create: {
+      id: "exit-half-day-seed",
+      categoryId: exitCategory.id,
+      name: "Half-Day",
+      amountCents: 34900,
+      description: "Half-day Exit & Valuation workshop",
+    },
+  });
+
+  console.log("Created pricing tiers");
+
   // Create coaches
   const coach1 = await prisma.coach.upsert({
     where: { email: "sarah.johnson@scalingup.com" },
@@ -313,6 +399,7 @@ async function main() {
     create: {
       coachId: coach1.id,
       workshopTypeId: aiWorkshop.id,
+      workshopCode: "WS-2025-S001",
       title: "AI Workshop - Chicago March 2025",
       description:
         "Join us for an intensive day of learning how to integrate AI into your business operations. Perfect for business owners and leadership teams ready to embrace the AI revolution.",
@@ -334,7 +421,7 @@ async function main() {
       earlyBirdPriceCents: 39900,
       earlyBirdDeadline: new Date("2025-02-28"),
       maxAttendees: 30,
-      status: "REGISTRATION_OPEN",
+      status: "PRE_EVENT",
       landingPageSlug: "ai-workshop-chicago-march-2025",
     },
   });
@@ -345,6 +432,7 @@ async function main() {
     create: {
       coachId: coach2.id,
       workshopTypeId: exitWorkshop.id,
+      workshopCode: "WS-2025-S002",
       title: "Exit Planning Workshop - San Francisco",
       description:
         "Prepare your business for a successful exit. Learn valuation drivers, due diligence preparation, and negotiation strategies from an experienced M&A professional.",
@@ -364,7 +452,7 @@ async function main() {
       isFree: false,
       priceCents: 59900,
       maxAttendees: 25,
-      status: "MARKETING_ACTIVE",
+      status: "PRE_EVENT",
       landingPageSlug: "exit-planning-sf-april-2025",
     },
   });
@@ -375,6 +463,7 @@ async function main() {
     create: {
       coachId: coach3.id,
       workshopTypeId: aiWorkshop.id,
+      workshopCode: "WS-2025-S003",
       title: "Introduction to AI for Business - Virtual",
       description:
         "A 2-hour virtual session covering AI fundamentals for business leaders. Perfect for those exploring AI adoption.",
@@ -387,12 +476,28 @@ async function main() {
       virtualLink: "https://zoom.us/j/example",
       isFree: true,
       maxAttendees: 100,
-      status: "REGISTRATION_OPEN",
+      status: "PRE_EVENT",
       landingPageSlug: "virtual-ai-intro-feb-2025",
     },
   });
 
   console.log("Created workshops");
+
+  // Link seeded workshops to categories + pricing tiers (JV-16/17)
+  await prisma.workshop.update({
+    where: { landingPageSlug: "ai-workshop-chicago-march-2025" },
+    data: { categoryId: aiCategory.id, pricingTierId: aiFullDay.id },
+  });
+  await prisma.workshop.update({
+    where: { landingPageSlug: "exit-planning-sf-april-2025" },
+    data: { categoryId: exitCategory.id },
+  });
+  await prisma.workshop.update({
+    where: { landingPageSlug: "virtual-ai-intro-feb-2025" },
+    data: { categoryId: aiCategory.id, pricingTierId: aiVirtual.id },
+  });
+
+  console.log("Linked workshops to categories/pricing tiers");
 
   // Create sample registrations
   const registrations = [

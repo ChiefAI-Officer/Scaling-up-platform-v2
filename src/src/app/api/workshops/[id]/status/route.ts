@@ -1,32 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { createPostWorkshopSurveys, sendSurveyEmail } from "@/lib/survey-automation";
 
-// Valid workshop statuses (since we're using SQLite with string fields)
+// JV-02: Jeff Verdun's 6 workshop stages
 const WORKSHOP_STATUSES = [
   "REQUESTED",
-  "VALIDATING",
-  "APPROVED",
-  "SETUP_IN_PROGRESS",
-  "MARKETING_ACTIVE",
-  "REGISTRATION_OPEN",
-  "REGISTRATION_CLOSED",
+  "AWAITING_APPROVAL",
+  "PRE_EVENT",
+  "POST_EVENT",
   "COMPLETED",
-  "CANCELLED",
+  "CANCELED",
 ] as const;
 
 type WorkshopStatus = typeof WORKSHOP_STATUSES[number];
 
 const validTransitions: Record<WorkshopStatus, WorkshopStatus[]> = {
-  REQUESTED: ["VALIDATING", "CANCELLED"],
-  VALIDATING: ["APPROVED", "REQUESTED", "CANCELLED"],
-  APPROVED: ["SETUP_IN_PROGRESS", "CANCELLED"],
-  SETUP_IN_PROGRESS: ["MARKETING_ACTIVE", "APPROVED", "CANCELLED"],
-  MARKETING_ACTIVE: ["REGISTRATION_OPEN", "SETUP_IN_PROGRESS", "CANCELLED"],
-  REGISTRATION_OPEN: ["REGISTRATION_CLOSED", "MARKETING_ACTIVE", "CANCELLED"],
-  REGISTRATION_CLOSED: ["COMPLETED", "REGISTRATION_OPEN", "CANCELLED"],
+  REQUESTED: ["AWAITING_APPROVAL", "CANCELED"],
+  AWAITING_APPROVAL: ["PRE_EVENT", "REQUESTED", "CANCELED"],
+  PRE_EVENT: ["POST_EVENT", "CANCELED"],
+  POST_EVENT: ["COMPLETED"],
   COMPLETED: [],
-  CANCELLED: ["REQUESTED"],
+  CANCELED: ["REQUESTED"],
 };
 
 export async function PATCH(
@@ -96,6 +91,38 @@ export async function PATCH(
         completedAt: new Date(),
       },
     });
+
+    // JV-13: Auto-create post-workshop surveys when transitioning to POST_EVENT
+    if (newStatus === "POST_EVENT") {
+      createPostWorkshopSurveys(id)
+        .then(async (result) => {
+          if (result.created > 0) {
+            // Fetch registrations to get names for emails
+            const registrations = await db.registration.findMany({
+              where: { workshopId: id, status: "REGISTERED" },
+              select: { email: true, firstName: true, lastName: true },
+            });
+
+            const regMap = new Map(registrations.map((r) => [r.email, r]));
+
+            for (const { email, surveyUrl } of result.surveyUrls) {
+              const reg = regMap.get(email);
+              if (reg) {
+                sendSurveyEmail({
+                  to: email,
+                  registrantName: `${reg.firstName} ${reg.lastName}`,
+                  workshopTitle: updated.title,
+                  surveyUrl,
+                  surveyType: "POST_WORKSHOP",
+                }).catch((err) => console.error("Post-workshop survey email failed:", err));
+              }
+            }
+
+            console.log(`[Survey] Created ${result.created} post-workshop surveys for workshop ${id} (${result.skipped} skipped)`);
+          }
+        })
+        .catch((err) => console.error("Post-workshop survey creation failed:", err));
+    }
 
     return NextResponse.json({
       success: true,

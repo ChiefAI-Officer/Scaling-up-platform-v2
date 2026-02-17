@@ -35,20 +35,20 @@ export const strongPasswordSchema = z
 
 export const workshopFormatSchema = z.enum(["IN_PERSON", "VIRTUAL", "HYBRID"]);
 
+// JV-02: Jeff Verdun's 6 workshop stages
 export const workshopStatusSchema = z.enum([
     "REQUESTED",
-    "VALIDATING",
-    "APPROVED",
-    "SETUP_IN_PROGRESS",
-    "MARKETING_ACTIVE",
-    "REGISTRATION_OPEN",
-    "REGISTRATION_CLOSED",
+    "AWAITING_APPROVAL",
+    "PRE_EVENT",
+    "POST_EVENT",
     "COMPLETED",
-    "CANCELLED",
+    "CANCELED",
 ]);
 
 export const createWorkshopSchema = z.object({
-    workshopTypeId: idSchema,
+    workshopTypeId: idSchema.optional(), // JV-16: Optional during migration
+    categoryId: idSchema.optional(),     // JV-16: Dynamic category FK
+    pricingTierId: idSchema.optional(),  // JV-17: Pricing tier FK
     coachId: idSchema, // Required for workshop creation
     title: z.string().min(5, "Title must be at least 5 characters"),
     description: z.string().optional(),

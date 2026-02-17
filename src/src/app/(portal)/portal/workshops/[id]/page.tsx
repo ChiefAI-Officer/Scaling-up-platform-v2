@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireCoach } from "@/lib/authorization";
 import { db } from "@/lib/db";
 import { StatusPill } from "@/components/ui/status-pill";
+import { CancelWorkshopDialog } from "@/components/workshops/cancel-workshop-dialog";
 
 interface WorkshopDetailsPageProps {
   params: Promise<{ id: string }>;
@@ -38,7 +39,7 @@ export default async function WorkshopDetailsPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{workshop.title}</h1>
-          <p className="text-gray-500">{workshop.workshopType.name}</p>
+          <p className="text-gray-500">{workshop.workshopType?.name}</p>
         </div>
         <StatusPill status={workshop.status} />
       </div>
@@ -99,6 +100,13 @@ export default async function WorkshopDetailsPage({
         >
           View Registrations
         </Link>
+        {["REQUESTED", "AWAITING_APPROVAL", "PRE_EVENT"].includes(workshop.status) && (
+          <CancelWorkshopDialog
+            workshopId={workshop.id}
+            workshopTitle={workshop.title}
+            eventDate={workshop.eventDate.toISOString()}
+          />
+        )}
       </div>
     </div>
   );

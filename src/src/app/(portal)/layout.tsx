@@ -9,10 +9,9 @@ import {
     PlusCircle,
     FileText,
     Settings,
-    Search,
-    Bell,
     FileBox
 } from "lucide-react";
+import { CoachMobileNav } from "@/components/layout/coach-mobile-nav";
 
 interface PortalLayoutProps {
     children: React.ReactNode;
@@ -21,18 +20,16 @@ interface PortalLayoutProps {
 /**
  * Coach Portal Layout
  * Main shell with navigation for the coach self-service dashboard.
- * Sprint 2: Enhanced with Search, Notifications, and new Navigation items.
  */
 export default async function PortalLayout({ children }: PortalLayoutProps) {
     const { session, coach } = await requireCoach();
 
-    // Fallback name if data is missing
     const coachName = coach.firstName || session.user.name || "Coach";
 
     return (
         <div className="flex min-h-screen bg-gray-100">
-            {/* Sidebar */}
-            <aside className="w-64 bg-gray-900 text-white flex flex-col fixed inset-y-0 left-0 z-50">
+            {/* Sidebar — hidden on mobile */}
+            <aside className="hidden md:flex w-64 bg-gray-900 text-white flex-col fixed inset-y-0 left-0 z-50">
                 <div className="px-6 h-16 flex items-center border-b border-gray-800">
                     <span className="text-xl font-bold tracking-tight">Scaling Up Coach</span>
                 </div>
@@ -79,27 +76,19 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
             </aside>
 
             {/* Main Content */}
-            <div className="ml-64 flex-1 flex flex-col min-h-screen">
-                <header className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between sticky top-0 z-40 shadow-sm">
-                    {/* Global Search - Figma Requirement */}
-                    <div className="flex-1 max-w-md relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Search workshops, participants..."
-                            className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                        />
-                    </div>
+            <div className="md:ml-64 flex-1 flex flex-col min-h-screen">
+                <header className="h-16 bg-white border-b border-gray-200 px-4 md:px-8 flex items-center justify-between sticky top-0 z-40 shadow-sm">
+                    {/* Mobile hamburger */}
+                    <CoachMobileNav coachName={coachName} />
 
-                    <div className="flex items-center gap-6">
-                        {/* Notifications - Figma Requirement */}
-                        <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
-                            <Bell className="w-5 h-5" />
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-                        </button>
+                    {/* Title on mobile */}
+                    <span className="md:hidden text-lg font-bold text-gray-900">Scaling Up</span>
 
-                        <div className="h-6 w-px bg-gray-200"></div>
+                    {/* Spacer on desktop */}
+                    <div className="hidden md:block flex-1" />
 
+                    <div className="flex items-center gap-4 md:gap-6">
+                        <div className="h-6 w-px bg-gray-200 hidden md:block"></div>
                         <Link
                             href="/api/auth/signout"
                             className="text-sm font-medium text-gray-600 hover:text-red-600 transition-colors"
@@ -109,7 +98,7 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                     </div>
                 </header>
 
-                <main className="flex-1 p-8">
+                <main className="flex-1 p-4 md:p-8">
                     {children}
                 </main>
             </div>

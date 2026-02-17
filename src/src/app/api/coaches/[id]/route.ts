@@ -146,7 +146,7 @@ export async function DELETE(
 
     // Check for active workshops
     const activeWorkshops = existing.workshops.filter(
-      (w) => !["COMPLETED", "CANCELLED"].includes(w.status)
+      (w) => !["COMPLETED", "CANCELED"].includes(w.status)
     );
 
     if (activeWorkshops.length > 0) {

@@ -5,10 +5,17 @@
 
 import nodemailer from "nodemailer";
 
+interface EmailAttachment {
+    filename: string;
+    content: string | Buffer;
+    contentType: string;
+}
+
 interface SendEmailOptions {
     to: string;
     templateId: string;
     variables: Record<string, string>;
+    attachments?: EmailAttachment[];
 }
 
 // Email templates stored in-memory for MVP
@@ -116,6 +123,7 @@ export async function sendEmailTemplate(options: SendEmailOptions): Promise<void
             to: options.to,
             subject,
             templateId: options.templateId,
+            attachments: options.attachments?.length || 0,
         });
         return;
     }
@@ -125,6 +133,11 @@ export async function sendEmailTemplate(options: SendEmailOptions): Promise<void
         to: options.to,
         subject,
         html,
+        attachments: options.attachments?.map((a) => ({
+            filename: a.filename,
+            content: a.content,
+            contentType: a.contentType,
+        })),
     });
 }
 

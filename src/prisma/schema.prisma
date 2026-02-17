@@ -140,10 +140,12 @@ model WorkshopType {
 // ============================================
 
 model Workshop {
-  id             String           @id @default(cuid())
+  id             String    @id @default(cuid())
+  workshopCode   String    @unique // JV-03: Human-readable unique ID (e.g., WS-2026-A1B2)
   coachId        String
-  workshopTypeId String
-  category       WorkshopCategory @default(AI)
+  workshopTypeId String?   // JV-16: Made optional during migration (workshopType being deprecated)
+  categoryId     String?   // JV-16: FK to dynamic Category model (replaces enum)
+  category       WorkshopCategory @default(AI) // JV-16: Kept during migration, will be removed
 
   // Event Details
   title        String
@@ -169,8 +171,10 @@ model Workshop {
   priceCents          Int?
   earlyBirdPriceCents Int?
   earlyBirdDeadline   DateTime?
+  pricingTierId       String?   // JV-17: FK to PricingTier model
 
-  // Status & Pipeline
+  // Status & Pipeline — JV-02: Jeff's 6 stages
+  // REQUESTED, AWAITING_APPROVAL, PRE_EVENT, POST_EVENT, COMPLETED, CANCELED
   status String @default("REQUESTED")
 
   // Generated Assets
@@ -184,16 +188,21 @@ model Workshop {
   // Capacity
   maxAttendees Int @default(50)
 
-  // Sprint 1: Workshop Locking (48h before event)
+  // Workshop Locking (48h before event)
   isLocked  Boolean   @default(false)
   lockedAt  DateTime?
   lockedBy  String?   // User ID who locked it, or 'SYSTEM'
+
+  // JV-27: Terms acceptance
+  termsAcceptedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   coach           Coach               @relation(fields: [coachId], references: [id])
-  workshopType    WorkshopType        @relation(fields: [workshopTypeId], references: [id])
+  workshopType    WorkshopType?       @relation(fields: [workshopTypeId], references: [id])
+  workshopCategory Category?          @relation(fields: [categoryId], references: [id])
+  pricingTier     PricingTier?        @relation(fields: [pricingTierId], references: [id])
   registrations   Registration[]
   campaigns       MarketingCampaign[]
   tasks           AutomationTask[]
@@ -201,10 +210,14 @@ model Workshop {
   approvals       ApprovalQueue[]
   landingPages    LandingPage[]
   followUpReports FollowUpReport[]
+  workshopPages       WorkshopPage[]        // JV-10: Unique pages per workshop
+  workflowAssignments WorkflowAssignment[]  // JV-11: Workflow linkage
+  fileAttachments     FileAttachment[]      // JV-12: File attachments
 
   @@index([coachId])
   @@index([status])
   @@index([eventDate])
+  @@index([categoryId])
   @@map("workshops")
 }
 
@@ -305,15 +318,66 @@ model AutomationTask {
 }
 
 // ============================================
-// Surveys & Feedback
+// Surveys & Feedback (JV-13: Custom Form Builder)
 // ============================================
 
+// Survey templates — reusable question sets (e.g., "Standard Post-Event Feedback")
+model SurveyTemplate {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Post-Workshop Satisfaction"
+  description String?
+  surveyType  String   // PRE_WORKSHOP, POST_WORKSHOP, NPS
+  categoryId  String?  // Optional: link to Category for auto-assignment by workshop category
+  isActive    Boolean  @default(true)
+  createdBy   String   // userId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category  Category?        @relation(fields: [categoryId], references: [id])
+  questions SurveyQuestion[]
+  surveys   Survey[]
+
+  @@index([categoryId])
+  @@index([surveyType])
+  @@map("survey_templates")
+}
+
+// Individual questions in a template
+model SurveyQuestion {
+  id         String @id @default(cuid())
+  templateId String
+  sortOrder  Int    // Display order
+
+  // Question definition
+  // questionType: TEXT, TEXTAREA, RATING, NPS, SINGLE_CHOICE, MULTI_CHOICE, YES_NO
+  questionType String
+  label        String   // The question text
+  description  String?  // Optional help text
+  isRequired   Boolean  @default(true)
+
+  // For SINGLE_CHOICE / MULTI_CHOICE: JSON array of option strings
+  options String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  template SurveyTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  answers  SurveyAnswer[]
+
+  @@index([templateId])
+  @@map("survey_questions")
+}
+
+// A survey instance assigned to a specific workshop
 model Survey {
   id             String  @id @default(cuid())
+  templateId     String? // FK to SurveyTemplate (null for legacy Typeform surveys)
   registrationId String?
   workshopId     String
-  surveyType     String // PRE_WORKSHOP, POST_WORKSHOP, NPS
+  workshopCode   String? // Denormalized (JV-04)
+  surveyType     String  // PRE_WORKSHOP, POST_WORKSHOP, NPS
 
+  // Legacy Typeform responses (kept for backward compat)
   responses String? // JSON string
   npsScore  Int?
 
@@ -321,10 +385,60 @@ model Survey {
   completedAt DateTime?
   createdAt   DateTime  @default(now())
 
-  registration Registration? @relation(fields: [registrationId], references: [id])
-  workshop     Workshop      @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  template     SurveyTemplate? @relation(fields: [templateId], references: [id])
+  registration Registration?   @relation(fields: [registrationId], references: [id])
+  workshop     Workshop        @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  answers      SurveyAnswer[]
 
+  @@index([workshopId])
+  @@index([workshopCode])
   @@map("surveys")
+}
+
+// Individual answers per question per survey response
+model SurveyAnswer {
+  id         String @id @default(cuid())
+  surveyId   String
+  questionId String
+
+  // The answer (stored as string; JSON for multi-choice)
+  value    String?
+  numValue Int?    // Numeric extraction for RATING/NPS aggregation
+
+  createdAt DateTime @default(now())
+
+  survey   Survey         @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  question SurveyQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, questionId]) // One answer per question per survey
+  @@index([questionId])
+  @@map("survey_answers")
+}
+
+// ============================================
+// JV-12: File Attachments (Vercel Blob)
+// ============================================
+
+model FileAttachment {
+  id           String   @id @default(cuid())
+  filename     String   // Original filename
+  blobUrl      String   // Vercel Blob URL
+  contentType  String   // MIME type
+  sizeBytes    Int      // File size in bytes
+  workshopId   String?  // Optional: linked to a workshop
+  workshopCode String?  // Denormalized for fast lookup
+  workflowStepId String? // Optional: linked to a workflow step for email attachment
+  uploadedBy   String   // userId who uploaded
+  category     String?  // e.g., "presentation", "handout", "resource"
+  createdAt    DateTime @default(now())
+
+  workshop     Workshop?     @relation(fields: [workshopId], references: [id], onDelete: SetNull)
+  workflowStep WorkflowStep? @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
+
+  @@index([workshopId])
+  @@index([workshopCode])
+  @@index([workflowStepId])
+  @@map("file_attachments")
 }
 
 // ============================================
@@ -390,6 +504,8 @@ model EmailTemplate {
   isActive   Boolean   @default(true)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+
+  workflowSteps WorkflowStep[] // JV-11: Steps that reference this template
 
   @@map("email_templates")
 }
@@ -457,6 +573,71 @@ model FollowUpReport {
 }
 
 // ============================================
+// JV-16: Dynamic Workshop Categories (replaces WorkshopCategory enum)
+// ============================================
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g., "AI Workshop", "Exit Workshop"
+  slug        String   @unique // e.g., "ai", "exit-and-valuation"
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workshops       Workshop[]
+  pricingTiers    PricingTier[]
+  surveyTemplates SurveyTemplate[]
+
+  @@map("categories")
+}
+
+// ============================================
+// JV-17: Pricing Tiers (replaces freeform price input)
+// ============================================
+
+model PricingTier {
+  id          String   @id @default(cuid())
+  categoryId  String
+  name        String   // e.g., "Standard", "Early Bird", "Group Rate"
+  amountCents Int      // Price in cents
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category  Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  workshops Workshop[]
+
+  @@index([categoryId])
+  @@map("pricing_tiers")
+}
+
+// ============================================
+// JV-10: Workshop Pages (unique pages per workshop)
+// ============================================
+
+model WorkshopPage {
+  id           String   @id @default(cuid())
+  workshopId   String
+  workshopCode String   // Denormalized for easy lookup
+  pageType     String   // LANDING, PAYMENT, THANK_YOU
+  templateId   String?  // Reference to template used
+  content      String?  // JSON with page content
+  slug         String?  @unique // Public URL slug
+  published    Boolean  @default(false)
+  publishedAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@unique([workshopId, pageType])
+  @@index([workshopCode])
+  @@map("workshop_pages")
+}
+
+// ============================================
 // V2: Enums
 // ============================================
 
@@ -512,6 +693,111 @@ enum LandingPageTemplate {
   DUO_LANDING
   REGISTRATION
   THANK_YOU
+}
+
+// ============================================
+// JV-11 + JV-22: Workflow System
+// ============================================
+
+model Workflow {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Standard Pre-Event Sequence"
+  description String?
+  isActive    Boolean  @default(true)
+  isTemplate  Boolean  @default(false) // Admin-created templates coaches can clone
+  createdBy   String   // userId who created the workflow
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  steps       WorkflowStep[]
+  assignments WorkflowAssignment[]
+
+  @@map("workflows")
+}
+
+model WorkflowStep {
+  id         String @id @default(cuid())
+  workflowId String
+  sortOrder  Int    // Execution order within the workflow
+
+  // What to do
+  // Allowed values: EMAIL_ATTENDEES, EMAIL_COACH, EMAIL_STAFF, EMAIL_CUSTOM, NOTIFICATION
+  stepType String
+
+  // Email content (inline or from template)
+  emailTemplateId String?   // Optional FK to reusable EmailTemplate
+  subject         String?   // Override or inline subject
+  body            String?   // Override or inline HTML body (supports {{ variables }})
+
+  // For EMAIL_CUSTOM: JSON array of email addresses
+  customRecipients String?
+
+  // JV-22: Date-relative scheduling
+  // triggerType values: RELATIVE_TO_EVENT, ON_REGISTRATION, ON_APPROVAL
+  triggerType   String
+  offsetDays    Int?       // Days relative to event (negative = before, positive = after)
+  offsetHours   Int?       // Hours offset for fine-grained timing
+  sendTimeOfDay String?    // "09:00" — preferred send time (defaults to event time if null)
+
+  // JV-12: File attachments placeholder (future Track B)
+  attachments String? // JSON array of { filename, storageKey, contentType }
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workflow        Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  emailTemplate   EmailTemplate?   @relation(fields: [emailTemplateId], references: [id])
+  executions      WorkflowStepExecution[]
+  fileAttachments FileAttachment[] // JV-12: Files attached to this step
+
+  @@index([workflowId])
+  @@map("workflow_steps")
+}
+
+model WorkflowAssignment {
+  id           String   @id @default(cuid())
+  workflowId   String
+  workshopId   String
+  workshopCode String   // Denormalized for easy lookup (JV-04)
+  isActive     Boolean  @default(true)
+  assignedBy   String   // userId who assigned the workflow
+  assignedAt   DateTime @default(now())
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, workshopId])
+  @@index([workshopId])
+  @@index([workshopCode])
+  @@map("workflow_assignments")
+}
+
+model WorkflowStepExecution {
+  id             String    @id @default(cuid())
+  stepId         String
+  workshopId     String    // Which workshop this execution is for
+  registrationId String?   // Which registrant (for attendee-targeted emails)
+
+  // Execution state: PENDING, SCHEDULED, SENT, FAILED, SKIPPED
+  status       String    @default("PENDING")
+  scheduledFor DateTime? // When Inngest should fire
+  executedAt   DateTime?
+  errorMessage String?
+  attempts     Int       @default(0)
+
+  // Inngest tracking
+  inngestEventId String? // For cancellation/retry tracking
+
+  createdAt DateTime @default(now())
+
+  step WorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([stepId])
+  @@index([workshopId])
+  @@index([status])
+  @@index([scheduledFor])
+  @@map("workflow_step_executions")
 }
 
 // ============================================

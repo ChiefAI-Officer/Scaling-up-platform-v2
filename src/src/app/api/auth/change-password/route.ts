@@ -5,11 +5,6 @@ import { db } from "@/lib/db";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { changePasswordSchema } from "@/lib/validations";
 
-function isCanonicalAdminEmail(email: string): boolean {
-  const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  return !configuredAdminEmail || email.toLowerCase() === configuredAdminEmail;
-}
-
 export async function POST(request: NextRequest) {
   const rateLimit = await withRateLimit(request, RateLimits.auth);
 
@@ -29,19 +24,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (actor.role !== "ADMIN") {
-      return NextResponse.json(
-        { success: false, error: "Only admin can change this password" },
-        { status: 403, headers: rateLimit.headers }
-      );
-    }
-
-    if (!isCanonicalAdminEmail(actor.email)) {
-      return NextResponse.json(
-        { success: false, error: "Only the canonical admin account can perform this action" },
-        { status: 403, headers: rateLimit.headers }
-      );
-    }
+    // JV-14: Any authenticated user can change their own password
 
     const body = await request.json();
     const validation = changePasswordSchema.safeParse(body);
@@ -102,7 +85,6 @@ export async function POST(request: NextRequest) {
           performedBy: actor.email,
           changes: JSON.stringify({
             role: actor.role,
-            canonicalAdmin: true,
           }),
         },
       }),

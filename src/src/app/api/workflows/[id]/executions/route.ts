@@ -1,0 +1,68 @@
+/**
+ * GET /api/workflows/[id]/executions — Fetch execution status grouped by workshop
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { db } from "@/lib/db";
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: workflowId } = await params;
+
+  // Get all assignments for this workflow
+  const assignments = await db.workflowAssignment.findMany({
+    where: { workflowId },
+    include: {
+      workshop: {
+        select: { id: true, title: true, workshopCode: true },
+      },
+    },
+  });
+
+  // Get all step IDs for this workflow
+  const steps = await db.workflowStep.findMany({
+    where: { workflowId },
+    select: { id: true, sortOrder: true, stepType: true, subject: true, offsetDays: true },
+    orderBy: { sortOrder: "asc" },
+  });
+
+  const stepIds = steps.map((s) => s.id);
+
+  // Get all executions for these steps
+  const executions = await db.workflowStepExecution.findMany({
+    where: { stepId: { in: stepIds } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Group by workshop
+  const groups = assignments.map((assignment) => ({
+    workshopId: assignment.workshop.id,
+    workshopTitle: assignment.workshop.title,
+    workshopCode: assignment.workshopCode,
+    executions: executions
+      .filter((e) => e.workshopId === assignment.workshopId)
+      .map((e) => ({
+        ...e,
+        scheduledFor: e.scheduledFor?.toISOString() ?? null,
+        executedAt: e.executedAt?.toISOString() ?? null,
+        createdAt: e.createdAt.toISOString(),
+        step: steps.find((s) => s.id === e.stepId) || {
+          sortOrder: 0,
+          stepType: "UNKNOWN",
+          subject: null,
+          offsetDays: null,
+        },
+      })),
+  }));
+
+  return NextResponse.json({ success: true, data: groups });
+}

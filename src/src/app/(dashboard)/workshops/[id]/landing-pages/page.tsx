@@ -5,478 +5,437 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 
 interface Workshop {
-  id: string;
-  title: string;
-  category: "AI" | "EXIT_AND_VALUATION";
-  coach: {
     id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-    bio: string | null;
-    profileImage: string | null;
-  };
-  landingPages: Array<{
+    title: string;
+    workshopCode: string | null;
+    coach: {
+        id: string;
+        firstName: string;
+        lastName: string;
+    };
+    landingPages: Array<{
+        id: string;
+        template: string;
+        status: string;
+        slug: string;
+    }>;
+}
+
+interface TemplateLibraryItem {
     id: string;
     template: string;
     status: string;
     slug: string;
-  }>;
+    createdAt: string;
+    workshopId: string;
+    workshopTitle: string;
 }
 
-interface TemplateLibraryItem {
-  id: string;
-  template: "SOLO_LANDING" | "DUO_LANDING" | "REGISTRATION";
-  status: string;
-  slug: string;
-  createdAt: string;
-  workshopId: string;
-  workshopTitle: string;
-  editPath: string;
-}
+type PageTab = "LANDING" | "REGISTRATION" | "THANK_YOU";
 
-const TEMPLATE_OPTIONS = [
-  {
-    value: "SOLO_LANDING",
-    label: "Solo Landing Page",
-    description: "Single coach workshop landing page for Exit & Valuation",
-    icon: "📄",
-  },
-  {
-    value: "DUO_LANDING",
-    label: "Duo Workshop Landing Page",
-    description: "Two-coach AI Workshop landing page",
-    icon: "👥",
-  },
-  {
-    value: "REGISTRATION",
-    label: "Registration Page",
-    description: "Registration form sub-page (linked from landing pages)",
-    icon: "📝",
-  },
-  {
-    value: "THANK_YOU",
-    label: "Thank You Page",
-    description: "Post-registration confirmation with video",
-    icon: "🎉",
-  },
+const PAGE_TABS: { value: PageTab; label: string; description: string }[] = [
+    {
+        value: "LANDING",
+        label: "Landing Pages",
+        description: "Workshop landing pages for marketing and registration",
+    },
+    {
+        value: "REGISTRATION",
+        label: "Registration / Payment",
+        description: "Registration form sub-page linked from landing pages",
+    },
+    {
+        value: "THANK_YOU",
+        label: "Thank You",
+        description: "Post-registration confirmation with video",
+    },
 ];
 
-export default function LandingPagesPage() {
-  const params = useParams();
-  const router = useRouter();
-  const workshopId = params.id as string;
+const LANDING_TEMPLATES = [
+    {
+        value: "SOLO_LANDING",
+        label: "Solo Landing Page",
+        description: "Single coach workshop (Exit & Valuation)",
+        icon: "📄",
+        editPath: "solo-landing",
+    },
+    {
+        value: "DUO_LANDING",
+        label: "Duo Workshop Landing Page",
+        description: "Two-coach AI Workshop landing page",
+        icon: "👥",
+        editPath: "duo-landing",
+    },
+    {
+        value: "BIO_PAGE",
+        label: "Coach Bio Page",
+        description: "Coach profile and credentials page",
+        icon: "🧑‍💼",
+        editPath: "bio-page",
+    },
+];
 
-  const [workshop, setWorkshop] = useState<Workshop | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
-  const [libraryItems, setLibraryItems] = useState<TemplateLibraryItem[]>([]);
-  const [libraryLoading, setLibraryLoading] = useState(false);
-  const [selectedLibraryItemId, setSelectedLibraryItemId] = useState("");
-  const [copyingTemplate, setCopyingTemplate] = useState(false);
-  const [templateMessage, setTemplateMessage] = useState<string | null>(null);
-  const [templateError, setTemplateError] = useState<string | null>(null);
+export default function WorkshopEditorPage() {
+    const params = useParams();
+    const router = useRouter();
+    const workshopId = params.id as string;
 
-  useEffect(() => {
-    async function loadWorkshop() {
-      try {
-        const res = await fetch(`/api/workshops/${workshopId}`);
-        const data = await res.json();
-        if (data.success) {
-          setWorkshop(data.data);
-        } else {
-          setError(data.error || "Failed to load workshop");
+    const [workshop, setWorkshop] = useState<Workshop | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<PageTab>("LANDING");
+
+    // Template library state
+    const [libraryItems, setLibraryItems] = useState<TemplateLibraryItem[]>([]);
+    const [libraryLoading, setLibraryLoading] = useState(false);
+    const [selectedSourceId, setSelectedSourceId] = useState("");
+    const [copyTarget, setCopyTarget] = useState<string | null>(null);
+    const [copying, setCopying] = useState(false);
+    const [copyMessage, setCopyMessage] = useState<string | null>(null);
+
+    useEffect(() => {
+        async function loadWorkshop() {
+            try {
+                const res = await fetch(`/api/workshops/${workshopId}`);
+                const data = await res.json();
+                if (data.success) {
+                    setWorkshop(data.data);
+                } else {
+                    setError(data.error || "Failed to load workshop");
+                }
+            } catch {
+                setError("Failed to load workshop");
+            } finally {
+                setLoading(false);
+            }
         }
-      } catch {
-        setError("Failed to load workshop");
-      } finally {
-        setLoading(false);
-      }
+        loadWorkshop();
+    }, [workshopId]);
+
+    function getPageStatus(template: string) {
+        const page = workshop?.landingPages?.find((p) => p.template === template);
+        if (!page) return { status: "NOT_CREATED", label: "Not Created", slug: null };
+        if (page.status === "PUBLISHED") return { status: "PUBLISHED", label: "Published", slug: page.slug };
+        return { status: "DRAFT", label: "Draft", slug: page.slug };
     }
-    loadWorkshop();
-  }, [workshopId]);
 
-  const getTemplateStatus = (templateValue: string) => {
-    const page = workshop?.landingPages?.find(
-      (p) => p.template === templateValue
-    );
-    if (!page) return { status: "NOT_CREATED", label: "Not Created", variant: "secondary" as const };
-    if (page.status === "PUBLISHED") return { status: "PUBLISHED", label: "Published", variant: "default" as const };
-    return { status: "DRAFT", label: "Draft", variant: "outline" as const };
-  };
-
-  const handleEditTemplate = () => {
-    if (selectedTemplate) {
-      router.push(`/workshops/${workshopId}/landing-pages/${selectedTemplate.toLowerCase().replace("_", "-")}`);
+    function statusBadgeVariant(status: string): "default" | "secondary" | "outline" {
+        if (status === "PUBLISHED") return "default";
+        if (status === "DRAFT") return "outline";
+        return "secondary";
     }
-  };
 
-  const selectedTemplateSupportsLibrary = ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION"].includes(selectedTemplate);
-
-  useEffect(() => {
-    async function loadTemplateLibrary() {
-      if (!selectedTemplateSupportsLibrary) {
-        setLibraryItems([]);
-        setSelectedLibraryItemId("");
-        return;
-      }
-
-      try {
+    // Load template library when opening copy panel
+    async function loadLibrary(template: string) {
+        setCopyTarget(template);
         setLibraryLoading(true);
-        setTemplateError(null);
-        setTemplateMessage(null);
-
-        const res = await fetch(`/api/landing-pages/library?template=${selectedTemplate}`);
-        const data = await res.json();
-
-        if (!data.success) {
-          throw new Error(data.error || "Failed to load template library");
+        setCopyMessage(null);
+        setSelectedSourceId("");
+        try {
+            const res = await fetch(`/api/landing-pages/library?template=${template}`);
+            const data = await res.json();
+            setLibraryItems(data.success ? data.data || [] : []);
+        } catch {
+            setLibraryItems([]);
+        } finally {
+            setLibraryLoading(false);
         }
-
-        const items = (data.data || []) as TemplateLibraryItem[];
-        setLibraryItems(items);
-        setSelectedLibraryItemId(items[0]?.id || "");
-      } catch (loadError) {
-        setTemplateError(loadError instanceof Error ? loadError.message : "Failed to load template library");
-      } finally {
-        setLibraryLoading(false);
-      }
     }
 
-    void loadTemplateLibrary();
-  }, [selectedTemplate, selectedTemplateSupportsLibrary]);
+    async function handleCopyTemplate() {
+        if (!copyTarget || !selectedSourceId) return;
+        setCopying(true);
+        setCopyMessage(null);
+        try {
+            const res = await fetch("/api/landing-pages/library", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    targetWorkshopId: workshopId,
+                    targetTemplate: copyTarget,
+                    sourceLandingPageId: selectedSourceId,
+                }),
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || "Copy failed");
 
-  const handleApplyTemplate = async () => {
-    if (!selectedTemplateSupportsLibrary || !selectedLibraryItemId) {
-      return;
+            setCopyMessage("Content copied successfully. You can now edit the page.");
+            // Update local state
+            setWorkshop((prev) => {
+                if (!prev) return prev;
+                const existing = prev.landingPages.find((p) => p.template === copyTarget);
+                if (existing) {
+                    return {
+                        ...prev,
+                        landingPages: prev.landingPages.map((p) =>
+                            p.template === copyTarget ? { ...p, status: "DRAFT" } : p
+                        ),
+                    };
+                }
+                return {
+                    ...prev,
+                    landingPages: [
+                        ...prev.landingPages,
+                        { id: data.data.id, template: copyTarget!, status: "DRAFT", slug: data.data.slug || "" },
+                    ],
+                };
+            });
+        } catch (err) {
+            setCopyMessage(err instanceof Error ? err.message : "Copy failed");
+        } finally {
+            setCopying(false);
+        }
     }
 
-    try {
-      setCopyingTemplate(true);
-      setTemplateError(null);
-      setTemplateMessage(null);
+    const formatDate = (value: string) =>
+        new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-      const res = await fetch("/api/landing-pages/library", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          targetWorkshopId: workshopId,
-          targetTemplate: selectedTemplate,
-          sourceLandingPageId: selectedLibraryItemId,
-        }),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || "Failed to apply template");
-      }
-
-      setTemplateMessage("Template content copied. You can now edit this workshop page.");
-      setWorkshop((prev) => {
-        if (!prev) {
-          return prev;
-        }
-
-        const existing = prev.landingPages.find((page) => page.template === selectedTemplate);
-        if (existing) {
-          return {
-            ...prev,
-            landingPages: prev.landingPages.map((page) =>
-              page.template === selectedTemplate ? { ...page, status: "DRAFT" } : page
-            ),
-          };
-        }
-
-        return {
-          ...prev,
-          landingPages: [
-            ...prev.landingPages,
-            {
-              id: data.data.id,
-              template: selectedTemplate,
-              status: "DRAFT",
-              slug: data.data.slug || "",
-            },
-          ],
-        };
-      });
-    } catch (copyError) {
-      setTemplateError(copyError instanceof Error ? copyError.message : "Failed to apply template");
-    } finally {
-      setCopyingTemplate(false);
+    if (loading) {
+        return <div className="flex items-center justify-center min-h-[400px] text-gray-500">Loading...</div>;
     }
-  };
 
-  const formatDate = (value: string) =>
-    new Date(value).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    );
-  }
-
-  if (error || !workshop) {
-    return (
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error || "Workshop not found"}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
-          <span>/</span>
-          <Link href={`/workshops/${workshopId}`} className="hover:text-gray-700">{workshop.title}</Link>
-          <span>/</span>
-          <span className="text-gray-900">Landing Pages</span>
-        </div>
-        <h1 className="text-2xl font-bold text-gray-900">Landing Page Editor</h1>
-        <p className="text-gray-600">
-          Create and manage landing pages for {workshop.title}
-        </p>
-      </div>
-
-      {/* Workshop Summary Card */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg">Workshop Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-500">Coach:</span>{" "}
-              <span className="font-medium">{workshop.coach.firstName} {workshop.coach.lastName}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Category:</span>{" "}
-              <Badge variant="outline">
-                {workshop.category === "AI" ? "AI Workshop" : "Exit & Valuation"}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Template Selection */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg">Select Template to Edit</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="template">Landing Page Template</Label>
-            <select
-              id="template"
-              value={selectedTemplate}
-              onChange={(e) => setSelectedTemplate(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-            >
-              <option value="">Select a template...</option>
-              {TEMPLATE_OPTIONS.map((option) => {
-                const status = getTemplateStatus(option.value);
-                return (
-                  <option key={option.value} value={option.value}>
-                    {option.icon} {option.label} ({status.label})
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {selectedTemplate && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">
-                  {TEMPLATE_OPTIONS.find((o) => o.value === selectedTemplate)?.icon}
-                </span>
-                <div>
-                  <h3 className="font-medium">
-                    {TEMPLATE_OPTIONS.find((o) => o.value === selectedTemplate)?.label}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    {TEMPLATE_OPTIONS.find((o) => o.value === selectedTemplate)?.description}
-                  </p>
-                  <div className="mt-2">
-                    <Badge variant={getTemplateStatus(selectedTemplate).variant}>
-                      {getTemplateStatus(selectedTemplate).label}
-                    </Badge>
-                  </div>
+    if (error || !workshop) {
+        return (
+            <div className="max-w-4xl mx-auto">
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                    {error || "Workshop not found"}
                 </div>
-              </div>
             </div>
-          )}
+        );
+    }
 
-          {selectedTemplateSupportsLibrary && (
-            <div className="rounded-lg border border-gray-200 p-4 space-y-3">
-              <div>
-                <Label htmlFor="sourceTemplate">Use Existing Page as Template</Label>
-                <select
-                  id="sourceTemplate"
-                  value={selectedLibraryItemId}
-                  onChange={(event) => setSelectedLibraryItemId(event.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                  disabled={libraryLoading || libraryItems.length === 0}
-                >
-                  <option value="">
-                    {libraryLoading ? "Loading templates..." : "Select a template source..."}
-                  </option>
-                  {libraryItems.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.workshopTitle} ({formatDate(item.createdAt)})
-                    </option>
-                  ))}
-                </select>
-              </div>
+    // Determine which templates to show based on active tab
+    function renderTabContent() {
+        if (activeTab === "LANDING") {
+            return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {LANDING_TEMPLATES.map((tpl) => {
+                        const info = getPageStatus(tpl.value);
+                        return (
+                            <Card key={tpl.value} className="hover:shadow-md transition-shadow">
+                                <CardContent className="pt-6">
+                                    <div className="text-center mb-4">
+                                        <span className="text-3xl">{tpl.icon}</span>
+                                        <h3 className="font-semibold mt-2">{tpl.label}</h3>
+                                        <p className="text-sm text-gray-500 mt-1">{tpl.description}</p>
+                                    </div>
 
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!selectedLibraryItemId || copyingTemplate}
-                  onClick={handleApplyTemplate}
-                >
-                  {copyingTemplate ? "Applying..." : "Use Selected Template"}
-                </Button>
-              </div>
+                                    <div className="flex justify-center mb-4">
+                                        <Badge variant={statusBadgeVariant(info.status)}>
+                                            {info.label}
+                                        </Badge>
+                                    </div>
 
-              {templateError ? (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {templateError}
+                                    <div className="space-y-2">
+                                        <Button
+                                            className="w-full"
+                                            onClick={() => router.push(`/workshops/${workshopId}/landing-pages/${tpl.editPath}`)}
+                                        >
+                                            {info.status === "NOT_CREATED" ? "Create Page" : "Edit Page"}
+                                        </Button>
+
+                                        <div className="flex gap-2">
+                                            {info.slug && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="flex-1 text-xs"
+                                                    onClick={() => window.open(`/workshop/${info.slug}`, "_blank")}
+                                                >
+                                                    Preview
+                                                </Button>
+                                            )}
+                                            {["SOLO_LANDING", "DUO_LANDING"].includes(tpl.value) && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="flex-1 text-xs"
+                                                    onClick={() => loadLibrary(tpl.value)}
+                                                >
+                                                    Copy from...
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
                 </div>
-              ) : null}
-              {templateMessage ? (
-                <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-                  {templateMessage}
-                </div>
-              ) : null}
+            );
+        }
 
-              <div className="overflow-x-auto rounded-md border border-gray-200">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Name
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Created Date
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Edit Link
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 bg-white">
-                    {libraryItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={3} className="px-3 py-3 text-sm text-gray-500">
-                          {libraryLoading
-                            ? "Loading pages..."
-                            : "No template pages found yet for this type."}
-                        </td>
-                      </tr>
-                    ) : (
-                      libraryItems.map((item) => (
-                        <tr key={item.id} className={item.id === selectedLibraryItemId ? "bg-blue-50" : ""}>
-                          <td className="px-3 py-2 text-sm text-gray-900">{item.workshopTitle}</td>
-                          <td className="px-3 py-2 text-sm text-gray-700">{formatDate(item.createdAt)}</td>
-                          <td className="px-3 py-2 text-sm">
-                            <Link
-                              href={item.editPath}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline"
-                            >
-                              Edit
-                            </Link>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+        // Registration or Thank You — single page type
+        const template = activeTab === "REGISTRATION" ? "REGISTRATION" : "THANK_YOU";
+        const editPath = activeTab === "REGISTRATION" ? "registration" : "thank-you";
+        const info = getPageStatus(template);
 
-          <div className="flex gap-3">
-            <Button
-              onClick={handleEditTemplate}
-              disabled={!selectedTemplate}
-              className="flex-1"
-            >
-              Edit Template
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/workshops/${workshopId}`)}
-            >
-              Back to Workshop
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* All Templates Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">All Templates</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {TEMPLATE_OPTIONS.map((option) => {
-              const status = getTemplateStatus(option.value);
-              const page = workshop.landingPages?.find(
-                (p) => p.template === option.value
-              );
-              return (
-                <div
-                  key={option.value}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                  onClick={() => setSelectedTemplate(option.value)}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{option.icon}</span>
-                    <div>
-                      <div className="font-medium">{option.label}</div>
-                      <div className="text-sm text-gray-500">{option.description}</div>
+        return (
+            <Card>
+                <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="font-semibold text-lg">
+                                {activeTab === "REGISTRATION" ? "Registration / Payment Page" : "Thank You Page"}
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                                {activeTab === "REGISTRATION"
+                                    ? "The form page visitors see when they click \"Register Here\" on the landing page."
+                                    : "Confirmation page shown after successful registration, with optional video and calendar links."}
+                            </p>
+                            <div className="mt-2">
+                                <Badge variant={statusBadgeVariant(info.status)}>
+                                    {info.label}
+                                </Badge>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            {info.slug && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => window.open(`/workshop/${info.slug}`, "_blank")}
+                                >
+                                    Preview
+                                </Button>
+                            )}
+                            <Button onClick={() => router.push(`/workshops/${workshopId}/landing-pages/${editPath}`)}>
+                                {info.status === "NOT_CREATED" ? "Create Page" : "Edit Page"}
+                            </Button>
+                        </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={status.variant}>{status.label}</Badge>
-                    {page && (
-                      <a
-                        href={`/workshop/${page.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        Preview
-                      </a>
+
+                    {activeTab === "REGISTRATION" && (
+                        <div className="mt-4 pt-4 border-t">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => loadLibrary("REGISTRATION")}
+                            >
+                                Copy content from another workshop...
+                            </Button>
+                        </div>
                     )}
-                  </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <div className="max-w-5xl mx-auto">
+            {/* Breadcrumb */}
+            <div className="mb-6">
+                <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                    <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
+                    <span>/</span>
+                    <Link href={`/workshops/${workshopId}`} className="hover:text-gray-700">{workshop.title}</Link>
+                    <span>/</span>
+                    <span className="text-gray-900">Workshop Editor</span>
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+                <h1 className="text-2xl font-bold text-gray-900">Workshop Editor</h1>
+                <p className="text-gray-600">
+                    Manage pages for <strong>{workshop.title}</strong>
+                    {workshop.workshopCode && <span className="text-gray-400 ml-2">({workshop.workshopCode})</span>}
+                </p>
+            </div>
+
+            {/* Page Type Tabs */}
+            <div className="border-b mb-6">
+                <nav className="flex gap-1">
+                    {PAGE_TABS.map((tab) => (
+                        <button
+                            key={tab.value}
+                            onClick={() => { setActiveTab(tab.value); setCopyTarget(null); setCopyMessage(null); }}
+                            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                                activeTab === tab.value
+                                    ? "border-blue-600 text-blue-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </nav>
+            </div>
+
+            {/* Tab description */}
+            <p className="text-sm text-gray-500 mb-4">
+                {PAGE_TABS.find((t) => t.value === activeTab)?.description}
+            </p>
+
+            {/* Tab Content */}
+            {renderTabContent()}
+
+            {/* Template Library Panel (shown when "Copy from..." is clicked) */}
+            {copyTarget && (
+                <Card className="mt-6">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-base">Copy Content from Existing Page</CardTitle>
+                            <Button variant="ghost" size="sm" onClick={() => { setCopyTarget(null); setCopyMessage(null); }}>
+                                Close
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {libraryLoading ? (
+                            <p className="text-sm text-gray-500">Loading available pages...</p>
+                        ) : libraryItems.length === 0 ? (
+                            <p className="text-sm text-gray-500">No existing pages of this type found to copy from.</p>
+                        ) : (
+                            <>
+                                <select
+                                    value={selectedSourceId}
+                                    onChange={(e) => setSelectedSourceId(e.target.value)}
+                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                >
+                                    <option value="">Select a page to copy from...</option>
+                                    {libraryItems.map((item) => (
+                                        <option key={item.id} value={item.id}>
+                                            {item.workshopTitle} ({formatDate(item.createdAt)})
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <div className="flex items-center gap-3">
+                                    <Button
+                                        onClick={handleCopyTemplate}
+                                        disabled={!selectedSourceId || copying}
+                                        size="sm"
+                                    >
+                                        {copying ? "Copying..." : "Apply Template"}
+                                    </Button>
+                                    <span className="text-xs text-gray-500">
+                                        This copies content as a draft. You can edit it afterward.
+                                    </span>
+                                </div>
+                            </>
+                        )}
+
+                        {copyMessage && (
+                            <div className={`text-sm px-3 py-2 rounded-md border ${
+                                copyMessage.includes("success")
+                                    ? "bg-green-50 border-green-200 text-green-700"
+                                    : "bg-red-50 border-red-200 text-red-700"
+                            }`}>
+                                {copyMessage}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Quick Actions */}
+            <div className="mt-6 flex gap-3">
+                <Button
+                    variant="outline"
+                    onClick={() => router.push(`/workshops/${workshopId}`)}
+                >
+                    Back to Workshop
+                </Button>
+            </div>
+        </div>
+    );
 }

@@ -23,7 +23,7 @@ export function QuickActions({
 
     const handleViewLandingPage = () => {
         if (landingPageSlug && publishedPage) {
-            window.open(`/workshop/${landingPageSlug}`, "_blank");
+            window.open(`${window.location.origin}/workshop/${landingPageSlug}`, "_blank");
         } else {
             // Redirect to editor if not published or no slug
             router.push(`/workshops/${workshopId}/landing-pages`);

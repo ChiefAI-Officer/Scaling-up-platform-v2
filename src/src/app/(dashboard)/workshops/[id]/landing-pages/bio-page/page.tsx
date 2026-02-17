@@ -134,6 +134,34 @@ export default function BioPageEditor() {
     }
   };
 
+  // S3-09: Populate from Circle profile
+  const [circleLoading, setCircleLoading] = useState(false);
+  const handlePopulateFromCircle = async () => {
+    setCircleLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/workshops/${workshopId}/circle-profile`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        const profile = data.data;
+        setFormData((prev) => ({
+          ...prev,
+          coachName: profile.fullName || prev.coachName,
+          coachTitle: profile.title || prev.coachTitle,
+          biography: profile.bio || prev.biography,
+          profileImageUrl: profile.avatarUrl || prev.profileImageUrl,
+        }));
+        setSuccess(true);
+      } else {
+        setError(data.message || "No Circle profile found");
+      }
+    } catch {
+      setError("Failed to fetch Circle profile");
+    } finally {
+      setCircleLoading(false);
+    }
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -170,7 +198,7 @@ export default function BioPageEditor() {
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
           <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
           <span>/</span>
-          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Landing Pages</Link>
+          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Workshop Editor</Link>
           <span>/</span>
           <span className="text-gray-900">Bio Page</span>
         </div>
@@ -194,8 +222,16 @@ export default function BioPageEditor() {
         {/* Editor Panel */}
         <div className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Coach Information</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePopulateFromCircle}
+                disabled={circleLoading}
+              >
+                {circleLoading ? "Loading..." : "Populate from Circle"}
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>

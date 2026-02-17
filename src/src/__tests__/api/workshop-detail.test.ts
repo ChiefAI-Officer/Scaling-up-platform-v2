@@ -144,7 +144,7 @@ describe("Workshop detail API", () => {
       });
       (db.workshop.update as jest.Mock).mockResolvedValue({
         id: "ws-1",
-        status: "CANCELLED",
+        status: "CANCELED",
       });
 
       const response = await DELETE(
@@ -166,7 +166,7 @@ describe("Workshop detail API", () => {
       expect(db.workshop.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "ws-1" },
-          data: { status: "CANCELLED" },
+          data: { status: "CANCELED" },
         })
       );
       expect(body.cancellationFee.charged).toBe(true);

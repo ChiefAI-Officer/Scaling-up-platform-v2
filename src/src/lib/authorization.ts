@@ -256,7 +256,7 @@ export async function getWorkshopLockStatus(workshopId: string): Promise<Worksho
         lockedBy: workshop.lockedBy,
         reason: locked ? (reason || "48h_rule") : null,
         hoursUntilEvent: hoursUntilEvent > 0 ? hoursUntilEvent : null,
-        canRequestEdit: locked && hoursUntilEvent > 0 && workshop.status !== "CANCELLED",
+        canRequestEdit: locked && hoursUntilEvent > 0 && workshop.status !== "CANCELED",
     };
 }
 

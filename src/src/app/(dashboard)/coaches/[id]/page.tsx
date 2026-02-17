@@ -47,7 +47,7 @@ function getWorkshopStatusColor(status: string) {
       return "bg-green-100 text-green-800";
     case "DRAFT":
       return "bg-gray-100 text-gray-800";
-    case "CANCELLED":
+    case "CANCELED":
       return "bg-red-100 text-red-800";
     case "COMPLETED":
       return "bg-blue-100 text-blue-800";
@@ -88,7 +88,7 @@ export default async function CoachDetailPage({
 
   const totalWorkshops = coach.workshops.length;
   const upcomingWorkshops = coach.workshops.filter(
-    (w) => new Date(w.eventDate) > new Date() && w.status !== "CANCELLED"
+    (w) => new Date(w.eventDate) > new Date() && w.status !== "CANCELED"
   ).length;
   const totalRegistrations = coach.workshops.reduce(
     (sum, w) => sum + w._count.registrations,
@@ -288,7 +288,7 @@ export default async function CoachDetailPage({
                             >
                               {workshop.title}
                             </Link>
-                            <p className="text-sm text-gray-500">{workshop.workshopType.name}</p>
+                            <p className="text-sm text-gray-500">{workshop.workshopType?.name}</p>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {formatDate(workshop.eventDate)}
@@ -367,12 +367,12 @@ export default async function CoachDetailPage({
               >
                 Create Workshop
               </Link>
-              <button className="block w-full text-center bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
-                Add Certification
-              </button>
-              <button className="block w-full text-center bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
-                Sync with HubSpot
-              </button>
+              <span className="block w-full text-center bg-gray-50 text-gray-400 px-4 py-2 rounded-lg text-sm cursor-default border border-dashed border-gray-300">
+                Add Certification — Coming Soon
+              </span>
+              <span className="block w-full text-center bg-gray-50 text-gray-400 px-4 py-2 rounded-lg text-sm cursor-default border border-dashed border-gray-300">
+                Sync with HubSpot — Coming Soon
+              </span>
             </CardContent>
           </Card>
         </div>
