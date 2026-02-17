@@ -1,4 +1,3 @@
-// Sprint 2: Figma Alignment - Updated Navigation & Header
 import React from "react";
 import Link from "next/link";
 import { requireCoach } from "@/lib/authorization";
@@ -17,24 +16,20 @@ interface PortalLayoutProps {
     children: React.ReactNode;
 }
 
-/**
- * Coach Portal Layout
- * Main shell with navigation for the coach self-service dashboard.
- */
 export default async function PortalLayout({ children }: PortalLayoutProps) {
     const { session, coach } = await requireCoach();
 
     const coachName = coach.firstName || session.user.name || "Coach";
 
     return (
-        <div className="flex min-h-screen bg-gray-100">
+        <div className="flex min-h-screen bg-background">
             {/* Sidebar — hidden on mobile */}
-            <aside className="hidden md:flex w-64 bg-gray-900 text-white flex-col fixed inset-y-0 left-0 z-50">
-                <div className="px-6 h-16 flex items-center border-b border-gray-800">
-                    <span className="text-xl font-bold tracking-tight">Scaling Up Coach</span>
+            <aside className="hidden md:flex w-64 bg-slate-900 text-white flex-col fixed inset-y-0 left-0 z-50">
+                <div className="px-6 h-16 flex items-center border-b border-slate-800">
+                    <span className="text-lg font-bold tracking-tight">Scaling Up Coach</span>
                 </div>
 
-                <nav className="flex-1 py-6 px-4 space-y-1">
+                <nav className="flex-1 py-6 px-3 space-y-1">
                     <NavLink href="/portal/home" icon={<LayoutDashboard className="w-5 h-5" />}>
                         Dashboard
                     </NavLink>
@@ -55,21 +50,21 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                         90-Day Follow-Up
                     </NavLink>
 
-                    <div className="pt-4 mt-4 border-t border-gray-800">
+                    <div className="pt-4 mt-4 border-t border-slate-800">
                         <NavLink href="/portal/settings" icon={<Settings className="w-5 h-5" />}>
                             Settings
                         </NavLink>
                     </div>
                 </nav>
 
-                <div className="p-4 border-t border-gray-800">
+                <div className="p-4 border-t border-slate-800">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-medium uppercase">
+                        <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-sm font-semibold text-primary-foreground uppercase">
                             {coachName.charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{coachName}</p>
-                            <p className="text-xs text-gray-400 truncate">Coach</p>
+                            <p className="text-xs text-slate-400 truncate">Coach</p>
                         </div>
                     </div>
                 </div>
@@ -77,21 +72,21 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
 
             {/* Main Content */}
             <div className="md:ml-64 flex-1 flex flex-col min-h-screen">
-                <header className="h-16 bg-white border-b border-gray-200 px-4 md:px-8 flex items-center justify-between sticky top-0 z-40 shadow-sm">
+                <header className="h-16 bg-card border-b px-4 md:px-8 flex items-center justify-between sticky top-0 z-40 backdrop-blur-sm bg-card/95">
                     {/* Mobile hamburger */}
                     <CoachMobileNav coachName={coachName} />
 
                     {/* Title on mobile */}
-                    <span className="md:hidden text-lg font-bold text-gray-900">Scaling Up</span>
+                    <span className="md:hidden text-lg font-bold text-foreground">Scaling Up</span>
 
                     {/* Spacer on desktop */}
                     <div className="hidden md:block flex-1" />
 
                     <div className="flex items-center gap-4 md:gap-6">
-                        <div className="h-6 w-px bg-gray-200 hidden md:block"></div>
+                        <div className="h-5 w-px bg-border hidden md:block" />
                         <Link
                             href="/api/auth/signout"
-                            className="text-sm font-medium text-gray-600 hover:text-red-600 transition-colors"
+                            className="text-sm font-medium text-muted-foreground hover:text-destructive transition-colors duration-200"
                         >
                             Sign Out
                         </Link>
@@ -110,14 +105,14 @@ function NavLink({ href, icon, children }: { href: string; icon: React.ReactNode
     return (
         <Link
             href={href}
-            className="flex items-center gap-3 px-4 py-2.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors group"
+            className="flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-lg transition-all duration-200 group"
         >
-            <span className="group-hover:text-white transition-colors">{icon}</span>
-            <span className="font-medium">{children}</span>
+            <span className="group-hover:text-white transition-colors duration-200">{icon}</span>
+            <span className="font-medium text-sm">{children}</span>
         </Link>
     );
 }
 
 function NavSeparator() {
-    return <div className="my-2 border-t border-gray-800/50" />;
+    return <div className="my-3 border-t border-slate-800/50" />;
 }
