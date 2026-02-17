@@ -18,24 +18,21 @@ interface StatusPillProps {
     showDot?: boolean;
 }
 
-const STATUS_CONFIG: Record<WorkshopStatus, { label: string; color: string; dotColor: string; animate?: boolean }> = {
+const STATUS_CONFIG: Record<WorkshopStatus, { label: string; color: string; dotColor: string }> = {
     REQUESTED: {
         label: "Requested",
         color: "bg-amber-50 text-amber-700 border-amber-200",
         dotColor: "bg-amber-400",
-        animate: true,
     },
     AWAITING_APPROVAL: {
         label: "Awaiting Approval",
         color: "bg-blue-50 text-blue-700 border-blue-200",
         dotColor: "bg-blue-400",
-        animate: true,
     },
     PRE_EVENT: {
         label: "Pre-Event",
-        color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-        dotColor: "bg-emerald-500",
-        animate: true,
+        color: "bg-green-50 text-green-700 border-green-200",
+        dotColor: "bg-green-500",
     },
     POST_EVENT: {
         label: "Post-Event",
@@ -44,8 +41,8 @@ const STATUS_CONFIG: Record<WorkshopStatus, { label: string; color: string; dotC
     },
     COMPLETED: {
         label: "Completed",
-        color: "bg-slate-100 text-slate-600 border-slate-200",
-        dotColor: "bg-slate-400",
+        color: "bg-gray-100 text-gray-600 border-gray-200",
+        dotColor: "bg-gray-400",
     },
     CANCELED: {
         label: "Canceled",
@@ -73,11 +70,7 @@ export function StatusPill({ status, className, showDot = true }: StatusPillProp
             )}
         >
             {showDot && (
-                <span className={cn(
-                    "w-1.5 h-1.5 rounded-full",
-                    config.dotColor,
-                    (config as { animate?: boolean }).animate && "animate-pulse"
-                )} />
+                <span className={cn("w-1.5 h-1.5 rounded-full", config.dotColor)} />
             )}
             {config.label}
         </span>

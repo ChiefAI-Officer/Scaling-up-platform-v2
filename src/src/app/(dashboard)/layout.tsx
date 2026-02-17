@@ -3,7 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
-import { Separator } from "@/components/ui/separator";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -31,21 +30,19 @@ export default async function DashboardLayout({
     redirect("/unauthorized");
   }
 
-  const userInitial = (session.user.name || session.user.email || "A").charAt(0).toUpperCase();
-
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gray-100">
       {/* Skip to main content link for accessibility */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg"
       >
         Skip to main content
       </a>
 
       {/* Navigation */}
       <nav
-        className="bg-card border-b sticky top-0 z-40 backdrop-blur-sm bg-card/95"
+        className="bg-white shadow-sm border-b"
         role="navigation"
         aria-label="Main navigation"
       >
@@ -55,19 +52,19 @@ export default async function DashboardLayout({
               <div className="flex-shrink-0 flex items-center">
                 <Link
                   href="/dashboard"
-                  className="text-xl font-bold text-primary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded"
+                  className="text-xl font-bold text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded"
                   aria-label="Scaling Up - Go to Dashboard"
                 >
                   Scaling Up
                 </Link>
               </div>
               {/* Desktop nav */}
-              <div className="hidden md:ml-8 md:flex md:space-x-1" role="menubar">
+              <div className="hidden md:ml-8 md:flex md:space-x-6" role="menubar">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                     role="menuitem"
                   >
                     {link.label}
@@ -75,28 +72,22 @@ export default async function DashboardLayout({
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="hidden sm:inline text-sm text-muted-foreground" aria-label="Logged in user">
+            <div className="flex items-center gap-4">
+              <span className="hidden sm:inline text-sm text-gray-600" aria-label="Logged in user">
                 {session.user.email}
               </span>
-              <Separator orientation="vertical" className="hidden md:block h-5" />
-              <div className="hidden md:flex items-center gap-3">
-                <Link
-                  href="/admin/settings"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
-                >
-                  Settings
-                </Link>
-                <Link
-                  href="/api/auth/signout"
-                  className="text-sm text-destructive hover:text-destructive/80 transition-colors duration-200"
-                >
-                  Sign Out
-                </Link>
-              </div>
-              <div className="hidden md:flex h-8 w-8 rounded-full bg-primary/10 text-primary items-center justify-center text-sm font-semibold">
-                {userInitial}
-              </div>
+              <Link
+                href="/admin/settings"
+                className="hidden md:inline text-sm text-gray-500 hover:text-gray-700"
+              >
+                Settings
+              </Link>
+              <Link
+                href="/api/auth/signout"
+                className="hidden md:inline text-sm text-red-500 hover:text-red-700"
+              >
+                Sign Out
+              </Link>
               {/* Mobile hamburger */}
               <AdminMobileNav links={navLinks} email={session.user.email || ""} />
             </div>
@@ -115,10 +106,10 @@ export default async function DashboardLayout({
       </main>
 
       {/* Footer */}
-      <footer className="bg-card border-t mt-auto" role="contentinfo">
+      <footer className="bg-white border-t mt-auto" role="contentinfo">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <p className="text-xs text-muted-foreground text-center">
-            Scaling Up Workshop Platform v2.0
+          <p className="text-sm text-gray-500 text-center">
+            Scaling Up Workshop Platform v1.0.0
           </p>
         </div>
       </footer>
