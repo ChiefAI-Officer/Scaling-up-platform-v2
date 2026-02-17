@@ -40,28 +40,28 @@ export function ConfirmationModal({
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
                 {/* Close button */}
                 <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute top-4 right-4 rounded-full p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-200 cursor-pointer"
                 >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4" />
                 </button>
 
                 <div className="p-6">
                     {/* Icon & Title */}
                     <div className="flex items-start gap-4">
                         {variant === "destructive" && (
-                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-50 border border-red-200 flex items-center justify-center">
                                 <AlertTriangle className="w-5 h-5 text-red-600" />
                             </div>
                         )}
                         <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-900">
+                            <h3 className="text-lg font-semibold text-foreground">
                                 {title}
                             </h3>
-                            <p className="mt-2 text-sm text-gray-600">
+                            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
                                 {description}
                             </p>
                         </div>

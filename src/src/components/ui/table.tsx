@@ -2,7 +2,7 @@ import * as React from "react";
 
 const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
+    <div className="relative w-full overflow-auto rounded-lg border">
       <table ref={ref} className={`w-full caption-bottom text-sm ${className || ""}`} {...props} />
     </div>
   )
@@ -10,7 +10,7 @@ const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableE
 Table.displayName = "Table";
 
 const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
-  ({ className, ...props }, ref) => <thead ref={ref} className={`[&_tr]:border-b ${className || ""}`} {...props} />
+  ({ className, ...props }, ref) => <thead ref={ref} className={`bg-muted/40 [&_tr]:border-b ${className || ""}`} {...props} />
 );
 TableHeader.displayName = "TableHeader";
 
@@ -28,14 +28,14 @@ TableFooter.displayName = "TableFooter";
 
 const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
   ({ className, ...props }, ref) => (
-    <tr ref={ref} className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${className || ""}`} {...props} />
+    <tr ref={ref} className={`border-b transition-colors duration-150 hover:bg-muted/50 data-[state=selected]:bg-muted ${className || ""}`} {...props} />
   )
 );
 TableRow.displayName = "TableRow";
 
 const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <th ref={ref} className={`h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 ${className || ""}`} {...props} />
+    <th ref={ref} className={`h-11 px-4 text-left align-middle text-xs font-semibold uppercase tracking-wider text-muted-foreground [&:has([role=checkbox])]:pr-0 ${className || ""}`} {...props} />
   )
 );
 TableHead.displayName = "TableHead";
