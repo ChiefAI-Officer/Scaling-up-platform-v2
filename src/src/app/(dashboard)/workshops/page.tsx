@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { WorkshopApprovalActions } from "@/components/workshops/workshop-approval-actions";
 import { AdminWorkshopFilters } from "@/components/workshops/admin-workshop-filters";
+import { FadeUp } from "@/components/ui/animated";
 
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
@@ -90,18 +91,20 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Workshops</h1>
-          <p className="text-gray-600">Manage all workshop events</p>
+      <FadeUp>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Workshops</h1>
+            <p className="text-gray-600">Manage all workshop events</p>
+          </div>
+          <Link
+            href="/workshops/new"
+            className="inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            + New Workshop
+          </Link>
         </div>
-        <Link
-          href="/workshops/new"
-          className="inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          + New Workshop
-        </Link>
-      </div>
+      </FadeUp>
 
       {/* Search & Filter Bar */}
       <Suspense>

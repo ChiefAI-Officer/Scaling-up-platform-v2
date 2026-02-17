@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { getWorkshopStatusColor, getWorkshopStatusLabel, formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 
 const PIPELINE_STAGES = [
   { status: "REQUESTED", icon: "📝" },
@@ -124,97 +125,112 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
-        <div className="flex gap-3">
-          <Link
-            href="/admin/approvals"
-            className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
-          >
-            Review Approvals {pendingApprovals > 0 && `(${pendingApprovals})`}
-          </Link>
-          <Link
-            href="/admin/financials"
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Financial Dashboard
-          </Link>
+      <FadeUp>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
+          <div className="flex gap-3">
+            <Link
+              href="/admin/approvals"
+              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+            >
+              Review Approvals {pendingApprovals > 0 && `(${pendingApprovals})`}
+            </Link>
+            <Link
+              href="/admin/financials"
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Financial Dashboard
+            </Link>
+          </div>
         </div>
-      </div>
+      </FadeUp>
 
       {/* Top-level Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Pending Approvals" value={pendingApprovals} urgent={pendingApprovals > 0} />
-        <StatCard label="Total Workshops" value={totalWorkshops} />
-        <StatCard label="Total Coaches" value={totalCoaches} />
-        <StatCard
-          label="Revenue (Month)"
-          value={formatCurrency(revenueThisMonth._sum.amountPaidCents || 0)}
-          sub={`${registrationsThisMonth} registrations`}
-        />
-      </div>
+      <StaggerContainer className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StaggerItem>
+          <StatCard label="Pending Approvals" value={pendingApprovals} urgent={pendingApprovals > 0} />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard label="Total Workshops" value={totalWorkshops} />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard label="Total Coaches" value={totalCoaches} />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Revenue (Month)"
+            value={formatCurrency(revenueThisMonth._sum.amountPaidCents || 0)}
+            sub={`${registrationsThisMonth} registrations`}
+          />
+        </StaggerItem>
+      </StaggerContainer>
 
       {/* JV-01/02: 6-Stage Pipeline */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">Workshop Pipeline</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {PIPELINE_STAGES.map((stage) => {
-            const count = countsByStatus[stage.status] || 0;
-            return (
-              <Link
-                key={stage.status}
-                href={`/workshops?status=${stage.status}`}
-                className="group rounded-lg border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">{stage.icon}</span>
-                  <Badge className={getWorkshopStatusColor(stage.status)} variant="secondary">
-                    {getWorkshopStatusLabel(stage.status)}
-                  </Badge>
-                </div>
-                <div className="text-3xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                  {count}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {count === 1 ? "workshop" : "workshops"}
-                </div>
-              </Link>
-            );
-          })}
+      <FadeUp delay={0.15}>
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <h3 className="mb-4 text-lg font-semibold text-gray-900">Workshop Pipeline</h3>
+          <StaggerContainer className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {PIPELINE_STAGES.map((stage) => {
+              const count = countsByStatus[stage.status] || 0;
+              return (
+                <StaggerItem key={stage.status}>
+                  <Link
+                    href={`/workshops?status=${stage.status}`}
+                    className="group block rounded-lg border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">{stage.icon}</span>
+                      <Badge className={getWorkshopStatusColor(stage.status)} variant="secondary">
+                        {getWorkshopStatusLabel(stage.status)}
+                      </Badge>
+                    </div>
+                    <div className="text-3xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                      {count}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {count === 1 ? "workshop" : "workshops"}
+                    </div>
+                  </Link>
+                </StaggerItem>
+              );
+            })}
+          </StaggerContainer>
         </div>
-      </div>
+      </FadeUp>
 
       {/* Recent Activity */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <h3 className="mb-3 text-lg font-semibold text-gray-900">Recent Activity</h3>
-        {activities.length === 0 ? (
-          <p className="text-sm text-gray-500">No recent activity found.</p>
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {activities.map((activity) => (
-              <li key={activity.id} className="flex items-start justify-between py-3">
-                <div className="pr-4">
-                  <span
-                    className={`mr-2 inline-flex rounded px-2 py-1 text-xs font-medium ${
-                      activity.type === "APPROVAL"
-                        ? "bg-purple-100 text-purple-700"
-                        : activity.type === "REGISTRATION"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-blue-100 text-blue-700"
-                    }`}
-                  >
-                    {activity.type}
+      <FadeUp delay={0.25}>
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <h3 className="mb-3 text-lg font-semibold text-gray-900">Recent Activity</h3>
+          {activities.length === 0 ? (
+            <p className="text-sm text-gray-500">No recent activity found.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {activities.map((activity) => (
+                <li key={activity.id} className="flex items-start justify-between py-3">
+                  <div className="pr-4">
+                    <span
+                      className={`mr-2 inline-flex rounded px-2 py-1 text-xs font-medium ${
+                        activity.type === "APPROVAL"
+                          ? "bg-purple-100 text-purple-700"
+                          : activity.type === "REGISTRATION"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {activity.type}
+                    </span>
+                    <span className="text-sm text-gray-800">{activity.description}</span>
+                  </div>
+                  <span className="shrink-0 text-xs text-gray-500">
+                    {formatRelativeTime(activity.timestamp)}
                   </span>
-                  <span className="text-sm text-gray-800">{activity.description}</span>
-                </div>
-                <span className="shrink-0 text-xs text-gray-500">
-                  {formatRelativeTime(activity.timestamp)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </FadeUp>
     </div>
   );
 }

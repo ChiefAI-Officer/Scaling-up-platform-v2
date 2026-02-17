@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { requireCoach } from "@/lib/authorization";
 import Link from "next/link";
 import { StatusPill } from "@/components/ui/status-pill";
+import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 
 /**
  * Coach Dashboard - Home Page
@@ -62,116 +63,130 @@ export default async function CoachDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">
-          Welcome Back, {coach.firstName}!
-        </h2>
-        <Link
-          href="/portal/request"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          + Request New Workshop
-        </Link>
-      </div>
-
-      {/* Stats Grid - Sprint 3: Only attendee/count stats, NO revenue */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          label="Upcoming Workshops"
-          value={stats.upcomingWorkshops}
-          color="blue"
-        />
-        <StatCard
-          label="Total Registrations"
-          value={stats.totalRegistrations}
-          color="green"
-        />
-        <StatCard
-          label="Past Workshops"
-          value={stats.pastWorkshops}
-          color="gray"
-        />
-        <StatCard
-          label="Pending Follow-Ups"
-          value={stats.pendingFollowUps}
-          color={stats.pendingFollowUps > 0 ? "orange" : "gray"}
-        />
-      </div>
-
-      {/* Upcoming Workshops */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900">Upcoming Workshops</h3>
-          <Link href="/portal/workshops" className="text-blue-600 hover:text-blue-700 text-sm">
-            View All →
+      <FadeUp>
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-gray-900">
+            Welcome Back, {coach.firstName}!
+          </h2>
+          <Link
+            href="/portal/request"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            + Request New Workshop
           </Link>
         </div>
+      </FadeUp>
 
-        {upcomingWorkshops.length === 0 ? (
-          <div className="px-6 py-12 text-center text-gray-500">
-            <p className="mb-4">No upcoming workshops scheduled.</p>
-            <Link
-              href="/portal/request"
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Request your first workshop →
+      {/* Stats Grid - Sprint 3: Only attendee/count stats, NO revenue */}
+      <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StaggerItem>
+          <StatCard
+            label="Upcoming Workshops"
+            value={stats.upcomingWorkshops}
+            color="blue"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Total Registrations"
+            value={stats.totalRegistrations}
+            color="green"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Past Workshops"
+            value={stats.pastWorkshops}
+            color="gray"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatCard
+            label="Pending Follow-Ups"
+            value={stats.pendingFollowUps}
+            color={stats.pendingFollowUps > 0 ? "orange" : "gray"}
+          />
+        </StaggerItem>
+      </StaggerContainer>
+
+      {/* Upcoming Workshops */}
+      <FadeUp delay={0.15}>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-gray-900">Upcoming Workshops</h3>
+            <Link href="/portal/workshops" className="text-blue-600 hover:text-blue-700 text-sm">
+              View All →
             </Link>
           </div>
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {upcomingWorkshops.map((workshop) => (
-              <li key={workshop.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h4 className="font-medium text-gray-900">{workshop.title}</h4>
-                    <p className="text-sm text-gray-500">
-                      {new Date(workshop.eventDate).toLocaleDateString("en-US", {
-                        weekday: "long",
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                      {workshop.eventTime && ` at ${workshop.eventTime}`}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    {/* Sprint 3: Only show attendee count, NOT revenue */}
-                    <div className="text-lg font-semibold text-blue-600">
-                      {workshop._count.registrations}
-                      <span className="text-sm font-normal text-gray-500 ml-1">
-                        registrations
-                      </span>
+
+          {upcomingWorkshops.length === 0 ? (
+            <div className="px-6 py-12 text-center text-gray-500">
+              <p className="mb-4">No upcoming workshops scheduled.</p>
+              <Link
+                href="/portal/request"
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Request your first workshop →
+              </Link>
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {upcomingWorkshops.map((workshop) => (
+                <li key={workshop.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="font-medium text-gray-900">{workshop.title}</h4>
+                      <p className="text-sm text-gray-500">
+                        {new Date(workshop.eventDate).toLocaleDateString("en-US", {
+                          weekday: "long",
+                          month: "long",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                        {workshop.eventTime && ` at ${workshop.eventTime}`}
+                      </p>
                     </div>
-                    <StatusPill status={workshop.status} />
+                    <div className="text-right">
+                      {/* Sprint 3: Only show attendee count, NOT revenue */}
+                      <div className="text-lg font-semibold text-blue-600">
+                        {workshop._count.registrations}
+                        <span className="text-sm font-normal text-gray-500 ml-1">
+                          registrations
+                        </span>
+                      </div>
+                      <StatusPill status={workshop.status} />
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </FadeUp>
 
       {/* Pending Follow-Ups Alert */}
       {stats.pendingFollowUps > 0 && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">⚠️</span>
-            <div>
-              <p className="font-medium text-orange-800">
-                You have {stats.pendingFollowUps} pending 90-day follow-up report{stats.pendingFollowUps > 1 ? "s" : ""}.
-              </p>
-              <p className="text-sm text-orange-600">
-                Please submit your follow-up reports to maintain your certification status.
-              </p>
+        <FadeUp delay={0.25}>
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <p className="font-medium text-orange-800">
+                  You have {stats.pendingFollowUps} pending 90-day follow-up report{stats.pendingFollowUps > 1 ? "s" : ""}.
+                </p>
+                <p className="text-sm text-orange-600">
+                  Please submit your follow-up reports to maintain your certification status.
+                </p>
+              </div>
             </div>
+            <Link
+              href="/portal/follow-up"
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors whitespace-nowrap"
+            >
+              Submit Reports
+            </Link>
           </div>
-          <Link
-            href="/portal/follow-up"
-            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors whitespace-nowrap"
-          >
-            Submit Reports
-          </Link>
-        </div>
+        </FadeUp>
       )}
     </div>
   );
