@@ -195,8 +195,8 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Registrations</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-foreground">Registrations</h1>
+          <p className="text-sm text-muted-foreground">
             View and export attendee data for your workshops.
           </p>
         </div>
@@ -224,7 +224,7 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
       <div className="flex flex-col gap-2 sm:max-w-sm">
         <label
           htmlFor="workshopFilter"
-          className="text-sm font-medium text-gray-700"
+          className="text-sm font-medium text-foreground"
         >
           Filter by workshop
         </label>
@@ -232,7 +232,7 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
           id="workshopFilter"
           value={selectedWorkshopId}
           onChange={(event) => setSelectedWorkshopId(event.target.value)}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-md border border-border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="all">All workshops</option>
           {workshops.map((workshop) => (
@@ -243,7 +243,7 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
         </select>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white">
+      <div className="rounded-xl border border-border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -257,7 +257,7 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
           <TableBody>
             {filteredRegistrations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-gray-500">
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                   No registrations found for this filter.
                 </TableCell>
               </TableRow>
@@ -265,19 +265,19 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
               filteredRegistrations.map((registration) => (
                 <TableRow key={registration.id}>
                   <TableCell>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-foreground">
                       {registration.firstName} {registration.lastName}
                     </div>
-                    <div className="text-sm text-gray-500">{registration.email}</div>
+                    <div className="text-sm text-muted-foreground">{registration.email}</div>
                     {registration.company && (
-                      <div className="text-sm text-gray-500">{registration.company}</div>
+                      <div className="text-sm text-muted-foreground">{registration.company}</div>
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-foreground">
                       {registration.workshopTitle}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-muted-foreground">
                       {formatDate(registration.workshopDate)}
                     </div>
                   </TableCell>

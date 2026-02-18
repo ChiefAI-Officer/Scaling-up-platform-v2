@@ -60,7 +60,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                         <li>
                             <Link 
                                 href="/admin/dashboard"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                                className="block px-6 py-3 text-white/80 hover:bg-card/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
                             >
                                 📊 Dashboard
                             </Link>
@@ -68,7 +68,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                         <li>
                             <Link 
                                 href="/admin/approvals"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                                className="block px-6 py-3 text-white/80 hover:bg-card/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
                             >
                                 ✅ Approvals
                                 {pendingCount > 0 && (
@@ -81,7 +81,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                         <li>
                             <Link
                                 href="/admin/categories"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                                className="block px-6 py-3 text-white/80 hover:bg-card/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
                             >
                                 🏷️ Categories
                             </Link>
@@ -89,7 +89,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                         <li>
                             <Link
                                 href="/admin/pricing"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                                className="block px-6 py-3 text-white/80 hover:bg-card/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
                             >
                                 💰 Pricing Tiers
                             </Link>
@@ -97,7 +97,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                         <li>
                             <Link
                                 href="/admin/financials"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                                className="block px-6 py-3 text-white/80 hover:bg-card/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
                             >
                                 💵 Financials
                             </Link>
@@ -105,7 +105,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                         <li>
                             <Link
                                 href="/dashboard"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                                className="block px-6 py-3 text-white/80 hover:bg-card/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
                             >
                                 🧭 Operations Dashboard
                             </Link>
@@ -113,7 +113,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
                         <li>
                             <Link
                                 href="/admin/settings"
-                                className="block px-6 py-3 text-white/80 hover:bg-white/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
+                                className="block px-6 py-3 text-white/80 hover:bg-card/10 hover:text-white hover:border-l-[3px] hover:border-purple-400 transition-all"
                             >
                                 🔐 Settings
                             </Link>
@@ -123,8 +123,8 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
             </aside>
 
             {/* Main Content */}
-            <div className="flex-1 bg-purple-50">
-                <header className="bg-white px-8 py-4 border-b border-gray-200 flex justify-between items-center">
+            <div className="flex-1 bg-background">
+                <header className="bg-card px-8 py-4 border-b border-border flex justify-between items-center">
                     <h1 className="text-xl font-semibold">Scaling Up Admin</h1>
                     <div className="flex items-center gap-3">
                         <ThemeToggle />

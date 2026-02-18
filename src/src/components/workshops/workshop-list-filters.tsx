@@ -54,13 +54,13 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
             {/* Filters & Search */}
             <div className="flex gap-4 mb-6">
                 <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
                         type="text"
                         placeholder="Search workshops..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                 </div>
                 <button
@@ -68,7 +68,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                     className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${
                         showFilters || statusFilter
                             ? "border-blue-500 text-blue-600 bg-blue-50"
-                            : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                            : "border-border text-foreground hover:bg-accent"
                     }`}
                 >
                     <SlidersHorizontal className="w-4 h-4" /> Filters
@@ -76,7 +76,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                 {hasActiveFilters && (
                     <button
                         onClick={() => { setSearch(""); setStatusFilter(""); }}
-                        className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+                        className="flex items-center gap-1 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
                     >
                         <X className="w-4 h-4" /> Clear
                     </button>
@@ -85,13 +85,13 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
 
             {/* Filter Panel */}
             {showFilters && (
-                <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="mb-4 p-4 bg-muted rounded-lg border border-border">
                     <div className="flex items-center gap-4">
-                        <label className="text-sm font-medium text-gray-700">Status:</label>
+                        <label className="text-sm font-medium text-foreground">Status:</label>
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="px-3 py-1.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
                             {STATUS_OPTIONS.map((opt) => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -103,28 +103,28 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
 
             {/* Results count */}
             {hasActiveFilters && (
-                <p className="text-sm text-gray-500 mb-3">
+                <p className="text-sm text-muted-foreground mb-3">
                     Showing {filtered.length} of {workshops.length} workshops
                 </p>
             )}
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
                 <table className="w-full text-left border-collapse">
                     <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Workshop</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Registrations</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Validated</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Approved</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                        <tr className="bg-muted border-b border-border">
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Workshop</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Registrations</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Validated</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Approved</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {filtered.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                                <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
                                     {hasActiveFilters
                                         ? "No workshops match your search."
                                         : "No workshops found. Request your first one above!"}
@@ -136,20 +136,20 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                                 const isApproved = ["PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(workshop.status);
 
                                 return (
-                                    <tr key={workshop.id} className="hover:bg-gray-50 transition-colors">
+                                    <tr key={workshop.id} className="hover:bg-accent transition-colors">
                                         <td className="px-6 py-4">
-                                            <div className="font-medium text-gray-900">{workshop.title}</div>
-                                            <div className="text-sm text-gray-500">
+                                            <div className="font-medium text-foreground">{workshop.title}</div>
+                                            <div className="text-sm text-muted-foreground">
                                                 {workshop.workshopCode && <span className="font-mono mr-2">{workshop.workshopCode}</span>}
                                                 {workshop.workshopType?.name}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">
+                                        <td className="px-6 py-4 text-sm text-muted-foreground">
                                             {new Date(workshop.eventDate).toLocaleDateString()}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-medium">{workshop._count.registrations}</div>
-                                            <div className="text-xs text-gray-400">of {workshop.maxAttendees} max</div>
+                                            <div className="text-xs text-muted-foreground">of {workshop.maxAttendees} max</div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             {isValidated ? (

@@ -96,8 +96,8 @@ export default function NewCoachPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Add New Coach</h1>
-        <p className="text-gray-600">Register a new coach in the system</p>
+        <h1 className="text-2xl font-bold text-foreground">Add New Coach</h1>
+        <p className="text-muted-foreground">Register a new coach in the system</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -199,7 +199,7 @@ export default function NewCoachPage() {
                 value={formData.bio}
                 onChange={handleChange}
                 rows={4}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                 placeholder="Brief biography and coaching experience..."
               />
             </div>

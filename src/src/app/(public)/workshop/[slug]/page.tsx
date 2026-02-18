@@ -253,36 +253,36 @@ function DefaultWorkshopTemplate({ workshop }: { workshop: WorkshopFallbackData 
       }).format(effectivePriceCents / 100);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
+    <div className="min-h-screen bg-muted py-10 px-4">
       <div className="max-w-5xl mx-auto grid gap-8 lg:grid-cols-3">
-        <section className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-8 space-y-6">
+        <section className="lg:col-span-2 bg-card rounded-xl shadow-sm border border-border p-8 space-y-6">
           <p className="text-sm font-semibold tracking-wide text-blue-600 uppercase">Workshop</p>
-          <h1 className="text-3xl font-bold text-gray-900">{workshop.title}</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-foreground">{workshop.title}</h1>
+          <p className="text-muted-foreground">
             {"Join this workshop to learn practical frameworks you can apply immediately."}
           </p>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Date</p>
-              <p className="mt-1 text-sm text-gray-900">{eventDate}</p>
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</p>
+              <p className="mt-1 text-sm text-foreground">{eventDate}</p>
             </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Time</p>
-              <p className="mt-1 text-sm text-gray-900">
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time</p>
+              <p className="mt-1 text-sm text-foreground">
                 {workshop.eventTime || "TBD"} {workshop.timezone}
               </p>
             </div>
-            <div className="sm:col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Location</p>
-              <p className="mt-1 text-sm text-gray-900">{locationLabel || "Location to be announced"}</p>
+            <div className="sm:col-span-2 rounded-lg border border-border bg-muted p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Location</p>
+              <p className="mt-1 text-sm text-foreground">{locationLabel || "Location to be announced"}</p>
             </div>
           </div>
         </section>
 
-        <aside className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900">Register</h2>
-          <p className="mt-2 text-sm text-gray-500">
+        <aside className="bg-card rounded-xl shadow-sm border border-border p-6">
+          <h2 className="text-xl font-semibold text-foreground">Register</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
             Hosted by {workshop.coach.firstName} {workshop.coach.lastName}
           </p>
           <p className="mt-4 text-2xl font-bold text-blue-700">{priceLabel}</p>
@@ -305,7 +305,7 @@ function BioPageTemplate({ content }: { content: BioContent }) {
   const ctaText = content.ctaButtonText || "Book a Call";
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-card">
       <div className="max-w-2xl mx-auto px-4 py-12 text-center">
         <div className="text-purple-700 font-bold text-xl tracking-wider mb-12">
           SCALING UP COACHES
@@ -319,10 +319,10 @@ function BioPageTemplate({ content }: { content: BioContent }) {
           />
         )}
 
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">{name}</h1>
-        <p className="text-gray-600 mb-8">{title}</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">{name}</h1>
+        <p className="text-muted-foreground mb-8">{title}</p>
 
-        <div className="text-left text-gray-700 space-y-4 mb-10">
+        <div className="text-left text-foreground space-y-4 mb-10">
           {bio.split("\n\n").map((para, i) => (
             <p key={i}>{para}</p>
           ))}
@@ -337,7 +337,7 @@ function BioPageTemplate({ content }: { content: BioContent }) {
           </a>
         )}
 
-        <div className="mt-16 pt-8 border-t text-gray-500 text-sm">
+        <div className="mt-16 pt-8 border-t text-muted-foreground text-sm">
           © {new Date().getFullYear()} Scaling Up Coach {name.split(" ")[0]}
         </div>
       </div>
@@ -366,7 +366,7 @@ function SoloLandingTemplate({ content, workshop }: { content: SoloContent; work
   const ctaText = content.ctaText || "Register";
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-card">
       <section className="bg-gradient-to-br from-purple-700 to-purple-900 text-white py-16 px-4">
         <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8 items-center">
           <div>
@@ -409,7 +409,7 @@ function SoloLandingTemplate({ content, workshop }: { content: SoloContent; work
                   <img
                     src={partnerLogoUrl}
                     alt={partnerName || "Partner"}
-                    className="mx-auto h-12 w-auto rounded bg-white p-1 object-contain"
+                    className="mx-auto h-12 w-auto rounded bg-card p-1 object-contain"
                   />
                 ) : null}
                 {partnerName ? <div className="mt-2 text-sm font-semibold">{partnerName}</div> : null}
@@ -423,7 +423,7 @@ function SoloLandingTemplate({ content, workshop }: { content: SoloContent; work
       <main className="max-w-5xl mx-auto py-16 px-4 grid md:grid-cols-3 gap-12">
         <div className="md:col-span-2">
           <h2 className="text-3xl font-bold mb-6">{aboutTitle}</h2>
-          <p className="text-gray-600 mb-8">{aboutDescription}</p>
+          <p className="text-muted-foreground mb-8">{aboutDescription}</p>
 
           {videoUrl && (
             <div className="mb-8 rounded-xl overflow-hidden shadow-lg">
@@ -436,14 +436,14 @@ function SoloLandingTemplate({ content, workshop }: { content: SoloContent; work
             {benefits.map((benefit, i) => (
               <li key={i} className="flex items-start gap-3">
                 <span className="text-blue-500 font-bold">✓</span>
-                <span className="text-gray-700">{benefit}</span>
+                <span className="text-foreground">{benefit}</span>
               </li>
             ))}
           </ul>
         </div>
 
         <div className="md:sticky md:top-8">
-          <div className="bg-white border rounded-xl shadow-lg overflow-hidden">
+          <div className="bg-card border rounded-xl shadow-lg overflow-hidden">
             <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4">
               <h3 className="font-semibold uppercase text-sm">Register Now</h3>
             </div>
@@ -466,8 +466,8 @@ function SoloLandingTemplate({ content, workshop }: { content: SoloContent; work
         </div>
       </main>
 
-      <section className="bg-gray-100 py-12 px-4 text-center">
-        <p className="max-w-2xl mx-auto text-gray-600 italic">
+      <section className="bg-muted py-12 px-4 text-center">
+        <p className="max-w-2xl mx-auto text-muted-foreground italic">
           <strong>Secure your spot today</strong> and take the next step toward building a stronger, more valuable business.
         </p>
       </section>
@@ -492,11 +492,11 @@ function DuoLandingTemplate({ content, workshop }: { content: DuoContent; worksh
   const ctaText = content.ctaText || "Register";
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-card">
       <section className="bg-gradient-to-br from-purple-700 via-purple-600 to-blue-600 text-white py-16 px-4">
         <div className="max-w-5xl mx-auto grid md:grid-cols-5 gap-8 items-center">
           <div className="md:col-span-3">
-            <span className="bg-white/20 text-sm px-4 py-1 rounded-full">Scaling Up</span>
+            <span className="bg-card/20 text-sm px-4 py-1 rounded-full">Scaling Up</span>
             <h1 className="text-4xl font-bold mt-4 mb-3">{heroTitle}</h1>
             <p className="text-purple-200 text-lg mb-6">{subtitle}</p>
             <div className="space-y-2">
@@ -522,14 +522,14 @@ function DuoLandingTemplate({ content, workshop }: { content: DuoContent; worksh
       </section>
 
       <main className="max-w-4xl mx-auto py-16 px-4">
-        <p className="text-gray-600 text-lg mb-12">{description}</p>
+        <p className="text-muted-foreground text-lg mb-12">{description}</p>
 
         <div className="grid md:grid-cols-2 gap-8 mb-12">
           <div>
             <h3 className="font-bold text-green-700 mb-4">What This Workshop Is ✓</h3>
             <ul className="space-y-2">
               {whatItIs.map((item, i) => (
-                <li key={i} className="flex items-center gap-2 text-gray-700">
+                <li key={i} className="flex items-center gap-2 text-foreground">
                   <span className="text-green-500">✓</span> {item}
                 </li>
               ))}
@@ -539,7 +539,7 @@ function DuoLandingTemplate({ content, workshop }: { content: DuoContent; worksh
             <h3 className="font-bold text-red-700 mb-4">What This Workshop Is Not ✗</h3>
             <ul className="space-y-2">
               {whatItIsNot.map((item, i) => (
-                <li key={i} className="flex items-center gap-2 text-gray-700">
+                <li key={i} className="flex items-center gap-2 text-foreground">
                   <span className="text-red-500">✗</span> {item}
                 </li>
               ))}
@@ -548,11 +548,11 @@ function DuoLandingTemplate({ content, workshop }: { content: DuoContent; worksh
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 mb-12">
-          <div className="bg-gray-50 p-6 rounded-lg">
+          <div className="bg-muted p-6 rounded-lg">
             <h3 className="font-bold mb-4">Who This Workshop Is For</h3>
             <ul className="space-y-2">
               {whoIsFor.map((item, i) => (
-                <li key={i} className="text-gray-700">• {item}</li>
+                <li key={i} className="text-foreground">• {item}</li>
               ))}
             </ul>
           </div>
@@ -560,7 +560,7 @@ function DuoLandingTemplate({ content, workshop }: { content: DuoContent; worksh
             <h3 className="font-bold mb-4">Who Should Skip This</h3>
             <ul className="space-y-2">
               {whoShouldSkip.map((item, i) => (
-                <li key={i} className="text-gray-700">• {item}</li>
+                <li key={i} className="text-foreground">• {item}</li>
               ))}
             </ul>
           </div>
@@ -578,11 +578,11 @@ function DuoLandingTemplate({ content, workshop }: { content: DuoContent; worksh
           >
             {ctaText}
           </a>
-          <p className="text-gray-500 mt-3">{workshop.isFree ? "Free" : "$299"}</p>
+          <p className="text-muted-foreground mt-3">{workshop.isFree ? "Free" : "$299"}</p>
         </div>
       </main>
 
-      <footer className="text-center py-8 text-gray-500">
+      <footer className="text-center py-8 text-muted-foreground">
         © {new Date().getFullYear()} Scaling Up. All rights reserved.
       </footer>
     </div>
@@ -627,7 +627,7 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
         <p className="text-purple-200">{heroDescription}</p>
       </div>
 
-      <div className="bg-white p-12 flex items-center justify-center">
+      <div className="bg-card p-12 flex items-center justify-center">
         <div className="w-full max-w-md">
           <div className="border rounded-xl shadow-lg overflow-hidden">
             <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4">
@@ -636,7 +636,7 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
             </div>
             <form className="p-6 space-y-4" action={`/api/workshops/${workshop.id}/register`} method="POST">
               <div className="space-y-2">
-                <label htmlFor="registrationEmail" className="text-sm font-medium text-gray-700">
+                <label htmlFor="registrationEmail" className="text-sm font-medium text-foreground">
                   Email
                 </label>
                 <input
@@ -651,7 +651,7 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <label htmlFor="registrationFirstName" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="registrationFirstName" className="text-sm font-medium text-foreground">
                     First Name
                   </label>
                   <input
@@ -664,7 +664,7 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
                   />
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="registrationLastName" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="registrationLastName" className="text-sm font-medium text-foreground">
                     Last Name
                   </label>
                   <input
@@ -678,12 +678,12 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
                 </div>
               </div>
 
-              <label htmlFor="registrationOptIn" className="flex items-start gap-2 text-sm text-gray-600">
+              <label htmlFor="registrationOptIn" className="flex items-start gap-2 text-sm text-muted-foreground">
                 <input id="registrationOptIn" type="checkbox" name="optIn" defaultChecked className="mt-1 rounded" />
                 <span>{optInText}</span>
               </label>
               <div className="space-y-2">
-                <label htmlFor="registrationCompany" className="text-sm font-medium text-gray-700">
+                <label htmlFor="registrationCompany" className="text-sm font-medium text-foreground">
                   Company
                 </label>
                 <input
@@ -697,7 +697,7 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
               <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition">
                 {submitButtonText}
               </button>
-              <p className="text-center text-gray-400 text-xs">{privacyText}</p>
+              <p className="text-center text-muted-foreground text-xs">{privacyText}</p>
             </form>
           </div>
         </div>
@@ -766,14 +766,14 @@ function ThankYouTemplate({ content, workshop }: { content: ThankYouContent; wor
             })}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-white/20 text-white px-4 py-2 rounded hover:bg-white/30 transition"
+            className="bg-card/20 text-white px-4 py-2 rounded hover:bg-card/30 transition"
           >
             Add to Google Calendar
           </a>
           <a
             href={`/api/workshops/${workshop.id}/ics`}
             download
-            className="bg-white/20 text-white px-4 py-2 rounded hover:bg-white/30 transition"
+            className="bg-card/20 text-white px-4 py-2 rounded hover:bg-card/30 transition"
           >
             Download .ics (Outlook)
           </a>

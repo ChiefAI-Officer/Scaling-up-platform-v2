@@ -94,8 +94,8 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
       <FadeUp>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Workshops</h1>
-            <p className="text-gray-600">Manage all workshop events</p>
+            <h1 className="text-2xl font-bold text-foreground">Workshops</h1>
+            <p className="text-muted-foreground">Manage all workshop events</p>
           </div>
           <Link
             href="/workshops/new"
@@ -111,45 +111,45 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
         <AdminWorkshopFilters />
       </Suspense>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div className="bg-card rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Code
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Workshop
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Coach
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Submit Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Start Date
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Start Time
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Cost
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Landing URL
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Actions
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Registrations
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Format
                 </th>
                 <th className="px-4 py-3">
@@ -157,10 +157,10 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-card divide-y divide-border">
               {workshops.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={13} className="px-6 py-12 text-center text-muted-foreground">
                     {search || status ? (
                       <>No workshops match your filters.</>
                     ) : (
@@ -175,8 +175,8 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                 </tr>
               ) : (
                 workshops.map((workshop) => (
-                  <tr key={workshop.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4 text-sm font-mono text-gray-600">
+                  <tr key={workshop.id} className="hover:bg-accent">
+                    <td className="px-4 py-4 text-sm font-mono text-muted-foreground">
                       {workshop.workshopCode || "—"}
                     </td>
                     <td className="px-4 py-4">
@@ -186,28 +186,28 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                       >
                         {workshop.title}
                       </Link>
-                      <p className="text-sm text-gray-500">{workshop.workshopType?.name}</p>
+                      <p className="text-sm text-muted-foreground">{workshop.workshopType?.name}</p>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-900">
+                    <td className="px-4 py-4 text-sm text-foreground">
                       {workshop.coach.firstName} {workshop.coach.lastName}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-900">
+                    <td className="px-4 py-4 text-sm text-foreground">
                       {formatDate(workshop.createdAt)}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-900">
+                    <td className="px-4 py-4 text-sm text-foreground">
                       {formatDate(workshop.eventDate)}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-900">
+                    <td className="px-4 py-4 text-sm text-foreground">
                       {formatStartTime(workshop.eventTime)}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-900">
+                    <td className="px-4 py-4 text-sm text-foreground">
                       {costLabel(workshop)}
                     </td>
                     <td className="px-4 py-4 text-sm">
                       {workshop.landingPageSlug ? (
                         <CopyUrlButton url={`${APP_URL}/workshop/${workshop.landingPageSlug}`} />
                       ) : (
-                        <span className="text-gray-400">Not published</span>
+                        <span className="text-muted-foreground">Not published</span>
                       )}
                     </td>
                     <td className="px-4 py-4">
@@ -222,10 +222,10 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                           workshopTitle={workshop.title}
                         />
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-900">
+                    <td className="px-4 py-4 text-sm text-foreground">
                       <Link
                         href={`/workshops/${workshop.id}#registrations`}
                         className="text-blue-600 hover:text-blue-800 hover:underline"
@@ -233,13 +233,13 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                         {workshop._count.registrations} / {workshop.maxAttendees}
                       </Link>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-900">
+                    <td className="px-4 py-4 text-sm text-foreground">
                       {formatWorkshopMode(workshop.format)}
                     </td>
                     <td className="px-4 py-4 text-right text-sm">
                       <Link
                         href={`/workshops/${workshop.id}/landing-pages`}
-                        className="text-gray-500 hover:text-blue-600 font-medium"
+                        className="text-muted-foreground hover:text-blue-600 font-medium"
                       >
                         Edit
                       </Link>

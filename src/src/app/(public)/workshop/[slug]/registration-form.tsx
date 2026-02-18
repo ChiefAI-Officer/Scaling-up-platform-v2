@@ -187,7 +187,7 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
         )}
       </Button>
 
-      <p className="text-xs text-gray-500 text-center">
+      <p className="text-xs text-muted-foreground text-center">
         By registering, you agree to receive communications about this workshop.
       </p>
     </form>

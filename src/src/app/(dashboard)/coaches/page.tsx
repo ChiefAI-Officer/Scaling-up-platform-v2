@@ -31,9 +31,9 @@ function getCertificationStatusColor(status: string) {
     case "EXPIRED":
       return "bg-red-100 text-red-800";
     case "SUSPENDED":
-      return "bg-gray-100 text-gray-800";
+      return "bg-muted text-foreground";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-muted text-foreground";
   }
 }
 
@@ -48,7 +48,7 @@ function getPaymentStatusColor(status: string) {
     case "GRACE_PERIOD":
       return "bg-orange-100 text-orange-800";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-muted text-foreground";
   }
 }
 
@@ -60,8 +60,8 @@ export default async function CoachesPage() {
       <FadeUp>
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Coaches</h1>
-            <p className="text-gray-600">Manage certified coaches</p>
+            <h1 className="text-2xl font-bold text-foreground">Coaches</h1>
+            <p className="text-muted-foreground">Manage certified coaches</p>
           </div>
           <Link
             href="/coaches/new"
@@ -77,7 +77,7 @@ export default async function CoachesPage() {
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Total Coaches</p>
+              <p className="text-sm text-muted-foreground">Total Coaches</p>
               <p className="text-2xl font-bold">{coaches.length}</p>
             </CardContent>
           </Card>
@@ -85,7 +85,7 @@ export default async function CoachesPage() {
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Active</p>
+              <p className="text-sm text-muted-foreground">Active</p>
               <p className="text-2xl font-bold text-green-600">
                 {coaches.filter((c) => c.certificationStatus === "ACTIVE").length}
               </p>
@@ -95,7 +95,7 @@ export default async function CoachesPage() {
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Pending</p>
+              <p className="text-sm text-muted-foreground">Pending</p>
               <p className="text-2xl font-bold text-yellow-600">
                 {coaches.filter((c) => c.certificationStatus === "PENDING").length}
               </p>
@@ -105,7 +105,7 @@ export default async function CoachesPage() {
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Payment Overdue</p>
+              <p className="text-sm text-muted-foreground">Payment Overdue</p>
               <p className="text-2xl font-bold text-red-600">
                 {coaches.filter((c) => c.paymentStatus === "OVERDUE").length}
               </p>
@@ -122,7 +122,7 @@ export default async function CoachesPage() {
         </CardHeader>
         <CardContent>
           {coaches.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-muted-foreground text-center py-8">
               No coaches yet.{" "}
               <Link href="/coaches/new" className="text-blue-600 hover:underline">
                 Add your first coach
@@ -130,29 +130,29 @@ export default async function CoachesPage() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                       Coach
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                       Certification
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                       Payment
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                       Certifications
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                       Workshops
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {coaches.map((coach) => (
-                    <tr key={coach.id} className="hover:bg-gray-50">
+                    <tr key={coach.id} className="hover:bg-accent">
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -164,11 +164,11 @@ export default async function CoachesPage() {
                           <div>
                             <Link
                               href={`/coaches/${coach.id}`}
-                              className="font-medium text-gray-900 hover:text-blue-600"
+                              className="font-medium text-foreground hover:text-blue-600"
                             >
                               {coach.firstName} {coach.lastName}
                             </Link>
-                            <p className="text-sm text-gray-500">{coach.email}</p>
+                            <p className="text-sm text-muted-foreground">{coach.email}</p>
                           </div>
                         </div>
                       </td>
@@ -193,7 +193,7 @@ export default async function CoachesPage() {
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap gap-1">
                           {coach.certifications.length === 0 ? (
-                            <span className="text-gray-400 text-sm">None</span>
+                            <span className="text-muted-foreground text-sm">None</span>
                           ) : (
                             coach.certifications.map((cert) => (
                               <Badge
@@ -207,7 +207,7 @@ export default async function CoachesPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">
+                      <td className="px-4 py-4 text-sm text-muted-foreground">
                         {coach._count.workshops}
                       </td>
                     </tr>

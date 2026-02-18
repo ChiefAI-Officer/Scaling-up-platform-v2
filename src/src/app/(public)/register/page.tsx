@@ -102,7 +102,7 @@ export default function CoachRegistrationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-12">
+    <div className="min-h-screen bg-muted px-4 py-12">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -205,7 +205,7 @@ export default function CoachRegistrationPage() {
                 />
               </div>
 
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-muted-foreground">
                 Password must be at least 12 characters and include upper/lowercase
                 letters, a number, and a special character.
               </p>
@@ -215,7 +215,7 @@ export default function CoachRegistrationPage() {
               </Button>
             </form>
 
-            <p className="mt-4 text-center text-sm text-gray-600">
+            <p className="mt-4 text-center text-sm text-muted-foreground">
               Already have an account?{" "}
               <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
                 Sign in

@@ -39,8 +39,8 @@ export default async function SurveyTemplateEditorPage({
 
     if (!template) {
       return (
-        <div className="rounded-lg bg-white p-12 text-center shadow">
-          <h2 className="text-lg font-medium text-gray-900">Template not found</h2>
+        <div className="rounded-lg bg-card p-12 text-center shadow">
+          <h2 className="text-lg font-medium text-foreground">Template not found</h2>
         </div>
       );
     }

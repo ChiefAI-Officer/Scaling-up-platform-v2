@@ -117,7 +117,7 @@ export function CoachResourcesPage() {
     const draftResources = coachResources.filter(r => r.status === 'Draft');
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-muted">
             {/* Header */}
             <header className="bg-gradient-to-r from-purple-800 to-blue-600 text-white py-12 px-6">
                 <div className="max-w-4xl mx-auto">
@@ -133,25 +133,25 @@ export function CoachResourcesPage() {
                 {/* Additional Resources Section */}
                 <section className="mb-10">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-semibold text-gray-800">
+                        <h2 className="text-xl font-semibold text-foreground">
                             📚 Additional Resources
                         </h2>
-                        <span className="text-sm text-gray-500">
+                        <span className="text-sm text-muted-foreground">
                             {publishedResources.length} available resources
                         </span>
                     </div>
 
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden">
                         {publishedResources.map((resource, index) => (
                             <div
                                 key={resource.id}
-                                className={`flex items-center justify-between p-4 hover:bg-gray-50 transition-colors ${index !== publishedResources.length - 1 ? 'border-b border-gray-100' : ''
+                                className={`flex items-center justify-between p-4 hover:bg-accent transition-colors ${index !== publishedResources.length - 1 ? 'border-b border-border' : ''
                                     }`}
                             >
                                 <div className="flex items-center gap-4">
                                     <span className="text-2xl">{getTypeIcon(resource.type)}</span>
                                     <div>
-                                        <h3 className="font-medium text-gray-900">
+                                        <h3 className="font-medium text-foreground">
                                             {resource.link ? (
                                                 <a
                                                     href={resource.link}
@@ -163,7 +163,7 @@ export function CoachResourcesPage() {
                                                 resource.title
                                             )}
                                         </h3>
-                                        <p className="text-sm text-gray-500">{resource.description}</p>
+                                        <p className="text-sm text-muted-foreground">{resource.description}</p>
                                     </div>
                                 </div>
                                 <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
@@ -177,10 +177,10 @@ export function CoachResourcesPage() {
                 {/* Draft Resources */}
                 {draftResources.length > 0 && (
                     <section className="mb-10">
-                        <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                        <h2 className="text-xl font-semibold text-foreground mb-4">
                             🚧 Coming Soon
                         </h2>
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden opacity-75">
+                        <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden opacity-75">
                             {draftResources.map((resource) => (
                                 <div
                                     key={resource.id}
@@ -189,8 +189,8 @@ export function CoachResourcesPage() {
                                     <div className="flex items-center gap-4">
                                         <span className="text-2xl">{getTypeIcon(resource.type)}</span>
                                         <div>
-                                            <h3 className="font-medium text-gray-600">{resource.title}</h3>
-                                            <p className="text-sm text-gray-400">{resource.description}</p>
+                                            <h3 className="font-medium text-muted-foreground">{resource.title}</h3>
+                                            <p className="text-sm text-muted-foreground">{resource.description}</p>
                                         </div>
                                     </div>
                                     <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
@@ -208,7 +208,7 @@ export function CoachResourcesPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <a
                             href="/coach/workshops/new"
-                            className="block bg-white/20 hover:bg-white/30 rounded-lg p-4 transition-colors"
+                            className="block bg-card/20 hover:bg-card/30 rounded-lg p-4 transition-colors"
                         >
                             <span className="text-2xl mb-2 block">📝</span>
                             <h3 className="font-medium">Request New Workshop</h3>
@@ -216,7 +216,7 @@ export function CoachResourcesPage() {
                         </a>
                         <a
                             href="/coach/dashboard"
-                            className="block bg-white/20 hover:bg-white/30 rounded-lg p-4 transition-colors"
+                            className="block bg-card/20 hover:bg-card/30 rounded-lg p-4 transition-colors"
                         >
                             <span className="text-2xl mb-2 block">📊</span>
                             <h3 className="font-medium">View Dashboard</h3>

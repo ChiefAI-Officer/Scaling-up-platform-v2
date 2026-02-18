@@ -39,7 +39,7 @@ const STEP_COLORS: Record<string, { bg: string; border: string; text: string }> 
   EMAIL_COACH: { bg: "bg-purple-100", border: "border-purple-400", text: "text-purple-700" },
   EMAIL_STAFF: { bg: "bg-amber-100", border: "border-amber-400", text: "text-amber-700" },
   EMAIL_CUSTOM: { bg: "bg-teal-100", border: "border-teal-400", text: "text-teal-700" },
-  NOTIFICATION: { bg: "bg-gray-100", border: "border-gray-400", text: "text-gray-700" },
+  NOTIFICATION: { bg: "bg-muted", border: "border-gray-400", text: "text-foreground" },
 };
 
 export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
@@ -63,7 +63,7 @@ export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
 
   if (steps.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-400 text-sm">
+      <div className="text-center py-8 text-muted-foreground text-sm">
         Add steps to see the visual timeline.
       </div>
     );
@@ -126,11 +126,11 @@ export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
                   <p className={`text-[10px] font-semibold ${colors.text} truncate`}>
                     {STEP_TYPE_LABELS[step.stepType as StepType] || step.stepType}
                   </p>
-                  <p className="text-[9px] text-gray-500 truncate">
+                  <p className="text-[9px] text-muted-foreground truncate">
                     {label}
                   </p>
                   {step.subject && (
-                    <p className="text-[9px] text-gray-400 truncate mt-0.5">
+                    <p className="text-[9px] text-muted-foreground truncate mt-0.5">
                       {step.subject}
                     </p>
                   )}
@@ -146,12 +146,12 @@ export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
       {/* Legend */}
       <div className="flex flex-wrap gap-3 justify-center">
         {Object.entries(STEP_COLORS).map(([type, colors]) => (
-          <div key={type} className="flex items-center gap-1.5 text-xs text-gray-500">
+          <div key={type} className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <div className={`w-2.5 h-2.5 rounded-full ${colors.bg} ${colors.border} border`} />
             {STEP_TYPE_LABELS[type as StepType] || type}
           </div>
         ))}
-        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
           Event Day
         </div>
@@ -160,7 +160,7 @@ export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
       {/* Event-triggered steps (not relative to date) */}
       {eventSteps.length > 0 && (
         <div className="border-t pt-3">
-          <p className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
+          <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
             Event-Triggered Steps
           </p>
           <div className="flex flex-wrap gap-2">

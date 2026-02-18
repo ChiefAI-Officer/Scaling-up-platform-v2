@@ -50,7 +50,7 @@ export function QuickActions({
             <Button
                 variant="secondary"
                 onClick={handleExport}
-                className="w-full bg-gray-100 text-gray-700 hover:bg-gray-200 border-0 justify-center"
+                className="w-full bg-muted text-foreground hover:bg-gray-200 border-0 justify-center"
             >
                 Export Registrations
             </Button>
@@ -58,7 +58,7 @@ export function QuickActions({
             <Button
                 variant="secondary"
                 onClick={handleReminder}
-                className="w-full bg-gray-100 text-gray-700 hover:bg-gray-200 border-0 justify-center"
+                className="w-full bg-muted text-foreground hover:bg-gray-200 border-0 justify-center"
             >
                 Send Reminder Email
             </Button>

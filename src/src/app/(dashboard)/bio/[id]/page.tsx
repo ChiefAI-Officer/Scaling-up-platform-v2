@@ -189,7 +189,7 @@ export default function CoachBioEditorPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
-        <p className="text-gray-500">Loading coach bio editor...</p>
+        <p className="text-muted-foreground">Loading coach bio editor...</p>
       </div>
     );
   }
@@ -197,19 +197,19 @@ export default function CoachBioEditorPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <div className="text-sm text-gray-500 flex items-center gap-2">
-          <Link href="/dashboard" className="hover:text-gray-700">
+        <div className="text-sm text-muted-foreground flex items-center gap-2">
+          <Link href="/dashboard" className="hover:text-foreground">
             Dashboard
           </Link>
           <span>/</span>
-          <Link href="/bio" className="hover:text-gray-700">
+          <Link href="/bio" className="hover:text-foreground">
             BIO
           </Link>
           <span>/</span>
-          <span className="text-gray-900">{coachFullName || "Coach"}</span>
+          <span className="text-foreground">{coachFullName || "Coach"}</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Bio Page Editor</h1>
-        <p className="text-gray-600">Edit coach bio details and import data from Circle.</p>
+        <h1 className="text-2xl font-bold text-foreground">Bio Page Editor</h1>
+        <p className="text-muted-foreground">Edit coach bio details and import data from Circle.</p>
       </div>
 
       {error && (
@@ -232,7 +232,7 @@ export default function CoachBioEditorPage() {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" value={coachEmail} disabled className="mt-1 bg-gray-50" />
+                <Input id="email" value={coachEmail} disabled className="mt-1 bg-muted" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -316,7 +316,7 @@ export default function CoachBioEditorPage() {
             <CardTitle>Preview</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border bg-white">
+            <div className="rounded-lg border bg-card">
               <div className="p-8 text-center">
                 <h2 className="text-sm font-bold tracking-wide text-purple-700 mb-6">
                   SCALING UP COACHES
@@ -328,17 +328,17 @@ export default function CoachBioEditorPage() {
                     className="mx-auto h-28 w-28 rounded-full object-cover border-4 border-purple-100"
                   />
                 ) : (
-                  <div className="mx-auto h-28 w-28 rounded-full bg-gray-200 flex items-center justify-center text-gray-400">
+                  <div className="mx-auto h-28 w-28 rounded-full bg-gray-200 flex items-center justify-center text-muted-foreground">
                     No Image
                   </div>
                 )}
-                <h3 className="mt-4 text-2xl font-bold text-gray-900">
+                <h3 className="mt-4 text-2xl font-bold text-foreground">
                   {coachFullName || "Coach Name"}
                 </h3>
-                <p className="text-gray-600 mt-1">
+                <p className="text-muted-foreground mt-1">
                   {formData.titleCredentials || "Scaling Up Certified Coach"}
                 </p>
-                <div className="mt-6 text-left text-sm text-gray-700 space-y-3 whitespace-pre-wrap">
+                <div className="mt-6 text-left text-sm text-foreground space-y-3 whitespace-pre-wrap">
                   {formData.biography || "Biography preview will appear here."}
                 </div>
               </div>

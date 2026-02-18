@@ -21,9 +21,9 @@ function getCertificationStatusColor(status: string) {
     case "EXPIRED":
       return "bg-red-100 text-red-800";
     case "SUSPENDED":
-      return "bg-gray-100 text-gray-800";
+      return "bg-muted text-foreground";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-muted text-foreground";
   }
 }
 
@@ -38,7 +38,7 @@ function getPaymentStatusColor(status: string) {
     case "GRACE_PERIOD":
       return "bg-orange-100 text-orange-800";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-muted text-foreground";
   }
 }
 
@@ -47,13 +47,13 @@ function getWorkshopStatusColor(status: string) {
     case "PUBLISHED":
       return "bg-green-100 text-green-800";
     case "DRAFT":
-      return "bg-gray-100 text-gray-800";
+      return "bg-muted text-foreground";
     case "CANCELED":
       return "bg-red-100 text-red-800";
     case "COMPLETED":
       return "bg-blue-100 text-blue-800";
     default:
-      return "bg-gray-100 text-gray-800";
+      return "bg-muted text-foreground";
   }
 }
 
@@ -105,7 +105,7 @@ export default async function CoachDetailPage({
           <div className="flex items-center gap-3 mb-2">
             <Link
               href="/coaches"
-              className="text-gray-500 hover:text-gray-700"
+              className="text-muted-foreground hover:text-foreground"
             >
               &larr; Coaches
             </Link>
@@ -117,10 +117,10 @@ export default async function CoachDetailPage({
               </span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-foreground">
                 {coach.firstName} {coach.lastName}
               </h1>
-              <p className="text-gray-600">{coach.email}</p>
+              <p className="text-muted-foreground">{coach.email}</p>
             </div>
           </div>
           <div className="flex items-center gap-3 mt-3">
@@ -141,7 +141,7 @@ export default async function CoachDetailPage({
         <div className="flex gap-2">
           <Link
             href={`/coaches/${coach.id}/edit`}
-            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+            className="bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
           >
             Edit Coach
           </Link>
@@ -154,7 +154,7 @@ export default async function CoachDetailPage({
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Total Workshops</p>
+              <p className="text-sm text-muted-foreground">Total Workshops</p>
               <p className="text-xl font-semibold">{totalWorkshops}</p>
             </CardContent>
           </Card>
@@ -163,7 +163,7 @@ export default async function CoachDetailPage({
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Upcoming</p>
+              <p className="text-sm text-muted-foreground">Upcoming</p>
               <p className="text-xl font-semibold text-blue-600">{upcomingWorkshops}</p>
             </CardContent>
           </Card>
@@ -172,7 +172,7 @@ export default async function CoachDetailPage({
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Total Registrations</p>
+              <p className="text-sm text-muted-foreground">Total Registrations</p>
               <p className="text-xl font-semibold text-green-600">{totalRegistrations}</p>
             </CardContent>
           </Card>
@@ -181,7 +181,7 @@ export default async function CoachDetailPage({
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Certifications</p>
+              <p className="text-sm text-muted-foreground">Certifications</p>
               <p className="text-xl font-semibold">{coach.certifications.length}</p>
             </CardContent>
           </Card>
@@ -200,47 +200,47 @@ export default async function CoachDetailPage({
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Phone</p>
-                  <p className="text-gray-900">{coach.phone || "Not provided"}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Phone</p>
+                  <p className="text-foreground">{coach.phone || "Not provided"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Company</p>
-                  <p className="text-gray-900">{coach.company || "Not provided"}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Company</p>
+                  <p className="text-foreground">{coach.company || "Not provided"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Territory</p>
-                  <p className="text-gray-900">{coach.territory || "Not assigned"}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Territory</p>
+                  <p className="text-foreground">{coach.territory || "Not assigned"}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Member Since</p>
-                  <p className="text-gray-900">{formatDate(coach.createdAt)}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Member Since</p>
+                  <p className="text-foreground">{formatDate(coach.createdAt)}</p>
                 </div>
               </div>
 
               {coach.bio && (
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Bio</p>
-                  <p className="text-gray-900 whitespace-pre-wrap">{coach.bio}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Bio</p>
+                  <p className="text-foreground whitespace-pre-wrap">{coach.bio}</p>
                 </div>
               )}
 
               {(coach.hubspotId || coach.circleId) && (
                 <div className="pt-4 border-t">
-                  <p className="text-sm font-medium text-gray-500 mb-2">Integration IDs</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Integration IDs</p>
                   <div className="grid grid-cols-2 gap-4">
                     {coach.hubspotId && (
                       <div>
-                        <p className="text-xs text-gray-400">HubSpot ID</p>
-                        <p className="text-sm text-gray-600 font-mono">{coach.hubspotId}</p>
+                        <p className="text-xs text-muted-foreground">HubSpot ID</p>
+                        <p className="text-sm text-muted-foreground font-mono">{coach.hubspotId}</p>
                       </div>
                     )}
                     {coach.circleId && (
                       <div>
-                        <p className="text-xs text-gray-400">Circle ID</p>
-                        <p className="text-sm text-gray-600 font-mono">{coach.circleId}</p>
+                        <p className="text-xs text-muted-foreground">Circle ID</p>
+                        <p className="text-sm text-muted-foreground font-mono">{coach.circleId}</p>
                       </div>
                     )}
                   </div>
@@ -262,7 +262,7 @@ export default async function CoachDetailPage({
             </CardHeader>
             <CardContent>
               {coach.workshops.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
+                <p className="text-muted-foreground text-center py-8">
                   No workshops yet.{" "}
                   <Link
                     href={`/workshops/new?coachId=${coach.id}`}
@@ -273,36 +273,36 @@ export default async function CoachDetailPage({
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-full divide-y divide-border">
                     <thead>
                       <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                           Workshop
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                           Date
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                           Status
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                           Registrations
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-border">
                       {coach.workshops.map((workshop) => (
-                        <tr key={workshop.id} className="hover:bg-gray-50">
+                        <tr key={workshop.id} className="hover:bg-accent">
                           <td className="px-4 py-3">
                             <Link
                               href={`/workshops/${workshop.id}`}
-                              className="font-medium text-gray-900 hover:text-blue-600"
+                              className="font-medium text-foreground hover:text-blue-600"
                             >
                               {workshop.title}
                             </Link>
-                            <p className="text-sm text-gray-500">{workshop.workshopType?.name}</p>
+                            <p className="text-sm text-muted-foreground">{workshop.workshopType?.name}</p>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
                             {formatDate(workshop.eventDate)}
                           </td>
                           <td className="px-4 py-3">
@@ -313,7 +313,7 @@ export default async function CoachDetailPage({
                               {workshop.status}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
                             {workshop._count.registrations} / {workshop.maxAttendees}
                           </td>
                         </tr>
@@ -335,7 +335,7 @@ export default async function CoachDetailPage({
             </CardHeader>
             <CardContent>
               {coach.certifications.length === 0 ? (
-                <p className="text-gray-500 text-sm">No certifications yet</p>
+                <p className="text-muted-foreground text-sm">No certifications yet</p>
               ) : (
                 <div className="space-y-3">
                   {coach.certifications.map((cert) => (
@@ -344,7 +344,7 @@ export default async function CoachDetailPage({
                       className="border rounded-lg p-3"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-gray-900">
+                        <span className="font-medium text-foreground">
                           {cert.workshopType.name}
                         </span>
                         <Badge
@@ -354,7 +354,7 @@ export default async function CoachDetailPage({
                           {cert.status}
                         </Badge>
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-muted-foreground">
                         <p>Certified: {formatDate(cert.certifiedAt)}</p>
                         {cert.expiresAt && (
                           <p>Expires: {formatDate(cert.expiresAt)}</p>
@@ -379,10 +379,10 @@ export default async function CoachDetailPage({
               >
                 Create Workshop
               </Link>
-              <span className="block w-full text-center bg-gray-50 text-gray-400 px-4 py-2 rounded-lg text-sm cursor-default border border-dashed border-gray-300">
+              <span className="block w-full text-center bg-muted text-muted-foreground px-4 py-2 rounded-lg text-sm cursor-default border border-dashed border-border">
                 Add Certification — Coming Soon
               </span>
-              <span className="block w-full text-center bg-gray-50 text-gray-400 px-4 py-2 rounded-lg text-sm cursor-default border border-dashed border-gray-300">
+              <span className="block w-full text-center bg-muted text-muted-foreground px-4 py-2 rounded-lg text-sm cursor-default border border-dashed border-border">
                 Sync with HubSpot — Coming Soon
               </span>
             </CardContent>

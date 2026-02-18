@@ -35,8 +35,8 @@ export function StepIndicator() {
                                 className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${isCompleted
                                         ? "bg-blue-600 border-blue-600 text-white"
                                         : isCurrent
-                                            ? "bg-white border-blue-600 text-blue-600"
-                                            : "bg-white border-gray-300 text-gray-400"
+                                            ? "bg-card border-blue-600 text-blue-600"
+                                            : "bg-card border-border text-muted-foreground"
                                     }`}
                             >
                                 {isCompleted ? (
@@ -46,7 +46,7 @@ export function StepIndicator() {
                                 )}
                             </div>
                             <span
-                                className={`text-sm font-medium ${isCurrent ? "text-blue-700" : isCompleted ? "text-gray-900" : "text-gray-400"
+                                className={`text-sm font-medium ${isCurrent ? "text-blue-700" : isCompleted ? "text-foreground" : "text-muted-foreground"
                                     }`}
                             >
                                 {step.title}

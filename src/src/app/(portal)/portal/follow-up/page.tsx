@@ -108,9 +108,9 @@ export default function FollowUpPage() {
                         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                             <span className="text-green-600 text-2xl">&#10003;</span>
                         </div>
-                        <h2 className="text-xl font-semibold text-gray-900 mb-2">Thank You!</h2>
-                        <p className="text-gray-600 mb-1">Your 90-day follow-up report has been submitted successfully.</p>
-                        <p className="text-gray-500 text-sm">This feedback helps us improve our workshops and track progress.</p>
+                        <h2 className="text-xl font-semibold text-foreground mb-2">Thank You!</h2>
+                        <p className="text-muted-foreground mb-1">Your 90-day follow-up report has been submitted successfully.</p>
+                        <p className="text-muted-foreground text-sm">This feedback helps us improve our workshops and track progress.</p>
                         <Button
                             className="mt-6"
                             variant="outline"
@@ -130,9 +130,9 @@ export default function FollowUpPage() {
     if (loading) {
         return (
             <div className="max-w-2xl">
-                <h1 className="text-2xl font-bold text-gray-900 mb-6">90-Day Follow-Up Report</h1>
+                <h1 className="text-2xl font-bold text-foreground mb-6">90-Day Follow-Up Report</h1>
                 <Card>
-                    <CardContent className="py-12 text-center text-gray-500">Loading workshops...</CardContent>
+                    <CardContent className="py-12 text-center text-muted-foreground">Loading workshops...</CardContent>
                 </Card>
             </div>
         );
@@ -142,7 +142,7 @@ export default function FollowUpPage() {
 
     return (
         <div className="max-w-2xl">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">90-Day Follow-Up Report</h1>
+            <h1 className="text-2xl font-bold text-foreground mb-6">90-Day Follow-Up Report</h1>
 
             {error && (
                 <div className="mb-4 px-4 py-3 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200">
@@ -153,8 +153,8 @@ export default function FollowUpPage() {
             {availableWorkshops.length === 0 ? (
                 <Card>
                     <CardContent className="py-12 text-center">
-                        <p className="text-gray-500">No workshops pending a follow-up report.</p>
-                        <p className="text-gray-400 text-sm mt-1">Follow-up reports are available after workshops reach Post-Event or Completed status.</p>
+                        <p className="text-muted-foreground">No workshops pending a follow-up report.</p>
+                        <p className="text-muted-foreground text-sm mt-1">Follow-up reports are available after workshops reach Post-Event or Completed status.</p>
                     </CardContent>
                 </Card>
             ) : (
@@ -165,7 +165,7 @@ export default function FollowUpPage() {
                         </CardHeader>
                         <CardContent>
                             <select
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 value={formData.workshopId}
                                 onChange={(e) => setFormData({ ...formData, workshopId: e.target.value })}
                                 required
@@ -187,14 +187,14 @@ export default function FollowUpPage() {
                         <CardContent>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {scalingUpTools.map((tool) => (
-                                    <label key={tool} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100">
+                                    <label key={tool} className="flex items-center gap-2 p-2 bg-muted rounded-lg cursor-pointer hover:bg-accent">
                                         <input
                                             type="checkbox"
-                                            className="rounded border-gray-300"
+                                            className="rounded border-border"
                                             checked={formData.implementedTools.includes(tool)}
                                             onChange={() => handleToolToggle(tool)}
                                         />
-                                        <span className="text-sm text-gray-700">{tool}</span>
+                                        <span className="text-sm text-foreground">{tool}</span>
                                     </label>
                                 ))}
                             </div>
@@ -231,7 +231,7 @@ export default function FollowUpPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-4">
-                                <span className="text-sm text-gray-500">0</span>
+                                <span className="text-sm text-muted-foreground">0</span>
                                 <input
                                     type="range"
                                     min="0"
@@ -241,7 +241,7 @@ export default function FollowUpPage() {
                                     onChange={(e) => setFormData({ ...formData, recommendationScore: parseInt(e.target.value) })}
                                     aria-label="Recommendation score from 0 to 10"
                                 />
-                                <span className="text-sm text-gray-500">10</span>
+                                <span className="text-sm text-muted-foreground">10</span>
                                 <span className="text-2xl font-bold text-blue-600 min-w-[3rem] text-center">{formData.recommendationScore}</span>
                             </div>
                         </CardContent>

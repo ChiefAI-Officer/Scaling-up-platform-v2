@@ -197,7 +197,7 @@ export default function PricingTiersPage() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-purple-900">Pricing Tiers</h2>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm text-muted-foreground mt-1">
                         Manage pricing options that appear in the workshop request wizard.
                     </p>
                 </div>
@@ -219,7 +219,7 @@ export default function PricingTiersPage() {
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                             filterCategory === "ALL"
                                 ? "bg-purple-700 text-white border-purple-700"
-                                : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                                : "bg-card text-foreground border-border hover:bg-accent"
                         }`}
                     >
                         All Categories
@@ -231,7 +231,7 @@ export default function PricingTiersPage() {
                             className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                                 filterCategory === cat.id
                                     ? "bg-purple-700 text-white border-purple-700"
-                                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                                    : "bg-card text-foreground border-border hover:bg-accent"
                             }`}
                         >
                             {cat.name}
@@ -242,20 +242,20 @@ export default function PricingTiersPage() {
 
             {/* Create/Edit Form */}
             {showForm && (
-                <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
+                <div className="bg-card rounded-xl shadow-sm border p-6 mb-6">
                     <h3 className="font-semibold text-lg mb-4">
                         {editingId ? "Edit Pricing Tier" : "New Pricing Tier"}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-foreground mb-1">
                                 Category <span className="text-red-500">*</span>
                             </label>
                             <select
                                 value={formCategoryId}
                                 onChange={(e) => setFormCategoryId(e.target.value)}
                                 disabled={!!editingId}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100"
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-muted"
                             >
                                 <option value="">Select category...</option>
                                 {categories.map((cat) => (
@@ -266,7 +266,7 @@ export default function PricingTiersPage() {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-foreground mb-1">
                                 Name <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -278,11 +278,11 @@ export default function PricingTiersPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-foreground mb-1">
                                 Price (USD) <span className="text-red-500">*</span>
                             </label>
                             <div className="relative">
-                                <span className="absolute left-3 top-2 text-gray-500">$</span>
+                                <span className="absolute left-3 top-2 text-muted-foreground">$</span>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -295,7 +295,7 @@ export default function PricingTiersPage() {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-foreground mb-1">
                                 Description
                             </label>
                             <input
@@ -320,7 +320,7 @@ export default function PricingTiersPage() {
                         </button>
                         <button
                             onClick={closeForm}
-                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium text-sm"
+                            className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-gray-200 font-medium text-sm"
                         >
                             Cancel
                         </button>
@@ -330,62 +330,62 @@ export default function PricingTiersPage() {
 
             {/* Pricing Tiers List */}
             {isLoading ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">
+                <div className="bg-card rounded-xl shadow-sm p-8 text-center text-muted-foreground">
                     Loading pricing tiers...
                 </div>
             ) : error ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-red-600">
+                <div className="bg-card rounded-xl shadow-sm p-8 text-center text-red-600">
                     {error}
                 </div>
             ) : filteredTiers.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">
+                <div className="bg-card rounded-xl shadow-sm p-8 text-center text-muted-foreground">
                     {categories.length === 0
                         ? "Create categories first, then add pricing tiers."
                         : "No pricing tiers found. Click \"+ Add Pricing Tier\" to create one."}
                 </div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
+                    <table className="min-w-full divide-y divide-border">
+                        <thead className="bg-muted">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                     Name
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                     Category
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
                                     Price
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                     Workshops
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                     Status
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
                                     Actions
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody className="divide-y divide-border">
                             {filteredTiers.map((tier) => (
-                                <tr key={tier.id} className={!tier.isActive ? "bg-gray-50 opacity-60" : ""}>
+                                <tr key={tier.id} className={!tier.isActive ? "bg-muted opacity-60" : ""}>
                                     <td className="px-6 py-4">
-                                        <div className="font-medium text-gray-900">{tier.name}</div>
+                                        <div className="font-medium text-foreground">{tier.name}</div>
                                         {tier.description && (
-                                            <div className="text-sm text-gray-500 mt-0.5">
+                                            <div className="text-sm text-muted-foreground mt-0.5">
                                                 {tier.description}
                                             </div>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-700">
+                                    <td className="px-6 py-4 text-sm text-foreground">
                                         {tier.category.name}
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-900 text-right font-medium">
+                                    <td className="px-6 py-4 text-sm text-foreground text-right font-medium">
                                         {formatPrice(tier.amountCents)}
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-900">
+                                    <td className="px-6 py-4 text-sm text-foreground">
                                         {tier._count.workshops}
                                     </td>
                                     <td className="px-6 py-4">
@@ -394,7 +394,7 @@ export default function PricingTiersPage() {
                                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
                                                 tier.isActive
                                                     ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                    : "bg-muted text-muted-foreground hover:bg-gray-200"
                                             }`}
                                         >
                                             {tier.isActive ? "Active" : "Inactive"}

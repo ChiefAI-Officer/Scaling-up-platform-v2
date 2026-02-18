@@ -46,7 +46,7 @@ const DropdownMenuContent = ({
   if (!open) return null;
   const alignClass = align === "end" ? "right-0" : align === "start" ? "left-0" : "left-1/2 -translate-x-1/2";
   return (
-    <div className={`absolute ${alignClass} z-50 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none`}>
+    <div className={`absolute ${alignClass} z-50 mt-2 w-48 origin-top-right rounded-md bg-card py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none`}>
       {children}
     </div>
   );
@@ -64,7 +64,7 @@ const DropdownMenuItem = ({
   return (
     <button
       onClick={onClick}
-      className={`block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 ${className || ""}`}
+      className={`block w-full px-4 py-2 text-left text-sm text-foreground hover:bg-accent ${className || ""}`}
     >
       {children}
     </button>

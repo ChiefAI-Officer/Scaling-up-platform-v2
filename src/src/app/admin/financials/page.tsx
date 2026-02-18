@@ -165,13 +165,13 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
       <FadeUp>
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-              <Link href="/admin/dashboard" className="hover:text-gray-700">Admin Dashboard</Link>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+              <Link href="/admin/dashboard" className="hover:text-foreground">Admin Dashboard</Link>
               <span>/</span>
-              <span className="text-gray-900">Financial Dashboard</span>
+              <span className="text-foreground">Financial Dashboard</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Financial Dashboard</h1>
-            <p className="text-gray-600">Revenue breakdown — {getPeriodLabel(period)}</p>
+            <h1 className="text-2xl font-bold text-foreground">Financial Dashboard</h1>
+            <p className="text-muted-foreground">Revenue breakdown — {getPeriodLabel(period)}</p>
           </div>
         </div>
       </FadeUp>
@@ -185,7 +185,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               period === p
                 ? "bg-blue-600 text-white"
-                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+                : "bg-card border border-border text-foreground hover:bg-accent"
             }`}
           >
             {p === "month" ? "Monthly" : p === "quarter" ? "Quarterly" : p === "year" ? "Annual" : "All Time"}
@@ -196,28 +196,28 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
       {/* Summary Stats */}
       <StaggerContainer className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StaggerItem>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-gray-500">Total Revenue</p>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Revenue</p>
             <p className="mt-2 text-2xl font-semibold text-green-600">{formatCurrency(totalRevenueCents)}</p>
           </div>
         </StaggerItem>
         <StaggerItem>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-gray-500">Avg / Workshop</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(avgRevenuePerWorkshop)}</p>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Avg / Workshop</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{formatCurrency(avgRevenuePerWorkshop)}</p>
           </div>
         </StaggerItem>
         <StaggerItem>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-gray-500">Paid Registrations</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">{paidRegistrations}</p>
-            <p className="text-xs text-gray-400 mt-1">{freeRegistrations} free</p>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Paid Registrations</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{paidRegistrations}</p>
+            <p className="text-xs text-muted-foreground mt-1">{freeRegistrations} free</p>
           </div>
         </StaggerItem>
         <StaggerItem>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-gray-500">Total Registrations</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900">{totalRegistrations}</p>
+          <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Registrations</p>
+            <p className="mt-2 text-2xl font-semibold text-foreground">{totalRegistrations}</p>
           </div>
         </StaggerItem>
       </StaggerContainer>
@@ -225,24 +225,24 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
       {/* Revenue by Category */}
       {categoryRevenue.length > 0 && (
         <FadeUp delay={0.15}>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">Revenue by Workshop Type</h3>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="mb-4 text-lg font-semibold text-foreground">Revenue by Workshop Type</h3>
           <div className="space-y-3">
             {categoryRevenue.map((cat) => {
               const pct = totalRevenueCents > 0 ? Math.round((cat.revenue / totalRevenueCents) * 100) : 0;
               return (
                 <div key={cat.id} className="flex items-center gap-4">
-                  <div className="w-40 text-sm font-medium text-gray-900 truncate">{cat.name}</div>
-                  <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+                  <div className="w-40 text-sm font-medium text-foreground truncate">{cat.name}</div>
+                  <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
                     <div
                       className="bg-blue-500 h-full rounded-full transition-all"
                       style={{ width: `${Math.max(pct, 2)}%` }}
                     />
                   </div>
-                  <div className="w-24 text-right text-sm font-semibold text-gray-900">
+                  <div className="w-24 text-right text-sm font-semibold text-foreground">
                     {formatCurrency(cat.revenue)}
                   </div>
-                  <div className="w-12 text-right text-xs text-gray-500">{pct}%</div>
+                  <div className="w-12 text-right text-xs text-muted-foreground">{pct}%</div>
                 </div>
               );
             })}
@@ -253,33 +253,33 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
 
       {/* Revenue by Workshop */}
       <FadeUp delay={0.25}>
-      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900">Revenue by Workshop</h3>
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="text-lg font-semibold text-foreground">Revenue by Workshop</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-muted">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Workshop</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Coach</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Event Date</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Registrations</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Revenue</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Code</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Workshop</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Coach</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Event Date</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Registrations</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Revenue</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-border">
               {workshopRevenue.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
                     No revenue data for this period.
                   </td>
                 </tr>
               ) : (
                 workshopRevenue.map((w) => (
-                  <tr key={w.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-mono text-gray-600">
+                  <tr key={w.id} className="hover:bg-accent">
+                    <td className="px-4 py-3 text-sm font-mono text-muted-foreground">
                       {w.workshopCode || "—"}
                     </td>
                     <td className="px-4 py-3">
@@ -287,9 +287,9 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
                         {w.title}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{w.coachName}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{formatDate(w.eventDate)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 text-right">{w.totalRegistrations}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{w.coachName}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{formatDate(w.eventDate)}</td>
+                    <td className="px-4 py-3 text-sm text-foreground text-right">{w.totalRegistrations}</td>
                     <td className="px-4 py-3 text-sm font-semibold text-green-600 text-right">
                       {formatCurrency(w.revenue)}
                     </td>
@@ -298,9 +298,9 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
               )}
             </tbody>
             {workshopRevenue.length > 0 && (
-              <tfoot className="bg-gray-50">
+              <tfoot className="bg-muted">
                 <tr>
-                  <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-gray-900 text-right">
+                  <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-foreground text-right">
                     Total
                   </td>
                   <td className="px-4 py-3 text-sm font-bold text-green-600 text-right">

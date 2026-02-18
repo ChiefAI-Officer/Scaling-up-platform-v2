@@ -7,7 +7,7 @@ export function SoloLandingPage({ data }: { data: LandingPageData }) {
     const workshop = data.workshop!;
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-card">
             {/* Hero Section */}
             <section className="relative bg-slate-900 text-white py-20 lg:py-32">
                 <div className="container mx-auto px-6 text-center">
@@ -77,7 +77,7 @@ export function SoloLandingPage({ data }: { data: LandingPageData }) {
                         <div className="grid md:grid-cols-2 gap-8">
                             {workshop.learningOutcomes.length > 0 ? (
                                 workshop.learningOutcomes.map((item, i) => (
-                                    <div key={i} className="flex gap-4 p-6 bg-white border rounded-xl shadow-sm hover:shadow-md transition">
+                                    <div key={i} className="flex gap-4 p-6 bg-card border rounded-xl shadow-sm hover:shadow-md transition">
                                         <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold shrink-0">
                                             {i + 1}
                                         </div>
@@ -87,7 +87,7 @@ export function SoloLandingPage({ data }: { data: LandingPageData }) {
                             ) : (
                                 // Placeholders
                                 [1, 2, 3, 4].map((i) => (
-                                    <div key={i} className="flex gap-4 p-6 bg-white border rounded-xl shadow-sm">
+                                    <div key={i} className="flex gap-4 p-6 bg-card border rounded-xl shadow-sm">
                                         <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center font-bold shrink-0">{i}</div>
                                         <p className="text-slate-400 italic">[Learning Outcome {i}]</p>
                                     </div>

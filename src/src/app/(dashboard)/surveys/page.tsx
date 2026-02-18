@@ -191,7 +191,7 @@ export default function SurveysPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[300px] items-center justify-center text-gray-500">
+      <div className="flex min-h-[300px] items-center justify-center text-muted-foreground">
         Loading surveys module...
       </div>
     );
@@ -200,8 +200,8 @@ export default function SurveysPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Surveys</h1>
-        <p className="text-gray-600">
+        <h1 className="text-2xl font-bold text-foreground">Surveys</h1>
+        <p className="text-muted-foreground">
           Create pre/post workflows per event and track answers in one place.
         </p>
       </div>
@@ -230,7 +230,7 @@ export default function SurveysPage() {
                 name="workshopId"
                 value={formData.workshopId}
                 onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2"
               >
                 {data.workshops.map((workshop) => (
                   <option key={workshop.id} value={workshop.id}>
@@ -276,13 +276,13 @@ export default function SurveysPage() {
               </div>
             </div>
 
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+            <label className="inline-flex items-center gap-2 text-sm text-foreground">
               <input
                 type="checkbox"
                 name="isActive"
                 checked={formData.isActive}
                 onChange={handleChange}
-                className="rounded border-gray-300"
+                className="rounded border-border"
               />
               Workflow active
             </label>
@@ -292,7 +292,7 @@ export default function SurveysPage() {
                 {saving ? "Saving..." : "Save Workflow"}
               </Button>
               {selectedWorkflow && (
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-muted-foreground">
                   Last updated {formatDate(selectedWorkflow.updatedAt)}
                 </span>
               )}
@@ -307,40 +307,40 @@ export default function SurveysPage() {
         </CardHeader>
         <CardContent>
           {data.workflowConfigs.length === 0 ? (
-            <p className="text-gray-500">No survey workflows configured yet.</p>
+            <p className="text-muted-foreground">No survey workflows configured yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Workshop
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Event Date
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Pre
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Post
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       NPS
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Status
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {data.workflowConfigs.map((config) => (
                     <tr key={config.workshopId}>
-                      <td className="px-4 py-3 text-sm text-gray-900">{config.workshopTitle}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(config.eventDate)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{config.preSurveyFormId || "—"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{config.postSurveyFormId || "—"}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{config.npsSurveyFormId || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{config.workshopTitle}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{formatDate(config.eventDate)}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{config.preSurveyFormId || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{config.postSurveyFormId || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{config.npsSurveyFormId || "—"}</td>
                       <td className="px-4 py-3">
                         <Badge variant={config.isActive ? "default" : "outline"}>
                           {config.isActive ? "Active" : "Inactive"}
@@ -361,34 +361,34 @@ export default function SurveysPage() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-border">
               <thead>
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Workshop
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Event Date
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Responses
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Completed
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Avg NPS
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {data.trends.map((trend) => (
                   <tr key={trend.workshopId}>
-                    <td className="px-4 py-3 text-sm text-gray-900">{trend.workshopTitle}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(trend.eventDate)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{trend.responses}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{trend.completed}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
+                    <td className="px-4 py-3 text-sm text-foreground">{trend.workshopTitle}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{formatDate(trend.eventDate)}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{trend.responses}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{trend.completed}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">
                       {trend.avgNps === null ? "—" : trend.avgNps}
                     </td>
                   </tr>
@@ -405,41 +405,41 @@ export default function SurveysPage() {
         </CardHeader>
         <CardContent>
           {data.responses.length === 0 ? (
-            <p className="text-gray-500">No survey answers captured yet.</p>
+            <p className="text-muted-foreground">No survey answers captured yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Type
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Workshop
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Sent
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Completed
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       NPS
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {data.responses.map((response) => (
                     <tr key={response.id}>
                       <td className="px-4 py-3">
                         <Badge variant="outline">{surveyTypeLabel(response.surveyType)}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{response.workshopTitle}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{formatDate(response.sentAt)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
+                      <td className="px-4 py-3 text-sm text-foreground">{response.workshopTitle}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{formatDate(response.sentAt)}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">
                         {response.completedAt ? formatDate(response.completedAt) : "Pending"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
+                      <td className="px-4 py-3 text-sm text-foreground">
                         {typeof response.npsScore === "number" ? response.npsScore : "—"}
                       </td>
                     </tr>

@@ -127,7 +127,7 @@ export default async function AdminDashboardPage() {
     <div className="space-y-6">
       <FadeUp>
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Admin Dashboard</h2>
+          <h2 className="text-2xl font-bold text-foreground">Admin Dashboard</h2>
           <div className="flex gap-3">
             <Link
               href="/admin/approvals"
@@ -137,7 +137,7 @@ export default async function AdminDashboardPage() {
             </Link>
             <Link
               href="/admin/financials"
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
             >
               Financial Dashboard
             </Link>
@@ -167,8 +167,8 @@ export default async function AdminDashboardPage() {
 
       {/* JV-01/02: 6-Stage Pipeline */}
       <FadeUp delay={0.15}>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">Workshop Pipeline</h3>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="mb-4 text-lg font-semibold text-foreground">Workshop Pipeline</h3>
           <StaggerContainer className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {PIPELINE_STAGES.map((stage) => {
               const count = countsByStatus[stage.status] || 0;
@@ -176,7 +176,7 @@ export default async function AdminDashboardPage() {
                 <StaggerItem key={stage.status}>
                   <Link
                     href={`/workshops?status=${stage.status}`}
-                    className="group block rounded-lg border border-gray-200 p-4 hover:border-blue-300 hover:shadow-sm transition-all"
+                    className="group block rounded-lg border border-border p-4 hover:border-blue-300 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">{stage.icon}</span>
@@ -184,10 +184,10 @@ export default async function AdminDashboardPage() {
                         {getWorkshopStatusLabel(stage.status)}
                       </Badge>
                     </div>
-                    <div className="text-3xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                    <div className="text-3xl font-bold text-foreground group-hover:text-blue-600 transition-colors">
                       {count}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {count === 1 ? "workshop" : "workshops"}
                     </div>
                   </Link>
@@ -200,10 +200,10 @@ export default async function AdminDashboardPage() {
 
       {/* Recent Activity */}
       <FadeUp delay={0.25}>
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h3 className="mb-3 text-lg font-semibold text-gray-900">Recent Activity</h3>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="mb-3 text-lg font-semibold text-foreground">Recent Activity</h3>
           {activities.length === 0 ? (
-            <p className="text-sm text-gray-500">No recent activity found.</p>
+            <p className="text-sm text-muted-foreground">No recent activity found.</p>
           ) : (
             <ul className="divide-y divide-gray-100">
               {activities.map((activity) => (
@@ -220,9 +220,9 @@ export default async function AdminDashboardPage() {
                     >
                       {activity.type}
                     </span>
-                    <span className="text-sm text-gray-800">{activity.description}</span>
+                    <span className="text-sm text-foreground">{activity.description}</span>
                   </div>
-                  <span className="shrink-0 text-xs text-gray-500">
+                  <span className="shrink-0 text-xs text-muted-foreground">
                     {formatRelativeTime(activity.timestamp)}
                   </span>
                 </li>
@@ -248,15 +248,15 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-xl border bg-white p-4 shadow-sm ${
-        urgent ? "border-red-200" : "border-gray-200"
+      className={`rounded-xl border bg-card p-4 shadow-sm ${
+        urgent ? "border-red-200" : "border-border"
       }`}
     >
-      <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-      <p className={`mt-2 text-2xl font-semibold ${urgent ? "text-red-600" : "text-gray-900"}`}>
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={`mt-2 text-2xl font-semibold ${urgent ? "text-red-600" : "text-foreground"}`}>
         {value}
       </p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
     </div>
   );
 }

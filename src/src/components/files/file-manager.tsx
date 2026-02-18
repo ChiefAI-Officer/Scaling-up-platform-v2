@@ -154,30 +154,30 @@ export function FileManager({ initialFiles, workshops }: Props) {
   return (
     <div className="space-y-6">
       {/* Upload Form */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Upload File</h2>
+      <div className="rounded-lg bg-card p-6 shadow">
+        <h2 className="text-lg font-medium text-foreground mb-4">Upload File</h2>
         <form onSubmit={handleUpload} className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <div className="sm:col-span-2">
-            <label htmlFor="file-input" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="file-input" className="block text-sm font-medium text-foreground mb-1">
               File (max 10MB)
             </label>
             <input
               id="file-input"
               ref={fileInputRef}
               type="file"
-              className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+              className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
             />
           </div>
 
           <div>
-            <label htmlFor="upload-workshop" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="upload-workshop" className="block text-sm font-medium text-foreground mb-1">
               Workshop (optional)
             </label>
             <select
               id="upload-workshop"
               value={uploadWorkshopId}
               onChange={(e) => setUploadWorkshopId(e.target.value)}
-              className="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="block w-full rounded-md border-border text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
               <option value="">No workshop</option>
               {workshops.map((w) => (
@@ -189,14 +189,14 @@ export function FileManager({ initialFiles, workshops }: Props) {
           </div>
 
           <div>
-            <label htmlFor="upload-category" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="upload-category" className="block text-sm font-medium text-foreground mb-1">
               Category (optional)
             </label>
             <select
               id="upload-category"
               value={uploadCategory}
               onChange={(e) => setUploadCategory(e.target.value)}
-              className="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="block w-full rounded-md border-border text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
               {FILE_CATEGORIES.map((c) => (
                 <option key={c.value} value={c.value}>
@@ -231,13 +231,13 @@ export function FileManager({ initialFiles, workshops }: Props) {
       )}
 
       {/* Filters */}
-      <div className="rounded-lg bg-white p-4 shadow">
+      <div className="rounded-lg bg-card p-4 shadow">
         <div className="flex flex-wrap items-center gap-4">
-          <span className="text-sm font-medium text-gray-700">Filter:</span>
+          <span className="text-sm font-medium text-foreground">Filter:</span>
           <select
             value={filterWorkshop}
             onChange={(e) => setFilterWorkshop(e.target.value)}
-            className="rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="rounded-md border-border text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
           >
             <option value="">All workshops</option>
             {workshops.map((w) => (
@@ -249,7 +249,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="rounded-md border-gray-300 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="rounded-md border-border text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
           >
             <option value="">All categories</option>
             {FILE_CATEGORIES.filter((c) => c.value).map((c) => (
@@ -258,52 +258,52 @@ export function FileManager({ initialFiles, workshops }: Props) {
               </option>
             ))}
           </select>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             {filteredFiles.length} file{filteredFiles.length !== 1 ? "s" : ""}
           </span>
         </div>
       </div>
 
       {/* File List */}
-      <div className="rounded-lg bg-white shadow">
+      <div className="rounded-lg bg-card shadow">
         {filteredFiles.length === 0 ? (
-          <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-            <h3 className="text-lg font-medium text-gray-900">No files</h3>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="rounded-lg border-2 border-dashed border-border p-12 text-center">
+            <h3 className="text-lg font-medium text-foreground">No files</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
               Upload your first file to get started.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-muted">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     File
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Workshop
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Category
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Workflow Step
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Size
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Uploaded
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-border bg-card">
                 {filteredFiles.map((file) => (
-                  <tr key={file.id} className="hover:bg-gray-50">
+                  <tr key={file.id} className="hover:bg-accent">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">{getFileIcon(file.contentType)}</span>
@@ -316,41 +316,41 @@ export function FileManager({ initialFiles, workshops }: Props) {
                           >
                             {file.filename}
                           </a>
-                          <div className="text-xs text-gray-400">{file.contentType}</div>
+                          <div className="text-xs text-muted-foreground">{file.contentType}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
+                    <td className="px-6 py-4 text-sm text-foreground">
                       {file.workshop ? (
                         <span title={file.workshop.title}>
                           {file.workshop.workshopCode}
                         </span>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-6 py-4">
                       {file.category ? (
-                        <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                        <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-foreground">
                           {file.category}
                         </span>
                       ) : (
-                        <span className="text-sm text-gray-400">—</span>
+                        <span className="text-sm text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
+                    <td className="px-6 py-4 text-sm text-foreground">
                       {file.workflowStep ? (
                         <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
                           {file.workflowStep.subject || file.workflowStep.stepType}
                         </span>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
+                    <td className="px-6 py-4 text-sm text-foreground">
                       {formatFileSize(file.sizeBytes)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {new Date(file.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4">

@@ -8,7 +8,7 @@ export function BioLandingPage({ data }: { data: LandingPageData }) {
     return (
         <div className="min-h-screen bg-slate-50">
             <div className="container mx-auto px-6 py-20">
-                <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+                <div className="max-w-4xl mx-auto bg-card rounded-3xl shadow-xl overflow-hidden border border-slate-100">
                     {/* Header / Cover */}
                     <div className="h-48 bg-gradient-to-r from-primary to-primary/80 relative">
                         {/* Optional Decorative Pattern */}
@@ -18,7 +18,7 @@ export function BioLandingPage({ data }: { data: LandingPageData }) {
                     <div className="px-8 pb-12 relative">
                         {/* Profile Image - Overlapping Header */}
                         <div className="-mt-24 mb-6 relative inline-block">
-                            <div className="w-48 h-48 rounded-full border-4 border-white shadow-lg bg-white overflow-hidden">
+                            <div className="w-48 h-48 rounded-full border-4 border-white shadow-lg bg-card overflow-hidden">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                     src={coach.imageUrl || "/placeholder-coach.jpg"}
@@ -52,7 +52,7 @@ export function BioLandingPage({ data }: { data: LandingPageData }) {
                                 <h3 className="font-semibold text-slate-900 mb-4">Certifications & Expertise</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {["Scaling Up Certified", "3HAG Certified", "Executive Leadership"].map(tag => (
-                                        <span key={tag} className="px-3 py-1 bg-white border shadow-sm rounded-full text-xs font-medium text-slate-600">
+                                        <span key={tag} className="px-3 py-1 bg-card border shadow-sm rounded-full text-xs font-medium text-slate-600">
                                             {tag}
                                         </span>
                                     ))}

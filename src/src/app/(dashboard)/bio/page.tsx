@@ -33,8 +33,8 @@ export default async function BioPageIndex() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">BIO</h1>
-        <p className="text-gray-600">Manage each coach&apos;s bio profile and landing-page details.</p>
+        <h1 className="text-2xl font-bold text-foreground">BIO</h1>
+        <p className="text-muted-foreground">Manage each coach&apos;s bio profile and landing-page details.</p>
       </div>
 
       <Card>
@@ -43,29 +43,29 @@ export default async function BioPageIndex() {
         </CardHeader>
         <CardContent>
           {coaches.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No coaches found.</p>
+            <p className="text-muted-foreground text-center py-8">No coaches found.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Coach
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Title / Credentials
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Last Updated
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Action
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {coaches.map((coach) => (
-                    <tr key={coach.id} className="hover:bg-gray-50">
+                    <tr key={coach.id} className="hover:bg-accent">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {coach.profileImage ? (
@@ -81,17 +81,17 @@ export default async function BioPageIndex() {
                             </div>
                           )}
                           <div>
-                            <p className="font-medium text-gray-900">
+                            <p className="font-medium text-foreground">
                               {coach.firstName} {coach.lastName}
                             </p>
-                            <p className="text-sm text-gray-500">{coach.email}</p>
+                            <p className="text-sm text-muted-foreground">{coach.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
+                      <td className="px-4 py-3 text-sm text-foreground">
                         {coach.company || "Not set"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
+                      <td className="px-4 py-3 text-sm text-foreground">
                         {formatDate(coach.updatedAt)}
                       </td>
                       <td className="px-4 py-3">

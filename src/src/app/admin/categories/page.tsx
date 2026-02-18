@@ -144,7 +144,7 @@ export default function CategoriesPage() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-purple-900">Workshop Categories</h2>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm text-muted-foreground mt-1">
                         Manage workshop categories that coaches select when creating workshops.
                     </p>
                 </div>
@@ -158,13 +158,13 @@ export default function CategoriesPage() {
 
             {/* Create/Edit Form */}
             {showForm && (
-                <div className="bg-white rounded-xl shadow-sm border p-6 mb-6">
+                <div className="bg-card rounded-xl shadow-sm border p-6 mb-6">
                     <h3 className="font-semibold text-lg mb-4">
                         {editingId ? "Edit Category" : "New Category"}
                     </h3>
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-foreground mb-1">
                                 Name <span className="text-red-500">*</span>
                             </label>
                             <input
@@ -176,7 +176,7 @@ export default function CategoriesPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-foreground mb-1">
                                 Description
                             </label>
                             <textarea
@@ -200,7 +200,7 @@ export default function CategoriesPage() {
                             </button>
                             <button
                                 onClick={closeForm}
-                                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium text-sm"
+                                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-gray-200 font-medium text-sm"
                             >
                                 Cancel
                             </button>
@@ -211,58 +211,58 @@ export default function CategoriesPage() {
 
             {/* Category List */}
             {isLoading ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">
+                <div className="bg-card rounded-xl shadow-sm p-8 text-center text-muted-foreground">
                     Loading categories...
                 </div>
             ) : error ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-red-600">
+                <div className="bg-card rounded-xl shadow-sm p-8 text-center text-red-600">
                     {error}
                 </div>
             ) : categories.length === 0 ? (
-                <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">
+                <div className="bg-card rounded-xl shadow-sm p-8 text-center text-muted-foreground">
                     No categories yet. Click &quot;+ Add Category&quot; to create one.
                 </div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                <div className="bg-card rounded-xl shadow-sm border overflow-hidden">
+                    <table className="min-w-full divide-y divide-border">
+                        <thead className="bg-muted">
                             <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                     Name
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                     Slug
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                     Pricing Tiers
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                     Workshops
                                 </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                                     Status
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                                <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
                                     Actions
                                 </th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody className="divide-y divide-border">
                             {categories.map((cat) => (
-                                <tr key={cat.id} className={!cat.isActive ? "bg-gray-50 opacity-60" : ""}>
+                                <tr key={cat.id} className={!cat.isActive ? "bg-muted opacity-60" : ""}>
                                     <td className="px-6 py-4">
-                                        <div className="font-medium text-gray-900">{cat.name}</div>
+                                        <div className="font-medium text-foreground">{cat.name}</div>
                                         {cat.description && (
-                                            <div className="text-sm text-gray-500 mt-0.5">{cat.description}</div>
+                                            <div className="text-sm text-muted-foreground mt-0.5">{cat.description}</div>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500 font-mono">
+                                    <td className="px-6 py-4 text-sm text-muted-foreground font-mono">
                                         {cat.slug}
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-900">
+                                    <td className="px-6 py-4 text-sm text-foreground">
                                         {cat.pricingTiers.length}
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-900">
+                                    <td className="px-6 py-4 text-sm text-foreground">
                                         {cat._count.workshops}
                                     </td>
                                     <td className="px-6 py-4">
@@ -271,7 +271,7 @@ export default function CategoriesPage() {
                                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
                                                 cat.isActive
                                                     ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                    : "bg-muted text-muted-foreground hover:bg-gray-200"
                                             }`}
                                         >
                                             {cat.isActive ? "Active" : "Inactive"}

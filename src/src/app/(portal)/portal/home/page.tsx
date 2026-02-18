@@ -65,7 +65,7 @@ export default async function CoachDashboardPage() {
     <div className="space-y-6">
       <FadeUp>
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-foreground">
             Welcome Back, {coach.firstName}!
           </h2>
           <Link
@@ -111,16 +111,16 @@ export default async function CoachDashboardPage() {
 
       {/* Upcoming Workshops */}
       <FadeUp delay={0.15}>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-900">Upcoming Workshops</h3>
+        <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+          <div className="px-6 py-4 border-b border-border flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-foreground">Upcoming Workshops</h3>
             <Link href="/portal/workshops" className="text-blue-600 hover:text-blue-700 text-sm">
               View All →
             </Link>
           </div>
 
           {upcomingWorkshops.length === 0 ? (
-            <div className="px-6 py-12 text-center text-gray-500">
+            <div className="px-6 py-12 text-center text-muted-foreground">
               <p className="mb-4">No upcoming workshops scheduled.</p>
               <Link
                 href="/portal/request"
@@ -132,11 +132,11 @@ export default async function CoachDashboardPage() {
           ) : (
             <ul className="divide-y divide-gray-100">
               {upcomingWorkshops.map((workshop) => (
-                <li key={workshop.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                <li key={workshop.id} className="px-6 py-4 hover:bg-accent transition-colors">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h4 className="font-medium text-gray-900">{workshop.title}</h4>
-                      <p className="text-sm text-gray-500">
+                      <h4 className="font-medium text-foreground">{workshop.title}</h4>
+                      <p className="text-sm text-muted-foreground">
                         {new Date(workshop.eventDate).toLocaleDateString("en-US", {
                           weekday: "long",
                           month: "long",
@@ -150,7 +150,7 @@ export default async function CoachDashboardPage() {
                       {/* Sprint 3: Only show attendee count, NOT revenue */}
                       <div className="text-lg font-semibold text-blue-600">
                         {workshop._count.registrations}
-                        <span className="text-sm font-normal text-gray-500 ml-1">
+                        <span className="text-sm font-normal text-muted-foreground ml-1">
                           registrations
                         </span>
                       </div>
@@ -197,14 +197,14 @@ function StatCard({ label, value, color }: { label: string; value: number; color
   const colors: Record<string, string> = {
     blue: "text-blue-600",
     green: "text-green-600",
-    gray: "text-gray-600",
+    gray: "text-muted-foreground",
     orange: "text-orange-600",
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      <div className="text-sm text-gray-500 uppercase tracking-wider">{label}</div>
-      <div className={`text-3xl font-bold mt-2 ${colors[color] || "text-gray-900"}`}>
+    <div className="bg-card rounded-xl shadow-sm border border-border p-6">
+      <div className="text-sm text-muted-foreground uppercase tracking-wider">{label}</div>
+      <div className={`text-3xl font-bold mt-2 ${colors[color] || "text-foreground"}`}>
         {value}
       </div>
     </div>

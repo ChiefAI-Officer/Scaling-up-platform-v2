@@ -64,26 +64,26 @@ export function Step3Review() {
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
             <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Pricing & Review</h2>
-                <p className="text-gray-500">
+                <h2 className="text-xl font-semibold text-foreground">Pricing & Review</h2>
+                <p className="text-muted-foreground">
                     Confirm your workshop details and select pricing.
                 </p>
             </div>
 
             {/* Review Summary Card */}
-            <Card className="bg-gray-50 border-gray-200">
+            <Card className="bg-muted border-border">
                 <CardContent className="pt-6 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <p className="text-sm font-medium text-gray-500">Category</p>
-                            <p className="font-semibold text-gray-900">{displayName}</p>
-                            <p className="text-sm text-gray-700 mt-1">{formData.title}</p>
+                            <p className="text-sm font-medium text-muted-foreground">Category</p>
+                            <p className="font-semibold text-foreground">{displayName}</p>
+                            <p className="text-sm text-foreground mt-1">{formData.title}</p>
                         </div>
                         <div>
-                            <p className="text-sm font-medium text-gray-500">When & Where</p>
-                            <p className="font-medium text-gray-900">{formattedDate} at {formData.eventTime}</p>
-                            <p className="text-sm text-gray-700">{locationDisplay}</p>
-                            <p className="text-xs text-gray-500 mt-1">{formatLabel}</p>
+                            <p className="text-sm font-medium text-muted-foreground">When & Where</p>
+                            <p className="font-medium text-foreground">{formattedDate} at {formData.eventTime}</p>
+                            <p className="text-sm text-foreground">{locationDisplay}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{formatLabel}</p>
                         </div>
                     </div>
                 </CardContent>
@@ -91,7 +91,7 @@ export function Step3Review() {
 
             {/* JV-17: Pricing Tier Dropdown */}
             <div className="space-y-4 py-4">
-                <h3 className="font-medium text-gray-900">Pricing</h3>
+                <h3 className="font-medium text-foreground">Pricing</h3>
 
                 {pricingTiers.length > 0 ? (
                     <div className="space-y-3">
@@ -114,12 +114,12 @@ export function Step3Review() {
                             </Select>
                         </div>
                         {selectedTier && (
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-muted-foreground">
                                 Selected: <span className="font-semibold">${(selectedTier.amountCents / 100).toFixed(0)}</span> per attendee
                             </p>
                         )}
 
-                        <div className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg">
+                        <div className="flex items-start space-x-3 p-4 border border-border rounded-lg">
                             <Checkbox
                                 id="customPricing"
                                 checked={formData.customPricing}
@@ -130,7 +130,7 @@ export function Step3Review() {
                                 <Label htmlFor="customPricing" className="font-medium cursor-pointer">
                                     Request Custom Pricing
                                 </Label>
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-muted-foreground">
                                     Need a different price? Check this to request approval for custom pricing.
                                 </p>
                             </div>
@@ -138,7 +138,7 @@ export function Step3Review() {
                     </div>
                 ) : (
                     /* Legacy fallback: no pricing tiers in DB */
-                    <div className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg">
+                    <div className="flex items-start space-x-3 p-4 border border-border rounded-lg">
                         <Checkbox
                             id="customPricing"
                             checked={formData.customPricing}
@@ -149,7 +149,7 @@ export function Step3Review() {
                             <Label htmlFor="customPricing" className="font-medium cursor-pointer">
                                 Request Custom Pricing
                             </Label>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-muted-foreground">
                                 Standard price is <span className="font-semibold">${(legacyType?.price || 0) / 100}</span>.
                                 Check this if you need to offer a different price (requires approval).
                             </p>
@@ -159,7 +159,7 @@ export function Step3Review() {
             </div>
 
             {/* JV-27: Terms and Conditions */}
-            <div className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg bg-blue-50/50">
+            <div className="flex items-start space-x-3 p-4 border border-border rounded-lg bg-blue-50/50">
                 <Checkbox
                     id="termsAccepted"
                     checked={formData.termsAccepted}
@@ -170,7 +170,7 @@ export function Step3Review() {
                     <Label htmlFor="termsAccepted" className="font-medium cursor-pointer">
                         I agree to the Terms and Conditions
                     </Label>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                         By submitting this workshop request, I confirm that I have read and agree to the
                         Scaling Up workshop hosting terms, including cancellation policies, pricing guidelines,
                         and brand usage requirements.
@@ -178,7 +178,7 @@ export function Step3Review() {
                 </div>
             </div>
 
-            <div className="flex justify-between pt-6 border-t border-gray-100">
+            <div className="flex justify-between pt-6 border-t border-border">
                 <Button variant="outline" onClick={prevStep}>
                     ← Back
                 </Button>

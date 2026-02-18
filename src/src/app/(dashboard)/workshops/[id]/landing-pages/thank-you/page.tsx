@@ -90,21 +90,21 @@ export default function ThankYouPageEditor() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[400px]"><div className="text-gray-500">Loading...</div></div>;
+    return <div className="flex items-center justify-center min-h-[400px]"><div className="text-muted-foreground">Loading...</div></div>;
   }
 
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+          <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
           <span>/</span>
-          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Workshop Editor</Link>
+          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-foreground">Workshop Editor</Link>
           <span>/</span>
-          <span className="text-gray-900">Thank You Page</span>
+          <span className="text-foreground">Thank You Page</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Thank You Page Editor</h1>
-        <p className="text-gray-600">Page shown after successful registration</p>
+        <h1 className="text-2xl font-bold text-foreground">Thank You Page Editor</h1>
+        <p className="text-muted-foreground">Page shown after successful registration</p>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>}
@@ -133,7 +133,7 @@ export default function ThankYouPageEditor() {
               <div>
                 <Label htmlFor="videoUrl">Video Embed URL</Label>
                 <Input id="videoUrl" name="videoUrl" value={formData.videoUrl} onChange={handleChange} placeholder="https://player.vimeo.com/video/..." className="mt-1" />
-                <p className="text-xs text-gray-500 mt-1">Vimeo or YouTube embed URL. Leave empty to hide video.</p>
+                <p className="text-xs text-muted-foreground mt-1">Vimeo or YouTube embed URL. Leave empty to hide video.</p>
               </div>
             </CardContent>
           </Card>
@@ -169,7 +169,7 @@ export default function ThankYouPageEditor() {
         {/* Preview */}
         <div className="sticky top-4">
           <Card className="overflow-hidden">
-            <CardHeader className="bg-gray-50 border-b py-2">
+            <CardHeader className="bg-muted border-b py-2">
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -247,10 +247,10 @@ export default function ThankYouPageEditor() {
 
                   {/* Calendar buttons placeholder */}
                   <div className="flex gap-2 justify-center">
-                    <button className="bg-white/20 text-white text-xs px-3 py-1.5 rounded hover:bg-white/30">
+                    <button className="bg-card/20 text-white text-xs px-3 py-1.5 rounded hover:bg-card/30">
                       Google Calendar
                     </button>
-                    <button className="bg-white/20 text-white text-xs px-3 py-1.5 rounded hover:bg-white/30">
+                    <button className="bg-card/20 text-white text-xs px-3 py-1.5 rounded hover:bg-card/30">
                       Outlook
                     </button>
                   </div>

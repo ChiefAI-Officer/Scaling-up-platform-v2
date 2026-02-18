@@ -83,9 +83,9 @@ export function CancelWorkshopDialog({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-                <h2 className="text-lg font-semibold text-gray-900">Cancel Workshop</h2>
-                <p className="mt-2 text-sm text-gray-600">
+            <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
+                <h2 className="text-lg font-semibold text-foreground">Cancel Workshop</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
                     Are you sure you want to cancel <span className="font-medium">{workshopTitle}</span>?
                 </p>
 
@@ -111,7 +111,7 @@ export function CancelWorkshopDialog({
                     </div>
                 )}
 
-                <p className="mt-4 text-sm text-gray-500">
+                <p className="mt-4 text-sm text-muted-foreground">
                     This action cannot be undone. Any registrants will need to be notified separately.
                 </p>
 

@@ -56,7 +56,7 @@ const STATUS_CONFIG: Record<WorkshopStatus, { label: string; color: string; dotC
 
 const DEFAULT_CONFIG = {
     label: "Unknown",
-    color: "bg-gray-100 text-gray-700 border-gray-200",
+    color: "bg-muted text-foreground border-border",
     dotColor: "bg-gray-400",
 };
 

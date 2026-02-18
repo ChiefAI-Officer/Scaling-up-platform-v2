@@ -40,7 +40,7 @@ export function CopyUrlButton({ url }: CopyUrlButtonProps) {
             </a>
             <button
                 onClick={handleCopy}
-                className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                className="text-muted-foreground hover:text-muted-foreground flex-shrink-0"
                 title={copied ? "Copied!" : "Copy URL"}
             >
                 {copied ? (

@@ -23,9 +23,9 @@ async function SurveyTemplatesList() {
 
   if (templates.length === 0) {
     return (
-      <div className="rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
-        <h3 className="text-lg font-medium text-gray-900">No survey templates</h3>
-        <p className="mt-1 text-sm text-gray-500">
+      <div className="rounded-lg border-2 border-dashed border-border p-12 text-center">
+        <h3 className="text-lg font-medium text-foreground">No survey templates</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
           Create your first survey template to start collecting feedback.
         </p>
         <div className="mt-6">
@@ -42,37 +42,37 @@ async function SurveyTemplatesList() {
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+      <table className="min-w-full divide-y divide-border">
+        <thead className="bg-muted">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Name
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Type
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Questions
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Responses
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Status
             </th>
-            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+            <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Actions
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
+        <tbody className="divide-y divide-border bg-card">
           {templates.map((template) => (
-            <tr key={template.id} className="hover:bg-gray-50">
+            <tr key={template.id} className="hover:bg-accent">
               <td className="px-6 py-4">
                 <div>
-                  <div className="text-sm font-medium text-gray-900">{template.name}</div>
+                  <div className="text-sm font-medium text-foreground">{template.name}</div>
                   {template.description && (
-                    <div className="text-sm text-gray-500">{template.description}</div>
+                    <div className="text-sm text-muted-foreground">{template.description}</div>
                   )}
                 </div>
               </td>
@@ -81,10 +81,10 @@ async function SurveyTemplatesList() {
                   {SURVEY_TYPE_LABELS[template.surveyType as SurveyType] || template.surveyType}
                 </span>
               </td>
-              <td className="px-6 py-4 text-sm text-gray-700">
+              <td className="px-6 py-4 text-sm text-foreground">
                 {template.questions.length}
               </td>
-              <td className="px-6 py-4 text-sm text-gray-700">
+              <td className="px-6 py-4 text-sm text-foreground">
                 {template._count.surveys}
               </td>
               <td className="px-6 py-4">
@@ -92,7 +92,7 @@ async function SurveyTemplatesList() {
                   className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     template.isActive
                       ? "bg-green-100 text-green-800"
-                      : "bg-gray-100 text-gray-800"
+                      : "bg-muted text-foreground"
                   }`}
                 >
                   {template.isActive ? "Active" : "Inactive"}
@@ -129,8 +129,8 @@ export default function AdminSurveysPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Survey Templates</h1>
-          <p className="text-gray-600">
+          <h1 className="text-2xl font-bold text-foreground">Survey Templates</h1>
+          <p className="text-muted-foreground">
             Build custom surveys to collect pre/post-event feedback and NPS scores.
           </p>
         </div>
@@ -142,10 +142,10 @@ export default function AdminSurveysPage() {
         </Link>
       </div>
 
-      <div className="rounded-lg bg-white shadow">
+      <div className="rounded-lg bg-card shadow">
         <Suspense
           fallback={
-            <div className="flex min-h-[200px] items-center justify-center text-gray-500">
+            <div className="flex min-h-[200px] items-center justify-center text-muted-foreground">
               Loading templates...
             </div>
           }

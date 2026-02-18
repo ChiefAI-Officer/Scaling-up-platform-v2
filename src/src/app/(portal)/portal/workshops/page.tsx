@@ -39,8 +39,8 @@ export default async function MyWorkshopsPage() {
             <FadeUp>
               <div className="flex justify-between items-center">
                   <div>
-                      <h1 className="text-2xl font-bold text-gray-900">My Workshops</h1>
-                      <p className="text-gray-500">Manage your upcoming and past events.</p>
+                      <h1 className="text-2xl font-bold text-foreground">My Workshops</h1>
+                      <p className="text-muted-foreground">Manage your upcoming and past events.</p>
                   </div>
                   <Link
                       href="/portal/request"

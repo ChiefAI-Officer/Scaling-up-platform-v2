@@ -16,7 +16,7 @@ export function AdminMobileNav({ links, email }: AdminMobileNavProps) {
     <div className="md:hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+        className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent"
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
       >
@@ -24,24 +24,24 @@ export function AdminMobileNav({ links, email }: AdminMobileNavProps) {
       </button>
 
       {open && (
-        <div className="absolute top-16 inset-x-0 bg-white border-b shadow-lg z-50">
+        <div className="absolute top-16 inset-x-0 bg-card border-b shadow-lg z-50">
           <div className="px-4 py-3 space-y-1">
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className="block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 text-sm font-medium"
+                className="block px-3 py-2 rounded-lg text-foreground hover:bg-accent text-sm font-medium"
               >
                 {link.label}
               </Link>
             ))}
             <div className="border-t pt-2 mt-2 space-y-1">
-              <p className="px-3 py-1 text-xs text-gray-500">{email}</p>
+              <p className="px-3 py-1 text-xs text-muted-foreground">{email}</p>
               <Link
                 href="/admin/settings"
                 onClick={() => setOpen(false)}
-                className="block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 text-sm font-medium"
+                className="block px-3 py-2 rounded-lg text-foreground hover:bg-accent text-sm font-medium"
               >
                 Settings
               </Link>

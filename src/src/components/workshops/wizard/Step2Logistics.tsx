@@ -47,15 +47,15 @@ export function Step2Logistics() {
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
             <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Event Logistics</h2>
-                <p className="text-gray-500">
+                <h2 className="text-xl font-semibold text-foreground">Event Logistics</h2>
+                <p className="text-muted-foreground">
                     Where and when will this workshop take place?
                 </p>
             </div>
 
             {/* JV-19: Format selector (virtual/in-person/hybrid) */}
             <div className="space-y-3">
-                <Label className="text-sm font-medium text-gray-700">Workshop Format</Label>
+                <Label className="text-sm font-medium text-foreground">Workshop Format</Label>
                 <div className="grid grid-cols-3 gap-3">
                     {([
                         { value: "IN_PERSON" as const, label: "In-Person", desc: "Physical venue" },
@@ -69,7 +69,7 @@ export function Step2Logistics() {
                             className={`flex flex-col items-center gap-1 p-4 rounded-lg border-2 transition-colors ${
                                 formData.format === option.value
                                     ? "border-blue-500 bg-blue-50 text-blue-700"
-                                    : "border-gray-200 hover:border-gray-300 text-gray-600"
+                                    : "border-border hover:border-border text-muted-foreground"
                             }`}
                         >
                             <span className="text-sm font-medium">{option.label}</span>
@@ -109,8 +109,8 @@ export function Step2Logistics() {
 
             {/* Venue section — shown for IN_PERSON and HYBRID */}
             {formData.format !== "VIRTUAL" && (
-                <div className="border-t border-gray-100 my-6 pt-6 space-y-4">
-                    <h3 className="font-medium text-gray-900">Venue Information</h3>
+                <div className="border-t border-border my-6 pt-6 space-y-4">
+                    <h3 className="font-medium text-foreground">Venue Information</h3>
 
                     <div className="space-y-2">
                         <Label htmlFor="venueName">Venue Name</Label>
@@ -170,8 +170,8 @@ export function Step2Logistics() {
 
             {/* Virtual section — shown for VIRTUAL and HYBRID */}
             {formData.format !== "IN_PERSON" && (
-                <div className="border-t border-gray-100 my-6 pt-6 space-y-4">
-                    <h3 className="font-medium text-gray-900">Virtual Details</h3>
+                <div className="border-t border-border my-6 pt-6 space-y-4">
+                    <h3 className="font-medium text-foreground">Virtual Details</h3>
 
                     <div className="space-y-2">
                         <Label htmlFor="virtualPlatform">Platform</Label>
@@ -179,7 +179,7 @@ export function Step2Logistics() {
                             id="virtualPlatform"
                             value={formData.virtualPlatform}
                             onChange={(e) => updateField("virtualPlatform", e.target.value)}
-                            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                            className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
                         >
                             <option value="">Select a platform...</option>
                             <option value="zoom">Zoom</option>
@@ -202,7 +202,7 @@ export function Step2Logistics() {
                         {virtualLinkInvalid && (
                             <p className="text-xs text-red-500">Please enter a valid URL (e.g., https://zoom.us/j/...)</p>
                         )}
-                        <p className="text-xs text-gray-400">You can add this later if you don&apos;t have it yet.</p>
+                        <p className="text-xs text-muted-foreground">You can add this later if you don&apos;t have it yet.</p>
                     </div>
                 </div>
             )}

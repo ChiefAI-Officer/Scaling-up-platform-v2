@@ -274,7 +274,7 @@ export default function SoloLandingEditor() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
@@ -282,15 +282,15 @@ export default function SoloLandingEditor() {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+          <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
           <span>/</span>
-          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Workshop Editor</Link>
+          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-foreground">Workshop Editor</Link>
           <span>/</span>
-          <span className="text-gray-900">Solo Landing Page</span>
+          <span className="text-foreground">Solo Landing Page</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Solo Landing Page</h1>
-        <p className="text-gray-600">Exit & Valuation Workshop template with single coach</p>
+        <h1 className="text-2xl font-bold text-foreground">Solo Landing Page</h1>
+        <p className="text-muted-foreground">Exit & Valuation Workshop template with single coach</p>
       </div>
 
       {error && (
@@ -359,7 +359,7 @@ export default function SoloLandingEditor() {
                   value={formData.aboutDescription}
                   onChange={handleChange}
                   rows={4}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
               <div>
@@ -368,7 +368,7 @@ export default function SoloLandingEditor() {
                   id="partnerId"
                   value={formData.partnerId}
                   onChange={(e) => handlePartnerSelect(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2"
                 >
                   <option value="">No partner</option>
                   {availablePartners.map((partner) => (
@@ -377,12 +377,12 @@ export default function SoloLandingEditor() {
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-muted-foreground">
                   Pulls partner logo and tagline from the Partners module.
                 </p>
               </div>
               {formData.partnerId ? (
-                <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                <div className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
                   <p><span className="font-medium">Tagline:</span> {formData.partnerTagline || "No tagline"}</p>
                   <p className="truncate"><span className="font-medium">Logo URL:</span> {formData.partnerLogoUrl || "No logo URL"}</p>
                 </div>
@@ -430,7 +430,7 @@ export default function SoloLandingEditor() {
                   placeholder="https://player.vimeo.com/video/..."
                   className="mt-1"
                 />
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Vimeo or YouTube embed URL
                 </p>
               </div>
@@ -469,7 +469,7 @@ export default function SoloLandingEditor() {
         {/* Preview Panel - 3 columns */}
         <div className="col-span-3 sticky top-4">
           <Card className="overflow-hidden">
-            <CardHeader className="bg-gray-50 border-b">
+            <CardHeader className="bg-muted border-b">
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -523,7 +523,7 @@ export default function SoloLandingEditor() {
                             <img
                               src={formData.partnerLogoUrl}
                               alt={formData.partnerName || "Partner"}
-                              className="mx-auto h-10 w-auto object-contain rounded bg-white p-1"
+                              className="mx-auto h-10 w-auto object-contain rounded bg-card p-1"
                             />
                           ) : null}
                           {formData.partnerName ? (
@@ -544,16 +544,16 @@ export default function SoloLandingEditor() {
                     <h2 className="text-xl font-bold mb-4">
                       {formData.aboutTitle || `Join us for the ${formData.heroTitle}`}
                     </h2>
-                    <p className="text-gray-600 mb-6">{formData.aboutDescription}</p>
+                    <p className="text-muted-foreground mb-6">{formData.aboutDescription}</p>
 
                     {formData.videoUrl && (
                       <div className="bg-gray-200 aspect-video rounded-lg mb-6 flex items-center justify-center">
-                        <span className="text-gray-500">Video: {formData.videoUrl}</span>
+                        <span className="text-muted-foreground">Video: {formData.videoUrl}</span>
                       </div>
                     )}
 
                     <h3 className="font-bold text-purple-700 mb-3">What You&rsquo;ll Learn</h3>
-                    <ul className="space-y-2 text-sm text-gray-700">
+                    <ul className="space-y-2 text-sm text-foreground">
                       {formData.benefits.map((b, i) => (
                         <li key={i} className="flex items-start gap-2">
                           <span className="text-blue-500">✓</span>
@@ -564,12 +564,12 @@ export default function SoloLandingEditor() {
                   </div>
 
                   {/* Registration Card */}
-                  <div className="bg-white border rounded-lg p-4 shadow-sm">
+                  <div className="bg-card border rounded-lg p-4 shadow-sm">
                     <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-3 -m-4 mb-4 rounded-t-lg">
                       <div className="text-xs uppercase font-semibold">Register Now</div>
                     </div>
                     <div className="text-sm font-bold mb-1">{formData.eventDate}</div>
-                    <div className="text-xs text-gray-600 mb-3">with {formData.coachName}</div>
+                    <div className="text-xs text-muted-foreground mb-3">with {formData.coachName}</div>
                     <div className="text-lg font-bold text-purple-700 mb-3">Free</div>
                     <button className="w-full bg-blue-600 text-white py-2 rounded-md text-sm font-semibold">
                       {formData.ctaText}

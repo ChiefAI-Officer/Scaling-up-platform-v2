@@ -9,8 +9,8 @@ export default async function RequestWorkshopPage() {
     return (
         <div className="max-w-4xl mx-auto py-8">
             <div className="mb-8 text-center">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Request New Workshop</h1>
-                <p className="text-gray-600">
+                <h1 className="text-3xl font-bold text-foreground mb-2">Request New Workshop</h1>
+                <p className="text-muted-foreground">
                     Follow the steps below to set up your new workshop event. Your progress is saved automatically.
                 </p>
             </div>

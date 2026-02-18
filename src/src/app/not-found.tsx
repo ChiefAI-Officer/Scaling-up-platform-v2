@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 export default function NotFound() {
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-gray-50 px-4"
+      className="min-h-screen flex items-center justify-center bg-muted px-4"
       role="main"
       aria-labelledby="not-found-title"
     >
@@ -20,12 +20,12 @@ export default function NotFound() {
 
         <h1
           id="not-found-title"
-          className="text-2xl font-bold text-gray-900 mb-2"
+          className="text-2xl font-bold text-foreground mb-2"
         >
           Page not found
         </h1>
 
-        <p className="text-gray-600 mb-8">
+        <p className="text-muted-foreground mb-8">
           Sorry, we couldn&apos;t find the page you&apos;re looking for. It may have
           been moved or deleted.
         </p>

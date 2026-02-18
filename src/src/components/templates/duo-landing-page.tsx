@@ -6,11 +6,11 @@ export function DuoLandingPage({ data }: { data: LandingPageData }) {
     const workshop = data.workshop!;
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-card">
             {/* Hero Section */}
             <section className="relative bg-gradient-to-r from-blue-900 to-slate-900 text-white py-24">
                 <div className="container mx-auto px-6 text-center">
-                    <div className="inline-block px-4 py-1.5 bg-white/10 rounded-full text-sm font-semibold mb-6 tracking-wide uppercase">
+                    <div className="inline-block px-4 py-1.5 bg-card/10 rounded-full text-sm font-semibold mb-6 tracking-wide uppercase">
                         Double Impact Workshop
                     </div>
                     <h1 className="text-4xl lg:text-6xl font-extrabold mb-6 leading-tight">
@@ -22,7 +22,7 @@ export function DuoLandingPage({ data }: { data: LandingPageData }) {
                         </p>
                     )}
 
-                    <div className="flex flex-wrap justify-center gap-6 text-lg mb-10 bg-white/5 inline-flex p-4 rounded-xl border border-white/10">
+                    <div className="flex flex-wrap justify-center gap-6 text-lg mb-10 bg-card/5 inline-flex p-4 rounded-xl border border-white/10">
                         <div className="flex items-center gap-2">
                             <Calendar className="w-5 h-5 text-blue-400" />
                             <span>{workshop.date}</span>
@@ -48,7 +48,7 @@ export function DuoLandingPage({ data }: { data: LandingPageData }) {
             </section>
 
             {/* Coaches Section */}
-            <section className="py-24 bg-white">
+            <section className="py-24 bg-card">
                 <div className="container mx-auto px-6">
                     <div className="text-center mb-16">
                         <h2 className="text-3xl font-bold mb-4">Led by Scale Up Certified Coaches</h2>

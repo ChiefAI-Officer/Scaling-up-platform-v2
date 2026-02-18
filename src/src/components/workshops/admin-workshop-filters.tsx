@@ -49,20 +49,20 @@ export function AdminWorkshopFilters() {
     return (
         <div className="flex items-center gap-3 flex-wrap">
             <form onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[200px] max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                     type="text"
                     placeholder="Search by title or coach..."
                     value={searchValue}
                     onChange={(e) => setSearchValue(e.target.value)}
                     onBlur={() => updateParams("search", searchValue.trim())}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
             </form>
             <select
                 value={currentStatus}
                 onChange={(e) => updateParams("status", e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
                 {STATUS_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -71,7 +71,7 @@ export function AdminWorkshopFilters() {
             {hasFilters && (
                 <button
                     onClick={clearAll}
-                    className="flex items-center gap-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
+                    className="flex items-center gap-1 px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
                 >
                     <X className="w-4 h-4" /> Clear
                 </button>

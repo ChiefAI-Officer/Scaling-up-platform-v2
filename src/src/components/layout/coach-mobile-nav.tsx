@@ -25,7 +25,7 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
     <div className="md:hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+        className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent"
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
       >
@@ -41,7 +41,7 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
           <div className="relative w-72 bg-gray-900 text-white flex flex-col">
             <div className="px-6 h-16 flex items-center justify-between border-b border-gray-800">
               <span className="text-lg font-bold">Scaling Up Coach</span>
-              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-white">
+              <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>

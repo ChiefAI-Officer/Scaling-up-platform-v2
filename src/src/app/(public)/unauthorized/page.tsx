@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 export default function UnauthorizedPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted py-12 px-4">
       <Card className="w-full max-w-md text-center">
         <CardHeader>
           <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
@@ -26,7 +26,7 @@ export default function UnauthorizedPage() {
           <CardTitle className="text-2xl font-bold">Access Denied</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             You don&apos;t have permission to access this page. Please contact your
             administrator if you believe this is an error.
           </p>

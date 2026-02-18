@@ -194,7 +194,7 @@ export default function WorkshopEditorPage() {
         new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
     if (loading) {
-        return <div className="flex items-center justify-center min-h-[400px] text-gray-500">Loading...</div>;
+        return <div className="flex items-center justify-center min-h-[400px] text-muted-foreground">Loading...</div>;
     }
 
     if (error || !workshop) {
@@ -220,7 +220,7 @@ export default function WorkshopEditorPage() {
                                     <div className="text-center mb-4">
                                         <span className="text-3xl">{tpl.icon}</span>
                                         <h3 className="font-semibold mt-2">{tpl.label}</h3>
-                                        <p className="text-sm text-gray-500 mt-1">{tpl.description}</p>
+                                        <p className="text-sm text-muted-foreground mt-1">{tpl.description}</p>
                                     </div>
 
                                     <div className="flex justify-center mb-4">
@@ -281,7 +281,7 @@ export default function WorkshopEditorPage() {
                             <h3 className="font-semibold text-lg">
                                 {activeTab === "REGISTRATION" ? "Registration / Payment Page" : "Thank You Page"}
                             </h3>
-                            <p className="text-sm text-gray-500 mt-1">
+                            <p className="text-sm text-muted-foreground mt-1">
                                 {activeTab === "REGISTRATION"
                                     ? "The form page visitors see when they click \"Register Here\" on the landing page."
                                     : "Confirmation page shown after successful registration, with optional video and calendar links."}
@@ -327,17 +327,17 @@ export default function WorkshopEditorPage() {
         <div className="max-w-5xl mx-auto">
             {/* Breadcrumb */}
             <div className="mb-6">
-                <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-                    <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                    <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
                     <span>/</span>
-                    <Link href={`/workshops/${workshopId}`} className="hover:text-gray-700">{workshop.title}</Link>
+                    <Link href={`/workshops/${workshopId}`} className="hover:text-foreground">{workshop.title}</Link>
                     <span>/</span>
-                    <span className="text-gray-900">Workshop Editor</span>
+                    <span className="text-foreground">Workshop Editor</span>
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">Workshop Editor</h1>
-                <p className="text-gray-600">
+                <h1 className="text-2xl font-bold text-foreground">Workshop Editor</h1>
+                <p className="text-muted-foreground">
                     Manage pages for <strong>{workshop.title}</strong>
-                    {workshop.workshopCode && <span className="text-gray-400 ml-2">({workshop.workshopCode})</span>}
+                    {workshop.workshopCode && <span className="text-muted-foreground ml-2">({workshop.workshopCode})</span>}
                 </p>
             </div>
 
@@ -351,7 +351,7 @@ export default function WorkshopEditorPage() {
                             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                                 activeTab === tab.value
                                     ? "border-blue-600 text-blue-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                             }`}
                         >
                             {tab.label}
@@ -361,7 +361,7 @@ export default function WorkshopEditorPage() {
             </div>
 
             {/* Tab description */}
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
                 {PAGE_TABS.find((t) => t.value === activeTab)?.description}
             </p>
 
@@ -381,15 +381,15 @@ export default function WorkshopEditorPage() {
                     </CardHeader>
                     <CardContent className="space-y-3">
                         {libraryLoading ? (
-                            <p className="text-sm text-gray-500">Loading available pages...</p>
+                            <p className="text-sm text-muted-foreground">Loading available pages...</p>
                         ) : libraryItems.length === 0 ? (
-                            <p className="text-sm text-gray-500">No existing pages of this type found to copy from.</p>
+                            <p className="text-sm text-muted-foreground">No existing pages of this type found to copy from.</p>
                         ) : (
                             <>
                                 <select
                                     value={selectedSourceId}
                                     onChange={(e) => setSelectedSourceId(e.target.value)}
-                                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    className="w-full rounded-md border border-border px-3 py-2 text-sm"
                                 >
                                     <option value="">Select a page to copy from...</option>
                                     {libraryItems.map((item) => (
@@ -407,7 +407,7 @@ export default function WorkshopEditorPage() {
                                     >
                                         {copying ? "Copying..." : "Apply Template"}
                                     </Button>
-                                    <span className="text-xs text-gray-500">
+                                    <span className="text-xs text-muted-foreground">
                                         This copies content as a draft. You can edit it afterward.
                                     </span>
                                 </div>

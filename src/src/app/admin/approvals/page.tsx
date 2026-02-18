@@ -89,20 +89,33 @@ export default function ApprovalsPage() {
     [filter]
   );
 
-  const getTypeColor = (type: string) => {
+  const getTypeBadgeClasses = (type: string) => {
     switch (type) {
       case "WORKSHOP_REQUEST":
-        return "#3182ce";
+        return "bg-blue-600";
       case "CUSTOM_PRICING":
-        return "#dd6b20";
+        return "bg-orange-600";
       case "CANCELLATION":
-        return "#e53e3e";
+        return "bg-red-600";
       case "REFUND":
-        return "#d69e2e";
+        return "bg-yellow-600";
       case "DATE_CHANGE":
-        return "#805ad5";
+        return "bg-purple-600";
       default:
-        return "#718096";
+        return "bg-gray-500";
+    }
+  };
+
+  const getStatusBadgeClasses = (status: ApprovalStatus) => {
+    switch (status) {
+      case "APPROVED":
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+      case "DENIED":
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+      case "EXPIRED":
+        return "bg-muted text-muted-foreground";
+      default:
+        return "bg-muted text-muted-foreground";
     }
   };
 
@@ -111,141 +124,18 @@ export default function ApprovalsPage() {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-      className="approvals-page"
     >
-      <style jsx>{`
-        .approvals-page h2 {
-          margin-bottom: 1.5rem;
-          color: #44337a;
-        }
-        .controls {
-          display: flex;
-          gap: 1rem;
-          margin-bottom: 1.5rem;
-          flex-wrap: wrap;
-        }
-        .filter-btn {
-          padding: 0.5rem 1rem;
-          border: 1px solid #e2e8f0;
-          background: white;
-          border-radius: 6px;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .filter-btn.active {
-          background: #805ad5;
-          color: white;
-          border-color: #805ad5;
-        }
-        .approvals-list {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-        .approval-card {
-          background: white;
-          padding: 1.5rem;
-          border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 1rem;
-          align-items: center;
-        }
-        .approval-card.escalated {
-          border-left: 4px solid #e53e3e;
-        }
-        .approval-info h3 {
-          margin: 0 0 0.5rem;
-          color: #2d3748;
-        }
-        .approval-meta {
-          display: flex;
-          gap: 1rem;
-          font-size: 0.875rem;
-          color: #718096;
-        }
-        .type-badge {
-          display: inline-block;
-          padding: 0.25rem 0.75rem;
-          border-radius: 20px;
-          font-size: 0.75rem;
-          font-weight: 500;
-          color: white;
-        }
-        .escalation-warning {
-          color: #e53e3e;
-          font-weight: 500;
-          font-size: 0.875rem;
-          margin-top: 0.5rem;
-        }
-        .approval-actions {
-          display: flex;
-          gap: 0.5rem;
-          align-items: center;
-        }
-        .action-btn {
-          padding: 0.75rem 1.5rem;
-          border: none;
-          border-radius: 6px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .action-btn.approve {
-          background: #38a169;
-          color: white;
-        }
-        .action-btn.approve:hover {
-          background: #2f855a;
-        }
-        .action-btn.deny {
-          background: #e53e3e;
-          color: white;
-        }
-        .action-btn.deny:hover {
-          background: #c53030;
-        }
-        .action-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-        .status-badge {
-          padding: 0.5rem 1rem;
-          border-radius: 6px;
-          font-weight: 500;
-        }
-        .status-badge.APPROVED {
-          background: #c6f6d5;
-          color: #22543d;
-        }
-        .status-badge.DENIED {
-          background: #fed7d7;
-          color: #822727;
-        }
-        .status-badge.EXPIRED {
-          background: #edf2f7;
-          color: #4a5568;
-        }
-        .empty-state {
-          text-align: center;
-          padding: 3rem;
-          color: #718096;
-          background: white;
-          border-radius: 12px;
-        }
-        .error-state {
-          color: #c53030;
-        }
-      `}</style>
+      <h2 className="mb-6 text-2xl font-bold text-foreground">Approval Queue</h2>
 
-      <h2>Approval Queue</h2>
-
-      <div className="controls">
+      <div className="flex gap-3 mb-6 flex-wrap">
         {FILTERS.map((status) => (
           <button
             key={status}
-            className={`filter-btn ${filter === status ? "active" : ""}`}
+            className={`px-4 py-2 border rounded-md text-sm font-medium cursor-pointer transition-all duration-200 ${
+              filter === status
+                ? "bg-purple-600 text-white border-purple-600"
+                : "bg-card text-foreground border-border hover:bg-accent"
+            }`}
             onClick={() => setFilter(status)}
           >
             {status === "ALL"
@@ -255,63 +145,64 @@ export default function ApprovalsPage() {
         ))}
       </div>
 
-      <p className="mb-4 text-sm text-gray-600">Showing {titleText}</p>
+      <p className="mb-4 text-sm text-muted-foreground">Showing {titleText}</p>
 
-      <div className="approvals-list">
+      <div className="flex flex-col gap-4">
         {isLoading ? (
-          <div className="empty-state">
+          <div className="text-center p-12 text-muted-foreground bg-card rounded-xl">
             <p>Loading approvals...</p>
           </div>
         ) : error ? (
-          <div className="empty-state error-state">
+          <div className="text-center p-12 bg-card rounded-xl text-destructive">
             <p>Failed to load approvals</p>
-            <p className="text-sm">{error}</p>
+            <p className="text-sm mt-1">{error}</p>
           </div>
         ) : approvals.length === 0 ? (
-          <div className="empty-state">
+          <div className="text-center p-12 text-muted-foreground bg-card rounded-xl">
             <p>No {titleText}</p>
           </div>
         ) : (
           approvals.map((approval) => (
             <div
               key={approval.id}
-              className={`approval-card ${approval.escalatedAt ? "escalated" : ""}`}
+              className={`bg-card p-6 rounded-xl shadow-sm grid grid-cols-[1fr_auto] gap-4 items-center ${
+                approval.escalatedAt ? "border-l-4 border-red-500" : ""
+              }`}
             >
-              <div className="approval-info">
-                <h3>
+              <div>
+                <h3 className="mb-2 text-foreground font-semibold">
                   <span
-                    className="type-badge"
-                    style={{ background: getTypeColor(approval.type) }}
+                    className={`inline-block px-3 py-1 rounded-full text-xs font-medium text-white ${getTypeBadgeClasses(approval.type)}`}
                   >
                     {approval.type.replace(/_/g, " ")}
                   </span>
                   &nbsp; {approval.coachName}
                 </h3>
-                <p>{approval.details}</p>
-                <div className="approval-meta">
+                <p className="text-foreground">{approval.details}</p>
+                <div className="flex gap-4 text-sm text-muted-foreground mt-1">
                   <span>
                     Requested: {new Date(approval.requestedAt).toLocaleDateString()}
                   </span>
                 </div>
                 {approval.escalatedAt && (
-                  <p className="escalation-warning">
+                  <p className="text-destructive font-medium text-sm mt-2">
                     ⚠️ Escalated - pending for 24+ hours
                   </p>
                 )}
               </div>
 
-              <div className="approval-actions">
+              <div className="flex gap-2 items-center">
                 {approval.status === "PENDING" ? (
                   <>
                     <button
-                      className="action-btn approve"
+                      className="px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleAction(approval.id, "APPROVE")}
                       disabled={processing === approval.id}
                     >
                       {processing === approval.id ? "..." : "Approve"}
                     </button>
                     <button
-                      className="action-btn deny"
+                      className="px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleAction(approval.id, "DENY")}
                       disabled={processing === approval.id}
                     >
@@ -319,7 +210,9 @@ export default function ApprovalsPage() {
                     </button>
                   </>
                 ) : (
-                  <span className={`status-badge ${approval.status}`}>{approval.status}</span>
+                  <span className={`px-4 py-2 rounded-md font-medium text-sm ${getStatusBadgeClasses(approval.status)}`}>
+                    {approval.status}
+                  </span>
                 )}
               </div>
             </div>

@@ -58,8 +58,8 @@ export function Step1Details() {
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Workshop Details</h2>
-                <p className="text-gray-500">
+                <h2 className="text-xl font-semibold text-foreground">Workshop Details</h2>
+                <p className="text-muted-foreground">
                     Select the workshop category and provide the basic details.
                 </p>
             </div>
@@ -124,7 +124,7 @@ export function Step1Details() {
                         {touched.title && !formData.title && (
                             <p className="text-xs text-red-500">Title is required</p>
                         )}
-                        <p className="text-xs text-gray-400 ml-auto">{formData.title.length}/120</p>
+                        <p className="text-xs text-muted-foreground ml-auto">{formData.title.length}/120</p>
                     </div>
                 </div>
 
@@ -143,7 +143,7 @@ export function Step1Details() {
                         {touched.description && !formData.description && (
                             <p className="text-xs text-red-500">Description is required</p>
                         )}
-                        <p className="text-xs text-gray-400 ml-auto">{formData.description.length}/500</p>
+                        <p className="text-xs text-muted-foreground ml-auto">{formData.description.length}/500</p>
                     </div>
                 </div>
 

@@ -43,15 +43,15 @@ export default function AdminFilesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">File Manager</h1>
-        <p className="text-gray-600">
+        <h1 className="text-2xl font-bold text-foreground">File Manager</h1>
+        <p className="text-muted-foreground">
           Upload and manage files for workshops and workflow email attachments.
         </p>
       </div>
 
       <Suspense
         fallback={
-          <div className="flex min-h-[200px] items-center justify-center text-gray-500">
+          <div className="flex min-h-[200px] items-center justify-center text-muted-foreground">
             Loading files...
           </div>
         }

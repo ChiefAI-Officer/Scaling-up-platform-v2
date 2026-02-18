@@ -332,17 +332,17 @@ export function WorkflowEditor({
           <div className="flex items-center gap-3">
             <Link
               href="/admin/workflows"
-              className="text-gray-400 hover:text-gray-600"
+              className="text-muted-foreground hover:text-muted-foreground"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-foreground">
               {isNew && !workflowId ? "New Workflow" : "Edit Workflow"}
             </h1>
           </div>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             Build automated email sequences for your workshops.
           </p>
         </div>
@@ -368,12 +368,12 @@ export function WorkflowEditor({
       )}
 
       {/* === Section 1: Workflow Details === */}
-      <div className="bg-white rounded-lg shadow p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Workflow Details</h2>
+      <div className="bg-card rounded-lg shadow p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-foreground">Workflow Details</h2>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="wf-name" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="wf-name" className="block text-sm font-medium text-foreground">
               Name *
             </label>
             <input
@@ -382,11 +382,11 @@ export function WorkflowEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Standard Pre-Event Sequence"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label htmlFor="wf-desc" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="wf-desc" className="block text-sm font-medium text-foreground">
               Description
             </label>
             <input
@@ -395,17 +395,17 @@ export function WorkflowEditor({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Brief description of this workflow's purpose"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
             />
           </div>
         </div>
 
-        <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <label className="inline-flex items-center gap-2 text-sm text-foreground cursor-pointer">
           <input
             type="checkbox"
             checked={isTemplate}
             onChange={(e) => setIsTemplate(e.target.checked)}
-            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            className="rounded border-border text-blue-600 focus:ring-blue-500"
           />
           Save as template (reusable across workshops)
         </label>
@@ -413,7 +413,7 @@ export function WorkflowEditor({
 
       {/* === Section 2: Tabbed content (Steps / Timeline / Executions) === */}
       {workflowId && (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-card rounded-lg shadow overflow-hidden">
           {/* Tab bar */}
           <div className="border-b flex">
             {(["steps", "timeline", "executions"] as const).map((tab) => (
@@ -423,7 +423,7 @@ export function WorkflowEditor({
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab
                     ? "border-blue-600 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
                 {tab === "steps" && `Steps (${steps.length})`}
@@ -441,7 +441,7 @@ export function WorkflowEditor({
             <div className="flex gap-2">
               <button
                 onClick={() => setShowVariables(!showVariables)}
-                className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 border rounded-md"
+                className="text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 border rounded-md"
               >
                 {showVariables ? "Hide" : "Show"} Variables
               </button>
@@ -475,7 +475,7 @@ export function WorkflowEditor({
 
           {/* Step list */}
           {steps.length === 0 && !showNewStep && (
-            <p className="text-sm text-gray-500 text-center py-6">
+            <p className="text-sm text-muted-foreground text-center py-6">
               No steps yet. Click &ldquo;+ Add Step&rdquo; to build your email sequence.
             </p>
           )}
@@ -523,22 +523,22 @@ export function WorkflowEditor({
 
       {/* === Section 3: Workshop Assignments === */}
       {workflowId && (
-        <div className="bg-white rounded-lg shadow p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">
+        <div className="bg-card rounded-lg shadow p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">
             Assigned Workshops ({assignments.length})
           </h2>
 
           {/* Assignment form */}
           <div className="flex gap-3 items-end">
             <div className="flex-1">
-              <label htmlFor="assign-ws" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="assign-ws" className="block text-sm font-medium text-foreground mb-1">
                 Assign to Workshop
               </label>
               <select
                 id="assign-ws"
                 value={assignWorkshopId}
                 onChange={(e) => setAssignWorkshopId(e.target.value)}
-                className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                className="block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
               >
                 <option value="">Select a workshop...</option>
                 {workshops
@@ -569,13 +569,13 @@ export function WorkflowEditor({
                   className="flex items-center justify-between py-3"
                 >
                   <div>
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-foreground">
                       {assignment.workshop.title}
                     </span>
-                    <span className="ml-2 text-sm text-gray-500">
+                    <span className="ml-2 text-sm text-muted-foreground">
                       [{assignment.workshopCode}]
                     </span>
-                    <span className="ml-2 text-sm text-gray-400">
+                    <span className="ml-2 text-sm text-muted-foreground">
                       {new Date(assignment.workshop.eventDate).toLocaleDateString()}
                     </span>
                     <Badge variant="secondary" className="ml-2">
@@ -688,26 +688,26 @@ function StepCard({
 
   if (!isEditing) {
     return (
-      <div className="border rounded-lg p-4 flex items-start justify-between hover:border-gray-300 transition-colors">
+      <div className="border rounded-lg p-4 flex items-start justify-between hover:border-border transition-colors">
         <div className="flex gap-3">
           <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-bold">
             {index + 1}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-900">
+              <span className="font-medium text-foreground">
                 {STEP_TYPE_LABELS[step.stepType as StepType] || step.stepType}
               </span>
               {!step.isActive && <Badge variant="outline">Disabled</Badge>}
             </div>
-            <p className="text-sm text-gray-500 mt-0.5">{timingLabel}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">{timingLabel}</p>
             {step.subject && (
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Subject: <span className="font-medium">{step.subject}</span>
               </p>
             )}
             {step.emailTemplate && (
-              <p className="text-sm text-gray-400 mt-0.5">
+              <p className="text-sm text-muted-foreground mt-0.5">
                 Template: {step.emailTemplate.name}
               </p>
             )}
@@ -734,15 +734,15 @@ function StepCard({
   // Editing mode
   return (
     <div className="border-2 border-blue-300 rounded-lg p-4 space-y-3 bg-blue-50/30">
-      <h4 className="font-medium text-gray-900">Edit Step {index + 1}</h4>
+      <h4 className="font-medium text-foreground">Edit Step {index + 1}</h4>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Step Type</label>
+          <label className="block text-sm font-medium text-foreground">Step Type</label>
           <select
             value={stepType}
             onChange={(e) => setStepType(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
           >
             {Object.entries(STEP_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -752,11 +752,11 @@ function StepCard({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Trigger</label>
+          <label className="block text-sm font-medium text-foreground">Trigger</label>
           <select
             value={triggerType}
             onChange={(e) => setTriggerType(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
           >
             {Object.entries(TRIGGER_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -771,11 +771,11 @@ function StepCard({
       {triggerType === TRIGGER_TYPES.RELATIVE_TO_EVENT && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Offset (days)</label>
+            <label className="block text-sm font-medium text-foreground">Offset (days)</label>
             <select
               value={offsetDays}
               onChange={(e) => setOffsetDays(Number(e.target.value))}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             >
               {OFFSET_PRESETS.filter((p) => !("hours" in p)).map((preset) => (
                 <option key={preset.days} value={preset.days}>
@@ -788,23 +788,23 @@ function StepCard({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Hours offset</label>
+            <label className="block text-sm font-medium text-foreground">Hours offset</label>
             <input
               type="number"
               value={offsetHours}
               onChange={(e) => setOffsetHours(Number(e.target.value))}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
               min={-24}
               max={24}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Send time</label>
+            <label className="block text-sm font-medium text-foreground">Send time</label>
             <input
               type="time"
               value={sendTime}
               onChange={(e) => setSendTime(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             />
           </div>
         </div>
@@ -812,13 +812,13 @@ function StepCard({
 
       {/* Email content */}
       <div>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-foreground">
           Email Template (optional)
         </label>
         <select
           value={templateId}
           onChange={(e) => setTemplateId(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
         >
           <option value="">Custom content (no template)</option>
           {emailTemplates.map((t) => (
@@ -832,23 +832,23 @@ function StepCard({
       {!templateId && (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Subject</label>
+            <label className="block text-sm font-medium text-foreground">Subject</label>
             <input
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="e.g., Your {{workshopTitle}} workshop is tomorrow!"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Body (HTML)</label>
+            <label className="block text-sm font-medium text-foreground">Body (HTML)</label>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={5}
               placeholder="Hi {{registrantName}},&#10;&#10;Your workshop is coming up..."
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm font-mono"
             />
           </div>
         </>
@@ -856,18 +856,18 @@ function StepCard({
 
       {/* JV-12: File Attachments */}
       <div className="border-t pt-3 mt-3">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-foreground mb-2">
           File Attachments ({stepFiles.length})
         </label>
         {loadingFiles ? (
-          <p className="text-xs text-gray-400">Loading files...</p>
+          <p className="text-xs text-muted-foreground">Loading files...</p>
         ) : (
           <>
             {stepFiles.length > 0 && (
               <div className="space-y-1 mb-2">
                 {stepFiles.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-sm">
-                    <span className="text-gray-700 truncate">{f.filename}</span>
+                  <div key={f.id} className="flex items-center justify-between bg-muted rounded px-2 py-1 text-sm">
+                    <span className="text-foreground truncate">{f.filename}</span>
                     <button
                       onClick={() => detachFile(f.id)}
                       className="text-xs text-red-500 hover:text-red-700 ml-2"
@@ -887,7 +887,7 @@ function StepCard({
                   }
                 }}
                 defaultValue=""
-                className="block w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                className="block w-full rounded-md border border-border px-3 py-1.5 text-sm"
               >
                 <option value="">Attach a file...</option>
                 {availableFiles.map((f) => (
@@ -898,7 +898,7 @@ function StepCard({
               </select>
             )}
             {availableFiles.length === 0 && stepFiles.length === 0 && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-muted-foreground">
                 No files uploaded yet. Upload files from the Files page first.
               </p>
             )}
@@ -926,7 +926,7 @@ function StepCard({
         </button>
         <button
           onClick={onCancelEdit}
-          className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border rounded-md"
+          className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border rounded-md"
         >
           Cancel
         </button>
@@ -970,15 +970,15 @@ function NewStepForm({
 
   return (
     <div className="border-2 border-green-300 rounded-lg p-4 space-y-3 bg-green-50/30">
-      <h4 className="font-medium text-gray-900">New Step</h4>
+      <h4 className="font-medium text-foreground">New Step</h4>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Step Type *</label>
+          <label className="block text-sm font-medium text-foreground">Step Type *</label>
           <select
             value={stepType}
             onChange={(e) => setStepType(e.target.value as StepType)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
           >
             {Object.entries(STEP_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -988,11 +988,11 @@ function NewStepForm({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Trigger *</label>
+          <label className="block text-sm font-medium text-foreground">Trigger *</label>
           <select
             value={triggerType}
             onChange={(e) => setTriggerType(e.target.value as TriggerType)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+            className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
           >
             {Object.entries(TRIGGER_TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -1006,11 +1006,11 @@ function NewStepForm({
       {triggerType === TRIGGER_TYPES.RELATIVE_TO_EVENT && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Timing</label>
+            <label className="block text-sm font-medium text-foreground">Timing</label>
             <select
               value={offsetDays}
               onChange={(e) => setOffsetDays(Number(e.target.value))}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             >
               {OFFSET_PRESETS.filter((p) => !("hours" in p)).map((preset) => (
                 <option key={preset.days} value={preset.days}>
@@ -1020,36 +1020,36 @@ function NewStepForm({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Hours offset</label>
+            <label className="block text-sm font-medium text-foreground">Hours offset</label>
             <input
               type="number"
               value={offsetHours}
               onChange={(e) => setOffsetHours(Number(e.target.value))}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
               min={-24}
               max={24}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Send time</label>
+            <label className="block text-sm font-medium text-foreground">Send time</label>
             <input
               type="time"
               value={sendTime}
               onChange={(e) => setSendTime(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             />
           </div>
         </div>
       )}
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-foreground">
           Email Template (optional)
         </label>
         <select
           value={templateId}
           onChange={(e) => setTemplateId(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
         >
           <option value="">Write custom content</option>
           {emailTemplates.map((t) => (
@@ -1063,23 +1063,23 @@ function NewStepForm({
       {!templateId && (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Subject</label>
+            <label className="block text-sm font-medium text-foreground">Subject</label>
             <input
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="e.g., Reminder: {{workshopTitle}} is tomorrow!"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Body (HTML)</label>
+            <label className="block text-sm font-medium text-foreground">Body (HTML)</label>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={5}
               placeholder="Hi {{registrantName}},&#10;&#10;Just a reminder that your workshop is coming up..."
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm font-mono"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm font-mono"
             />
           </div>
         </>
@@ -1106,7 +1106,7 @@ function NewStepForm({
         </button>
         <button
           onClick={onCancel}
-          className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 border rounded-md"
+          className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border rounded-md"
         >
           Cancel
         </button>

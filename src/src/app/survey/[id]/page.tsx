@@ -107,19 +107,19 @@ export default function PublicSurveyPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading survey...</p>
+      <div className="flex min-h-screen items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading survey...</p>
       </div>
     );
   }
 
   if (submitted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="mx-auto max-w-md rounded-lg bg-white p-8 text-center shadow-lg">
+      <div className="flex min-h-screen items-center justify-center bg-muted">
+        <div className="mx-auto max-w-md rounded-lg bg-card p-8 text-center shadow-lg">
           <div className="mb-4 text-4xl">&#10003;</div>
-          <h1 className="text-2xl font-bold text-gray-900">Thank You!</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="text-2xl font-bold text-foreground">Thank You!</h1>
+          <p className="mt-2 text-muted-foreground">
             Your feedback has been recorded. We appreciate you taking the time to
             share your thoughts.
           </p>
@@ -130,10 +130,10 @@ export default function PublicSurveyPage() {
 
   if (error && !survey) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="mx-auto max-w-md rounded-lg bg-white p-8 text-center shadow-lg">
-          <h1 className="text-xl font-bold text-gray-900">Survey Unavailable</h1>
-          <p className="mt-2 text-gray-600">{error}</p>
+      <div className="flex min-h-screen items-center justify-center bg-muted">
+        <div className="mx-auto max-w-md rounded-lg bg-card p-8 text-center shadow-lg">
+          <h1 className="text-xl font-bold text-foreground">Survey Unavailable</h1>
+          <p className="mt-2 text-muted-foreground">{error}</p>
         </div>
       </div>
     );
@@ -142,12 +142,12 @@ export default function PublicSurveyPage() {
   if (!survey) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-muted py-8">
       <div className="mx-auto max-w-2xl px-4">
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900">{survey.templateName}</h1>
-          <p className="mt-1 text-gray-600">{survey.workshopTitle}</p>
+          <h1 className="text-2xl font-bold text-foreground">{survey.templateName}</h1>
+          <p className="mt-1 text-muted-foreground">{survey.workshopTitle}</p>
         </div>
 
         {error && (
@@ -158,16 +158,16 @@ export default function PublicSurveyPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {survey.questions.map((question, index) => (
-            <div key={question.id} className="rounded-lg bg-white p-6 shadow-sm">
+            <div key={question.id} className="rounded-lg bg-card p-6 shadow-sm">
               <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-900">
+                <label className="block text-sm font-medium text-foreground">
                   {index + 1}. {question.label}
                   {question.isRequired && (
                     <span className="ml-1 text-red-500">*</span>
                   )}
                 </label>
                 {question.description && (
-                  <p className="mt-1 text-xs text-gray-500">{question.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{question.description}</p>
                 )}
               </div>
 
@@ -177,7 +177,7 @@ export default function PublicSurveyPage() {
                   type="text"
                   value={answers[question.id] || ""}
                   onChange={(e) => setAnswer(question.id, e.target.value)}
-                  className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="block w-full rounded-md border border-border px-3 py-2 text-sm"
                   placeholder="Your answer..."
                 />
               )}
@@ -188,7 +188,7 @@ export default function PublicSurveyPage() {
                   value={answers[question.id] || ""}
                   onChange={(e) => setAnswer(question.id, e.target.value)}
                   rows={4}
-                  className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="block w-full rounded-md border border-border px-3 py-2 text-sm"
                   placeholder="Your answer..."
                 />
               )}
@@ -204,7 +204,7 @@ export default function PublicSurveyPage() {
                       className={`flex h-12 w-12 items-center justify-center rounded-lg border-2 text-lg font-medium transition-colors ${
                         answers[question.id] === String(n)
                           ? "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-gray-300 text-gray-600 hover:border-gray-400"
+                          : "border-border text-muted-foreground hover:border-gray-400"
                       }`}
                     >
                       {n}
@@ -229,14 +229,14 @@ export default function PublicSurveyPage() {
                               : n <= 8
                                 ? "border-yellow-500 bg-yellow-50 text-yellow-700"
                                 : "border-green-500 bg-green-50 text-green-700"
-                            : "border-gray-300 text-gray-600 hover:border-gray-400"
+                            : "border-border text-muted-foreground hover:border-gray-400"
                         }`}
                       >
                         {n}
                       </button>
                     ))}
                   </div>
-                  <div className="mt-1 flex justify-between text-xs text-gray-400">
+                  <div className="mt-1 flex justify-between text-xs text-muted-foreground">
                     <span>Not at all likely</span>
                     <span>Extremely likely</span>
                   </div>
@@ -249,7 +249,7 @@ export default function PublicSurveyPage() {
                   {question.options.map((opt) => (
                     <label
                       key={opt}
-                      className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50"
+                      className="flex cursor-pointer items-center gap-3 rounded-md border border-border p-3 hover:bg-accent"
                     >
                       <input
                         type="radio"
@@ -257,9 +257,9 @@ export default function PublicSurveyPage() {
                         value={opt}
                         checked={answers[question.id] === opt}
                         onChange={() => setAnswer(question.id, opt)}
-                        className="h-4 w-4 border-gray-300 text-blue-600"
+                        className="h-4 w-4 border-border text-blue-600"
                       />
-                      <span className="text-sm text-gray-700">{opt}</span>
+                      <span className="text-sm text-foreground">{opt}</span>
                     </label>
                   ))}
                 </div>
@@ -275,15 +275,15 @@ export default function PublicSurveyPage() {
                     return (
                       <label
                         key={opt}
-                        className="flex cursor-pointer items-center gap-3 rounded-md border border-gray-200 p-3 hover:bg-gray-50"
+                        className="flex cursor-pointer items-center gap-3 rounded-md border border-border p-3 hover:bg-accent"
                       >
                         <input
                           type="checkbox"
                           checked={selected}
                           onChange={() => toggleMultiChoice(question.id, opt)}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                          className="h-4 w-4 rounded border-border text-blue-600"
                         />
-                        <span className="text-sm text-gray-700">{opt}</span>
+                        <span className="text-sm text-foreground">{opt}</span>
                       </label>
                     );
                   })}
@@ -301,7 +301,7 @@ export default function PublicSurveyPage() {
                       className={`rounded-md border-2 px-6 py-2 text-sm font-medium transition-colors ${
                         answers[question.id] === val
                           ? "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-gray-300 text-gray-600 hover:border-gray-400"
+                          : "border-border text-muted-foreground hover:border-gray-400"
                       }`}
                     >
                       {val}

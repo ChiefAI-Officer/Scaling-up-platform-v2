@@ -134,7 +134,7 @@ export function ContactsTable({ data }: ContactsTableProps) {
                                 <TableCell>
                                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${contact.emailMarketing === "Subscribed"
                                             ? "bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20"
-                                            : "bg-gray-50 text-gray-600 ring-1 ring-inset ring-gray-500/10"
+                                            : "bg-muted text-muted-foreground ring-1 ring-inset ring-gray-500/10"
                                         }`}>
                                         {contact.emailMarketing}
                                     </span>

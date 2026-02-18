@@ -75,15 +75,15 @@ export default async function WorkshopDetailPage({
           <div className="flex items-center gap-3 mb-2">
             <Link
               href="/workshops"
-              className="text-gray-500 hover:text-gray-700"
+              className="text-muted-foreground hover:text-foreground"
             >
               &larr; Workshops
             </Link>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">{workshop.title}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{workshop.title}</h1>
           <div className="flex items-center gap-3 mt-2">
             {workshop.workshopCode && (
-              <span className="font-mono text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+              <span className="font-mono text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded">
                 {workshop.workshopCode}
               </span>
             )}
@@ -98,7 +98,7 @@ export default async function WorkshopDetailPage({
                 Locked
               </Badge>
             )}
-            <span className="text-gray-500">{workshop.workshopType?.name}</span>
+            <span className="text-muted-foreground">{workshop.workshopType?.name}</span>
           </div>
         </div>
         <WorkshopActions workshop={workshop} />
@@ -110,10 +110,10 @@ export default async function WorkshopDetailPage({
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Event Date</p>
+              <p className="text-sm text-muted-foreground">Event Date</p>
               <p className="text-xl font-semibold">{formatDate(workshop.eventDate)}</p>
               {workshop.eventTime && (
-                <p className="text-gray-600">{workshop.eventTime}</p>
+                <p className="text-muted-foreground">{workshop.eventTime}</p>
               )}
             </CardContent>
           </Card>
@@ -122,11 +122,11 @@ export default async function WorkshopDetailPage({
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Registrations</p>
+              <p className="text-sm text-muted-foreground">Registrations</p>
               <p className="text-xl font-semibold">
                 {workshop.registrations.length} / {workshop.maxAttendees}
               </p>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 {workshop.maxAttendees - workshop.registrations.length} spots left
               </p>
             </CardContent>
@@ -136,11 +136,11 @@ export default async function WorkshopDetailPage({
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Revenue</p>
+              <p className="text-sm text-muted-foreground">Revenue</p>
               <p className="text-xl font-semibold text-green-600">
                 {formatCurrency(totalRevenue)}
               </p>
-              <p className="text-gray-600">{completedPayments.length} paid</p>
+              <p className="text-muted-foreground">{completedPayments.length} paid</p>
             </CardContent>
           </Card>
         </StaggerItem>
@@ -148,7 +148,7 @@ export default async function WorkshopDetailPage({
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
-              <p className="text-sm text-gray-500">Format</p>
+              <p className="text-sm text-muted-foreground">Format</p>
               <p className="text-xl font-semibold">
                 {workshop.format === "VIRTUAL"
                   ? "Virtual"
@@ -156,7 +156,7 @@ export default async function WorkshopDetailPage({
                     ? "Hybrid"
                     : "In-Person"}
               </p>
-              <p className="text-gray-600">{workshop.duration}</p>
+              <p className="text-muted-foreground">{workshop.duration}</p>
             </CardContent>
           </Card>
         </StaggerItem>
@@ -174,8 +174,8 @@ export default async function WorkshopDetailPage({
             <CardContent className="space-y-4">
               {workshop.description && (
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Description</p>
-                  <p className="text-gray-900 whitespace-pre-wrap">
+                  <p className="text-sm font-medium text-muted-foreground">Description</p>
+                  <p className="text-foreground whitespace-pre-wrap">
                     {workshop.description}
                   </p>
                 </div>
@@ -183,22 +183,22 @@ export default async function WorkshopDetailPage({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Coach</p>
-                  <p className="text-gray-900">
+                  <p className="text-sm font-medium text-muted-foreground">Coach</p>
+                  <p className="text-foreground">
                     {workshop.coach.firstName} {workshop.coach.lastName}
                   </p>
-                  <p className="text-sm text-gray-500">{workshop.coach.email}</p>
+                  <p className="text-sm text-muted-foreground">{workshop.coach.email}</p>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Pricing</p>
-                  <p className="text-gray-900">
+                  <p className="text-sm font-medium text-muted-foreground">Pricing</p>
+                  <p className="text-foreground">
                     {workshop.isFree
                       ? "Free"
                       : formatCurrency(workshop.priceCents || 0)}
                   </p>
                   {workshop.earlyBirdPriceCents && workshop.earlyBirdDeadline && (
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                       Early bird: {formatCurrency(workshop.earlyBirdPriceCents)}{" "}
                       until {formatDate(workshop.earlyBirdDeadline)}
                     </p>
@@ -208,12 +208,12 @@ export default async function WorkshopDetailPage({
 
               {workshop.format !== "VIRTUAL" && workshop.venueName && (
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Location</p>
-                  <p className="text-gray-900">{workshop.venueName}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Location</p>
+                  <p className="text-foreground">{workshop.venueName}</p>
                   {workshop.venueAddress && (() => {
                     const address = parseJsonField<VenueAddress>(workshop.venueAddress);
                     return address && (
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         {address.street && <>{address.street}, </>}
                         {address.city}, {address.state} {address.zip}
                       </p>
@@ -224,7 +224,7 @@ export default async function WorkshopDetailPage({
 
               {workshop.landingPageSlug && (
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Landing Page</p>
+                  <p className="text-sm font-medium text-muted-foreground">Landing Page</p>
                   <CopyUrlButton url={`${APP_URL}/workshop/${workshop.landingPageSlug}`} />
                 </div>
               )}
@@ -238,38 +238,38 @@ export default async function WorkshopDetailPage({
             </CardHeader>
             <CardContent>
               {workshop.registrations.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
+                <p className="text-muted-foreground text-center py-8">
                   No registrations yet
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="min-w-full divide-y divide-border">
                     <thead>
                       <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                           Name
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                           Email
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                           Status
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                           Payment
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                           Date
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-border">
                       {workshop.registrations.map((reg) => (
                         <tr key={reg.id}>
                           <td className="px-4 py-3">
                             {reg.firstName} {reg.lastName}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
                             {reg.email}
                           </td>
                           <td className="px-4 py-3">
@@ -287,7 +287,7 @@ export default async function WorkshopDetailPage({
                               {reg.paymentStatus}
                             </Badge>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
                             {formatDate(reg.createdAt)}
                           </td>
                         </tr>
@@ -309,7 +309,7 @@ export default async function WorkshopDetailPage({
             </CardHeader>
             <CardContent>
               {workshop.tasks.length === 0 ? (
-                <p className="text-gray-500 text-sm">No automation tasks yet</p>
+                <p className="text-muted-foreground text-sm">No automation tasks yet</p>
               ) : (
                 <div className="space-y-3">
                   {workshop.tasks.map((task) => (
@@ -317,7 +317,7 @@ export default async function WorkshopDetailPage({
                       key={task.id}
                       className="flex items-center justify-between text-sm"
                     >
-                      <span className="text-gray-700">{task.taskType}</span>
+                      <span className="text-foreground">{task.taskType}</span>
                       <Badge
                         variant={
                           task.status === "COMPLETED"

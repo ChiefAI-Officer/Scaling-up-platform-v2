@@ -18,15 +18,15 @@ export default async function AdminSettingsPage() {
     <FadeUp>
       <div className="mx-auto max-w-2xl space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Admin Settings</h2>
-          <p className="text-sm text-gray-600">
+          <h2 className="text-2xl font-bold text-foreground">Admin Settings</h2>
+          <p className="text-sm text-muted-foreground">
             Manage your account settings.
           </p>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <h3 className="mb-2 text-lg font-semibold text-gray-900">Change Password</h3>
-          <p className="mb-4 text-sm text-gray-600">
+        <div className="rounded-xl border border-border bg-card p-6">
+          <h3 className="mb-2 text-lg font-semibold text-foreground">Change Password</h3>
+          <p className="mb-4 text-sm text-muted-foreground">
             Signed in as <span className="font-medium">{session.user.email}</span>
           </p>
           <ChangePasswordForm />

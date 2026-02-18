@@ -93,7 +93,7 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
 
   if (groups.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-400 text-sm">
+      <div className="text-center py-8 text-muted-foreground text-sm">
         No executions yet. Assign this workflow to a workshop to start scheduling.
       </div>
     );
@@ -114,24 +114,24 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
         <div className="flex gap-4">
           <div className="text-center">
             <p className="text-lg font-bold text-green-600">{sent}</p>
-            <p className="text-xs text-gray-500">Sent</p>
+            <p className="text-xs text-muted-foreground">Sent</p>
           </div>
           <div className="text-center">
             <p className="text-lg font-bold text-amber-600">{scheduled}</p>
-            <p className="text-xs text-gray-500">Scheduled</p>
+            <p className="text-xs text-muted-foreground">Scheduled</p>
           </div>
           <div className="text-center">
-            <p className="text-lg font-bold text-gray-500">{pending}</p>
-            <p className="text-xs text-gray-500">Pending</p>
+            <p className="text-lg font-bold text-muted-foreground">{pending}</p>
+            <p className="text-xs text-muted-foreground">Pending</p>
           </div>
           <div className="text-center">
             <p className="text-lg font-bold text-red-600">{failed}</p>
-            <p className="text-xs text-gray-500">Failed</p>
+            <p className="text-xs text-muted-foreground">Failed</p>
           </div>
           {skipped > 0 && (
             <div className="text-center">
-              <p className="text-lg font-bold text-gray-400">{skipped}</p>
-              <p className="text-xs text-gray-500">Skipped</p>
+              <p className="text-lg font-bold text-muted-foreground">{skipped}</p>
+              <p className="text-xs text-muted-foreground">Skipped</p>
             </div>
           )}
         </div>
@@ -146,12 +146,12 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
       {/* Per-workshop groups */}
       {groups.map((group) => (
         <div key={group.workshopId} className="border rounded-lg overflow-hidden">
-          <div className="bg-gray-50 px-4 py-2 flex items-center justify-between">
+          <div className="bg-muted px-4 py-2 flex items-center justify-between">
             <div>
-              <span className="font-medium text-gray-900 text-sm">{group.workshopTitle}</span>
-              <span className="ml-2 text-xs text-gray-500">[{group.workshopCode}]</span>
+              <span className="font-medium text-foreground text-sm">{group.workshopTitle}</span>
+              <span className="ml-2 text-xs text-muted-foreground">[{group.workshopCode}]</span>
             </div>
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-muted-foreground">
               {group.executions.length} step{group.executions.length !== 1 ? "s" : ""}
             </span>
           </div>
@@ -163,14 +163,14 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
                 return (
                   <div key={exec.id} className="px-4 py-2.5 flex items-center justify-between text-sm">
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex-shrink-0 w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
+                      <span className="flex-shrink-0 w-6 h-6 bg-muted rounded-full flex items-center justify-center text-xs font-medium text-muted-foreground">
                         {exec.step.sortOrder + 1}
                       </span>
                       <div className="min-w-0">
-                        <p className="text-gray-900 truncate">
+                        <p className="text-foreground truncate">
                           {STEP_TYPE_LABELS[exec.step.stepType as StepType] || exec.step.stepType}
                           {exec.step.subject && (
-                            <span className="text-gray-400 ml-1">— {exec.step.subject}</span>
+                            <span className="text-muted-foreground ml-1">— {exec.step.subject}</span>
                           )}
                         </p>
                         {exec.scheduledFor && exec.status === "SCHEDULED" && (
@@ -179,7 +179,7 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
                           </p>
                         )}
                         {exec.executedAt && (
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-muted-foreground">
                             {exec.status === "SENT" ? "Sent" : "Executed"}: {new Date(exec.executedAt).toLocaleString()}
                           </p>
                         )}

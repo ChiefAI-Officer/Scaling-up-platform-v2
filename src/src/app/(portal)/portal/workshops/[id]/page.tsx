@@ -38,18 +38,18 @@ export default async function WorkshopDetailsPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{workshop.title}</h1>
-          <p className="text-gray-500">{workshop.workshopType?.name}</p>
+          <h1 className="text-2xl font-bold text-foreground">{workshop.title}</h1>
+          <p className="text-muted-foreground">{workshop.workshopType?.name}</p>
         </div>
         <StatusPill status={workshop.status} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Event Details
           </h2>
-          <div className="space-y-2 text-sm text-gray-700">
+          <div className="space-y-2 text-sm text-foreground">
             <p>
               <span className="font-medium">Date:</span>{" "}
               {new Date(workshop.eventDate).toLocaleDateString()}
@@ -67,22 +67,22 @@ export default async function WorkshopDetailsPage({
           </div>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Registrations
           </h2>
-          <p className="text-3xl font-semibold text-gray-900">
+          <p className="text-3xl font-semibold text-foreground">
             {workshop._count.registrations}
           </p>
-          <p className="text-sm text-gray-500">of {workshop.maxAttendees} max attendees</p>
+          <p className="text-sm text-muted-foreground">of {workshop.maxAttendees} max attendees</p>
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Description
         </h2>
-        <p className="text-sm text-gray-700">
+        <p className="text-sm text-foreground">
           {workshop.description || "No workshop description provided yet."}
         </p>
       </div>
@@ -90,7 +90,7 @@ export default async function WorkshopDetailsPage({
       <div className="flex items-center gap-3">
         <Link
           href="/portal/workshops"
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
         >
           Back to Workshops
         </Link>

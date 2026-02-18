@@ -110,8 +110,8 @@ export default async function TemplatesPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Templates</h1>
-        <p className="text-gray-600">Select template to edit</p>
+        <h1 className="text-2xl font-bold text-foreground">Templates</h1>
+        <p className="text-muted-foreground">Select template to edit</p>
       </div>
 
       <Card>
@@ -121,14 +121,14 @@ export default async function TemplatesPage({
         <CardContent className="space-y-4">
           <form className="grid gap-4">
             <div>
-              <label htmlFor="workshopId" className="text-sm font-medium text-gray-700">
+              <label htmlFor="workshopId" className="text-sm font-medium text-foreground">
                 Workshop
               </label>
               <select
                 id="workshopId"
                 name="workshopId"
                 defaultValue={selectedWorkshopId}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2"
               >
                 {workshops.map((workshop) => (
                   <option key={workshop.id} value={workshop.id}>
@@ -139,14 +139,14 @@ export default async function TemplatesPage({
             </div>
 
             <div>
-              <label htmlFor="template" className="text-sm font-medium text-gray-700">
+              <label htmlFor="template" className="text-sm font-medium text-foreground">
                 Landing Page Template
               </label>
               <select
                 id="template"
                 name="template"
                 defaultValue={selectedTemplateMeta?.value}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2"
               >
                 {TEMPLATE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -158,7 +158,7 @@ export default async function TemplatesPage({
 
             <button
               type="submit"
-              className="inline-flex items-center justify-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
+              className="inline-flex items-center justify-center rounded-md bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-gray-200"
             >
               Refresh Selection
             </button>
@@ -166,10 +166,10 @@ export default async function TemplatesPage({
 
           {selectedTemplateMeta && (
             <div className="rounded-lg border p-4">
-              <p className="font-medium text-gray-900">
+              <p className="font-medium text-foreground">
                 {selectedTemplateMeta.icon} {selectedTemplateMeta.label}
               </p>
-              <p className="text-sm text-gray-600">{selectedTemplateMeta.description}</p>
+              <p className="text-sm text-muted-foreground">{selectedTemplateMeta.description}</p>
               <div className="mt-3 flex items-center gap-3">
                 <Badge variant={selectedPage ? labelForStatus(selectedPage.status) : "outline"}>
                   {selectedPage ? selectedPage.status : "NOT_CREATED"}
@@ -194,30 +194,30 @@ export default async function TemplatesPage({
         </CardHeader>
         <CardContent>
           {pages.length === 0 ? (
-            <p className="text-gray-500">No templates created yet.</p>
+            <p className="text-muted-foreground">No templates created yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Template
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Workshop
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Create Date
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Status
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {pages.map((page) => {
                     const templateMeta =
                       TEMPLATE_OPTIONS.find((option) => option.value === page.template) || null;
@@ -228,12 +228,12 @@ export default async function TemplatesPage({
                     return (
                       <tr key={page.id}>
                         <td className="px-4 py-3">
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-foreground">
                             {templateMeta?.label || page.template}
                           </p>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{page.workshop.title}</td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className="px-4 py-3 text-sm text-foreground">{page.workshop.title}</td>
+                        <td className="px-4 py-3 text-sm text-foreground">
                           {formatDate(page.createdAt)}
                         </td>
                         <td className="px-4 py-3">

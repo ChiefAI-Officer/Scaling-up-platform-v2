@@ -187,7 +187,7 @@ export default function BioPageEditor() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-muted-foreground">Loading...</div>
       </div>
     );
   }
@@ -195,15 +195,15 @@ export default function BioPageEditor() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+          <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
           <span>/</span>
-          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Workshop Editor</Link>
+          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-foreground">Workshop Editor</Link>
           <span>/</span>
-          <span className="text-gray-900">Bio Page</span>
+          <span className="text-foreground">Bio Page</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Bio Page Editor</h1>
-        <p className="text-gray-600">Edit the coach biography landing page</p>
+        <h1 className="text-2xl font-bold text-foreground">Bio Page Editor</h1>
+        <p className="text-muted-foreground">Edit the coach biography landing page</p>
       </div>
 
       {error && (
@@ -301,10 +301,10 @@ export default function BioPageEditor() {
                   value={formData.biography}
                   onChange={handleChange}
                   rows={10}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                   placeholder="Enter the coach's biography..."
                 />
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Use double line breaks to create paragraphs
                 </p>
               </div>
@@ -323,7 +323,7 @@ export default function BioPageEditor() {
                   type="checkbox"
                   checked={formData.showCtaButton}
                   onChange={handleChange}
-                  className="rounded border-gray-300"
+                  className="rounded border-border"
                 />
                 <Label htmlFor="showCtaButton">Show CTA button on bio page</Label>
               </div>
@@ -379,7 +379,7 @@ export default function BioPageEditor() {
               <CardTitle>Preview</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg overflow-hidden bg-white">
+              <div className="border rounded-lg overflow-hidden bg-card">
                 <div className="p-6 text-center">
                   {/* Logo */}
                   <div className="text-purple-700 font-bold text-xl mb-8">
@@ -395,26 +395,26 @@ export default function BioPageEditor() {
                     />
                   ) : (
                     <div className="w-32 h-32 rounded-full bg-gray-200 mx-auto mb-4 flex items-center justify-center">
-                      <span className="text-gray-400">No Image</span>
+                      <span className="text-muted-foreground">No Image</span>
                     </div>
                   )}
 
                   {/* Name & Title */}
-                  <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                  <h1 className="text-2xl font-bold text-foreground mb-1">
                     {formData.coachName || "Coach Name"}
                   </h1>
-                  <p className="text-gray-600 mb-6">
+                  <p className="text-muted-foreground mb-6">
                     {formData.coachTitle || "Scaling Up Certified Coach"}
                   </p>
 
                   {/* Biography */}
-                  <div className="text-left text-sm text-gray-700 space-y-3 mb-6 max-h-48 overflow-y-auto">
+                  <div className="text-left text-sm text-foreground space-y-3 mb-6 max-h-48 overflow-y-auto">
                     {formData.biography ? (
                       formData.biography.split("\n\n").map((para, i) => (
                         <p key={i}>{para}</p>
                       ))
                     ) : (
-                      <p className="text-gray-400 italic">Biography will appear here...</p>
+                      <p className="text-muted-foreground italic">Biography will appear here...</p>
                     )}
                   </div>
 
@@ -427,7 +427,7 @@ export default function BioPageEditor() {
                 </div>
 
                 {/* Footer */}
-                <div className="border-t px-6 py-4 text-center text-sm text-gray-500">
+                <div className="border-t px-6 py-4 text-center text-sm text-muted-foreground">
                   © {new Date().getFullYear()} Scaling Up Coach {formData.coachName?.split(" ")[0]}
                 </div>
               </div>

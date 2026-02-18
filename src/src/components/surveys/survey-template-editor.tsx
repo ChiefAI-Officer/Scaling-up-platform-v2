@@ -285,11 +285,11 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
         <div className="flex items-center gap-3">
           <Link
             href="/admin/surveys"
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-sm text-muted-foreground hover:text-foreground"
           >
             &larr; Back to Templates
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-foreground">
             {isNew ? "New Survey Template" : template?.name || ""}
           </h1>
         </div>
@@ -310,25 +310,25 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
       )}
 
       {/* Template Details */}
-      <div className="rounded-lg bg-white p-6 shadow">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Template Details</h2>
+      <div className="rounded-lg bg-card p-6 shadow">
+        <h2 className="mb-4 text-lg font-semibold text-foreground">Template Details</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Name</label>
+            <label className="block text-sm font-medium text-foreground">Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
               placeholder="e.g., Post-Workshop Feedback"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Survey Type</label>
+            <label className="block text-sm font-medium text-foreground">Survey Type</label>
             <select
               value={surveyType}
               onChange={(e) => setSurveyType(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             >
               {Object.entries(SURVEY_TYPE_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -338,11 +338,11 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Category</label>
+            <label className="block text-sm font-medium text-foreground">Category</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             >
               <option value="">All Categories (Generic)</option>
               {categories.map((cat) => (
@@ -351,27 +351,27 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-500">Auto-assigned to workshops in this category</p>
+            <p className="mt-1 text-xs text-muted-foreground">Auto-assigned to workshops in this category</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Description</label>
+            <label className="block text-sm font-medium text-foreground">Description</label>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
               placeholder="Optional description"
             />
           </div>
         </div>
         <div className="mt-4 flex items-center gap-4">
           {!isNew && (
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+            <label className="inline-flex items-center gap-2 text-sm text-foreground">
               <input
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="rounded border-gray-300"
+                className="rounded border-border"
               />
               Active
             </label>
@@ -389,7 +389,7 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
       {/* Tabs (only for existing templates) */}
       {!isNew && template && (
         <>
-          <div className="border-b border-gray-200">
+          <div className="border-b border-border">
             <nav className="-mb-px flex space-x-8">
               {(["builder", "assign", "results"] as const).map((tab) => (
                 <button
@@ -398,7 +398,7 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
                   className={`border-b-2 px-1 py-3 text-sm font-medium ${
                     activeTab === tab
                       ? "border-blue-500 text-blue-600"
-                      : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                      : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
                   }`}
                 >
                   {tab === "builder" ? `Questions (${questions.length})` : tab === "assign" ? "Assign to Workshops" : "Results"}
@@ -424,14 +424,14 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
               ))}
 
               {/* Add Question Buttons */}
-              <div className="rounded-lg border-2 border-dashed border-gray-300 p-6">
-                <p className="mb-3 text-sm font-medium text-gray-700">Add Question</p>
+              <div className="rounded-lg border-2 border-dashed border-border p-6">
+                <p className="mb-3 text-sm font-medium text-foreground">Add Question</p>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(QUESTION_TYPE_LABELS).map(([type, label]) => (
                     <button
                       key={type}
                       onClick={() => addNewQuestion(type as QuestionType)}
-                      className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+                      className="rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground hover:bg-accent"
                     >
                       + {label}
                     </button>
@@ -444,19 +444,19 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
           {/* Assign Tab */}
           {activeTab === "assign" && (
             <div className="space-y-6">
-              <div className="rounded-lg bg-white p-6 shadow">
-                <h3 className="mb-4 text-lg font-semibold text-gray-900">
+              <div className="rounded-lg bg-card p-6 shadow">
+                <h3 className="mb-4 text-lg font-semibold text-foreground">
                   Assign Survey to Workshop
                 </h3>
                 <div className="flex items-end gap-3">
                   <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-foreground">
                       Workshop
                     </label>
                     <select
                       value={assignWorkshopId}
                       onChange={(e) => setAssignWorkshopId(e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                      className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
                     >
                       <option value="">Select a workshop...</option>
                       {workshops.map((w) => (
@@ -478,43 +478,43 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
 
               {/* Assigned Surveys List */}
               {template.surveys.length > 0 && (
-                <div className="rounded-lg bg-white shadow">
+                <div className="rounded-lg bg-card shadow">
                   <div className="border-b px-6 py-4">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold text-foreground">
                       Assigned Surveys ({template.surveys.length})
                     </h3>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                    <table className="min-w-full divide-y divide-border">
+                      <thead className="bg-muted">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
                             Workshop
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
                             Attendee
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
                             Status
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
                             NPS
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">
+                          <th className="px-6 py-3 text-left text-xs font-medium uppercase text-muted-foreground">
                             Link
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {template.surveys.map((survey) => (
                           <tr key={survey.id}>
                             <td className="px-6 py-3 text-sm">
-                              <span className="font-mono text-xs text-gray-500">
+                              <span className="font-mono text-xs text-muted-foreground">
                                 {survey.workshop.workshopCode}
                               </span>{" "}
                               {survey.workshop.title}
                             </td>
-                            <td className="px-6 py-3 text-sm text-gray-700">
+                            <td className="px-6 py-3 text-sm text-foreground">
                               {survey.registration
                                 ? `${survey.registration.firstName} ${survey.registration.lastName}`
                                 : "—"}
@@ -530,7 +530,7 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
                                 {survey.completedAt ? "Completed" : "Pending"}
                               </span>
                             </td>
-                            <td className="px-6 py-3 text-sm text-gray-700">
+                            <td className="px-6 py-3 text-sm text-foreground">
                               {survey.npsScore !== null ? survey.npsScore : "—"}
                             </td>
                             <td className="px-6 py-3 text-sm">
@@ -589,8 +589,8 @@ function QuestionCard({
   const parsedOptions: string[] = question.options ? JSON.parse(question.options) : [];
 
   const typeColor: Record<string, string> = {
-    TEXT: "bg-gray-100 text-gray-700",
-    TEXTAREA: "bg-gray-100 text-gray-700",
+    TEXT: "bg-muted text-foreground",
+    TEXTAREA: "bg-muted text-foreground",
     RATING: "bg-yellow-100 text-yellow-700",
     NPS: "bg-purple-100 text-purple-700",
     SINGLE_CHOICE: "bg-blue-100 text-blue-700",
@@ -600,26 +600,26 @@ function QuestionCard({
 
   if (editing) {
     return (
-      <div className="rounded-lg border border-blue-200 bg-white p-5 shadow-sm">
+      <div className="rounded-lg border border-blue-200 bg-card p-5 shadow-sm">
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Question Text</label>
+            <label className="block text-sm font-medium text-foreground">Question Text</label>
             <input
               type="text"
               defaultValue={question.label}
               onBlur={(e) => onUpdate(question.id, "label", e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-foreground">
               Help Text (optional)
             </label>
             <input
               type="text"
               defaultValue={question.description || ""}
               onBlur={(e) => onUpdate(question.id, "description", e.target.value)}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             />
           </div>
           <div className="flex items-center gap-4">
@@ -628,7 +628,7 @@ function QuestionCard({
                 type="checkbox"
                 defaultChecked={question.isRequired}
                 onChange={(e) => onUpdate(question.id, "isRequired", e.target.checked)}
-                className="rounded border-gray-300"
+                className="rounded border-border"
               />
               Required
             </label>
@@ -655,13 +655,13 @@ function QuestionCard({
   }
 
   return (
-    <div className="group flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-gray-300">
+    <div className="group flex items-start gap-3 rounded-lg border border-border bg-card p-4 shadow-sm hover:border-border">
       {/* Reorder buttons */}
       <div className="flex flex-col gap-1 pt-1">
         <button
           onClick={() => onMove(index, "up")}
           disabled={index === 0}
-          className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+          className="text-muted-foreground hover:text-muted-foreground disabled:opacity-30"
           title="Move up"
         >
           &#9650;
@@ -669,7 +669,7 @@ function QuestionCard({
         <button
           onClick={() => onMove(index, "down")}
           disabled={index === total - 1}
-          className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
+          className="text-muted-foreground hover:text-muted-foreground disabled:opacity-30"
           title="Move down"
         >
           &#9660;
@@ -679,10 +679,10 @@ function QuestionCard({
       {/* Question content */}
       <div className="flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-500">Q{index + 1}</span>
+          <span className="text-sm font-medium text-muted-foreground">Q{index + 1}</span>
           <span
             className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-              typeColor[question.questionType] || "bg-gray-100 text-gray-700"
+              typeColor[question.questionType] || "bg-muted text-foreground"
             }`}
           >
             {QUESTION_TYPE_LABELS[question.questionType as QuestionType] || question.questionType}
@@ -691,14 +691,14 @@ function QuestionCard({
             <span className="text-xs text-red-500">Required</span>
           )}
         </div>
-        <p className="mt-1 text-sm text-gray-900">{question.label}</p>
+        <p className="mt-1 text-sm text-foreground">{question.label}</p>
         {question.description && (
-          <p className="text-xs text-gray-500">{question.description}</p>
+          <p className="text-xs text-muted-foreground">{question.description}</p>
         )}
         {parsedOptions.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
             {parsedOptions.map((opt, i) => (
-              <span key={i} className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+              <span key={i} className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                 {opt}
               </span>
             ))}
@@ -762,7 +762,7 @@ function OptionsEditor({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700">Options</label>
+      <label className="block text-sm font-medium text-foreground">Options</label>
       <div className="mt-1 space-y-2">
         {localOptions.map((opt, i) => (
           <div key={i} className="flex items-center gap-2">
@@ -771,7 +771,7 @@ function OptionsEditor({
               value={opt}
               onChange={(e) => updateOption(i, e.target.value)}
               onBlur={commitOptions}
-              className="block w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+              className="block w-full rounded-md border border-border px-3 py-1.5 text-sm"
             />
             <button
               onClick={() => removeOption(i)}
@@ -823,7 +823,7 @@ function SurveyResultsPanel({ templateId }: { templateId: string }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-gray-500">
+      <div className="flex min-h-[200px] items-center justify-center text-muted-foreground">
         Loading results...
       </div>
     );
@@ -831,8 +831,8 @@ function SurveyResultsPanel({ templateId }: { templateId: string }) {
 
   if (!results || results.totalResponses === 0) {
     return (
-      <div className="rounded-lg bg-white p-8 text-center shadow">
-        <p className="text-gray-500">No responses collected yet.</p>
+      <div className="rounded-lg bg-card p-8 text-center shadow">
+        <p className="text-muted-foreground">No responses collected yet.</p>
       </div>
     );
   }
@@ -840,7 +840,7 @@ function SurveyResultsPanel({ templateId }: { templateId: string }) {
   return (
     <div className="space-y-6">
       {/* Summary */}
-      <div className="rounded-lg bg-white p-6 shadow">
+      <div className="rounded-lg bg-card p-6 shadow">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-lg bg-blue-50 p-4 text-center">
             <p className="text-3xl font-bold text-blue-700">{results.totalResponses}</p>
@@ -864,9 +864,9 @@ function SurveyResultsPanel({ templateId }: { templateId: string }) {
 
       {/* Per-question breakdown */}
       {results.questionStats.map((stat) => (
-        <div key={stat.questionId} className="rounded-lg bg-white p-6 shadow">
-          <h4 className="text-sm font-semibold text-gray-900">{stat.label}</h4>
-          <p className="text-xs text-gray-500">
+        <div key={stat.questionId} className="rounded-lg bg-card p-6 shadow">
+          <h4 className="text-sm font-semibold text-foreground">{stat.label}</h4>
+          <p className="text-xs text-muted-foreground">
             {stat.totalResponses} responses &middot; {stat.type}
           </p>
 
@@ -885,7 +885,7 @@ function SurveyResultsPanel({ templateId }: { templateId: string }) {
                     }}
                   />
                 </div>
-                <span className="text-sm font-medium text-gray-700">
+                <span className="text-sm font-medium text-foreground">
                   {stat.avgNumeric.toFixed(1)}{stat.type === "NPS" ? "/10" : "/5"}
                 </span>
               </div>
@@ -902,8 +902,8 @@ function SurveyResultsPanel({ templateId }: { templateId: string }) {
                       width: `${(count / stat.totalResponses) * 100}%`,
                       minWidth: "8px",
                     }} />
-                    <span className="flex-shrink-0 text-gray-600">{value}</span>
-                    <span className="text-gray-400">({count})</span>
+                    <span className="flex-shrink-0 text-muted-foreground">{value}</span>
+                    <span className="text-muted-foreground">({count})</span>
                   </div>
                 ))}
             </div>

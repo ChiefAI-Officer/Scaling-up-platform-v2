@@ -47,8 +47,8 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <FadeUp>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Overview of workshop operations</p>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-muted-foreground">Overview of workshop operations</p>
       </FadeUp>
 
       {metrics.pendingApprovals > 0 && (
@@ -92,7 +92,7 @@ export default async function DashboardPage() {
                 "CANCELED",
               ].map((status) => (
                 <StaggerItem key={status}>
-                  <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-2">
+                  <div className="flex items-center gap-2 bg-muted rounded-lg px-4 py-2">
                     <span
                       className={`px-2 py-1 rounded text-xs font-medium ${getWorkshopStatusColor(
                         status
@@ -122,7 +122,7 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent>
           {metrics.recentWorkshops.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-muted-foreground text-center py-8">
               No workshops yet.{" "}
               <Link href="/workshops/new" className="text-blue-600 hover:underline">
                 Create your first workshop
@@ -130,60 +130,60 @@ export default async function DashboardPage() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Workshop
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Created Date
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Event Date
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Event Time
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Price
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Landing Page
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Status
                     </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Registrations
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {metrics.recentWorkshops.map((workshop) => (
-                    <tr key={workshop.id} className="hover:bg-gray-50">
+                    <tr key={workshop.id} className="hover:bg-accent">
                       <td className="px-3 py-3">
                         <Link
                           href={`/workshops/${workshop.id}`}
-                          className="font-medium text-gray-900 hover:text-blue-600"
+                          className="font-medium text-foreground hover:text-blue-600"
                         >
                           {workshop.title}
                         </Link>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           {workshop.workshopType?.name} · {workshop.coach.firstName}{" "}
                           {workshop.coach.lastName}
                         </p>
                       </td>
-                      <td className="px-3 py-3 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-foreground">
                         {formatDate(workshop.createdAt)}
                       </td>
-                      <td className="px-3 py-3 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-foreground">
                         {formatDate(workshop.eventDate)}
                       </td>
-                      <td className="px-3 py-3 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-foreground">
                         {workshop.eventTime || "TBD"}
                       </td>
-                      <td className="px-3 py-3 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-foreground">
                         {workshop.isFree ? "Free" : formatCurrency(workshop.priceCents || 0)}
                       </td>
                       <td className="px-3 py-3 text-sm">
@@ -196,7 +196,7 @@ export default async function DashboardPage() {
                             Open landing page
                           </Link>
                         ) : (
-                          <span className="text-gray-400">Not published</span>
+                          <span className="text-muted-foreground">Not published</span>
                         )}
                       </td>
                       <td className="px-3 py-3">
@@ -204,7 +204,7 @@ export default async function DashboardPage() {
                           {getWorkshopStatusLabel(workshop.status)}
                         </Badge>
                       </td>
-                      <td className="px-3 py-3 text-sm text-gray-700">
+                      <td className="px-3 py-3 text-sm text-foreground">
                         <Link
                           href={`/workshops/${workshop.id}#registrations`}
                           className="text-blue-600 hover:text-blue-700 hover:underline"

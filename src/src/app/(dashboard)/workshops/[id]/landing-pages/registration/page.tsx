@@ -141,21 +141,21 @@ export default function RegistrationPageEditor() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[400px]"><div className="text-gray-500">Loading...</div></div>;
+    return <div className="flex items-center justify-center min-h-[400px]"><div className="text-muted-foreground">Loading...</div></div>;
   }
 
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+          <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
           <span>/</span>
-          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Workshop Editor</Link>
+          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-foreground">Workshop Editor</Link>
           <span>/</span>
-          <span className="text-gray-900">Registration Page</span>
+          <span className="text-foreground">Registration Page</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Registration Page Editor</h1>
-        <p className="text-gray-600">Sub-page shown when visitors click &ldquo;Register Here&rdquo;</p>
+        <h1 className="text-2xl font-bold text-foreground">Registration Page Editor</h1>
+        <p className="text-muted-foreground">Sub-page shown when visitors click &ldquo;Register Here&rdquo;</p>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>}
@@ -229,7 +229,7 @@ export default function RegistrationPageEditor() {
         {/* Preview */}
         <div className="sticky top-4">
           <Card className="overflow-hidden">
-            <CardHeader className="bg-gray-50 border-b py-2">
+            <CardHeader className="bg-muted border-b py-2">
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -261,7 +261,7 @@ export default function RegistrationPageEditor() {
                 </div>
 
                 {/* Right - Form */}
-                <div className="bg-white p-6">
+                <div className="bg-card p-6">
                   <div className="border rounded-lg p-4 shadow-sm">
                     <div className="bg-gradient-to-r from-purple-600 to-blue-600 -m-4 mb-4 p-3 rounded-t-lg">
                       <div className="text-white text-sm font-medium">{formData.workshopTitle}</div>
@@ -277,7 +277,7 @@ export default function RegistrationPageEditor() {
                         className="w-full border rounded px-3 py-2 text-sm"
                         disabled
                       />
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <input type="checkbox" checked readOnly className="rounded" />
                         <span>{formData.optInText}</span>
                       </div>
@@ -287,7 +287,7 @@ export default function RegistrationPageEditor() {
                         className="w-full border rounded px-3 py-2 text-sm"
                         disabled
                       />
-                      <div className="text-xs text-gray-500 font-medium">Additional information</div>
+                      <div className="text-xs text-muted-foreground font-medium">Additional information</div>
                       <input
                         type="text"
                         placeholder={formData.companyPlaceholder}
@@ -297,7 +297,7 @@ export default function RegistrationPageEditor() {
                       <button className="w-full bg-blue-600 text-white py-2 rounded font-medium text-sm">
                         {formData.submitButtonText}
                       </button>
-                      <p className="text-xs text-gray-400 text-center">{formData.privacyText}</p>
+                      <p className="text-xs text-muted-foreground text-center">{formData.privacyText}</p>
                     </div>
                   </div>
                 </div>

@@ -254,7 +254,7 @@ export default function PartnersPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[300px] items-center justify-center text-gray-500">
+      <div className="flex min-h-[300px] items-center justify-center text-muted-foreground">
         Loading partners module...
       </div>
     );
@@ -263,8 +263,8 @@ export default function PartnersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Partners</h1>
-        <p className="text-gray-600">
+        <h1 className="text-2xl font-bold text-foreground">Partners</h1>
+        <p className="text-muted-foreground">
           Partner profiles (description/logo) with workshop-level visibility toggles.
         </p>
       </div>
@@ -306,7 +306,7 @@ export default function PartnersPage() {
                   value={partnerForm.description}
                   onChange={handlePartnerFormChange}
                   rows={4}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2"
                 />
               </div>
               <div>
@@ -330,13 +330,13 @@ export default function PartnersPage() {
                   className="mt-1"
                 />
               </div>
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <label className="inline-flex items-center gap-2 text-sm text-foreground">
                 <input
                   type="checkbox"
                   name="isActive"
                   checked={partnerForm.isActive}
                   onChange={handlePartnerFormChange}
-                  className="rounded border-gray-300"
+                  className="rounded border-border"
                 />
                 Partner active
               </label>
@@ -362,7 +362,7 @@ export default function PartnersPage() {
                   name="partnerId"
                   value={toggleForm.partnerId}
                   onChange={handleToggleFormChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2"
                 >
                   {data.partners.map((partner) => (
                     <option key={partner.id} value={partner.id}>
@@ -378,7 +378,7 @@ export default function PartnersPage() {
                   name="workshopId"
                   value={toggleForm.workshopId}
                   onChange={handleToggleFormChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2"
                 >
                   {data.workshops.map((workshop) => (
                     <option key={workshop.id} value={workshop.id}>
@@ -387,13 +387,13 @@ export default function PartnersPage() {
                   ))}
                 </select>
               </div>
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <label className="inline-flex items-center gap-2 text-sm text-foreground">
                 <input
                   type="checkbox"
                   name="enabled"
                   checked={toggleForm.enabled}
                   onChange={handleToggleFormChange}
-                  className="rounded border-gray-300"
+                  className="rounded border-border"
                 />
                 Show this partner on selected workshop landing page
               </label>
@@ -413,18 +413,18 @@ export default function PartnersPage() {
         </CardHeader>
         <CardContent>
           {data.partners.length === 0 ? (
-            <p className="text-gray-500">No partners created yet.</p>
+            <p className="text-muted-foreground">No partners created yet.</p>
           ) : (
             <div className="space-y-3">
               {data.partners.map((partner) => (
                 <div key={partner.id} className="rounded-lg border p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">
-                      <p className="font-medium text-gray-900">{partner.name}</p>
+                      <p className="font-medium text-foreground">{partner.name}</p>
                       {partner.tagline ? (
                         <p className="text-sm text-purple-700">{partner.tagline}</p>
                       ) : null}
-                      <p className="text-sm text-gray-600">{partner.description || "No description"}</p>
+                      <p className="text-sm text-muted-foreground">{partner.description || "No description"}</p>
                       {partner.logoUrl ? (
                         <a
                           href={partner.logoUrl}
@@ -434,7 +434,7 @@ export default function PartnersPage() {
                           View logo
                         </a>
                       ) : (
-                        <p className="text-sm text-gray-400">No logo URL</p>
+                        <p className="text-sm text-muted-foreground">No logo URL</p>
                       )}
                     </div>
                     <div className="space-y-2 text-right">
@@ -467,7 +467,7 @@ export default function PartnersPage() {
                           Delete
                         </Button>
                       </div>
-                      <p className="text-xs text-gray-400">Updated {formatDate(partner.updatedAt)}</p>
+                      <p className="text-xs text-muted-foreground">Updated {formatDate(partner.updatedAt)}</p>
                     </div>
                   </div>
                 </div>
@@ -483,37 +483,37 @@ export default function PartnersPage() {
         </CardHeader>
         <CardContent>
           {togglesWithLabels.length === 0 ? (
-            <p className="text-gray-500">No partner/event toggles configured yet.</p>
+            <p className="text-muted-foreground">No partner/event toggles configured yet.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-border">
                 <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Workshop
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Partner
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Enabled
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Updated
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-border">
                   {togglesWithLabels.map((toggle) => (
                     <tr key={`${toggle.workshopId}-${toggle.partnerId}`}>
-                      <td className="px-4 py-3 text-sm text-gray-900">{toggle.workshopTitle}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{toggle.partnerName}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{toggle.workshopTitle}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{toggle.partnerName}</td>
                       <td className="px-4 py-3">
                         <Badge variant={toggle.enabled ? "default" : "outline"}>
                           {toggle.enabled ? "On" : "Off"}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
+                      <td className="px-4 py-3 text-sm text-foreground">
                         {formatDate(toggle.updatedAt)}
                       </td>
                     </tr>

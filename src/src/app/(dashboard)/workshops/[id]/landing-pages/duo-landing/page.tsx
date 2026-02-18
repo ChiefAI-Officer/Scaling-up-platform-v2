@@ -327,21 +327,21 @@ export default function DuoLandingEditor() {
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-[400px]"><div className="text-gray-500">Loading...</div></div>;
+    return <div className="flex items-center justify-center min-h-[400px]"><div className="text-muted-foreground">Loading...</div></div>;
   }
 
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-6">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-          <Link href="/workshops" className="hover:text-gray-700">Workshops</Link>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+          <Link href="/workshops" className="hover:text-foreground">Workshops</Link>
           <span>/</span>
-          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-gray-700">Workshop Editor</Link>
+          <Link href={`/workshops/${workshopId}/landing-pages`} className="hover:text-foreground">Workshop Editor</Link>
           <span>/</span>
-          <span className="text-gray-900">Duo Landing Page</span>
+          <span className="text-foreground">Duo Landing Page</span>
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Duo Workshop Landing Page</h1>
-        <p className="text-gray-600">AI Workshop template with two coaches</p>
+        <h1 className="text-2xl font-bold text-foreground">Duo Workshop Landing Page</h1>
+        <p className="text-muted-foreground">AI Workshop template with two coaches</p>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>}
@@ -361,7 +361,7 @@ export default function DuoLandingEditor() {
                   id="coach1BioId"
                   value={formData.coach1BioId}
                   onChange={(event) => handleCoachProfileChange("coach1", event.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2"
                 >
                   <option value="">Select coach bio page...</option>
                   {bioProfiles.map((profile) => (
@@ -377,7 +377,7 @@ export default function DuoLandingEditor() {
                   id="coach2BioId"
                   value={formData.coach2BioId}
                   onChange={(event) => handleCoachProfileChange("coach2", event.target.value)}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2"
                 >
                   <option value="">Select coach bio page...</option>
                   {bioProfiles.map((profile) => (
@@ -388,35 +388,35 @@ export default function DuoLandingEditor() {
                 </select>
               </div>
 
-              <div className="rounded-md border border-gray-200">
-                <div className="border-b bg-gray-50 px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+              <div className="rounded-md border border-border">
+                <div className="border-b bg-muted px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Available Bio Pages
                 </div>
                 {bioProfiles.length === 0 ? (
-                  <p className="px-3 py-3 text-sm text-gray-500">
+                  <p className="px-3 py-3 text-sm text-muted-foreground">
                     No coach bio pages found. Create or update coach bios first.
                   </p>
                 ) : (
                   <div className="max-h-48 overflow-y-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-white">
+                    <table className="min-w-full divide-y divide-border text-sm">
+                      <thead className="bg-card">
                         <tr>
-                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             Name
                           </th>
-                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             Created
                           </th>
-                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                          <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                             Edit
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-border">
                         {bioProfiles.map((profile) => (
                           <tr key={profile.id}>
                             <td className="px-3 py-2">{profile.name}</td>
-                            <td className="px-3 py-2 text-gray-600">{formatCreatedDate(profile.createdAt)}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{formatCreatedDate(profile.createdAt)}</td>
                             <td className="px-3 py-2">
                               <Link
                                 href={profile.editUrl}
@@ -514,7 +514,7 @@ export default function DuoLandingEditor() {
             </CardContent>
           </Card>
 
-          <div className="flex gap-3 sticky bottom-0 bg-white py-3">
+          <div className="flex gap-3 sticky bottom-0 bg-card py-3">
             <Button onClick={() => handleSave(false)} variant="outline" disabled={saving} className="flex-1">
               {saving ? "Saving..." : "Save Draft"}
             </Button>
@@ -527,7 +527,7 @@ export default function DuoLandingEditor() {
         {/* Preview Panel */}
         <div className="col-span-3 sticky top-4">
           <Card className="overflow-hidden">
-            <CardHeader className="bg-gray-50 border-b py-2">
+            <CardHeader className="bg-muted border-b py-2">
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
             <CardContent className="p-0 max-h-[calc(100vh-200px)] overflow-y-auto">
@@ -535,7 +535,7 @@ export default function DuoLandingEditor() {
               <div className="bg-gradient-to-br from-purple-700 via-purple-600 to-blue-600 text-white p-6">
                 <div className="grid grid-cols-5 gap-4 items-center">
                   <div className="col-span-3">
-                    <span className="bg-white/20 text-xs px-3 py-1 rounded-full">Scaling Up</span>
+                    <span className="bg-card/20 text-xs px-3 py-1 rounded-full">Scaling Up</span>
                     <h1 className="text-xl font-bold mt-2">{formData.heroTitle}</h1>
                     <p className="text-purple-200 text-sm mt-1">{formData.subtitle}</p>
                     <div className="mt-4 space-y-1 text-sm">
@@ -562,29 +562,29 @@ export default function DuoLandingEditor() {
 
               {/* Content */}
               <div className="p-6 space-y-6 text-sm">
-                <p className="text-gray-600">{formData.description}</p>
+                <p className="text-muted-foreground">{formData.description}</p>
 
                 {/* What It Is/Isn't */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <h4 className="font-medium text-green-700 mb-2">What This Is ✓</h4>
-                    <ul className="space-y-1">{formData.whatItIs.map((i, idx) => <li key={idx} className="text-gray-600">• {i}</li>)}</ul>
+                    <ul className="space-y-1">{formData.whatItIs.map((i, idx) => <li key={idx} className="text-muted-foreground">• {i}</li>)}</ul>
                   </div>
                   <div>
                     <h4 className="font-medium text-red-700 mb-2">What This Is Not ✗</h4>
-                    <ul className="space-y-1">{formData.whatItIsNot.map((i, idx) => <li key={idx} className="text-gray-600">• {i}</li>)}</ul>
+                    <ul className="space-y-1">{formData.whatItIsNot.map((i, idx) => <li key={idx} className="text-muted-foreground">• {i}</li>)}</ul>
                   </div>
                 </div>
 
                 {/* Who For / Skip */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-3 rounded">
+                  <div className="bg-muted p-3 rounded">
                     <h4 className="font-medium mb-2">Who This Is For</h4>
-                    <ul className="space-y-1">{formData.whoIsFor.map((i, idx) => <li key={idx} className="text-gray-600 text-xs">• {i}</li>)}</ul>
+                    <ul className="space-y-1">{formData.whoIsFor.map((i, idx) => <li key={idx} className="text-muted-foreground text-xs">• {i}</li>)}</ul>
                   </div>
                   <div className="bg-red-50 p-3 rounded">
                     <h4 className="font-medium mb-2">Who Should Skip</h4>
-                    <ul className="space-y-1">{formData.whoShouldSkip.map((i, idx) => <li key={idx} className="text-gray-600 text-xs">• {i}</li>)}</ul>
+                    <ul className="space-y-1">{formData.whoShouldSkip.map((i, idx) => <li key={idx} className="text-muted-foreground text-xs">• {i}</li>)}</ul>
                   </div>
                 </div>
 
@@ -599,7 +599,7 @@ export default function DuoLandingEditor() {
                   <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold">
                     {formData.ctaText}
                   </button>
-                  <p className="text-gray-500 text-xs mt-2">Free</p>
+                  <p className="text-muted-foreground text-xs mt-2">Free</p>
                 </div>
               </div>
             </CardContent>

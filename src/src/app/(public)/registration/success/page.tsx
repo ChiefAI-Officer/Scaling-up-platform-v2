@@ -64,12 +64,12 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
 
   if (!registration) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-muted">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+          <h1 className="text-2xl font-bold text-foreground mb-4">
             Registration Not Found
           </h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-muted-foreground mb-6">
             We couldn&apos;t find your registration. Please check your email for
             confirmation.
           </p>
@@ -107,7 +107,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
     registration.id;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-muted py-12">
       {shouldTrackAffiliate && idevScriptUrl && (
         <IdevTracking
           scriptUrl={idevScriptUrl}
@@ -119,10 +119,10 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
         />
       )}
       <div className="max-w-2xl mx-auto px-4">
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="bg-card rounded-xl shadow-lg overflow-hidden">
           {/* Success Header */}
           <div className="bg-green-500 px-6 py-8 text-white text-center">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-card rounded-full flex items-center justify-center mx-auto mb-4">
               <svg
                 className="w-8 h-8 text-green-500"
                 fill="none"
@@ -146,40 +146,40 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
           {/* Details */}
           <div className="p-6 space-y-6">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold text-foreground">
                 {registration.workshop.title}
               </h2>
-              <p className="text-gray-600">
+              <p className="text-muted-foreground">
                 {registration.workshop.workshopType?.name}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-500">Date</p>
-                <p className="text-gray-900">
+                <p className="text-sm font-medium text-muted-foreground">Date</p>
+                <p className="text-foreground">
                   {formatDate(registration.workshop.eventDate)}
                 </p>
               </div>
               {registration.workshop.eventTime && (
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Time</p>
-                  <p className="text-gray-900">
+                  <p className="text-sm font-medium text-muted-foreground">Time</p>
+                  <p className="text-foreground">
                     {registration.workshop.eventTime}
                   </p>
                 </div>
               )}
               <div>
-                <p className="text-sm font-medium text-gray-500">Format</p>
-                <p className="text-gray-900">
+                <p className="text-sm font-medium text-muted-foreground">Format</p>
+                <p className="text-foreground">
                   {registration.workshop.format === "VIRTUAL"
                     ? "Virtual"
                     : "In-Person"}
                 </p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">Facilitator</p>
-                <p className="text-gray-900">
+                <p className="text-sm font-medium text-muted-foreground">Facilitator</p>
+                <p className="text-foreground">
                   {registration.workshop.coach.firstName}{" "}
                   {registration.workshop.coach.lastName}
                 </p>
@@ -190,15 +190,15 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
               registration.workshop.venueName && (() => {
                 const address = parseJsonField<VenueAddress>(registration.workshop.venueAddress);
                 return (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-sm font-medium text-gray-500 mb-1">
+                  <div className="bg-muted rounded-lg p-4">
+                    <p className="text-sm font-medium text-muted-foreground mb-1">
                       Location
                     </p>
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-foreground">
                       {registration.workshop.venueName}
                     </p>
                     {address && (
-                      <p className="text-gray-600 text-sm">
+                      <p className="text-muted-foreground text-sm">
                         {address.street && (
                           <>
                             {address.street}
@@ -213,10 +213,10 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
               })()}
 
             <div className="border-t pt-6">
-              <h3 className="font-semibold text-gray-900 mb-2">
+              <h3 className="font-semibold text-foreground mb-2">
                 What&apos;s Next?
               </h3>
-              <ul className="space-y-2 text-gray-600">
+              <ul className="space-y-2 text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <svg
                     className="w-5 h-5 text-green-500 mt-0.5"
@@ -260,7 +260,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
                       >
                         Download .ics
                       </a>
-                      <span className="text-gray-400">|</span>
+                      <span className="text-muted-foreground">|</span>
                       <a
                         href={buildGoogleCalendarUrl({
                           uid: registration.workshop.id,

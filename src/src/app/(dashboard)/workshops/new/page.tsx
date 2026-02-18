@@ -419,8 +419,8 @@ export default function NewWorkshopPage() {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Create New Workshop</h1>
-        <p className="text-gray-600">Set up a new workshop event</p>
+        <h1 className="text-2xl font-bold text-foreground">Create New Workshop</h1>
+        <p className="text-muted-foreground">Set up a new workshop event</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -444,7 +444,7 @@ export default function NewWorkshopPage() {
                 onChange={handleChange}
                 required
                 disabled={coachIsAutoFilled}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500 disabled:bg-muted"
               >
                 <option value="">Select a coach...</option>
                 {coaches.map((coach) => (
@@ -454,7 +454,7 @@ export default function NewWorkshopPage() {
                 ))}
               </select>
               {coachIsAutoFilled && (
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Coach is auto-filled from login.
                 </p>
               )}
@@ -467,7 +467,7 @@ export default function NewWorkshopPage() {
                 type="checkbox"
                 checked={formData.isDuoWorkshop}
                 onChange={handleChange}
-                className="rounded border-gray-300"
+                className="rounded border-border"
               />
               <Label htmlFor="isDuoWorkshop">Duo workshop (add Coach 2)</Label>
             </div>
@@ -481,7 +481,7 @@ export default function NewWorkshopPage() {
                   value={formData.secondaryCoachId}
                   onChange={handleChange}
                   required={formData.isDuoWorkshop}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                 >
                   <option value="">Select Coach 2...</option>
                   {secondaryCoachOptions.map((coach) => (
@@ -495,10 +495,10 @@ export default function NewWorkshopPage() {
 
             <div>
               <Label>Workshop Type *</Label>
-              <div className="mt-1 rounded-md border border-gray-300 px-3 py-2 bg-gray-50 text-gray-900">
+              <div className="mt-1 rounded-md border border-border px-3 py-2 bg-muted text-foreground">
                 {recommendedWorkshopType?.name || "No active workshop type available"}
               </div>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Workshop type is assigned automatically from coach certification + category.
               </p>
               <input type="hidden" name="workshopTypeId" value={formData.workshopTypeId} />
@@ -512,7 +512,7 @@ export default function NewWorkshopPage() {
                 value={formData.categoryId}
                 onChange={handleChange}
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
               >
                 <option value="">Select a category...</option>
                 {categories.map((cat) => (
@@ -549,10 +549,10 @@ export default function NewWorkshopPage() {
                 value={formData.description}
                 onChange={handleChange}
                 rows={4}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                 placeholder="Internal notes for operations and setup..."
               />
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Internal only. Not shown in landing page editors.
               </p>
             </div>
@@ -573,7 +573,7 @@ export default function NewWorkshopPage() {
                   value={formData.format}
                   onChange={handleChange}
                   required
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                 >
                   <option value="IN_PERSON">In-Person</option>
                   <option value="VIRTUAL">Virtual</option>
@@ -708,7 +708,7 @@ export default function NewWorkshopPage() {
                   value={formData.parkingInstructions}
                   onChange={handleChange}
                   rows={2}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                   placeholder="Parking details for attendees..."
                 />
               </div>
@@ -729,7 +729,7 @@ export default function NewWorkshopPage() {
                   name="virtualPlatform"
                   value={formData.virtualPlatform}
                   onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                 >
                   <option value="">Select platform...</option>
                   <option value="zoom">Zoom</option>
@@ -766,7 +766,7 @@ export default function NewWorkshopPage() {
                 type="checkbox"
                 checked={formData.isFree}
                 onChange={handleChange}
-                className="rounded border-gray-300"
+                className="rounded border-border"
               />
               <Label htmlFor="isFree">This is a free workshop</Label>
             </div>
@@ -782,7 +782,7 @@ export default function NewWorkshopPage() {
                       value={formData.pricingTierId}
                       onChange={handleChange}
                       required={!formData.isFree}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                      className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                     >
                       <option value="">Select a pricing tier...</option>
                       {availablePricingTiers.map((tier) => (
@@ -793,7 +793,7 @@ export default function NewWorkshopPage() {
                       ))}
                     </select>
                     {formData.pricingTierId && (
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm text-muted-foreground mt-1">
                         Price: ${formData.priceCents || "0"}
                       </p>
                     )}
@@ -848,7 +848,7 @@ export default function NewWorkshopPage() {
                   </div>
                 )}
 
-                <div className="rounded-lg border border-gray-200 p-4 space-y-4">
+                <div className="rounded-lg border border-border p-4 space-y-4">
                   <div>
                     <Label htmlFor="couponDiscountPercent">Coach Coupon Discount</Label>
                     <select
@@ -856,7 +856,7 @@ export default function NewWorkshopPage() {
                       name="couponDiscountPercent"
                       value={formData.couponDiscountPercent}
                       onChange={handleChange}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                      className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
                     >
                       <option value="">No coupon</option>
                       {COUPON_PRESETS.map((preset) => (
@@ -878,7 +878,7 @@ export default function NewWorkshopPage() {
                         placeholder="e.g., SU50-DETROIT"
                         className="mt-1"
                       />
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm text-muted-foreground mt-1">
                         Share this code with registrants. Checkout already supports discount codes.
                       </p>
                     </div>
@@ -897,9 +897,9 @@ export default function NewWorkshopPage() {
                 type="checkbox"
                 checked={termsAccepted}
                 onChange={(e) => setTermsAccepted(e.target.checked)}
-                className="mt-1 rounded border-gray-300"
+                className="mt-1 rounded border-border"
               />
-              <Label htmlFor="termsAccepted" className="text-sm text-gray-700 leading-relaxed">
+              <Label htmlFor="termsAccepted" className="text-sm text-foreground leading-relaxed">
                 I confirm that all workshop details are accurate and I agree to the Scaling Up
                 workshop terms and conditions, including the cancellation and refund policies.
               </Label>

@@ -16,7 +16,7 @@ export default function Error({ error, reset }: ErrorProps) {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-gray-50 px-4"
+      className="min-h-screen flex items-center justify-center bg-muted px-4"
       role="alert"
       aria-live="assertive"
     >
@@ -38,16 +38,16 @@ export default function Error({ error, reset }: ErrorProps) {
           </svg>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <h1 className="text-2xl font-bold text-foreground mb-2">
           Something went wrong
         </h1>
 
-        <p className="text-gray-600 mb-6">
+        <p className="text-muted-foreground mb-6">
           We apologize for the inconvenience. An unexpected error has occurred.
         </p>
 
         {error.digest && (
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-muted-foreground mb-6">
             Error ID: {error.digest}
           </p>
         )}

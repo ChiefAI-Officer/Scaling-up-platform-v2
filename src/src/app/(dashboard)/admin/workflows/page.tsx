@@ -21,7 +21,7 @@ async function WorkflowsContent() {
 
   if (workflows.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-12 text-center">
+      <div className="bg-card rounded-lg shadow p-12 text-center">
         <svg
           className="w-12 h-12 text-gray-300 mx-auto mb-4"
           fill="none"
@@ -35,8 +35,8 @@ async function WorkflowsContent() {
             d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
           />
         </svg>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No workflows yet</h3>
-        <p className="text-gray-500 mb-6">
+        <h3 className="text-lg font-medium text-foreground mb-2">No workflows yet</h3>
+        <p className="text-muted-foreground mb-6">
           Create your first email workflow to automate pre- and post-event
           communications.
         </p>
@@ -51,37 +51,37 @@ async function WorkflowsContent() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="bg-card rounded-lg shadow overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-muted">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Name
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Steps
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Workshops
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Type
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Updated
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-border">
             {workflows.map((workflow) => (
-              <tr key={workflow.id} className="hover:bg-gray-50">
+              <tr key={workflow.id} className="hover:bg-accent">
                 <td className="px-4 py-4">
                   <Link
                     href={`/admin/workflows/${workflow.id}`}
@@ -90,15 +90,15 @@ async function WorkflowsContent() {
                     {workflow.name}
                   </Link>
                   {workflow.description && (
-                    <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">
+                    <p className="text-sm text-muted-foreground mt-0.5 line-clamp-1">
                       {workflow.description}
                     </p>
                   )}
                 </td>
-                <td className="px-4 py-4 text-sm text-gray-600">
+                <td className="px-4 py-4 text-sm text-muted-foreground">
                   {workflow.steps.length} step{workflow.steps.length !== 1 ? "s" : ""}
                 </td>
-                <td className="px-4 py-4 text-sm text-gray-600">
+                <td className="px-4 py-4 text-sm text-muted-foreground">
                   {workflow._count.assignments} workshop{workflow._count.assignments !== 1 ? "s" : ""}
                 </td>
                 <td className="px-4 py-4">
@@ -115,7 +115,7 @@ async function WorkflowsContent() {
                     <Badge variant="outline">Inactive</Badge>
                   )}
                 </td>
-                <td className="px-4 py-4 text-sm text-gray-500">
+                <td className="px-4 py-4 text-sm text-muted-foreground">
                   {workflow.updatedAt.toLocaleDateString()}
                 </td>
                 <td className="px-4 py-4 text-right">
@@ -140,8 +140,8 @@ export default function WorkflowsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Workflows</h1>
-          <p className="text-gray-600">
+          <h1 className="text-2xl font-bold text-foreground">Workflows</h1>
+          <p className="text-muted-foreground">
             Manage automated email sequences for pre- and post-event
             communications.
           </p>

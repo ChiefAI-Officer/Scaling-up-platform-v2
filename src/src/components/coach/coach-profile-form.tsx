@@ -49,8 +49,8 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 space-y-6">
-            <h2 className="text-lg font-semibold text-gray-900">Profile Information</h2>
+        <div className="bg-card rounded-xl shadow-sm border border-border p-8 space-y-6">
+            <h2 className="text-lg font-semibold text-foreground">Profile Information</h2>
 
             {message && (
                 <div className={`px-4 py-3 rounded-lg text-sm ${message.type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
@@ -79,8 +79,8 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
 
             <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" defaultValue={initialData.email} disabled className="bg-gray-50" />
-                <p className="text-xs text-gray-500">Contact support to change your email address.</p>
+                <Input id="email" defaultValue={initialData.email} disabled className="bg-muted" />
+                <p className="text-xs text-muted-foreground">Contact support to change your email address.</p>
             </div>
 
             <div className="space-y-2">
@@ -94,7 +94,7 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
                 />
             </div>
 
-            <div className="pt-4 border-t border-gray-100 flex justify-end">
+            <div className="pt-4 border-t border-border flex justify-end">
                 <Button onClick={handleSave} disabled={saving}>
                     {saving ? "Saving..." : "Save Changes"}
                 </Button>
