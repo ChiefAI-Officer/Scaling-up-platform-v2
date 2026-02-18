@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | February 18, 2026 — ALL SPRINTS + QA + JV Gap Fixes + Production Readiness + UI/UX Phase 1 + Phase 2 (Animations) + Phase 2+ (Full Page Animations + Dark Mode) COMPLETE |
+| **Last Updated** | February 18, 2026 — ALL SPRINTS + QA + JV Gap Fixes + Production Readiness + UI/UX Phase 1-2+ + Dark Mode Migration + Phase F Defensive Fixes COMPLETE |
 
 ## Current Status
 
@@ -52,6 +52,26 @@ the full workshop lifecycle from request through post-event follow-up.
 - Coach layout: polished sidebar with primary-colored avatar
 - Design system persisted: `design-system/scaling-up-platform/MASTER.md` + page overrides
 - DB tables confirmed in sync via `prisma db push` (no migration needed)
+
+**UI/UX Phase 2+ (Animations + Dark Mode)** — Complete:
+- Framer Motion animations added to 15+ pages (FadeUp, StaggerContainer, StaggerItem wrappers)
+- Dark mode: next-themes integration, ThemeProvider, ThemeToggle in all 3 layouts
+- `.dark` CSS variable overrides in globals.css
+
+**Dark Mode Color Migration** — Complete:
+- 1,000+ hardcoded gray Tailwind classes replaced across 80 files
+- Replacements: text-gray-* → text-foreground/text-muted-foreground, bg-white → bg-card, bg-gray-50 → bg-muted, border-gray-* → border-border, divide-gray-* → divide-border, hover:bg-gray-* → hover:bg-accent
+- Admin approvals page rewritten from inline JSX styles to Tailwind classes
+- Semantic status colors (green, red, yellow, orange, blue) intentionally preserved
+- Commit: `edfc722`
+
+**Phase F: Defensive Code Fixes** — Complete (3/3):
+- HubSpot: Lazy client init via Proxy, `isHubSpotConfigured()` guard on all 8 exported functions — returns no-op when `HUBSPOT_ACCESS_TOKEN` missing
+- Circle.so: `getCircleProfileByEmail()` returns `null` when `CIRCLE_API_KEY` missing (verifyCertification already handled)
+- Inngest: Startup warnings when `INNGEST_EVENT_KEY` or `INNGEST_SIGNING_KEY` missing
+
+**Production Readiness Roadmap:** `D:\The CTO Project\plans\PRODUCTION_READINESS_ROADMAP.md`
+**Production Readiness Tasks:** `D:\The CTO Project\plans\PRODUCTION_READINESS_TASKS.md` (51 tasks, 3 done)
 
 **Roadmap:** `D:\The CTO Project\plans\JEFF_VERDUN_REVISIONS_IMPLEMENTATION_ROADMAP.md`
 **Task Tracker:** `D:\The CTO Project\plans\JEFF_VERDUN_REVISION_TASKS.md`

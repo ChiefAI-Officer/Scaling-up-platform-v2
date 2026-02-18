@@ -163,6 +163,10 @@ function mapCircleMember(member: CircleMember): CircleProfile {
  * Fetch a coach profile from Circle by email for pre-filling coach bios.
  */
 export async function getCircleProfileByEmail(email: string): Promise<CircleProfile | null> {
+    if (!process.env.CIRCLE_API_KEY) {
+        console.warn("[Circle.so] Skipping getCircleProfileByEmail — CIRCLE_API_KEY not configured.");
+        return null;
+    }
     const members = await searchCommunityMembers(email);
     if (members.length === 0) {
         return null;

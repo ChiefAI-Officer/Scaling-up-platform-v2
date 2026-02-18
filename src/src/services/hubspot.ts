@@ -1,8 +1,29 @@
 import { Client } from "@hubspot/api-client";
 import { FilterOperatorEnum } from "@hubspot/api-client/lib/codegen/crm/contacts";
 
-const hubspotClient = new Client({
-  accessToken: process.env.HUBSPOT_ACCESS_TOKEN,
+function isHubSpotConfigured(): boolean {
+  return !!process.env.HUBSPOT_ACCESS_TOKEN;
+}
+
+let _hubspotClient: Client | null = null;
+
+function getHubSpotClient(): Client {
+  if (!_hubspotClient) {
+    if (!isHubSpotConfigured()) {
+      console.warn("[HubSpot] HUBSPOT_ACCESS_TOKEN not set — HubSpot operations will be skipped.");
+    }
+    _hubspotClient = new Client({
+      accessToken: process.env.HUBSPOT_ACCESS_TOKEN,
+    });
+  }
+  return _hubspotClient;
+}
+
+// Backward-compatible export
+const hubspotClient = new Proxy({} as Client, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getHubSpotClient(), prop, receiver);
+  },
 });
 
 interface ContactProperties {
@@ -23,6 +44,10 @@ interface WorkshopContactProperties extends ContactProperties {
 export async function createOrUpdateContact(
   properties: WorkshopContactProperties
 ): Promise<string> {
+  if (!isHubSpotConfigured()) {
+    console.warn("[HubSpot] Skipping createOrUpdateContact — token not configured.");
+    return "hubspot-not-configured";
+  }
   try {
     // Try to find existing contact
     const searchResponse = await hubspotClient.crm.contacts.searchApi.doSearch({
@@ -65,6 +90,10 @@ export async function addContactToList(
   contactId: string,
   listId: string
 ): Promise<void> {
+  if (!isHubSpotConfigured()) {
+    console.warn("[HubSpot] Skipping addContactToList — token not configured.");
+    return;
+  }
   try {
     // HubSpot API v4 list membership
     await hubspotClient.crm.lists.membershipsApi.add(listId, [contactId]);
@@ -75,6 +104,10 @@ export async function addContactToList(
 }
 
 export async function getContactByEmail(email: string): Promise<unknown | null> {
+  if (!isHubSpotConfigured()) {
+    console.warn("[HubSpot] Skipping getContactByEmail — token not configured.");
+    return null;
+  }
   try {
     const searchResponse = await hubspotClient.crm.contacts.searchApi.doSearch({
       filterGroups: [
@@ -116,6 +149,13 @@ export async function syncCoachFromHubspot(hubspotId: string): Promise<{
   paymentStatus: string | null | undefined;
   territory: string | null | undefined;
 }> {
+  if (!isHubSpotConfigured()) {
+    console.warn("[HubSpot] Skipping syncCoachFromHubspot — token not configured.");
+    return {
+      email: null, firstName: null, lastName: null, company: null,
+      phone: null, certificationStatus: null, paymentStatus: null, territory: null,
+    };
+  }
   try {
     const contact = await hubspotClient.crm.contacts.basicApi.getById(
       hubspotId,
@@ -151,6 +191,10 @@ export async function updateCoachInHubspot(
   hubspotId: string,
   properties: Record<string, string>
 ): Promise<void> {
+  if (!isHubSpotConfigured()) {
+    console.warn("[HubSpot] Skipping updateCoachInHubspot — token not configured.");
+    return;
+  }
   try {
     await hubspotClient.crm.contacts.basicApi.update(hubspotId, {
       properties,
@@ -193,6 +237,10 @@ export async function scheduleEmailCampaign(
   contactEmail: string,
   sequence: EmailSequenceItem[]
 ): Promise<void> {
+  if (!isHubSpotConfigured()) {
+    console.warn("[HubSpot] Skipping scheduleEmailCampaign — token not configured.");
+    return;
+  }
   // Check if contact exists
   const contact = await getContactByEmail(contactEmail);
   if (!contact) {
@@ -212,6 +260,10 @@ export async function scheduleEmailCampaign(
  * Batch update contacts (e.g., after a workshop to tag all attendees)
  */
 export async function batchUpdateContacts(updates: ContactUpdate[]): Promise<void> {
+  if (!isHubSpotConfigured()) {
+    console.warn("[HubSpot] Skipping batchUpdateContacts — token not configured.");
+    return;
+  }
   try {
     const inputs = updates.map(u => ({
       email: u.email,
@@ -235,6 +287,9 @@ export async function batchUpdateContacts(updates: ContactUpdate[]): Promise<voi
  * Typed Coach Getter (simulates Service-Domain mapping)
  */
 export async function getCoachByEmail(email: string): Promise<unknown | null> {
-  // Re-uses getContactByEmail but meant for higher-level domains
+  if (!isHubSpotConfigured()) {
+    console.warn("[HubSpot] Skipping getCoachByEmail — token not configured.");
+    return null;
+  }
   return getContactByEmail(email);
 }
