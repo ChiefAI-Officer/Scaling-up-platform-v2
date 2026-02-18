@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface AdminLayoutProps {
     children: React.ReactNode;
@@ -125,7 +126,8 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
             <div className="flex-1 bg-purple-50">
                 <header className="bg-white px-8 py-4 border-b border-gray-200 flex justify-between items-center">
                     <h1 className="text-xl font-semibold">Scaling Up Admin</h1>
-                    <div>
+                    <div className="flex items-center gap-3">
+                        <ThemeToggle />
                         <span>Welcome, {userName}</span>
                     </div>
                 </header>

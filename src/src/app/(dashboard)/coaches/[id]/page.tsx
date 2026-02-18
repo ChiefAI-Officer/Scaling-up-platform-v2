@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 
 interface CoachDetailPageProps {
   params: Promise<{ id: string }>;
@@ -98,6 +99,7 @@ export default async function CoachDetailPage({
   return (
     <div className="space-y-6">
       {/* Header */}
+      <FadeUp>
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -145,38 +147,48 @@ export default async function CoachDetailPage({
           </Link>
         </div>
       </div>
+      </FadeUp>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Total Workshops</p>
-            <p className="text-xl font-semibold">{totalWorkshops}</p>
-          </CardContent>
-        </Card>
+      <StaggerContainer className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Total Workshops</p>
+              <p className="text-xl font-semibold">{totalWorkshops}</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
 
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Upcoming</p>
-            <p className="text-xl font-semibold text-blue-600">{upcomingWorkshops}</p>
-          </CardContent>
-        </Card>
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Upcoming</p>
+              <p className="text-xl font-semibold text-blue-600">{upcomingWorkshops}</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
 
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Total Registrations</p>
-            <p className="text-xl font-semibold text-green-600">{totalRegistrations}</p>
-          </CardContent>
-        </Card>
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Total Registrations</p>
+              <p className="text-xl font-semibold text-green-600">{totalRegistrations}</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
 
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Certifications</p>
-            <p className="text-xl font-semibold">{coach.certifications.length}</p>
-          </CardContent>
-        </Card>
-      </div>
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Certifications</p>
+              <p className="text-xl font-semibold">{coach.certifications.length}</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
+      </StaggerContainer>
 
+      <FadeUp delay={0.15}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Details */}
         <div className="lg:col-span-2 space-y-6">
@@ -377,6 +389,7 @@ export default async function CoachDetailPage({
           </Card>
         </div>
       </div>
+      </FadeUp>
     </div>
   );
 }

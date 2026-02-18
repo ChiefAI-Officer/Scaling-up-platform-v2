@@ -4,6 +4,7 @@ import {
   CoachRegistrationView,
   RegistrationsClient,
 } from "./registrations-client";
+import { FadeUp } from "@/components/ui/animated";
 
 export default async function RegistrationsPage() {
   const { coach } = await requireCoach();
@@ -42,5 +43,5 @@ export default async function RegistrationsPage() {
     registeredAt: registration.createdAt.toISOString(),
   }));
 
-  return <RegistrationsClient registrations={rows} />;
+  return <FadeUp><RegistrationsClient registrations={rows} /></FadeUp>;
 }

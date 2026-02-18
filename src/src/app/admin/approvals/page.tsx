@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 
 type ApprovalStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED";
 type FilterStatus = ApprovalStatus | "ALL";
@@ -106,7 +107,12 @@ export default function ApprovalsPage() {
   };
 
   return (
-    <div className="approvals-page">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+      className="approvals-page"
+    >
       <style jsx>{`
         .approvals-page h2 {
           margin-bottom: 1.5rem;
@@ -320,6 +326,6 @@ export default function ApprovalsPage() {
           ))
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

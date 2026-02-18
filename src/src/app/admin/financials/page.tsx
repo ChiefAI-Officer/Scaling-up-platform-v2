@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 
 type PeriodFilter = "month" | "quarter" | "year" | "all";
 
@@ -161,17 +162,19 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-            <Link href="/admin/dashboard" className="hover:text-gray-700">Admin Dashboard</Link>
-            <span>/</span>
-            <span className="text-gray-900">Financial Dashboard</span>
+      <FadeUp>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <Link href="/admin/dashboard" className="hover:text-gray-700">Admin Dashboard</Link>
+              <span>/</span>
+              <span className="text-gray-900">Financial Dashboard</span>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Financial Dashboard</h1>
+            <p className="text-gray-600">Revenue breakdown — {getPeriodLabel(period)}</p>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Financial Dashboard</h1>
-          <p className="text-gray-600">Revenue breakdown — {getPeriodLabel(period)}</p>
         </div>
-      </div>
+      </FadeUp>
 
       {/* Period Filter */}
       <div className="flex gap-2">
@@ -191,28 +194,37 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
       </div>
 
       {/* Summary Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-gray-500">Total Revenue</p>
-          <p className="mt-2 text-2xl font-semibold text-green-600">{formatCurrency(totalRevenueCents)}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-gray-500">Avg / Workshop</p>
-          <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(avgRevenuePerWorkshop)}</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-gray-500">Paid Registrations</p>
-          <p className="mt-2 text-2xl font-semibold text-gray-900">{paidRegistrations}</p>
-          <p className="text-xs text-gray-400 mt-1">{freeRegistrations} free</p>
-        </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-gray-500">Total Registrations</p>
-          <p className="mt-2 text-2xl font-semibold text-gray-900">{totalRegistrations}</p>
-        </div>
-      </div>
+      <StaggerContainer className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StaggerItem>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-gray-500">Total Revenue</p>
+            <p className="mt-2 text-2xl font-semibold text-green-600">{formatCurrency(totalRevenueCents)}</p>
+          </div>
+        </StaggerItem>
+        <StaggerItem>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-gray-500">Avg / Workshop</p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{formatCurrency(avgRevenuePerWorkshop)}</p>
+          </div>
+        </StaggerItem>
+        <StaggerItem>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-gray-500">Paid Registrations</p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{paidRegistrations}</p>
+            <p className="text-xs text-gray-400 mt-1">{freeRegistrations} free</p>
+          </div>
+        </StaggerItem>
+        <StaggerItem>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-gray-500">Total Registrations</p>
+            <p className="mt-2 text-2xl font-semibold text-gray-900">{totalRegistrations}</p>
+          </div>
+        </StaggerItem>
+      </StaggerContainer>
 
       {/* Revenue by Category */}
       {categoryRevenue.length > 0 && (
+        <FadeUp delay={0.15}>
         <div className="rounded-xl border border-gray-200 bg-white p-5">
           <h3 className="mb-4 text-lg font-semibold text-gray-900">Revenue by Workshop Type</h3>
           <div className="space-y-3">
@@ -236,9 +248,11 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
             })}
           </div>
         </div>
+        </FadeUp>
       )}
 
       {/* Revenue by Workshop */}
+      <FadeUp delay={0.25}>
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">Revenue by Workshop</h3>
@@ -298,6 +312,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
           </table>
         </div>
       </div>
+      </FadeUp>
     </div>
   );
 }

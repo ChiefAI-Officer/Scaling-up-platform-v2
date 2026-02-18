@@ -10,6 +10,7 @@ import {
 } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 
 async function getDashboardMetrics() {
   const [workshopsByStatus, recentWorkshops, pendingApprovals] = await Promise.all([
@@ -45,10 +46,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
+      <FadeUp>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-600">Overview of workshop operations</p>
-      </div>
+      </FadeUp>
 
       {metrics.pendingApprovals > 0 && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between">
@@ -75,38 +76,40 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Workshop Pipeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            {[
-              "REQUESTED",
-              "AWAITING_APPROVAL",
-              "PRE_EVENT",
-              "POST_EVENT",
-              "COMPLETED",
-              "CANCELED",
-            ].map((status) => (
-              <div
-                key={status}
-                className="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-2"
-              >
-                <span
-                  className={`px-2 py-1 rounded text-xs font-medium ${getWorkshopStatusColor(
-                    status
-                  )}`}
-                >
-                  {getWorkshopStatusLabel(status)}
-                </span>
-                <span className="font-bold">{metrics.workshopsByStatus[status] || 0}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <FadeUp delay={0.1}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Workshop Pipeline</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StaggerContainer className="flex flex-wrap gap-4">
+              {[
+                "REQUESTED",
+                "AWAITING_APPROVAL",
+                "PRE_EVENT",
+                "POST_EVENT",
+                "COMPLETED",
+                "CANCELED",
+              ].map((status) => (
+                <StaggerItem key={status}>
+                  <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-4 py-2">
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${getWorkshopStatusColor(
+                        status
+                      )}`}
+                    >
+                      {getWorkshopStatusLabel(status)}
+                    </span>
+                    <span className="font-bold">{metrics.workshopsByStatus[status] || 0}</span>
+                  </div>
+                </StaggerItem>
+              ))}
+            </StaggerContainer>
+          </CardContent>
+        </Card>
+      </FadeUp>
 
+      <FadeUp delay={0.2}>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Workshops</CardTitle>
@@ -217,7 +220,9 @@ export default async function DashboardPage() {
           )}
         </CardContent>
       </Card>
+      </FadeUp>
 
+      <FadeUp delay={0.3}>
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
@@ -231,6 +236,7 @@ export default async function DashboardPage() {
           </Link>
         </CardContent>
       </Card>
+      </FadeUp>
     </div>
   );
 }

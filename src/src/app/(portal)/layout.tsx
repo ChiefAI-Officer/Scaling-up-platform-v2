@@ -11,6 +11,7 @@ import {
     FileBox
 } from "lucide-react";
 import { CoachMobileNav } from "@/components/layout/coach-mobile-nav";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface PortalLayoutProps {
     children: React.ReactNode;
@@ -83,6 +84,7 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                     <div className="hidden md:block flex-1" />
 
                     <div className="flex items-center gap-4 md:gap-6">
+                        <ThemeToggle />
                         <div className="h-5 w-px bg-border hidden md:block" />
                         <Link
                             href="/api/auth/signout"

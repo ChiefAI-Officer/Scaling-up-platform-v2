@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -102,7 +103,12 @@ export default function CoachRegistrationPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-12">
-      <div className="mx-auto w-full max-w-md">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+        className="mx-auto w-full max-w-md"
+      >
         <Card>
           <CardHeader className="space-y-2 text-center">
             <CardTitle className="text-2xl font-bold">Coach Account Registration</CardTitle>
@@ -217,7 +223,7 @@ export default function CoachRegistrationPage() {
             </p>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
+import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 import { WorkshopActions } from "./workshop-actions";
@@ -68,6 +69,7 @@ export default async function WorkshopDetailPage({
   return (
     <div className="space-y-6">
       {/* Header */}
+      <FadeUp>
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3 mb-2">
@@ -101,56 +103,66 @@ export default async function WorkshopDetailPage({
         </div>
         <WorkshopActions workshop={workshop} />
       </div>
+      </FadeUp>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Event Date</p>
-            <p className="text-xl font-semibold">{formatDate(workshop.eventDate)}</p>
-            {workshop.eventTime && (
-              <p className="text-gray-600">{workshop.eventTime}</p>
-            )}
-          </CardContent>
-        </Card>
+      <StaggerContainer className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Event Date</p>
+              <p className="text-xl font-semibold">{formatDate(workshop.eventDate)}</p>
+              {workshop.eventTime && (
+                <p className="text-gray-600">{workshop.eventTime}</p>
+              )}
+            </CardContent>
+          </Card>
+        </StaggerItem>
 
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Registrations</p>
-            <p className="text-xl font-semibold">
-              {workshop.registrations.length} / {workshop.maxAttendees}
-            </p>
-            <p className="text-gray-600">
-              {workshop.maxAttendees - workshop.registrations.length} spots left
-            </p>
-          </CardContent>
-        </Card>
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Registrations</p>
+              <p className="text-xl font-semibold">
+                {workshop.registrations.length} / {workshop.maxAttendees}
+              </p>
+              <p className="text-gray-600">
+                {workshop.maxAttendees - workshop.registrations.length} spots left
+              </p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
 
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Revenue</p>
-            <p className="text-xl font-semibold text-green-600">
-              {formatCurrency(totalRevenue)}
-            </p>
-            <p className="text-gray-600">{completedPayments.length} paid</p>
-          </CardContent>
-        </Card>
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Revenue</p>
+              <p className="text-xl font-semibold text-green-600">
+                {formatCurrency(totalRevenue)}
+              </p>
+              <p className="text-gray-600">{completedPayments.length} paid</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
 
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Format</p>
-            <p className="text-xl font-semibold">
-              {workshop.format === "VIRTUAL"
-                ? "Virtual"
-                : workshop.format === "HYBRID"
-                  ? "Hybrid"
-                  : "In-Person"}
-            </p>
-            <p className="text-gray-600">{workshop.duration}</p>
-          </CardContent>
-        </Card>
-      </div>
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Format</p>
+              <p className="text-xl font-semibold">
+                {workshop.format === "VIRTUAL"
+                  ? "Virtual"
+                  : workshop.format === "HYBRID"
+                    ? "Hybrid"
+                    : "In-Person"}
+              </p>
+              <p className="text-gray-600">{workshop.duration}</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
+      </StaggerContainer>
 
+      <FadeUp delay={0.15}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Details */}
         <div className="lg:col-span-2 space-y-6">
@@ -339,6 +351,7 @@ export default async function WorkshopDetailPage({
           </Card>
         </div>
       </div>
+      </FadeUp>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { requireCoach } from "@/lib/authorization";
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
 import { PortalWorkshopList } from "@/components/workshops/workshop-list-filters";
+import { FadeUp } from "@/components/ui/animated";
 
 /**
  * My Workshops Page
@@ -35,20 +36,24 @@ export default async function MyWorkshopsPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">My Workshops</h1>
-                    <p className="text-gray-500">Manage your upcoming and past events.</p>
-                </div>
-                <Link
-                    href="/portal/request"
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                >
-                    <PlusCircle className="w-5 h-5" /> Request New
-                </Link>
-            </div>
+            <FadeUp>
+              <div className="flex justify-between items-center">
+                  <div>
+                      <h1 className="text-2xl font-bold text-gray-900">My Workshops</h1>
+                      <p className="text-gray-500">Manage your upcoming and past events.</p>
+                  </div>
+                  <Link
+                      href="/portal/request"
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                      <PlusCircle className="w-5 h-5" /> Request New
+                  </Link>
+              </div>
+            </FadeUp>
 
-            <PortalWorkshopList workshops={serialized} />
+            <FadeUp delay={0.1}>
+              <PortalWorkshopList workshops={serialized} />
+            </FadeUp>
         </div>
     );
 }

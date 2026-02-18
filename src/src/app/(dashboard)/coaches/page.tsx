@@ -4,6 +4,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 
 async function getCoaches() {
   return db.coach.findMany({
@@ -56,54 +57,65 @@ export default async function CoachesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Coaches</h1>
-          <p className="text-gray-600">Manage certified coaches</p>
+      <FadeUp>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Coaches</h1>
+            <p className="text-gray-600">Manage certified coaches</p>
+          </div>
+          <Link
+            href="/coaches/new"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            + Add Coach
+          </Link>
         </div>
-        <Link
-          href="/coaches/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          + Add Coach
-        </Link>
-      </div>
+      </FadeUp>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Total Coaches</p>
-            <p className="text-2xl font-bold">{coaches.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Active</p>
-            <p className="text-2xl font-bold text-green-600">
-              {coaches.filter((c) => c.certificationStatus === "ACTIVE").length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Pending</p>
-            <p className="text-2xl font-bold text-yellow-600">
-              {coaches.filter((c) => c.certificationStatus === "PENDING").length}
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-500">Payment Overdue</p>
-            <p className="text-2xl font-bold text-red-600">
-              {coaches.filter((c) => c.paymentStatus === "OVERDUE").length}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <StaggerContainer className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Total Coaches</p>
+              <p className="text-2xl font-bold">{coaches.length}</p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Active</p>
+              <p className="text-2xl font-bold text-green-600">
+                {coaches.filter((c) => c.certificationStatus === "ACTIVE").length}
+              </p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Pending</p>
+              <p className="text-2xl font-bold text-yellow-600">
+                {coaches.filter((c) => c.certificationStatus === "PENDING").length}
+              </p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
+        <StaggerItem>
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-sm text-gray-500">Payment Overdue</p>
+              <p className="text-2xl font-bold text-red-600">
+                {coaches.filter((c) => c.paymentStatus === "OVERDUE").length}
+              </p>
+            </CardContent>
+          </Card>
+        </StaggerItem>
+      </StaggerContainer>
 
       {/* Coaches Table */}
+      <FadeUp delay={0.15}>
       <Card>
         <CardHeader>
           <CardTitle>All Coaches</CardTitle>
@@ -206,6 +218,7 @@ export default async function CoachesPage() {
           )}
         </CardContent>
       </Card>
+      </FadeUp>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
 import { Separator } from "@/components/ui/separator";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -79,6 +80,7 @@ export default async function DashboardLayout({
               <span className="hidden sm:inline text-sm text-muted-foreground" aria-label="Logged in user">
                 {session.user.email}
               </span>
+              <ThemeToggle />
               <Separator orientation="vertical" className="hidden md:block h-5" />
               <div className="hidden md:flex items-center gap-3">
                 <Link

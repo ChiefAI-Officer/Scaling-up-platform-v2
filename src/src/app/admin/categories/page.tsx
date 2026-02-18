@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 interface Category {
     id: string;
@@ -135,7 +136,11 @@ export default function CategoriesPage() {
     }
 
     return (
-        <div>
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+        >
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-purple-900">Workshop Categories</h2>
@@ -294,6 +299,6 @@ export default function CategoriesPage() {
                     </table>
                 </div>
             )}
-        </div>
+        </motion.div>
     );
 }
