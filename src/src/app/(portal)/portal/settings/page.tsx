@@ -17,6 +17,7 @@ export default async function SettingsPage() {
                         lastName: coach.lastName || "",
                         email: coach.email,
                         bio: coach.bio || "",
+                        profileImage: coach.profileImage || null,
                     }}
                 />
 

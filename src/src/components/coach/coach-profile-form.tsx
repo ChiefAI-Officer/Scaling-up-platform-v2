@@ -13,6 +13,7 @@ interface CoachProfileFormProps {
         lastName: string;
         email: string;
         bio: string;
+        profileImage?: string | null;
     };
 }
 
@@ -50,7 +51,27 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
 
     return (
         <div className="bg-card rounded-xl shadow-sm border border-border p-8 space-y-6">
-            <h2 className="text-lg font-semibold text-foreground">Profile Information</h2>
+            <div className="flex items-center gap-4">
+                {initialData.profileImage ? (
+                    <img
+                        src={initialData.profileImage}
+                        alt={`${initialData.firstName} ${initialData.lastName}`}
+                        className="w-16 h-16 rounded-full object-cover"
+                    />
+                ) : (
+                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-xl font-medium text-blue-600">
+                            {initialData.firstName?.[0]}{initialData.lastName?.[0]}
+                        </span>
+                    </div>
+                )}
+                <div>
+                    <h2 className="text-lg font-semibold text-foreground">Profile Information</h2>
+                    {!initialData.profileImage && (
+                        <p className="text-xs text-muted-foreground">Your photo is imported from Circle.so automatically.</p>
+                    )}
+                </div>
+            </div>
 
             {message && (
                 <div className={`px-4 py-3 rounded-lg text-sm ${message.type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>

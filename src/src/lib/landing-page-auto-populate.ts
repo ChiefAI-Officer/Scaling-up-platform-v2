@@ -4,6 +4,7 @@
  */
 
 import { db } from "@/lib/db";
+import { syncCoachFromCircle } from "@/services/circle-sync";
 
 export interface AutoPopulatedContent {
     heading: string;
@@ -38,8 +39,19 @@ export async function getAutoPopulatedContent(workshopId: string): Promise<AutoP
         return null;
     }
 
-    const coach = workshop.coach;
+    let coach = workshop.coach;
     const workshopType = workshop.workshopType;
+
+    // Lazy sync: if coach is missing profile image or bio, attempt Circle sync
+    if (!coach.profileImage || !coach.bio) {
+        const syncResult = await syncCoachFromCircle(coach.id);
+        if (syncResult.updated) {
+            const refreshed = await db.coach.findUnique({ where: { id: coach.id } });
+            if (refreshed) {
+                coach = refreshed;
+            }
+        }
+    }
 
     // Format event date
     const eventDate = new Date(workshop.eventDate).toLocaleDateString("en-US", {

@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
+import { CircleSyncButton } from "@/components/coach/circle-sync-button";
 
 interface CoachDetailPageProps {
   params: Promise<{ id: string }>;
@@ -111,11 +112,19 @@ export default async function CoachDetailPage({
             </Link>
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-xl font-medium text-blue-600">
-                {coach.firstName[0]}{coach.lastName[0]}
-              </span>
-            </div>
+            {coach.profileImage ? (
+              <img
+                src={coach.profileImage}
+                alt={`${coach.firstName} ${coach.lastName}`}
+                className="w-16 h-16 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                <span className="text-xl font-medium text-blue-600">
+                  {coach.firstName[0]}{coach.lastName[0]}
+                </span>
+              </div>
+            )}
             <div>
               <h1 className="text-2xl font-bold text-foreground">
                 {coach.firstName} {coach.lastName}
@@ -227,7 +236,7 @@ export default async function CoachDetailPage({
                 </div>
               )}
 
-              {(coach.hubspotId || coach.circleId) && (
+              {(coach.hubspotId || coach.circleId || coach.syncedAt) && (
                 <div className="pt-4 border-t">
                   <p className="text-sm font-medium text-muted-foreground mb-2">Integration IDs</p>
                   <div className="grid grid-cols-2 gap-4">
@@ -241,6 +250,12 @@ export default async function CoachDetailPage({
                       <div>
                         <p className="text-xs text-muted-foreground">Circle ID</p>
                         <p className="text-sm text-muted-foreground font-mono">{coach.circleId}</p>
+                      </div>
+                    )}
+                    {coach.syncedAt && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Last Circle Sync</p>
+                        <p className="text-sm text-muted-foreground">{formatDate(coach.syncedAt)}</p>
                       </div>
                     )}
                   </div>
@@ -382,9 +397,7 @@ export default async function CoachDetailPage({
               <span className="block w-full text-center bg-muted text-muted-foreground px-4 py-2 rounded-lg text-sm cursor-default border border-dashed border-border">
                 Add Certification — Coming Soon
               </span>
-              <span className="block w-full text-center bg-muted text-muted-foreground px-4 py-2 rounded-lg text-sm cursor-default border border-dashed border-border">
-                Sync with HubSpot — Coming Soon
-              </span>
+              <CircleSyncButton coachId={coach.id} />
             </CardContent>
           </Card>
         </div>
