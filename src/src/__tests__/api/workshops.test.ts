@@ -13,6 +13,7 @@ jest.mock("@/lib/db", () => ({
     workshop: {
       findMany: jest.fn(),
       count: jest.fn(),
+      findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
     },

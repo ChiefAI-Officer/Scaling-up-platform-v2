@@ -13,11 +13,40 @@ jest.mock("@/lib/db", () => ({
     approvalQueue: {
       findMany: jest.fn(),
     },
+    workshopType: {
+      findFirst: jest.fn(),
+    },
+    workshop: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    category: {
+      findUnique: jest.fn(),
+    },
+    pricingTier: {
+      findUnique: jest.fn(),
+    },
+    coach: {
+      findFirst: jest.fn(),
+    },
   },
 }));
 
 jest.mock("@/lib/approval-engine", () => ({
   evaluateApproval: jest.fn(),
+}));
+
+jest.mock("@/services/circle", () => ({
+  verifyCertification: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock("@/services/hubspot", () => ({
+  getCoachByEmail: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock("@/services/notifications", () => ({
+  sendEnrichedApprovalRequest: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/lib/authorization", () => ({
@@ -51,6 +80,13 @@ describe("Approvals API", () => {
       approvalId: "apr-1",
       routeTo: "admin@scalingup.com",
     });
+    (db.workshopType.findFirst as jest.Mock).mockResolvedValue({ id: "wt-1" });
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue(null);
+    (db.workshop.create as jest.Mock).mockResolvedValue({ id: "ws-new" });
+    (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-new" });
+    (db.category.findUnique as jest.Mock).mockResolvedValue(null);
+    (db.pricingTier.findUnique as jest.Mock).mockResolvedValue(null);
+    (db.coach.findFirst as jest.Mock).mockResolvedValue(null);
   });
 
   describe("GET /api/approvals", () => {

@@ -45,10 +45,10 @@ describe("Workshop Validation Schemas", () => {
       expect(result.success).toBe(true);
     });
 
-    it("should reject workshop without required workshopTypeId", () => {
+    it("should accept workshop without workshopTypeId (migration compatibility)", () => {
         const { workshopTypeId: _, ...withoutTypeId } = validWorkshop; void _;
         const result = createWorkshopSchema.safeParse(withoutTypeId);
-        expect(result.success).toBe(false);
+        expect(result.success).toBe(true);
     });
 
     it("should reject workshop without required title", () => {
