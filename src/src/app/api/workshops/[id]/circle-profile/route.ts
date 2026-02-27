@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getApiActor } from "@/lib/authorization";
+import { canManageCoachData, getApiActor } from "@/lib/authorization";
 import { getCircleProfileByEmail } from "@/services/circle";
+import { z } from "zod";
+
+const workshopCircleProfileParamsSchema = z.object({
+  id: z.string().min(1, "Workshop id is required"),
+});
 
 /**
  * GET /api/workshops/[id]/circle-profile
@@ -18,18 +23,27 @@ export async function GET(
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
 
-    const { id } = await params;
+    const paramsValidation = workshopCircleProfileParamsSchema.safeParse(await params);
+    if (!paramsValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid workshop id", details: paramsValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { id } = paramsValidation.data;
 
     const workshop = await db.workshop.findUnique({
       where: { id },
       select: {
+        coachId: true,
         coach: {
           select: { email: true, firstName: true, lastName: true },
         },
       },
     });
 
-    if (!workshop) {
+    if (!workshop || !canManageCoachData(actor, workshop.coachId)) {
       return NextResponse.json({ success: false, error: "Workshop not found" }, { status: 404 });
     }
 

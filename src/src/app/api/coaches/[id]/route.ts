@@ -98,6 +98,8 @@ export async function PATCH(
         ...(data.company !== undefined && { company: data.company }),
         ...(data.bio !== undefined && { bio: data.bio }),
         ...(data.profileImage !== undefined && { profileImage: data.profileImage }),
+        ...(data.linkedinUrl !== undefined && { linkedinUrl: data.linkedinUrl }),
+        ...(data.showBookCallCta !== undefined && { showBookCallCta: data.showBookCallCta }),
         ...(data.hubspotId !== undefined && { hubspotId: data.hubspotId }),
         ...(data.circleId !== undefined && { circleId: data.circleId }),
       },

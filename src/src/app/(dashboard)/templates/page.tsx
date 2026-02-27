@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ActiveTemplateToggle } from "@/components/templates/active-template-toggle";
 
 const TEMPLATE_OPTIONS = [
   {
@@ -58,6 +59,7 @@ async function getTemplateData() {
         template: true,
         status: true,
         slug: true,
+        isActiveTemplate: true,
         createdAt: true,
         workshopId: true,
         workshop: {
@@ -213,6 +215,9 @@ export default async function TemplatesPage({
                       Status
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Auto-Build
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Actions
                     </th>
                   </tr>
@@ -238,6 +243,9 @@ export default async function TemplatesPage({
                         </td>
                         <td className="px-4 py-3">
                           <Badge variant={labelForStatus(page.status)}>{page.status}</Badge>
+                        </td>
+                        <td className="px-4 py-3">
+                          <ActiveTemplateToggle pageId={page.id} isActive={page.isActiveTemplate} />
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">

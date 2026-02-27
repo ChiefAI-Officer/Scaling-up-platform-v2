@@ -77,6 +77,8 @@ model Coach {
   company             String?
   bio                 String?
   profileImage        String?
+  linkedinUrl         String?
+  showBookCallCta     Boolean   @default(true)
   certificationStatus String    @default("PENDING")
   certificationExpiry DateTime?
   paymentStatus       String    @default("PENDING")
@@ -158,20 +160,24 @@ model Workshop {
   timezone     String    @default("America/New_York")
 
   // Location (for in-person)
-  venueName           String?
-  venueAddress        String? // JSON string
-  parkingInstructions String?
+  venueName         String?
+  venueAddress      String? // JSON string
+  venueInstructions String? @map("parkingInstructions") // Feb25: Renamed from parkingInstructions
 
   // Virtual (for online)
-  virtualPlatform String? // 'zoom', 'teams', 'meet'
+  virtualPlatform String? // 'zoom', 'teams', 'meet' — no longer in form but kept for historical data
   virtualLink     String?
 
   // Pricing
   isFree              Boolean   @default(false)
   priceCents          Int?
-  earlyBirdPriceCents Int?
-  earlyBirdDeadline   DateTime?
+  earlyBirdPriceCents Int?      // Deprecated: kept for historical data
+  earlyBirdDeadline   DateTime? // Deprecated: kept for historical data
   pricingTierId       String?   // JV-17: FK to PricingTier model
+
+  // Feb25: Targeting
+  geoTargetAreas  String? // Feb25: Comma-separated geographic target areas
+  excludedClients String? // Feb25: Comma-separated excluded client names
 
   // Status & Pipeline — JV-02: Jeff's 6 stages
   // REQUESTED, AWAITING_APPROVAL, PRE_EVENT, POST_EVENT, COMPLETED, CANCELED
@@ -249,6 +255,13 @@ model Registration {
   // Status
   status      String    @default("REGISTERED")
   checkedInAt DateTime?
+
+  // Feb25: Attendance tracking (Sprint 3 UI, pre-added here)
+  attended    Boolean   @default(false)
+  attendedAt  DateTime?
+
+  // Feb25: Marketing opt-in (Sprint 6 UI, pre-added here)
+  marketingOptIn Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -515,15 +528,16 @@ model EmailTemplate {
 // ============================================
 
 model LandingPage {
-  id           String              @id @default(cuid())
-  workshopId   String
-  template     LandingPageTemplate
-  slug         String              @unique
-  content      String              // JSON with all dynamic variables
-  status       PageStatus          @default(DRAFT)
-  publishedAt  DateTime?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  id               String              @id @default(cuid())
+  workshopId       String
+  template         LandingPageTemplate
+  slug             String              @unique
+  content          String              // JSON with all dynamic variables
+  status           PageStatus          @default(DRAFT)
+  isActiveTemplate Boolean             @default(false) // Feb25 Sprint 5: marks this page as the active template for auto-build
+  publishedAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
 
@@ -577,17 +591,20 @@ model FollowUpReport {
 // ============================================
 
 model Category {
-  id          String   @id @default(cuid())
-  name        String   @unique // e.g., "AI Workshop", "Exit Workshop"
-  slug        String   @unique // e.g., "ai", "exit-and-valuation"
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  name               String   @unique // e.g., "AI Workshop", "Exit Workshop"
+  slug               String   @unique // e.g., "ai", "exit-and-valuation"
+  description        String?
+  defaultTitle       String?  // Feb25: Auto-title template (e.g., "Scaling Up AI Workshop")
+  defaultDescription String?  // Feb25: Auto-description populated on category select
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   workshops       Workshop[]
   pricingTiers    PricingTier[]
   surveyTemplates SurveyTemplate[]
+  workflows       Workflow[]
 
   @@map("categories")
 }
@@ -700,15 +717,19 @@ enum LandingPageTemplate {
 // ============================================
 
 model Workflow {
-  id          String   @id @default(cuid())
-  name        String   // e.g., "Standard Pre-Event Sequence"
-  description String?
-  isActive    Boolean  @default(true)
-  isTemplate  Boolean  @default(false) // Admin-created templates coaches can clone
-  createdBy   String   // userId who created the workflow
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String   // e.g., "Standard Pre-Event Sequence"
+  description     String?
+  isActive        Boolean  @default(true)
+  isTemplate      Boolean  @default(false) // Admin-created templates coaches can clone
+  categoryId      String?  // Feb25 Sprint 5: FK to Category for auto-assignment on approval
+  workshopFormat  String?  // Feb25 Sprint 5: "IN_PERSON" or "VIRTUAL" — null = any format
+  workflowPhase   String?  // Feb25 Sprint 5: "PRE_EVENT" or "POST_EVENT" — for auto-assign matching
+  createdBy       String   // userId who created the workflow
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
+  category    Category?    @relation(fields: [categoryId], references: [id])
   steps       WorkflowStep[]
   assignments WorkflowAssignment[]
 

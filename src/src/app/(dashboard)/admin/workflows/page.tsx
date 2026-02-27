@@ -14,6 +14,7 @@ async function WorkflowsContent() {
   const workflows = await db.workflow.findMany({
     include: {
       steps: { orderBy: { sortOrder: "asc" } },
+      category: { select: { name: true } },
       _count: { select: { assignments: true } },
     },
     orderBy: { updatedAt: "desc" },
@@ -69,6 +70,9 @@ async function WorkflowsContent() {
                 Type
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Auto-Assign
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -106,6 +110,17 @@ async function WorkflowsContent() {
                     <Badge variant="info">Template</Badge>
                   ) : (
                     <Badge variant="secondary">Custom</Badge>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-xs text-muted-foreground">
+                  {workflow.workflowPhase || workflow.category?.name ? (
+                    <span>
+                      {workflow.workflowPhase === "PRE_EVENT" ? "Pre" : workflow.workflowPhase === "POST_EVENT" ? "Post" : ""}
+                      {workflow.workflowPhase && workflow.category?.name ? " / " : ""}
+                      {workflow.category?.name || ""}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
                   )}
                 </td>
                 <td className="px-4 py-4">

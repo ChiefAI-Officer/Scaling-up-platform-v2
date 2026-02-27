@@ -3,18 +3,31 @@ import { db } from "@/lib/db";
 import { requireCoach, canAccessWorkshop } from "@/lib/authorization";
 import { generateSlug } from "@/lib/utils";
 import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
+import { z } from "zod";
+
+const cloneWorkshopParamsSchema = z.object({
+    id: z.string().min(1, "Workshop id is required"),
+});
 
 /**
  * POST /api/workshops/[id]/clone
  * Creates a copy of an existing workshop as a new draft
  */
 export async function POST(
-    request: NextRequest,
+    _request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { coach } = await requireCoach();
-        const { id: workshopId } = await params;
+        const paramsValidation = cloneWorkshopParamsSchema.safeParse(await params);
+        if (!paramsValidation.success) {
+            return NextResponse.json(
+                { success: false, error: "Invalid workshop id", details: paramsValidation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const { id: workshopId } = paramsValidation.data;
 
         // Verify coach owns this workshop
         if (!(await canAccessWorkshop(workshopId))) {
@@ -67,7 +80,7 @@ export async function POST(
                 // Location (copied as-is)
                 venueName: sourceWorkshop.venueName,
                 venueAddress: sourceWorkshop.venueAddress,
-                parkingInstructions: sourceWorkshop.parkingInstructions,
+                venueInstructions: sourceWorkshop.venueInstructions,
 
                 // Virtual settings
                 virtualPlatform: sourceWorkshop.virtualPlatform,

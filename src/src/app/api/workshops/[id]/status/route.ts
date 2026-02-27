@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { inngest } from "@/inngest/client";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 import { createPostWorkshopSurveys, sendSurveyEmail } from "@/lib/survey-automation";
+import { z } from "zod";
 
 // JV-02: Jeff Verdun's 6 workshop stages
 const WORKSHOP_STATUSES = [
@@ -14,6 +16,14 @@ const WORKSHOP_STATUSES = [
 ] as const;
 
 type WorkshopStatus = typeof WORKSHOP_STATUSES[number];
+
+const workshopStatusParamsSchema = z.object({
+  id: z.string().min(1, "Workshop id is required"),
+});
+
+const updateWorkshopStatusSchema = z.object({
+  status: z.enum(WORKSHOP_STATUSES),
+});
 
 const validTransitions: Record<WorkshopStatus, WorkshopStatus[]> = {
   REQUESTED: ["AWAITING_APPROVAL", "CANCELED"],
@@ -37,15 +47,24 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
-    const { id } = await params;
-    const { status: newStatus } = await request.json();
-
-    if (!newStatus || !WORKSHOP_STATUSES.includes(newStatus)) {
+    const paramsValidation = workshopStatusParamsSchema.safeParse(await params);
+    if (!paramsValidation.success) {
       return NextResponse.json(
-        { success: false, error: "Invalid status" },
+        { success: false, error: "Invalid workshop id", details: paramsValidation.error.issues },
         { status: 400 }
       );
     }
+
+    const bodyValidation = updateWorkshopStatusSchema.safeParse(await request.json());
+    if (!bodyValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid status", details: bodyValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { id } = paramsValidation.data;
+    const { status: newStatus } = bodyValidation.data;
 
     const workshop = await db.workshop.findUnique({
       where: { id },
@@ -91,6 +110,13 @@ export async function PATCH(
         completedAt: new Date(),
       },
     });
+
+    // Emit workshop/completed event for summary email
+    if (newStatus === "COMPLETED") {
+      inngest
+        .send({ name: "workshop/completed", data: { workshopId: id } })
+        .catch((err) => console.error("Failed to emit workshop/completed:", err));
+    }
 
     // JV-13: Auto-create post-workshop surveys when transitioning to POST_EVENT
     if (newStatus === "POST_EVENT") {

@@ -6,6 +6,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { submitSurveyResponse } from "@/lib/survey-service";
 import { withRateLimit, RateLimits } from "@/lib/rate-limit";
+import { z } from "zod";
+
+const submitSurveyParamsSchema = z.object({
+  id: z.string().min(1, "Survey id is required"),
+});
+
+const submitSurveyAnswerSchema = z.object({
+  questionId: z.string().min(1, "questionId is required"),
+  value: z.string(),
+  numValue: z.number().optional(),
+});
+
+const submitSurveyBodySchema = z.object({
+  answers: z.array(submitSurveyAnswerSchema).min(1, "answers array is required and must not be empty"),
+});
 
 export async function POST(
   request: NextRequest,
@@ -20,26 +35,24 @@ export async function POST(
     );
   }
 
-  const { id: surveyId } = await params;
-  const body = await request.json();
-  const { answers } = body;
-
-  if (!Array.isArray(answers) || answers.length === 0) {
+  const paramsValidation = submitSurveyParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
     return NextResponse.json(
-      { error: "answers array is required and must not be empty" },
+      { error: "Invalid survey id", details: paramsValidation.error.issues },
       { status: 400 }
     );
   }
 
-  // Validate answer shape
-  for (const answer of answers) {
-    if (!answer.questionId || typeof answer.value !== "string") {
-      return NextResponse.json(
-        { error: "Each answer must have questionId (string) and value (string)" },
-        { status: 400 }
-      );
-    }
+  const bodyValidation = submitSurveyBodySchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: bodyValidation.error.issues },
+      { status: 400 }
+    );
   }
+
+  const { id: surveyId } = paramsValidation.data;
+  const { answers } = bodyValidation.data;
 
   try {
     const result = await submitSurveyResponse(surveyId, answers);

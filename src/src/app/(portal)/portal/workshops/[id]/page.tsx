@@ -3,10 +3,26 @@ import { notFound } from "next/navigation";
 import { requireCoach } from "@/lib/authorization";
 import { db } from "@/lib/db";
 import { StatusPill } from "@/components/ui/status-pill";
+import { Badge } from "@/components/ui/badge";
 import { CancelWorkshopDialog } from "@/components/workshops/cancel-workshop-dialog";
+import { ResubmitWorkshop } from "@/components/workshops/resubmit-workshop";
 
 interface WorkshopDetailsPageProps {
   params: Promise<{ id: string }>;
+}
+
+function executionStatusColor(status: string) {
+  switch (status) {
+    case "SENT":
+    case "COMPLETED":
+      return "success";
+    case "FAILED":
+      return "destructive";
+    case "SCHEDULED":
+      return "warning";
+    default:
+      return "secondary";
+  }
 }
 
 export default async function WorkshopDetailsPage({
@@ -15,20 +31,50 @@ export default async function WorkshopDetailsPage({
   const { id } = await params;
   const { coach } = await requireCoach();
 
-  const workshop = await db.workshop.findFirst({
-    where: {
-      id,
-      coachId: coach.id,
-    },
-    include: {
-      workshopType: true,
-      _count: {
-        select: {
-          registrations: true,
+  const [workshop, workflowAssignments, surveyCount, latestDenial] = await Promise.all([
+    db.workshop.findFirst({
+      where: { id, coachId: coach.id },
+      include: {
+        workshopType: true,
+        _count: { select: { registrations: true } },
+      },
+    }),
+    db.workflowAssignment.findMany({
+      where: { workshopId: id },
+      include: {
+        workflow: {
+          include: {
+            steps: {
+              where: { isActive: true },
+              orderBy: { sortOrder: "asc" },
+              include: {
+                executions: {
+                  where: { workshopId: id },
+                  orderBy: { createdAt: "desc" },
+                  take: 1,
+                },
+              },
+            },
+          },
         },
       },
-    },
-  });
+    }),
+    db.survey.count({
+      where: { workshopId: id, completedAt: { not: null } },
+    }),
+    db.approvalQueue.findFirst({
+      where: {
+        workshopId: id,
+        decision: "DENIED",
+      },
+      orderBy: { respondedAt: "desc" },
+      select: {
+        responseReason: true,
+        notes: true,
+        respondedAt: true,
+      },
+    }),
+  ]);
 
   if (!workshop) {
     notFound();
@@ -87,7 +133,66 @@ export default async function WorkshopDetailsPage({
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
+      {/* Rejection + Resubmit */}
+      {["CANCELED", "DENIED"].includes(workshop.status) && (
+        <ResubmitWorkshop
+          workshopId={workshop.id}
+          rejectionReason={latestDenial?.responseReason || latestDenial?.notes || null}
+          title={workshop.title}
+          description={workshop.description}
+          eventDate={workshop.eventDate.toISOString()}
+          eventTime={workshop.eventTime}
+          venueName={workshop.venueName}
+        />
+      )}
+
+      {/* Workflow Status Timeline */}
+      {workflowAssignments.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Workflow Status
+          </h2>
+          <div className="space-y-4">
+            {workflowAssignments.map((assignment) => (
+              <div key={assignment.id}>
+                <h3 className="text-sm font-medium text-foreground mb-2">
+                  {assignment.workflow.name}
+                </h3>
+                {assignment.workflow.steps.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No steps configured</p>
+                ) : (
+                  <div className="space-y-2">
+                    {assignment.workflow.steps.map((step, index) => {
+                      const execution = step.executions[0];
+                      const status = execution?.status ?? "PENDING";
+                      return (
+                        <div key={step.id} className="flex items-center gap-3 text-sm">
+                          <span className="text-muted-foreground w-6 text-right">
+                            {index + 1}.
+                          </span>
+                          <span className="flex-1 text-foreground">
+                            {step.subject || step.stepType}
+                          </span>
+                          <Badge variant={executionStatusColor(status)}>
+                            {status}
+                          </Badge>
+                          {execution?.scheduledFor && status === "SCHEDULED" && (
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(execution.scheduledFor).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center gap-3 flex-wrap">
         <Link
           href="/portal/workshops"
           className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
@@ -100,6 +205,14 @@ export default async function WorkshopDetailsPage({
         >
           View Registrations
         </Link>
+        {surveyCount > 0 && (
+          <Link
+            href={`/portal/workshops/${workshop.id}/surveys`}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+          >
+            Survey Results ({surveyCount})
+          </Link>
+        )}
         {["REQUESTED", "AWAITING_APPROVAL", "PRE_EVENT"].includes(workshop.status) && (
           <CancelWorkshopDialog
             workshopId={workshop.id}

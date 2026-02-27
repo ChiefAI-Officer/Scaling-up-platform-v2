@@ -23,12 +23,14 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
     jobTitle: "",
     phone: "",
     discountCode: "",
+    marketingOptIn: false,
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
@@ -131,12 +133,26 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
       </div>
 
       <div>
-        <Label htmlFor="company">Company</Label>
+        <Label htmlFor="company">Company *</Label>
         <Input
           id="company"
           name="company"
           value={formData.company}
           onChange={handleChange}
+          required
+          className="mt-1"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="phone">Phone *</Label>
+        <Input
+          id="phone"
+          name="phone"
+          type="tel"
+          value={formData.phone}
+          onChange={handleChange}
+          required
           className="mt-1"
         />
       </div>
@@ -147,18 +163,6 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
           id="jobTitle"
           name="jobTitle"
           value={formData.jobTitle}
-          onChange={handleChange}
-          className="mt-1"
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="phone">Phone</Label>
-        <Input
-          id="phone"
-          name="phone"
-          type="tel"
-          value={formData.phone}
           onChange={handleChange}
           className="mt-1"
         />
@@ -176,6 +180,20 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
           />
         </div>
       )}
+
+      <div className="flex items-start gap-2">
+        <input
+          id="marketingOptIn"
+          name="marketingOptIn"
+          type="checkbox"
+          checked={formData.marketingOptIn}
+          onChange={handleChange}
+          className="mt-1 h-4 w-4 rounded border-gray-300"
+        />
+        <Label htmlFor="marketingOptIn" className="text-sm text-muted-foreground font-normal leading-snug">
+          I&apos;d like to receive future Scaling Up events and insights
+        </Label>
+      </div>
 
       <Button type="submit" className="w-full" size="lg" disabled={loading}>
         {loading ? (

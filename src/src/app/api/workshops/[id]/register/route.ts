@@ -7,21 +7,39 @@ import {
   RegistrationServiceError,
 } from "@/lib/registration-service";
 import { sendRegistrationNotification } from "@/services/notifications";
+import { createOrUpdateContact } from "@/services/hubspot";
 import {
   generateIcsContent,
   parseDurationHours,
   buildLocationString,
 } from "@/lib/ics-generator";
 import { createPreWorkshopSurvey, sendSurveyEmail } from "@/lib/survey-automation";
+import { z } from "zod";
+
+const workshopRegisterParamsSchema = z.object({
+  id: z.string().min(1, "Workshop id is required"),
+});
+
+const registrationInputSchema = z.object({
+  email: z.string().email(),
+  firstName: z.string().trim().min(1),
+  lastName: z.string().trim().min(1),
+  company: z.string().min(1, "Company is required"),
+  jobTitle: z.string().optional(),
+  phone: z.string().regex(/^[\d\s\-\+\(\)]+$/, "Invalid phone number").min(1, "Phone is required"),
+  discountCode: z.string().optional(),
+  marketingOptIn: z.boolean().optional().default(false),
+});
 
 interface RegistrationInput {
   email: string;
   firstName: string;
   lastName: string;
-  company?: string;
+  company: string;
   jobTitle?: string;
   phone?: string;
   discountCode?: string;
+  marketingOptIn?: boolean;
 }
 
 function normalizeOptionalString(value: unknown): string | undefined {
@@ -74,12 +92,7 @@ async function parseRegistrationInput(request: NextRequest): Promise<Registratio
     return null;
   }
 
-  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  if (!isValidEmail) {
-    return null;
-  }
-
-  return {
+  const validation = registrationInputSchema.safeParse({
     email,
     firstName,
     lastName,
@@ -87,7 +100,14 @@ async function parseRegistrationInput(request: NextRequest): Promise<Registratio
     jobTitle: normalizeOptionalString(payload.jobTitle),
     phone: normalizeOptionalString(payload.phone),
     discountCode: normalizeOptionalString(payload.discountCode),
-  };
+    marketingOptIn: payload.marketingOptIn === true || payload.marketingOptIn === "true",
+  });
+
+  if (!validation.success) {
+    return null;
+  }
+
+  return validation.data;
 }
 
 function wantsJsonResponse(request: NextRequest): boolean {
@@ -124,7 +144,12 @@ export async function POST(
     );
   }
 
-  const { id: workshopId } = await params;
+  const paramsValidation = workshopRegisterParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return jsonError("Invalid workshop id", 400, rateLimit.headers);
+  }
+
+  const { id: workshopId } = paramsValidation.data;
   const isJsonResponse = wantsJsonResponse(request);
 
   try {
@@ -144,6 +169,33 @@ export async function POST(
     db.coach.findFirst({ where: { id: workshop.coachId }, select: { email: true, firstName: true, lastName: true } })
       .then((coach) => {
         if (coach) {
+          if (workshop.isFree) {
+            if (!process.env.HUBSPOT_ACCESS_TOKEN) {
+              console.warn("HUBSPOT_ACCESS_TOKEN is not set; skipping HubSpot sync for free registration");
+            } else {
+              createOrUpdateContact({
+                email: registration.email,
+                firstname: registration.firstName,
+                lastname: registration.lastName,
+                company: registration.company || undefined,
+                jobtitle: registration.jobTitle || undefined,
+                phone: registration.phone || undefined,
+                workshop_name: workshop.title,
+                workshop_date: workshop.eventDate.toISOString(),
+                coach_name: `${coach.firstName} ${coach.lastName}`,
+              })
+                .then((hubspotContactId) =>
+                  db.registration.update({
+                    where: { id: registration.id },
+                    data: { hubspotContactId },
+                  })
+                )
+                .catch((err) =>
+                  console.error("Failed to sync free registration to HubSpot:", err)
+                );
+            }
+          }
+
           // JV-18: Generate ICS calendar file for the registrant
           const icsContent = generateIcsContent({
             uid: workshop.id,
@@ -163,6 +215,7 @@ export async function POST(
           const safeTitle = workshop.title.replace(/[^a-zA-Z0-9-_ ]/g, "").replace(/\s+/g, "-").substring(0, 50);
 
           sendRegistrationNotification({
+            workshopId: workshop.id,
             workshopTitle: workshop.title,
             workshopCode: workshop.workshopCode,
             coachEmail: coach.email,

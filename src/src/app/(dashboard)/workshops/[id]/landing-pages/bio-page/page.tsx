@@ -134,34 +134,6 @@ export default function BioPageEditor() {
     }
   };
 
-  // S3-09: Populate from Circle profile
-  const [circleLoading, setCircleLoading] = useState(false);
-  const handlePopulateFromCircle = async () => {
-    setCircleLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/workshops/${workshopId}/circle-profile`);
-      const data = await res.json();
-      if (data.success && data.data) {
-        const profile = data.data;
-        setFormData((prev) => ({
-          ...prev,
-          coachName: profile.fullName || prev.coachName,
-          coachTitle: profile.title || prev.coachTitle,
-          biography: profile.bio || prev.biography,
-          profileImageUrl: profile.avatarUrl || prev.profileImageUrl,
-        }));
-        setSuccess(true);
-      } else {
-        setError(data.message || "No Circle profile found");
-      }
-    } catch {
-      setError("Failed to fetch Circle profile");
-    } finally {
-      setCircleLoading(false);
-    }
-  };
-
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -224,14 +196,6 @@ export default function BioPageEditor() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Coach Information</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePopulateFromCircle}
-                disabled={circleLoading}
-              >
-                {circleLoading ? "Loading..." : "Populate from Circle"}
-              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>

@@ -44,8 +44,24 @@ type WorkflowStepExecute = {
     };
 };
 
+type WorkshopApproved = {
+    data: {
+        approvalId: string;
+        workshopId: string;
+        coachId: string;
+    };
+};
+
+type WorkshopCompleted = {
+    data: {
+        workshopId: string;
+    };
+};
+
 type Events = {
     "workshop/created": WorkshopCreated;
+    "workshop/approved": WorkshopApproved;
+    "workshop/completed": WorkshopCompleted;
     "registration/created": RegistrationCreated;
     "approval/requested": ApprovalRequested;
     "workflow/schedule": WorkflowSchedule;

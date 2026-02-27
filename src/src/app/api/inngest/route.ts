@@ -3,6 +3,8 @@ import { inngest } from "@/inngest/client";
 import { checkStaleApprovals } from "@/inngest/functions/check-stale-approvals";
 import { scheduleEmailSequence } from "@/inngest/functions/schedule-emails";
 import { executeWorkflow } from "@/inngest/functions/execute-workflow";
+import { autoBuildWorkshop } from "@/inngest/functions/auto-build-workshop";
+import { workshopCompletionSummary } from "@/inngest/functions/workshop-completion-summary";
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -10,5 +12,7 @@ export const { GET, POST, PUT } = serve({
         checkStaleApprovals,
         scheduleEmailSequence,
         executeWorkflow,
+        autoBuildWorkshop,
+        workshopCompletionSummary,
     ],
 });

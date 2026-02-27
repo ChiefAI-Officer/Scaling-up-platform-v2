@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { z } from "zod";
+
+const submitFollowUpSchema = z.object({
+  workshopId: z.string().min(1, "Workshop selection required"),
+  implementedTools: z.array(z.string()).optional(),
+  challenges: z.string().optional(),
+  successes: z.string().optional(),
+  recommendationScore: z.coerce.number().min(0).max(10).optional(),
+  additionalComments: z.string().optional(),
+});
 
 export async function GET() {
   try {
@@ -71,12 +81,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Coach not found" }, { status: 404 });
     }
 
-    const body = await request.json();
-    const { workshopId, implementedTools, challenges, successes, recommendationScore, additionalComments } = body;
-
-    if (!workshopId) {
-      return NextResponse.json({ success: false, error: "Workshop selection required" }, { status: 400 });
+    const bodyValidation = submitFollowUpSchema.safeParse(await request.json());
+    if (!bodyValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body", details: bodyValidation.error.issues },
+        { status: 400 }
+      );
     }
+
+    const { workshopId, implementedTools, challenges, successes, recommendationScore, additionalComments } =
+      bodyValidation.data;
 
     // Verify the workshop belongs to this coach
     const workshop = await db.workshop.findFirst({

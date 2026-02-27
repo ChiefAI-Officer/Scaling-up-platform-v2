@@ -9,6 +9,28 @@ import { authOptions } from "@/lib/auth";
 import { addWorkflowStep, reorderWorkflowSteps } from "@/lib/workflow-service";
 import { STEP_TYPES, TRIGGER_TYPES } from "@/lib/workflow-types";
 import type { StepType, TriggerType } from "@/lib/workflow-types";
+import { z } from "zod";
+
+const workflowStepParamsSchema = z.object({
+  id: z.string().min(1, "Workflow id is required"),
+});
+
+const createWorkflowStepSchema = z.object({
+  stepType: z.string().min(1, "stepType is required"),
+  triggerType: z.string().min(1, "triggerType is required"),
+  sortOrder: z.coerce.number().int().min(0).optional(),
+  subject: z.string().optional(),
+  body: z.string().optional(),
+  emailTemplateId: z.string().optional(),
+  customRecipients: z.array(z.string().email()).optional(),
+  offsetDays: z.coerce.number().int().optional(),
+  offsetHours: z.coerce.number().int().optional(),
+  sendTimeOfDay: z.string().optional(),
+});
+
+const reorderWorkflowStepsSchema = z.object({
+  stepIds: z.array(z.string().min(1)).min(1, "stepIds must be a non-empty array"),
+});
 
 export async function POST(
   request: NextRequest,
@@ -19,10 +41,35 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id: workflowId } = await params;
-  const body = await request.json();
+  const paramsValidation = workflowStepParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid workflow id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
 
-  const { stepType, triggerType, sortOrder, subject, body: emailBody, emailTemplateId, customRecipients, offsetDays, offsetHours, sendTimeOfDay } = body;
+  const bodyValidation = createWorkflowStepSchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: bodyValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id: workflowId } = paramsValidation.data;
+  const {
+    stepType,
+    triggerType,
+    sortOrder,
+    subject,
+    body: emailBody,
+    emailTemplateId,
+    customRecipients,
+    offsetDays,
+    offsetHours,
+    sendTimeOfDay,
+  } = bodyValidation.data;
 
   if (!stepType || !Object.values(STEP_TYPES).includes(stepType as StepType)) {
     return NextResponse.json({ error: "Invalid stepType" }, { status: 400 });
@@ -58,13 +105,24 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id: workflowId } = await params;
-  const body = await request.json();
-  const { stepIds } = body;
-
-  if (!Array.isArray(stepIds)) {
-    return NextResponse.json({ error: "stepIds must be an array" }, { status: 400 });
+  const paramsValidation = workflowStepParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid workflow id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
   }
+
+  const bodyValidation = reorderWorkflowStepsSchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: bodyValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id: workflowId } = paramsValidation.data;
+  const { stepIds } = bodyValidation.data;
 
   await reorderWorkflowSteps(workflowId, stepIds);
 

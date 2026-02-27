@@ -172,4 +172,69 @@ describe("Stripe webhook API", () => {
     expect(db.registration.update).not.toHaveBeenCalled();
     expect(createOrUpdateContact).not.toHaveBeenCalled();
   });
+
+  it("processes payment_intent.succeeded when registrationId metadata exists", async () => {
+    process.env.HUBSPOT_ACCESS_TOKEN = "test-token";
+    (constructWebhookEvent as jest.Mock).mockReturnValue({
+      id: "evt_pi_1",
+      type: "payment_intent.succeeded",
+      data: {
+        object: {
+          id: "pi_789",
+          amount: 29900,
+          amount_received: 29900,
+          metadata: {
+            registrationId: "reg-2",
+          },
+        },
+      },
+    });
+
+    (db.registration.findUnique as jest.Mock).mockResolvedValue({
+      id: "reg-2",
+      email: "paid@example.com",
+      paymentStatus: "PENDING",
+      stripePaymentId: null,
+    });
+
+    (db.registration.update as jest.Mock)
+      .mockResolvedValueOnce({
+        id: "reg-2",
+        email: "paid@example.com",
+        firstName: "Pay",
+        lastName: "User",
+        company: "Scaling Up",
+        jobTitle: "Owner",
+        phone: "123",
+        workshop: {
+          title: "Paid Workshop",
+          eventDate: new Date("2026-05-01T10:00:00.000Z"),
+          coach: {
+            firstName: "Coach",
+            lastName: "One",
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        id: "reg-2",
+        hubspotContactId: "hs_paid_1",
+      });
+    (createOrUpdateContact as jest.Mock).mockResolvedValue("hs_paid_1");
+
+    const response = await POST(
+      buildWebhookRequest({
+        signature: "good-signature",
+        body: JSON.stringify({}),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(db.registration.update).toHaveBeenCalledTimes(2);
+    expect(createOrUpdateContact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "paid@example.com",
+        workshop_name: "Paid Workshop",
+      })
+    );
+  });
 });

@@ -123,7 +123,7 @@ export interface CreateWorkshopInput {
     zip?: string;
     country?: string;
   };
-  parkingInstructions?: string;
+  venueInstructions?: string;
   virtualPlatform?: string;
   virtualLink?: string;
   isFree?: boolean;

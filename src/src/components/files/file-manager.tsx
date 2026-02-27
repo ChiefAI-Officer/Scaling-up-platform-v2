@@ -5,7 +5,8 @@ import { useState, useRef } from "react";
 interface FileRecord {
   id: string;
   filename: string;
-  blobUrl: string;
+  downloadUrl: string;
+  blobUrl?: string | null;
   contentType: string;
   sizeBytes: number;
   workshopId: string | null;
@@ -309,7 +310,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
                         <span className="text-lg">{getFileIcon(file.contentType)}</span>
                         <div>
                           <a
-                            href={file.blobUrl}
+                            href={file.downloadUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm font-medium text-blue-600 hover:text-blue-800"
@@ -356,7 +357,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <a
-                          href={file.blobUrl}
+                          href={file.downloadUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm font-medium text-blue-600 hover:text-blue-800"

@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { z } from "zod";
+
+const pricingTierQuerySchema = z.object({
+    categoryId: z.string().min(1).optional(),
+    all: z.enum(["true", "false"]).optional(),
+});
+
+const createPricingTierSchema = z.object({
+    categoryId: z.string().min(1, "categoryId is required"),
+    name: z.string().trim().min(1, "name is required"),
+    amountCents: z.coerce.number().int().min(0, "amountCents must be non-negative"),
+    description: z.string().trim().optional().nullable(),
+});
 
 /**
  * GET /api/pricing-tiers
@@ -9,8 +22,19 @@ import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const categoryId = searchParams.get("categoryId");
-        const includeInactive = searchParams.get("all") === "true";
+        const queryValidation = pricingTierQuerySchema.safeParse(
+            Object.fromEntries(searchParams.entries())
+        );
+
+        if (!queryValidation.success) {
+            return NextResponse.json(
+                { error: "Invalid query parameters", details: queryValidation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const categoryId = queryValidation.data.categoryId;
+        const includeInactive = queryValidation.data.all === "true";
 
         const tiers = await db.pricingTier.findMany({
             where: {
@@ -42,19 +66,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const body = await request.json();
-        const { categoryId, name, amountCents, description } = body;
-
-        if (!categoryId || !name || amountCents === undefined) {
+        const bodyValidation = createPricingTierSchema.safeParse(await request.json());
+        if (!bodyValidation.success) {
             return NextResponse.json(
-                { error: "categoryId, name, and amountCents are required" },
+                { error: "Invalid request body", details: bodyValidation.error.issues },
                 { status: 400 }
             );
         }
 
-        if (typeof amountCents !== "number" || amountCents < 0) {
-            return NextResponse.json({ error: "amountCents must be a non-negative number" }, { status: 400 });
-        }
+        const { categoryId, name, amountCents, description } = bodyValidation.data;
 
         const tier = await db.pricingTier.create({
             data: {

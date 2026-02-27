@@ -34,10 +34,6 @@ export function QuickActions({
         alert("Configuration Required\n\nExport functionality requires active Mailgun and AWS S3 configuration.");
     };
 
-    const handleReminder = () => {
-        alert("Configuration Required\n\nSending reminders requires active HubSpot and Mailgun integration.");
-    };
-
     return (
         <div className="space-y-2">
             <Button
@@ -53,14 +49,6 @@ export function QuickActions({
                 className="w-full bg-muted text-foreground hover:bg-gray-200 border-0 justify-center"
             >
                 Export Registrations
-            </Button>
-
-            <Button
-                variant="secondary"
-                onClick={handleReminder}
-                className="w-full bg-muted text-foreground hover:bg-gray-200 border-0 justify-center"
-            >
-                Send Reminder Email
             </Button>
         </div>
     );

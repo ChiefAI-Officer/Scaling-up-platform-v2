@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireCoach, isWorkshopLocked, canAccessWorkshop } from "@/lib/authorization";
+import { z } from "zod";
+
+const requestEditParamsSchema = z.object({
+    id: z.string().min(1, "Workshop id is required"),
+});
+
+const requestEditBodySchema = z.object({
+    reason: z.string().trim().min(1).max(1000).optional(),
+});
 
 /**
  * POST /api/workshops/[id]/request-edit
@@ -12,7 +21,15 @@ export async function POST(
 ) {
     try {
         const { session, coach } = await requireCoach();
-        const { id: workshopId } = await params;
+        const paramsValidation = requestEditParamsSchema.safeParse(await params);
+        if (!paramsValidation.success) {
+            return NextResponse.json(
+                { success: false, error: "Invalid workshop id", details: paramsValidation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const { id: workshopId } = paramsValidation.data;
 
         // Verify coach owns this workshop
         if (!(await canAccessWorkshop(workshopId))) {
@@ -71,9 +88,16 @@ export async function POST(
         // Parse request body for edit details
         let editReason = "Coach requested to edit locked workshop";
         try {
-            const body = await request.json();
-            if (body.reason) {
-                editReason = body.reason;
+            const bodyValidation = requestEditBodySchema.safeParse(await request.json());
+            if (!bodyValidation.success) {
+                return NextResponse.json(
+                    { success: false, error: "Invalid request body", details: bodyValidation.error.issues },
+                    { status: 400 }
+                );
+            }
+
+            if (bodyValidation.data.reason) {
+                editReason = bodyValidation.data.reason;
             }
         } catch {
             // No body provided, use default reason

@@ -1,8 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/authorization";
+import { z } from "zod";
 
-export async function GET() {
+const bioProfilesQuerySchema = z.object({
+  coachId: z.string().min(1).optional(),
+});
+
+export async function GET(request: NextRequest) {
   try {
     const actor = await getApiActor();
     if (!actor) {
@@ -12,7 +17,19 @@ export async function GET() {
       );
     }
 
+    const queryValidation = bioProfilesQuerySchema.safeParse(
+      Object.fromEntries(request.nextUrl.searchParams.entries())
+    );
+
+    if (!queryValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid query parameters", details: queryValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
     const coaches = await db.coach.findMany({
+      where: queryValidation.data.coachId ? { id: queryValidation.data.coachId } : undefined,
       select: {
         id: true,
         firstName: true,

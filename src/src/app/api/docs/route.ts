@@ -329,7 +329,7 @@ export async function GET() {
                 country: { type: "string" },
               },
             },
-            parkingInstructions: { type: "string" },
+            venueInstructions: { type: "string" },
             virtualPlatform: { type: "string" },
             virtualLink: { type: "string", format: "uri" },
             isFree: { type: "boolean" },

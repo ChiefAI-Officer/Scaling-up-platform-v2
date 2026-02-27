@@ -8,13 +8,17 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/workshops", label: "Workshops" },
-  { href: "/coaches", label: "Coaches" },
+  { href: "/workshops", label: "All Workshops" },
+  { href: "/bio", label: "Bio" },
   { href: "/templates", label: "Templates" },
   { href: "/admin/workflows", label: "Workflows" },
   { href: "/admin/surveys", label: "Surveys" },
   { href: "/admin/files", label: "Files" },
   { href: "/partners", label: "Partners" },
+  { href: "/admin/approvals", label: "Approvals" },
+  { href: "/admin/categories", label: "Categories" },
+  { href: "/admin/pricing", label: "Pricing" },
+  { href: "/admin/financials", label: "Financials" },
 ];
 
 export default async function DashboardLayout({

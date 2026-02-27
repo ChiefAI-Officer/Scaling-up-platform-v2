@@ -6,6 +6,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { z } from "zod";
+
+const workflowExecutionsParamsSchema = z.object({
+  id: z.string().min(1, "Workflow id is required"),
+});
 
 export async function GET(
   _request: NextRequest,
@@ -16,7 +21,15 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id: workflowId } = await params;
+  const paramsValidation = workflowExecutionsParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid workflow id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id: workflowId } = paramsValidation.data;
 
   // Get all assignments for this workflow
   const assignments = await db.workflowAssignment.findMany({

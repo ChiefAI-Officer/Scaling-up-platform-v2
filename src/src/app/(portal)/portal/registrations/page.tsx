@@ -40,6 +40,7 @@ export default async function RegistrationsPage() {
     company: registration.company,
     paymentStatus: registration.paymentStatus,
     status: registration.status,
+    attended: registration.attended,
     registeredAt: registration.createdAt.toISOString(),
   }));
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { syncCoachFromCircle } from "@/services/circle-sync";
 
 // Request validation schema
 const CreateLandingPageSchema = z.object({
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
         const { workshopId } = CreateLandingPageSchema.parse(body);
 
         // Fetch workshop with related data
-        const workshop = await db.workshop.findUnique({
+        let workshop = await db.workshop.findUnique({
             where: { id: workshopId },
             include: {
                 coach: true,
@@ -123,6 +124,24 @@ export async function POST(request: NextRequest) {
                 { error: "Workshop not found" },
                 { status: 404 }
             );
+        }
+
+        // Lazy sync coach profile once during landing-page generation.
+        // This helps fill missing coach bio/photo from Circle without manual import.
+        if (!workshop.coach.profileImage || !workshop.coach.bio) {
+            const syncResult = await syncCoachFromCircle(workshop.coachId);
+            if (syncResult.updated) {
+                const refreshedWorkshop = await db.workshop.findUnique({
+                    where: { id: workshopId },
+                    include: {
+                        coach: true,
+                        workshopType: true,
+                    },
+                });
+                if (refreshedWorkshop) {
+                    workshop = refreshedWorkshop;
+                }
+            }
         }
 
         // Check if landing page already exists (use the first/default template for legacy support)

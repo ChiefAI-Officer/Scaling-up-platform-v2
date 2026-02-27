@@ -1,9 +1,13 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "./db";
+import { enforceProductionSafeAuthPosture } from "./auth-posture";
 
 // User roles for authorization
 export type UserRole = "ADMIN" | "STAFF" | "COACH";
+
+// Guardrail: DEMO_MODE can only be effective in local development.
+enforceProductionSafeAuthPosture("startup");
 
 function isCanonicalAdminEmail(email: string): boolean {
   const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
@@ -66,16 +70,17 @@ export const authOptions: NextAuthOptions = {
           throw new Error(INVALID_CREDENTIALS);
         }
 
-        // Production mode: require proper password validation
-        // Demo mode: only allow demo123 password when DEMO_MODE is enabled
-        const isDemoMode = process.env.DEMO_MODE === "true";
+        const authPosture = enforceProductionSafeAuthPosture("runtime");
+        const isDemoMode = authPosture.effectiveDemoMode;
 
         if (isDemoMode) {
           // Demo mode - accept demo123 for testing
           if (credentials.password !== "demo123") {
             throw new Error(INVALID_CREDENTIALS);
           }
-          console.warn("⚠️ DEMO_MODE enabled - using insecure authentication");
+          console.warn(
+            `⚠️ DEMO_MODE enabled in ${authPosture.deploymentContext} - using local demo authentication`
+          );
         } else {
           // Production mode - require bcrypt password validation
           const bcrypt = await import("bcryptjs");

@@ -69,13 +69,6 @@ const LANDING_TEMPLATES = [
         icon: "👥",
         editPath: "duo-landing",
     },
-    {
-        value: "BIO_PAGE",
-        label: "Coach Bio Page",
-        description: "Coach profile and credentials page",
-        icon: "🧑‍💼",
-        editPath: "bio-page",
-    },
 ];
 
 export default function WorkshopEditorPage() {

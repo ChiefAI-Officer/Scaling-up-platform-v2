@@ -172,25 +172,16 @@ export async function PATCH(
         ...(data.venueAddress !== undefined && {
           venueAddress: data.venueAddress ? JSON.stringify(data.venueAddress) : null
         }),
-        ...(data.parkingInstructions !== undefined && {
-          parkingInstructions: data.parkingInstructions,
-        }),
-        ...(data.virtualPlatform !== undefined && {
-          virtualPlatform: data.virtualPlatform,
+        ...(data.venueInstructions !== undefined && {
+          venueInstructions: data.venueInstructions,
         }),
         ...(data.virtualLink !== undefined && {
           virtualLink: data.virtualLink || null,
         }),
+        ...(data.geoTargetAreas !== undefined && { geoTargetAreas: data.geoTargetAreas }),
+        ...(data.excludedClients !== undefined && { excludedClients: data.excludedClients }),
         ...(data.isFree !== undefined && { isFree: data.isFree }),
         ...(data.priceCents !== undefined && { priceCents: data.priceCents }),
-        ...(data.earlyBirdPriceCents !== undefined && {
-          earlyBirdPriceCents: data.earlyBirdPriceCents,
-        }),
-        ...(data.earlyBirdDeadline !== undefined && {
-          earlyBirdDeadline: data.earlyBirdDeadline
-            ? new Date(data.earlyBirdDeadline)
-            : null,
-        }),
         ...(data.maxAttendees !== undefined && { maxAttendees: data.maxAttendees }),
       },
       include: {

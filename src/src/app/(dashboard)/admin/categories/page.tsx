@@ -8,6 +8,8 @@ interface Category {
     name: string;
     slug: string;
     description: string | null;
+    defaultTitle: string | null;
+    defaultDescription: string | null;
     isActive: boolean;
     _count: { workshops: number };
     pricingTiers: { id: string; name: string; amountCents: number; isActive: boolean }[];
@@ -23,6 +25,8 @@ export default function CategoriesPage() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [formName, setFormName] = useState("");
     const [formDescription, setFormDescription] = useState("");
+    const [formDefaultTitle, setFormDefaultTitle] = useState("");
+    const [formDefaultDescription, setFormDefaultDescription] = useState("");
     const [formSaving, setFormSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
 
@@ -49,6 +53,8 @@ export default function CategoriesPage() {
         setEditingId(null);
         setFormName("");
         setFormDescription("");
+        setFormDefaultTitle("");
+        setFormDefaultDescription("");
         setFormError(null);
         setShowForm(true);
     }
@@ -57,6 +63,8 @@ export default function CategoriesPage() {
         setEditingId(cat.id);
         setFormName(cat.name);
         setFormDescription(cat.description || "");
+        setFormDefaultTitle(cat.defaultTitle || "");
+        setFormDefaultDescription(cat.defaultDescription || "");
         setFormError(null);
         setShowForm(true);
     }
@@ -86,6 +94,8 @@ export default function CategoriesPage() {
                 body: JSON.stringify({
                     name: formName.trim(),
                     description: formDescription.trim() || null,
+                    defaultTitle: formDefaultTitle.trim() || null,
+                    defaultDescription: formDefaultDescription.trim() || null,
                 }),
             });
 
@@ -186,6 +196,36 @@ export default function CategoriesPage() {
                                 rows={2}
                                 placeholder="Optional description"
                             />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-1">
+                                Default Title Template
+                            </label>
+                            <input
+                                type="text"
+                                value={formDefaultTitle}
+                                onChange={(e) => setFormDefaultTitle(e.target.value)}
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                placeholder="e.g. Scaling Up AI Workshop"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Auto-fills workshop title as &quot;{"{title}"} with {"{Coach Name}"}&quot; when coaches select this category.
+                            </p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-foreground mb-1">
+                                Default Description
+                            </label>
+                            <textarea
+                                value={formDefaultDescription}
+                                onChange={(e) => setFormDefaultDescription(e.target.value)}
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                rows={3}
+                                placeholder="Default internal description for workshops in this category..."
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Auto-fills workshop description when coaches select this category.
+                            </p>
                         </div>
                         {formError && (
                             <p className="text-sm text-red-600">{formError}</p>

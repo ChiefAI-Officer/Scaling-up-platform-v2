@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { z } from "zod";
+
+const categoryRouteParamsSchema = z.object({
+    id: z.string().min(1, "Category id is required"),
+});
+
+const updateCategorySchema = z.object({
+    name: z.string().trim().min(1).optional(),
+    description: z.string().trim().optional().nullable(),
+    defaultTitle: z.string().trim().optional().nullable(),
+    defaultDescription: z.string().trim().optional().nullable(),
+    isActive: z.boolean().optional(),
+});
 
 /**
  * PATCH /api/categories/[id]
@@ -16,9 +29,24 @@ export async function PATCH(
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const { id } = await params;
-        const body = await request.json();
-        const { name, description, isActive } = body;
+        const paramsValidation = categoryRouteParamsSchema.safeParse(await params);
+        if (!paramsValidation.success) {
+            return NextResponse.json(
+                { error: "Invalid category id", details: paramsValidation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const bodyValidation = updateCategorySchema.safeParse(await request.json());
+        if (!bodyValidation.success) {
+            return NextResponse.json(
+                { error: "Invalid request body", details: bodyValidation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const { id } = paramsValidation.data;
+        const { name, description, defaultTitle, defaultDescription, isActive } = bodyValidation.data;
 
         const data: Record<string, unknown> = {};
         if (name !== undefined) {
@@ -26,6 +54,8 @@ export async function PATCH(
             data.slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
         }
         if (description !== undefined) data.description = description?.trim() || null;
+        if (defaultTitle !== undefined) data.defaultTitle = defaultTitle?.trim() || null;
+        if (defaultDescription !== undefined) data.defaultDescription = defaultDescription?.trim() || null;
         if (isActive !== undefined) data.isActive = Boolean(isActive);
 
         const category = await db.category.update({
@@ -60,7 +90,15 @@ export async function DELETE(
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const { id } = await params;
+        const paramsValidation = categoryRouteParamsSchema.safeParse(await params);
+        if (!paramsValidation.success) {
+            return NextResponse.json(
+                { error: "Invalid category id", details: paramsValidation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const { id } = paramsValidation.data;
 
         // Check for linked workshops
         const workshopCount = await db.workshop.count({ where: { categoryId: id } });

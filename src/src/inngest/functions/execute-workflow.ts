@@ -15,46 +15,14 @@ import {
 } from "@/lib/workflow-service";
 import { TRIGGER_TYPES, STEP_TYPES } from "@/lib/workflow-types";
 import { buildLocationString } from "@/lib/ics-generator";
-import { getWorkflowStepFiles } from "@/lib/file-service";
-
-interface EmailAttachment {
-  filename: string;
-  path: string; // URL for nodemailer to fetch
-  contentType: string;
-}
-
-async function sendEmail(
-  to: string,
-  subject: string,
-  html: string,
-  attachments?: EmailAttachment[]
-) {
-  const nodemailer = await import("nodemailer");
-
-  if (!process.env.SMTP_HOST) {
-    console.log(`[Workflow Mock Email] To: ${to}, Subject: ${subject}, Attachments: ${attachments?.length || 0}`);
-    return;
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: false,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
-  });
-
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || '"Scaling Up Platform" <noreply@scalingup.com>',
-    to,
-    subject,
-    html,
-    attachments: attachments?.map((a) => ({
-      filename: a.filename,
-      path: a.path,
-      contentType: a.contentType,
-    })),
-  });
-}
+import {
+  buildProtectedEmailAttachments,
+  canDeliverWorkflowAttachments,
+  getWorkflowStepFiles,
+} from "@/lib/file-service";
+import { sendEmailViaSMTP } from "@/lib/smtp-transport";
+import { recordDeliveryTelemetry } from "@/lib/delivery-telemetry";
+import type { FileRecipientRole } from "@/lib/file-access";
 
 export const executeWorkflow = inngest.createFunction(
   { id: "execute-workflow", retries: 2 },
@@ -168,27 +136,26 @@ export const executeWorkflow = inngest.createFunction(
           subject = interpolateTemplate(subject, baseContext);
           body = interpolateTemplate(body, baseContext);
 
-          // JV-12: Fetch file attachments for this workflow step
+          // JV-12/P1: Fetch attachments and apply stage + role delivery protection
           const stepFiles = await getWorkflowStepFiles(workflowStep.id);
-          const attachments: EmailAttachment[] = stepFiles.map((f) => ({
-            filename: f.filename,
-            path: f.blobUrl,
-            contentType: f.contentType,
-          }));
 
           // Determine recipients based on step type
           const recipients: string[] = [];
+          let recipientRole: FileRecipientRole = "CUSTOM";
 
           switch (workflowStep.stepType) {
             case STEP_TYPES.EMAIL_COACH:
+              recipientRole = "COACH";
               recipients.push(workshop.coach.email);
               break;
 
             case STEP_TYPES.EMAIL_STAFF:
+              recipientRole = "STAFF";
               recipients.push(process.env.ADMIN_EMAIL || "admin@scalingup.com");
               break;
 
             case STEP_TYPES.EMAIL_CUSTOM:
+              recipientRole = "CUSTOM";
               if (workflowStep.customRecipients) {
                 try {
                   const parsed = JSON.parse(workflowStep.customRecipients);
@@ -203,11 +170,42 @@ export const executeWorkflow = inngest.createFunction(
               break;
 
             case STEP_TYPES.EMAIL_ATTENDEES: {
+              recipientRole = "ATTENDEE";
               // Fetch all registrations for this workshop
               const registrations = await db.registration.findMany({
                 where: { workshopId: workshop.id, status: "REGISTERED" },
-                select: { email: true, firstName: true, lastName: true, company: true },
+                select: { id: true, email: true, firstName: true, lastName: true, company: true },
               });
+              const canAttach = canDeliverWorkflowAttachments({
+                recipientRole,
+                workshopStatus: workshop.status,
+              });
+              if (!canAttach && stepFiles.length > 0) {
+                await recordDeliveryTelemetry({
+                  recipient: "SYSTEM",
+                  subject: subject || workflowStep.emailTemplate?.subject || "Workflow step execution",
+                  status: "SKIPPED",
+                  provider: process.env.SMTP_HOST ? "SMTP" : "MOCK",
+                  workshopId: workshop.id,
+                  workshopCode: workshop.workshopCode,
+                  workflowId: workflow.id,
+                  workflowStepId: workflowStep.id,
+                  recipientRole,
+                  metadata: {
+                    reason: "attachment_policy_blocked",
+                    workshopStatus: workshop.status,
+                    attemptedAttachmentCount: stepFiles.length,
+                  },
+                });
+              }
+              const attendeeAttachments = canAttach
+                ? buildProtectedEmailAttachments({
+                    files: stepFiles,
+                    workshopId: workshop.id,
+                    workshopStatus: workshop.status,
+                    recipientRole,
+                  })
+                : [];
 
               for (const reg of registrations) {
                 const personalContext: WorkflowContext = {
@@ -225,7 +223,25 @@ export const executeWorkflow = inngest.createFunction(
                   personalContext
                 );
 
-                await sendEmail(reg.email, personalSubject, personalBody, attachments);
+                await sendEmailViaSMTP({
+                  to: reg.email,
+                  subject: personalSubject,
+                  html: personalBody,
+                  attachments: attendeeAttachments,
+                  telemetry: {
+                    workshopId: workshop.id,
+                    workshopCode: workshop.workshopCode,
+                    workflowId: workflow.id,
+                    workflowStepId: workflowStep.id,
+                    recipientRole,
+                    registrationId: reg.id,
+                    metadata: {
+                      attemptedAttachmentCount: stepFiles.length,
+                      attachedCount: attendeeAttachments.length,
+                      attachmentPolicyAllowed: canAttach,
+                    },
+                  },
+                });
               }
 
               // Record execution
@@ -258,9 +274,57 @@ export const executeWorkflow = inngest.createFunction(
               return;
           }
 
+          const canAttach = canDeliverWorkflowAttachments({
+            recipientRole,
+            workshopStatus: workshop.status,
+          });
+          if (!canAttach && stepFiles.length > 0) {
+            await recordDeliveryTelemetry({
+              recipient: "SYSTEM",
+              subject: subject || workflowStep.emailTemplate?.subject || "Workflow step execution",
+              status: "SKIPPED",
+              provider: process.env.SMTP_HOST ? "SMTP" : "MOCK",
+              workshopId: workshop.id,
+              workshopCode: workshop.workshopCode,
+              workflowId: workflow.id,
+              workflowStepId: workflowStep.id,
+              recipientRole,
+              metadata: {
+                reason: "attachment_policy_blocked",
+                workshopStatus: workshop.status,
+                attemptedAttachmentCount: stepFiles.length,
+              },
+            });
+          }
+          const protectedAttachments = canAttach
+            ? buildProtectedEmailAttachments({
+                files: stepFiles,
+                workshopId: workshop.id,
+                workshopStatus: workshop.status,
+                recipientRole,
+              })
+            : [];
+
           // Send to collected recipients with attachments
           for (const recipient of recipients) {
-            await sendEmail(recipient, subject, body, attachments);
+            await sendEmailViaSMTP({
+              to: recipient,
+              subject,
+              html: body,
+              attachments: protectedAttachments,
+              telemetry: {
+                workshopId: workshop.id,
+                workshopCode: workshop.workshopCode,
+                workflowId: workflow.id,
+                workflowStepId: workflowStep.id,
+                recipientRole,
+                metadata: {
+                  attemptedAttachmentCount: stepFiles.length,
+                  attachedCount: protectedAttachments.length,
+                  attachmentPolicyAllowed: canAttach,
+                },
+              },
+            });
           }
 
           // Record execution

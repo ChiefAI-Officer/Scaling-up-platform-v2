@@ -23,6 +23,7 @@ export interface CoachRegistrationView {
   company: string | null;
   paymentStatus: string;
   status: string;
+  attended: boolean;
   registeredAt: string;
 }
 
@@ -59,9 +60,11 @@ function paymentBadgeVariant(
   }
 }
 
-export function RegistrationsClient({ registrations }: RegistrationsClientProps) {
+export function RegistrationsClient({ registrations: initialRegistrations }: RegistrationsClientProps) {
+  const [registrations, setRegistrations] = useState(initialRegistrations);
   const [selectedWorkshopId, setSelectedWorkshopId] = useState("all");
   const [submittingForId, setSubmittingForId] = useState<string | null>(null);
+  const [togglingAttendanceId, setTogglingAttendanceId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     message: string;
@@ -104,6 +107,7 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
       "Company",
       "Payment Status",
       "Registration Status",
+      "Attended",
       "Registered At",
     ];
 
@@ -116,6 +120,7 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
       registration.company || "",
       registration.paymentStatus,
       registration.status,
+      registration.attended ? "Yes" : "No",
       formatDate(registration.registeredAt),
     ]);
 
@@ -138,9 +143,9 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
     URL.revokeObjectURL(url);
   };
 
-  const requestRemoval = async (registration: CoachRegistrationView) => {
+  const handleUnregister = async (registration: CoachRegistrationView) => {
     const confirmed = window.confirm(
-      `Request removal for ${registration.firstName} ${registration.lastName}? This creates an approval request for admin review.`
+      `Unregister ${registration.firstName} ${registration.lastName}? ${registration.paymentStatus === "COMPLETED" ? "A refund will be issued automatically." : "This cannot be undone."}`
     );
 
     if (!confirmed) {
@@ -152,14 +157,8 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
 
     try {
       const response = await fetch(
-        `/api/registrations/${registration.id}/removal-request`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({}),
-        }
+        `/api/registrations/${registration.id}`,
+        { method: "DELETE" }
       );
 
       const result = (await response.json()) as {
@@ -169,14 +168,20 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
       };
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || "Failed to submit removal request");
+        throw new Error(result.error || "Failed to unregister attendee");
       }
+
+      setRegistrations((prev) =>
+        prev.map((r) =>
+          r.id === registration.id
+            ? { ...r, status: "CANCELLED", paymentStatus: r.paymentStatus === "COMPLETED" ? "REFUNDED" : r.paymentStatus }
+            : r
+        )
+      );
 
       setFeedback({
         type: "success",
-        message:
-          result.message ||
-          "Removal request submitted. Admin approval is required.",
+        message: result.message || "Attendee unregistered successfully.",
       });
     } catch (error) {
       setFeedback({
@@ -184,10 +189,53 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
         message:
           error instanceof Error
             ? error.message
-            : "Failed to submit removal request",
+            : "Failed to unregister attendee",
       });
     } finally {
       setSubmittingForId(null);
+    }
+  };
+
+  const handleToggleAttendance = async (registration: CoachRegistrationView) => {
+    setTogglingAttendanceId(registration.id);
+
+    try {
+      const response = await fetch(
+        `/api/registrations/${registration.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ attended: !registration.attended }),
+        }
+      );
+
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: { attended: boolean };
+        error?: string;
+      };
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Failed to update attendance");
+      }
+
+      setRegistrations((prev) =>
+        prev.map((r) =>
+          r.id === registration.id
+            ? { ...r, attended: result.data?.attended ?? !r.attended }
+            : r
+        )
+      );
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to update attendance",
+      });
+    } finally {
+      setTogglingAttendanceId(null);
     }
   };
 
@@ -251,13 +299,14 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
               <TableHead>Workshop</TableHead>
               <TableHead>Registered</TableHead>
               <TableHead>Payment</TableHead>
+              <TableHead>Attended</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredRegistrations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   No registrations found for this filter.
                 </TableCell>
               </TableRow>
@@ -287,17 +336,33 @@ export function RegistrationsClient({ registrations }: RegistrationsClientProps)
                       {registration.paymentStatus}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {registration.status !== "CANCELLED" && (
+                      <input
+                        type="checkbox"
+                        checked={registration.attended}
+                        onChange={() => handleToggleAttendance(registration)}
+                        disabled={togglingAttendanceId === registration.id}
+                        className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
+                        aria-label={`Mark ${registration.firstName} ${registration.lastName} as ${registration.attended ? "not attended" : "attended"}`}
+                      />
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => requestRemoval(registration)}
-                      disabled={submittingForId === registration.id}
-                    >
-                      {submittingForId === registration.id
-                        ? "Submitting..."
-                        : "Request Removal"}
-                    </Button>
+                    {registration.status !== "CANCELLED" ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleUnregister(registration)}
+                        disabled={submittingForId === registration.id}
+                      >
+                        {submittingForId === registration.id
+                          ? "Processing..."
+                          : "Unregister"}
+                      </Button>
+                    ) : (
+                      <Badge variant="secondary">Cancelled</Badge>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

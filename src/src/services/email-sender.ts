@@ -1,9 +1,11 @@
 /**
  * Email Sender Service
- * Handles sending templated emails via SMTP or a transactional email provider.
+ * Handles sending templated emails via SMTP.
+ * Uses shared SMTP transport from lib/smtp-transport.ts.
  */
 
-import nodemailer from "nodemailer";
+import { sendEmailViaSMTP } from "@/lib/smtp-transport";
+import { recordDeliveryTelemetry } from "@/lib/delivery-telemetry";
 
 interface EmailAttachment {
     filename: string;
@@ -16,6 +18,12 @@ interface SendEmailOptions {
     templateId: string;
     variables: Record<string, string>;
     attachments?: EmailAttachment[];
+    telemetry?: {
+        workshopId?: string;
+        workshopCode?: string;
+        recipientRole?: "STAFF" | "COACH" | "ATTENDEE" | "CUSTOM";
+        metadata?: Record<string, unknown>;
+    };
 }
 
 // Email templates stored in-memory for MVP
@@ -86,17 +94,6 @@ const EMAIL_TEMPLATES: Record<string, { subject: string; html: string }> = {
     }
 };
 
-// SMTP transport (configure based on environment)
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.example.com",
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: false,
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-    },
-});
-
 /**
  * Send an email using a template
  */
@@ -117,27 +114,46 @@ export async function sendEmailTemplate(options: SendEmailOptions): Promise<void
         html = html.replace(regex, value);
     }
 
-    // Send email (or log in dev mode)
-    if (!process.env.SMTP_HOST || process.env.NODE_ENV === "development") {
+    // Extra dev-mode guard for template emails
+    if (process.env.NODE_ENV === "development") {
         console.log("[DEV EMAIL]", {
             to: options.to,
             subject,
             templateId: options.templateId,
             attachments: options.attachments?.length || 0,
         });
+        await recordDeliveryTelemetry({
+            recipient: options.to,
+            subject,
+            status: "MOCK",
+            provider: "MOCK",
+            workshopId: options.telemetry?.workshopId,
+            workshopCode: options.telemetry?.workshopCode,
+            recipientRole: options.telemetry?.recipientRole,
+            metadata: {
+                templateId: options.templateId,
+                attachmentCount: options.attachments?.length ?? 0,
+                ...(options.telemetry?.metadata ?? {}),
+            },
+        });
         return;
     }
 
-    await transporter.sendMail({
-        from: process.env.SMTP_FROM || '"Scaling Up" <noreply@scalingup.com>',
+    await sendEmailViaSMTP({
         to: options.to,
         subject,
         html,
-        attachments: options.attachments?.map((a) => ({
-            filename: a.filename,
-            content: a.content,
-            contentType: a.contentType,
-        })),
+        attachments: options.attachments,
+        telemetry: {
+            workshopId: options.telemetry?.workshopId,
+            workshopCode: options.telemetry?.workshopCode,
+            recipientRole: options.telemetry?.recipientRole,
+            metadata: {
+                templateId: options.templateId,
+                attachmentCount: options.attachments?.length ?? 0,
+                ...(options.telemetry?.metadata ?? {}),
+            },
+        },
     });
 }
 

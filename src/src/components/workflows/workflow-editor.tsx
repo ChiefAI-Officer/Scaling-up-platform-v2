@@ -74,6 +74,9 @@ interface SerializedWorkflow {
   description: string | null;
   isActive: boolean;
   isTemplate: boolean;
+  categoryId: string | null;
+  workshopFormat: string | null;
+  workflowPhase: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -95,10 +98,16 @@ interface WorkshopOption {
   eventDate: string;
 }
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
 interface WorkflowEditorProps {
   workflow: SerializedWorkflow | null;
   emailTemplates: EmailTemplateOption[];
   workshops: WorkshopOption[];
+  categories: CategoryOption[];
   isNew: boolean;
 }
 
@@ -110,6 +119,7 @@ export function WorkflowEditor({
   workflow: initialWorkflow,
   emailTemplates,
   workshops,
+  categories,
   isNew,
 }: WorkflowEditorProps) {
   const router = useRouter();
@@ -118,6 +128,9 @@ export function WorkflowEditor({
   const [name, setName] = useState(initialWorkflow?.name ?? "");
   const [description, setDescription] = useState(initialWorkflow?.description ?? "");
   const [isTemplate, setIsTemplate] = useState(initialWorkflow?.isTemplate ?? false);
+  const [categoryId, setCategoryId] = useState<string>(initialWorkflow?.categoryId ?? "");
+  const [workshopFormat, setWorkshopFormat] = useState<string>(initialWorkflow?.workshopFormat ?? "");
+  const [workflowPhase, setWorkflowPhase] = useState<string>(initialWorkflow?.workflowPhase ?? "");
   const [steps, setSteps] = useState<SerializedStep[]>(initialWorkflow?.steps ?? []);
   const [assignments, setAssignments] = useState<SerializedAssignment[]>(
     initialWorkflow?.assignments ?? []
@@ -154,7 +167,14 @@ export function WorkflowEditor({
         const res = await fetch("/api/workflows", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name.trim(), description: description.trim(), isTemplate }),
+          body: JSON.stringify({
+            name: name.trim(),
+            description: description.trim(),
+            isTemplate,
+            categoryId: categoryId || null,
+            workshopFormat: workshopFormat || null,
+            workflowPhase: workflowPhase || null,
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to create workflow");
@@ -167,7 +187,14 @@ export function WorkflowEditor({
         const res = await fetch(`/api/workflows/${workflowId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name.trim(), description: description.trim(), isTemplate }),
+          body: JSON.stringify({
+            name: name.trim(),
+            description: description.trim(),
+            isTemplate,
+            categoryId: categoryId || null,
+            workshopFormat: workshopFormat || null,
+            workflowPhase: workflowPhase || null,
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to update workflow");
@@ -179,7 +206,7 @@ export function WorkflowEditor({
     } finally {
       setSaving(false);
     }
-  }, [name, description, isTemplate, isNew, workflowId, router]);
+  }, [name, description, isTemplate, categoryId, workshopFormat, workflowPhase, isNew, workflowId, router]);
 
   // ============================================
   // Step CRUD
@@ -409,6 +436,56 @@ export function WorkflowEditor({
           />
           Save as template (reusable across workshops)
         </label>
+
+        {/* Auto-assignment filters for auto-build on approval */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-border">
+          <div>
+            <label htmlFor="wf-category" className="block text-sm font-medium text-muted-foreground">
+              Category (auto-assign)
+            </label>
+            <select
+              id="wf-category"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+            >
+              <option value="">Any category</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="wf-format" className="block text-sm font-medium text-muted-foreground">
+              Format (auto-assign)
+            </label>
+            <select
+              id="wf-format"
+              value={workshopFormat}
+              onChange={(e) => setWorkshopFormat(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+            >
+              <option value="">Any format</option>
+              <option value="IN_PERSON">In-Person</option>
+              <option value="VIRTUAL">Virtual</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="wf-phase" className="block text-sm font-medium text-muted-foreground">
+              Phase (auto-assign)
+            </label>
+            <select
+              id="wf-phase"
+              value={workflowPhase}
+              onChange={(e) => setWorkflowPhase(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+            >
+              <option value="">Not set</option>
+              <option value="PRE_EVENT">Pre-Event</option>
+              <option value="POST_EVENT">Post-Event</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* === Section 2: Tabbed content (Steps / Timeline / Executions) === */}
@@ -631,7 +708,7 @@ function StepCard({
   const [templateId, setTemplateId] = useState(step.emailTemplateId ?? "");
 
   // JV-12: File attachments for this step
-  const [stepFiles, setStepFiles] = useState<{ id: string; filename: string; blobUrl: string; contentType: string }[]>([]);
+  const [stepFiles, setStepFiles] = useState<{ id: string; filename: string; blobUrl?: string; contentType: string }[]>([]);
   const [availableFiles, setAvailableFiles] = useState<{ id: string; filename: string; contentType: string }[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
 

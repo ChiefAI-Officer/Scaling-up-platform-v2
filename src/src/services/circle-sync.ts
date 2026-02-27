@@ -48,7 +48,7 @@ export async function syncCoachFromCircle(
 
         const profile = await getCircleProfileByEmail(coach.email);
         if (!profile) {
-            return { success: true, updated: false, fieldsUpdated: [], error: "No Circle profile found for this email" };
+            return { success: false, updated: false, fieldsUpdated: [], error: "No Circle profile found for this email" };
         }
 
         // Build update payload — only fill empty fields unless forceOverwrite
@@ -71,7 +71,7 @@ export async function syncCoachFromCircle(
         }
 
         // System fields — always update
-        if (profile.memberId) {
+        if (profile.memberId && profile.memberId !== coach.circleId) {
             updateData.circleId = profile.memberId;
             fieldsUpdated.push("circleId");
         }

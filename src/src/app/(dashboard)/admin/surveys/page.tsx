@@ -134,12 +134,20 @@ export default function AdminSurveysPage() {
             Build custom surveys to collect pre/post-event feedback and NPS scores.
           </p>
         </div>
-        <Link
-          href="/admin/surveys/templates/new"
-          className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          + Create Template
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/admin/surveys/aggregate"
+            className="inline-flex items-center rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
+          >
+            Aggregated Results
+          </Link>
+          <Link
+            href="/admin/surveys/templates/new"
+            className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            + Create Template
+          </Link>
+        </div>
       </div>
 
       <div className="rounded-lg bg-card shadow">

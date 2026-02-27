@@ -7,6 +7,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createWorkflow, listWorkflows, duplicateWorkflow } from "@/lib/workflow-service";
+import { z } from "zod";
+
+const workflowsQuerySchema = z.object({
+  templates: z.enum(["true", "false"]).optional(),
+});
+
+const createWorkflowSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+  isTemplate: z.boolean().optional(),
+  duplicateFromId: z.string().min(1).optional(),
+});
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -15,7 +27,17 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const templatesOnly = searchParams.get("templates") === "true";
+  const queryValidation = workflowsQuerySchema.safeParse(
+    Object.fromEntries(searchParams.entries())
+  );
+  if (!queryValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid query parameters", details: queryValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const templatesOnly = queryValidation.data.templates === "true";
 
   const workflows = await listWorkflows({
     templatesOnly,
@@ -31,8 +53,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { name, description, isTemplate, duplicateFromId } = body;
+  const bodyValidation = createWorkflowSchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: bodyValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { name, description, isTemplate, duplicateFromId } = bodyValidation.data;
 
   if (!name?.trim()) {
     return NextResponse.json({ error: "Workflow name is required" }, { status: 400 });

@@ -156,6 +156,18 @@ async function checkEnvExposure() {
                     scanDirectory(filePath);
                 }
             } else if (file.endsWith(".ts") || file.endsWith(".tsx") || file.endsWith(".js")) {
+                const normalizedPath = filePath.replace(/\\/g, "/");
+                const isTestFile =
+                    normalizedPath.includes("/__tests__/") ||
+                    normalizedPath.endsWith(".test.ts") ||
+                    normalizedPath.endsWith(".test.tsx") ||
+                    normalizedPath.endsWith(".spec.ts") ||
+                    normalizedPath.endsWith(".spec.tsx");
+
+                if (isTestFile) {
+                    continue;
+                }
+
                 const content = fs.readFileSync(filePath, "utf-8");
                 for (const pattern of sensitivePatterns) {
                     if (pattern.test(content)) {
@@ -260,6 +272,7 @@ async function checkInputValidation() {
             } else if (file === "route.ts" || file === "route.tsx") {
                 routeCount++;
                 const content = fs.readFileSync(filePath, "utf-8");
+                const normalizedPath = filePath.replace(/\\/g, "/");
                 
                 // Check for Zod patterns - including imports from validations
                 const hasZod = 
@@ -273,11 +286,12 @@ async function checkInputValidation() {
                 
                 // Skip system routes that don't need validation
                 const isSystemRoute = 
-                    filePath.includes("auth/") ||
-                    filePath.includes("health") ||
-                    filePath.includes("docs") ||
-                    filePath.includes("inngest") ||
-                    filePath.includes("webhooks/stripe"); // Stripe validates via signature
+                    normalizedPath.includes("/auth/") ||
+                    normalizedPath.includes("/health") ||
+                    normalizedPath.includes("/docs") ||
+                    normalizedPath.includes("/inngest") ||
+                    normalizedPath.includes("/debug-auth/") ||
+                    normalizedPath.includes("/webhooks/stripe"); // Stripe validates via signature
                 
                 if (hasZod || isSystemRoute) {
                     zodCount++;

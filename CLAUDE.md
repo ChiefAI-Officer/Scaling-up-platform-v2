@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | February 18, 2026 — ALL SPRINTS + QA + JV Gap Fixes + Production Readiness + UI/UX Phase 1-2+ + Dark Mode Migration + Phase F Defensive Fixes COMPLETE |
+| **Last Updated** | February 27, 2026 — Phase 1 Production Hardening (next sprint) |
 
 ## Current Status
 
@@ -70,11 +70,118 @@ the full workshop lifecycle from request through post-event follow-up.
 - Circle.so: `getCircleProfileByEmail()` returns `null` when `CIRCLE_API_KEY` missing (verifyCertification already handled)
 - Inngest: Startup warnings when `INNGEST_EVENT_KEY` or `INNGEST_SIGNING_KEY` missing
 
-**Production Readiness Roadmap:** `D:\The CTO Project\plans\PRODUCTION_READINESS_ROADMAP.md`
-**Production Readiness Tasks:** `D:\The CTO Project\plans\PRODUCTION_READINESS_TASKS.md` (51 tasks, 3 done)
+**CIO Revision Audit Pass (Feb 20, 2026)** — Complete (P0 updates):
+- Navigation clarity: `All Workshops` naming restored in admin IA
+- Added direct `Bio` nav route and `Financials` nav route in admin header
+- Workshop Editor scope tightened to workshop pages (removed BIO page from template picker)
+- Admin Create Workshop: removed visible Workshop Type field (category-first flow)
+- Paid workshops now require approved pricing tier selection (manual fallback removed)
+- Free registration path now syncs to HubSpot (paid sync already handled by Stripe webhook)
 
-**Roadmap:** `D:\The CTO Project\plans\JEFF_VERDUN_REVISIONS_IMPLEMENTATION_ROADMAP.md`
-**Task Tracker:** `D:\The CTO Project\plans\JEFF_VERDUN_REVISION_TASKS.md`
+**Context Bloat Cleanup (Feb 26, 2026)** — Complete:
+- Deleted 6 dead code files (~800 lines): animations.ts, cache.ts, api-handler.ts, logger.ts, landing-page-auto-populate.ts, workshop-generator.ts
+- Fixed toast dismiss bug in `use-toast.ts` L109 (`onsubmit` → `toastId`)
+- Removed unused `bullmq` dependency (12 sub-packages)
+- Consolidated 3 duplicate SMTP transports into shared `lib/smtp-transport.ts`
+- Merged dual admin layouts: moved 6 pages from standalone `/admin/` into `(dashboard)/admin/`
+- npm audit fix: 1 fixed, 3 low-severity cookie vulns deferred (next-auth breaking change)
+- All verified: 0 type errors, 226/226 tests pass, build succeeds
+
+**Phase 1: Production Hardening (Feb 27, 2026)** — **NEXT SPRINT**:
+- 8 security fixes (S1-S8): password reset nonce, webhook secret enforcement, survey access control, error handling, API timeouts, auto-build idempotency, email dedup
+- 10 critical test files to write (T1-T10): auto-build, registration, workflow execution, status transitions, surveys, auth, files, resubmit, completion summary, typeform
+- Manual E2E verification by GTM engineer (47 manual checks + 19 end-to-end scenarios)
+- Target: ~35-40% test coverage (up from 11.15%), all 8 security issues closed
+- Plans: `plans/PLATFORM_STATE_ASSESSMENT_FEB27_2026.md` + `plans/V_AND_V_TASK_TRACKER.md`
+
+**Feb 25 Call Revisions (Feb 26-27, 2026)** — **ALL 7 SPRINTS COMPLETE** (65/65 tasks):
+- Source: 64-min walkthrough by Jeff Verdun + Suzanne Krygier (Feb 24, 2026)
+- 42 revisions + 5 gap fixes identified, organized into 7 sprints
+- 24 video frames extracted and analyzed for visual context
+- Sprint 1 complete: Form cleanup (HYBRID, virtualPlatform, early bird removed; free-form pricing, venue instructions, T&C link)
+- Sprint 2 complete: Schema migration (Category defaults, Workshop geo/excluded, Registration attendance/marketing); auto-title/description; category admin editor
+- Sprint 3 complete: Coach portal enhancements (unregister API + UI, attendance tracking, survey results page, workflow status on coach + admin detail, rejection/edit/resubmit flow)
+- Sprint 4 complete: Coach profile + notification emails (Circle.so cleanup, image upload, LinkedIn URL, CTA toggle, 3 notification emails wired)
+- Sprint 5 complete: Auto-Build on Approval (flagship) — Inngest function, template toggle, workflow auto-assign, variable interpolation, status automation, built email
+- Sprint 6 complete: Financials filters (coach/category/date range), workshop completion summary Inngest function, registration form (phone+company required, marketing opt-in)
+- Sprint 7 complete: Aggregated survey results page, cross-workshop API mode, coach post-workshop + 30-day follow-up survey seeds, post-event coach survey workflow seed
+
+**New API Routes (Sprints 3-5):**
+- `DELETE /api/registrations/[id]` — Direct unregister (coach-scoped, Stripe refund)
+- `PATCH /api/registrations/[id]` — Toggle attendance (attended + attendedAt)
+- `POST /api/workshops/[id]/resubmit` — Resubmit denied workshop for approval
+- `POST /api/portal/profile/image` — Coach profile image upload (Vercel Blob, 5MB max)
+- `PATCH /api/landing-pages/[id]` — Update landing page properties (isActiveTemplate toggle)
+
+**New Pages (Sprint 3):**
+- `/portal/workshops/[id]/surveys` — Coach survey results (grouped by template)
+
+**New Components (Sprints 3 + 5):**
+- `components/workshops/resubmit-workshop.tsx` — Rejection reason + edit + resubmit client component
+- `components/templates/active-template-toggle.tsx` — Toggle "Set as Active Template" for auto-build
+
+**Schema Changes (Sprint 4):**
+- `Coach.linkedinUrl` (String?) — LinkedIn profile URL
+- `Coach.showBookCallCta` (Boolean, default true) — Toggle CTA on bio page
+- Migration: `20260227000000_feb25_coach_profile_fields`
+
+**Schema Changes (Sprint 5):**
+- `LandingPage.isActiveTemplate` (Boolean, default false) — Marks page as template for auto-build cloning
+- `Workflow.categoryId` (String?, FK→Category) — Auto-assign by category
+- `Workflow.workshopFormat` (String?) — "IN_PERSON" or "VIRTUAL", null = any
+- `Workflow.workflowPhase` (String?) — "PRE_EVENT" or "POST_EVENT"
+- Migration: `20260227100000_feb25_sprint5_auto_build_fields`
+
+**Notification Emails (Sprints 4 + 5):**
+- `sendWorkshopRequestedEmail()` — To coach + admin on workshop submit
+- `sendWorkshopApprovedEmail()` — To coach when workshop approved
+- `sendWorkshopDeniedEmail()` — To coach when workshop denied (includes reason + resubmit link)
+- `sendWorkshopBuiltEmail()` — To coach after auto-build (pages created, workflows assigned)
+
+**Auto-Build on Approval (Sprint 5 - Flagship):**
+- `inngest/functions/auto-build-workshop.ts` — Triggered by `workshop/approved` event
+- Copies active landing page templates with variable interpolation (20+ variables)
+- Auto-assigns PRE_EVENT + POST_EVENT workflows by category/format match
+- Advances workshop status AWAITING_APPROVAL → PRE_EVENT
+- Emits `workflow/schedule` events for each assigned workflow
+- Sends coach notification with build summary
+
+**Sprint 6 — Dashboard, Financials & Registration:**
+- `components/financials/financial-filters.tsx` — Client component: coach/category dropdowns, custom date range picker
+- `admin/financials/page.tsx` — Updated with coach/category/date filtering on all queries
+- `inngest/functions/workshop-completion-summary.ts` — Triggered by `workshop/completed` event, emails admin with attendee list + revenue total
+- `services/notifications.ts` — Added `sendWorkshopCompletionSummary()` (attendee table + revenue breakdown)
+- `api/workshops/[id]/status/route.ts` — Emits `workshop/completed` Inngest event on COMPLETED transition
+- Registration form: phone + company now required, marketing opt-in checkbox added
+- `lib/validations.ts` — `createRegistrationSchema` updated: company required, phone required, marketingOptIn field
+- `lib/registration-service.ts` — Passes `marketingOptIn` through to db.registration.create
+- `api/workshops/[id]/register/route.ts` — Updated Zod schema + parseRegistrationInput for new fields
+- `inngest/types.ts` — Added `workshop/completed` event type
+- `api/inngest/route.ts` — Registered `workshopCompletionSummary` function
+**Sprint 7 — Aggregated Surveys & Coach Surveys:**
+- `admin/surveys/aggregate/page.tsx` — Cross-workshop aggregated survey results page (template selector tabs, summary cards, per-question distribution bars, per-workshop breakdown table)
+- `api/survey-templates/[id]/results/route.ts` — Added `workshopId=all` support (passes undefined for cross-workshop aggregation)
+- `admin/surveys/page.tsx` — Added "Aggregated Results" link button
+- `prisma/seed.ts` — Added "Coach Post-Workshop Survey" template (5 questions), "Coach 30-Day Follow-Up Survey" template (5 questions), "Post-Event Coach Survey Sequence" workflow (2 steps: 1-day + 30-day)
+
+**Status Automation (Sprint 5):**
+- Manual "Move to" buttons removed from workshop-actions (kept Cancel + POST_EVENT/COMPLETED)
+- "Send Reminder Email" button removed from quick-actions (handled by workflows)
+
+**Circle.so Cleanup (Sprint 4):**
+- Removed Circle sync button from `coaches/[id]/page.tsx`
+- Removed Circle import from `bio/[id]/page.tsx`
+- Removed Circle populate from `workshops/[id]/landing-pages/bio-page/page.tsx`
+- Removed "imported from Circle.so" text from `coach-profile-form.tsx`
+
+**Feb 25 Roadmap:** `D:\The CTO Project\plans\FEB25_CALL_REVISIONS_IMPLEMENTATION_ROADMAP.md`
+**Feb 25 Task Tracker:** `D:\The CTO Project\plans\FEB25_IMPLEMENTATION_TASKS.md` (65/65 tasks — ALL SPRINTS COMPLETE)
+**Feb 25 Video Frames:** `docs/Context Building Call Transcripts/Feb 25/frames/` (24 frames, 7 sprint folders)
+
+**Previous Plans:**
+- Production Readiness: `plans/PRODUCTION_READINESS_ROADMAP.md` + `plans/PRODUCTION_READINESS_TASKS.md`
+- JV Revisions (Feb 15): `plans/JEFF_VERDUN_REVISIONS_IMPLEMENTATION_ROADMAP.md` + `plans/JEFF_VERDUN_REVISION_TASKS.md`
+- CIO Audit (Feb 20): `plans/CIO_WORD_FOR_WORD_REVISION_AUDIT_AND_IMPLEMENTATION_PLAN_FEB20_2026.md`
 
 ## Tech Stack
 
@@ -125,7 +232,7 @@ src/
 ├── src/
 │   ├── app/
 │   │   ├── (dashboard)/       # Admin/staff dashboard (requires ADMIN/STAFF role)
-│   │   │   ├── layout.tsx     # Nav: Dashboard, Workshops, Coaches, Templates, Workflows, Surveys, Files, Partners
+│   │   │   ├── layout.tsx     # Nav: Dashboard, All Workshops, Bio, Templates, Workflows, Surveys, Files, Partners, Financials
 │   │   │   ├── dashboard/     # Admin overview
 │   │   │   ├── workshops/     # Workshop CRUD, detail, landing pages, quick-actions
 │   │   │   ├── coaches/       # Coach management
@@ -151,13 +258,12 @@ src/
 │   │   │   ├── workshop/[slug]/ # Public landing pages
 │   │   │   ├── w/[slug]/      # Short URL redirect
 │   │   │   └── registration/success/ # Post-registration confirmation
-│   │   ├── admin/             # Admin-only pages
-│   │   │   ├── approvals/     # Approval queue management
-│   │   │   ├── categories/    # Category CRUD (JV-16)
-│   │   │   ├── dashboard/     # Admin analytics + 6-stage pipeline (JV-01)
-│   │   │   ├── financials/    # Financial dashboard (JV-21)
-│   │   │   ├── pricing/       # Pricing tier CRUD (JV-17)
-│   │   │   └── settings/      # Admin settings + password change
+│   │   │   ├── admin/approvals/  # Approval queue management (merged into dashboard layout)
+│   │   │   ├── admin/categories/ # Category CRUD (JV-16)
+│   │   │   ├── admin/dashboard/  # Admin analytics + 6-stage pipeline (JV-01)
+│   │   │   ├── admin/financials/ # Financial dashboard (JV-21)
+│   │   │   ├── admin/pricing/    # Pricing tier CRUD (JV-17)
+│   │   │   └── admin/settings/   # Admin settings + password change
 │   │   └── api/               # API routes (see below)
 │   ├── components/
 │   │   ├── ui/                # shadcn/ui + custom (status-pill, copy-url-button)
@@ -174,20 +280,19 @@ src/
 │   │   ├── authorization.ts   # Role-based access (getApiActor, requireCoach, canManageCoachData)
 │   │   ├── approval-engine.ts # Auto-approval logic (cert confidence >=85%)
 │   │   ├── workshop-code.ts   # WS-YYYY-XXXX generator
-│   │   ├── workshop-generator.ts # Automated workshop creation
+│   │   ├── smtp-transport.ts  # Shared SMTP transport (single source of truth for email sending)
 │   │   ├── registration-service.ts # Registration with capacity/duplicate checks
 │   │   ├── lead-time-validator.ts  # 14-day minimum lead time
 │   │   ├── validations.ts     # Zod schemas
 │   │   ├── utils.ts           # formatDate, formatCurrency, generateSlug, getWorkshopStatusLabel
 │   │   ├── rate-limit.ts      # API rate limiting
-│   │   ├── db.ts              # Prisma client singleton
-│   │   └── cache.ts           # Redis/Upstash cache
+│   │   └── db.ts              # Prisma client singleton
 │   ├── services/              # External service integrations
 │   │   ├── stripe.ts          # Payments, cancellation fees, refunds
 │   │   ├── hubspot.ts         # CRM sync
 │   │   ├── circle.ts          # Certification verification
-│   │   ├── email-sender.ts    # Azure Communication Services
-│   │   └── notifications.ts   # Multi-channel notifications
+│   │   ├── email-sender.ts    # Email sending (uses shared smtp-transport)
+│   │   └── notifications.ts   # Multi-channel notifications (uses shared smtp-transport)
 │   ├── inngest/               # Background job definitions
 │   └── __tests__/             # Jest unit tests
 └── package.json
@@ -300,8 +405,8 @@ Cataloged in `plans/JEFF_VERDUN_REVISIONS_IMPLEMENTATION_ROADMAP.md` (IDs JV-01 
 | JV-02 | 6 workshop stages | S0 |
 | JV-03 | Unique alphanumeric workshop code (WS-YYYY-XXXX) + displayed in all tables | S0+S3 |
 | JV-04 | Workshop code visible in all views | S0+S3 |
-| JV-05 | "Coaches" nav link in dashboard | S2 |
-| JV-06 | "All Workshops" renamed to "Workshops" | S2 |
+| JV-05 | Coach bio editing accessible from admin navigation (`/bio`) | S2 + Feb20 audit pass |
+| JV-06 | Naming clarity: admin list view uses **All Workshops** | S2 + Feb20 audit pass |
 | JV-07 | Landing URL copyable (CopyUrlButton component) | S1 |
 | JV-09 | "Landing Page Editor" renamed to "Workshop Editor" (all pages) | S2 |
 | JV-10 | Workshop Editor tabbed interface (Landing/Registration/Thank You tabs) | S2 |
@@ -322,10 +427,10 @@ Cataloged in `plans/JEFF_VERDUN_REVISIONS_IMPLEMENTATION_ROADMAP.md` (IDs JV-01 
 | JV-13 | Survey system (custom form builder, per-workshop, results dashboard) | S4C |
 | JV-12 | File attachments (Vercel Blob upload, workflow email attachments, file manager) | S4B |
 
-### Future Sprints
+### Future Sprints / Remaining Roadmap Gaps
 
 - **Sprint 4+:** JV-23 (email tracking)
-- **Roadmap:** JV-08 (HTTPS), JV-24 (Circle SSO/bio), JV-25 (HubSpot sync)
+- **Roadmap:** JV-08 (HTTPS env canonicalization), JV-24 (Circle SSO/auth), JV-12 hardening (protected file delivery by stage threshold)
 
 ## Development Commands
 
@@ -370,6 +475,12 @@ Secrets are in local `.env` (gitignored) and Vercel dashboard. Key variables:
 - **File uploads**: Filenames are sanitized (path separators, null bytes, `..` stripped) before Vercel Blob storage
 - **File deletion**: Ownership verified — only the uploader or ADMIN/STAFF can delete files
 - **Survey submission**: Public endpoint rate-limited at 20 req/min per IP
+- **SMTP transport**: All email sending goes through `lib/smtp-transport.ts` — do NOT create new nodemailer transports elsewhere
+- **Admin layout unified**: All admin pages are under `(dashboard)/admin/` — the standalone `/admin/` layout was removed in Feb 26 cleanup
+- **Dead code removed (Feb 26)**: animations.ts, cache.ts, api-handler.ts, logger.ts, landing-page-auto-populate.ts, workshop-generator.ts — all deleted, zero imports
+- **Approval engine emits Inngest events**: `workshop/approved` event emitted on approval (added in Sprint 5) — triggers auto-build function
+- **Bio page CTA toggle exists**: Bio page editor already has "Show CTA button on bio page" checkbox (discovered via video analysis)
+- **npm audit**: 3 low-severity `cookie` vulns via `@auth/core` → next-auth. Fix requires next-auth downgrade — deferred
 
 ## Continuous Update Protocol
 

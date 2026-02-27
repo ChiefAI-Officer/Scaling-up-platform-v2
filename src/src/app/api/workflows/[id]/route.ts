@@ -8,6 +8,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getWorkflow, updateWorkflow, deleteWorkflow } from "@/lib/workflow-service";
+import { z } from "zod";
+
+const workflowRouteParamsSchema = z.object({
+  id: z.string().min(1, "Workflow id is required"),
+});
+
+const updateWorkflowSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional().nullable(),
+  isTemplate: z.boolean().optional(),
+  categoryId: z.string().nullable().optional(),
+  workshopFormat: z.enum(["IN_PERSON", "VIRTUAL"]).nullable().optional(),
+  workflowPhase: z.enum(["PRE_EVENT", "POST_EVENT"]).nullable().optional(),
+});
 
 export async function GET(
   _request: NextRequest,
@@ -18,7 +32,15 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
+  const paramsValidation = workflowRouteParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid workflow id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = paramsValidation.data;
   const workflow = await getWorkflow(id);
 
   if (!workflow) {
@@ -37,14 +59,32 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
-  const body = await request.json();
-  const { name, description, isTemplate } = body;
+  const paramsValidation = workflowRouteParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid workflow id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const bodyValidation = updateWorkflowSchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: bodyValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = paramsValidation.data;
+  const { name, description, isTemplate, categoryId, workshopFormat, workflowPhase } = bodyValidation.data;
 
   const workflow = await updateWorkflow(id, {
     ...(name !== undefined ? { name: name.trim() } : {}),
     ...(description !== undefined ? { description: description?.trim() } : {}),
     ...(isTemplate !== undefined ? { isTemplate } : {}),
+    ...(categoryId !== undefined ? { categoryId } : {}),
+    ...(workshopFormat !== undefined ? { workshopFormat } : {}),
+    ...(workflowPhase !== undefined ? { workflowPhase } : {}),
   });
 
   return NextResponse.json({ success: true, data: workflow });
@@ -59,7 +99,15 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
+  const paramsValidation = workflowRouteParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid workflow id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = paramsValidation.data;
   await deleteWorkflow(id);
 
   return NextResponse.json({ success: true });

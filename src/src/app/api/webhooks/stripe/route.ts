@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
       case "payment_intent.succeeded": {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
-        console.log("Payment succeeded:", paymentIntent.id);
+        await handlePaymentIntentSucceeded(paymentIntent);
         break;
       }
 
@@ -59,6 +59,58 @@ export async function POST(request: NextRequest) {
       { error: "Webhook handler failed" },
       { status: 500 }
     );
+  }
+}
+
+interface RegistrationWithWorkshopForSync {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  company: string | null;
+  jobTitle: string | null;
+  phone: string | null;
+  workshop: {
+    title: string;
+    eventDate: Date;
+    coach: {
+      firstName: string;
+      lastName: string;
+    };
+  };
+}
+
+async function syncRegistrationToHubSpot(
+  registration: RegistrationWithWorkshopForSync,
+  registrationId: string
+) {
+  if (!process.env.HUBSPOT_ACCESS_TOKEN) {
+    console.warn("HUBSPOT_ACCESS_TOKEN is not set; skipping HubSpot sync");
+    return;
+  }
+
+  try {
+    const hubspotContactId = await createOrUpdateContact({
+      email: registration.email,
+      firstname: registration.firstName,
+      lastname: registration.lastName,
+      company: registration.company || undefined,
+      jobtitle: registration.jobTitle || undefined,
+      phone: registration.phone || undefined,
+      workshop_name: registration.workshop.title,
+      workshop_date: registration.workshop.eventDate.toISOString(),
+      coach_name: `${registration.workshop.coach.firstName} ${registration.workshop.coach.lastName}`,
+    });
+
+    await db.registration.update({
+      where: { id: registrationId },
+      data: { hubspotContactId },
+    });
+
+    console.log(`HubSpot contact synced: ${hubspotContactId}`);
+  } catch (error) {
+    console.error("Failed to sync to HubSpot:", error);
+    // Don't fail the webhook - HubSpot sync can be retried
   }
 }
 
@@ -118,37 +170,61 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     },
   });
 
-  // Sync to HubSpot
-  if (!process.env.HUBSPOT_ACCESS_TOKEN) {
-    console.warn("HUBSPOT_ACCESS_TOKEN is not set; skipping HubSpot sync");
-  } else {
-    try {
-      const hubspotContactId = await createOrUpdateContact({
-        email: registration.email,
-        firstname: registration.firstName,
-        lastname: registration.lastName,
-        company: registration.company || undefined,
-        jobtitle: registration.jobTitle || undefined,
-        phone: registration.phone || undefined,
-        workshop_name: registration.workshop.title,
-        workshop_date: registration.workshop.eventDate.toISOString(),
-        coach_name: `${registration.workshop.coach.firstName} ${registration.workshop.coach.lastName}`,
-      });
-
-      // Update registration with HubSpot contact ID
-      await db.registration.update({
-        where: { id: registrationId },
-        data: { hubspotContactId },
-      });
-
-      console.log(`HubSpot contact synced: ${hubspotContactId}`);
-    } catch (error) {
-      console.error("Failed to sync to HubSpot:", error);
-      // Don't fail the webhook - HubSpot sync can be retried
-    }
-  }
+  await syncRegistrationToHubSpot(registration, registrationId);
 
   console.log(`Payment completed for registration: ${registrationId}`);
+}
+
+async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  const { registrationId } = paymentIntent.metadata || {};
+  if (!registrationId) {
+    console.log(`Payment intent ${paymentIntent.id} has no registrationId metadata; skipping.`);
+    return;
+  }
+
+  const existing = await db.registration.findUnique({
+    where: { id: registrationId },
+    select: {
+      id: true,
+      email: true,
+      paymentStatus: true,
+      stripePaymentId: true,
+    },
+  });
+
+  if (!existing) {
+    console.warn(`Registration not found for payment_intent.succeeded ${paymentIntent.id}: ${registrationId}`);
+    return;
+  }
+
+  if (
+    existing.paymentStatus === "COMPLETED" &&
+    existing.stripePaymentId &&
+    existing.stripePaymentId === paymentIntent.id
+  ) {
+    console.log(`Duplicate payment_intent.succeeded ignored for registration ${registrationId}`);
+    return;
+  }
+
+  const registration = await db.registration.update({
+    where: { id: registrationId },
+    data: {
+      paymentStatus: "COMPLETED",
+      stripePaymentId: paymentIntent.id,
+      amountPaidCents: paymentIntent.amount_received || paymentIntent.amount || 0,
+      status: "CONFIRMED",
+    },
+    include: {
+      workshop: {
+        include: {
+          coach: true,
+        },
+      },
+    },
+  });
+
+  await syncRegistrationToHubSpot(registration, registrationId);
+  console.log(`Payment intent succeeded for registration: ${registrationId}`);
 }
 
 async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {

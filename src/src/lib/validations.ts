@@ -33,7 +33,7 @@ export const strongPasswordSchema = z
 // Workshop Schemas
 // ============================================================
 
-export const workshopFormatSchema = z.enum(["IN_PERSON", "VIRTUAL", "HYBRID"]);
+export const workshopFormatSchema = z.enum(["IN_PERSON", "VIRTUAL"]);
 
 // JV-02: Jeff Verdun's 6 workshop stages
 export const workshopStatusSchema = z.enum([
@@ -61,17 +61,18 @@ export const createWorkshopSchema = z.object({
     // Location (for in-person)
     venueName: z.string().optional(),
     venueAddress: z.string().optional(),
-    parkingInstructions: z.string().optional(),
+    venueInstructions: z.string().optional(),
 
     // Virtual (for online)
-    virtualPlatform: z.enum(["zoom", "teams", "meet"]).optional(),
     virtualLink: z.string().url().optional(),
+
+    // Targeting (Feb25)
+    geoTargetAreas: z.string().optional(),
+    excludedClients: z.string().optional(),
 
     // Pricing
     isFree: z.boolean().default(false),
     priceCents: z.number().int().min(0).optional(),
-    earlyBirdPriceCents: z.number().int().min(0).optional(),
-    earlyBirdDeadline: dateSchema.optional(),
 
     // Capacity
     maxAttendees: z.number().int().min(1).max(500).default(50),
@@ -107,9 +108,10 @@ export const createRegistrationSchema = z.object({
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
     email: emailSchema,
-    company: z.string().optional(),
+    company: z.string().min(1, "Company is required"),
     jobTitle: z.string().optional(),
-    phone: phoneSchema,
+    phone: z.string().regex(/^[\d\s\-\+\(\)]+$/, "Invalid phone number").min(1, "Phone is required"),
+    marketingOptIn: z.boolean().optional().default(false),
 });
 
 export const updateRegistrationSchema = z.object({
@@ -170,6 +172,8 @@ export const createCoachSchema = z.object({
     territory: z.string().optional(),
     hubspotId: z.string().optional(),
     circleId: z.string().optional(),
+    linkedinUrl: z.string().url().nullable().optional(),
+    showBookCallCta: z.boolean().optional(),
 });
 
 export const updateCoachSchema = createCoachSchema.partial();

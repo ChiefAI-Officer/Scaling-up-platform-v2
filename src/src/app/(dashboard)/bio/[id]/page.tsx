@@ -35,7 +35,6 @@ export default function CoachBioEditorPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [coachEmail, setCoachEmail] = useState("");
@@ -90,39 +89,6 @@ export default function CoachBioEditorPage() {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setSuccess(null);
-  };
-
-  const handleImportFromCircle = async () => {
-    try {
-      setImporting(true);
-      setError(null);
-      setSuccess(null);
-
-      const response = await fetch(`/api/coaches/${coachId}/circle-import`, {
-        method: "POST",
-      });
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || "Failed to import from Circle");
-      }
-
-      setFormData((prev) => ({
-        ...prev,
-        firstName: data.data.firstName || prev.firstName,
-        lastName: data.data.lastName || prev.lastName,
-        titleCredentials: data.data.titleCredentials || prev.titleCredentials,
-        biography: data.data.biography || prev.biography,
-        profileImageUrl: data.data.profileImageUrl || prev.profileImageUrl,
-        circleId: data.data.circleId || prev.circleId,
-      }));
-
-      setSuccess("Imported profile data from Circle. Review and click Save Bio.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to import from Circle");
-    } finally {
-      setImporting(false);
-    }
   };
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -209,7 +175,7 @@ export default function CoachBioEditorPage() {
           <span className="text-foreground">{coachFullName || "Coach"}</span>
         </div>
         <h1 className="text-2xl font-bold text-foreground">Bio Page Editor</h1>
-        <p className="text-muted-foreground">Edit coach bio details and import data from Circle.</p>
+        <p className="text-muted-foreground">Edit coach bio details and profile picture.</p>
       </div>
 
       {error && (
@@ -268,16 +234,12 @@ export default function CoachBioEditorPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="profileImageUrl">Profile Picture</Label>
+                <Label htmlFor="profileImage">Profile Picture</Label>
                 <div className="space-y-2 mt-1">
-                  <Input
-                    id="profileImageUrl"
-                    name="profileImageUrl"
-                    value={formData.profileImageUrl}
-                    onChange={handleChange}
-                    placeholder="https://..."
-                  />
-                  <input type="file" accept="image/*" onChange={handleImageUpload} />
+                  {formData.profileImageUrl && (
+                    <img src={formData.profileImageUrl} alt="Current profile" className="w-16 h-16 rounded-full object-cover" />
+                  )}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageUpload} className="text-sm" />
                 </div>
               </div>
             </CardContent>
@@ -302,9 +264,6 @@ export default function CoachBioEditorPage() {
           </Card>
 
           <div className="flex flex-wrap gap-3">
-            <Button variant="outline" onClick={handleImportFromCircle} disabled={importing}>
-              {importing ? "Importing..." : "Import from Circle"}
-            </Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Bio"}
             </Button>

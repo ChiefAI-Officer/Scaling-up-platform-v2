@@ -10,6 +10,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createSurveyForWorkshop } from "@/lib/survey-service";
+import { z } from "zod";
+
+const assignSurveySchema = z.object({
+  templateId: z.string().min(1, "templateId is required"),
+  workshopId: z.string().min(1, "workshopId is required"),
+  registrationId: z.string().min(1).optional(),
+});
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -17,15 +24,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { templateId, workshopId, registrationId } = body;
-
-  if (!templateId || !workshopId) {
+  const bodyValidation = assignSurveySchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
     return NextResponse.json(
-      { error: "templateId and workshopId are required" },
+      { error: "Invalid request body", details: bodyValidation.error.issues },
       { status: 400 }
     );
   }
+
+  const { templateId, workshopId, registrationId } = bodyValidation.data;
 
   try {
     const survey = await createSurveyForWorkshop({

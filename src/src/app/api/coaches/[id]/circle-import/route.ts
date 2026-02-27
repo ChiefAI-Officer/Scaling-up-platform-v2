@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 import { syncCoachFromCircle } from "@/services/circle-sync";
+import { z } from "zod";
+
+const circleImportParamsSchema = z.object({
+  id: z.string().min(1, "Coach id is required"),
+});
 
 export async function POST(
   _request: NextRequest,
@@ -23,7 +28,15 @@ export async function POST(
       );
     }
 
-    const { id } = await params;
+    const paramsValidation = circleImportParamsSchema.safeParse(await params);
+    if (!paramsValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid coach id", details: paramsValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { id } = paramsValidation.data;
 
     // Verify coach exists
     const coach = await db.coach.findUnique({
@@ -42,7 +55,14 @@ export async function POST(
     const result = await syncCoachFromCircle(id, { forceOverwrite: true });
 
     if (!result.success) {
-      const status = result.error === "No Circle profile found for this email" ? 404 : 500;
+      const status =
+        result.error === "Coach not found"
+          ? 404
+          : result.error === "No Circle profile found for this email"
+          ? 404
+          : result.error === "Circle not configured"
+          ? 503
+          : 500;
       return NextResponse.json(
         { success: false, error: result.error },
         { status }
@@ -65,9 +85,19 @@ export async function POST(
       },
     });
 
+    const responseData = updatedCoach
+      ? {
+          ...updatedCoach,
+          // Backward-compatible aliases for older consumers.
+          titleCredentials: updatedCoach.company ?? "",
+          biography: updatedCoach.bio ?? "",
+          profileImageUrl: updatedCoach.profileImage ?? "",
+        }
+      : null;
+
     return NextResponse.json({
       success: true,
-      data: updatedCoach,
+      data: responseData,
       fieldsUpdated: result.fieldsUpdated,
       message: result.updated
         ? `Synced ${result.fieldsUpdated.length} field(s) from Circle.`

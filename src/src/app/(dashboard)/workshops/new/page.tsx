@@ -28,6 +28,8 @@ interface CategoryData {
   id: string;
   name: string;
   slug: string;
+  defaultTitle: string | null;
+  defaultDescription: string | null;
   pricingTiers: PricingTierData[];
 }
 
@@ -114,14 +116,12 @@ export default function NewWorkshopPage() {
     venueCity: "",
     venueState: "",
     venueZip: "",
-    parkingInstructions: "",
-    virtualPlatform: "",
+    venueInstructions: "",
     virtualLink: "",
     isFree: false,
-    pricingTierId: "",
     priceCents: "",
-    earlyBirdPriceCents: "",
-    earlyBirdDeadline: "",
+    geoTargetAreas: "",
+    excludedClients: "",
     maxAttendees: "50",
     couponDiscountPercent: "",
     couponCode: "",
@@ -197,11 +197,6 @@ export default function NewWorkshopPage() {
     [categories, formData.categoryId]
   );
 
-  const availablePricingTiers = useMemo(
-    () => selectedCategory?.pricingTiers || [],
-    [selectedCategory]
-  );
-
   const recommendedWorkshopType = useMemo(() => {
     const slug = selectedCategory?.slug || "";
     const categoryMatchedTypes = availableWorkshopTypes.filter((type) =>
@@ -257,22 +252,36 @@ export default function NewWorkshopPage() {
       }
 
       if (name === "categoryId") {
-        next.pricingTierId = "";
         next.priceCents = "";
+        // Auto-generate title and description from category defaults
+        if (typeof nextValue === "string" && nextValue) {
+          const cat = categories.find((c) => c.id === nextValue);
+          if (cat) {
+            const coach = coaches.find((c) => c.id === next.coachId);
+            const coachName = coach ? `${coach.firstName} ${coach.lastName}` : "";
+            const baseTitle = cat.defaultTitle || `Scaling Up ${cat.name}`;
+            next.title = coachName ? `${baseTitle} with ${coachName}` : baseTitle;
+            if (cat.defaultDescription) {
+              next.description = cat.defaultDescription;
+            }
+          }
+        }
       }
 
-      if (name === "pricingTierId" && typeof nextValue === "string" && nextValue) {
-        const selectedCat = categories.find((c) => c.id === next.categoryId);
-        const tier = selectedCat?.pricingTiers.find((t) => t.id === nextValue);
-        if (tier) {
-          next.priceCents = String(Math.round(tier.amountCents / 100));
+      // Re-generate title when coach changes (if category is already selected)
+      if (name === "coachId" && typeof nextValue === "string" && next.categoryId) {
+        const cat = categories.find((c) => c.id === next.categoryId);
+        if (cat) {
+          const coach = coaches.find((c) => c.id === nextValue);
+          const coachName = coach ? `${coach.firstName} ${coach.lastName}` : "";
+          const baseTitle = cat.defaultTitle || `Scaling Up ${cat.name}`;
+          next.title = coachName ? `${baseTitle} with ${coachName}` : baseTitle;
         }
       }
 
       if (name === "isFree" && nextValue === true) {
         next.couponDiscountPercent = "";
         next.couponCode = "";
-        next.pricingTierId = "";
         next.priceCents = "";
       }
 
@@ -316,8 +325,11 @@ export default function NewWorkshopPage() {
         throw new Error("Please provide a start time before setting an end time.");
       }
 
+      if (!formData.isFree && !formData.priceCents) {
+        throw new Error("Please enter a workshop price before creating a paid workshop.");
+      }
+
       const parsedPrice = Number.parseInt(formData.priceCents || "0", 10);
-      const parsedEarlyBirdPrice = Number.parseInt(formData.earlyBirdPriceCents || "0", 10);
       const parsedMaxAttendees = Number.parseInt(formData.maxAttendees || "50", 10);
 
       const startTime = formData.eventTime.trim();
@@ -332,7 +344,6 @@ export default function NewWorkshopPage() {
         coachId: formData.coachId,
         workshopTypeId: formData.workshopTypeId,
         categoryId: formData.categoryId || undefined,
-        pricingTierId: formData.pricingTierId || undefined,
         title: formData.title,
         description: formData.description || undefined,
         format: formData.format,
@@ -351,16 +362,12 @@ export default function NewWorkshopPage() {
                 zip: formData.venueZip || undefined,
               }
             : undefined,
-        parkingInstructions: formData.parkingInstructions || undefined,
-        virtualPlatform: formData.virtualPlatform || undefined,
+        venueInstructions: formData.venueInstructions || undefined,
         virtualLink: formData.virtualLink || undefined,
+        geoTargetAreas: formData.geoTargetAreas || undefined,
+        excludedClients: formData.excludedClients || undefined,
         isFree: formData.isFree,
         priceCents: formData.isFree ? undefined : Math.max(0, parsedPrice) * 100,
-        earlyBirdPriceCents:
-          !formData.isFree && formData.earlyBirdPriceCents
-            ? Math.max(0, parsedEarlyBirdPrice) * 100
-            : undefined,
-        earlyBirdDeadline: formData.earlyBirdDeadline || undefined,
         maxAttendees:
           formData.format === "VIRTUAL"
             ? undefined
@@ -493,16 +500,7 @@ export default function NewWorkshopPage() {
               </div>
             )}
 
-            <div>
-              <Label>Workshop Type *</Label>
-              <div className="mt-1 rounded-md border border-border px-3 py-2 bg-muted text-foreground">
-                {recommendedWorkshopType?.name || "No active workshop type available"}
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                Workshop type is assigned automatically from coach certification + category.
-              </p>
-              <input type="hidden" name="workshopTypeId" value={formData.workshopTypeId} />
-            </div>
+            <input type="hidden" name="workshopTypeId" value={formData.workshopTypeId} />
 
             <div>
               <Label htmlFor="categoryId">Workshop Category *</Label>
@@ -536,9 +534,15 @@ export default function NewWorkshopPage() {
                 value={formData.title}
                 onChange={handleChange}
                 required
-                placeholder="e.g., AI Workshop - Chicago March 2025"
-                className="mt-1"
+                readOnly={coachIsAutoFilled}
+                placeholder="Auto-generated from category + coach"
+                className={`mt-1 ${coachIsAutoFilled ? "bg-muted" : ""}`}
               />
+              {coachIsAutoFilled && formData.title && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Title is auto-generated from your category selection.
+                </p>
+              )}
             </div>
 
             <div>
@@ -548,12 +552,47 @@ export default function NewWorkshopPage() {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
+                readOnly={coachIsAutoFilled && Boolean(formData.description)}
                 rows={4}
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                className={`mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500 ${coachIsAutoFilled && formData.description ? "bg-muted" : ""}`}
                 placeholder="Internal notes for operations and setup..."
               />
               <p className="text-sm text-muted-foreground mt-1">
-                Internal only. Not shown in landing page editors.
+                {coachIsAutoFilled && formData.description
+                  ? "Description auto-populated from category."
+                  : "Internal only. Not shown in landing page editors."}
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="geoTargetAreas">Geographic Target Areas</Label>
+              <textarea
+                id="geoTargetAreas"
+                name="geoTargetAreas"
+                value={formData.geoTargetAreas}
+                onChange={handleChange}
+                rows={2}
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                placeholder="e.g., Chicago metro, Northern Illinois, Southeast Wisconsin"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Regions this workshop targets for marketing and outreach.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="excludedClients">Excluded Clients</Label>
+              <textarea
+                id="excludedClients"
+                name="excludedClients"
+                value={formData.excludedClients}
+                onChange={handleChange}
+                rows={2}
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                placeholder="e.g., Acme Corp, GlobalTech Inc"
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                Companies or clients to exclude from marketing for this workshop.
               </p>
             </div>
           </CardContent>
@@ -577,7 +616,6 @@ export default function NewWorkshopPage() {
                 >
                   <option value="IN_PERSON">In-Person</option>
                   <option value="VIRTUAL">Virtual</option>
-                  <option value="HYBRID">Hybrid</option>
                 </select>
               </div>
 
@@ -701,43 +739,27 @@ export default function NewWorkshopPage() {
               </div>
 
               <div>
-                <Label htmlFor="parkingInstructions">Parking Instructions</Label>
+                <Label htmlFor="venueInstructions">Venue Instructions</Label>
                 <textarea
-                  id="parkingInstructions"
-                  name="parkingInstructions"
-                  value={formData.parkingInstructions}
+                  id="venueInstructions"
+                  name="venueInstructions"
+                  value={formData.venueInstructions}
                   onChange={handleChange}
                   rows={2}
                   className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="Parking details for attendees..."
+                  placeholder="Parking, entrance, and venue details for attendees..."
                 />
               </div>
             </CardContent>
           </Card>
         )}
 
-        {(formData.format === "VIRTUAL" || formData.format === "HYBRID") && (
+        {formData.format === "VIRTUAL" && (
           <Card>
             <CardHeader>
               <CardTitle>Virtual Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="virtualPlatform">Platform</Label>
-                <select
-                  id="virtualPlatform"
-                  name="virtualPlatform"
-                  value={formData.virtualPlatform}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-                >
-                  <option value="">Select platform...</option>
-                  <option value="zoom">Zoom</option>
-                  <option value="teams">Microsoft Teams</option>
-                  <option value="meet">Google Meet</option>
-                </select>
-              </div>
-
               <div>
                 <Label htmlFor="virtualLink">Meeting Link</Label>
                 <Input
@@ -759,94 +781,40 @@ export default function NewWorkshopPage() {
             <CardTitle>Pricing</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
-              <input
-                id="isFree"
-                name="isFree"
-                type="checkbox"
-                checked={formData.isFree}
-                onChange={handleChange}
-                className="rounded border-border"
-              />
-              <Label htmlFor="isFree">This is a free workshop</Label>
-            </div>
+            {formData.format !== "IN_PERSON" && (
+              <div className="flex items-center gap-2">
+                <input
+                  id="isFree"
+                  name="isFree"
+                  type="checkbox"
+                  checked={formData.isFree}
+                  onChange={handleChange}
+                  className="rounded border-border"
+                />
+                <Label htmlFor="isFree">This is a free workshop</Label>
+              </div>
+            )}
 
             {!formData.isFree && (
               <>
-                {availablePricingTiers.length > 0 ? (
-                  <div>
-                    <Label htmlFor="pricingTierId">Pricing Tier *</Label>
-                    <select
-                      id="pricingTierId"
-                      name="pricingTierId"
-                      value={formData.pricingTierId}
-                      onChange={handleChange}
-                      required={!formData.isFree}
-                      className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-                    >
-                      <option value="">Select a pricing tier...</option>
-                      {availablePricingTiers.map((tier) => (
-                        <option key={tier.id} value={tier.id}>
-                          {tier.name} — ${(tier.amountCents / 100).toFixed(0)}
-                          {tier.description ? ` (${tier.description})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    {formData.pricingTierId && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Price: ${formData.priceCents || "0"}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <Label htmlFor="priceCents">Price ($) *</Label>
-                    <Input
-                      id="priceCents"
-                      name="priceCents"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={formData.priceCents}
-                      onChange={handleChange}
-                      required={!formData.isFree}
-                      placeholder="299"
-                      className="mt-1"
-                    />
-                    <p className="text-sm text-amber-600 mt-1">
-                      No pricing tiers configured for this category. Enter price manually.
-                    </p>
-                  </div>
-                )}
-
                 <div>
-                  <Label htmlFor="earlyBirdPriceCents">Early Bird Price ($)</Label>
+                  <Label htmlFor="priceCents">Workshop Price ($) *</Label>
                   <Input
-                    id="earlyBirdPriceCents"
-                    name="earlyBirdPriceCents"
+                    id="priceCents"
+                    name="priceCents"
                     type="number"
                     min="0"
                     step="1"
-                    value={formData.earlyBirdPriceCents}
+                    value={formData.priceCents}
                     onChange={handleChange}
-                    placeholder="249"
+                    required={!formData.isFree}
+                    placeholder="395"
                     className="mt-1"
                   />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Suggested: $395 (half-day), $595 (full-day)
+                  </p>
                 </div>
-
-                {formData.earlyBirdPriceCents && (
-                  <div>
-                    <Label htmlFor="earlyBirdDeadline">Early Bird Deadline</Label>
-                    <Input
-                      id="earlyBirdDeadline"
-                      name="earlyBirdDeadline"
-                      type="date"
-                      value={formData.earlyBirdDeadline}
-                      onChange={handleChange}
-                      className="mt-1"
-                    />
-                  </div>
-                )}
 
                 <div className="rounded-lg border border-border p-4 space-y-4">
                   <div>
@@ -901,7 +869,16 @@ export default function NewWorkshopPage() {
               />
               <Label htmlFor="termsAccepted" className="text-sm text-foreground leading-relaxed">
                 I confirm that all workshop details are accurate and I agree to the Scaling Up
-                workshop terms and conditions, including the cancellation and refund policies.
+                workshop{" "}
+                <a
+                  href="/terms-and-conditions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline text-blue-600 hover:text-blue-800"
+                >
+                  terms and conditions
+                </a>
+                , including the cancellation and refund policies.
               </Label>
             </div>
           </CardContent>
@@ -924,4 +901,3 @@ export default function NewWorkshopPage() {
     </div>
   );
 }
-

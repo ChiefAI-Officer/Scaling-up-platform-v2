@@ -5,6 +5,11 @@ import {
   parseDurationHours,
   buildLocationString,
 } from "@/lib/ics-generator";
+import { z } from "zod";
+
+const workshopIcsParamsSchema = z.object({
+  id: z.string().min(1, "Workshop id is required"),
+});
 
 /**
  * GET /api/workshops/[id]/ics
@@ -16,7 +21,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const paramsValidation = workshopIcsParamsSchema.safeParse(await params);
+    if (!paramsValidation.success) {
+      return NextResponse.json(
+        { error: "Invalid workshop id", details: paramsValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { id } = paramsValidation.data;
 
     const workshop = await db.workshop.findUnique({
       where: { id },

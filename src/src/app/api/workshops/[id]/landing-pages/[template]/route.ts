@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { z } from "zod";
 
 const VALID_TEMPLATES = ["BIO_PAGE", "SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] as const;
 type TemplateType = typeof VALID_TEMPLATES[number];
@@ -8,6 +9,16 @@ type TemplateType = typeof VALID_TEMPLATES[number];
 interface RouteParams {
   params: Promise<{ id: string; template: string }>;
 }
+
+const landingPageParamsSchema = z.object({
+  id: z.string().min(1, "Workshop id is required"),
+  template: z.string().min(1, "Template is required"),
+});
+
+const updateLandingPageBodySchema = z.object({
+  content: z.unknown(),
+  status: z.enum(["DRAFT", "PUBLISHED", "CANCELLED"]).optional(),
+});
 
 function normalizeTemplate(template: string): TemplateType | null {
   const normalized = template.toUpperCase().replace(/-/g, "_");
@@ -35,7 +46,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { id, template } = await params;
+    const paramsValidation = landingPageParamsSchema.safeParse(await params);
+    if (!paramsValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid route parameters", details: paramsValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { id, template } = paramsValidation.data;
     const normalizedTemplate = normalizeTemplate(template);
 
     if (!normalizedTemplate) {
@@ -90,7 +109,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { id, template } = await params;
+    const paramsValidation = landingPageParamsSchema.safeParse(await params);
+    if (!paramsValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid route parameters", details: paramsValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { id, template } = paramsValidation.data;
     const normalizedTemplate = normalizeTemplate(template);
 
     if (!normalizedTemplate) {
@@ -100,15 +127,15 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const body = await request.json();
-    const { content, status } = body;
-
-    if (!content) {
+    const bodyValidation = updateLandingPageBodySchema.safeParse(await request.json());
+    if (!bodyValidation.success) {
       return NextResponse.json(
-        { success: false, error: "Content is required" },
+        { success: false, error: "Invalid request body", details: bodyValidation.error.issues },
         { status: 400 }
       );
     }
+
+    const { content, status } = bodyValidation.data;
 
     // Check if workshop exists
     const workshop = await db.workshop.findUnique({

@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { z } from "zod";
+
+const updatePortalProfileSchema = z
+  .object({
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    bio: z.string().optional(),
+    linkedinUrl: z.string().url().nullable().optional(),
+    showBookCallCta: z.boolean().optional(),
+  })
+  .refine((value) => Object.values(value).some((entry) => entry !== undefined), {
+    message: "At least one field must be provided",
+  });
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -18,8 +31,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Coach profile not found" }, { status: 404 });
     }
 
-    const body = await request.json();
-    const { firstName, lastName, bio } = body;
+    const bodyValidation = updatePortalProfileSchema.safeParse(await request.json());
+    if (!bodyValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body", details: bodyValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { firstName, lastName, bio, linkedinUrl, showBookCallCta } = bodyValidation.data;
 
     const updated = await db.coach.update({
       where: { id: coach.id },
@@ -27,6 +47,8 @@ export async function PATCH(request: NextRequest) {
         ...(typeof firstName === "string" && { firstName: firstName.trim() }),
         ...(typeof lastName === "string" && { lastName: lastName.trim() }),
         ...(typeof bio === "string" && { bio: bio.trim() }),
+        ...(linkedinUrl !== undefined && { linkedinUrl }),
+        ...(typeof showBookCallCta === "boolean" && { showBookCallCta }),
       },
     });
 

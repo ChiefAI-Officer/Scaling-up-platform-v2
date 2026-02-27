@@ -36,7 +36,7 @@ describe("Workshop Validation Schemas", () => {
         timezone: "America/Chicago",
         venueName: "Marriott Chicago",
         venueAddress: "540 N Michigan Ave, Chicago, IL 60611",
-        virtualPlatform: "zoom",
+        venueInstructions: "Park in the west garage, enter through lobby",
         isFree: false,
         priceCents: 49900,
         maxAttendees: 30,
@@ -74,7 +74,7 @@ describe("Workshop Validation Schemas", () => {
     });
 
     it("should accept all valid format options", () => {
-      const formats = ["IN_PERSON", "VIRTUAL", "HYBRID"];
+      const formats = ["IN_PERSON", "VIRTUAL"];
       formats.forEach((format) => {
         const result = createWorkshopSchema.safeParse({
           ...validWorkshop,
@@ -84,21 +84,10 @@ describe("Workshop Validation Schemas", () => {
       });
     });
 
-    it("should accept valid virtualPlatform options", () => {
-      const platforms = ["zoom", "teams", "meet"];
-      platforms.forEach((virtualPlatform) => {
-        const result = createWorkshopSchema.safeParse({
-          ...validWorkshop,
-          virtualPlatform,
-        });
-        expect(result.success).toBe(true);
-      });
-    });
-
-    it("should reject invalid virtualPlatform", () => {
+    it("should reject HYBRID format (removed)", () => {
       const result = createWorkshopSchema.safeParse({
         ...validWorkshop,
-        virtualPlatform: "invalid-platform",
+        format: "HYBRID",
       });
       expect(result.success).toBe(false);
     });
@@ -198,6 +187,8 @@ describe("Registration Validation Schema", () => {
     email: "attendee@example.com",
     firstName: "Jane",
     lastName: "Smith",
+    company: "Smith Corp",
+    phone: "+1 555-0200",
   };
 
   it("should accept valid registration data", () => {

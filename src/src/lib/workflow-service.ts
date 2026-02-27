@@ -16,6 +16,9 @@ export interface CreateWorkflowInput {
   name: string;
   description?: string;
   isTemplate?: boolean;
+  categoryId?: string | null;
+  workshopFormat?: string | null;
+  workflowPhase?: string | null;
   createdBy: string;
 }
 
@@ -88,7 +91,7 @@ export async function listWorkflows(options?: { templatesOnly?: boolean; created
   });
 }
 
-export async function updateWorkflow(id: string, data: Partial<Pick<CreateWorkflowInput, "name" | "description" | "isTemplate">>) {
+export async function updateWorkflow(id: string, data: Partial<Pick<CreateWorkflowInput, "name" | "description" | "isTemplate" | "categoryId" | "workshopFormat" | "workflowPhase">>) {
   return db.workflow.update({
     where: { id },
     data,

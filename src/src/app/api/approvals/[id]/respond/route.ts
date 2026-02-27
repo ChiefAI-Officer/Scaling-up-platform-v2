@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import crypto from "crypto";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { sendWorkshopApprovedEmail, sendWorkshopDeniedEmail } from "@/services/notifications";
+import { inngest } from "@/inngest/client";
 
 const DEFAULT_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const MAX_APPROVAL_LINK_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days guardrail
@@ -115,6 +117,39 @@ export async function GET(
             });
         }
 
+        // Send notification email to coach (non-blocking)
+        if (approval.workshopId) {
+            const workshopForEmail = await db.workshop.findUnique({
+                where: { id: approval.workshopId },
+                include: { coach: { select: { email: true, firstName: true, lastName: true } } },
+            });
+            if (workshopForEmail?.coach) {
+                const emailPayload = {
+                    coachEmail: workshopForEmail.coach.email,
+                    coachName: `${workshopForEmail.coach.firstName} ${workshopForEmail.coach.lastName}`,
+                    workshopTitle: workshopForEmail.title,
+                    workshopId: workshopForEmail.id,
+                };
+                if (newStatus === "APPROVED") {
+                    sendWorkshopApprovedEmail(emailPayload).catch((err) =>
+                        console.error("Failed to send workshop approved email:", err)
+                    );
+                } else {
+                    sendWorkshopDeniedEmail({ ...emailPayload, reason: "Denied via email link" }).catch((err) =>
+                        console.error("Failed to send workshop denied email:", err)
+                    );
+                }
+            }
+        }
+
+        // Sprint 5: Emit workshop/approved event to trigger auto-build
+        if (newStatus === "APPROVED" && approval.workshopId) {
+            inngest.send({
+                name: "workshop/approved",
+                data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
+            }).catch((err) => console.error("Failed to emit workshop/approved event:", err));
+        }
+
         await logAudit({
             entityType: "ApprovalQueue",
             entityId: id,
@@ -214,6 +249,39 @@ export async function POST(
                 where: { id: approval.workshopId },
                 data: { status: "AWAITING_APPROVAL" },
             });
+        }
+
+        // Send notification email to coach (non-blocking)
+        if (approval.workshopId) {
+            const workshopForEmail = await db.workshop.findUnique({
+                where: { id: approval.workshopId },
+                include: { coach: { select: { email: true, firstName: true, lastName: true } } },
+            });
+            if (workshopForEmail?.coach) {
+                const emailPayload = {
+                    coachEmail: workshopForEmail.coach.email,
+                    coachName: `${workshopForEmail.coach.firstName} ${workshopForEmail.coach.lastName}`,
+                    workshopTitle: workshopForEmail.title,
+                    workshopId: workshopForEmail.id,
+                };
+                if (newStatus === "APPROVED") {
+                    sendWorkshopApprovedEmail(emailPayload).catch((err) =>
+                        console.error("Failed to send workshop approved email:", err)
+                    );
+                } else {
+                    sendWorkshopDeniedEmail({ ...emailPayload, reason: reason || "Denied by administrator" }).catch((err) =>
+                        console.error("Failed to send workshop denied email:", err)
+                    );
+                }
+            }
+        }
+
+        // Sprint 5: Emit workshop/approved event to trigger auto-build
+        if (newStatus === "APPROVED" && approval.workshopId) {
+            inngest.send({
+                name: "workshop/approved",
+                data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
+            }).catch((err) => console.error("Failed to emit workshop/approved event:", err));
         }
 
         await logAudit({

@@ -1,10 +1,10 @@
 /**
  * Notifications Service (V2)
  * Handles sending notifications via Email (SMTP) and Microsoft Teams.
- * Replaces Slack notifications from V1.
+ * Uses shared SMTP transport from lib/smtp-transport.ts.
  */
 
-import nodemailer from "nodemailer";
+import { sendEmailViaSMTP, type SmtpAttachment } from "@/lib/smtp-transport";
 
 // ============================================
 // Types
@@ -17,33 +17,6 @@ export interface ApprovalRequest {
     details: string;
     requestedAt: Date;
 }
-
-interface EmailAttachment {
-    filename: string;
-    content: string | Buffer;
-    contentType: string;
-}
-
-interface EmailPayload {
-    to: string;
-    subject: string;
-    html: string;
-    attachments?: EmailAttachment[];
-}
-
-// ============================================
-// Email Transport (SMTP)
-// ============================================
-
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.example.com",
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-    },
-});
 
 // ============================================
 // Notification Functions
@@ -64,14 +37,12 @@ export async function sendApprovalRequest(approval: ApprovalRequest): Promise<vo
     <a href="${approvalUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Request</a>
   `;
 
-    // 1. Send Email
-    await sendEmail({
+    await sendNotificationEmail({
         to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
         subject: `[ACTION REQUIRED] Approval Needed: ${approval.type}`,
         html,
     });
 
-    // 2. Send Teams Notification (if configured)
     if (process.env.TEAMS_WEBHOOK_URL) {
         await sendTeamsNotification({
             title: `Approval Needed: ${approval.type}`,
@@ -99,7 +70,7 @@ export async function sendEscalation(
     <a href="${approvalUrl}">View ASAP</a>
   `;
 
-    await sendEmail({
+    await sendNotificationEmail({
         to: escalateToEmail,
         subject: `[ESCALATION] Pending Approval: ${approval.type}`,
         html,
@@ -110,6 +81,7 @@ export async function sendEscalation(
  * JV-26: Send registration notification to admin + coach
  */
 export async function sendRegistrationNotification(data: {
+    workshopId?: string;
     workshopTitle: string;
     workshopCode: string | null;
     coachEmail: string;
@@ -130,27 +102,34 @@ export async function sendRegistrationNotification(data: {
     <p><strong>Coach:</strong> ${data.coachName}</p>
     `;
 
-    const attachments: EmailAttachment[] = data.icsAttachment
+    const attachments: SmtpAttachment[] = data.icsAttachment
         ? [{ filename: data.icsAttachment.filename, content: data.icsAttachment.content, contentType: "text/calendar" }]
         : [];
 
-    // 1. Notify admin
-    await sendEmail({
+    await sendNotificationEmail({
         to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
         subject: `[Registration] ${data.registrantName} registered for ${data.workshopTitle}`,
         html,
+        telemetry: {
+            workshopId: data.workshopId,
+            workshopCode: data.workshopCode || undefined,
+            recipientRole: "STAFF" as const,
+        },
     });
 
-    // 2. Notify the coach (scoped to their workshop only — JV-26)
-    await sendEmail({
+    await sendNotificationEmail({
         to: data.coachEmail,
         subject: `New registration: ${data.registrantName} for ${data.workshopTitle}`,
         html,
+        telemetry: {
+            workshopId: data.workshopId,
+            workshopCode: data.workshopCode || undefined,
+            recipientRole: "COACH" as const,
+        },
     });
 
-    // 3. Send confirmation to registrant with ICS attachment (JV-18)
     if (data.icsAttachment) {
-        await sendEmail({
+        await sendNotificationEmail({
             to: data.registrantEmail,
             subject: `You're Registered: ${data.workshopTitle}`,
             html: `
@@ -162,6 +141,11 @@ export async function sendRegistrationNotification(data: {
             <p>— The Scaling Up Team</p>
             `,
             attachments,
+            telemetry: {
+                workshopId: data.workshopId,
+                workshopCode: data.workshopCode || undefined,
+                recipientRole: "ATTENDEE" as const,
+            },
         });
     }
 }
@@ -225,7 +209,7 @@ export async function sendEnrichedApprovalRequest(data: {
     <a href="${approvalUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Review Request</a>
     `;
 
-    await sendEmail({
+    await sendNotificationEmail({
         to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
         subject: `[ACTION REQUIRED] Approval Needed: ${data.type} — ${data.coachName}`,
         html,
@@ -241,31 +225,287 @@ export async function sendEnrichedApprovalRequest(data: {
 }
 
 // ============================================
+// Workshop Status Notifications (Feb 25 Revisions)
+// ============================================
+
+/**
+ * Rev 21: Email sent to coach + admin when a workshop is requested
+ */
+export async function sendWorkshopRequestedEmail(data: {
+    coachEmail: string;
+    coachName: string;
+    workshopTitle: string;
+    workshopId?: string;
+    linkedinUrl?: string | null;
+}): Promise<void> {
+    const dashboardUrl = `${process.env.APP_URL}/workshops`;
+    const linkedinHtml = data.linkedinUrl
+        ? `<p><strong>LinkedIn:</strong> <a href="${data.linkedinUrl}">${data.linkedinUrl}</a></p>`
+        : "";
+
+    const adminHtml = `
+    <h2>New Workshop Requested</h2>
+    <p><strong>Coach:</strong> ${data.coachName}</p>
+    <p><strong>Workshop:</strong> ${data.workshopTitle}</p>
+    ${linkedinHtml}
+    <br/>
+    <a href="${dashboardUrl}" style="background-color: #1D4ED8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View in Dashboard</a>
+    `;
+
+    const coachHtml = `
+    <h2>Your Workshop Request Has Been Submitted</h2>
+    <p>Hi ${data.coachName},</p>
+    <p>Your workshop <strong>${data.workshopTitle}</strong> has been submitted for review. You'll receive a notification once it's been approved or if changes are needed.</p>
+    <p>— The Scaling Up Team</p>
+    `;
+
+    await sendNotificationEmail({
+        to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+        subject: `[Workshop Requested] ${data.workshopTitle} — ${data.coachName}`,
+        html: adminHtml,
+        telemetry: { workshopId: data.workshopId, recipientRole: "STAFF" as const },
+    });
+
+    await sendNotificationEmail({
+        to: data.coachEmail,
+        subject: `Workshop Submitted: ${data.workshopTitle}`,
+        html: coachHtml,
+        telemetry: { workshopId: data.workshopId, recipientRole: "COACH" as const },
+    });
+}
+
+/**
+ * Rev 22: Email sent to coach when a workshop is approved
+ */
+export async function sendWorkshopApprovedEmail(data: {
+    coachEmail: string;
+    coachName: string;
+    workshopTitle: string;
+    workshopId?: string;
+}): Promise<void> {
+    const portalUrl = `${process.env.APP_URL}/portal/workshops`;
+
+    const html = `
+    <h2>Your Workshop Has Been Approved!</h2>
+    <p>Hi ${data.coachName},</p>
+    <p>Great news — your workshop <strong>${data.workshopTitle}</strong> has been approved and is now active.</p>
+    <p>You can view your workshop and manage registrations from your portal.</p>
+    <br/>
+    <a href="${portalUrl}" style="background-color: #16a34a; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Your Workshops</a>
+    <p>— The Scaling Up Team</p>
+    `;
+
+    await sendNotificationEmail({
+        to: data.coachEmail,
+        subject: `Workshop Approved: ${data.workshopTitle}`,
+        html,
+        telemetry: { workshopId: data.workshopId, recipientRole: "COACH" as const },
+    });
+}
+
+/**
+ * Rev 23: Email sent to coach when a workshop is denied, with reason
+ */
+export async function sendWorkshopDeniedEmail(data: {
+    coachEmail: string;
+    coachName: string;
+    workshopTitle: string;
+    reason: string;
+    workshopId?: string;
+}): Promise<void> {
+    const portalUrl = `${process.env.APP_URL}/portal/workshops`;
+
+    const html = `
+    <h2>Workshop Changes Requested</h2>
+    <p>Hi ${data.coachName},</p>
+    <p>Your workshop <strong>${data.workshopTitle}</strong> requires changes before it can be approved.</p>
+    <p><strong>Reason:</strong> ${data.reason}</p>
+    <p>Please review the feedback, make any necessary edits, and resubmit your workshop from the portal.</p>
+    <br/>
+    <a href="${portalUrl}" style="background-color: #1D4ED8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Edit &amp; Resubmit</a>
+    <p>— The Scaling Up Team</p>
+    `;
+
+    await sendNotificationEmail({
+        to: data.coachEmail,
+        subject: `Changes Requested: ${data.workshopTitle}`,
+        html,
+        telemetry: { workshopId: data.workshopId, recipientRole: "COACH" as const },
+    });
+}
+
+/**
+ * Sprint 5: Workshop Built notification — sent by auto-build Inngest function after approval
+ */
+export async function sendWorkshopBuiltEmail(data: {
+    coachEmail: string;
+    coachName: string;
+    workshopTitle: string;
+    workshopId?: string;
+    pagesCreated: string[];
+    preEventWorkflow: string | null;
+    postEventWorkflow: string | null;
+}): Promise<void> {
+    const portalUrl = `${process.env.APP_URL}/portal/workshops${data.workshopId ? `/${data.workshopId}` : ""}`;
+
+    const pagesList = data.pagesCreated.length > 0
+        ? `<li><strong>Landing pages created:</strong> ${data.pagesCreated.map((t) => t.replace(/_/g, " ").toLowerCase()).join(", ")}</li>`
+        : "";
+    const preWf = data.preEventWorkflow
+        ? `<li><strong>Pre-event workflow:</strong> ${data.preEventWorkflow}</li>`
+        : "";
+    const postWf = data.postEventWorkflow
+        ? `<li><strong>Post-event workflow:</strong> ${data.postEventWorkflow}</li>`
+        : "";
+
+    const html = `
+    <h2>Your Workshop Is Ready!</h2>
+    <p>Hi ${data.coachName},</p>
+    <p>Great news — your workshop <strong>${data.workshopTitle}</strong> has been approved and automatically set up.</p>
+    <p>Here&rsquo;s what was built for you:</p>
+    <ul>
+        ${pagesList}
+        ${preWf}
+        ${postWf}
+        <li><strong>Status:</strong> Pre-Event (active)</li>
+    </ul>
+    <p>You can view your workshop details and make edits in the coach portal:</p>
+    <br/>
+    <a href="${portalUrl}" style="background-color: #38a169; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Workshop</a>
+    <br/><br/>
+    <p>— The Scaling Up Team</p>
+    `;
+
+    await sendNotificationEmail({
+        to: data.coachEmail,
+        subject: `Workshop Ready: ${data.workshopTitle}`,
+        html,
+        telemetry: { workshopId: data.workshopId, recipientRole: "COACH" as const },
+    });
+}
+
+/**
+ * Send workshop completion summary email to admin
+ * Includes attendee list and revenue breakdown.
+ */
+export async function sendWorkshopCompletionSummary(data: {
+    workshopId: string;
+    workshopTitle: string;
+    workshopCode: string;
+    eventDate: string;
+    coachName: string;
+    totalRegistrations: number;
+    attended: number;
+    paidCount: number;
+    freeCount: number;
+    totalRevenueCents: number;
+    attendees: Array<{
+        name: string;
+        email: string;
+        company: string;
+        paid: boolean;
+        amount: number;
+        attended: boolean;
+    }>;
+}): Promise<void> {
+    const eventDate = new Date(data.eventDate).toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+    const revenue = `$${(data.totalRevenueCents / 100).toFixed(2)}`;
+    const workshopUrl = `${process.env.APP_URL}/workshops/${data.workshopId}`;
+
+    const attendeeRows = data.attendees
+        .map(
+            (a) =>
+                `<tr>
+                    <td style="padding:6px 10px;border-bottom:1px solid #eee;">${a.name}</td>
+                    <td style="padding:6px 10px;border-bottom:1px solid #eee;">${a.email}</td>
+                    <td style="padding:6px 10px;border-bottom:1px solid #eee;">${a.company || "—"}</td>
+                    <td style="padding:6px 10px;border-bottom:1px solid #eee;">${a.paid ? `$${(a.amount / 100).toFixed(0)}` : "Free"}</td>
+                    <td style="padding:6px 10px;border-bottom:1px solid #eee;">${a.attended ? "Yes" : "No"}</td>
+                </tr>`
+        )
+        .join("");
+
+    const html = `
+    <h2>Workshop Completed: ${data.workshopTitle}</h2>
+    <p><strong>Code:</strong> ${data.workshopCode} &nbsp;|&nbsp; <strong>Coach:</strong> ${data.coachName} &nbsp;|&nbsp; <strong>Date:</strong> ${eventDate}</p>
+
+    <h3>Summary</h3>
+    <table style="border-collapse:collapse;margin-bottom:16px;">
+        <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Total Registrations:</td><td>${data.totalRegistrations}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Attended:</td><td>${data.attended} / ${data.totalRegistrations}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Paid:</td><td>${data.paidCount}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Free:</td><td>${data.freeCount}</td></tr>
+        <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Total Revenue:</td><td style="color:#38a169;font-weight:bold;">${revenue}</td></tr>
+    </table>
+
+    <h3>Attendee List</h3>
+    <table style="border-collapse:collapse;width:100%;font-size:14px;">
+        <thead>
+            <tr style="background:#f5f5f5;">
+                <th style="padding:8px 10px;text-align:left;">Name</th>
+                <th style="padding:8px 10px;text-align:left;">Email</th>
+                <th style="padding:8px 10px;text-align:left;">Company</th>
+                <th style="padding:8px 10px;text-align:left;">Paid</th>
+                <th style="padding:8px 10px;text-align:left;">Attended</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${attendeeRows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#999;">No registrations</td></tr>'}
+        </tbody>
+    </table>
+
+    <br/>
+    <a href="${workshopUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Workshop</a>
+    <br/><br/>
+    <p>— Scaling Up Platform</p>
+    `;
+
+    await sendNotificationEmail({
+        to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+        subject: `Workshop Completed: ${data.workshopTitle} (${data.workshopCode})`,
+        html,
+        telemetry: { workshopId: data.workshopId, workshopCode: data.workshopCode, recipientRole: "STAFF" as const },
+    });
+}
+
+// ============================================
 // Internal Helpers
 // ============================================
 
-async function sendEmail(payload: EmailPayload): Promise<void> {
-    if (!process.env.SMTP_HOST) {
-        console.log("[Mock Email] Would send:", payload.subject);
-        return;
-    }
-
+async function sendNotificationEmail(options: {
+    to: string;
+    subject: string;
+    html: string;
+    attachments?: SmtpAttachment[];
+    telemetry?: {
+        workshopId?: string;
+        workshopCode?: string;
+        recipientRole?: "STAFF" | "COACH" | "ATTENDEE" | "CUSTOM";
+        metadata?: Record<string, unknown>;
+    };
+}): Promise<void> {
     try {
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM || '"Scaling Up Platform" <noreply@scalingup.com>',
-            to: payload.to,
-            subject: payload.subject,
-            html: payload.html,
-            attachments: payload.attachments?.map((a) => ({
-                filename: a.filename,
-                content: a.content,
-                contentType: a.contentType,
-            })),
+        await sendEmailViaSMTP({
+            to: options.to,
+            subject: options.subject,
+            html: options.html,
+            attachments: options.attachments,
+            telemetry: options.telemetry ? {
+                ...options.telemetry,
+                metadata: {
+                    attachmentCount: options.attachments?.length ?? 0,
+                    ...(options.telemetry.metadata ?? {}),
+                },
+            } : undefined,
         });
-        console.log(`Email sent to ${payload.to}: ${payload.subject}`);
     } catch (error) {
-        console.error("Failed to send email:", error);
-        // Don't throw, just log. Notifications shouldn't break the main flow usually.
+        console.error("Failed to send notification email:", error);
+        // Don't throw — notifications shouldn't break the main flow.
     }
 }
 

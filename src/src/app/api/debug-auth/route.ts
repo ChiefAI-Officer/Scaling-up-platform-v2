@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { getAuthPosture } from "@/lib/auth-posture";
 
 export async function GET() {
     if (process.env.NODE_ENV === "production") {
@@ -18,15 +19,20 @@ export async function GET() {
     const report: Record<string, unknown> = {
         timestamp: new Date().toISOString(),
     };
+    const posture = getAuthPosture();
 
     // 1. Environment Variable Check
     report.environment = {
         DEMO_MODE: process.env.DEMO_MODE ?? "(not set)",
-        DEMO_MODE_IS_TRUE: process.env.DEMO_MODE === "true",
+        DEMO_MODE_IS_TRUE: posture.configuredDemoMode,
+        DEMO_MODE_EFFECTIVE: posture.effectiveDemoMode,
+        DEMO_MODE_BLOCKED_BY_GUARD: posture.guardViolation,
+        DEPLOYMENT_CONTEXT: posture.deploymentContext,
         NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? "(not set)",
         NEXTAUTH_SECRET_EXISTS: !!process.env.NEXTAUTH_SECRET,
         DATABASE_URL_EXISTS: !!process.env.DATABASE_URL,
         NODE_ENV: process.env.NODE_ENV,
+        VERCEL_ENV: process.env.VERCEL_ENV ?? "(not set)",
     };
 
     // 2. Database Connection Check
@@ -63,7 +69,11 @@ export async function GET() {
     // 3. Auth Logic Simulation
     report.authLogicSimulation = {
         wouldDemoModeAllow_demo123:
-            process.env.DEMO_MODE === "true" ? "YES" : "NO (DEMO_MODE is not 'true')",
+            posture.effectiveDemoMode
+                ? "YES (local development only)"
+                : posture.configuredDemoMode
+                  ? "NO (blocked by P0-SEC-03 guard outside local development)"
+                  : "NO (DEMO_MODE is not enabled)",
     };
 
     return NextResponse.json(report, { status: 200 });

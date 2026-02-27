@@ -7,6 +7,7 @@ import { Suspense } from "react";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/authorization";
 import { FileManager } from "@/components/files/file-manager";
+import { mapFileForClient } from "@/lib/file-service";
 
 async function FilesPageData() {
   await requireAdmin();
@@ -26,10 +27,12 @@ async function FilesPageData() {
   ]);
 
   // Serialize dates for client component
-  const serializedFiles = files.map((f) => ({
-    ...f,
-    createdAt: f.createdAt.toISOString(),
-  }));
+  const serializedFiles = files.map((f) =>
+    mapFileForClient({
+      ...f,
+      createdAt: f.createdAt.toISOString(),
+    })
+  );
 
   return (
     <FileManager

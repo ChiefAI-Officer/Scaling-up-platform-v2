@@ -18,6 +18,8 @@ export default async function SettingsPage() {
                         email: coach.email,
                         bio: coach.bio || "",
                         profileImage: coach.profileImage || null,
+                        linkedinUrl: coach.linkedinUrl || null,
+                        showBookCallCta: coach.showBookCallCta,
                     }}
                 />
 

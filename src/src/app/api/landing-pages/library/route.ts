@@ -2,9 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { z } from "zod";
 
 const TEMPLATE_OPTIONS = ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION"] as const;
 type TemplateType = (typeof TEMPLATE_OPTIONS)[number];
+
+const landingPageLibraryQuerySchema = z.object({
+  template: z.string().trim().optional(),
+});
+
+const applyLandingPageTemplateSchema = z.object({
+  targetWorkshopId: z.string().min(1, "targetWorkshopId is required"),
+  targetTemplate: z.string().min(1, "targetTemplate is required"),
+  sourceLandingPageId: z.string().min(1, "sourceLandingPageId is required"),
+});
 
 function isTemplateType(value: string): value is TemplateType {
   return TEMPLATE_OPTIONS.includes(value as TemplateType);
@@ -32,7 +43,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const templateParam = request.nextUrl.searchParams.get("template") || "";
+    const queryValidation = landingPageLibraryQuerySchema.safeParse(
+      Object.fromEntries(request.nextUrl.searchParams.entries())
+    );
+    if (!queryValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid query parameters", details: queryValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const templateParam = queryValidation.data.template || "";
     const normalizedTemplate = templateParam.toUpperCase();
 
     if (templateParam && !isTemplateType(normalizedTemplate)) {
@@ -113,19 +134,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as {
-      targetWorkshopId?: string;
-      targetTemplate?: string;
-      sourceLandingPageId?: string;
-    };
-
-    const targetWorkshopId = body.targetWorkshopId || "";
-    const targetTemplateRaw = (body.targetTemplate || "").toUpperCase();
-    const sourceLandingPageId = body.sourceLandingPageId || "";
-
-    if (!targetWorkshopId || !sourceLandingPageId || !isTemplateType(targetTemplateRaw)) {
+    const bodyValidation = applyLandingPageTemplateSchema.safeParse(await request.json());
+    if (!bodyValidation.success) {
       return NextResponse.json(
-        { success: false, error: "targetWorkshopId, sourceLandingPageId, and valid targetTemplate are required" },
+        { success: false, error: "Invalid request body", details: bodyValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { targetWorkshopId, sourceLandingPageId, targetTemplate } = bodyValidation.data;
+    const targetTemplateRaw = targetTemplate.toUpperCase();
+
+    if (!isTemplateType(targetTemplateRaw)) {
+      return NextResponse.json(
+        { success: false, error: "targetTemplate is invalid" },
         { status: 400 }
       );
     }

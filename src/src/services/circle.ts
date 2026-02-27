@@ -32,6 +32,10 @@ export interface CircleProfile {
     createdAt?: string;
 }
 
+export interface CircleProfileLookupOptions {
+    allowFallback?: boolean;
+}
+
 // Zod schema for verification result
 export const CertificationResultSchema = z.object({
     verified: z.boolean(),
@@ -162,7 +166,11 @@ function mapCircleMember(member: CircleMember): CircleProfile {
 /**
  * Fetch a coach profile from Circle by email for pre-filling coach bios.
  */
-export async function getCircleProfileByEmail(email: string): Promise<CircleProfile | null> {
+export async function getCircleProfileByEmail(
+    email: string,
+    options?: CircleProfileLookupOptions
+): Promise<CircleProfile | null> {
+    const allowFallback = options?.allowFallback ?? false;
     if (!process.env.CIRCLE_API_KEY) {
         console.warn("[Circle.so] Skipping getCircleProfileByEmail — CIRCLE_API_KEY not configured.");
         return null;
@@ -177,7 +185,11 @@ export async function getCircleProfileByEmail(email: string): Promise<CircleProf
         (member) => member.email?.toLowerCase() === email.toLowerCase()
     );
 
-    return exactMatch ?? normalizedMembers[0] ?? null;
+    if (exactMatch) {
+        return exactMatch;
+    }
+
+    return allowFallback ? (normalizedMembers[0] ?? null) : null;
 }
 
 /**

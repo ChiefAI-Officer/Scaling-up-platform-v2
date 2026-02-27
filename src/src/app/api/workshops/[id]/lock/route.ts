@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { z } from "zod";
+
+const lockWorkshopParamsSchema = z.object({
+  id: z.string().min(1, "Workshop id is required"),
+});
+
+const lockWorkshopBodySchema = z.object({
+  locked: z.boolean(),
+});
 
 /**
  * POST /api/workshops/[id]/lock
@@ -25,8 +34,24 @@ export async function POST(
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
-    const { id } = await params;
-    const { locked } = await request.json();
+    const paramsValidation = lockWorkshopParamsSchema.safeParse(await params);
+    if (!paramsValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid workshop id", details: paramsValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const bodyValidation = lockWorkshopBodySchema.safeParse(await request.json());
+    if (!bodyValidation.success) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body", details: bodyValidation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const { id } = paramsValidation.data;
+    const { locked } = bodyValidation.data;
 
     const workshop = await db.workshop.findUnique({
       where: { id },

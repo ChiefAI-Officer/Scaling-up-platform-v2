@@ -38,21 +38,37 @@ async function validateCircleSo(): Promise<ValidationResult> {
                 'Content-Type': 'application/json'
             }
         });
+        let data: Record<string, unknown> | null = null;
+        try {
+            data = (await response.json()) as Record<string, unknown>;
+        } catch {
+            data = null;
+        }
 
-        if (response.ok) {
-            const data = await response.json();
+        const isUnauthorizedPayload =
+            !!data &&
+            (data.status === "unauthorized" ||
+                data.message === "Your account could not be authenticated.");
+
+        if (response.ok && !isUnauthorizedPayload) {
             return {
                 service: 'Circle.so',
                 status: 'SUCCESS',
                 message: 'API key validated successfully',
-                data: { email: data.email, name: data.name }
+                data: data
+                    ? {
+                          email: data.email ?? null,
+                          name: data.name ?? null,
+                          id: data.id ?? null,
+                      }
+                    : undefined
             };
         } else {
-            const error = await response.text();
+            const error = data ? JSON.stringify(data) : await response.text();
             return {
                 service: 'Circle.so',
                 status: 'FAILED',
-                message: `API returned ${response.status}: ${error}`
+                message: `API returned ${response.status}: ${error}`,
             };
         }
     } catch (error) {

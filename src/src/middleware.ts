@@ -1,20 +1,70 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
+import {
+  enforceGlobalApiRateLimit,
+  getRequestIdentifierFromHeaders,
+} from "@/lib/global-rate-limit";
+
+function withRateLimitHeaders(
+  response: NextResponse,
+  headers?: Record<string, string>
+): NextResponse {
+  if (!headers) {
+    return response;
+  }
+
+  for (const [name, value] of Object.entries(headers)) {
+    response.headers.set(name, value);
+  }
+
+  return response;
+}
 
 export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token;
     const pathname = req.nextUrl.pathname;
+    let rateLimitHeaders: Record<string, string> | undefined;
+
+    // P0-SEC-04: Global middleware rate limiting for sensitive API classes.
+    if (pathname.startsWith("/api/")) {
+      const rateLimit = enforceGlobalApiRateLimit({
+        pathname,
+        method: req.method,
+        identifier: getRequestIdentifierFromHeaders(req.headers),
+      });
+
+      if (rateLimit.enforced) {
+        rateLimitHeaders = rateLimit.headers;
+      }
+
+      if (rateLimit.enforced && !rateLimit.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Too many requests. Please try again shortly.",
+            code: "RATE_LIMITED",
+          },
+          { status: 429, headers: rateLimit.headers }
+        );
+      }
+    }
 
     // Role-based access control
     if (pathname.startsWith("/dashboard") || pathname.startsWith("/workshops") || pathname.startsWith("/coaches")) {
       if (!token) {
-        return NextResponse.redirect(new URL("/login", req.url));
+        return withRateLimitHeaders(
+          NextResponse.redirect(new URL("/login", req.url)),
+          rateLimitHeaders
+        );
       }
 
       // Only ADMIN and STAFF can access dashboard
       if (token.role === "COACH" && !pathname.startsWith("/coaches/profile")) {
-        return NextResponse.redirect(new URL("/unauthorized", req.url));
+        return withRateLimitHeaders(
+          NextResponse.redirect(new URL("/unauthorized", req.url)),
+          rateLimitHeaders
+        );
       }
     }
 
@@ -29,18 +79,21 @@ export default withAuth(
         pathname.startsWith("/api/docs") ||
         pathname.match(/^\/api\/workshops\/[^/]+\/register$/)
       ) {
-        return NextResponse.next();
+        return withRateLimitHeaders(NextResponse.next(), rateLimitHeaders);
       }
 
       if (!token) {
-        return NextResponse.json(
-          { success: false, error: "Authentication required" },
-          { status: 401 }
+        return withRateLimitHeaders(
+          NextResponse.json(
+            { success: false, error: "Authentication required" },
+            { status: 401 }
+          ),
+          rateLimitHeaders
         );
       }
     }
 
-    return NextResponse.next();
+    return withRateLimitHeaders(NextResponse.next(), rateLimitHeaders);
   },
   {
     callbacks: {

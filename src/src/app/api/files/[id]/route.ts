@@ -13,7 +13,17 @@ import {
   deleteFile,
   linkFileToWorkflowStep,
   unlinkFileFromWorkflowStep,
+  mapFileForClient,
 } from "@/lib/file-service";
+import { z } from "zod";
+
+const fileRouteParamsSchema = z.object({
+  id: z.string().min(1, "File id is required"),
+});
+
+const updateFileSchema = z.object({
+  workflowStepId: z.string().min(1).optional(),
+});
 
 export async function GET(
   _request: NextRequest,
@@ -24,14 +34,22 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
+  const paramsValidation = fileRouteParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid file id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = paramsValidation.data;
   const file = await getFile(id);
 
   if (!file) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ success: true, data: file });
+  return NextResponse.json({ success: true, data: mapFileForClient(file) });
 }
 
 export async function PATCH(
@@ -43,17 +61,32 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
-  const body = await request.json();
-  const { workflowStepId } = body;
+  const paramsValidation = fileRouteParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid file id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const bodyValidation = updateFileSchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: bodyValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = paramsValidation.data;
+  const { workflowStepId } = bodyValidation.data;
 
   try {
     if (workflowStepId) {
       const updated = await linkFileToWorkflowStep(id, workflowStepId);
-      return NextResponse.json({ success: true, data: updated });
+      return NextResponse.json({ success: true, data: mapFileForClient(updated) });
     } else {
       const updated = await unlinkFileFromWorkflowStep(id);
-      return NextResponse.json({ success: true, data: updated });
+      return NextResponse.json({ success: true, data: mapFileForClient(updated) });
     }
   } catch (err) {
     if (err instanceof Error) {
@@ -72,7 +105,15 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
+  const paramsValidation = fileRouteParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid file id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = paramsValidation.data;
 
   // Ownership check: only uploader or privileged roles can delete
   const file = await getFile(id);

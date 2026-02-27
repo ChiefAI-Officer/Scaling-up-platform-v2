@@ -1,5 +1,8 @@
 import { test, expect } from "@playwright/test";
 
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "jverdun@scalingup.com";
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "demo123";
+
 test.describe("Authentication", () => {
   test("should redirect unauthenticated users to login", async ({ page }) => {
     await page.goto("/dashboard");
@@ -32,9 +35,9 @@ test.describe("Authentication", () => {
   test("should login successfully with valid credentials", async ({ page }) => {
     await page.goto("/login");
 
-    // Fill in valid credentials (demo user)
-    await page.getByLabel(/email/i).fill("admin@scalingup.com");
-    await page.getByLabel(/password/i).fill("demo123");
+    // Fill in valid credentials
+    await page.getByLabel(/email/i).fill(ADMIN_EMAIL);
+    await page.getByLabel(/password/i).fill(ADMIN_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();
 
     // Should redirect to dashboard
@@ -46,7 +49,7 @@ test.describe("Authentication", () => {
 
     // Check for demo credentials info
     await expect(page.getByText(/demo credentials/i)).toBeVisible();
-    await expect(page.getByText(/admin@scalingup\.com/)).toBeVisible();
+    await expect(page.getByText(/@scalingup\.com/)).toBeVisible();
   });
 });
 

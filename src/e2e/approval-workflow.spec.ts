@@ -1,12 +1,17 @@
 import { expect, test } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
 
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "jverdun@scalingup.com";
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "demo123";
+const COACH_EMAIL = process.env.E2E_COACH_EMAIL || "coach@example.com";
+const COACH_PASSWORD = process.env.E2E_COACH_PASSWORD || "demo123";
+
 test.describe("Approval Workflow E2E", () => {
   test.describe("Admin Approval Queue", () => {
     test.beforeEach(async ({ page }) => {
       await loginAs(page, {
-        email: "admin@scalingup.com",
-        password: "demo123",
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
         expectedUrl: /\/dashboard/,
       });
     });
@@ -36,8 +41,8 @@ test.describe("Approval Workflow E2E", () => {
   test.describe("Coach Approval Request Flow", () => {
     test.beforeEach(async ({ page }) => {
       await loginAs(page, {
-        email: "coach@example.com",
-        password: "demo123",
+        email: COACH_EMAIL,
+        password: COACH_PASSWORD,
         expectedUrl: /\/portal\/home/,
       });
     });

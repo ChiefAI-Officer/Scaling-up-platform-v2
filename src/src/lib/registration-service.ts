@@ -36,6 +36,7 @@ export interface RegistrationInput {
   company?: string;
   jobTitle?: string;
   phone?: string;
+  marketingOptIn?: boolean;
 }
 
 export type RegistrationWithWorkshopDetails = Registration & {
@@ -131,6 +132,7 @@ async function createRegistrationTransaction(
       company: input.company,
       jobTitle: input.jobTitle,
       phone: input.phone,
+      marketingOptIn: input.marketingOptIn ?? false,
       paymentStatus: workshop.isFree ? "FREE" : "PENDING",
       status: "REGISTERED",
     },

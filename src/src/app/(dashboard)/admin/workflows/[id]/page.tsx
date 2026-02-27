@@ -61,11 +61,18 @@ export default async function WorkflowEditorPage({ params }: WorkflowEditorPageP
   });
 
   // Fetch workshops for assignment (only active ones)
-  const workshops = await db.workshop.findMany({
-    where: { status: { notIn: ["CANCELED", "COMPLETED"] } },
-    select: { id: true, title: true, workshopCode: true, eventDate: true },
-    orderBy: { eventDate: "asc" },
-  });
+  const [workshops, categories] = await Promise.all([
+    db.workshop.findMany({
+      where: { status: { notIn: ["CANCELED", "COMPLETED"] } },
+      select: { id: true, title: true, workshopCode: true, eventDate: true },
+      orderBy: { eventDate: "asc" },
+    }),
+    db.category.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   // Serialize dates for client component
   const serializedWorkflow = workflow
@@ -103,6 +110,7 @@ export default async function WorkflowEditorPage({ params }: WorkflowEditorPageP
         workflow={serializedWorkflow}
         emailTemplates={emailTemplates}
         workshops={serializedWorkshops}
+        categories={categories}
         isNew={isNew}
       />
     </div>

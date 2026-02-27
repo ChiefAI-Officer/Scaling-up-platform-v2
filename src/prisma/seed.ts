@@ -415,7 +415,7 @@ async function main() {
         state: "IL",
         zip: "60611",
       }),
-      parkingInstructions: "Valet parking available at hotel. Self-parking at 545 N Michigan Ave garage.",
+      venueInstructions: "Valet parking available at hotel. Self-parking at 545 N Michigan Ave garage.",
       isFree: false,
       priceCents: 49900,
       earlyBirdPriceCents: 39900,
@@ -448,7 +448,7 @@ async function main() {
         state: "CA",
         zip: "94103",
       }),
-      parkingInstructions: "Validated parking in building garage.",
+      venueInstructions: "Validated parking in building garage.",
       isFree: false,
       priceCents: 59900,
       maxAttendees: 25,
@@ -545,6 +545,233 @@ async function main() {
   }
 
   console.log("Created registrations");
+
+  // ============================================
+  // Sprint 7: Coach Post-Workshop Survey Template
+  // ============================================
+
+  const coachSurveyTemplate = await prisma.surveyTemplate.upsert({
+    where: { id: "coach-post-workshop-seed" },
+    update: {},
+    create: {
+      id: "coach-post-workshop-seed",
+      name: "Coach Post-Workshop Survey",
+      description: "Post-event feedback from the coach — attendance, quality, conversions, and partnerships.",
+      surveyType: "POST_WORKSHOP",
+      isActive: true,
+      createdBy: adminUser.id,
+    },
+  });
+
+  const coachSurveyQuestions = [
+    {
+      id: "cpsq-attendance",
+      sortOrder: 0,
+      questionType: "RATING",
+      label: "How would you rate the attendance turnout for this workshop?",
+      description: "1 = Very poor, 5 = Excellent",
+      isRequired: true,
+    },
+    {
+      id: "cpsq-overall-rating",
+      sortOrder: 1,
+      questionType: "RATING",
+      label: "Overall, how would you rate the quality of this workshop?",
+      description: "1 = Very poor, 5 = Excellent",
+      isRequired: true,
+    },
+    {
+      id: "cpsq-conversions",
+      sortOrder: 2,
+      questionType: "TEXT",
+      label: "How many attendees expressed interest in follow-up coaching or services?",
+      description: "Enter a number or describe the level of interest",
+      isRequired: true,
+    },
+    {
+      id: "cpsq-partnerships",
+      sortOrder: 3,
+      questionType: "TEXTAREA",
+      label: "Were there any partnership or collaboration opportunities that emerged?",
+      description: "Describe any connections, referrals, or partnership discussions",
+      isRequired: false,
+    },
+    {
+      id: "cpsq-feedback",
+      sortOrder: 4,
+      questionType: "TEXTAREA",
+      label: "Any additional feedback or notes about this workshop?",
+      description: "Share anything notable — challenges, wins, suggestions for improvement",
+      isRequired: false,
+    },
+  ];
+
+  for (const q of coachSurveyQuestions) {
+    await prisma.surveyQuestion.upsert({
+      where: { id: q.id },
+      update: {},
+      create: {
+        id: q.id,
+        templateId: coachSurveyTemplate.id,
+        sortOrder: q.sortOrder,
+        questionType: q.questionType,
+        label: q.label,
+        description: q.description,
+        isRequired: q.isRequired,
+      },
+    });
+  }
+
+  console.log("Created coach post-workshop survey template");
+
+  // ============================================
+  // Sprint 7: 30-Day Follow-Up Coach Survey Template
+  // ============================================
+
+  const followUpSurveyTemplate = await prisma.surveyTemplate.upsert({
+    where: { id: "coach-30day-followup-seed" },
+    update: {},
+    create: {
+      id: "coach-30day-followup-seed",
+      name: "Coach 30-Day Follow-Up Survey",
+      description: "30-day post-event check-in — conversion tracking and long-term outcomes.",
+      surveyType: "POST_WORKSHOP",
+      isActive: true,
+      createdBy: adminUser.id,
+    },
+  });
+
+  const followUpQuestions = [
+    {
+      id: "c30q-conversions",
+      sortOrder: 0,
+      questionType: "TEXT",
+      label: "How many attendees have converted to paid coaching clients since the workshop?",
+      description: "Enter a number",
+      isRequired: true,
+    },
+    {
+      id: "c30q-revenue",
+      sortOrder: 1,
+      questionType: "TEXT",
+      label: "What is the estimated revenue generated from workshop attendee conversions?",
+      description: "Enter approximate dollar amount",
+      isRequired: false,
+    },
+    {
+      id: "c30q-followups",
+      sortOrder: 2,
+      questionType: "TEXTAREA",
+      label: "How many attendees are still in your follow-up pipeline?",
+      description: "Describe active conversations or scheduled follow-ups",
+      isRequired: false,
+    },
+    {
+      id: "c30q-nps",
+      sortOrder: 3,
+      questionType: "NPS",
+      label: "How likely are you to recommend the Scaling Up workshop platform to a fellow coach?",
+      description: "0 = Not at all likely, 10 = Extremely likely",
+      isRequired: true,
+    },
+    {
+      id: "c30q-suggestions",
+      sortOrder: 4,
+      questionType: "TEXTAREA",
+      label: "Any suggestions for improving the workshop experience or platform?",
+      isRequired: false,
+    },
+  ];
+
+  for (const q of followUpQuestions) {
+    await prisma.surveyQuestion.upsert({
+      where: { id: q.id },
+      update: {},
+      create: {
+        id: q.id,
+        templateId: followUpSurveyTemplate.id,
+        sortOrder: q.sortOrder,
+        questionType: q.questionType,
+        label: q.label,
+        description: q.description,
+        isRequired: q.isRequired,
+      },
+    });
+  }
+
+  console.log("Created 30-day follow-up survey template");
+
+  // ============================================
+  // Sprint 7: Post-Event Workflow with Coach Surveys
+  // ============================================
+
+  const postEventWorkflow = await prisma.workflow.upsert({
+    where: { id: "post-event-coach-survey-workflow-seed" },
+    update: {},
+    create: {
+      id: "post-event-coach-survey-workflow-seed",
+      name: "Post-Event Coach Survey Sequence",
+      description: "Automatically sends coach feedback survey 1 day after event, then 30-day follow-up.",
+      isActive: true,
+      isTemplate: true,
+      workflowPhase: "POST_EVENT",
+      createdBy: adminUser.id,
+    },
+  });
+
+  // Step 1: Coach survey 1 day after event
+  await prisma.workflowStep.upsert({
+    where: { id: "ws-coach-survey-1day-seed" },
+    update: {},
+    create: {
+      id: "ws-coach-survey-1day-seed",
+      workflowId: postEventWorkflow.id,
+      sortOrder: 0,
+      stepType: "EMAIL_COACH",
+      subject: "How did your workshop go? Share your feedback",
+      body: `<h2>Workshop Feedback Request</h2>
+<p>Hi {{coach_name}},</p>
+<p>Your workshop <strong>{{workshop_title}}</strong> has been completed. We'd love to hear how it went!</p>
+<p>Please take 2 minutes to share your feedback:</p>
+<br/>
+<a href="{{survey_url}}" style="background-color: #1D4ED8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Survey</a>
+<br/><br/>
+<p>Your input helps us improve the Scaling Up workshop experience for everyone.</p>
+<p>— The Scaling Up Team</p>`,
+      triggerType: "RELATIVE_TO_EVENT",
+      offsetDays: 1,
+      sendTimeOfDay: "09:00",
+      isActive: true,
+    },
+  });
+
+  // Step 2: 30-day follow-up survey
+  await prisma.workflowStep.upsert({
+    where: { id: "ws-coach-survey-30day-seed" },
+    update: {},
+    create: {
+      id: "ws-coach-survey-30day-seed",
+      workflowId: postEventWorkflow.id,
+      sortOrder: 1,
+      stepType: "EMAIL_COACH",
+      subject: "30-Day Check-In: Workshop Conversion Results",
+      body: `<h2>30-Day Follow-Up</h2>
+<p>Hi {{coach_name}},</p>
+<p>It's been 30 days since your workshop <strong>{{workshop_title}}</strong>. We'd like to check in on your results.</p>
+<p>How many attendees have converted to coaching clients? What revenue has been generated?</p>
+<br/>
+<a href="{{survey_url}}" style="background-color: #1D4ED8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Share Your Results</a>
+<br/><br/>
+<p>This data helps us demonstrate the ROI of Scaling Up workshops and improve our platform.</p>
+<p>— The Scaling Up Team</p>`,
+      triggerType: "RELATIVE_TO_EVENT",
+      offsetDays: 30,
+      sendTimeOfDay: "09:00",
+      isActive: true,
+    },
+  });
+
+  console.log("Created post-event coach survey workflow");
 
   console.log("Seeding completed!");
 }

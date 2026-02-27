@@ -18,9 +18,11 @@ interface WorkshopActionsProps {
   workshop: Workshop;
 }
 
+// Sprint 5: Status transitions are now automated via auto-build on approval.
+// Only manual cancel and re-request remain as admin overrides.
 const statusTransitions: Record<WorkshopStatus, WorkshopStatus[]> = {
-  REQUESTED: ["AWAITING_APPROVAL", "CANCELED"],
-  AWAITING_APPROVAL: ["PRE_EVENT", "REQUESTED", "CANCELED"],
+  REQUESTED: ["CANCELED"],
+  AWAITING_APPROVAL: ["CANCELED"],
   PRE_EVENT: ["POST_EVENT", "CANCELED"],
   POST_EVENT: ["COMPLETED"],
   COMPLETED: [],

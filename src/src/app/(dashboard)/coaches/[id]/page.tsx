@@ -7,7 +7,6 @@ import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
-import { CircleSyncButton } from "@/components/coach/circle-sync-button";
 
 interface CoachDetailPageProps {
   params: Promise<{ id: string }>;
@@ -397,7 +396,6 @@ export default async function CoachDetailPage({
               <span className="block w-full text-center bg-muted text-muted-foreground px-4 py-2 rounded-lg text-sm cursor-default border border-dashed border-border">
                 Add Certification — Coming Soon
               </span>
-              <CircleSyncButton coachId={coach.id} />
             </CardContent>
           </Card>
         </div>

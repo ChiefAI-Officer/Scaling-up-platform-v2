@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { z } from "zod";
+
+const categoriesQuerySchema = z.object({
+    all: z.enum(["true", "false"]).optional(),
+});
+
+const createCategorySchema = z.object({
+    name: z.string().trim().min(1, "Name is required"),
+    description: z.string().trim().optional().nullable(),
+    defaultTitle: z.string().trim().optional().nullable(),
+    defaultDescription: z.string().trim().optional().nullable(),
+});
 
 /**
  * GET /api/categories
@@ -10,7 +22,18 @@ import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const includeInactive = searchParams.get("all") === "true";
+        const queryValidation = categoriesQuerySchema.safeParse(
+            Object.fromEntries(searchParams.entries())
+        );
+
+        if (!queryValidation.success) {
+            return NextResponse.json(
+                { error: "Invalid query parameters", details: queryValidation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const includeInactive = queryValidation.data.all === "true";
 
         const categories = await db.category.findMany({
             where: includeInactive ? {} : { isActive: true },
@@ -45,12 +68,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const body = await request.json();
-        const { name, description } = body;
+        const bodyValidation = createCategorySchema.safeParse(await request.json());
 
-        if (!name || typeof name !== "string" || name.trim().length === 0) {
+        if (!bodyValidation.success) {
             return NextResponse.json({ error: "Name is required" }, { status: 400 });
         }
+
+        const { name, description, defaultTitle, defaultDescription } = bodyValidation.data;
 
         const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
@@ -59,6 +83,8 @@ export async function POST(request: NextRequest) {
                 name: name.trim(),
                 slug,
                 description: description?.trim() || null,
+                defaultTitle: defaultTitle?.trim() || null,
+                defaultDescription: defaultDescription?.trim() || null,
             },
         });
 

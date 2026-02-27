@@ -12,6 +12,22 @@ import {
   updateSurveyTemplate,
   deleteSurveyTemplate,
 } from "@/lib/survey-service";
+import { SURVEY_TYPES } from "@/lib/survey-types";
+import type { SurveyType } from "@/lib/survey-types";
+import { z } from "zod";
+
+const surveyTemplateParamsSchema = z.object({
+  id: z.string().min(1, "Template id is required"),
+});
+
+const validSurveyTypes = Object.values(SURVEY_TYPES) as [SurveyType, ...SurveyType[]];
+
+const updateSurveyTemplateSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
+  surveyType: z.enum(validSurveyTypes).optional(),
+  isActive: z.boolean().optional(),
+});
 
 export async function GET(
   _request: NextRequest,
@@ -22,7 +38,15 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
+  const paramsValidation = surveyTemplateParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid template id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = paramsValidation.data;
   const template = await getSurveyTemplate(id);
 
   if (!template) {
@@ -41,8 +65,24 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
-  const body = await request.json();
+  const paramsValidation = surveyTemplateParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid template id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const bodyValidation = updateSurveyTemplateSchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: bodyValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = paramsValidation.data;
+  const body = bodyValidation.data;
 
   const template = await updateSurveyTemplate(id, body);
   return NextResponse.json({ success: true, data: template });
@@ -57,7 +97,15 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = await params;
+  const paramsValidation = surveyTemplateParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid template id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id } = paramsValidation.data;
   await deleteSurveyTemplate(id);
   return NextResponse.json({ success: true });
 }

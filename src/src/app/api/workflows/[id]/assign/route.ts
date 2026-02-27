@@ -11,6 +11,19 @@ import {
   unassignWorkflow,
 } from "@/lib/workflow-service";
 import { inngest } from "@/inngest/client";
+import { z } from "zod";
+
+const workflowAssignParamsSchema = z.object({
+  id: z.string().min(1, "Workflow id is required"),
+});
+
+const createWorkflowAssignmentSchema = z.object({
+  workshopId: z.string().min(1, "workshopId is required"),
+});
+
+const deleteWorkflowAssignmentSchema = z.object({
+  assignmentId: z.string().min(1, "assignmentId is required"),
+});
 
 export async function POST(
   request: NextRequest,
@@ -21,13 +34,24 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id: workflowId } = await params;
-  const body = await request.json();
-  const { workshopId } = body;
-
-  if (!workshopId) {
-    return NextResponse.json({ error: "workshopId is required" }, { status: 400 });
+  const paramsValidation = workflowAssignParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid workflow id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
   }
+
+  const bodyValidation = createWorkflowAssignmentSchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: bodyValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { id: workflowId } = paramsValidation.data;
+  const { workshopId } = bodyValidation.data;
 
   try {
     const assignment = await assignWorkflowToWorkshop({
@@ -71,12 +95,23 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { assignmentId } = body;
-
-  if (!assignmentId) {
-    return NextResponse.json({ error: "assignmentId is required" }, { status: 400 });
+  const paramsValidation = workflowAssignParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid workflow id", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
   }
+
+  const bodyValidation = deleteWorkflowAssignmentSchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: bodyValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { assignmentId } = bodyValidation.data;
 
   await unassignWorkflow(assignmentId);
 

@@ -5,6 +5,7 @@ import { generateSlug } from "@/lib/utils";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 import { validateLeadTime } from "@/lib/lead-time-validator";
 import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
+import { sendWorkshopRequestedEmail } from "@/services/notifications";
 
 function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -288,15 +289,12 @@ export async function POST(request: NextRequest) {
         timezone: data.timezone,
         venueName: data.venueName,
         venueAddress: data.venueAddress ? JSON.stringify(data.venueAddress) : null,
-        parkingInstructions: data.parkingInstructions,
-        virtualPlatform: data.virtualPlatform,
+        venueInstructions: data.venueInstructions,
         virtualLink: data.virtualLink || null,
+        geoTargetAreas: data.geoTargetAreas,
+        excludedClients: data.excludedClients,
         isFree: data.isFree,
         priceCents: data.priceCents,
-        earlyBirdPriceCents: data.earlyBirdPriceCents,
-        earlyBirdDeadline: data.earlyBirdDeadline
-          ? new Date(data.earlyBirdDeadline)
-          : null,
         maxAttendees: data.maxAttendees,
         status: "REQUESTED",
       },
@@ -344,6 +342,15 @@ export async function POST(request: NextRequest) {
         },
       });
     }
+
+    // Send workshop requested notification (non-blocking)
+    sendWorkshopRequestedEmail({
+      coachEmail: coach.email,
+      coachName: `${coach.firstName} ${coach.lastName}`,
+      workshopTitle: workshop.title,
+      workshopId: workshop.id,
+      linkedinUrl: coach.linkedinUrl,
+    }).catch((err) => console.error("Failed to send workshop requested email:", err));
 
     return NextResponse.json(
       {

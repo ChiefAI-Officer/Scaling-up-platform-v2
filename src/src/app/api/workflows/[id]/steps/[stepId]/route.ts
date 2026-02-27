@@ -9,6 +9,26 @@ import { authOptions } from "@/lib/auth";
 import { updateWorkflowStep, deleteWorkflowStep } from "@/lib/workflow-service";
 import { STEP_TYPES, TRIGGER_TYPES } from "@/lib/workflow-types";
 import type { StepType, TriggerType } from "@/lib/workflow-types";
+import { z } from "zod";
+
+const workflowStepRouteParamsSchema = z.object({
+  id: z.string().min(1, "Workflow id is required"),
+  stepId: z.string().min(1, "Step id is required"),
+});
+
+const updateWorkflowStepSchema = z.object({
+  stepType: z.string().optional(),
+  triggerType: z.string().optional(),
+  subject: z.string().optional().nullable(),
+  body: z.string().optional().nullable(),
+  emailTemplateId: z.string().optional().nullable(),
+  customRecipients: z.array(z.string().email()).optional().nullable(),
+  offsetDays: z.coerce.number().int().optional().nullable(),
+  offsetHours: z.coerce.number().int().optional().nullable(),
+  sendTimeOfDay: z.string().optional().nullable(),
+  sortOrder: z.coerce.number().int().min(0).optional(),
+  isActive: z.boolean().optional(),
+});
 
 export async function PATCH(
   request: NextRequest,
@@ -19,8 +39,24 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { stepId } = await params;
-  const body = await request.json();
+  const paramsValidation = workflowStepRouteParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid route parameters", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const bodyValidation = updateWorkflowStepSchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid request body", details: bodyValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { stepId } = paramsValidation.data;
+  const body = bodyValidation.data;
 
   const updateData: Record<string, unknown> = {};
 
@@ -62,7 +98,15 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { stepId } = await params;
+  const paramsValidation = workflowStepRouteParamsSchema.safeParse(await params);
+  if (!paramsValidation.success) {
+    return NextResponse.json(
+      { error: "Invalid route parameters", details: paramsValidation.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const { stepId } = paramsValidation.data;
   await deleteWorkflowStep(stepId);
 
   return NextResponse.json({ success: true });

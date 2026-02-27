@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { z } from "zod";
+
+const pricingTierRouteParamsSchema = z.object({
+    id: z.string().min(1, "Pricing tier id is required"),
+});
+
+const updatePricingTierSchema = z.object({
+    name: z.string().trim().min(1).optional(),
+    amountCents: z.coerce.number().int().min(0).optional(),
+    description: z.string().trim().optional().nullable(),
+    isActive: z.boolean().optional(),
+});
 
 /**
  * PATCH /api/pricing-tiers/[id]
@@ -16,9 +28,24 @@ export async function PATCH(
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const { id } = await params;
-        const body = await request.json();
-        const { name, amountCents, description, isActive } = body;
+        const paramsValidation = pricingTierRouteParamsSchema.safeParse(await params);
+        if (!paramsValidation.success) {
+            return NextResponse.json(
+                { error: "Invalid pricing tier id", details: paramsValidation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const bodyValidation = updatePricingTierSchema.safeParse(await request.json());
+        if (!bodyValidation.success) {
+            return NextResponse.json(
+                { error: "Invalid request body", details: bodyValidation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const { id } = paramsValidation.data;
+        const { name, amountCents, description, isActive } = bodyValidation.data;
 
         const data: Record<string, unknown> = {};
         if (name !== undefined) data.name = name.trim();
@@ -56,7 +83,15 @@ export async function DELETE(
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const { id } = await params;
+        const paramsValidation = pricingTierRouteParamsSchema.safeParse(await params);
+        if (!paramsValidation.success) {
+            return NextResponse.json(
+                { error: "Invalid pricing tier id", details: paramsValidation.error.issues },
+                { status: 400 }
+            );
+        }
+
+        const { id } = paramsValidation.data;
 
         const workshopCount = await db.workshop.count({ where: { pricingTierId: id } });
         if (workshopCount > 0) {

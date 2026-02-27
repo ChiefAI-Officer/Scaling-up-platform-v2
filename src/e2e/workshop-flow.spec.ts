@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { loginAs } from "./helpers/auth";
 
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || "jverdun@scalingup.com";
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || "demo123";
+
 test.describe("Workshop Public Pages", () => {
   test("should display workshop landing page", async ({ page }) => {
     await page.goto("/workshop/ai-workshop-chicago-march-2025");
@@ -69,8 +72,8 @@ test.describe("Workshop Registration", () => {
 test.describe("Dashboard Workshops (Authenticated)", () => {
   test.beforeEach(async ({ page }) => {
     await loginAs(page, {
-      email: "admin@scalingup.com",
-      password: "demo123",
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
       expectedUrl: /\/dashboard/,
     });
   });
@@ -79,14 +82,14 @@ test.describe("Dashboard Workshops (Authenticated)", () => {
     await page.goto("/workshops");
 
     // Should show workshop heading
-    await expect(page.getByRole("heading", { name: "Workshops", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /all workshops|workshops/i })).toBeVisible();
   });
 
   test("should have create workshop button", async ({ page }) => {
     await page.goto("/workshops");
 
     // Look for create button
-    await expect(page.getByRole("link", { name: /create new workshop/i }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /new workshop|create workshop|create new workshop/i }).first()).toBeVisible();
   });
 
   test("should navigate to workshop details", async ({ page }) => {

@@ -12,6 +12,16 @@ import {
 } from "@/lib/survey-service";
 import type { SurveyType } from "@/lib/survey-types";
 import { SURVEY_TYPES } from "@/lib/survey-types";
+import { z } from "zod";
+
+const validSurveyTypes = Object.values(SURVEY_TYPES) as [SurveyType, ...SurveyType[]];
+
+const createSurveyTemplateSchema = z.object({
+  name: z.string().trim().min(1, "name is required"),
+  description: z.string().trim().optional(),
+  surveyType: z.enum(validSurveyTypes),
+  categoryId: z.string().min(1).optional(),
+});
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -29,23 +39,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { name, description, surveyType, categoryId } = body;
-
-  if (!name || !surveyType) {
+  const bodyValidation = createSurveyTemplateSchema.safeParse(await request.json());
+  if (!bodyValidation.success) {
     return NextResponse.json(
-      { error: "name and surveyType are required" },
+      { error: "Invalid request body", details: bodyValidation.error.issues },
       { status: 400 }
     );
   }
 
-  const validTypes = Object.values(SURVEY_TYPES);
-  if (!validTypes.includes(surveyType as SurveyType)) {
-    return NextResponse.json(
-      { error: `Invalid surveyType. Must be one of: ${validTypes.join(", ")}` },
-      { status: 400 }
-    );
-  }
+  const { name, description, surveyType, categoryId } = bodyValidation.data;
 
   const template = await createSurveyTemplate({
     name,

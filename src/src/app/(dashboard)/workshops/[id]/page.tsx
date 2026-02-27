@@ -20,6 +20,20 @@ const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.ap
 import { WorkshopActions } from "./workshop-actions";
 import { QuickActions } from "./quick-actions";
 
+function executionStatusVariant(status: string): "success" | "warning" | "destructive" | "secondary" {
+  switch (status) {
+    case "SENT":
+    case "COMPLETED":
+      return "success";
+    case "FAILED":
+      return "destructive";
+    case "SCHEDULED":
+      return "warning";
+    default:
+      return "secondary";
+  }
+}
+
 interface WorkshopDetailPageProps {
   params: Promise<{ id: string }>;
 }
@@ -29,26 +43,48 @@ export default async function WorkshopDetailPage({
 }: WorkshopDetailPageProps) {
   const { id } = await params;
 
-  const workshop = await db.workshop.findUnique({
-    where: { id },
-    include: {
-      coach: true,
-      workshopType: true,
-      registrations: {
-        orderBy: { createdAt: "desc" },
-      },
-      tasks: {
-        orderBy: { createdAt: "desc" },
-      },
-      landingPages: {
-        select: {
-          id: true,
-          slug: true,
-          status: true,
+  const [workshop, workflowAssignments] = await Promise.all([
+    db.workshop.findUnique({
+      where: { id },
+      include: {
+        coach: true,
+        workshopType: true,
+        registrations: {
+          orderBy: { createdAt: "desc" },
+        },
+        tasks: {
+          orderBy: { createdAt: "desc" },
+        },
+        landingPages: {
+          select: {
+            id: true,
+            slug: true,
+            status: true,
+          },
         },
       },
-    },
-  });
+    }),
+    db.workflowAssignment.findMany({
+      where: { workshopId: id },
+      include: {
+        workflow: {
+          include: {
+            steps: {
+              where: { isActive: true },
+              orderBy: { sortOrder: "asc" },
+              include: {
+                executions: {
+                  where: { workshopId: id },
+                  orderBy: { createdAt: "desc" },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+  ]);
 
   if (!workshop) {
     notFound();
@@ -335,6 +371,47 @@ export default async function WorkshopDetailPage({
               )}
             </CardContent>
           </Card>
+
+          {/* Workflow Status */}
+          {workflowAssignments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Workflow Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {workflowAssignments.map((assignment) => (
+                    <div key={assignment.id}>
+                      <p className="text-sm font-medium text-foreground mb-2">
+                        {assignment.workflow.name}
+                      </p>
+                      {assignment.workflow.steps.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No steps</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {assignment.workflow.steps.map((step, index) => {
+                            const execution = step.executions[0];
+                            const status = execution?.status ?? "PENDING";
+                            return (
+                              <div key={step.id} className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground mr-2">{index + 1}.</span>
+                                <span className="flex-1 text-foreground truncate">
+                                  {step.subject || step.stepType}
+                                </span>
+                                <Badge variant={executionStatusVariant(status)}>
+                                  {status}
+                                </Badge>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick Links */}
           <Card>

@@ -1,14 +1,22 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { Suspense } from "react";
 import { db } from "@/lib/db";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
+import { FinancialFilters } from "@/components/financials/financial-filters";
 
-type PeriodFilter = "month" | "quarter" | "year" | "all";
+type PeriodFilter = "month" | "quarter" | "year" | "all" | "custom";
 
 interface PageProps {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{
+    period?: string;
+    coachId?: string;
+    categoryId?: string;
+    startDate?: string;
+    endDate?: string;
+  }>;
 }
 
 function getPeriodStart(period: PeriodFilter): Date | null {
@@ -23,11 +31,18 @@ function getPeriodStart(period: PeriodFilter): Date | null {
     case "year":
       return new Date(now.getFullYear(), 0, 1);
     case "all":
+    case "custom":
       return null;
   }
 }
 
-function getPeriodLabel(period: PeriodFilter): string {
+function getPeriodLabel(period: PeriodFilter, startDate?: string, endDate?: string): string {
+  if (period === "custom") {
+    const parts: string[] = [];
+    if (startDate) parts.push(new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }));
+    if (endDate) parts.push(new Date(endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }));
+    return parts.length > 0 ? parts.join(" – ") : "Custom Range";
+  }
   const now = new Date();
   switch (period) {
     case "month":
@@ -44,14 +59,49 @@ function getPeriodLabel(period: PeriodFilter): string {
 }
 
 export default async function FinancialDashboardPage({ searchParams }: PageProps) {
-  const { period: rawPeriod } = await searchParams;
-  const period: PeriodFilter =
-    rawPeriod === "month" || rawPeriod === "quarter" || rawPeriod === "year" || rawPeriod === "all"
-      ? rawPeriod
-      : "month";
+  const { period: rawPeriod, coachId, categoryId, startDate, endDate } = await searchParams;
+  const validPeriods = ["month", "quarter", "year", "all", "custom"];
+  const period: PeriodFilter = validPeriods.includes(rawPeriod || "")
+    ? (rawPeriod as PeriodFilter)
+    : "month";
 
-  const periodStart = getPeriodStart(period);
-  const dateFilter = periodStart ? { gte: periodStart } : undefined;
+  // Build date filter from period presets or custom range
+  let dateFilter: { gte?: Date; lte?: Date } | undefined;
+  if (period === "custom") {
+    const gte = startDate ? new Date(startDate) : undefined;
+    const lte = endDate ? new Date(`${endDate}T23:59:59.999Z`) : undefined;
+    if (gte || lte) {
+      dateFilter = { ...(gte ? { gte } : {}), ...(lte ? { lte } : {}) };
+    }
+  } else {
+    const periodStart = getPeriodStart(period);
+    dateFilter = periodStart ? { gte: periodStart } : undefined;
+  }
+
+  // Build workshop-level filter for coach and category
+  const workshopFilter: Record<string, unknown> = {};
+  if (coachId) workshopFilter.coachId = coachId;
+  if (categoryId) workshopFilter.categoryId = categoryId;
+  const hasWorkshopFilter = Object.keys(workshopFilter).length > 0;
+
+  // Fetch filter options
+  const [coaches, categories] = await Promise.all([
+    db.coach.findMany({
+      select: { id: true, firstName: true, lastName: true },
+      orderBy: { firstName: "asc" },
+    }),
+    db.category.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  // Registration-level filter: date + optional workshop scoping
+  const registrationWhere = {
+    ...(dateFilter ? { createdAt: dateFilter } : {}),
+    ...(hasWorkshopFilter ? { workshop: workshopFilter } : {}),
+  };
 
   const [
     totalRevenue,
@@ -63,28 +113,20 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
   ] = await Promise.all([
     db.registration.aggregate({
       _sum: { amountPaidCents: true },
-      where: {
-        paymentStatus: "COMPLETED",
-        ...(dateFilter ? { createdAt: dateFilter } : {}),
-      },
+      where: { paymentStatus: "COMPLETED", ...registrationWhere },
     }),
     db.registration.count({
-      where: dateFilter ? { createdAt: dateFilter } : {},
+      where: registrationWhere,
     }),
     db.registration.count({
-      where: {
-        paymentStatus: "COMPLETED",
-        ...(dateFilter ? { createdAt: dateFilter } : {}),
-      },
+      where: { paymentStatus: "COMPLETED", ...registrationWhere },
     }),
     db.registration.count({
-      where: {
-        paymentStatus: "FREE",
-        ...(dateFilter ? { createdAt: dateFilter } : {}),
-      },
+      where: { paymentStatus: "FREE", ...registrationWhere },
     }),
     db.workshop.findMany({
       where: {
+        ...workshopFilter,
         registrations: {
           some: {
             paymentStatus: "COMPLETED",
@@ -115,6 +157,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
         id: true,
         name: true,
         workshops: {
+          where: hasWorkshopFilter ? workshopFilter : undefined,
           select: {
             registrations: {
               where: {
@@ -171,27 +214,15 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
               <span className="text-foreground">Financial Dashboard</span>
             </div>
             <h1 className="text-2xl font-bold text-foreground">Financial Dashboard</h1>
-            <p className="text-muted-foreground">Revenue breakdown — {getPeriodLabel(period)}</p>
+            <p className="text-muted-foreground">Revenue breakdown — {getPeriodLabel(period, startDate, endDate)}</p>
           </div>
         </div>
       </FadeUp>
 
-      {/* Period Filter */}
-      <div className="flex gap-2">
-        {(["month", "quarter", "year", "all"] as PeriodFilter[]).map((p) => (
-          <Link
-            key={p}
-            href={`/admin/financials?period=${p}`}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-              period === p
-                ? "bg-blue-600 text-white"
-                : "bg-card border border-border text-foreground hover:bg-accent"
-            }`}
-          >
-            {p === "month" ? "Monthly" : p === "quarter" ? "Quarterly" : p === "year" ? "Annual" : "All Time"}
-          </Link>
-        ))}
-      </div>
+      {/* Filters: Period + Coach + Category + Date Range */}
+      <Suspense>
+        <FinancialFilters coaches={coaches} categories={categories} />
+      </Suspense>
 
       {/* Summary Stats */}
       <StaggerContainer className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
