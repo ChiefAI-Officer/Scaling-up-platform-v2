@@ -598,12 +598,6 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
   const heroHeadline = content.heroHeadline || "";
   const heroDescription = content.heroDescription || "";
   const workshopTitle = content.workshopTitle || "";
-  const emailPlaceholder = content.emailPlaceholder || "Email";
-  const optInText = content.optInText || "";
-  const namePlaceholder = content.namePlaceholder || "Full name";
-  const companyPlaceholder = content.companyPlaceholder || "Company";
-  const submitButtonText = content.submitButtonText || "Register";
-  const privacyText = content.privacyText || "";
 
   return (
     <div className="min-h-screen grid md:grid-cols-2">
@@ -634,71 +628,9 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
               <div className="font-semibold">{workshopTitle}</div>
               <div className="text-purple-200 text-sm">with {coachName}</div>
             </div>
-            <form className="p-6 space-y-4" action={`/api/workshops/${workshop.id}/register`} method="POST">
-              <div className="space-y-2">
-                <label htmlFor="registrationEmail" className="text-sm font-medium text-foreground">
-                  Email
-                </label>
-                <input
-                  id="registrationEmail"
-                  type="email"
-                  name="email"
-                  placeholder={emailPlaceholder}
-                  required
-                  className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label htmlFor="registrationFirstName" className="text-sm font-medium text-foreground">
-                    First Name
-                  </label>
-                  <input
-                    id="registrationFirstName"
-                    type="text"
-                    name="firstName"
-                    placeholder="First name"
-                    required
-                    className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="registrationLastName" className="text-sm font-medium text-foreground">
-                    Last Name
-                  </label>
-                  <input
-                    id="registrationLastName"
-                    type="text"
-                    name="lastName"
-                    placeholder={namePlaceholder}
-                    required
-                    className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              <label htmlFor="registrationOptIn" className="flex items-start gap-2 text-sm text-muted-foreground">
-                <input id="registrationOptIn" type="checkbox" name="optIn" defaultChecked className="mt-1 rounded" />
-                <span>{optInText}</span>
-              </label>
-              <div className="space-y-2">
-                <label htmlFor="registrationCompany" className="text-sm font-medium text-foreground">
-                  Company
-                </label>
-                <input
-                  id="registrationCompany"
-                  type="text"
-                  name="company"
-                  placeholder={companyPlaceholder}
-                  className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary"
-                />
-              </div>
-              <button type="submit" className="w-full bg-primary text-primary-foreground py-4 rounded-lg font-semibold hover:bg-primary/90 transition">
-                {submitButtonText}
-              </button>
-              <p className="text-center text-muted-foreground text-xs">{privacyText}</p>
-            </form>
+            <div className="p-6">
+              <RegistrationForm workshopId={workshop.id} isFree={workshop.isFree} />
+            </div>
           </div>
         </div>
       </div>
