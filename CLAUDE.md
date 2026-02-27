@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | February 27, 2026 — Design token consolidation + hardcoded color sweep + security S1-S8 |
+| **Last Updated** | February 27, 2026 — Test coverage T1-T10 (415 tests) + production launch guide |
 
 ## Current Status
 
@@ -97,12 +97,13 @@ the full workshop lifecycle from request through post-event follow-up.
 - S7: Auto-build idempotency guard (prevents duplicate builds on Inngest retry)
 - S8: Email attendee deduplication via Set in workflow execution
 
-**E2E Test Coverage (Feb 27, 2026)** — In progress:
-- 8 Playwright spec files covering 40+ automatable checks across 12 rounds
-- 2 critical Inngest/API test suites: auto-build (15 tests), registration (29 tests)
-- 28 test suites / 269 tests total (up from 225)
-- 12 remaining manual checks require email inbox / external service access
-- Plans: `plans/PLATFORM_STATE_ASSESSMENT_FEB27_2026.md` + `plans/V_AND_V_TASK_TRACKER.md`
+**Test Coverage Push T1-T10 (Feb 27, 2026)** — Complete:
+- 37 test suites / 415 tests total (up from 28/269)
+- 9 new test files: auto-build, execute-workflow, workshop-status, surveys, auth, files, workshop-resubmit, completion-summary, typeform-webhook
+- All critical paths now covered: Inngest functions, auth routes, status transitions, file upload, webhooks
+- 8 Playwright E2E spec files covering 40+ automatable checks across 12 rounds
+- 12 remaining manual checks require email inbox / external service access (see `plans/MANUAL_VERIFICATION_REMAINING_CHECKS.md`)
+- Production launch guide: `plans/PRODUCTION_LAUNCH_GUIDE.md`
 
 **Design Token Consolidation + Color Sweep (Feb 27, 2026)** — Complete:
 - Single source of truth: `globals.css` (`brand-tokens.css` deleted — had zero imports)
