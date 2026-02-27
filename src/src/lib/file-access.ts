@@ -24,12 +24,22 @@ interface FileAccessTokenPayload {
 }
 
 function getFileAccessSecret(): string {
-  return (
+  const secret =
     process.env.FILE_ACCESS_SECRET ||
     process.env.NEXTAUTH_SECRET ||
-    process.env.AUTH_SECRET ||
-    "local-dev-file-access-secret"
-  );
+    process.env.AUTH_SECRET;
+
+  if (!secret) {
+    if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV) {
+      throw new Error(
+        "FILE_ACCESS_SECRET (or NEXTAUTH_SECRET) must be set in production. " +
+        "File access tokens cannot be signed securely without a secret."
+      );
+    }
+    return "local-dev-file-access-secret";
+  }
+
+  return secret;
 }
 
 function getConfiguredMinStatus(): WorkshopStatus {

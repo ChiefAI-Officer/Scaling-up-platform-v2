@@ -100,7 +100,7 @@ export default withAuth(
       authorized: ({ token, req }) => {
         const pathname = req.nextUrl.pathname;
 
-        // Public routes
+        // Public routes — no authentication required
         if (
           pathname === "/" ||
           pathname === "/login" ||
@@ -117,14 +117,14 @@ export default withAuth(
           pathname.startsWith("/api/health") ||
           pathname.startsWith("/api/docs") ||
           pathname.startsWith("/api/registrations") ||
-          pathname.startsWith("/api/") ||
+          pathname.match(/^\/api\/workshops\/[^/]+\/register$/) ||
           pathname.startsWith("/_next") ||
           pathname.includes(".")
         ) {
           return true;
         }
 
-        // Protected routes require authentication
+        // All other routes (including protected API routes) require authentication
         return !!token;
       },
     },
