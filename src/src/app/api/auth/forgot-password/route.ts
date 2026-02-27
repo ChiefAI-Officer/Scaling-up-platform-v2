@@ -48,7 +48,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Malformed JSON in request body" },
+        { status: 400, headers: rateLimit.headers }
+      );
+    }
     const parsed = forgotPasswordSchema.safeParse(body);
 
     if (!parsed.success) {

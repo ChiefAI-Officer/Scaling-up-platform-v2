@@ -6,6 +6,7 @@ interface PasswordResetPayload {
   email: string;
   exp: number;
   fp: string;
+  nonce: string;
 }
 
 function getResetSecret(): string {
@@ -67,10 +68,12 @@ export function generatePasswordResetToken(
   passwordHash: string | null | undefined,
   ttlSeconds: number = DEFAULT_RESET_TTL_SECONDS
 ): string {
+  const nonce = crypto.randomBytes(32).toString("hex");
   const payload: PasswordResetPayload = {
     email: email.trim().toLowerCase(),
     exp: Date.now() + ttlSeconds * 1000,
     fp: passwordFingerprint(passwordHash),
+    nonce,
   };
 
   const payloadBase64 = toBase64Url(JSON.stringify(payload));

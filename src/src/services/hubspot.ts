@@ -1,5 +1,8 @@
+import https from "https";
 import { Client } from "@hubspot/api-client";
 import { FilterOperatorEnum } from "@hubspot/api-client/lib/codegen/crm/contacts";
+
+const HUBSPOT_TIMEOUT_MS = 15_000;
 
 function isHubSpotConfigured(): boolean {
   return !!process.env.HUBSPOT_ACCESS_TOKEN;
@@ -14,6 +17,7 @@ function getHubSpotClient(): Client {
     }
     _hubspotClient = new Client({
       accessToken: process.env.HUBSPOT_ACCESS_TOKEN,
+      httpAgent: new https.Agent({ timeout: HUBSPOT_TIMEOUT_MS }),
     });
   }
   return _hubspotClient;

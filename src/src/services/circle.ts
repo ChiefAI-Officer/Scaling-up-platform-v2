@@ -57,17 +57,28 @@ function getCircleApiKey(): string {
     return apiKey;
 }
 
+const EXTERNAL_API_TIMEOUT_MS = 15_000;
+
 async function searchCommunityMembers(query: string): Promise<CircleMember[]> {
     const apiKey = getCircleApiKey();
     const searchUrl = `${CIRCLE_API_BASE}/community_members/search?query=${encodeURIComponent(query)}`;
 
-    const response = await fetch(searchUrl, {
-        method: "GET",
-        headers: {
-            Authorization: `Token ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), EXTERNAL_API_TIMEOUT_MS);
+
+    let response: Response;
+    try {
+        response = await fetch(searchUrl, {
+            method: "GET",
+            headers: {
+                Authorization: `Token ${apiKey}`,
+                "Content-Type": "application/json",
+            },
+            signal: controller.signal,
+        });
+    } finally {
+        clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
         throw new Error(`Circle API Error: ${response.status} ${response.statusText}`);

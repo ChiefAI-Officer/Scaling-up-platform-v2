@@ -162,11 +162,26 @@ export async function submitSurveyResponse(
 ) {
   const survey = await db.survey.findUnique({
     where: { id: surveyId },
-    select: { id: true, completedAt: true },
+    select: { id: true, completedAt: true, templateId: true },
   });
 
   if (!survey) throw new Error("Survey not found");
   if (survey.completedAt) throw new Error("Survey already completed");
+
+  // Validate that all questionIds belong to this survey's template
+  if (survey.templateId) {
+    const validQuestions = await db.surveyQuestion.findMany({
+      where: { templateId: survey.templateId },
+      select: { id: true },
+    });
+    const validQuestionIds = new Set(validQuestions.map((q) => q.id));
+    const invalidIds = answers.filter((a) => !validQuestionIds.has(a.questionId));
+    if (invalidIds.length > 0) {
+      throw new Error(
+        `Invalid question IDs for this survey: ${invalidIds.map((a) => a.questionId).join(", ")}`
+      );
+    }
+  }
 
   // Upsert answers + mark survey complete in a transaction
   const operations = answers.map((answer) =>

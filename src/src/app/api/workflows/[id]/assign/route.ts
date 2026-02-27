@@ -82,7 +82,11 @@ export async function POST(
         { status: 409 }
       );
     }
-    throw error;
+    console.error("Workflow assign POST error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -113,7 +117,14 @@ export async function DELETE(
 
   const { assignmentId } = bodyValidation.data;
 
-  await unassignWorkflow(assignmentId);
-
-  return NextResponse.json({ success: true });
+  try {
+    await unassignWorkflow(assignmentId);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Workflow assign DELETE error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
 }

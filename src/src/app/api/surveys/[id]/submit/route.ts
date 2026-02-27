@@ -65,7 +65,14 @@ export async function POST(
       if (err.message === "Survey already completed") {
         return NextResponse.json({ error: err.message }, { status: 410 });
       }
+      if (err.message.startsWith("Invalid question IDs")) {
+        return NextResponse.json({ error: err.message }, { status: 400 });
+      }
     }
-    throw err;
+    console.error("Survey submit error:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

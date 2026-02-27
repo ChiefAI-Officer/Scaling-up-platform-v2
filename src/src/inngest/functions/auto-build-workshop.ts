@@ -59,6 +59,29 @@ export const autoBuildWorkshop = inngest.createFunction(
     async ({ event, step }) => {
         const { workshopId } = event.data;
 
+        // Idempotency guard: skip if workshop has already been built (e.g. Inngest retry)
+        const alreadyBuilt = await step.run("idempotency-check", async () => {
+            const existingPages = await db.landingPage.findMany({
+                where: { workshopId },
+                select: { id: true },
+            });
+            const ws = await db.workshop.findUnique({
+                where: { id: workshopId },
+                select: { status: true },
+            });
+            if (existingPages.length > 0 || ws?.status === "PRE_EVENT") {
+                console.warn(
+                    `[auto-build-workshop] Workshop ${workshopId} already has ${existingPages.length} landing page(s) and status=${ws?.status}. Skipping duplicate build.`
+                );
+                return true;
+            }
+            return false;
+        });
+
+        if (alreadyBuilt) {
+            return { workshopId, skipped: true, reason: "Workshop already built (idempotency guard)" };
+        }
+
         // Step 1: Fetch workshop + coach + category
         const workshop = await step.run("fetch-workshop", async (): Promise<WorkshopData> => {
             const w = await db.workshop.findUnique({

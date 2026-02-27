@@ -171,6 +171,23 @@ export const executeWorkflow = inngest.createFunction(
 
             case STEP_TYPES.EMAIL_ATTENDEES: {
               recipientRole = "ATTENDEE";
+
+              // Dedup guard: skip if this step was already successfully executed (Inngest retry)
+              const existingExecution = await db.workflowStepExecution.findFirst({
+                where: {
+                  stepId: workflowStep.id,
+                  workshopId: workshop.id,
+                  status: "SENT",
+                },
+              });
+              if (existingExecution) {
+                console.warn(
+                  `[execute-workflow] EMAIL_ATTENDEES step ${workflowStep.id} already sent for workshop ${workshop.id}. Skipping duplicate.`
+                );
+                stepsExecuted++;
+                return;
+              }
+
               // Fetch all registrations for this workshop
               const registrations = await db.registration.findMany({
                 where: { workshopId: workshop.id, status: "REGISTERED" },
@@ -207,7 +224,15 @@ export const executeWorkflow = inngest.createFunction(
                   })
                 : [];
 
+              const sentEmails = new Set<string>();
               for (const reg of registrations) {
+                const normalizedEmail = reg.email.toLowerCase();
+                if (sentEmails.has(normalizedEmail)) {
+                  console.warn(`[execute-workflow] Skipping duplicate email ${reg.email} for step ${workflowStep.id}`);
+                  continue;
+                }
+                sentEmails.add(normalizedEmail);
+
                 const personalContext: WorkflowContext = {
                   ...baseContext,
                   registrantName: `${reg.firstName} ${reg.lastName}`,

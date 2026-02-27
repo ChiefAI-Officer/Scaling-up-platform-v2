@@ -8,7 +8,9 @@ function getStripeClient(): Stripe {
     if (!process.env.STRIPE_SECRET_KEY) {
       throw new Error("STRIPE_SECRET_KEY is not set");
     }
-    stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY);
+    stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      timeout: 15_000, // 15-second timeout for all Stripe API calls
+    });
   }
   return stripeClient;
 }
@@ -160,6 +162,9 @@ export function constructWebhookEvent(
   signature: string
 ): Stripe.Event {
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("STRIPE_WEBHOOK_SECRET is not configured. Refusing to process webhook in production without signature verification.");
+    }
     throw new Error("STRIPE_WEBHOOK_SECRET is not set");
   }
 
