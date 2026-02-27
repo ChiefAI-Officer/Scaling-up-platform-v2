@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | February 27, 2026 — Phase 1 Production Hardening (next sprint) |
+| **Last Updated** | February 27, 2026 — Fixed dashboard crash (missing migrations) + header nav layout |
 
 ## Current Status
 
@@ -471,12 +471,14 @@ Secrets are in local `.env` (gitignored) and Vercel dashboard. Key variables:
 - **Vercel env vars** need a redeploy to take effect
 - **Workshop status spelling**: Workshop uses "CANCELED" (American); Registration/PageStatus uses "CANCELLED" (British) — different domains, intentional
 - **workshopType is optional**: Made nullable in Sprint 0 (JV-16). Always use `workshop.workshopType?.` with optional chaining.
-- **No pending migrations**: All schema changes applied via `prisma db push`. Run `npx prisma db seed` after fresh DB setup to populate Categories and PricingTiers.
+- **Build script runs migrations**: `prisma migrate deploy` runs automatically during `npm run build` (added Feb 27). Never remove this — without it, new schema columns cause runtime crashes on Vercel because the Prisma client expects columns the DB doesn't have yet.
+- **Dashboard canonical route is `/admin/dashboard`**: The `/dashboard` route redirects to `/admin/dashboard`. Do NOT create pages at `/dashboard` directly.
 - **File uploads**: Filenames are sanitized (path separators, null bytes, `..` stripped) before Vercel Blob storage
 - **File deletion**: Ownership verified — only the uploader or ADMIN/STAFF can delete files
 - **Survey submission**: Public endpoint rate-limited at 20 req/min per IP
 - **SMTP transport**: All email sending goes through `lib/smtp-transport.ts` — do NOT create new nodemailer transports elsewhere
 - **Admin layout unified**: All admin pages are under `(dashboard)/admin/` — the standalone `/admin/` layout was removed in Feb 26 cleanup
+- **Nav bar has 12 items**: At capacity. Always use `whitespace-nowrap` on nav links. Desktop nav shows at `lg` (1024px+); mobile hamburger shows below `lg`. Email shows at `xl` (1280px+) only.
 - **Dead code removed (Feb 26)**: animations.ts, cache.ts, api-handler.ts, logger.ts, landing-page-auto-populate.ts, workshop-generator.ts — all deleted, zero imports
 - **Approval engine emits Inngest events**: `workshop/approved` event emitted on approval (added in Sprint 5) — triggers auto-build function
 - **Bio page CTA toggle exists**: Bio page editor already has "Show CTA button on bio page" checkbox (discovered via video analysis)

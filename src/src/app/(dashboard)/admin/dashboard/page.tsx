@@ -104,13 +104,13 @@ export default async function AdminDashboardPage() {
     ...recentApprovals.map((item) => ({
       id: `approval-${item.id}`,
       type: "APPROVAL" as const,
-      description: `${item.type.replace(/_/g, " ")} request from ${item.coach.firstName} ${item.coach.lastName}`,
+      description: `${item.type.replace(/_/g, " ")} request from ${item.coach?.firstName ?? "Unknown"} ${item.coach?.lastName ?? "Coach"}`,
       timestamp: item.requestedAt,
     })),
     ...recentRegistrations.map((item) => ({
       id: `registration-${item.id}`,
       type: "REGISTRATION" as const,
-      description: `New registration for ${item.workshop.title}`,
+      description: `New registration for ${item.workshop?.title ?? "Unknown Workshop"}`,
       timestamp: item.createdAt,
     })),
     ...recentWorkshops.map((item) => ({

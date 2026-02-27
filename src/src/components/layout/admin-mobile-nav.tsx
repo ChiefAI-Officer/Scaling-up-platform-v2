@@ -13,7 +13,7 @@ export function AdminMobileNav({ links, email }: AdminMobileNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="md:hidden">
+    <div className="lg:hidden">
       <button
         onClick={() => setOpen(!open)}
         className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent"
@@ -48,7 +48,7 @@ export function AdminMobileNav({ links, email }: AdminMobileNavProps) {
               <Link
                 href="/api/auth/signout"
                 onClick={() => setOpen(false)}
-                className="block px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 text-sm font-medium"
+                className="block px-3 py-2 rounded-lg text-destructive hover:bg-destructive/10 text-sm font-medium"
               >
                 Sign Out
               </Link>

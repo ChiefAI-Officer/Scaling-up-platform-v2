@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 const navLinks = [
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/workshops", label: "All Workshops" },
   { href: "/bio", label: "Bio" },
   { href: "/templates", label: "Templates" },
@@ -54,25 +54,25 @@ export default async function DashboardLayout({
         role="navigation"
         aria-label="Main navigation"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
-            <div className="flex items-center">
+            <div className="flex items-center min-w-0">
               <div className="flex-shrink-0 flex items-center">
                 <Link
-                  href="/dashboard"
-                  className="text-xl font-bold text-primary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded"
+                  href="/admin/dashboard"
+                  className="text-xl font-bold text-primary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded whitespace-nowrap"
                   aria-label="Scaling Up - Go to Dashboard"
                 >
                   Scaling Up
                 </Link>
               </div>
               {/* Desktop nav */}
-              <div className="hidden md:ml-8 md:flex md:space-x-1" role="menubar">
+              <div className="hidden lg:ml-6 lg:flex lg:space-x-0.5 overflow-x-auto" role="menubar">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                     role="menuitem"
                   >
                     {link.label}
@@ -80,30 +80,30 @@ export default async function DashboardLayout({
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="hidden sm:inline text-sm text-muted-foreground" aria-label="Logged in user">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="hidden xl:inline text-sm text-muted-foreground max-w-[180px] truncate" aria-label="Logged in user">
                 {session.user.email}
               </span>
               <ThemeToggle />
-              <Separator orientation="vertical" className="hidden md:block h-5" />
-              <div className="hidden md:flex items-center gap-3">
+              <Separator orientation="vertical" className="hidden lg:block h-5" />
+              <div className="hidden lg:flex items-center gap-2">
                 <Link
                   href="/admin/settings"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap"
                 >
                   Settings
                 </Link>
                 <Link
                   href="/api/auth/signout"
-                  className="text-sm text-destructive hover:text-destructive/80 transition-colors duration-200"
+                  className="text-sm text-destructive hover:text-destructive/80 transition-colors duration-200 whitespace-nowrap"
                 >
                   Sign Out
                 </Link>
               </div>
-              <div className="hidden md:flex h-8 w-8 rounded-full bg-primary/10 text-primary items-center justify-center text-sm font-semibold">
+              <div className="hidden lg:flex h-8 w-8 rounded-full bg-primary/10 text-primary items-center justify-center text-sm font-semibold flex-shrink-0">
                 {userInitial}
               </div>
-              {/* Mobile hamburger */}
+              {/* Mobile/tablet hamburger */}
               <AdminMobileNav links={navLinks} email={session.user.email || ""} />
             </div>
           </div>
