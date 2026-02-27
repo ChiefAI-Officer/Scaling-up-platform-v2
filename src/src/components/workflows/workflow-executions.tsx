@@ -78,14 +78,14 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+      <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">
         {error}
       </div>
     );
@@ -113,11 +113,11 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
       <div className="flex items-center justify-between">
         <div className="flex gap-4">
           <div className="text-center">
-            <p className="text-lg font-bold text-green-600">{sent}</p>
+            <p className="text-lg font-bold text-success">{sent}</p>
             <p className="text-xs text-muted-foreground">Sent</p>
           </div>
           <div className="text-center">
-            <p className="text-lg font-bold text-amber-600">{scheduled}</p>
+            <p className="text-lg font-bold text-warning">{scheduled}</p>
             <p className="text-xs text-muted-foreground">Scheduled</p>
           </div>
           <div className="text-center">
@@ -125,7 +125,7 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
             <p className="text-xs text-muted-foreground">Pending</p>
           </div>
           <div className="text-center">
-            <p className="text-lg font-bold text-red-600">{failed}</p>
+            <p className="text-lg font-bold text-destructive">{failed}</p>
             <p className="text-xs text-muted-foreground">Failed</p>
           </div>
           {skipped > 0 && (
@@ -137,7 +137,7 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
         </div>
         <button
           onClick={fetchExecutions}
-          className="text-sm text-blue-600 hover:text-blue-700 px-3 py-1.5 border rounded-md"
+          className="text-sm text-primary hover:text-primary/80 px-3 py-1.5 border rounded-md"
         >
           Refresh
         </button>
@@ -155,7 +155,7 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
               {group.executions.length} step{group.executions.length !== 1 ? "s" : ""}
             </span>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border">
             {group.executions
               .sort((a, b) => a.step.sortOrder - b.step.sortOrder)
               .map((exec) => {
@@ -174,7 +174,7 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
                           )}
                         </p>
                         {exec.scheduledFor && exec.status === "SCHEDULED" && (
-                          <p className="text-xs text-amber-600">
+                          <p className="text-xs text-warning">
                             Scheduled: {new Date(exec.scheduledFor).toLocaleString()}
                           </p>
                         )}
@@ -184,7 +184,7 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
                           </p>
                         )}
                         {exec.errorMessage && (
-                          <p className="text-xs text-red-500 truncate">{exec.errorMessage}</p>
+                          <p className="text-xs text-destructive truncate">{exec.errorMessage}</p>
                         )}
                       </div>
                     </div>

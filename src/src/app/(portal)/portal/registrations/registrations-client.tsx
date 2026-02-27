@@ -261,8 +261,8 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
         <div
           className={`rounded-md border px-4 py-3 text-sm ${
             feedback.type === "success"
-              ? "border-green-200 bg-green-50 text-green-700"
-              : "border-red-200 bg-red-50 text-red-700"
+              ? "border-success/20 bg-success/10 text-success"
+              : "border-destructive/20 bg-destructive/10 text-destructive"
           }`}
         >
           {feedback.message}
@@ -280,7 +280,7 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
           id="workshopFilter"
           value={selectedWorkshopId}
           onChange={(event) => setSelectedWorkshopId(event.target.value)}
-          className="rounded-md border border-border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
         >
           <option value="all">All workshops</option>
           {workshops.map((workshop) => (
@@ -343,7 +343,7 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
                         checked={registration.attended}
                         onChange={() => handleToggleAttendance(registration)}
                         disabled={togglingAttendanceId === registration.id}
-                        className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                         aria-label={`Mark ${registration.firstName} ${registration.lastName} as ${registration.attended ? "not attended" : "attended"}`}
                       />
                     )}

@@ -179,12 +179,12 @@ export default function CoachBioEditorPage() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <div className="rounded-md border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
           {success}
         </div>
       )}
@@ -277,17 +277,17 @@ export default function CoachBioEditorPage() {
           <CardContent>
             <div className="rounded-lg border bg-card">
               <div className="p-8 text-center">
-                <h2 className="text-sm font-bold tracking-wide text-purple-700 mb-6">
+                <h2 className="text-sm font-bold tracking-wide text-primary mb-6">
                   SCALING UP COACHES
                 </h2>
                 {formData.profileImageUrl ? (
                   <img
                     src={formData.profileImageUrl}
                     alt={coachFullName || "Coach"}
-                    className="mx-auto h-28 w-28 rounded-full object-cover border-4 border-purple-100"
+                    className="mx-auto h-28 w-28 rounded-full object-cover border-4 border-primary/20"
                   />
                 ) : (
-                  <div className="mx-auto h-28 w-28 rounded-full bg-gray-200 flex items-center justify-center text-muted-foreground">
+                  <div className="mx-auto h-28 w-28 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                     No Image
                   </div>
                 )}

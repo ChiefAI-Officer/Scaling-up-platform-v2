@@ -38,10 +38,10 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
           <div className="fixed inset-0 bg-black/50" onClick={() => setOpen(false)} />
 
           {/* Slide-out panel */}
-          <div className="relative w-72 bg-gray-900 text-white flex flex-col">
-            <div className="px-6 h-16 flex items-center justify-between border-b border-gray-800">
+          <div className="relative w-72 bg-sidebar text-sidebar-foreground flex flex-col">
+            <div className="px-6 h-16 flex items-center justify-between border-b border-sidebar-border">
               <span className="text-lg font-bold">Scaling Up Coach</span>
-              <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-white">
+              <button onClick={() => setOpen(false)} className="text-sidebar-muted hover:text-sidebar-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -54,7 +54,7 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
                     key={link.href}
                     href={link.href}
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-gray-300 hover:text-white hover:bg-gray-800 rounded-lg text-sm font-medium"
+                    className="flex items-center gap-3 px-4 py-2.5 text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-border rounded-lg text-sm font-medium"
                   >
                     <Icon className="w-5 h-5" />
                     {link.label}
@@ -63,9 +63,9 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
               })}
             </nav>
 
-            <div className="p-4 border-t border-gray-800">
+            <div className="p-4 border-t border-sidebar-border">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-medium uppercase">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-sm font-medium uppercase">
                   {coachName.charAt(0)}
                 </div>
                 <p className="text-sm font-medium truncate">{coachName}</p>
@@ -73,7 +73,7 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
               <Link
                 href="/api/auth/signout"
                 onClick={() => setOpen(false)}
-                className="mt-3 block text-center text-sm text-red-400 hover:text-red-300"
+                className="mt-3 block text-center text-sm text-destructive hover:text-destructive/80"
               >
                 Sign Out
               </Link>

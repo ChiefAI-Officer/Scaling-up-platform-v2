@@ -45,14 +45,14 @@ export function generateSlug(title: string, id?: string): string {
 // JV-02: Jeff Verdun's 6 workshop stages
 export function getWorkshopStatusColor(status: string): string {
   const colors: Record<string, string> = {
-    REQUESTED: "bg-yellow-100 text-yellow-800",
-    AWAITING_APPROVAL: "bg-blue-100 text-blue-800",
-    PRE_EVENT: "bg-green-100 text-green-800",
-    POST_EVENT: "bg-purple-100 text-purple-800",
-    COMPLETED: "bg-slate-100 text-slate-800",
-    CANCELED: "bg-red-100 text-red-800",
+    REQUESTED: "bg-status-requested/10 text-status-requested",
+    AWAITING_APPROVAL: "bg-status-awaiting/10 text-status-awaiting",
+    PRE_EVENT: "bg-status-active/10 text-status-active",
+    POST_EVENT: "bg-status-post/10 text-status-post",
+    COMPLETED: "bg-muted text-status-completed",
+    CANCELED: "bg-status-canceled/10 text-status-canceled",
   };
-  return colors[status] || "bg-gray-100 text-gray-800";
+  return colors[status] || "bg-muted text-muted-foreground";
 }
 
 export function getWorkshopStatusLabel(status: string): string {

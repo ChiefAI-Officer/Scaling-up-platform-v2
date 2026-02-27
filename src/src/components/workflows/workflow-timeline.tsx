@@ -35,11 +35,11 @@ interface WorkflowTimelineProps {
 }
 
 const STEP_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  EMAIL_ATTENDEES: { bg: "bg-blue-100", border: "border-blue-400", text: "text-blue-700" },
-  EMAIL_COACH: { bg: "bg-purple-100", border: "border-purple-400", text: "text-purple-700" },
-  EMAIL_STAFF: { bg: "bg-amber-100", border: "border-amber-400", text: "text-amber-700" },
-  EMAIL_CUSTOM: { bg: "bg-teal-100", border: "border-teal-400", text: "text-teal-700" },
-  NOTIFICATION: { bg: "bg-muted", border: "border-gray-400", text: "text-foreground" },
+  EMAIL_ATTENDEES: { bg: "bg-primary/10", border: "border-primary/40", text: "text-primary" },
+  EMAIL_COACH: { bg: "bg-status-post/10", border: "border-status-post/40", text: "text-status-post" },
+  EMAIL_STAFF: { bg: "bg-warning/10", border: "border-warning/40", text: "text-warning" },
+  EMAIL_CUSTOM: { bg: "bg-success/10", border: "border-success/40", text: "text-success" },
+  NOTIFICATION: { bg: "bg-muted", border: "border-muted-foreground/40", text: "text-foreground" },
 };
 
 export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
@@ -86,7 +86,7 @@ export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
       {/* Timeline visualization */}
       <div className="relative pt-8 pb-16 px-4">
         {/* Horizontal line */}
-        <div className="absolute top-[50%] left-4 right-4 h-0.5 bg-gray-200" />
+        <div className="absolute top-[50%] left-4 right-4 h-0.5 bg-border" />
 
         {/* Event date marker */}
         <div
@@ -94,11 +94,11 @@ export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
           style={{ left: `${eventPosition}%` }}
         >
           <div className="flex flex-col items-center">
-            <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider mb-1 whitespace-nowrap">
+            <span className="text-[10px] font-bold text-destructive uppercase tracking-wider mb-1 whitespace-nowrap">
               Event Day
             </span>
-            <div className="w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-md" />
-            <div className="w-0.5 h-4 bg-red-300" />
+            <div className="w-4 h-4 bg-destructive rounded-full border-2 border-white shadow-md" />
+            <div className="w-0.5 h-4 bg-destructive/40" />
           </div>
         </div>
 
@@ -152,7 +152,7 @@ export function WorkflowTimeline({ steps }: WorkflowTimelineProps) {
           </div>
         ))}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+          <div className="w-2.5 h-2.5 rounded-full bg-destructive" />
           Event Day
         </div>
       </div>

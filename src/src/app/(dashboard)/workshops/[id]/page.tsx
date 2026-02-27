@@ -130,7 +130,7 @@ export default async function WorkshopDetailPage({
               {getWorkshopStatusLabel(workshop.status)}
             </Badge>
             {isLocked && (
-              <Badge className="bg-red-100 text-red-800" variant="secondary">
+              <Badge className="bg-destructive/10 text-destructive" variant="secondary">
                 Locked
               </Badge>
             )}
@@ -173,7 +173,7 @@ export default async function WorkshopDetailPage({
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Revenue</p>
-              <p className="text-xl font-semibold text-green-600">
+              <p className="text-xl font-semibold text-success">
                 {formatCurrency(totalRevenue)}
               </p>
               <p className="text-muted-foreground">{completedPayments.length} paid</p>

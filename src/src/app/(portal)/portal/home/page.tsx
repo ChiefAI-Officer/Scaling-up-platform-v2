@@ -70,7 +70,7 @@ export default async function CoachDashboardPage() {
           </h2>
           <Link
             href="/portal/request"
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
           >
             + Request New Workshop
           </Link>
@@ -114,7 +114,7 @@ export default async function CoachDashboardPage() {
         <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
           <div className="px-6 py-4 border-b border-border flex justify-between items-center">
             <h3 className="text-lg font-semibold text-foreground">Upcoming Workshops</h3>
-            <Link href="/portal/workshops" className="text-blue-600 hover:text-blue-700 text-sm">
+            <Link href="/portal/workshops" className="text-primary hover:text-primary/80 text-sm">
               View All →
             </Link>
           </div>
@@ -124,13 +124,13 @@ export default async function CoachDashboardPage() {
               <p className="mb-4">No upcoming workshops scheduled.</p>
               <Link
                 href="/portal/request"
-                className="text-blue-600 hover:text-blue-700 font-medium"
+                className="text-primary hover:text-primary/80 font-medium"
               >
                 Request your first workshop →
               </Link>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-border">
               {upcomingWorkshops.map((workshop) => (
                 <li key={workshop.id} className="px-6 py-4 hover:bg-accent transition-colors">
                   <div className="flex justify-between items-center">
@@ -148,7 +148,7 @@ export default async function CoachDashboardPage() {
                     </div>
                     <div className="text-right">
                       {/* Sprint 3: Only show attendee count, NOT revenue */}
-                      <div className="text-lg font-semibold text-blue-600">
+                      <div className="text-lg font-semibold text-primary">
                         {workshop._count.registrations}
                         <span className="text-sm font-normal text-muted-foreground ml-1">
                           registrations
@@ -167,21 +167,21 @@ export default async function CoachDashboardPage() {
       {/* Pending Follow-Ups Alert */}
       {stats.pendingFollowUps > 0 && (
         <FadeUp delay={0.25}>
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="text-2xl">⚠️</span>
               <div>
-                <p className="font-medium text-orange-800">
+                <p className="font-medium text-warning">
                   You have {stats.pendingFollowUps} pending 90-day follow-up report{stats.pendingFollowUps > 1 ? "s" : ""}.
                 </p>
-                <p className="text-sm text-orange-600">
+                <p className="text-sm text-warning/80">
                   Please submit your follow-up reports to maintain your certification status.
                 </p>
               </div>
             </div>
             <Link
               href="/portal/follow-up"
-              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors whitespace-nowrap"
+              className="bg-warning text-primary-foreground px-4 py-2 rounded-lg hover:bg-warning/90 transition-colors whitespace-nowrap"
             >
               Submit Reports
             </Link>
@@ -195,10 +195,10 @@ export default async function CoachDashboardPage() {
 // Helper Components
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   const colors: Record<string, string> = {
-    blue: "text-blue-600",
-    green: "text-green-600",
+    blue: "text-primary",
+    green: "text-success",
     gray: "text-muted-foreground",
-    orange: "text-orange-600",
+    orange: "text-warning",
   };
 
   return (

@@ -159,7 +159,7 @@ export default async function CoachSurveyResultsPage({
                                 <div key={label} className="flex items-center gap-2 text-sm">
                                   <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
                                     <div
-                                      className="bg-blue-600 h-full rounded-full"
+                                      className="bg-primary h-full rounded-full"
                                       style={{
                                         width: `${allAnswers.length > 0 ? (count / allAnswers.length) * 100 : 0}%`,
                                       }}

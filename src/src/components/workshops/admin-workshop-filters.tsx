@@ -56,13 +56,13 @@ export function AdminWorkshopFilters() {
                     value={searchValue}
                     onChange={(e) => setSearchValue(e.target.value)}
                     onBlur={() => updateParams("search", searchValue.trim())}
-                    className="w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 />
             </form>
             <select
                 value={currentStatus}
                 onChange={(e) => updateParams("status", e.target.value)}
-                className="px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
                 {STATUS_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>

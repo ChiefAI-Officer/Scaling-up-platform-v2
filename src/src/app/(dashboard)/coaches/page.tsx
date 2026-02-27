@@ -25,11 +25,11 @@ async function getCoaches() {
 function getCertificationStatusColor(status: string) {
   switch (status) {
     case "ACTIVE":
-      return "bg-green-100 text-green-800";
+      return "bg-success/10 text-success";
     case "PENDING":
-      return "bg-yellow-100 text-yellow-800";
+      return "bg-warning/10 text-warning";
     case "EXPIRED":
-      return "bg-red-100 text-red-800";
+      return "bg-destructive/10 text-destructive";
     case "SUSPENDED":
       return "bg-muted text-foreground";
     default:
@@ -40,13 +40,13 @@ function getCertificationStatusColor(status: string) {
 function getPaymentStatusColor(status: string) {
   switch (status) {
     case "CURRENT":
-      return "bg-green-100 text-green-800";
+      return "bg-success/10 text-success";
     case "PENDING":
-      return "bg-yellow-100 text-yellow-800";
+      return "bg-warning/10 text-warning";
     case "OVERDUE":
-      return "bg-red-100 text-red-800";
+      return "bg-destructive/10 text-destructive";
     case "GRACE_PERIOD":
-      return "bg-orange-100 text-orange-800";
+      return "bg-warning/10 text-warning";
     default:
       return "bg-muted text-foreground";
   }
@@ -65,7 +65,7 @@ export default async function CoachesPage() {
           </div>
           <Link
             href="/coaches/new"
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
           >
             + Add Coach
           </Link>
@@ -86,7 +86,7 @@ export default async function CoachesPage() {
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Active</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-2xl font-bold text-success">
                 {coaches.filter((c) => c.certificationStatus === "ACTIVE").length}
               </p>
             </CardContent>
@@ -96,7 +96,7 @@ export default async function CoachesPage() {
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600">
+              <p className="text-2xl font-bold text-warning">
                 {coaches.filter((c) => c.certificationStatus === "PENDING").length}
               </p>
             </CardContent>
@@ -106,7 +106,7 @@ export default async function CoachesPage() {
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Payment Overdue</p>
-              <p className="text-2xl font-bold text-red-600">
+              <p className="text-2xl font-bold text-destructive">
                 {coaches.filter((c) => c.paymentStatus === "OVERDUE").length}
               </p>
             </CardContent>
@@ -124,7 +124,7 @@ export default async function CoachesPage() {
           {coaches.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
               No coaches yet.{" "}
-              <Link href="/coaches/new" className="text-blue-600 hover:underline">
+              <Link href="/coaches/new" className="text-primary hover:underline">
                 Add your first coach
               </Link>
             </p>
@@ -155,8 +155,8 @@ export default async function CoachesPage() {
                     <tr key={coach.id} className="hover:bg-accent">
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                            <span className="text-sm font-medium text-blue-600">
+                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-medium text-primary">
                               {coach.firstName[0]}
                               {coach.lastName[0]}
                             </span>
@@ -164,7 +164,7 @@ export default async function CoachesPage() {
                           <div>
                             <Link
                               href={`/coaches/${coach.id}`}
-                              className="font-medium text-foreground hover:text-blue-600"
+                              className="font-medium text-foreground hover:text-primary"
                             >
                               {coach.firstName} {coach.lastName}
                             </Link>

@@ -122,7 +122,7 @@ export function Step1Details() {
                     />
                     <div className="flex justify-between">
                         {touched.title && !formData.title && (
-                            <p className="text-xs text-red-500">Title is required</p>
+                            <p className="text-xs text-destructive">Title is required</p>
                         )}
                         <p className="text-xs text-muted-foreground ml-auto">{formData.title.length}/120</p>
                     </div>
@@ -141,7 +141,7 @@ export function Step1Details() {
                     />
                     <div className="flex justify-between">
                         {touched.description && !formData.description && (
-                            <p className="text-xs text-red-500">Description is required</p>
+                            <p className="text-xs text-destructive">Description is required</p>
                         )}
                         <p className="text-xs text-muted-foreground ml-auto">{formData.description.length}/500</p>
                     </div>

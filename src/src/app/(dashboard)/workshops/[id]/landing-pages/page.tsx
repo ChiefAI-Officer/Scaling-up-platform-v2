@@ -193,7 +193,7 @@ export default function WorkshopEditorPage() {
     if (error || !workshop) {
         return (
             <div className="max-w-4xl mx-auto">
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg">
                     {error || "Workshop not found"}
                 </div>
             </div>
@@ -343,7 +343,7 @@ export default function WorkshopEditorPage() {
                             onClick={() => { setActiveTab(tab.value); setCopyTarget(null); setCopyMessage(null); }}
                             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                                 activeTab === tab.value
-                                    ? "border-blue-600 text-blue-600"
+                                    ? "border-primary text-primary"
                                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                             }`}
                         >
@@ -410,8 +410,8 @@ export default function WorkshopEditorPage() {
                         {copyMessage && (
                             <div className={`text-sm px-3 py-2 rounded-md border ${
                                 copyMessage.includes("success")
-                                    ? "bg-green-50 border-green-200 text-green-700"
-                                    : "bg-red-50 border-red-200 text-red-700"
+                                    ? "bg-success/10 border-success/20 text-success"
+                                    : "bg-destructive/10 border-destructive/20 text-destructive"
                             }`}>
                                 {copyMessage}
                             </div>

@@ -7,9 +7,9 @@ export default function UnauthorizedPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted py-12 px-4">
       <Card className="w-full max-w-md text-center">
         <CardHeader>
-          <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+          <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
             <svg
-              className="w-8 h-8 text-red-600"
+              className="w-8 h-8 text-destructive"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

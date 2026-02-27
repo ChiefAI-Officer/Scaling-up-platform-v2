@@ -21,9 +21,9 @@ export default function Error({ error, reset }: ErrorProps) {
       aria-live="assertive"
     >
       <div className="max-w-md w-full text-center">
-        <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+        <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-6">
           <svg
-            className="w-8 h-8 text-red-600"
+            className="w-8 h-8 text-destructive"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -55,14 +55,14 @@ export default function Error({ error, reset }: ErrorProps) {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Button
             onClick={reset}
-            className="focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             Try again
           </Button>
           <Button
             variant="outline"
             onClick={() => (window.location.href = "/")}
-            className="focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             Go to home
           </Button>

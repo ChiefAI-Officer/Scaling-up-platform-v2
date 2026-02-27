@@ -60,14 +60,14 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                         placeholder="Search workshops..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                 </div>
                 <button
                     onClick={() => setShowFilters(!showFilters)}
                     className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-colors ${
                         showFilters || statusFilter
-                            ? "border-blue-500 text-blue-600 bg-blue-50"
+                            ? "border-primary text-primary bg-primary/10"
                             : "border-border text-foreground hover:bg-accent"
                     }`}
                 >
@@ -91,7 +91,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-3 py-1.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="px-3 py-1.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         >
                             {STATUS_OPTIONS.map((opt) => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -121,7 +121,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-border">
                         {filtered.length === 0 ? (
                             <tr>
                                 <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
@@ -153,16 +153,16 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             {isValidated ? (
-                                                <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" />
+                                                <CheckCircle2 className="w-5 h-5 text-success mx-auto" />
                                             ) : (
-                                                <Circle className="w-5 h-5 text-gray-300 mx-auto" />
+                                                <Circle className="w-5 h-5 text-muted-foreground mx-auto" />
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             {isApproved ? (
-                                                <CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" />
+                                                <CheckCircle2 className="w-5 h-5 text-success mx-auto" />
                                             ) : (
-                                                <Circle className="w-5 h-5 text-gray-300 mx-auto" />
+                                                <Circle className="w-5 h-5 text-muted-foreground mx-auto" />
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
@@ -171,7 +171,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                                         <td className="px-6 py-4 text-right">
                                             <Link
                                                 href={`/portal/workshops/${workshop.id}`}
-                                                className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                                                className="text-sm font-medium text-primary hover:text-primary/80"
                                             >
                                                 Manage
                                             </Link>

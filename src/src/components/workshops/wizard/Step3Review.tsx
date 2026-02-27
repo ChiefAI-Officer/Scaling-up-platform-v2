@@ -159,7 +159,7 @@ export function Step3Review() {
             </div>
 
             {/* JV-27: Terms and Conditions */}
-            <div className="flex items-start space-x-3 p-4 border border-border rounded-lg bg-blue-50/50">
+            <div className="flex items-start space-x-3 p-4 border border-border rounded-lg bg-primary/5">
                 <Checkbox
                     id="termsAccepted"
                     checked={formData.termsAccepted}
@@ -185,7 +185,7 @@ export function Step3Review() {
                 <Button
                     onClick={submitWorkshop}
                     disabled={!formData.termsAccepted || isSaving}
-                    className="bg-blue-600 hover:bg-blue-700 px-8 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-primary hover:bg-primary/90 px-8 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {isSaving ? "Saving..." : "Submit Workshop Request"}
                 </Button>

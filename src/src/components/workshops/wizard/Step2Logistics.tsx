@@ -68,7 +68,7 @@ export function Step2Logistics() {
                             onClick={() => updateField("format", option.value)}
                             className={`flex flex-col items-center gap-1 p-4 rounded-lg border-2 transition-colors ${
                                 formData.format === option.value
-                                    ? "border-blue-500 bg-blue-50 text-blue-700"
+                                    ? "border-primary bg-primary/10 text-primary"
                                     : "border-border hover:border-border text-muted-foreground"
                             }`}
                         >
@@ -90,7 +90,7 @@ export function Step2Logistics() {
                         onChange={(e) => updateField("eventDate", e.target.value)}
                     />
                     {dateIsTooSoon && (
-                        <p className="text-xs text-amber-600">
+                        <p className="text-xs text-warning">
                             Events must be at least 14 days out. Earliest: {new Date(minDate).toLocaleDateString()}
                         </p>
                     )}
@@ -179,7 +179,7 @@ export function Step2Logistics() {
                             id="virtualPlatform"
                             value={formData.virtualPlatform}
                             onChange={(e) => updateField("virtualPlatform", e.target.value)}
-                            className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                            className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary"
                         >
                             <option value="">Select a platform...</option>
                             <option value="zoom">Zoom</option>
@@ -200,7 +200,7 @@ export function Step2Logistics() {
                             placeholder="https://zoom.us/j/..."
                         />
                         {virtualLinkInvalid && (
-                            <p className="text-xs text-red-500">Please enter a valid URL (e.g., https://zoom.us/j/...)</p>
+                            <p className="text-xs text-destructive">Please enter a valid URL (e.g., https://zoom.us/j/...)</p>
                         )}
                         <p className="text-xs text-muted-foreground">You can add this later if you don&apos;t have it yet.</p>
                     </div>

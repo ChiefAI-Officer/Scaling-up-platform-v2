@@ -37,6 +37,20 @@
   --info: 199 89% 48%;
   --info-foreground: 0 0% 100%;
 
+  /* --- Workshop status tokens --- */
+  --status-requested: 38 92% 50%;
+  --status-awaiting: 224 76% 48%;
+  --status-active: 160 84% 39%;
+  --status-post: 271 81% 56%;
+  --status-completed: 215.4 16.3% 46.9%;
+  --status-canceled: 0 84.2% 60.2%;
+
+  /* --- Coach portal sidebar --- */
+  --sidebar: 222.2 84% 4.9%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-muted: 215 20.2% 65.1%;
+  --sidebar-border: 217.2 32.6% 17.5%;
+
   /* --- Shadow depth scale --- */
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
@@ -82,6 +96,20 @@
   --info: 199 89% 48%;
   --info-foreground: 0 0% 100%;
 
+  /* --- Workshop status tokens (dark mode) --- */
+  --status-requested: 38 92% 50%;
+  --status-awaiting: 224 76% 58%;
+  --status-active: 160 84% 45%;
+  --status-post: 271 81% 65%;
+  --status-completed: 215 20.2% 65.1%;
+  --status-canceled: 0 62.8% 50%;
+
+  /* --- Coach portal sidebar (dark = same as light, it's always dark) --- */
+  --sidebar: 222.2 84% 4.9%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-muted: 215 20.2% 65.1%;
+  --sidebar-border: 217.2 32.6% 17.5%;
+
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.15);
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.15);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.25), 0 2px 4px -2px rgb(0 0 0 / 0.15);
@@ -113,6 +141,16 @@
   --color-warning-foreground: hsl(var(--warning-foreground));
   --color-info: hsl(var(--info));
   --color-info-foreground: hsl(var(--info-foreground));
+  --color-status-requested: hsl(var(--status-requested));
+  --color-status-awaiting: hsl(var(--status-awaiting));
+  --color-status-active: hsl(var(--status-active));
+  --color-status-post: hsl(var(--status-post));
+  --color-status-completed: hsl(var(--status-completed));
+  --color-status-canceled: hsl(var(--status-canceled));
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-muted: hsl(var(--sidebar-muted));
+  --color-sidebar-border: hsl(var(--sidebar-border));
   --font-sans: var(--font-plus-jakarta);
   --font-mono: var(--font-geist-mono);
 }

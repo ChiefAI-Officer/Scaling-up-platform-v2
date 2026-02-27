@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | February 27, 2026 — Fixed dashboard crash (missing migrations) + header nav layout |
+| **Last Updated** | February 27, 2026 — Design token consolidation + hardcoded color sweep + security S1-S8 |
 
 ## Current Status
 
@@ -87,12 +87,33 @@ the full workshop lifecycle from request through post-event follow-up.
 - npm audit fix: 1 fixed, 3 low-severity cookie vulns deferred (next-auth breaking change)
 - All verified: 0 type errors, 226/226 tests pass, build succeeds
 
-**Phase 1: Production Hardening (Feb 27, 2026)** — **NEXT SPRINT**:
-- 8 security fixes (S1-S8): password reset nonce, webhook secret enforcement, survey access control, error handling, API timeouts, auto-build idempotency, email dedup
-- 10 critical test files to write (T1-T10): auto-build, registration, workflow execution, status transitions, surveys, auth, files, resubmit, completion summary, typeform
-- Manual E2E verification by GTM engineer (47 manual checks + 19 end-to-end scenarios)
-- Target: ~35-40% test coverage (up from 11.15%), all 8 security issues closed
+**Security Hardening S1-S8 (Feb 27, 2026)** — Complete (commit `3a685ca`):
+- S1: Nonce added to password reset tokens (`lib/password-reset.ts`)
+- S2: Webhook secret enforcement in production (Typeform + Stripe)
+- S3: Question-to-survey template validation (`lib/survey-service.ts`)
+- S4: JSON.parse try-catch in forgot-password route
+- S5: Error handlers on 3 API routes (workflow assign, survey submit, survey endpoint)
+- S6: 15-second AbortController timeouts on external APIs (Stripe, Circle, HubSpot)
+- S7: Auto-build idempotency guard (prevents duplicate builds on Inngest retry)
+- S8: Email attendee deduplication via Set in workflow execution
+
+**E2E Test Coverage (Feb 27, 2026)** — In progress:
+- 8 Playwright spec files covering 40+ automatable checks across 12 rounds
+- 2 critical Inngest/API test suites: auto-build (15 tests), registration (29 tests)
+- 28 test suites / 269 tests total (up from 225)
+- 12 remaining manual checks require email inbox / external service access
 - Plans: `plans/PLATFORM_STATE_ASSESSMENT_FEB27_2026.md` + `plans/V_AND_V_TASK_TRACKER.md`
+
+**Design Token Consolidation + Color Sweep (Feb 27, 2026)** — Complete:
+- Single source of truth: `globals.css` (`brand-tokens.css` deleted — had zero imports)
+- Added `--status-*` tokens (requested/awaiting/active/post/completed/canceled) with light+dark
+- Added `--sidebar-*` tokens (sidebar/foreground/muted/border) for coach portal
+- Swept ~1,087 hardcoded Tailwind colors → semantic tokens across ~80 files
+- Foundation components fixed: utils, status-pill, badge, alert, confirmation-modal, checkbox
+- Workflow/survey components fixed: timeline, editor, executions, template-editor, template-toggle
+- Coach sidebar fixed: portal layout + mobile nav use `--sidebar-*` tokens
+- Bulk page sweep: dashboard, portal, public, components all tokenized
+- `MASTER.md` updated to match actual implementation
 
 **Feb 25 Call Revisions (Feb 26-27, 2026)** — **ALL 7 SPRINTS COMPLETE** (65/65 tasks):
 - Source: 64-min walkthrough by Jeff Verdun + Suzanne Krygier (Feb 24, 2026)
@@ -483,6 +504,11 @@ Secrets are in local `.env` (gitignored) and Vercel dashboard. Key variables:
 - **Approval engine emits Inngest events**: `workshop/approved` event emitted on approval (added in Sprint 5) — triggers auto-build function
 - **Bio page CTA toggle exists**: Bio page editor already has "Show CTA button on bio page" checkbox (discovered via video analysis)
 - **npm audit**: 3 low-severity `cookie` vulns via `@auth/core` → next-auth. Fix requires next-auth downgrade — deferred
+- **Design tokens live in globals.css only**: `brand-tokens.css` was deleted (zero imports). `MASTER.md` is reference docs only.
+- **Never use hardcoded Tailwind colors for semantic states**: Use `text-destructive` not `text-red-600`, `bg-success/10` not `bg-green-50`, `text-primary` not `text-blue-600`.
+- **Sidebar uses `--sidebar-*` tokens**: Coach portal sidebar uses `bg-sidebar`, not `bg-slate-900`.
+- **Workshop status colors use `--status-*` tokens**: `getWorkshopStatusColor()` and `StatusPill` both use dedicated status tokens.
+- **Security S1-S8 applied**: Nonces, webhook secrets, survey validation, JSON safety, error handlers, 15s timeouts, idempotency, email dedup.
 
 ## Continuous Update Protocol
 

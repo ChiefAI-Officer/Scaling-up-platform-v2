@@ -131,7 +131,7 @@ export default async function AdminDashboardPage() {
           <div className="flex gap-3">
             <Link
               href="/admin/approvals"
-              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               Review Approvals {pendingApprovals > 0 && `(${pendingApprovals})`}
             </Link>
@@ -176,7 +176,7 @@ export default async function AdminDashboardPage() {
                 <StaggerItem key={stage.status}>
                   <Link
                     href={`/workshops?status=${stage.status}`}
-                    className="group block rounded-lg border border-border p-4 hover:border-blue-300 hover:shadow-sm transition-all"
+                    className="group block rounded-lg border border-border p-4 hover:border-primary/30 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-lg">{stage.icon}</span>
@@ -184,7 +184,7 @@ export default async function AdminDashboardPage() {
                         {getWorkshopStatusLabel(stage.status)}
                       </Badge>
                     </div>
-                    <div className="text-3xl font-bold text-foreground group-hover:text-blue-600 transition-colors">
+                    <div className="text-3xl font-bold text-foreground group-hover:text-primary transition-colors">
                       {count}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
@@ -205,17 +205,17 @@ export default async function AdminDashboardPage() {
           {activities.length === 0 ? (
             <p className="text-sm text-muted-foreground">No recent activity found.</p>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-border">
               {activities.map((activity) => (
                 <li key={activity.id} className="flex items-start justify-between py-3">
                   <div className="pr-4">
                     <span
                       className={`mr-2 inline-flex rounded px-2 py-1 text-xs font-medium ${
                         activity.type === "APPROVAL"
-                          ? "bg-purple-100 text-purple-700"
+                          ? "bg-primary/10 text-primary"
                           : activity.type === "REGISTRATION"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-blue-100 text-blue-700"
+                            ? "bg-success/10 text-success"
+                            : "bg-info/10 text-info"
                       }`}
                     >
                       {activity.type}
@@ -249,11 +249,11 @@ function StatCard({
   return (
     <div
       className={`rounded-xl border bg-card p-4 shadow-sm ${
-        urgent ? "border-red-200" : "border-border"
+        urgent ? "border-destructive/20" : "border-border"
       }`}
     >
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={`mt-2 text-2xl font-semibold ${urgent ? "text-red-600" : "text-foreground"}`}>
+      <p className={`mt-2 text-2xl font-semibold ${urgent ? "text-destructive" : "text-foreground"}`}>
         {value}
       </p>
       {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}

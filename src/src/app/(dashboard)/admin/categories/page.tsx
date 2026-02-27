@@ -153,14 +153,14 @@ export default function CategoriesPage() {
         >
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-purple-900">Workshop Categories</h2>
+                    <h2 className="text-2xl font-bold text-foreground">Workshop Categories</h2>
                     <p className="text-sm text-muted-foreground mt-1">
                         Manage workshop categories that coaches select when creating workshops.
                     </p>
                 </div>
                 <button
                     onClick={openCreate}
-                    className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 font-medium text-sm"
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm"
                 >
                     + Add Category
                 </button>
@@ -175,13 +175,13 @@ export default function CategoriesPage() {
                     <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-foreground mb-1">
-                                Name <span className="text-red-500">*</span>
+                                Name <span className="text-destructive">*</span>
                             </label>
                             <input
                                 type="text"
                                 value={formName}
                                 onChange={(e) => setFormName(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                                 placeholder="e.g. Master Class, Growth Summit"
                             />
                         </div>
@@ -192,7 +192,7 @@ export default function CategoriesPage() {
                             <textarea
                                 value={formDescription}
                                 onChange={(e) => setFormDescription(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                                 rows={2}
                                 placeholder="Optional description"
                             />
@@ -205,7 +205,7 @@ export default function CategoriesPage() {
                                 type="text"
                                 value={formDefaultTitle}
                                 onChange={(e) => setFormDefaultTitle(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                                 placeholder="e.g. Scaling Up AI Workshop"
                             />
                             <p className="text-xs text-muted-foreground mt-1">
@@ -219,7 +219,7 @@ export default function CategoriesPage() {
                             <textarea
                                 value={formDefaultDescription}
                                 onChange={(e) => setFormDefaultDescription(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                                 rows={3}
                                 placeholder="Default internal description for workshops in this category..."
                             />
@@ -228,19 +228,19 @@ export default function CategoriesPage() {
                             </p>
                         </div>
                         {formError && (
-                            <p className="text-sm text-red-600">{formError}</p>
+                            <p className="text-sm text-destructive">{formError}</p>
                         )}
                         <div className="flex gap-3">
                             <button
                                 onClick={handleSave}
                                 disabled={formSaving}
-                                className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 font-medium text-sm disabled:opacity-50"
+                                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm disabled:opacity-50"
                             >
                                 {formSaving ? "Saving..." : editingId ? "Update" : "Create"}
                             </button>
                             <button
                                 onClick={closeForm}
-                                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-gray-200 font-medium text-sm"
+                                className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent font-medium text-sm"
                             >
                                 Cancel
                             </button>
@@ -255,7 +255,7 @@ export default function CategoriesPage() {
                     Loading categories...
                 </div>
             ) : error ? (
-                <div className="bg-card rounded-xl shadow-sm p-8 text-center text-red-600">
+                <div className="bg-card rounded-xl shadow-sm p-8 text-center text-destructive">
                     {error}
                 </div>
             ) : categories.length === 0 ? (
@@ -310,8 +310,8 @@ export default function CategoriesPage() {
                                             onClick={() => handleToggleActive(cat)}
                                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
                                                 cat.isActive
-                                                    ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                                    : "bg-muted text-muted-foreground hover:bg-gray-200"
+                                                    ? "bg-success/10 text-success hover:bg-success/20"
+                                                    : "bg-muted text-muted-foreground hover:bg-accent"
                                             }`}
                                         >
                                             {cat.isActive ? "Active" : "Inactive"}
@@ -320,14 +320,14 @@ export default function CategoriesPage() {
                                     <td className="px-6 py-4 text-right text-sm space-x-3">
                                         <button
                                             onClick={() => openEdit(cat)}
-                                            className="text-purple-600 hover:text-purple-800 font-medium"
+                                            className="text-primary hover:text-primary/80 font-medium"
                                         >
                                             Edit
                                         </button>
                                         {cat._count.workshops === 0 && (
                                             <button
                                                 onClick={() => handleDelete(cat)}
-                                                className="text-red-600 hover:text-red-800 font-medium"
+                                                className="text-destructive hover:text-destructive/80 font-medium"
                                             >
                                                 Delete
                                             </button>

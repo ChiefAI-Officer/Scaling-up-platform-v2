@@ -155,7 +155,7 @@ export function CoachResourcesPage() {
                                             {resource.link ? (
                                                 <a
                                                     href={resource.link}
-                                                    className="text-blue-600 hover:underline"
+                                                    className="text-primary hover:underline"
                                                 >
                                                     {resource.title}
                                                 </a>
@@ -166,7 +166,7 @@ export function CoachResourcesPage() {
                                         <p className="text-sm text-muted-foreground">{resource.description}</p>
                                     </div>
                                 </div>
-                                <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                                <span className="px-3 py-1 text-xs font-medium rounded-full bg-success/10 text-success">
                                     {resource.status}
                                 </span>
                             </div>
@@ -193,7 +193,7 @@ export function CoachResourcesPage() {
                                             <p className="text-sm text-muted-foreground">{resource.description}</p>
                                         </div>
                                     </div>
-                                    <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-700">
+                                    <span className="px-3 py-1 text-xs font-medium rounded-full bg-warning/10 text-warning">
                                         Draft
                                     </span>
                                 </div>

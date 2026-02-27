@@ -119,13 +119,13 @@ export default function CoachRegistrationPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {errorMessage && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   {errorMessage}
                 </div>
               )}
 
               {successMessage && (
-                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                <div className="rounded-lg border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
                   {successMessage}
                 </div>
               )}
@@ -217,7 +217,7 @@ export default function CoachRegistrationPage() {
 
             <p className="mt-4 text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
+              <Link href="/login" className="font-medium text-primary hover:text-primary/80">
                 Sign in
               </Link>
             </p>

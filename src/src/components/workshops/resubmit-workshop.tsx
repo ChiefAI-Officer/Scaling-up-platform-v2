@@ -89,14 +89,14 @@ export function ResubmitWorkshop({
   }
 
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-5 space-y-4">
+    <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-5 space-y-4">
       <div className="flex items-center gap-2">
         <Badge variant="destructive">Denied</Badge>
-        <h2 className="text-sm font-semibold text-red-900">Workshop Requires Changes</h2>
+        <h2 className="text-sm font-semibold text-destructive">Workshop Requires Changes</h2>
       </div>
 
       {rejectionReason && (
-        <div className="text-sm text-red-800 bg-white/60 rounded-lg p-3 border border-red-100">
+        <div className="text-sm text-destructive bg-white/60 rounded-lg p-3 border border-destructive/20">
           <span className="font-medium">Reason: </span>
           {rejectionReason}
         </div>
@@ -106,8 +106,8 @@ export function ResubmitWorkshop({
         <div
           className={`rounded-md border px-4 py-3 text-sm ${
             feedback.type === "success"
-              ? "border-green-200 bg-green-50 text-green-700"
-              : "border-red-200 bg-white text-red-700"
+              ? "border-success/20 bg-success/10 text-success"
+              : "border-destructive/20 bg-white text-destructive"
           }`}
         >
           {feedback.message}
@@ -115,14 +115,14 @@ export function ResubmitWorkshop({
       )}
 
       {isEditing ? (
-        <div className="space-y-3 bg-white rounded-lg p-4 border border-red-100">
+        <div className="space-y-3 bg-white rounded-lg p-4 border border-destructive/20">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
           <div>
@@ -131,7 +131,7 @@ export function ResubmitWorkshop({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -141,7 +141,7 @@ export function ResubmitWorkshop({
                 type="date"
                 value={eventDate}
                 onChange={(e) => setEventDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
             <div>
@@ -151,7 +151,7 @@ export function ResubmitWorkshop({
                 value={eventTime}
                 onChange={(e) => setEventTime(e.target.value)}
                 placeholder="e.g. 9:00 AM"
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
           </div>
@@ -161,7 +161,7 @@ export function ResubmitWorkshop({
               type="text"
               value={venueName}
               onChange={(e) => setVenueName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
         </div>

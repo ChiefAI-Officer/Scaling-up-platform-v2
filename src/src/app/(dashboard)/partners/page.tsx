@@ -270,12 +270,12 @@ export default function PartnersPage() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
       {success && (
-        <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <div className="rounded-md border border-success/20 bg-success/10 px-4 py-3 text-sm text-success">
           {success}
         </div>
       )}
@@ -422,14 +422,14 @@ export default function PartnersPage() {
                     <div className="space-y-1">
                       <p className="font-medium text-foreground">{partner.name}</p>
                       {partner.tagline ? (
-                        <p className="text-sm text-purple-700">{partner.tagline}</p>
+                        <p className="text-sm text-primary">{partner.tagline}</p>
                       ) : null}
                       <p className="text-sm text-muted-foreground">{partner.description || "No description"}</p>
                       {partner.logoUrl ? (
                         <a
                           href={partner.logoUrl}
                           target="_blank"
-                          className="text-sm text-blue-600 hover:underline"
+                          className="text-sm text-primary hover:underline"
                         >
                           View logo
                         </a>

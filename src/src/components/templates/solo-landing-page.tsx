@@ -9,13 +9,13 @@ export function SoloLandingPage({ data }: { data: LandingPageData }) {
     return (
         <div className="min-h-screen bg-card">
             {/* Hero Section */}
-            <section className="relative bg-slate-900 text-white py-20 lg:py-32">
+            <section className="relative bg-sidebar text-sidebar-foreground py-20 lg:py-32">
                 <div className="container mx-auto px-6 text-center">
                     <h1 className="text-4xl lg:text-6xl font-extrabold mb-6 leading-tight">
                         {data.title}
                     </h1>
                     {data.subtitle && (
-                        <p className="text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
+                        <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
                             {data.subtitle}
                         </p>
                     )}
@@ -42,7 +42,7 @@ export function SoloLandingPage({ data }: { data: LandingPageData }) {
             </section>
 
             {/* Coach Bio Section */}
-            <section className="py-20 bg-slate-50">
+            <section className="py-20 bg-muted">
                 <div className="container mx-auto px-6">
                     <div className="flex flex-col md:flex-row items-center gap-12">
                         <div className="w-full md:w-1/3">
@@ -58,7 +58,7 @@ export function SoloLandingPage({ data }: { data: LandingPageData }) {
                         <div className="w-full md:w-2/3">
                             <h2 className="text-3xl font-bold mb-2">Meet Your Coach</h2>
                             <h3 className="text-xl text-primary font-semibold mb-6">{coach.name}, {coach.title}</h3>
-                            <div className="prose lg:prose-lg text-slate-600">
+                            <div className="prose lg:prose-lg text-muted-foreground">
                                 <p>{coach.bio}</p>
                                 {!coach.bio && (
                                     <p className="italic text-muted-foreground">[Insert Coach Bio Text Here from Sample]</p>
@@ -78,18 +78,18 @@ export function SoloLandingPage({ data }: { data: LandingPageData }) {
                             {workshop.learningOutcomes.length > 0 ? (
                                 workshop.learningOutcomes.map((item, i) => (
                                     <div key={i} className="flex gap-4 p-6 bg-card border rounded-xl shadow-sm hover:shadow-md transition">
-                                        <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold shrink-0">
+                                        <div className="w-8 h-8 rounded-full bg-success/10 text-success flex items-center justify-center font-bold shrink-0">
                                             {i + 1}
                                         </div>
-                                        <p className="text-slate-700 font-medium">{item}</p>
+                                        <p className="text-foreground font-medium">{item}</p>
                                     </div>
                                 ))
                             ) : (
                                 // Placeholders
                                 [1, 2, 3, 4].map((i) => (
                                     <div key={i} className="flex gap-4 p-6 bg-card border rounded-xl shadow-sm">
-                                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center font-bold shrink-0">{i}</div>
-                                        <p className="text-slate-400 italic">[Learning Outcome {i}]</p>
+                                        <div className="w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-bold shrink-0">{i}</div>
+                                        <p className="text-muted-foreground italic">[Learning Outcome {i}]</p>
                                     </div>
                                 ))
                             )}

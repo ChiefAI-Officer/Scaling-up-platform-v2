@@ -31,7 +31,7 @@ async function SurveyTemplatesList() {
         <div className="mt-6">
           <Link
             href="/admin/surveys/templates/new"
-            className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             + Create Template
           </Link>
@@ -77,7 +77,7 @@ async function SurveyTemplatesList() {
                 </div>
               </td>
               <td className="px-6 py-4">
-                <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                <span className="inline-flex rounded-full bg-info/10 px-2.5 py-0.5 text-xs font-medium text-info">
                   {SURVEY_TYPE_LABELS[template.surveyType as SurveyType] || template.surveyType}
                 </span>
               </td>
@@ -91,7 +91,7 @@ async function SurveyTemplatesList() {
                 <span
                   className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
                     template.isActive
-                      ? "bg-green-100 text-green-800"
+                      ? "bg-success/10 text-success"
                       : "bg-muted text-foreground"
                   }`}
                 >
@@ -102,14 +102,14 @@ async function SurveyTemplatesList() {
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/admin/surveys/templates/${template.id}`}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                    className="text-sm font-medium text-primary hover:text-primary/80"
                   >
                     Edit
                   </Link>
                   {template._count.surveys > 0 && (
                     <Link
                       href={`/admin/surveys/templates/${template.id}?tab=results`}
-                      className="text-sm font-medium text-green-600 hover:text-green-800"
+                      className="text-sm font-medium text-success hover:text-success/80"
                     >
                       Results
                     </Link>
@@ -143,7 +143,7 @@ export default function AdminSurveysPage() {
           </Link>
           <Link
             href="/admin/surveys/templates/new"
-            className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             + Create Template
           </Link>

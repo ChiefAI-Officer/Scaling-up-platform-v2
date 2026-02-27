@@ -75,7 +75,7 @@ function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {wasRegistered && (
               <div
-                className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm"
+                className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg text-sm"
               >
                 Coach account created. Sign in with your new credentials.
               </div>
@@ -85,7 +85,7 @@ function LoginForm() {
               <div
                 role="alert"
                 aria-live="polite"
-                className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm"
+                className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg text-sm"
               >
                 {errorMessage}
               </div>
@@ -110,7 +110,7 @@ function LoginForm() {
                 <Label htmlFor="password">Password</Label>
                 <Link
                   href="/forgot-password"
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                  className="text-xs font-medium text-primary hover:text-primary/80"
                 >
                   Forgot password?
                 </Link>
@@ -138,7 +138,7 @@ function LoginForm() {
 
             <p className="text-center text-sm text-muted-foreground">
               New coach?{" "}
-              <Link href="/register" className="font-medium text-blue-600 hover:text-blue-700">
+              <Link href="/register" className="font-medium text-primary hover:text-primary/80">
                 Create an account
               </Link>
             </p>
@@ -149,10 +149,10 @@ function LoginForm() {
           </form>
 
           {showDemoCredentials && (
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800 font-medium mb-2">Demo Credentials:</p>
-              <p className="text-xs text-blue-700">Email: admin@scalingup.com</p>
-              <p className="text-xs text-blue-700">Password: demo123</p>
+            <div className="mt-6 p-4 bg-primary/10 rounded-lg">
+              <p className="text-sm text-primary font-medium mb-2">Demo Credentials:</p>
+              <p className="text-xs text-primary/80">Email: admin@scalingup.com</p>
+              <p className="text-xs text-primary/80">Password: demo123</p>
             </div>
           )}
         </CardContent>
@@ -167,7 +167,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-muted">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       }
     >

@@ -160,7 +160,7 @@ export default async function TemplatesPage({
 
             <button
               type="submit"
-              className="inline-flex items-center justify-center rounded-md bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-gray-200"
+              className="inline-flex items-center justify-center rounded-md bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
             >
               Refresh Selection
             </button>
@@ -179,7 +179,7 @@ export default async function TemplatesPage({
                 {templateHref && (
                   <Link
                     href={templateHref}
-                    className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                    className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                   >
                     Edit Template
                   </Link>
@@ -249,13 +249,13 @@ export default async function TemplatesPage({
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <Link href={editHref} className="text-blue-600 hover:underline text-sm">
+                            <Link href={editHref} className="text-primary hover:underline text-sm">
                               Edit
                             </Link>
                             <Link
                               href={`/workshop/${page.slug}`}
                               target="_blank"
-                              className="text-blue-600 hover:underline text-sm"
+                              className="text-primary hover:underline text-sm"
                             >
                               Preview
                             </Link>

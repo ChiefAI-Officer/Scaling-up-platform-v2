@@ -24,7 +24,7 @@ async function WorkflowsContent() {
     return (
       <div className="bg-card rounded-lg shadow p-12 text-center">
         <svg
-          className="w-12 h-12 text-gray-300 mx-auto mb-4"
+          className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -43,7 +43,7 @@ async function WorkflowsContent() {
         </p>
         <Link
           href="/admin/workflows/new"
-          className="inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           Create Workflow
         </Link>
@@ -89,7 +89,7 @@ async function WorkflowsContent() {
                 <td className="px-4 py-4">
                   <Link
                     href={`/admin/workflows/${workflow.id}`}
-                    className="text-blue-600 hover:text-blue-700 font-medium"
+                    className="text-primary hover:text-primary/80 font-medium"
                   >
                     {workflow.name}
                   </Link>
@@ -120,7 +120,7 @@ async function WorkflowsContent() {
                       {workflow.category?.name || ""}
                     </span>
                   ) : (
-                    <span className="text-gray-400">—</span>
+                    <span className="text-muted-foreground">—</span>
                   )}
                 </td>
                 <td className="px-4 py-4">
@@ -136,7 +136,7 @@ async function WorkflowsContent() {
                 <td className="px-4 py-4 text-right">
                   <Link
                     href={`/admin/workflows/${workflow.id}`}
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    className="text-sm text-primary hover:text-primary/80 font-medium"
                   >
                     Edit
                   </Link>
@@ -163,7 +163,7 @@ export default function WorkflowsPage() {
         </div>
         <Link
           href="/admin/workflows/new"
-          className="inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           Create Workflow
         </Link>
@@ -172,7 +172,7 @@ export default function WorkflowsPage() {
       <Suspense
         fallback={
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         }
       >

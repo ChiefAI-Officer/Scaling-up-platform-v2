@@ -158,13 +158,13 @@ export default function RegistrationPageEditor() {
         <p className="text-muted-foreground">Sub-page shown when visitors click &ldquo;Register Here&rdquo;</p>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>}
-      {success && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">Changes saved!</div>}
+      {error && <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6">{error}</div>}
+      {success && <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg mb-6">Changes saved!</div>}
 
       <div className="grid grid-cols-2 gap-6">
         {/* Editor */}
         <div className="space-y-6">
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <div className="rounded-md border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
             Coach information and workshop details are auto-mapped from the workshop and coach BIO profile.
           </div>
 
@@ -235,37 +235,37 @@ export default function RegistrationPageEditor() {
             <CardContent className="p-0">
               <div className="grid grid-cols-2 min-h-[500px]">
                 {/* Left - Hero */}
-                <div className="bg-gradient-to-br from-purple-700 to-blue-600 text-white p-6 flex flex-col">
+                <div className="bg-sidebar text-sidebar-foreground p-6 flex flex-col">
                   <div className="flex-1">
-                    <div className="bg-purple-600/50 rounded-lg p-4 mb-4">
+                    <div className="bg-primary/50 rounded-lg p-4 mb-4">
                       <div className="flex items-center gap-3 mb-3">
                         {formData.coachPhoto ? (
-                          <img src={formData.coachPhoto} alt={formData.coachName} className="w-12 h-12 rounded-full object-cover border-2 border-white" />
+                          <img src={formData.coachPhoto} alt={formData.coachName} className="w-12 h-12 rounded-full object-cover border-2 border-sidebar-foreground" />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-purple-400 flex items-center justify-center text-xs">No Img</div>
+                          <div className="w-12 h-12 rounded-full bg-primary/60 flex items-center justify-center text-xs">No Img</div>
                         )}
                         <div>
                           <div className="font-medium text-sm">{formData.coachName}</div>
-                          <div className="text-purple-200 text-xs">{formData.coachTitle}</div>
+                          <div className="text-sidebar-muted text-xs">{formData.coachTitle}</div>
                         </div>
                       </div>
-                      <div className="text-xs space-y-1 text-purple-200">
+                      <div className="text-xs space-y-1 text-sidebar-muted">
                         <div>📅 {formData.eventDate}</div>
                         <div>⏰ {formData.eventTime}</div>
                       </div>
                     </div>
                     
                     <h2 className="text-lg font-bold mb-2">{formData.heroHeadline}</h2>
-                    <p className="text-purple-200 text-sm">{formData.heroDescription}</p>
+                    <p className="text-sidebar-muted text-sm">{formData.heroDescription}</p>
                   </div>
                 </div>
 
                 {/* Right - Form */}
                 <div className="bg-card p-6">
                   <div className="border rounded-lg p-4 shadow-sm">
-                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 -m-4 mb-4 p-3 rounded-t-lg">
-                      <div className="text-white text-sm font-medium">{formData.workshopTitle}</div>
-                      <div className="text-purple-200 text-xs">with {formData.coachName}</div>
+                    <div className="bg-gradient-to-r from-primary to-primary/80 -m-4 mb-4 p-3 rounded-t-lg">
+                      <div className="text-primary-foreground text-sm font-medium">{formData.workshopTitle}</div>
+                      <div className="text-primary-foreground/70 text-xs">with {formData.coachName}</div>
                     </div>
 
                     <h3 className="font-medium text-sm mb-4">{formData.formTitle}</h3>
@@ -294,7 +294,7 @@ export default function RegistrationPageEditor() {
                         className="w-full border rounded px-3 py-2 text-sm"
                         disabled
                       />
-                      <button className="w-full bg-blue-600 text-white py-2 rounded font-medium text-sm">
+                      <button className="w-full bg-primary text-primary-foreground py-2 rounded font-medium text-sm">
                         {formData.submitButtonText}
                       </button>
                       <p className="text-xs text-muted-foreground text-center">{formData.privacyText}</p>

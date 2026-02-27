@@ -7,14 +7,14 @@ export function ThankYouLandingPage({ data }: { data: LandingPageData }) {
     const workshop = data.workshop!;
 
     return (
-        <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6">
+        <div className="min-h-screen bg-sidebar text-sidebar-foreground flex flex-col items-center justify-center p-6">
             <div className="max-w-3xl w-full text-center">
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-500/20 text-green-400 mb-8 ring-1 ring-green-500/40">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-success/20 text-success mb-8 ring-1 ring-success/40">
                     <CheckCircle2 className="w-10 h-10" />
                 </div>
 
                 <h1 className="text-4xl lg:text-5xl font-bold mb-6">Registration Confirmed!</h1>
-                <p className="text-xl text-slate-300 mb-12">
+                <p className="text-xl text-muted-foreground mb-12">
                     You are successfully registered for <span className="text-white font-semibold">{data.title}</span>.
                 </p>
 
@@ -23,7 +23,7 @@ export function ThankYouLandingPage({ data }: { data: LandingPageData }) {
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-16 h-16 rounded-full bg-card/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform">
                             <div className="w-12 h-12 rounded-full bg-card flex items-center justify-center pl-1 shadow-lg">
-                                <Video className="w-6 h-6 text-slate-900" />
+                                <Video className="w-6 h-6 text-sidebar" />
                             </div>
                         </div>
                     </div>
@@ -40,15 +40,15 @@ export function ThankYouLandingPage({ data }: { data: LandingPageData }) {
                     </h3>
                     <div className="grid md:grid-cols-3 gap-6 text-left">
                         <div className="bg-card/5 p-4 rounded-xl">
-                            <p className="text-slate-400 text-sm mb-1">Date</p>
+                            <p className="text-muted-foreground text-sm mb-1">Date</p>
                             <p className="font-semibold">{workshop.date}</p>
                         </div>
                         <div className="bg-card/5 p-4 rounded-xl">
-                            <p className="text-slate-400 text-sm mb-1">Time</p>
+                            <p className="text-muted-foreground text-sm mb-1">Time</p>
                             <p className="font-semibold">{workshop.time}</p>
                         </div>
                         <div className="bg-card/5 p-4 rounded-xl">
-                            <p className="text-slate-400 text-sm mb-1">Format</p>
+                            <p className="text-muted-foreground text-sm mb-1">Format</p>
                             <p className="font-semibold">{workshop.location || "Virtual Workshop"}</p>
                         </div>
                     </div>
@@ -63,7 +63,7 @@ export function ThankYouLandingPage({ data }: { data: LandingPageData }) {
                     </Button>
                 </div>
 
-                <p className="mt-12 text-slate-500 text-sm">
+                <p className="mt-12 text-muted-foreground text-sm">
                     Check your email ({'{email}'}) for access details.
                 </p>
             </div>

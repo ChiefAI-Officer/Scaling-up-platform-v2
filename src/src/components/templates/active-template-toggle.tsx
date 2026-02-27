@@ -34,12 +34,12 @@ export function ActiveTemplateToggle({ pageId, isActive }: ActiveTemplateToggleP
             disabled={loading}
             className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
                 active
-                    ? "bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400"
+                    ? "bg-success/10 text-success hover:bg-success/20"
                     : "bg-muted text-muted-foreground hover:bg-accent"
             }`}
             title={active ? "Click to unmark as template" : "Click to mark as active template for auto-build"}
         >
-            <span className={`inline-block h-2 w-2 rounded-full ${active ? "bg-green-500" : "bg-gray-400"}`} />
+            <span className={`inline-block h-2 w-2 rounded-full ${active ? "bg-success" : "bg-muted-foreground"}`} />
             {loading ? "..." : active ? "Active Template" : "Set as Template"}
         </button>
     );

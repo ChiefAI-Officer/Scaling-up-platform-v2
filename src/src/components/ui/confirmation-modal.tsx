@@ -53,8 +53,8 @@ export function ConfirmationModal({
                     {/* Icon & Title */}
                     <div className="flex items-start gap-4">
                         {variant === "destructive" && (
-                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-50 border border-red-200 flex items-center justify-center">
-                                <AlertTriangle className="w-5 h-5 text-red-600" />
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center">
+                                <AlertTriangle className="w-5 h-5 text-destructive" />
                             </div>
                         )}
                         <div className="flex-1">
@@ -69,8 +69,8 @@ export function ConfirmationModal({
 
                     {/* Warning Box */}
                     {warningText && (
-                        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                            <p className="text-sm text-amber-800">
+                        <div className="mt-4 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                            <p className="text-sm text-warning-foreground">
                                 <span className="font-semibold">⚠️ Warning:</span>{" "}
                                 {warningText}
                             </p>
@@ -90,7 +90,7 @@ export function ConfirmationModal({
                             variant={variant === "destructive" ? "destructive" : "default"}
                             onClick={onConfirm}
                             disabled={isLoading}
-                            className={variant === "destructive" ? "bg-red-600 hover:bg-red-700" : ""}
+                            className={variant === "destructive" ? "bg-destructive hover:bg-destructive/90" : ""}
                         >
                             {isLoading ? "Processing..." : confirmLabel}
                         </Button>

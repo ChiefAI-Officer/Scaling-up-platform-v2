@@ -33,7 +33,7 @@ export function CopyUrlButton({ url }: CopyUrlButtonProps) {
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 hover:underline truncate max-w-[200px]"
+                className="text-primary hover:text-primary/80 hover:underline truncate max-w-[200px]"
                 title={url}
             >
                 {url.replace(/^https?:\/\//, "")}
@@ -44,7 +44,7 @@ export function CopyUrlButton({ url }: CopyUrlButtonProps) {
                 title={copied ? "Copied!" : "Copy URL"}
             >
                 {copied ? (
-                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                 ) : (

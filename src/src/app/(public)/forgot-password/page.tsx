@@ -60,13 +60,13 @@ export default function ForgotPasswordPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {message && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg text-sm">
                 {message}
               </div>
             )}
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
@@ -91,7 +91,7 @@ export default function ForgotPasswordPage() {
 
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Remember your password?{" "}
-            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
+            <Link href="/login" className="font-medium text-primary hover:text-primary/80">
               Back to login
             </Link>
           </p>

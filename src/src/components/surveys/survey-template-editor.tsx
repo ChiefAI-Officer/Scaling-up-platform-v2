@@ -296,7 +296,7 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
         {!isNew && (
           <button
             onClick={deleteTemplate}
-            className="text-sm text-red-500 hover:text-red-700"
+            className="text-sm text-destructive hover:text-destructive/80"
           >
             Delete Template
           </button>
@@ -304,7 +304,7 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
       </div>
 
       {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
@@ -379,7 +379,7 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
           <button
             onClick={saveTemplate}
             disabled={saving}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {saving ? "Saving..." : isNew ? "Create Template" : "Save Changes"}
           </button>
@@ -397,7 +397,7 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
                   onClick={() => setActiveTab(tab)}
                   className={`border-b-2 px-1 py-3 text-sm font-medium ${
                     activeTab === tab
-                      ? "border-blue-500 text-blue-600"
+                      ? "border-primary text-primary"
                       : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
                   }`}
                 >
@@ -469,7 +469,7 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
                   <button
                     onClick={assignToWorkshop}
                     disabled={!assignWorkshopId || assigning}
-                    className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
                     {assigning ? "Assigning..." : "Assign"}
                   </button>
@@ -523,8 +523,8 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
                               <span
                                 className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                   survey.completedAt
-                                    ? "bg-green-100 text-green-800"
-                                    : "bg-yellow-100 text-yellow-800"
+                                    ? "bg-success/10 text-success"
+                                    : "bg-warning/10 text-warning"
                                 }`}
                               >
                                 {survey.completedAt ? "Completed" : "Pending"}
@@ -540,7 +540,7 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
                                     const url = `${window.location.origin}/survey/${survey.id}`;
                                     navigator.clipboard.writeText(url);
                                   }}
-                                  className="text-blue-600 hover:text-blue-800"
+                                  className="text-primary hover:text-primary/80"
                                 >
                                   Copy Link
                                 </button>
@@ -591,16 +591,16 @@ function QuestionCard({
   const typeColor: Record<string, string> = {
     TEXT: "bg-muted text-foreground",
     TEXTAREA: "bg-muted text-foreground",
-    RATING: "bg-yellow-100 text-yellow-700",
-    NPS: "bg-purple-100 text-purple-700",
-    SINGLE_CHOICE: "bg-blue-100 text-blue-700",
-    MULTI_CHOICE: "bg-blue-100 text-blue-700",
-    YES_NO: "bg-green-100 text-green-700",
+    RATING: "bg-warning/10 text-warning",
+    NPS: "bg-status-post/10 text-status-post",
+    SINGLE_CHOICE: "bg-primary/10 text-primary",
+    MULTI_CHOICE: "bg-primary/10 text-primary",
+    YES_NO: "bg-success/10 text-success",
   };
 
   if (editing) {
     return (
-      <div className="rounded-lg border border-blue-200 bg-card p-5 shadow-sm">
+      <div className="rounded-lg border border-primary/20 bg-card p-5 shadow-sm">
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-foreground">Question Text</label>
@@ -645,7 +645,7 @@ function QuestionCard({
 
           <button
             onClick={() => setEditing(false)}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             Done
           </button>
@@ -688,7 +688,7 @@ function QuestionCard({
             {QUESTION_TYPE_LABELS[question.questionType as QuestionType] || question.questionType}
           </span>
           {question.isRequired && (
-            <span className="text-xs text-red-500">Required</span>
+            <span className="text-xs text-destructive">Required</span>
           )}
         </div>
         <p className="mt-1 text-sm text-foreground">{question.label}</p>
@@ -710,13 +710,13 @@ function QuestionCard({
       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100">
         <button
           onClick={() => setEditing(true)}
-          className="text-sm text-blue-600 hover:text-blue-800"
+          className="text-sm text-primary hover:text-primary/80"
         >
           Edit
         </button>
         <button
           onClick={() => onRemove(question.id)}
-          className="text-sm text-red-500 hover:text-red-700"
+          className="text-sm text-destructive hover:text-destructive/80"
         >
           Remove
         </button>
@@ -775,7 +775,7 @@ function OptionsEditor({
             />
             <button
               onClick={() => removeOption(i)}
-              className="text-sm text-red-500 hover:text-red-700"
+              className="text-sm text-destructive hover:text-destructive/80"
             >
               &times;
             </button>
@@ -784,7 +784,7 @@ function OptionsEditor({
       </div>
       <button
         onClick={addOption}
-        className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+        className="mt-2 text-sm text-primary hover:text-primary/80"
       >
         + Add Option
       </button>
@@ -842,19 +842,19 @@ function SurveyResultsPanel({ templateId }: { templateId: string }) {
       {/* Summary */}
       <div className="rounded-lg bg-card p-6 shadow">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-lg bg-blue-50 p-4 text-center">
-            <p className="text-3xl font-bold text-blue-700">{results.totalResponses}</p>
-            <p className="text-sm text-blue-600">Total Responses</p>
+          <div className="rounded-lg bg-primary/10 p-4 text-center">
+            <p className="text-3xl font-bold text-primary">{results.totalResponses}</p>
+            <p className="text-sm text-primary/80">Total Responses</p>
           </div>
           {results.questionStats
             .filter((q) => q.avgNumeric !== undefined)
             .slice(0, 2)
             .map((q) => (
-              <div key={q.questionId} className="rounded-lg bg-purple-50 p-4 text-center">
-                <p className="text-3xl font-bold text-purple-700">
+              <div key={q.questionId} className="rounded-lg bg-status-post/10 p-4 text-center">
+                <p className="text-3xl font-bold text-status-post">
                   {q.avgNumeric?.toFixed(1)}
                 </p>
-                <p className="text-sm text-purple-600">
+                <p className="text-sm text-status-post/80">
                   Avg {q.type === "NPS" ? "NPS" : "Rating"}
                 </p>
               </div>
@@ -873,9 +873,9 @@ function SurveyResultsPanel({ templateId }: { templateId: string }) {
           {stat.avgNumeric !== undefined && (
             <div className="mt-3">
               <div className="flex items-center gap-3">
-                <div className="h-2 flex-1 rounded-full bg-gray-200">
+                <div className="h-2 flex-1 rounded-full bg-muted">
                   <div
-                    className="h-2 rounded-full bg-blue-500"
+                    className="h-2 rounded-full bg-primary"
                     style={{
                       width: `${
                         stat.type === "NPS"
@@ -898,7 +898,7 @@ function SurveyResultsPanel({ templateId }: { templateId: string }) {
                 .sort(([, a], [, b]) => b - a)
                 .map(([value, count]) => (
                   <div key={value} className="flex items-center gap-2 text-sm">
-                    <div className="h-2 rounded-full bg-blue-400" style={{
+                    <div className="h-2 rounded-full bg-primary/70" style={{
                       width: `${(count / stat.totalResponses) * 100}%`,
                       minWidth: "8px",
                     }} />

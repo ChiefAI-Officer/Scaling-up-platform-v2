@@ -55,7 +55,7 @@ export function WorkshopApprovalActions({ approvalId, workshopTitle }: WorkshopA
 
     if (status === "done") {
         return (
-            <span className={`text-xs font-medium ${result === "Approved" ? "text-green-600" : "text-red-600"}`}>
+            <span className={`text-xs font-medium ${result === "Approved" ? "text-success" : "text-destructive"}`}>
                 {result}
             </span>
         );
@@ -66,7 +66,7 @@ export function WorkshopApprovalActions({ approvalId, workshopTitle }: WorkshopA
             <Button
                 size="sm"
                 variant="outline"
-                className="h-7 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
+                className="h-7 px-2 text-xs text-success border-success/20 hover:bg-success/10"
                 onClick={() => handleAction("APPROVE")}
                 disabled={status === "loading"}
             >
@@ -75,7 +75,7 @@ export function WorkshopApprovalActions({ approvalId, workshopTitle }: WorkshopA
             <Button
                 size="sm"
                 variant="outline"
-                className="h-7 px-2 text-xs text-red-700 border-red-300 hover:bg-red-50"
+                className="h-7 px-2 text-xs text-destructive border-destructive/20 hover:bg-destructive/10"
                 onClick={() => handleAction("DENY")}
                 disabled={status === "loading"}
             >

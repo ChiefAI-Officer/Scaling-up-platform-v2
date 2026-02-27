@@ -92,26 +92,26 @@ export default function ApprovalsPage() {
   const getTypeBadgeClasses = (type: string) => {
     switch (type) {
       case "WORKSHOP_REQUEST":
-        return "bg-blue-600";
+        return "bg-primary";
       case "CUSTOM_PRICING":
-        return "bg-orange-600";
+        return "bg-warning";
       case "CANCELLATION":
-        return "bg-red-600";
+        return "bg-destructive";
       case "REFUND":
-        return "bg-yellow-600";
+        return "bg-warning";
       case "DATE_CHANGE":
-        return "bg-purple-600";
+        return "bg-primary";
       default:
-        return "bg-gray-500";
+        return "bg-muted-foreground";
     }
   };
 
   const getStatusBadgeClasses = (status: ApprovalStatus) => {
     switch (status) {
       case "APPROVED":
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
+        return "bg-success/10 text-success";
       case "DENIED":
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
+        return "bg-destructive/10 text-destructive";
       case "EXPIRED":
         return "bg-muted text-muted-foreground";
       default:
@@ -133,7 +133,7 @@ export default function ApprovalsPage() {
             key={status}
             className={`px-4 py-2 border rounded-md text-sm font-medium cursor-pointer transition-all duration-200 ${
               filter === status
-                ? "bg-purple-600 text-white border-purple-600"
+                ? "bg-primary text-primary-foreground border-primary"
                 : "bg-card text-foreground border-border hover:bg-accent"
             }`}
             onClick={() => setFilter(status)}
@@ -166,7 +166,7 @@ export default function ApprovalsPage() {
             <div
               key={approval.id}
               className={`bg-card p-6 rounded-xl shadow-sm grid grid-cols-[1fr_auto] gap-4 items-center ${
-                approval.escalatedAt ? "border-l-4 border-red-500" : ""
+                approval.escalatedAt ? "border-l-4 border-destructive" : ""
               }`}
             >
               <div>
@@ -195,14 +195,14 @@ export default function ApprovalsPage() {
                 {approval.status === "PENDING" ? (
                   <>
                     <button
-                      className="px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-success text-primary-foreground hover:bg-success/90 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleAction(approval.id, "APPROVE")}
                       disabled={processing === approval.id}
                     >
                       {processing === approval.id ? "..." : "Approve"}
                     </button>
                     <button
-                      className="px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-destructive text-primary-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => handleAction(approval.id, "DENY")}
                       disabled={processing === approval.id}
                     >

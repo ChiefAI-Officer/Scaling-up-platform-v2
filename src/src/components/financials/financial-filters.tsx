@@ -68,7 +68,7 @@ export function FinancialFilters({ coaches, categories }: FinancialFiltersProps)
             onClick={() => handleChange("period", p)}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               period === p
-                ? "bg-blue-600 text-white"
+                ? "bg-primary text-primary-foreground"
                 : "bg-card border border-border text-foreground hover:bg-accent"
             }`}
           >

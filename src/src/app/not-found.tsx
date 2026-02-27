@@ -11,7 +11,7 @@ export default function NotFound() {
       <div className="max-w-md w-full text-center">
         <div className="mb-8">
           <span
-            className="text-8xl font-bold text-gray-200"
+            className="text-8xl font-bold text-muted"
             aria-hidden="true"
           >
             404
@@ -33,14 +33,14 @@ export default function NotFound() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Button
             asChild
-            className="focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             <Link href="/">Go to home</Link>
           </Button>
           <Button
             variant="outline"
             asChild
-            className="focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            className="focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
           >
             <Link href="/dashboard">Go to dashboard</Link>
           </Button>

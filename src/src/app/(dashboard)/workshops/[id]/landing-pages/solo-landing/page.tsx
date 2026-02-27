@@ -294,13 +294,13 @@ export default function SoloLandingEditor() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">
+        <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg mb-6">
           Changes saved successfully!
         </div>
       )}
@@ -359,7 +359,7 @@ export default function SoloLandingEditor() {
                   value={formData.aboutDescription}
                   onChange={handleChange}
                   rows={4}
-                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
                 />
               </div>
               <div>
@@ -475,16 +475,16 @@ export default function SoloLandingEditor() {
             <CardContent className="p-0">
               <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
                 {/* Hero */}
-                <div className="bg-gradient-to-br from-purple-700 to-purple-900 text-white p-8">
+                <div className="bg-sidebar text-sidebar-foreground p-8">
                   <div className="grid grid-cols-2 gap-6 items-center">
                     <div>
-                      <span className="bg-orange-500 text-xs px-3 py-1 rounded-full uppercase font-semibold">
+                      <span className="bg-warning text-xs px-3 py-1 rounded-full uppercase font-semibold">
                         Scaling Up
                       </span>
                       <h1 className="text-2xl font-bold mt-3 mb-2">
                         {formData.heroTitle}
                       </h1>
-                      <p className="text-purple-200 mb-4">{formData.heroSubtitle}</p>
+                      <p className="text-sidebar-muted mb-4">{formData.heroSubtitle}</p>
                       <div className="space-y-2 text-sm">
                         <div className="flex items-center gap-2">
                           <span>📅</span>
@@ -505,18 +505,18 @@ export default function SoloLandingEditor() {
                         <img
                           src={formData.coachPhoto}
                           alt={formData.coachName}
-                          className="w-28 h-28 rounded-full object-cover mx-auto mb-3 border-4 border-white"
+                          className="w-28 h-28 rounded-full object-cover mx-auto mb-3 border-4 border-sidebar-foreground"
                         />
                       ) : (
-                        <div className="w-28 h-28 rounded-full bg-purple-600 mx-auto mb-3 flex items-center justify-center text-purple-300">
+                        <div className="w-28 h-28 rounded-full bg-primary/80 mx-auto mb-3 flex items-center justify-center text-sidebar-muted">
                           No Photo
                         </div>
                       )}
                       <div className="font-bold">{formData.coachName}</div>
-                      <div className="text-purple-200 text-sm">{formData.coachTitle}</div>
+                      <div className="text-sidebar-muted text-sm">{formData.coachTitle}</div>
                       {formData.partnerId && (formData.partnerName || formData.partnerLogoUrl || formData.partnerTagline) ? (
-                        <div className="mt-4 border-t border-white/20 pt-4">
-                          <div className="text-[10px] uppercase tracking-wide text-purple-200 mb-2">
+                        <div className="mt-4 border-t border-sidebar-foreground/20 pt-4">
+                          <div className="text-[10px] uppercase tracking-wide text-sidebar-muted mb-2">
                             In Partnership With
                           </div>
                           {formData.partnerLogoUrl ? (
@@ -527,10 +527,10 @@ export default function SoloLandingEditor() {
                             />
                           ) : null}
                           {formData.partnerName ? (
-                            <div className="mt-2 text-sm font-semibold text-white">{formData.partnerName}</div>
+                            <div className="mt-2 text-sm font-semibold text-sidebar-foreground">{formData.partnerName}</div>
                           ) : null}
                           {formData.partnerTagline ? (
-                            <div className="text-xs text-purple-200">{formData.partnerTagline}</div>
+                            <div className="text-xs text-sidebar-muted">{formData.partnerTagline}</div>
                           ) : null}
                         </div>
                       ) : null}
@@ -547,16 +547,16 @@ export default function SoloLandingEditor() {
                     <p className="text-muted-foreground mb-6">{formData.aboutDescription}</p>
 
                     {formData.videoUrl && (
-                      <div className="bg-gray-200 aspect-video rounded-lg mb-6 flex items-center justify-center">
+                      <div className="bg-muted aspect-video rounded-lg mb-6 flex items-center justify-center">
                         <span className="text-muted-foreground">Video: {formData.videoUrl}</span>
                       </div>
                     )}
 
-                    <h3 className="font-bold text-purple-700 mb-3">What You&rsquo;ll Learn</h3>
+                    <h3 className="font-bold text-primary mb-3">What You&rsquo;ll Learn</h3>
                     <ul className="space-y-2 text-sm text-foreground">
                       {formData.benefits.map((b, i) => (
                         <li key={i} className="flex items-start gap-2">
-                          <span className="text-blue-500">✓</span>
+                          <span className="text-primary">✓</span>
                           <span>{b}</span>
                         </li>
                       ))}
@@ -565,13 +565,13 @@ export default function SoloLandingEditor() {
 
                   {/* Registration Card */}
                   <div className="bg-card border rounded-lg p-4 shadow-sm">
-                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-3 -m-4 mb-4 rounded-t-lg">
+                    <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground p-3 -m-4 mb-4 rounded-t-lg">
                       <div className="text-xs uppercase font-semibold">Register Now</div>
                     </div>
                     <div className="text-sm font-bold mb-1">{formData.eventDate}</div>
                     <div className="text-xs text-muted-foreground mb-3">with {formData.coachName}</div>
-                    <div className="text-lg font-bold text-purple-700 mb-3">Free</div>
-                    <button className="w-full bg-blue-600 text-white py-2 rounded-md text-sm font-semibold">
+                    <div className="text-lg font-bold text-primary mb-3">Free</div>
+                    <button className="w-full bg-primary text-primary-foreground py-2 rounded-md text-sm font-semibold">
                       {formData.ctaText}
                     </button>
                   </div>

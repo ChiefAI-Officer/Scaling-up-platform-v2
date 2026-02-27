@@ -47,12 +47,12 @@ export function CircleSyncButton({ coachId }: CircleSyncButtonProps) {
             <button
                 onClick={handleSync}
                 disabled={syncing}
-                className="block w-full text-center bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                className="block w-full text-center bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
             >
                 {syncing ? "Syncing..." : "Sync from Circle"}
             </button>
             {result && (
-                <p className={`text-xs px-2 ${result.type === "success" ? "text-green-600" : "text-red-500"}`}>
+                <p className={`text-xs px-2 ${result.type === "success" ? "text-success" : "text-destructive"}`}>
                     {result.text}
                 </p>
             )}

@@ -15,11 +15,11 @@ interface CoachDetailPageProps {
 function getCertificationStatusColor(status: string) {
   switch (status) {
     case "ACTIVE":
-      return "bg-green-100 text-green-800";
+      return "bg-success/10 text-success";
     case "PENDING":
-      return "bg-yellow-100 text-yellow-800";
+      return "bg-warning/10 text-warning";
     case "EXPIRED":
-      return "bg-red-100 text-red-800";
+      return "bg-destructive/10 text-destructive";
     case "SUSPENDED":
       return "bg-muted text-foreground";
     default:
@@ -30,13 +30,13 @@ function getCertificationStatusColor(status: string) {
 function getPaymentStatusColor(status: string) {
   switch (status) {
     case "CURRENT":
-      return "bg-green-100 text-green-800";
+      return "bg-success/10 text-success";
     case "PENDING":
-      return "bg-yellow-100 text-yellow-800";
+      return "bg-warning/10 text-warning";
     case "OVERDUE":
-      return "bg-red-100 text-red-800";
+      return "bg-destructive/10 text-destructive";
     case "GRACE_PERIOD":
-      return "bg-orange-100 text-orange-800";
+      return "bg-warning/10 text-warning";
     default:
       return "bg-muted text-foreground";
   }
@@ -45,13 +45,13 @@ function getPaymentStatusColor(status: string) {
 function getWorkshopStatusColor(status: string) {
   switch (status) {
     case "PUBLISHED":
-      return "bg-green-100 text-green-800";
+      return "bg-success/10 text-success";
     case "DRAFT":
       return "bg-muted text-foreground";
     case "CANCELED":
-      return "bg-red-100 text-red-800";
+      return "bg-destructive/10 text-destructive";
     case "COMPLETED":
-      return "bg-blue-100 text-blue-800";
+      return "bg-info/10 text-info";
     default:
       return "bg-muted text-foreground";
   }
@@ -118,8 +118,8 @@ export default async function CoachDetailPage({
                 className="w-16 h-16 rounded-full object-cover"
               />
             ) : (
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-xl font-medium text-blue-600">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                <span className="text-xl font-medium text-primary">
                   {coach.firstName[0]}{coach.lastName[0]}
                 </span>
               </div>
@@ -149,7 +149,7 @@ export default async function CoachDetailPage({
         <div className="flex gap-2">
           <Link
             href={`/coaches/${coach.id}/edit`}
-            className="bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+            className="bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent transition-colors"
           >
             Edit Coach
           </Link>
@@ -172,7 +172,7 @@ export default async function CoachDetailPage({
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Upcoming</p>
-              <p className="text-xl font-semibold text-blue-600">{upcomingWorkshops}</p>
+              <p className="text-xl font-semibold text-primary">{upcomingWorkshops}</p>
             </CardContent>
           </Card>
         </StaggerItem>
@@ -181,7 +181,7 @@ export default async function CoachDetailPage({
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Total Registrations</p>
-              <p className="text-xl font-semibold text-green-600">{totalRegistrations}</p>
+              <p className="text-xl font-semibold text-success">{totalRegistrations}</p>
             </CardContent>
           </Card>
         </StaggerItem>
@@ -269,7 +269,7 @@ export default async function CoachDetailPage({
               <CardTitle>Recent Workshops</CardTitle>
               <Link
                 href={`/workshops/new?coachId=${coach.id}`}
-                className="text-sm text-blue-600 hover:text-blue-700"
+                className="text-sm text-primary hover:text-primary/80"
               >
                 + Create Workshop
               </Link>
@@ -280,7 +280,7 @@ export default async function CoachDetailPage({
                   No workshops yet.{" "}
                   <Link
                     href={`/workshops/new?coachId=${coach.id}`}
-                    className="text-blue-600 hover:underline"
+                    className="text-primary hover:underline"
                   >
                     Create the first one
                   </Link>
@@ -310,7 +310,7 @@ export default async function CoachDetailPage({
                           <td className="px-4 py-3">
                             <Link
                               href={`/workshops/${workshop.id}`}
-                              className="font-medium text-foreground hover:text-blue-600"
+                              className="font-medium text-foreground hover:text-primary"
                             >
                               {workshop.title}
                             </Link>
@@ -389,7 +389,7 @@ export default async function CoachDetailPage({
             <CardContent className="space-y-2">
               <Link
                 href={`/workshops/new?coachId=${coach.id}`}
-                className="block w-full text-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="block w-full text-center bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
               >
                 Create Workshop
               </Link>

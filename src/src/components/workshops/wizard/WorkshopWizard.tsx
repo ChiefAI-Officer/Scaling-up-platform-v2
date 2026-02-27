@@ -14,7 +14,7 @@ function WizardContent() {
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-4" />
+                <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
                 <p className="text-muted-foreground">Loading your workshop draft...</p>
             </div>
         );

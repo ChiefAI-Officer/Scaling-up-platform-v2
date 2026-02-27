@@ -105,8 +105,8 @@ export default function FollowUpPage() {
             <div className="max-w-2xl mx-auto py-8">
                 <Card>
                     <CardContent className="pt-8 pb-8 text-center">
-                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <span className="text-green-600 text-2xl">&#10003;</span>
+                        <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <span className="text-success text-2xl">&#10003;</span>
                         </div>
                         <h2 className="text-xl font-semibold text-foreground mb-2">Thank You!</h2>
                         <p className="text-muted-foreground mb-1">Your 90-day follow-up report has been submitted successfully.</p>
@@ -145,7 +145,7 @@ export default function FollowUpPage() {
             <h1 className="text-2xl font-bold text-foreground mb-6">90-Day Follow-Up Report</h1>
 
             {error && (
-                <div className="mb-4 px-4 py-3 rounded-lg text-sm bg-red-50 text-red-800 border border-red-200">
+                <div className="mb-4 px-4 py-3 rounded-lg text-sm bg-destructive/10 text-destructive border border-destructive/20">
                     {error}
                 </div>
             )}
@@ -165,7 +165,7 @@ export default function FollowUpPage() {
                         </CardHeader>
                         <CardContent>
                             <select
-                                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                 value={formData.workshopId}
                                 onChange={(e) => setFormData({ ...formData, workshopId: e.target.value })}
                                 required
@@ -242,7 +242,7 @@ export default function FollowUpPage() {
                                     aria-label="Recommendation score from 0 to 10"
                                 />
                                 <span className="text-sm text-muted-foreground">10</span>
-                                <span className="text-2xl font-bold text-blue-600 min-w-[3rem] text-center">{formData.recommendationScore}</span>
+                                <span className="text-2xl font-bold text-primary min-w-[3rem] text-center">{formData.recommendationScore}</span>
                             </div>
                         </CardContent>
                     </Card>

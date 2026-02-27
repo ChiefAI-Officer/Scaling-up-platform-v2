@@ -75,7 +75,7 @@ export default async function BioPageIndex() {
                               className="h-10 w-10 rounded-full object-cover"
                             />
                           ) : (
-                            <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-semibold">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold">
                               {coach.firstName[0]}
                               {coach.lastName[0]}
                             </div>
@@ -97,7 +97,7 @@ export default async function BioPageIndex() {
                       <td className="px-4 py-3">
                         <Link
                           href={`/bio/${coach.id}`}
-                          className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         >
                           Edit Bio
                         </Link>

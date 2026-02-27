@@ -17,11 +17,11 @@ export function StepIndicator() {
         <div className="mb-8">
             <div className="flex justify-between items-center relative">
                 {/* Progress Line Background */}
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-gray-200 -z-10 rounded-full" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-muted -z-10 rounded-full" />
 
                 {/* Progress Line Fill */}
                 <div
-                    className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-blue-600 -z-10 rounded-full transition-all duration-300 ease-in-out"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary -z-10 rounded-full transition-all duration-300 ease-in-out"
                     style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
                 />
 
@@ -33,9 +33,9 @@ export function StepIndicator() {
                         <div key={step.id} className="flex flex-col items-center gap-2">
                             <div
                                 className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${isCompleted
-                                        ? "bg-blue-600 border-blue-600 text-white"
+                                        ? "bg-primary border-primary text-primary-foreground"
                                         : isCurrent
-                                            ? "bg-card border-blue-600 text-blue-600"
+                                            ? "bg-card border-primary text-primary"
                                             : "bg-card border-border text-muted-foreground"
                                     }`}
                             >
@@ -46,7 +46,7 @@ export function StepIndicator() {
                                 )}
                             </div>
                             <span
-                                className={`text-sm font-medium ${isCurrent ? "text-blue-700" : isCompleted ? "text-foreground" : "text-muted-foreground"
+                                className={`text-sm font-medium ${isCurrent ? "text-primary" : isCompleted ? "text-foreground" : "text-muted-foreground"
                                     }`}
                             >
                                 {step.title}

@@ -229,7 +229,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
         <StaggerItem>
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Revenue</p>
-            <p className="mt-2 text-2xl font-semibold text-green-600">{formatCurrency(totalRevenueCents)}</p>
+            <p className="mt-2 text-2xl font-semibold text-success">{formatCurrency(totalRevenueCents)}</p>
           </div>
         </StaggerItem>
         <StaggerItem>
@@ -266,7 +266,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
                   <div className="w-40 text-sm font-medium text-foreground truncate">{cat.name}</div>
                   <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
                     <div
-                      className="bg-blue-500 h-full rounded-full transition-all"
+                      className="bg-primary h-full rounded-full transition-all"
                       style={{ width: `${Math.max(pct, 2)}%` }}
                     />
                   </div>
@@ -314,14 +314,14 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
                       {w.workshopCode || "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/workshops/${w.id}`} className="text-blue-600 hover:text-blue-800 font-medium text-sm">
+                      <Link href={`/workshops/${w.id}`} className="text-primary hover:text-primary/80 font-medium text-sm">
                         {w.title}
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-sm text-foreground">{w.coachName}</td>
                     <td className="px-4 py-3 text-sm text-foreground">{formatDate(w.eventDate)}</td>
                     <td className="px-4 py-3 text-sm text-foreground text-right">{w.totalRegistrations}</td>
-                    <td className="px-4 py-3 text-sm font-semibold text-green-600 text-right">
+                    <td className="px-4 py-3 text-sm font-semibold text-success text-right">
                       {formatCurrency(w.revenue)}
                     </td>
                   </tr>
@@ -334,7 +334,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
                   <td colSpan={5} className="px-4 py-3 text-sm font-semibold text-foreground text-right">
                     Total
                   </td>
-                  <td className="px-4 py-3 text-sm font-bold text-green-600 text-right">
+                  <td className="px-4 py-3 text-sm font-bold text-success text-right">
                     {formatCurrency(totalRevenueCents)}
                   </td>
                 </tr>

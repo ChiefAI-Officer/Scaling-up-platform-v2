@@ -99,7 +99,7 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
           </div>
           <Link
             href="/workshops/new"
-            className="inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             + New Workshop
           </Link>
@@ -166,7 +166,7 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                     ) : (
                       <>
                         No workshops yet.{" "}
-                        <Link href="/workshops/new" className="text-blue-600 hover:underline">
+                        <Link href="/workshops/new" className="text-primary hover:underline">
                           Create your first workshop
                         </Link>
                       </>
@@ -182,7 +182,7 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                     <td className="px-4 py-4">
                       <Link
                         href={`/workshops/${workshop.id}`}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
+                        className="text-primary hover:text-primary/80 font-medium"
                       >
                         {workshop.title}
                       </Link>
@@ -228,7 +228,7 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                     <td className="px-4 py-4 text-sm text-foreground">
                       <Link
                         href={`/workshops/${workshop.id}#registrations`}
-                        className="text-blue-600 hover:text-blue-800 hover:underline"
+                        className="text-primary hover:text-primary/80 hover:underline"
                       >
                         {workshop._count.registrations} / {workshop.maxAttendees}
                       </Link>
@@ -239,7 +239,7 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                     <td className="px-4 py-4 text-right text-sm">
                       <Link
                         href={`/workshops/${workshop.id}/landing-pages`}
-                        className="text-muted-foreground hover:text-blue-600 font-medium"
+                        className="text-muted-foreground hover:text-primary font-medium"
                       >
                         Edit
                       </Link>

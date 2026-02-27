@@ -38,7 +38,7 @@ export function QuickActions({
         <div className="space-y-2">
             <Button
                 onClick={handleViewLandingPage}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
             >
                 {landingPageSlug && publishedPage ? "View Landing Page" : "Edit Landing Page"}
             </Button>
@@ -46,7 +46,7 @@ export function QuickActions({
             <Button
                 variant="secondary"
                 onClick={handleExport}
-                className="w-full bg-muted text-foreground hover:bg-gray-200 border-0 justify-center"
+                className="w-full bg-muted text-foreground hover:bg-accent border-0 justify-center"
             >
                 Export Registrations
             </Button>

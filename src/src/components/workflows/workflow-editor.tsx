@@ -376,7 +376,7 @@ export function WorkflowEditor({
         <button
           onClick={saveWorkflow}
           disabled={saving}
-          className="inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save Workflow"}
         </button>
@@ -384,12 +384,12 @@ export function WorkflowEditor({
 
       {/* Alerts */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">
           {error}
         </div>
       )}
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
+        <div className="bg-success/10 border border-success/20 rounded-lg p-3 text-sm text-success">
           {success}
         </div>
       )}
@@ -409,7 +409,7 @@ export function WorkflowEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Standard Pre-Event Sequence"
-              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary"
             />
           </div>
           <div>
@@ -422,7 +422,7 @@ export function WorkflowEditor({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Brief description of this workflow's purpose"
-              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary"
             />
           </div>
         </div>
@@ -432,7 +432,7 @@ export function WorkflowEditor({
             type="checkbox"
             checked={isTemplate}
             onChange={(e) => setIsTemplate(e.target.checked)}
-            className="rounded border-border text-blue-600 focus:ring-blue-500"
+            className="rounded border-border text-primary focus:ring-primary"
           />
           Save as template (reusable across workshops)
         </label>
@@ -499,7 +499,7 @@ export function WorkflowEditor({
                 onClick={() => setActiveTab(tab)}
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === tab
-                    ? "border-blue-600 text-blue-600"
+                    ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 }`}
               >
@@ -524,7 +524,7 @@ export function WorkflowEditor({
               </button>
               <button
                 onClick={() => setShowNewStep(true)}
-                className="inline-flex rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                className="inline-flex rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
                 + Add Step
               </button>
@@ -533,17 +533,17 @@ export function WorkflowEditor({
 
           {/* Variable reference panel */}
           {showVariables && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-blue-800 mb-2">
+            <div className="bg-info/10 border border-info/20 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-info mb-2">
                 Available Template Variables
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
                 {Object.entries(WORKFLOW_VARIABLES).map(([variable, desc]) => (
                   <div key={variable} className="text-xs">
-                    <code className="bg-blue-100 px-1 py-0.5 rounded text-blue-700">
+                    <code className="bg-primary/10 px-1 py-0.5 rounded text-primary">
                       {variable}
                     </code>{" "}
-                    <span className="text-blue-600">— {desc}</span>
+                    <span className="text-primary">— {desc}</span>
                   </div>
                 ))}
               </div>
@@ -615,7 +615,7 @@ export function WorkflowEditor({
                 id="assign-ws"
                 value={assignWorkshopId}
                 onChange={(e) => setAssignWorkshopId(e.target.value)}
-                className="block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500"
+                className="block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary"
               >
                 <option value="">Select a workshop...</option>
                 {workshops
@@ -631,7 +631,7 @@ export function WorkflowEditor({
             <button
               onClick={assignWorkshop}
               disabled={!assignWorkshopId || saving}
-              className="inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               Assign
             </button>
@@ -639,7 +639,7 @@ export function WorkflowEditor({
 
           {/* Current assignments */}
           {assignments.length > 0 && (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-border">
               {assignments.map((assignment) => (
                 <div
                   key={assignment.id}
@@ -661,7 +661,7 @@ export function WorkflowEditor({
                   </div>
                   <button
                     onClick={() => unassignWorkshop(assignment.id)}
-                    className="text-sm text-red-500 hover:text-red-700"
+                    className="text-sm text-destructive hover:text-destructive/80"
                   >
                     Remove
                   </button>
@@ -767,7 +767,7 @@ function StepCard({
     return (
       <div className="border rounded-lg p-4 flex items-start justify-between hover:border-border transition-colors">
         <div className="flex gap-3">
-          <div className="flex-shrink-0 w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-sm font-bold">
+          <div className="flex-shrink-0 w-8 h-8 bg-primary/10 text-primary rounded-full flex items-center justify-center text-sm font-bold">
             {index + 1}
           </div>
           <div>
@@ -793,13 +793,13 @@ function StepCard({
         <div className="flex gap-2">
           <button
             onClick={onEdit}
-            className="text-sm text-blue-600 hover:text-blue-700"
+            className="text-sm text-primary hover:text-primary/80"
           >
             Edit
           </button>
           <button
             onClick={onDelete}
-            className="text-sm text-red-500 hover:text-red-700"
+            className="text-sm text-destructive hover:text-destructive/80"
           >
             Delete
           </button>
@@ -810,7 +810,7 @@ function StepCard({
 
   // Editing mode
   return (
-    <div className="border-2 border-blue-300 rounded-lg p-4 space-y-3 bg-blue-50/30">
+    <div className="border-2 border-primary/30 rounded-lg p-4 space-y-3 bg-primary/5">
       <h4 className="font-medium text-foreground">Edit Step {index + 1}</h4>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -947,7 +947,7 @@ function StepCard({
                     <span className="text-foreground truncate">{f.filename}</span>
                     <button
                       onClick={() => detachFile(f.id)}
-                      className="text-xs text-red-500 hover:text-red-700 ml-2"
+                      className="text-xs text-destructive hover:text-destructive/80 ml-2"
                     >
                       Remove
                     </button>
@@ -997,7 +997,7 @@ function StepCard({
               emailTemplateId: templateId || null,
             })
           }
-          className="inline-flex rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+          className="inline-flex rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           Save Changes
         </button>
@@ -1046,7 +1046,7 @@ function NewStepForm({
   const [templateId, setTemplateId] = useState("");
 
   return (
-    <div className="border-2 border-green-300 rounded-lg p-4 space-y-3 bg-green-50/30">
+    <div className="border-2 border-success/30 rounded-lg p-4 space-y-3 bg-success/5">
       <h4 className="font-medium text-foreground">New Step</h4>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1177,7 +1177,7 @@ function NewStepForm({
             })
           }
           disabled={saving}
-          className="inline-flex rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          className="inline-flex rounded-md bg-success px-3 py-1.5 text-sm font-medium text-success-foreground hover:bg-success/90 disabled:opacity-50"
         >
           {saving ? "Adding..." : "Add Step"}
         </button>

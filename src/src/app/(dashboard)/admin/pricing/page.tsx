@@ -196,7 +196,7 @@ export default function PricingTiersPage() {
         >
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-purple-900">Pricing Tiers</h2>
+                    <h2 className="text-2xl font-bold text-foreground">Pricing Tiers</h2>
                     <p className="text-sm text-muted-foreground mt-1">
                         Manage pricing options that appear in the workshop request wizard.
                     </p>
@@ -204,7 +204,7 @@ export default function PricingTiersPage() {
                 <button
                     onClick={openCreate}
                     disabled={categories.length === 0}
-                    className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     title={categories.length === 0 ? "Create a category first" : ""}
                 >
                     + Add Pricing Tier
@@ -218,7 +218,7 @@ export default function PricingTiersPage() {
                         onClick={() => setFilterCategory("ALL")}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                             filterCategory === "ALL"
-                                ? "bg-purple-700 text-white border-purple-700"
+                                ? "bg-primary text-primary-foreground border-primary"
                                 : "bg-card text-foreground border-border hover:bg-accent"
                         }`}
                     >
@@ -230,7 +230,7 @@ export default function PricingTiersPage() {
                             onClick={() => setFilterCategory(cat.id)}
                             className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                                 filterCategory === cat.id
-                                    ? "bg-purple-700 text-white border-purple-700"
+                                    ? "bg-primary text-primary-foreground border-primary"
                                     : "bg-card text-foreground border-border hover:bg-accent"
                             }`}
                         >
@@ -249,13 +249,13 @@ export default function PricingTiersPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-foreground mb-1">
-                                Category <span className="text-red-500">*</span>
+                                Category <span className="text-destructive">*</span>
                             </label>
                             <select
                                 value={formCategoryId}
                                 onChange={(e) => setFormCategoryId(e.target.value)}
                                 disabled={!!editingId}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-muted"
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-muted"
                             >
                                 <option value="">Select category...</option>
                                 {categories.map((cat) => (
@@ -267,19 +267,19 @@ export default function PricingTiersPage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-foreground mb-1">
-                                Name <span className="text-red-500">*</span>
+                                Name <span className="text-destructive">*</span>
                             </label>
                             <input
                                 type="text"
                                 value={formName}
                                 onChange={(e) => setFormName(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                                 placeholder="e.g. Standard, Premium, Enterprise"
                             />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-foreground mb-1">
-                                Price (USD) <span className="text-red-500">*</span>
+                                Price (USD) <span className="text-destructive">*</span>
                             </label>
                             <div className="relative">
                                 <span className="absolute left-3 top-2 text-muted-foreground">$</span>
@@ -289,7 +289,7 @@ export default function PricingTiersPage() {
                                     min="0"
                                     value={formAmount}
                                     onChange={(e) => setFormAmount(e.target.value)}
-                                    className="w-full pl-7 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                    className="w-full pl-7 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                                     placeholder="0.00"
                                 />
                             </div>
@@ -302,25 +302,25 @@ export default function PricingTiersPage() {
                                 type="text"
                                 value={formDescription}
                                 onChange={(e) => setFormDescription(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
                                 placeholder="Optional description"
                             />
                         </div>
                     </div>
                     {formError && (
-                        <p className="text-sm text-red-600 mt-3">{formError}</p>
+                        <p className="text-sm text-destructive mt-3">{formError}</p>
                     )}
                     <div className="flex gap-3 mt-4">
                         <button
                             onClick={handleSave}
                             disabled={formSaving}
-                            className="px-4 py-2 bg-purple-700 text-white rounded-lg hover:bg-purple-800 font-medium text-sm disabled:opacity-50"
+                            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium text-sm disabled:opacity-50"
                         >
                             {formSaving ? "Saving..." : editingId ? "Update" : "Create"}
                         </button>
                         <button
                             onClick={closeForm}
-                            className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-gray-200 font-medium text-sm"
+                            className="px-4 py-2 bg-muted text-foreground rounded-lg hover:bg-accent font-medium text-sm"
                         >
                             Cancel
                         </button>
@@ -334,7 +334,7 @@ export default function PricingTiersPage() {
                     Loading pricing tiers...
                 </div>
             ) : error ? (
-                <div className="bg-card rounded-xl shadow-sm p-8 text-center text-red-600">
+                <div className="bg-card rounded-xl shadow-sm p-8 text-center text-destructive">
                     {error}
                 </div>
             ) : filteredTiers.length === 0 ? (
@@ -393,8 +393,8 @@ export default function PricingTiersPage() {
                                             onClick={() => handleToggleActive(tier)}
                                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
                                                 tier.isActive
-                                                    ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                                    : "bg-muted text-muted-foreground hover:bg-gray-200"
+                                                    ? "bg-success/10 text-success hover:bg-success/20"
+                                                    : "bg-muted text-muted-foreground hover:bg-accent"
                                             }`}
                                         >
                                             {tier.isActive ? "Active" : "Inactive"}
@@ -403,14 +403,14 @@ export default function PricingTiersPage() {
                                     <td className="px-6 py-4 text-right text-sm space-x-3">
                                         <button
                                             onClick={() => openEdit(tier)}
-                                            className="text-purple-600 hover:text-purple-800 font-medium"
+                                            className="text-primary hover:text-primary/80 font-medium"
                                         >
                                             Edit
                                         </button>
                                         {tier._count.workshops === 0 && (
                                             <button
                                                 onClick={() => handleDelete(tier)}
-                                                className="text-red-600 hover:text-red-800 font-medium"
+                                                className="text-destructive hover:text-destructive/80 font-medium"
                                             >
                                                 Delete
                                             </button>

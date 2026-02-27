@@ -344,8 +344,8 @@ export default function DuoLandingEditor() {
         <p className="text-muted-foreground">AI Workshop template with two coaches</p>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>}
-      {success && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">Changes saved successfully!</div>}
+      {error && <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6">{error}</div>}
+      {success && <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg mb-6">Changes saved successfully!</div>}
 
       <div className="grid grid-cols-5 gap-6">
         {/* Editor Panel */}
@@ -420,7 +420,7 @@ export default function DuoLandingEditor() {
                             <td className="px-3 py-2">
                               <Link
                                 href={profile.editUrl}
-                                className="text-blue-600 hover:underline"
+                                className="text-primary hover:underline"
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
@@ -456,7 +456,7 @@ export default function DuoLandingEditor() {
             <CardHeader><CardTitle>What This Workshop Is / Is Not</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label className="text-green-700">What This Is ✓</Label>
+                <Label className="text-success">What This Is ✓</Label>
                 {formData.whatItIs.map((item, i) => (
                   <div key={i} className="flex gap-2 mt-2">
                     <Input value={item} onChange={(e) => handleArrayChange("whatItIs", i, e.target.value)} />
@@ -466,7 +466,7 @@ export default function DuoLandingEditor() {
                 <Button variant="outline" size="sm" className="mt-2" onClick={() => addArrayItem("whatItIs")}>+ Add</Button>
               </div>
               <div>
-                <Label className="text-red-700">What This Is Not ✗</Label>
+                <Label className="text-destructive">What This Is Not ✗</Label>
                 {formData.whatItIsNot.map((item, i) => (
                   <div key={i} className="flex gap-2 mt-2">
                     <Input value={item} onChange={(e) => handleArrayChange("whatItIsNot", i, e.target.value)} />
@@ -532,12 +532,12 @@ export default function DuoLandingEditor() {
             </CardHeader>
             <CardContent className="p-0 max-h-[calc(100vh-200px)] overflow-y-auto">
               {/* Hero */}
-              <div className="bg-gradient-to-br from-purple-700 via-purple-600 to-blue-600 text-white p-6">
+              <div className="bg-sidebar text-sidebar-foreground p-6">
                 <div className="grid grid-cols-5 gap-4 items-center">
                   <div className="col-span-3">
                     <span className="bg-card/20 text-xs px-3 py-1 rounded-full">Scaling Up</span>
                     <h1 className="text-xl font-bold mt-2">{formData.heroTitle}</h1>
-                    <p className="text-purple-200 text-sm mt-1">{formData.subtitle}</p>
+                    <p className="text-sidebar-muted text-sm mt-1">{formData.subtitle}</p>
                     <div className="mt-4 space-y-1 text-sm">
                       <div>📅 {formData.eventDate}</div>
                       <div>⏰ {formData.eventTime}</div>
@@ -548,12 +548,12 @@ export default function DuoLandingEditor() {
                     {[formData.coach1, formData.coach2].map((c, i) => (
                       <div key={i} className="text-center">
                         {c.photo ? (
-                          <img src={c.photo} alt={c.name} className="w-16 h-16 rounded-full object-cover mx-auto mb-1 border-2 border-white" />
+                          <img src={c.photo} alt={c.name} className="w-16 h-16 rounded-full object-cover mx-auto mb-1 border-2 border-sidebar-foreground" />
                         ) : (
-                          <div className="w-16 h-16 rounded-full bg-purple-500 mx-auto mb-1 flex items-center justify-center text-xs">No Img</div>
+                          <div className="w-16 h-16 rounded-full bg-primary/70 mx-auto mb-1 flex items-center justify-center text-xs">No Img</div>
                         )}
                         <div className="text-xs font-medium">{c.name || `Coach ${i+1}`}</div>
-                        <div className="text-[10px] text-purple-200">{c.title}</div>
+                        <div className="text-[10px] text-sidebar-muted">{c.title}</div>
                       </div>
                     ))}
                   </div>
@@ -567,11 +567,11 @@ export default function DuoLandingEditor() {
                 {/* What It Is/Isn't */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <h4 className="font-medium text-green-700 mb-2">What This Is ✓</h4>
+                    <h4 className="font-medium text-success mb-2">What This Is ✓</h4>
                     <ul className="space-y-1">{formData.whatItIs.map((i, idx) => <li key={idx} className="text-muted-foreground">• {i}</li>)}</ul>
                   </div>
                   <div>
-                    <h4 className="font-medium text-red-700 mb-2">What This Is Not ✗</h4>
+                    <h4 className="font-medium text-destructive mb-2">What This Is Not ✗</h4>
                     <ul className="space-y-1">{formData.whatItIsNot.map((i, idx) => <li key={idx} className="text-muted-foreground">• {i}</li>)}</ul>
                   </div>
                 </div>
@@ -582,21 +582,21 @@ export default function DuoLandingEditor() {
                     <h4 className="font-medium mb-2">Who This Is For</h4>
                     <ul className="space-y-1">{formData.whoIsFor.map((i, idx) => <li key={idx} className="text-muted-foreground text-xs">• {i}</li>)}</ul>
                   </div>
-                  <div className="bg-red-50 p-3 rounded">
+                  <div className="bg-destructive/10 p-3 rounded">
                     <h4 className="font-medium mb-2">Who Should Skip</h4>
                     <ul className="space-y-1">{formData.whoShouldSkip.map((i, idx) => <li key={idx} className="text-muted-foreground text-xs">• {i}</li>)}</ul>
                   </div>
                 </div>
 
                 {/* Why Now */}
-                <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 rounded-lg text-center">
+                <div className="bg-sidebar text-sidebar-foreground p-4 rounded-lg text-center">
                   <h4 className="font-medium mb-2">Why This Matters Now</h4>
-                  <p className="text-sm text-purple-100">{formData.whyNow}</p>
+                  <p className="text-sm text-sidebar-muted">{formData.whyNow}</p>
                 </div>
 
                 {/* CTA */}
                 <div className="text-center py-4">
-                  <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold">
+                  <button className="bg-primary text-primary-foreground px-8 py-3 rounded-lg font-semibold">
                     {formData.ctaText}
                   </button>
                   <p className="text-muted-foreground text-xs mt-2">Free</p>

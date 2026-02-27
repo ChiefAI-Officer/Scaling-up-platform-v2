@@ -107,8 +107,8 @@ export default function ThankYouPageEditor() {
         <p className="text-muted-foreground">Page shown after successful registration</p>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>}
-      {success && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">Changes saved!</div>}
+      {error && <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6">{error}</div>}
+      {success && <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg mb-6">Changes saved!</div>}
 
       <div className="grid grid-cols-2 gap-6">
         {/* Editor */}
@@ -149,7 +149,7 @@ export default function ThankYouPageEditor() {
                 <Label htmlFor="calendarReminderText">Calendar Reminder Text</Label>
                 <Input id="calendarReminderText" name="calendarReminderText" value={formData.calendarReminderText} onChange={handleChange} className="mt-1" />
               </div>
-              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <div className="rounded-md border border-warning/20 bg-warning/10 px-3 py-2 text-xs text-warning">
                 iDevAffiliate tracking fires automatically on this Thank You page for paid workshops only
                 using the hidden image tag format (sale amount + workshop title order number).
               </div>
@@ -173,15 +173,12 @@ export default function ThankYouPageEditor() {
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div 
-                className="min-h-[500px] relative overflow-hidden"
-                style={{
-                  background: "linear-gradient(135deg, #6B21A8 0%, #7C3AED 50%, #6B21A8 100%)",
-                }}
+              <div
+                className="min-h-[500px] relative overflow-hidden bg-sidebar"
               >
                 {/* Decorative patterns */}
                 <div className="absolute left-4 top-1/4 opacity-20">
-                  <svg width="60" height="200" viewBox="0 0 60 200" className="text-white">
+                  <svg width="60" height="200" viewBox="0 0 60 200" className="text-sidebar-foreground">
                     <path d="M30 0 L30 40 M30 60 L30 100 M30 120 L30 160 M30 180 L30 200" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" fill="none" />
                     <circle cx="30" cy="50" r="5" fill="currentColor" />
                     <circle cx="30" cy="110" r="5" fill="currentColor" />
@@ -189,7 +186,7 @@ export default function ThankYouPageEditor() {
                   </svg>
                 </div>
                 <div className="absolute right-4 top-1/4 opacity-20">
-                  <svg width="60" height="200" viewBox="0 0 60 200" className="text-white">
+                  <svg width="60" height="200" viewBox="0 0 60 200" className="text-sidebar-foreground">
                     <path d="M30 0 L30 40 M30 60 L30 100 M30 120 L30 160 M30 180 L30 200" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" fill="none" />
                     <circle cx="30" cy="50" r="5" fill="currentColor" />
                     <circle cx="30" cy="110" r="5" fill="currentColor" />
@@ -197,7 +194,7 @@ export default function ThankYouPageEditor() {
                   </svg>
                 </div>
 
-                <div className="relative z-10 text-white text-center p-8">
+                <div className="relative z-10 text-sidebar-foreground text-center p-8">
                   {/* Logo */}
                   <div className="font-bold text-lg tracking-wider mb-8">
                     SCALING UP
@@ -209,48 +206,48 @@ export default function ThankYouPageEditor() {
                   </h1>
 
                   {/* Sub-headline */}
-                  <p className="text-purple-200 italic mb-8 max-w-md mx-auto text-sm">
+                  <p className="text-sidebar-muted italic mb-8 max-w-md mx-auto text-sm">
                     {formData.subheadline}
                   </p>
 
                   {/* Video */}
                   {formData.videoUrl ? (
                     <div className="max-w-sm mx-auto mb-6">
-                      <div className="border-4 border-white rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
+                      <div className="border-4 border-sidebar-foreground rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
                         <div className="text-center">
-                          <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center mx-auto mb-2">
-                            <svg className="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 20 20">
+                          <div className="w-12 h-12 rounded-full bg-success flex items-center justify-center mx-auto mb-2">
+                            <svg className="w-6 h-6 text-sidebar-foreground ml-1" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                             </svg>
                           </div>
-                          <span className="text-white text-xs">Video Preview</span>
+                          <span className="text-sidebar-foreground text-xs">Video Preview</span>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="max-w-sm mx-auto mb-6 border-2 border-dashed border-purple-300 rounded-lg p-8 text-purple-200 text-sm">
+                    <div className="max-w-sm mx-auto mb-6 border-2 border-dashed border-sidebar-muted rounded-lg p-8 text-sidebar-muted text-sm">
                       No video configured
                     </div>
                   )}
 
                   {/* Additional Message */}
                   {formData.additionalMessage && (
-                    <p className="text-purple-200 text-sm mb-6 max-w-md mx-auto">
+                    <p className="text-sidebar-muted text-sm mb-6 max-w-md mx-auto">
                       {formData.additionalMessage}
                     </p>
                   )}
 
                   {/* Calendar Reminder */}
-                  <p className="text-purple-200 text-xs mb-4">
+                  <p className="text-sidebar-muted text-xs mb-4">
                     {formData.calendarReminderText}
                   </p>
 
                   {/* Calendar buttons placeholder */}
                   <div className="flex gap-2 justify-center">
-                    <button className="bg-card/20 text-white text-xs px-3 py-1.5 rounded hover:bg-card/30">
+                    <button className="bg-card/20 text-sidebar-foreground text-xs px-3 py-1.5 rounded hover:bg-card/30">
                       Google Calendar
                     </button>
-                    <button className="bg-card/20 text-white text-xs px-3 py-1.5 rounded hover:bg-card/30">
+                    <button className="bg-card/20 text-sidebar-foreground text-xs px-3 py-1.5 rounded hover:bg-card/30">
                       Outlook
                     </button>
                   </div>

@@ -89,7 +89,7 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg text-sm">
           {error}
         </div>
       )}
@@ -188,7 +188,7 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
           type="checkbox"
           checked={formData.marketingOptIn}
           onChange={handleChange}
-          className="mt-1 h-4 w-4 rounded border-gray-300"
+          className="mt-1 h-4 w-4 rounded border-border"
         />
         <Label htmlFor="marketingOptIn" className="text-sm text-muted-foreground font-normal leading-snug">
           I&apos;d like to receive future Scaling Up events and insights

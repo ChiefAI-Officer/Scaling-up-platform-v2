@@ -179,13 +179,13 @@ export default function BioPageEditor() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-6">
+        <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg mb-6">
           Changes saved successfully!
         </div>
       )}
@@ -265,7 +265,7 @@ export default function BioPageEditor() {
                   value={formData.biography}
                   onChange={handleChange}
                   rows={10}
-                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
                   placeholder="Enter the coach's biography..."
                 />
                 <p className="text-sm text-muted-foreground mt-1">
@@ -346,7 +346,7 @@ export default function BioPageEditor() {
               <div className="border rounded-lg overflow-hidden bg-card">
                 <div className="p-6 text-center">
                   {/* Logo */}
-                  <div className="text-purple-700 font-bold text-xl mb-8">
+                  <div className="text-primary font-bold text-xl mb-8">
                     SCALING UP COACHES
                   </div>
 
@@ -355,10 +355,10 @@ export default function BioPageEditor() {
                     <img
                       src={formData.profileImageUrl}
                       alt={formData.coachName}
-                      className="w-32 h-32 rounded-full object-cover mx-auto mb-4 border-4 border-purple-100"
+                      className="w-32 h-32 rounded-full object-cover mx-auto mb-4 border-4 border-primary/20"
                     />
                   ) : (
-                    <div className="w-32 h-32 rounded-full bg-gray-200 mx-auto mb-4 flex items-center justify-center">
+                    <div className="w-32 h-32 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
                       <span className="text-muted-foreground">No Image</span>
                     </div>
                   )}
@@ -384,7 +384,7 @@ export default function BioPageEditor() {
 
                   {/* CTA Button */}
                   {formData.showCtaButton && (
-                    <button className="bg-purple-600 text-white px-6 py-3 rounded-full font-medium hover:bg-purple-700 transition">
+                    <button className="bg-primary text-primary-foreground px-6 py-3 rounded-full font-medium hover:bg-primary/90 transition">
                       {formData.ctaButtonText || "Book a Free Call"}
                     </button>
                   )}

@@ -75,7 +75,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
           </p>
           <Link
             href="/"
-            className="text-blue-600 hover:text-blue-700 font-medium"
+            className="text-primary hover:text-primary/80 font-medium"
           >
             Return Home
           </Link>
@@ -121,10 +121,10 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
       <div className="max-w-2xl mx-auto px-4">
         <div className="bg-card rounded-xl shadow-lg overflow-hidden">
           {/* Success Header */}
-          <div className="bg-green-500 px-6 py-8 text-white text-center">
+          <div className="bg-success px-6 py-8 text-white text-center">
             <div className="w-16 h-16 bg-card rounded-full flex items-center justify-center mx-auto mb-4">
               <svg
-                className="w-8 h-8 text-green-500"
+                className="w-8 h-8 text-success"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -138,7 +138,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
               </svg>
             </div>
             <h1 className="text-2xl font-bold">Registration Confirmed!</h1>
-            <p className="mt-2 text-green-100">
+            <p className="mt-2 text-white/80">
               You&apos;re all set for the workshop
             </p>
           </div>
@@ -219,7 +219,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
               <ul className="space-y-2 text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <svg
-                    className="w-5 h-5 text-green-500 mt-0.5"
+                    className="w-5 h-5 text-success mt-0.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -238,7 +238,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
                 </li>
                 <li className="flex items-start gap-2">
                   <svg
-                    className="w-5 h-5 text-green-500 mt-0.5"
+                    className="w-5 h-5 text-success mt-0.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -256,7 +256,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
                       <a
                         href={`/api/workshops/${registration.workshop.id}/ics`}
                         download
-                        className="text-blue-600 hover:text-blue-700 text-sm font-medium underline"
+                        className="text-primary hover:text-primary/80 text-sm font-medium underline"
                       >
                         Download .ics
                       </a>
@@ -274,7 +274,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
                         })}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700 text-sm font-medium underline"
+                        className="text-primary hover:text-primary/80 text-sm font-medium underline"
                       >
                         Google Calendar
                       </a>
@@ -284,7 +284,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
                 {registration.workshop.workshopType?.preWorkshopInstructions && (
                   <li className="flex items-start gap-2">
                     <svg
-                      className="w-5 h-5 text-green-500 mt-0.5"
+                      className="w-5 h-5 text-success mt-0.5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -307,7 +307,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
             <div className="text-center pt-4">
               <Link
                 href="/"
-                className="text-blue-600 hover:text-blue-700 font-medium"
+                className="text-primary hover:text-primary/80 font-medium"
               >
                 Return to Home
               </Link>
@@ -324,7 +324,7 @@ export default function SuccessPage(props: SuccessPageProps) {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       }
     >

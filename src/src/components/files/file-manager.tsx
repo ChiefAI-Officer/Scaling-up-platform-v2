@@ -166,7 +166,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
               id="file-input"
               ref={fileInputRef}
               type="file"
-              className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+              className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary hover:file:bg-primary/15"
             />
           </div>
 
@@ -178,7 +178,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
               id="upload-workshop"
               value={uploadWorkshopId}
               onChange={(e) => setUploadWorkshopId(e.target.value)}
-              className="block w-full rounded-md border-border text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="block w-full rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary"
             >
               <option value="">No workshop</option>
               {workshops.map((w) => (
@@ -197,7 +197,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
               id="upload-category"
               value={uploadCategory}
               onChange={(e) => setUploadCategory(e.target.value)}
-              className="block w-full rounded-md border-border text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="block w-full rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary"
             >
               {FILE_CATEGORIES.map((c) => (
                 <option key={c.value} value={c.value}>
@@ -211,7 +211,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
             <button
               type="submit"
               disabled={uploading}
-              className="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {uploading ? "Uploading..." : "Upload"}
             </button>
@@ -221,13 +221,13 @@ export function FileManager({ initialFiles, workshops }: Props) {
 
       {/* Status Messages */}
       {error && (
-        <div className="rounded-md bg-red-50 p-4">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="rounded-md bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
       {success && (
-        <div className="rounded-md bg-green-50 p-4">
-          <p className="text-sm text-green-700">{success}</p>
+        <div className="rounded-md bg-success/10 p-4">
+          <p className="text-sm text-success">{success}</p>
         </div>
       )}
 
@@ -238,7 +238,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
           <select
             value={filterWorkshop}
             onChange={(e) => setFilterWorkshop(e.target.value)}
-            className="rounded-md border-border text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary"
           >
             <option value="">All workshops</option>
             {workshops.map((w) => (
@@ -250,7 +250,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="rounded-md border-border text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            className="rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary"
           >
             <option value="">All categories</option>
             {FILE_CATEGORIES.filter((c) => c.value).map((c) => (
@@ -313,7 +313,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
                             href={file.downloadUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                            className="text-sm font-medium text-primary hover:text-primary/80"
                           >
                             {file.filename}
                           </a>
@@ -341,7 +341,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
                     </td>
                     <td className="px-6 py-4 text-sm text-foreground">
                       {file.workflowStep ? (
-                        <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                        <span className="inline-flex rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                           {file.workflowStep.subject || file.workflowStep.stepType}
                         </span>
                       ) : (
@@ -360,14 +360,14 @@ export function FileManager({ initialFiles, workshops }: Props) {
                           href={file.downloadUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                          className="text-sm font-medium text-primary hover:text-primary/80"
                         >
                           View
                         </a>
                         <button
                           onClick={() => handleDelete(file.id, file.filename)}
                           disabled={deletingId === file.id}
-                          className="text-sm font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
+                          className="text-sm font-medium text-destructive hover:text-destructive/80 disabled:opacity-50"
                         >
                           {deletingId === file.id ? "..." : "Delete"}
                         </button>

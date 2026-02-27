@@ -133,8 +133,8 @@ export function ContactsTable({ data }: ContactsTableProps) {
                                 <TableCell className="text-muted-foreground">{contact.email}</TableCell>
                                 <TableCell>
                                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${contact.emailMarketing === "Subscribed"
-                                            ? "bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20"
-                                            : "bg-muted text-muted-foreground ring-1 ring-inset ring-gray-500/10"
+                                            ? "bg-success/10 text-success ring-1 ring-inset ring-success/20"
+                                            : "bg-muted text-muted-foreground ring-1 ring-inset ring-border"
                                         }`}>
                                         {contact.emailMarketing}
                                     </span>

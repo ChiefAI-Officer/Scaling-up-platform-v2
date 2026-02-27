@@ -74,7 +74,7 @@ export function CancelWorkshopDialog({
             <Button
                 variant="outline"
                 onClick={() => setIsOpen(true)}
-                className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                className="border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
                 Cancel Workshop
             </Button>
@@ -90,11 +90,11 @@ export function CancelWorkshopDialog({
                 </p>
 
                 {feeRequired && (
-                    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                        <p className="text-sm font-medium text-amber-800">
+                    <div className="mt-4 rounded-lg border border-warning/20 bg-warning/10 p-4">
+                        <p className="text-sm font-medium text-warning">
                             Cancellation Fee: ${CANCELLATION_FEE_DOLLARS}
                         </p>
-                        <p className="mt-1 text-sm text-amber-700">
+                        <p className="mt-1 text-sm text-warning">
                             This workshop is within {MINIMUM_LEAD_TIME_DAYS} days of the event date
                             ({daysUntilEvent} days remaining). A ${CANCELLATION_FEE_DOLLARS} cancellation
                             fee will be billed to your account.
@@ -103,8 +103,8 @@ export function CancelWorkshopDialog({
                 )}
 
                 {!feeRequired && daysUntilEvent >= 0 && (
-                    <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                        <p className="text-sm text-blue-700">
+                    <div className="mt-4 rounded-lg border border-primary/20 bg-primary/10 p-4">
+                        <p className="text-sm text-primary">
                             No cancellation fee applies. The event is {daysUntilEvent} days away
                             (more than {MINIMUM_LEAD_TIME_DAYS} days).
                         </p>
@@ -116,7 +116,7 @@ export function CancelWorkshopDialog({
                 </p>
 
                 {error && (
-                    <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className="mt-3 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                         {error}
                     </div>
                 )}
@@ -135,7 +135,7 @@ export function CancelWorkshopDialog({
                     <Button
                         onClick={handleCancel}
                         disabled={isSubmitting}
-                        className="bg-red-600 hover:bg-red-700 text-white"
+                        className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                     >
                         {isSubmitting
                             ? "Canceling..."

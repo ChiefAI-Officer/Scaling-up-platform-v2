@@ -432,7 +432,7 @@ export default function NewWorkshopPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
@@ -451,7 +451,7 @@ export default function NewWorkshopPage() {
                 onChange={handleChange}
                 required
                 disabled={coachIsAutoFilled}
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500 disabled:bg-muted"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary disabled:bg-muted"
               >
                 <option value="">Select a coach...</option>
                 {coaches.map((coach) => (
@@ -488,7 +488,7 @@ export default function NewWorkshopPage() {
                   value={formData.secondaryCoachId}
                   onChange={handleChange}
                   required={formData.isDuoWorkshop}
-                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
                 >
                   <option value="">Select Coach 2...</option>
                   {secondaryCoachOptions.map((coach) => (
@@ -510,7 +510,7 @@ export default function NewWorkshopPage() {
                 value={formData.categoryId}
                 onChange={handleChange}
                 required
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
               >
                 <option value="">Select a category...</option>
                 {categories.map((cat) => (
@@ -520,7 +520,7 @@ export default function NewWorkshopPage() {
                 ))}
               </select>
               {categories.length === 0 && (
-                <p className="text-sm text-amber-600 mt-1">
+                <p className="text-sm text-warning mt-1">
                   No categories found. An admin must create categories first.
                 </p>
               )}
@@ -554,7 +554,7 @@ export default function NewWorkshopPage() {
                 onChange={handleChange}
                 readOnly={coachIsAutoFilled && Boolean(formData.description)}
                 rows={4}
-                className={`mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500 ${coachIsAutoFilled && formData.description ? "bg-muted" : ""}`}
+                className={`mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary ${coachIsAutoFilled && formData.description ? "bg-muted" : ""}`}
                 placeholder="Internal notes for operations and setup..."
               />
               <p className="text-sm text-muted-foreground mt-1">
@@ -572,7 +572,7 @@ export default function NewWorkshopPage() {
                 value={formData.geoTargetAreas}
                 onChange={handleChange}
                 rows={2}
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
                 placeholder="e.g., Chicago metro, Northern Illinois, Southeast Wisconsin"
               />
               <p className="text-sm text-muted-foreground mt-1">
@@ -588,7 +588,7 @@ export default function NewWorkshopPage() {
                 value={formData.excludedClients}
                 onChange={handleChange}
                 rows={2}
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
                 placeholder="e.g., Acme Corp, GlobalTech Inc"
               />
               <p className="text-sm text-muted-foreground mt-1">
@@ -612,7 +612,7 @@ export default function NewWorkshopPage() {
                   value={formData.format}
                   onChange={handleChange}
                   required
-                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
                 >
                   <option value="IN_PERSON">In-Person</option>
                   <option value="VIRTUAL">Virtual</option>
@@ -746,7 +746,7 @@ export default function NewWorkshopPage() {
                   value={formData.venueInstructions}
                   onChange={handleChange}
                   rows={2}
-                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
                   placeholder="Parking, entrance, and venue details for attendees..."
                 />
               </div>
@@ -824,7 +824,7 @@ export default function NewWorkshopPage() {
                       name="couponDiscountPercent"
                       value={formData.couponDiscountPercent}
                       onChange={handleChange}
-                      className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                      className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
                     >
                       <option value="">No coupon</option>
                       {COUPON_PRESETS.map((preset) => (
@@ -874,7 +874,7 @@ export default function NewWorkshopPage() {
                   href="/terms-and-conditions"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline text-blue-600 hover:text-blue-800"
+                  className="underline text-primary hover:text-primary/80"
                 >
                   terms and conditions
                 </a>

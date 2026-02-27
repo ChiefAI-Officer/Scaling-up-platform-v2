@@ -21,43 +21,43 @@ interface StatusPillProps {
 const STATUS_CONFIG: Record<WorkshopStatus, { label: string; color: string; dotColor: string; animate?: boolean }> = {
     REQUESTED: {
         label: "Requested",
-        color: "bg-amber-50 text-amber-700 border-amber-200",
-        dotColor: "bg-amber-400",
+        color: "bg-status-requested/10 text-status-requested border-status-requested/20",
+        dotColor: "bg-status-requested",
         animate: true,
     },
     AWAITING_APPROVAL: {
         label: "Awaiting Approval",
-        color: "bg-blue-50 text-blue-700 border-blue-200",
-        dotColor: "bg-blue-400",
+        color: "bg-status-awaiting/10 text-status-awaiting border-status-awaiting/20",
+        dotColor: "bg-status-awaiting",
         animate: true,
     },
     PRE_EVENT: {
         label: "Pre-Event",
-        color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-        dotColor: "bg-emerald-500",
+        color: "bg-status-active/10 text-status-active border-status-active/20",
+        dotColor: "bg-status-active",
         animate: true,
     },
     POST_EVENT: {
         label: "Post-Event",
-        color: "bg-purple-50 text-purple-700 border-purple-200",
-        dotColor: "bg-purple-500",
+        color: "bg-status-post/10 text-status-post border-status-post/20",
+        dotColor: "bg-status-post",
     },
     COMPLETED: {
         label: "Completed",
-        color: "bg-slate-100 text-slate-600 border-slate-200",
-        dotColor: "bg-slate-400",
+        color: "bg-muted text-status-completed border-border",
+        dotColor: "bg-status-completed",
     },
     CANCELED: {
         label: "Canceled",
-        color: "bg-red-50 text-red-700 border-red-200",
-        dotColor: "bg-red-500",
+        color: "bg-status-canceled/10 text-status-canceled border-status-canceled/20",
+        dotColor: "bg-status-canceled",
     },
 };
 
 const DEFAULT_CONFIG = {
     label: "Unknown",
     color: "bg-muted text-foreground border-border",
-    dotColor: "bg-gray-400",
+    dotColor: "bg-muted-foreground",
 };
 
 export function StatusPill({ status, className, showDot = true }: StatusPillProps) {

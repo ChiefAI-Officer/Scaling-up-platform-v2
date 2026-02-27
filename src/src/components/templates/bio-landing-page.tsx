@@ -6,9 +6,9 @@ export function BioLandingPage({ data }: { data: LandingPageData }) {
     const coach = data.coaches[0];
 
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-muted">
             <div className="container mx-auto px-6 py-20">
-                <div className="max-w-4xl mx-auto bg-card rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+                <div className="max-w-4xl mx-auto bg-card rounded-3xl shadow-xl overflow-hidden border border-border">
                     {/* Header / Cover */}
                     <div className="h-48 bg-gradient-to-r from-primary to-primary/80 relative">
                         {/* Optional Decorative Pattern */}
@@ -30,9 +30,9 @@ export function BioLandingPage({ data }: { data: LandingPageData }) {
 
                         <div className="flex flex-col md:flex-row justify-between items-start gap-6">
                             <div>
-                                <h1 className="text-4xl font-bold mb-2 text-slate-900">{coach.name}</h1>
+                                <h1 className="text-4xl font-bold mb-2 text-foreground">{coach.name}</h1>
                                 <p className="text-xl text-primary font-medium mb-1">{coach.title}</p>
-                                <p className="text-slate-500 text-lg mb-6">{coach.company}</p>
+                                <p className="text-muted-foreground text-lg mb-6">{coach.company}</p>
 
                                 <div className="flex gap-3">
                                     {/* Social Links Placeholders */}
@@ -48,11 +48,11 @@ export function BioLandingPage({ data }: { data: LandingPageData }) {
                                 </div>
                             </div>
 
-                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 max-w-sm w-full">
-                                <h3 className="font-semibold text-slate-900 mb-4">Certifications & Expertise</h3>
+                            <div className="bg-muted p-6 rounded-2xl border border-border max-w-sm w-full">
+                                <h3 className="font-semibold text-foreground mb-4">Certifications & Expertise</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {["Scaling Up Certified", "3HAG Certified", "Executive Leadership"].map(tag => (
-                                        <span key={tag} className="px-3 py-1 bg-card border shadow-sm rounded-full text-xs font-medium text-slate-600">
+                                        <span key={tag} className="px-3 py-1 bg-card border shadow-sm rounded-full text-xs font-medium text-muted-foreground">
                                             {tag}
                                         </span>
                                     ))}
@@ -62,7 +62,7 @@ export function BioLandingPage({ data }: { data: LandingPageData }) {
 
                         <div className="mt-12 border-t pt-12">
                             <h2 className="text-2xl font-bold mb-6">About {coach.name.split(' ')[0]}</h2>
-                            <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed">
+                            <div className="prose prose-slate max-w-none text-muted-foreground leading-relaxed">
                                 <p>{coach.bio}</p>
                                 {!coach.bio && (
                                     <>
@@ -78,9 +78,9 @@ export function BioLandingPage({ data }: { data: LandingPageData }) {
                         </div>
 
                         {/* Workshop CTA */}
-                        <div className="mt-12 p-8 bg-slate-900 rounded-2xl text-white text-center">
+                        <div className="mt-12 p-8 bg-sidebar rounded-2xl text-sidebar-foreground text-center">
                             <h2 className="text-2xl font-bold mb-4">Work with {coach.name.split(' ')[0]}</h2>
-                            <p className="text-slate-300 mb-8 max-w-2xl mx-auto">
+                            <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
                                 Join my upcoming Scaling Up Masterclass and take your business to the next level.
                             </p>
                             <Button size="lg" variant="secondary" className="font-bold">

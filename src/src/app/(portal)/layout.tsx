@@ -25,8 +25,8 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
     return (
         <div className="flex min-h-screen bg-background">
             {/* Sidebar — hidden on mobile */}
-            <aside className="hidden md:flex w-64 bg-slate-900 text-white flex-col fixed inset-y-0 left-0 z-50">
-                <div className="px-6 h-16 flex items-center border-b border-slate-800">
+            <aside className="hidden md:flex w-64 bg-sidebar text-sidebar-foreground flex-col fixed inset-y-0 left-0 z-50">
+                <div className="px-6 h-16 flex items-center border-b border-sidebar-border">
                     <span className="text-lg font-bold tracking-tight">Scaling Up Coach</span>
                 </div>
 
@@ -51,21 +51,21 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                         90-Day Follow-Up
                     </NavLink>
 
-                    <div className="pt-4 mt-4 border-t border-slate-800">
+                    <div className="pt-4 mt-4 border-t border-sidebar-border">
                         <NavLink href="/portal/settings" icon={<Settings className="w-5 h-5" />}>
                             Settings
                         </NavLink>
                     </div>
                 </nav>
 
-                <div className="p-4 border-t border-slate-800">
+                <div className="p-4 border-t border-sidebar-border">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-sm font-semibold text-primary-foreground uppercase">
                             {coachName.charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{coachName}</p>
-                            <p className="text-xs text-slate-400 truncate">Coach</p>
+                            <p className="text-xs text-sidebar-muted truncate">Coach</p>
                         </div>
                     </div>
                 </div>
@@ -107,7 +107,7 @@ function NavLink({ href, icon, children }: { href: string; icon: React.ReactNode
     return (
         <Link
             href={href}
-            className="flex items-center gap-3 px-4 py-2.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-lg transition-all duration-200 group"
+            className="flex items-center gap-3 px-4 py-2.5 text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-border/80 rounded-lg transition-all duration-200 group"
         >
             <span className="group-hover:text-white transition-colors duration-200">{icon}</span>
             <span className="font-medium text-sm">{children}</span>
@@ -116,5 +116,5 @@ function NavLink({ href, icon, children }: { href: string; icon: React.ReactNode
 }
 
 function NavSeparator() {
-    return <div className="my-3 border-t border-slate-800/50" />;
+    return <div className="my-3 border-t border-sidebar-border/50" />;
 }

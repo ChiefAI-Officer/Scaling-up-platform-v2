@@ -256,7 +256,7 @@ function DefaultWorkshopTemplate({ workshop }: { workshop: WorkshopFallbackData 
     <div className="min-h-screen bg-muted py-10 px-4">
       <div className="max-w-5xl mx-auto grid gap-8 lg:grid-cols-3">
         <section className="lg:col-span-2 bg-card rounded-xl shadow-sm border border-border p-8 space-y-6">
-          <p className="text-sm font-semibold tracking-wide text-blue-600 uppercase">Workshop</p>
+          <p className="text-sm font-semibold tracking-wide text-primary uppercase">Workshop</p>
           <h1 className="text-3xl font-bold text-foreground">{workshop.title}</h1>
           <p className="text-muted-foreground">
             {"Join this workshop to learn practical frameworks you can apply immediately."}
@@ -285,7 +285,7 @@ function DefaultWorkshopTemplate({ workshop }: { workshop: WorkshopFallbackData 
           <p className="mt-2 text-sm text-muted-foreground">
             Hosted by {workshop.coach.firstName} {workshop.coach.lastName}
           </p>
-          <p className="mt-4 text-2xl font-bold text-blue-700">{priceLabel}</p>
+          <p className="mt-4 text-2xl font-bold text-primary">{priceLabel}</p>
           <div className="mt-6">
             <RegistrationForm workshopId={workshop.id} isFree={workshop.isFree} />
           </div>
@@ -435,7 +435,7 @@ function SoloLandingTemplate({ content, workshop }: { content: SoloContent; work
           <ul className="space-y-3">
             {benefits.map((benefit, i) => (
               <li key={i} className="flex items-start gap-3">
-                <span className="text-blue-500 font-bold">✓</span>
+                <span className="text-primary font-bold">✓</span>
                 <span className="text-foreground">{benefit}</span>
               </li>
             ))}
@@ -448,16 +448,16 @@ function SoloLandingTemplate({ content, workshop }: { content: SoloContent; work
               <h3 className="font-semibold uppercase text-sm">Register Now</h3>
             </div>
             <div className="p-6">
-              <div className="bg-blue-600 text-white inline-block px-4 py-2 rounded mb-4 font-semibold">
+              <div className="bg-primary text-primary-foreground inline-block px-4 py-2 rounded mb-4 font-semibold">
                 {eventDate}
               </div>
               <p className="font-semibold mb-2">{heroTitle} with {coachName}</p>
-              <p className="text-2xl font-bold text-purple-700 mb-6">
+              <p className="text-2xl font-bold text-primary mb-6">
                 {workshop.isFree ? "Free" : "$299"}
               </p>
               <a
                 href={registrationUrl}
-                className="block w-full bg-blue-600 text-white text-center py-4 rounded-lg font-semibold hover:bg-blue-700 transition"
+                className="block w-full bg-primary text-primary-foreground text-center py-4 rounded-lg font-semibold hover:bg-primary/90 transition"
               >
                 {ctaText}
               </a>
@@ -526,21 +526,21 @@ function DuoLandingTemplate({ content, workshop }: { content: DuoContent; worksh
 
         <div className="grid md:grid-cols-2 gap-8 mb-12">
           <div>
-            <h3 className="font-bold text-green-700 mb-4">What This Workshop Is ✓</h3>
+            <h3 className="font-bold text-success mb-4">What This Workshop Is ✓</h3>
             <ul className="space-y-2">
               {whatItIs.map((item, i) => (
                 <li key={i} className="flex items-center gap-2 text-foreground">
-                  <span className="text-green-500">✓</span> {item}
+                  <span className="text-success">✓</span> {item}
                 </li>
               ))}
             </ul>
           </div>
           <div>
-            <h3 className="font-bold text-red-700 mb-4">What This Workshop Is Not ✗</h3>
+            <h3 className="font-bold text-destructive mb-4">What This Workshop Is Not ✗</h3>
             <ul className="space-y-2">
               {whatItIsNot.map((item, i) => (
                 <li key={i} className="flex items-center gap-2 text-foreground">
-                  <span className="text-red-500">✗</span> {item}
+                  <span className="text-destructive">✗</span> {item}
                 </li>
               ))}
             </ul>
@@ -556,7 +556,7 @@ function DuoLandingTemplate({ content, workshop }: { content: DuoContent; worksh
               ))}
             </ul>
           </div>
-          <div className="bg-red-50 p-6 rounded-lg">
+          <div className="bg-destructive/10 p-6 rounded-lg">
             <h3 className="font-bold mb-4">Who Should Skip This</h3>
             <ul className="space-y-2">
               {whoShouldSkip.map((item, i) => (
@@ -574,7 +574,7 @@ function DuoLandingTemplate({ content, workshop }: { content: DuoContent; worksh
         <div className="text-center py-8">
           <a
             href={registrationUrl}
-            className="inline-block bg-blue-600 text-white px-12 py-4 rounded-lg font-bold text-lg hover:bg-blue-700 transition"
+            className="inline-block bg-primary text-primary-foreground px-12 py-4 rounded-lg font-bold text-lg hover:bg-primary/90 transition"
           >
             {ctaText}
           </a>
@@ -645,7 +645,7 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
                   name="email"
                   placeholder={emailPlaceholder}
                   required
-                  className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                  className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -660,7 +660,7 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
                     name="firstName"
                     placeholder="First name"
                     required
-                    className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary"
                   />
                 </div>
                 <div className="space-y-2">
@@ -673,7 +673,7 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
                     name="lastName"
                     placeholder={namePlaceholder}
                     required
-                    className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                    className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -691,10 +691,10 @@ function RegistrationTemplate({ content, workshop }: { content: RegistrationCont
                   type="text"
                   name="company"
                   placeholder={companyPlaceholder}
-                  className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500"
+                  className="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-primary"
                 />
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition">
+              <button type="submit" className="w-full bg-primary text-primary-foreground py-4 rounded-lg font-semibold hover:bg-primary/90 transition">
                 {submitButtonText}
               </button>
               <p className="text-center text-muted-foreground text-xs">{privacyText}</p>

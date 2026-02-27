@@ -97,8 +97,8 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
                         className="w-16 h-16 rounded-full object-cover"
                     />
                 ) : (
-                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-xl font-medium text-blue-600">
+                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                        <span className="text-xl font-medium text-primary">
                             {firstName?.[0]}{lastName?.[0]}
                         </span>
                     </div>
@@ -113,7 +113,7 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
                                 accept="image/jpeg,image/png,image/webp"
                                 onChange={handleImageUpload}
                                 disabled={uploading}
-                                className="text-xs file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                className="text-xs file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/15"
                             />
                         </label>
                     </div>
@@ -121,7 +121,7 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
             </div>
 
             {message && (
-                <div className={`px-4 py-3 rounded-lg text-sm ${message.type === "success" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+                <div className={`px-4 py-3 rounded-lg text-sm ${message.type === "success" ? "bg-success/10 text-success border border-success/20" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>
                     {message.text}
                 </div>
             )}
@@ -178,7 +178,7 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
                     type="checkbox"
                     checked={showBookCallCta}
                     onChange={(e) => setShowBookCallCta(e.target.checked)}
-                    className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                 />
                 <Label htmlFor="showBookCallCta" className="cursor-pointer">
                     Show &ldquo;Book a Call&rdquo; button on my bio page

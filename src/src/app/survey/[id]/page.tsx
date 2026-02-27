@@ -151,7 +151,7 @@ export default function PublicSurveyPage() {
         </div>
 
         {error && (
-          <div className="mb-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mb-6 rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         )}
@@ -163,7 +163,7 @@ export default function PublicSurveyPage() {
                 <label className="block text-sm font-medium text-foreground">
                   {index + 1}. {question.label}
                   {question.isRequired && (
-                    <span className="ml-1 text-red-500">*</span>
+                    <span className="ml-1 text-destructive">*</span>
                   )}
                 </label>
                 {question.description && (
@@ -203,8 +203,8 @@ export default function PublicSurveyPage() {
                       onClick={() => setAnswer(question.id, String(n))}
                       className={`flex h-12 w-12 items-center justify-center rounded-lg border-2 text-lg font-medium transition-colors ${
                         answers[question.id] === String(n)
-                          ? "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-border text-muted-foreground hover:border-gray-400"
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:border-muted-foreground"
                       }`}
                     >
                       {n}
@@ -225,11 +225,11 @@ export default function PublicSurveyPage() {
                         className={`flex h-10 w-10 items-center justify-center rounded-md border text-sm font-medium transition-colors ${
                           answers[question.id] === String(n)
                             ? n <= 6
-                              ? "border-red-500 bg-red-50 text-red-700"
+                              ? "border-destructive bg-destructive/10 text-destructive"
                               : n <= 8
-                                ? "border-yellow-500 bg-yellow-50 text-yellow-700"
-                                : "border-green-500 bg-green-50 text-green-700"
-                            : "border-border text-muted-foreground hover:border-gray-400"
+                                ? "border-warning bg-warning/10 text-warning"
+                                : "border-success bg-success/10 text-success"
+                            : "border-border text-muted-foreground hover:border-muted-foreground"
                         }`}
                       >
                         {n}
@@ -257,7 +257,7 @@ export default function PublicSurveyPage() {
                         value={opt}
                         checked={answers[question.id] === opt}
                         onChange={() => setAnswer(question.id, opt)}
-                        className="h-4 w-4 border-border text-blue-600"
+                        className="h-4 w-4 border-border text-primary"
                       />
                       <span className="text-sm text-foreground">{opt}</span>
                     </label>
@@ -281,7 +281,7 @@ export default function PublicSurveyPage() {
                           type="checkbox"
                           checked={selected}
                           onChange={() => toggleMultiChoice(question.id, opt)}
-                          className="h-4 w-4 rounded border-border text-blue-600"
+                          className="h-4 w-4 rounded border-border text-primary"
                         />
                         <span className="text-sm text-foreground">{opt}</span>
                       </label>
@@ -300,8 +300,8 @@ export default function PublicSurveyPage() {
                       onClick={() => setAnswer(question.id, val)}
                       className={`rounded-md border-2 px-6 py-2 text-sm font-medium transition-colors ${
                         answers[question.id] === val
-                          ? "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-border text-muted-foreground hover:border-gray-400"
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:border-muted-foreground"
                       }`}
                     >
                       {val}
@@ -317,7 +317,7 @@ export default function PublicSurveyPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-md bg-blue-600 px-8 py-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded-md bg-primary px-8 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {submitting ? "Submitting..." : "Submit Survey"}
             </button>

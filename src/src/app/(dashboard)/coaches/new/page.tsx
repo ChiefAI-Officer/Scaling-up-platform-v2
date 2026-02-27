@@ -102,7 +102,7 @@ export default function NewCoachPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
@@ -199,7 +199,7 @@ export default function NewCoachPage() {
                 value={formData.bio}
                 onChange={handleChange}
                 rows={4}
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
                 placeholder="Brief biography and coaching experience..."
               />
             </div>
@@ -237,8 +237,8 @@ export default function NewCoachPage() {
           </CardContent>
         </Card>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800">
+        <div className="bg-info/10 border border-info/20 rounded-lg p-4">
+          <p className="text-sm text-info">
             <strong>Note:</strong> New coaches are created with Pending certification and payment status.
             You can update their status and add certifications after creation.
           </p>

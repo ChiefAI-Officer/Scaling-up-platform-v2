@@ -109,7 +109,7 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
             href={`/admin/surveys/aggregate?templateId=${t.id}`}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               t.id === selectedId
-                ? "bg-blue-600 text-white"
+                ? "bg-primary text-primary-foreground"
                 : "bg-card border border-border text-foreground hover:bg-accent"
             }`}
           >
@@ -160,7 +160,7 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                   </div>
                   {q.avgNumeric !== undefined && (
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-blue-600">{q.avgNumeric.toFixed(1)}</p>
+                      <p className="text-2xl font-bold text-primary">{q.avgNumeric.toFixed(1)}</p>
                       <p className="text-xs text-muted-foreground">
                         {q.type === "NPS" ? "avg NPS" : "avg rating"}
                       </p>
@@ -181,7 +181,7 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                             </div>
                             <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden">
                               <div
-                                className="bg-blue-500 h-full rounded-full transition-all"
+                                className="bg-primary h-full rounded-full transition-all"
                                 style={{ width: `${Math.max(pct, 2)}%` }}
                               />
                             </div>
@@ -218,14 +218,14 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                       <tr key={w.workshopId} className="hover:bg-accent">
                         <td className="px-4 py-3 text-sm font-mono text-muted-foreground">{w.workshopCode || "---"}</td>
                         <td className="px-4 py-3">
-                          <Link href={`/workshops/${w.workshopId}`} className="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                          <Link href={`/workshops/${w.workshopId}`} className="text-sm text-primary hover:text-primary/80 font-medium">
                             {w.workshopTitle}
                           </Link>
                         </td>
                         <td className="px-4 py-3 text-sm text-foreground text-right">{w.responseCount}</td>
                         <td className="px-4 py-3 text-sm text-right">
                           {w.avgNps !== null ? (
-                            <span className={w.avgNps >= 8 ? "text-green-600 font-semibold" : w.avgNps >= 6 ? "text-foreground" : "text-red-600"}>
+                            <span className={w.avgNps >= 8 ? "text-success font-semibold" : w.avgNps >= 6 ? "text-foreground" : "text-destructive"}>
                               {w.avgNps}
                             </span>
                           ) : (
@@ -235,7 +235,7 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                         <td className="px-4 py-3 text-sm text-right">
                           <Link
                             href={`/admin/surveys/templates/${selectedId}?tab=results&workshopId=${w.workshopId}`}
-                            className="text-blue-600 hover:underline"
+                            className="text-primary hover:underline"
                           >
                             View
                           </Link>
