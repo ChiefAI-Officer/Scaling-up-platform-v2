@@ -173,11 +173,10 @@ describe("Workshop status API – PATCH /api/workshops/[id]/status", () => {
 
   /* ---------- Happy-path transitions ------------------------------ */
 
-  it("REQUESTED -> AWAITING_APPROVAL succeeds", async () => {
+  it("REQUESTED -> AWAITING_APPROVAL is blocked (only via approval queue)", async () => {
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(
       mockWorkshop("REQUESTED")
     );
-    mockUpdateReturns("AWAITING_APPROVAL");
 
     const response = await PATCH(
       buildPatchRequest({ status: "AWAITING_APPROVAL" }),
@@ -185,24 +184,9 @@ describe("Workshop status API – PATCH /api/workshops/[id]/status", () => {
     );
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(body.message).toContain("AWAITING_APPROVAL");
-    expect(db.workshop.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "ws-1" },
-        data: { status: "AWAITING_APPROVAL" },
-      })
-    );
-    expect(db.automationTask.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          workshopId: "ws-1",
-          taskType: "status_change_to_AWAITING_APPROVAL",
-          status: "COMPLETED",
-        }),
-      })
-    );
+    expect(response.status).toBe(400);
+    expect(body.success).toBe(false);
+    expect(body.error).toMatch(/cannot transition/i);
   });
 
   it("AWAITING_APPROVAL -> PRE_EVENT succeeds", async () => {
@@ -430,12 +414,12 @@ describe("Workshop status API – PATCH /api/workshops/[id]/status", () => {
 
   it("does not emit Inngest event for non-COMPLETED transitions", async () => {
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(
-      mockWorkshop("REQUESTED")
+      mockWorkshop("PRE_EVENT")
     );
-    mockUpdateReturns("AWAITING_APPROVAL");
+    mockUpdateReturns("POST_EVENT");
 
     await PATCH(
-      buildPatchRequest({ status: "AWAITING_APPROVAL" }),
+      buildPatchRequest({ status: "POST_EVENT" }),
       routeParams()
     );
 

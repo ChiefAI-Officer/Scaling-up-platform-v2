@@ -26,7 +26,7 @@ const updateWorkshopStatusSchema = z.object({
 });
 
 const validTransitions: Record<WorkshopStatus, WorkshopStatus[]> = {
-  REQUESTED: ["AWAITING_APPROVAL", "CANCELED"],
+  REQUESTED: ["CANCELED"], // AWAITING_APPROVAL only via approval queue (respond handler)
   AWAITING_APPROVAL: ["PRE_EVENT", "REQUESTED", "CANCELED"],
   PRE_EVENT: ["POST_EVENT", "CANCELED"],
   POST_EVENT: ["COMPLETED"],

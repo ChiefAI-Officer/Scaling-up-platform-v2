@@ -340,12 +340,22 @@ export async function POST(request: NextRequest) {
             requestedBy,
         });
 
-        // If auto-approved, advance workshop status
+        // If auto-approved, advance workshop status and trigger auto-build
         if (result.autoApproved && workshopId) {
             await db.workshop.update({
                 where: { id: workshopId },
                 data: { status: "AWAITING_APPROVAL" },
             });
+
+            try {
+                await inngest.send({
+                    name: "workshop/approved",
+                    data: { approvalId: result.approvalId || "", workshopId, coachId },
+                });
+                console.log(`[INNGEST] workshop/approved event sent (auto-approved) for workshop=${workshopId}`);
+            } catch (err) {
+                console.error("[INNGEST] Failed to emit workshop/approved (auto-approved):", err);
+            }
         }
 
         if (!result.autoApproved && result.approvalId) {

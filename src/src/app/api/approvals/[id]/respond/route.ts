@@ -156,11 +156,18 @@ export async function GET(
         }
 
         // Sprint 5: Emit workshop/approved event to trigger auto-build
+        let inngestSent = false;
         if (newStatus === "APPROVED" && approval.workshopId) {
-            await inngest.send({
-                name: "workshop/approved",
-                data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
-            }).catch((err) => console.error("Failed to emit workshop/approved event:", err));
+            try {
+                await inngest.send({
+                    name: "workshop/approved",
+                    data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
+                });
+                inngestSent = true;
+                console.log(`[INNGEST] workshop/approved event sent for workshop=${approval.workshopId}`);
+            } catch (err) {
+                console.error("[INNGEST] Failed to emit workshop/approved:", err);
+            }
         }
 
         await logAudit({
@@ -172,6 +179,9 @@ export async function GET(
         });
 
         // Return success HTML page
+        const autoBuildNote = newStatus === "APPROVED"
+            ? `<p style="color: #718096; font-size: 0.9em;">Auto-build: ${inngestSent ? "triggered" : "not triggered (check Inngest)"}</p>`
+            : "";
         return new NextResponse(
             `<html>
         <head><title>Request ${newStatus}</title></head>
@@ -180,6 +190,7 @@ export async function GET(
             ${action === 'approve' ? '✅ Approved' : '❌ Denied'}
           </h1>
           <p>The request has been ${newStatus.toLowerCase()}.</p>
+          ${autoBuildNote}
           <a href="${process.env.APP_URL}/admin/approvals" style="color: #3182ce;">
             View All Approvals
           </a>
@@ -303,11 +314,18 @@ export async function POST(
         }
 
         // Sprint 5: Emit workshop/approved event to trigger auto-build
+        let inngestSent = false;
         if (newStatus === "APPROVED" && approval.workshopId) {
-            await inngest.send({
-                name: "workshop/approved",
-                data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
-            }).catch((err) => console.error("[INNGEST] Failed to emit workshop/approved — check INNGEST_EVENT_KEY:", err));
+            try {
+                await inngest.send({
+                    name: "workshop/approved",
+                    data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
+                });
+                inngestSent = true;
+                console.log(`[INNGEST] workshop/approved event sent for workshop=${approval.workshopId}`);
+            } catch (err) {
+                console.error("[INNGEST] Failed to emit workshop/approved — check INNGEST_EVENT_KEY:", err);
+            }
         }
 
         await logAudit({
@@ -321,7 +339,8 @@ export async function POST(
         return NextResponse.json({
             success: true,
             status: newStatus,
-            message: `Request ${newStatus.toLowerCase()}`
+            message: `Request ${newStatus.toLowerCase()}`,
+            autoBuildTriggered: inngestSent,
         });
     } catch (error) {
         console.error("Approval respond POST error:", error);
