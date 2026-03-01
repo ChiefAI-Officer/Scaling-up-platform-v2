@@ -265,7 +265,7 @@ describe("auto-build-workshop Inngest function", () => {
       expect(result).toEqual({
         workshopId: "ws-test-123",
         skipped: true,
-        reason: "Workshop already built (idempotency guard)",
+        reason: "Idempotency guard: pages=1, status=APPROVED",
       });
       // Should only run the idempotency-check step
       expect(step.run).toHaveBeenCalledTimes(1);
@@ -284,7 +284,7 @@ describe("auto-build-workshop Inngest function", () => {
       expect(result).toEqual({
         workshopId: "ws-test-123",
         skipped: true,
-        reason: "Workshop already built (idempotency guard)",
+        reason: "Idempotency guard: pages=0, status=PRE_EVENT",
       });
       expect(step.run).toHaveBeenCalledTimes(1);
     });

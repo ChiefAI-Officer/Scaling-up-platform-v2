@@ -60,7 +60,7 @@ export const autoBuildWorkshop = inngest.createFunction(
         const { workshopId } = event.data;
 
         // Idempotency guard: skip if workshop has already been built (e.g. Inngest retry)
-        const alreadyBuilt = await step.run("idempotency-check", async () => {
+        const idempotencyResult = await step.run("idempotency-check", async () => {
             const existingPages = await db.landingPage.findMany({
                 where: { workshopId },
                 select: { id: true },
@@ -69,17 +69,30 @@ export const autoBuildWorkshop = inngest.createFunction(
                 where: { id: workshopId },
                 select: { status: true },
             });
-            if (existingPages.length > 0 || ws?.status === "PRE_EVENT") {
+
+            const pageCount = existingPages.length;
+            const status = ws?.status ?? "NOT_FOUND";
+            const statusAlreadyAdvanced = status === "PRE_EVENT" || status === "POST_EVENT" || status === "COMPLETED";
+
+            if (pageCount > 0 || statusAlreadyAdvanced) {
                 console.warn(
-                    `[auto-build-workshop] Workshop ${workshopId} already has ${existingPages.length} landing page(s) and status=${ws?.status}. Skipping duplicate build.`
+                    `[auto-build] SKIP workshopId=${workshopId} pages=${pageCount} status=${status}`
                 );
-                return true;
+                return { skip: true, pageCount, status };
             }
-            return false;
+
+            console.log(
+                `[auto-build] PROCEED workshopId=${workshopId} pages=${pageCount} status=${status}`
+            );
+            return { skip: false, pageCount, status };
         });
 
-        if (alreadyBuilt) {
-            return { workshopId, skipped: true, reason: "Workshop already built (idempotency guard)" };
+        if (idempotencyResult.skip) {
+            return {
+                workshopId,
+                skipped: true,
+                reason: `Idempotency guard: pages=${idempotencyResult.pageCount}, status=${idempotencyResult.status}`,
+            };
         }
 
         // Step 1: Fetch workshop + coach + category

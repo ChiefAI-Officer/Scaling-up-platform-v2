@@ -250,7 +250,7 @@ describe("autoBuildWorkshop Inngest function", () => {
     expect(result).toEqual({
       workshopId: "ws-1",
       skipped: true,
-      reason: "Workshop already built (idempotency guard)",
+      reason: "Idempotency guard: pages=1, status=AWAITING_APPROVAL",
     });
     // Should NOT have proceeded to fetch workshop or create pages
     expect(db.landingPage.create).not.toHaveBeenCalled();
@@ -273,7 +273,7 @@ describe("autoBuildWorkshop Inngest function", () => {
     expect(result).toEqual({
       workshopId: "ws-1",
       skipped: true,
-      reason: "Workshop already built (idempotency guard)",
+      reason: "Idempotency guard: pages=0, status=PRE_EVENT",
     });
     expect(db.landingPage.create).not.toHaveBeenCalled();
     expect(sendWorkshopBuiltEmail).not.toHaveBeenCalled();
