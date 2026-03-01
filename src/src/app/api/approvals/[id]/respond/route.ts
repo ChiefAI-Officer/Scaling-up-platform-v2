@@ -142,11 +142,11 @@ export async function GET(
                     workshopId: approval.workshopId || undefined,
                 };
                 if (newStatus === "APPROVED") {
-                    sendWorkshopApprovedEmail(emailPayload).catch((err) =>
+                    await sendWorkshopApprovedEmail(emailPayload).catch((err) =>
                         console.error("Failed to send workshop approved email:", err)
                     );
                 } else {
-                    sendWorkshopDeniedEmail({ ...emailPayload, reason: "Denied via email link" }).catch((err) =>
+                    await sendWorkshopDeniedEmail({ ...emailPayload, reason: "Denied via email link" }).catch((err) =>
                         console.error("Failed to send workshop denied email:", err)
                     );
                 }
@@ -157,7 +157,7 @@ export async function GET(
 
         // Sprint 5: Emit workshop/approved event to trigger auto-build
         if (newStatus === "APPROVED" && approval.workshopId) {
-            inngest.send({
+            await inngest.send({
                 name: "workshop/approved",
                 data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
             }).catch((err) => console.error("Failed to emit workshop/approved event:", err));
@@ -289,11 +289,11 @@ export async function POST(
                     workshopId: approval.workshopId || undefined,
                 };
                 if (newStatus === "APPROVED") {
-                    sendWorkshopApprovedEmail(emailPayload).catch((err) =>
+                    await sendWorkshopApprovedEmail(emailPayload).catch((err) =>
                         console.error("Failed to send workshop approved email:", err)
                     );
                 } else {
-                    sendWorkshopDeniedEmail({ ...emailPayload, reason: reason || "Denied by administrator" }).catch((err) =>
+                    await sendWorkshopDeniedEmail({ ...emailPayload, reason: reason || "Denied by administrator" }).catch((err) =>
                         console.error("Failed to send workshop denied email:", err)
                     );
                 }
@@ -304,7 +304,7 @@ export async function POST(
 
         // Sprint 5: Emit workshop/approved event to trigger auto-build
         if (newStatus === "APPROVED" && approval.workshopId) {
-            inngest.send({
+            await inngest.send({
                 name: "workshop/approved",
                 data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
             }).catch((err) => console.error("[INNGEST] Failed to emit workshop/approved — check INNGEST_EVENT_KEY:", err));
