@@ -10,12 +10,21 @@ import { sendEmailViaSMTP, type SmtpAttachment } from "@/lib/smtp-transport";
 // Types
 // ============================================
 
+const APPROVAL_TYPE_LABELS: Record<string, string> = {
+    WORKSHOP_REQUEST: "Workshop Request",
+    CUSTOM_PRICING: "Custom Pricing Request",
+    CANCELLATION: "Cancellation Request",
+    DATE_CHANGE: "Date Change Request",
+    REFUND: "Refund Request",
+};
+
 export interface ApprovalRequest {
     id: string;
     type: string; // 'CUSTOM_PRICING', 'CANCELLATION', etc.
     coachName: string;
     details: string;
     requestedAt: Date;
+    amount?: number; // In cents, for pricing/refund requests
 }
 
 // ============================================
@@ -27,19 +36,24 @@ export interface ApprovalRequest {
  */
 export async function sendApprovalRequest(approval: ApprovalRequest): Promise<void> {
     const approvalUrl = `${process.env.APP_URL}/admin/approvals/${approval.id}`;
+    const typeLabel = APPROVAL_TYPE_LABELS[approval.type] || approval.type;
+    const amountLine = approval.amount
+        ? `<p><strong>Amount:</strong> $${(approval.amount / 100).toFixed(2)}</p>`
+        : "";
 
     const html = `
-    <h2>New Approval Request: ${approval.type}</h2>
+    <h2 style="color: #1e293b;">${typeLabel}</h2>
     <p><strong>Coach:</strong> ${approval.coachName}</p>
     <p><strong>Details:</strong> ${approval.details}</p>
+    ${amountLine}
     <p><strong>Requested:</strong> ${approval.requestedAt.toLocaleString()}</p>
     <br/>
-    <a href="${approvalUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Request</a>
+    <a href="${approvalUrl}" style="background-color: #1D4ED8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Review Request</a>
   `;
 
     await sendNotificationEmail({
         to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
-        subject: `[ACTION REQUIRED] Approval Needed: ${approval.type}`,
+        subject: `[ACTION REQUIRED] ${typeLabel} — ${approval.coachName}`,
         html,
     });
 
@@ -199,19 +213,21 @@ export async function sendEnrichedApprovalRequest(data: {
         </ul>`;
     }
 
+    const typeLabel = APPROVAL_TYPE_LABELS[data.type] || data.type;
+
     const html = `
-    <h2>New Approval Request: ${data.type}</h2>
+    <h2 style="color: #1e293b;">${typeLabel}</h2>
     <p><strong>Coach:</strong> ${data.coachName} (${data.coachEmail})</p>
     <p><strong>Details:</strong> ${data.details}</p>
     <p><strong>Requested:</strong> ${data.requestedAt.toLocaleString()}</p>
     ${enrichmentHtml}
     <br/>
-    <a href="${approvalUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Review Request</a>
+    <a href="${approvalUrl}" style="background-color: #1D4ED8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Review Request</a>
     `;
 
     await sendNotificationEmail({
         to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
-        subject: `[ACTION REQUIRED] Approval Needed: ${data.type} — ${data.coachName}`,
+        subject: `[ACTION REQUIRED] ${typeLabel} — ${data.coachName}`,
         html,
     });
 

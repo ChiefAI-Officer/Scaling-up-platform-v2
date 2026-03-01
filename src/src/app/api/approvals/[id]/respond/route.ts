@@ -118,17 +118,28 @@ export async function GET(
         }
 
         // Send notification email to coach (non-blocking)
-        if (approval.workshopId) {
-            const workshopForEmail = await db.workshop.findUnique({
-                where: { id: approval.workshopId },
-                include: { coach: { select: { email: true, firstName: true, lastName: true } } },
+        // Use coachId directly (always non-null) instead of workshop→coach join
+        {
+            const coach = await db.coach.findUnique({
+                where: { id: approval.coachId },
+                select: { email: true, firstName: true, lastName: true },
             });
-            if (workshopForEmail?.coach) {
+
+            let workshopTitle = "Workshop";
+            if (approval.workshopId) {
+                const w = await db.workshop.findUnique({
+                    where: { id: approval.workshopId },
+                    select: { title: true },
+                });
+                if (w) workshopTitle = w.title;
+            }
+
+            if (coach) {
                 const emailPayload = {
-                    coachEmail: workshopForEmail.coach.email,
-                    coachName: `${workshopForEmail.coach.firstName} ${workshopForEmail.coach.lastName}`,
-                    workshopTitle: workshopForEmail.title,
-                    workshopId: workshopForEmail.id,
+                    coachEmail: coach.email,
+                    coachName: `${coach.firstName} ${coach.lastName}`,
+                    workshopTitle,
+                    workshopId: approval.workshopId || undefined,
                 };
                 if (newStatus === "APPROVED") {
                     sendWorkshopApprovedEmail(emailPayload).catch((err) =>
@@ -139,6 +150,8 @@ export async function GET(
                         console.error("Failed to send workshop denied email:", err)
                     );
                 }
+            } else {
+                console.error(`[APPROVAL RESPOND GET] Coach not found for coachId=${approval.coachId}, approvalId=${id}`);
             }
         }
 
@@ -252,17 +265,28 @@ export async function POST(
         }
 
         // Send notification email to coach (non-blocking)
-        if (approval.workshopId) {
-            const workshopForEmail = await db.workshop.findUnique({
-                where: { id: approval.workshopId },
-                include: { coach: { select: { email: true, firstName: true, lastName: true } } },
+        // Use coachId directly (always non-null) instead of workshop→coach join
+        {
+            const coach = await db.coach.findUnique({
+                where: { id: approval.coachId },
+                select: { email: true, firstName: true, lastName: true },
             });
-            if (workshopForEmail?.coach) {
+
+            let workshopTitle = "Workshop";
+            if (approval.workshopId) {
+                const w = await db.workshop.findUnique({
+                    where: { id: approval.workshopId },
+                    select: { title: true },
+                });
+                if (w) workshopTitle = w.title;
+            }
+
+            if (coach) {
                 const emailPayload = {
-                    coachEmail: workshopForEmail.coach.email,
-                    coachName: `${workshopForEmail.coach.firstName} ${workshopForEmail.coach.lastName}`,
-                    workshopTitle: workshopForEmail.title,
-                    workshopId: workshopForEmail.id,
+                    coachEmail: coach.email,
+                    coachName: `${coach.firstName} ${coach.lastName}`,
+                    workshopTitle,
+                    workshopId: approval.workshopId || undefined,
                 };
                 if (newStatus === "APPROVED") {
                     sendWorkshopApprovedEmail(emailPayload).catch((err) =>
@@ -273,6 +297,8 @@ export async function POST(
                         console.error("Failed to send workshop denied email:", err)
                     );
                 }
+            } else {
+                console.error(`[APPROVAL RESPOND POST] Coach not found for coachId=${approval.coachId}, approvalId=${id}`);
             }
         }
 
@@ -281,7 +307,7 @@ export async function POST(
             inngest.send({
                 name: "workshop/approved",
                 data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
-            }).catch((err) => console.error("Failed to emit workshop/approved event:", err));
+            }).catch((err) => console.error("[INNGEST] Failed to emit workshop/approved — check INNGEST_EVENT_KEY:", err));
         }
 
         await logAudit({

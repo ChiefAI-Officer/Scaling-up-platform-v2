@@ -147,6 +147,7 @@ async function createManualApproval(
         coachName: input.requestedBy,
         details: input.details,
         requestedAt: new Date(),
+        amount: input.amount,
     });
 
     // Audit log
