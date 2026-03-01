@@ -14,6 +14,7 @@
  */
 
 import React from 'react';
+import { BookOpen, Video, Presentation, Palette, HelpCircle, FileText, Folder, Library, Construction } from "lucide-react";
 
 interface Resource {
     id: string;
@@ -81,7 +82,7 @@ const coachResources: Resource[] = [
         title: 'Link to Register for a New Workshop',
         description: 'Submit a new workshop request through the coach portal.',
         status: 'Published',
-        link: '/coach/workshops/new',
+        link: '/portal/request',
         type: 'guide',
     },
     {
@@ -101,14 +102,15 @@ const coachResources: Resource[] = [
 ];
 
 const getTypeIcon = (type: Resource['type']) => {
+    const iconClass = "w-6 h-6 text-primary";
     switch (type) {
-        case 'guide': return '📚';
-        case 'video': return '🎥';
-        case 'deck': return '📊';
-        case 'marketing': return '🎨';
-        case 'faq': return '❓';
-        case 'document': return '📄';
-        default: return '📁';
+        case 'guide': return <BookOpen className={iconClass} />;
+        case 'video': return <Video className={iconClass} />;
+        case 'deck': return <Presentation className={iconClass} />;
+        case 'marketing': return <Palette className={iconClass} />;
+        case 'faq': return <HelpCircle className={iconClass} />;
+        case 'document': return <FileText className={iconClass} />;
+        default: return <Folder className={iconClass} />;
     }
 };
 
@@ -133,8 +135,8 @@ export function CoachResourcesPage() {
                 {/* Additional Resources Section */}
                 <section className="mb-10">
                     <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-semibold text-foreground">
-                            📚 Additional Resources
+                        <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+                            <Library className="w-5 h-5 text-primary" /> Additional Resources
                         </h2>
                         <span className="text-sm text-muted-foreground">
                             {publishedResources.length} available resources
@@ -149,7 +151,7 @@ export function CoachResourcesPage() {
                                     }`}
                             >
                                 <div className="flex items-center gap-4">
-                                    <span className="text-2xl">{getTypeIcon(resource.type)}</span>
+                                    <span className="flex-shrink-0">{getTypeIcon(resource.type)}</span>
                                     <div>
                                         <h3 className="font-medium text-foreground">
                                             {resource.link ? (
@@ -177,8 +179,8 @@ export function CoachResourcesPage() {
                 {/* Draft Resources */}
                 {draftResources.length > 0 && (
                     <section className="mb-10">
-                        <h2 className="text-xl font-semibold text-foreground mb-4">
-                            🚧 Coming Soon
+                        <h2 className="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+                            <Construction className="w-5 h-5 text-warning" /> Coming Soon
                         </h2>
                         <div className="bg-card rounded-lg shadow-sm border border-border overflow-hidden opacity-75">
                             {draftResources.map((resource) => (
@@ -187,7 +189,7 @@ export function CoachResourcesPage() {
                                     className="flex items-center justify-between p-4"
                                 >
                                     <div className="flex items-center gap-4">
-                                        <span className="text-2xl">{getTypeIcon(resource.type)}</span>
+                                        <span className="flex-shrink-0">{getTypeIcon(resource.type)}</span>
                                         <div>
                                             <h3 className="font-medium text-muted-foreground">{resource.title}</h3>
                                             <p className="text-sm text-muted-foreground">{resource.description}</p>
@@ -207,18 +209,18 @@ export function CoachResourcesPage() {
                     <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <a
-                            href="/coach/workshops/new"
+                            href="/portal/request"
                             className="block bg-card/20 hover:bg-card/30 rounded-lg p-4 transition-colors"
                         >
-                            <span className="text-2xl mb-2 block">📝</span>
+                            <FileText className="w-6 h-6 mb-2" />
                             <h3 className="font-medium">Request New Workshop</h3>
                             <p className="text-sm opacity-80">Submit a new workshop for approval</p>
                         </a>
                         <a
-                            href="/coach/dashboard"
+                            href="/portal/home"
                             className="block bg-card/20 hover:bg-card/30 rounded-lg p-4 transition-colors"
                         >
-                            <span className="text-2xl mb-2 block">📊</span>
+                            <Presentation className="w-6 h-6 mb-2" />
                             <h3 className="font-medium">View Dashboard</h3>
                             <p className="text-sm opacity-80">Check your workshops and registrations</p>
                         </a>

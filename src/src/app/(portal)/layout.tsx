@@ -11,6 +11,7 @@ import {
     FileBox
 } from "lucide-react";
 import { CoachMobileNav } from "@/components/layout/coach-mobile-nav";
+import { CoachNavLink } from "@/components/layout/coach-nav-link";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface PortalLayoutProps {
@@ -31,34 +32,34 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                 </div>
 
                 <nav className="flex-1 py-6 px-3 space-y-1">
-                    <NavLink href="/portal/home" icon={<LayoutDashboard className="w-5 h-5" />}>
+                    <CoachNavLink href="/portal/home" icon={<LayoutDashboard className="w-5 h-5" />}>
                         Dashboard
-                    </NavLink>
-                    <NavLink href="/portal/workshops" icon={<Calendar className="w-5 h-5" />}>
+                    </CoachNavLink>
+                    <CoachNavLink href="/portal/workshops" icon={<Calendar className="w-5 h-5" />}>
                         My Workshops
-                    </NavLink>
-                    <NavLink href="/portal/registrations" icon={<Users className="w-5 h-5" />}>
+                    </CoachNavLink>
+                    <CoachNavLink href="/portal/registrations" icon={<Users className="w-5 h-5" />}>
                         Registrations
-                    </NavLink>
-                    <NavLink href="/portal/templates" icon={<FileBox className="w-5 h-5" />}>
+                    </CoachNavLink>
+                    <CoachNavLink href="/portal/templates" icon={<FileBox className="w-5 h-5" />}>
                         Templates
-                    </NavLink>
+                    </CoachNavLink>
                     <NavSeparator />
-                    <NavLink href="/portal/request" icon={<PlusCircle className="w-5 h-5" />}>
+                    <CoachNavLink href="/portal/request" icon={<PlusCircle className="w-5 h-5" />}>
                         Request Workshop
-                    </NavLink>
-                    <NavLink href="/portal/follow-up" icon={<FileText className="w-5 h-5" />}>
+                    </CoachNavLink>
+                    <CoachNavLink href="/portal/follow-up" icon={<FileText className="w-5 h-5" />}>
                         90-Day Follow-Up
-                    </NavLink>
+                    </CoachNavLink>
 
                     <div className="pt-4 mt-4 border-t border-sidebar-border">
-                        <NavLink href="/portal/settings" icon={<Settings className="w-5 h-5" />}>
+                        <CoachNavLink href="/portal/settings" icon={<Settings className="w-5 h-5" />}>
                             Settings
-                        </NavLink>
+                        </CoachNavLink>
                     </div>
                 </nav>
 
-                <div className="p-4 border-t border-sidebar-border">
+                <Link href="/portal/settings" className="block p-4 border-t border-sidebar-border hover:bg-sidebar-border/50 transition-colors duration-200 cursor-pointer">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-sm font-semibold text-primary-foreground uppercase">
                             {coachName.charAt(0)}
@@ -68,7 +69,7 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                             <p className="text-xs text-sidebar-muted truncate">Coach</p>
                         </div>
                     </div>
-                </div>
+                </Link>
             </aside>
 
             {/* Main Content */}
@@ -87,6 +88,12 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                         <ThemeToggle />
                         <div className="h-5 w-px bg-border hidden md:block" />
                         <Link
+                            href="/portal/settings"
+                            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200 hidden md:inline"
+                        >
+                            Settings
+                        </Link>
+                        <Link
                             href="/api/auth/signout"
                             className="text-sm font-medium text-muted-foreground hover:text-destructive transition-colors duration-200"
                         >
@@ -100,18 +107,6 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                 </main>
             </div>
         </div>
-    );
-}
-
-function NavLink({ href, icon, children }: { href: string; icon: React.ReactNode; children: React.ReactNode }) {
-    return (
-        <Link
-            href={href}
-            className="flex items-center gap-3 px-4 py-2.5 text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-border/80 rounded-lg transition-all duration-200 group"
-        >
-            <span className="group-hover:text-white transition-colors duration-200">{icon}</span>
-            <span className="font-medium text-sm">{children}</span>
-        </Link>
     );
 }
 

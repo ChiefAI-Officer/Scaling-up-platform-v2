@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Menu, X, LayoutDashboard, Calendar, Users, PlusCircle, FileText, Settings, FileBox } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { isNavLinkActive } from "@/lib/nav-utils";
 
 interface CoachMobileNavProps {
   coachName: string;
@@ -20,6 +23,7 @@ const navLinks = [
 
 export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
     <div className="md:hidden">
@@ -49,14 +53,21 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
             <nav className="flex-1 py-4 px-3 space-y-1">
               {navLinks.map((link) => {
                 const Icon = link.icon;
+                const isActive = isNavLinkActive(pathname, link.href);
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
                     onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-border rounded-lg text-sm font-medium"
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors duration-200 cursor-pointer",
+                      isActive
+                        ? "bg-sidebar-border text-sidebar-foreground font-semibold"
+                        : "text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-border font-medium"
+                    )}
+                    aria-current={isActive ? "page" : undefined}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className={cn("w-5 h-5", isActive && "text-white")} />
                     {link.label}
                   </Link>
                 );
@@ -64,12 +75,16 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
             </nav>
 
             <div className="p-4 border-t border-sidebar-border">
-              <div className="flex items-center gap-3">
+              <Link
+                href="/portal/settings"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 hover:bg-sidebar-border/50 rounded-lg p-1 -m-1 transition-colors duration-200 cursor-pointer"
+              >
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-sm font-medium uppercase">
                   {coachName.charAt(0)}
                 </div>
                 <p className="text-sm font-medium truncate">{coachName}</p>
-              </div>
+              </Link>
               <Link
                 href="/api/auth/signout"
                 onClick={() => setOpen(false)}

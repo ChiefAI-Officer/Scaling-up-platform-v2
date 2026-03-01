@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
+import { AdminNavLinks } from "@/components/layout/admin-nav-links";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -67,18 +68,7 @@ export default async function DashboardLayout({
                 </Link>
               </div>
               {/* Desktop nav */}
-              <div className="hidden lg:ml-6 lg:flex lg:space-x-0.5 overflow-x-auto" role="menubar">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    role="menuitem"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
+              <AdminNavLinks links={navLinks} />
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="hidden xl:inline text-sm text-muted-foreground max-w-[180px] truncate" aria-label="Logged in user">
