@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | March 2, 2026 — Phase 4 Smoke Test (12/12 checks passed) + production launch assessment |
+| **Last Updated** | March 2, 2026 — Coach certification management + Coaches nav link + deployment protocol |
 
 ## Current Status
 
@@ -266,7 +266,7 @@ src/
 ├── src/
 │   ├── app/
 │   │   ├── (dashboard)/       # Admin/staff dashboard (requires ADMIN/STAFF role)
-│   │   │   ├── layout.tsx     # Nav: Dashboard, All Workshops, Bio, Templates, Workflows, Surveys, Files, Partners, Financials
+│   │   │   ├── layout.tsx     # Nav: Dashboard, All Workshops, Bio, Templates, Workflows, Surveys, Files, Partners, Coaches, Approvals, Categories, Pricing, Financials
 │   │   │   ├── dashboard/     # Admin overview
 │   │   │   ├── workshops/     # Workshop CRUD, detail, landing pages, quick-actions
 │   │   │   ├── coaches/       # Coach management
@@ -356,6 +356,8 @@ src/
 | `/api/pricing-tiers` | GET, POST | Pricing tier CRUD (GET=public, POST=admin) | GET: Public, POST: Admin |
 | `/api/pricing-tiers/[id]` | PATCH, DELETE | Update/delete pricing tier | Admin |
 | `/api/coaches` | GET, POST | Coach CRUD | Admin |
+| `/api/coaches/[id]` | GET, PATCH, DELETE | Coach detail/update/delete | Admin |
+| `/api/coaches/[id]/certifications` | POST, DELETE | Grant/revoke workshop type certification | Admin |
 | `/api/registrations` | GET | Registration list | Auth required |
 | `/api/landing-pages` | GET | Landing page list | Admin |
 | `/api/workflows` | GET, POST | List/create workflows | Auth required |
@@ -481,6 +483,7 @@ npx prisma migrate dev   # Create + apply migrations
 npx prisma db push       # Push schema without migration (dev only)
 npx tsx prisma/seed.ts   # Seed dev data
 npx tsx prisma/seed-real-data.ts  # Seed real Kajabi migration data
+npx tsx prisma/seed-templates.ts # Seed active landing page templates for auto-build
 ```
 
 ## Environment Variables
@@ -512,7 +515,7 @@ Secrets are in local `.env` (gitignored) and Vercel dashboard. Key variables:
 - **Survey submission**: Public endpoint rate-limited at 20 req/min per IP
 - **SMTP transport**: All email sending goes through `lib/smtp-transport.ts` — do NOT create new nodemailer transports elsewhere
 - **Admin layout unified**: All admin pages are under `(dashboard)/admin/` — the standalone `/admin/` layout was removed in Feb 26 cleanup
-- **Nav bar has 12 items**: At capacity. Always use `whitespace-nowrap` on nav links. Desktop nav shows at `lg` (1024px+); mobile hamburger shows below `lg`. Email shows at `xl` (1280px+) only.
+- **Nav bar has 13 items**: Dashboard, All Workshops, Bio, Templates, Workflows, Surveys, Files, Partners, Coaches, Approvals, Categories, Pricing, Financials. Uses `overflow-x-auto` for horizontal scroll on tight screens. Desktop nav shows at `lg` (1024px+); mobile hamburger shows below `lg`. Email shows at `xl` (1280px+) only.
 - **Dead code removed (Feb 26)**: animations.ts, cache.ts, api-handler.ts, logger.ts, landing-page-auto-populate.ts, workshop-generator.ts — all deleted, zero imports
 - **Approval engine emits Inngest events**: `workshop/approved` event emitted on approval (added in Sprint 5) — triggers auto-build function
 - **Bio page CTA toggle exists**: Bio page editor already has "Show CTA button on bio page" checkbox (discovered via video analysis)
@@ -522,6 +525,44 @@ Secrets are in local `.env` (gitignored) and Vercel dashboard. Key variables:
 - **Sidebar uses `--sidebar-*` tokens**: Coach portal sidebar uses `bg-sidebar`, not `bg-slate-900`.
 - **Workshop status colors use `--status-*` tokens**: `getWorkshopStatusColor()` and `StatusPill` both use dedicated status tokens.
 - **Security S1-S8 applied**: Nonces, webhook secrets, survey validation, JSON safety, error handlers, 15s timeouts, idempotency, email dedup.
+- **Node version pinned**: `.nvmrc` pins Node 20 for Vercel compatibility. Local development should use Node 20.
+- **tsconfig excludes scripts**: `prisma/seed*.ts` and `scripts/**` are excluded from TypeScript build checking — they're standalone CLI scripts, not app code.
+- **Always run `CI=true npm run build` before pushing**: See "Deployment Verification Protocol" section below.
+
+## Deployment Verification Protocol
+
+**MANDATORY before every `git push` to `main`:**
+
+1. **Run the FULL Vercel build command locally** (not just `next build`):
+   ```bash
+   CI=true npm run build
+   ```
+   This runs `prisma generate && prisma db push && next build` with CI mode — matching Vercel exactly.
+
+2. **Check ESLint on changed files:**
+   ```bash
+   npx eslint <changed-files>
+   ```
+   Fix ALL warnings AND errors. Vercel may treat warnings as build failures.
+
+3. **Run tests on changed areas:**
+   ```bash
+   npm run test -- --passWithNoTests
+   ```
+
+4. **After pushing, verify Vercel deployment status:**
+   ```bash
+   npx vercel ls 2>&1 | head -5
+   ```
+   Wait for `● Ready` status. If `● Error`, check build logs in Vercel dashboard.
+
+5. **If Vercel build fails but local passes:**
+   - Check Node version: `.nvmrc` pins Node 20 (Vercel default). Local must match.
+   - Check `tsconfig.json` exclude list: standalone scripts (`prisma/seed*.ts`, `scripts/**`) are excluded to prevent cross-platform TS issues.
+   - Check for stale build cache: try redeploying from Vercel dashboard with "Clear Build Cache" option.
+   - Check `prisma db push` connectivity: Neon databases may cold-start timeout on Vercel's build server.
+
+**Why this matters:** Local `npx next build` does NOT match the Vercel build pipeline. The Vercel build also runs `prisma generate` + `prisma db push` (database migration), and runs in a Linux/Node 20 environment. A passing local build does NOT guarantee a passing Vercel build.
 
 ## Continuous Update Protocol
 

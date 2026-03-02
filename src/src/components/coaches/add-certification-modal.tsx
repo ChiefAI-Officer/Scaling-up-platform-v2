@@ -40,7 +40,7 @@ export function AddCertificationModal({ coachId, existingWorkshopTypeIds }: AddC
             }
         }
         loadTypes();
-    }, []);
+    }, [isOpen, workshopTypes.length]);
 
     const availableTypes = workshopTypes.filter(
         (wt) => !existingWorkshopTypeIds.includes(wt.id)
