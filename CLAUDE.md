@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | February 27, 2026 — Test coverage T1-T10 (415 tests) + production launch guide |
+| **Last Updated** | March 2, 2026 — Phase 4 Smoke Test (12/12 checks passed) + production launch assessment |
 
 ## Current Status
 
@@ -96,6 +96,7 @@ the full workshop lifecycle from request through post-event follow-up.
 - S6: 15-second AbortController timeouts on external APIs (Stripe, Circle, HubSpot)
 - S7: Auto-build idempotency guard (prevents duplicate builds on Inngest retry)
 - S8: Email attendee deduplication via Set in workflow execution
+- S9 (Mar 2): Auto-build idempotency guard returns structured `{ skip, pageCount, status }` (replaces bare boolean for debuggability)
 
 **Test Coverage Push T1-T10 (Feb 27, 2026)** — Complete:
 - 37 test suites / 415 tests total (up from 28/269)
@@ -104,6 +105,17 @@ the full workshop lifecycle from request through post-event follow-up.
 - 8 Playwright E2E spec files covering 40+ automatable checks across 12 rounds
 - 12 remaining manual checks require email inbox / external service access (see `plans/MANUAL_VERIFICATION_REMAINING_CHECKS.md`)
 - Production launch guide: `plans/PRODUCTION_LAUNCH_GUIDE.md`
+
+**Phase 4 Smoke Test (Mar 2, 2026)** — Complete (12/12 checks passed):
+- Tests #1-6: Image upload, emails (requested/approved/denied), auto-status, landing pages
+- Test #7: Auto-build pipeline verified end-to-end (7 Inngest steps, status → PRE_EVENT)
+- Test #8: Workflows — code correct, no workflows configured yet (content dependency)
+- Tests #9-10: No broken placeholders, registration flow works
+- Test #11: Stripe payment (verified in Phase 3)
+- Test #12: Inngest running (5 functions registered)
+- Fix 8 deployed: Structured idempotency logging in auto-build (`{ skip, pageCount, status }` instead of bare boolean)
+- Content gaps identified: No active landing page templates, no workflows configured (data setup, not code bugs)
+- Production launch assessment: `plans/PRODUCTION_LAUNCH_GUIDE.md` (Steps 1-3, 5, 8 still pending)
 
 **Design Token Consolidation + Color Sweep (Feb 27, 2026)** — Complete:
 - Single source of truth: `globals.css` (`brand-tokens.css` deleted — had zero imports)

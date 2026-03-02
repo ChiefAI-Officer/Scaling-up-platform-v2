@@ -7,6 +7,8 @@ import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
+import { AddCertificationModal } from "@/components/coaches/add-certification-modal";
+import { RemoveCertificationButton } from "@/components/coaches/remove-certification-button";
 
 interface CoachDetailPageProps {
   params: Promise<{ id: string }>;
@@ -361,12 +363,19 @@ export default async function CoachDetailPage({
                         <span className="font-medium text-foreground">
                           {cert.workshopType.name}
                         </span>
-                        <Badge
-                          className={getCertificationStatusColor(cert.status)}
-                          variant="secondary"
-                        >
-                          {cert.status}
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge
+                            className={getCertificationStatusColor(cert.status)}
+                            variant="secondary"
+                          >
+                            {cert.status}
+                          </Badge>
+                          <RemoveCertificationButton
+                            coachId={coach.id}
+                            certificationId={cert.id}
+                            workshopTypeName={cert.workshopType.name}
+                          />
+                        </div>
                       </div>
                       <div className="text-xs text-muted-foreground">
                         <p>Certified: {formatDate(cert.certifiedAt)}</p>
@@ -393,9 +402,10 @@ export default async function CoachDetailPage({
               >
                 Create Workshop
               </Link>
-              <span className="block w-full text-center bg-muted text-muted-foreground px-4 py-2 rounded-lg text-sm cursor-default border border-dashed border-border">
-                Add Certification — Coming Soon
-              </span>
+              <AddCertificationModal
+                coachId={coach.id}
+                existingWorkshopTypeIds={coach.certifications.map((c) => c.workshopTypeId)}
+              />
             </CardContent>
           </Card>
         </div>
