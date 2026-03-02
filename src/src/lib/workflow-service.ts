@@ -235,6 +235,7 @@ export interface WorkflowContext {
   workshopTime: string;
   workshopLocation: string;
   workshopUrl: string;
+  workshopFormat: string;
   coachName: string;
   coachEmail: string;
   registrantName?: string;
@@ -244,17 +245,35 @@ export interface WorkflowContext {
 
 export function interpolateTemplate(template: string, context: WorkflowContext): string {
   return template
+    // camelCase (original)
     .replace(/\{\{workshopTitle\}\}/g, context.workshopTitle)
     .replace(/\{\{workshopCode\}\}/g, context.workshopCode)
     .replace(/\{\{workshopDate\}\}/g, context.workshopDate)
     .replace(/\{\{workshopTime\}\}/g, context.workshopTime)
     .replace(/\{\{workshopLocation\}\}/g, context.workshopLocation)
     .replace(/\{\{workshopUrl\}\}/g, context.workshopUrl)
+    .replace(/\{\{workshopFormat\}\}/g, context.workshopFormat)
     .replace(/\{\{coachName\}\}/g, context.coachName)
     .replace(/\{\{coachEmail\}\}/g, context.coachEmail)
     .replace(/\{\{registrantName\}\}/g, context.registrantName || "")
     .replace(/\{\{registrantEmail\}\}/g, context.registrantEmail || "")
-    .replace(/\{\{registrantCompany\}\}/g, context.registrantCompany || "");
+    .replace(/\{\{registrantCompany\}\}/g, context.registrantCompany || "")
+    // snake_case aliases (user-friendly, matches landing page convention)
+    .replace(/\{\{workshop_title\}\}/g, context.workshopTitle)
+    .replace(/\{\{workshop_code\}\}/g, context.workshopCode)
+    .replace(/\{\{workshop_date\}\}/g, context.workshopDate)
+    .replace(/\{\{workshop_time\}\}/g, context.workshopTime)
+    .replace(/\{\{workshop_location\}\}/g, context.workshopLocation)
+    .replace(/\{\{workshop_url\}\}/g, context.workshopUrl)
+    .replace(/\{\{workshop_format\}\}/g, context.workshopFormat)
+    .replace(/\{\{coach_name\}\}/g, context.coachName)
+    .replace(/\{\{coach_email\}\}/g, context.coachEmail)
+    .replace(/\{\{attendee_name\}\}/g, context.registrantName || "")
+    .replace(/\{\{attendee_email\}\}/g, context.registrantEmail || "")
+    .replace(/\{\{attendee_company\}\}/g, context.registrantCompany || "")
+    .replace(/\{\{registrant_name\}\}/g, context.registrantName || "")
+    .replace(/\{\{registrant_email\}\}/g, context.registrantEmail || "")
+    .replace(/\{\{registrant_company\}\}/g, context.registrantCompany || "");
 }
 
 // ============================================
