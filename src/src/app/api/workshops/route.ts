@@ -343,6 +343,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Create approval queue entry so admin can approve from /admin/approvals
+    // (triggers auto-build pipeline on approval)
+    await db.approvalQueue.create({
+      data: {
+        type: "WORKSHOP_REQUEST",
+        status: "PENDING",
+        coachId: data.coachId,
+        workshopId: workshop.id,
+        requestedBy: `${coach.firstName} ${coach.lastName}`,
+        requestData: JSON.stringify({
+          workshopTitle: workshop.title,
+          workshopCode,
+          format: data.format,
+          eventDate: data.eventDate,
+          createdVia: "ADMIN_DASHBOARD",
+        }),
+      },
+    });
+
     // Send workshop requested notification (non-blocking)
     sendWorkshopRequestedEmail({
       coachEmail: coach.email,
