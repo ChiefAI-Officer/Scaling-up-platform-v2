@@ -16,6 +16,7 @@ const navLinks = [
   { href: "/admin/surveys", label: "Surveys" },
   { href: "/admin/files", label: "Files" },
   { href: "/partners", label: "Partners" },
+  { href: "/coaches", label: "Coaches" },
   { href: "/admin/approvals", label: "Approvals" },
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/pricing", label: "Pricing" },
