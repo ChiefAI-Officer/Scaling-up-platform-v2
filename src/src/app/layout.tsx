@@ -3,6 +3,8 @@ import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -40,6 +42,8 @@ export default function RootLayout({
           <SessionProvider>
             {children}
             <Toaster />
+            <Analytics />
+            <SpeedInsights />
           </SessionProvider>
         </ThemeProvider>
       </body>

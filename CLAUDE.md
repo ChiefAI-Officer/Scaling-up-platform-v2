@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | March 2, 2026 — Coach certification management + Coaches nav link + deployment protocol |
+| **Last Updated** | March 3, 2026 — Production go-live (analytics installed, go-live checklist, handoff document) |
 
 ## Current Status
 
@@ -116,6 +116,19 @@ the full workshop lifecycle from request through post-event follow-up.
 - Fix 8 deployed: Structured idempotency logging in auto-build (`{ skip, pageCount, status }` instead of bare boolean)
 - Content gaps identified: No active landing page templates, no workflows configured (data setup, not code bugs)
 - Production launch assessment: `plans/PRODUCTION_LAUNCH_GUIDE.md` (Steps 1-3, 5, 8 still pending)
+
+**Production Configuration (Mar 3, 2026)** — Complete (Steps 1-10):
+- 35 env vars pushed to Vercel via `scripts/push-env-to-vercel.mjs` (with production overrides for NEXTAUTH_URL, APP_URL, LANDING_PAGE_BASE_URL, DEMO_MODE)
+- Stripe webhook configured (3 events: checkout.session.completed, payment_intent.succeeded, payment_intent.payment_failed)
+- Inngest verified: 5 functions active (auto-build-workshop, check-stale-approvals, execute-workflow, schedule-email-sequence, workshop-completion-summary)
+- "Standard Pre-Event Sequence" workflow created (Phase=Pre-Event, 1 email step: 1 day before event)
+- Snake_case variable aliases added to `interpolateTemplate()` — both `{{workshop_title}}` and `{{workshopTitle}}` now work
+- `workshopFormat` variable added to workflow context
+- Production smoke test passed (5/5 tests): workshop create, approve, auto-build, Inngest runs, landing page render
+- Vercel Analytics + Speed Insights installed (`@vercel/analytics`, `@vercel/speed-insights` in root layout)
+- Go-live checklist: `plans/GO_LIVE_CHECKLIST.md`
+- Handoff document: `plans/PRODUCTION_HANDOFF_MARCH_2026.md`
+- Commits: `c0c002d` (variable aliases), pending commit (analytics + handoff docs)
 
 **Design Token Consolidation + Color Sweep (Feb 27, 2026)** — Complete:
 - Single source of truth: `globals.css` (`brand-tokens.css` deleted — had zero imports)
@@ -525,6 +538,9 @@ Secrets are in local `.env` (gitignored) and Vercel dashboard. Key variables:
 - **Sidebar uses `--sidebar-*` tokens**: Coach portal sidebar uses `bg-sidebar`, not `bg-slate-900`.
 - **Workshop status colors use `--status-*` tokens**: `getWorkshopStatusColor()` and `StatusPill` both use dedicated status tokens.
 - **Security S1-S8 applied**: Nonces, webhook secrets, survey validation, JSON safety, error handlers, 15s timeouts, idempotency, email dedup.
+- **Never push NODE_ENV to Vercel**: Vercel manages NODE_ENV automatically. Pushing `NODE_ENV=production` causes `npm install` to skip devDependencies, breaking builds (e.g., `@tailwindcss/postcss` not found). The `scripts/push-env-to-vercel.mjs` script has NODE_ENV in its SKIP list.
+- **Workflow variables support both naming conventions**: `interpolateTemplate()` in `lib/workflow-service.ts` accepts both camelCase (`{{workshopTitle}}`) and snake_case (`{{workshop_title}}`). Also supports `{{attendee_name}}` as alias for `{{registrantName}}`.
+- **Env push script (`scripts/push-env-to-vercel.mjs`)**: Uses Node.js `input` option on `execSync` to pipe values — NOT shell `echo` (which breaks on Windows due to literal quote preservation). Production overrides for URL-related vars. SKIP list: `BLOB_READ_WRITE_TOKEN`, `NODE_ENV`.
 - **Node version pinned**: `.nvmrc` pins Node 20 for Vercel compatibility. Local development should use Node 20.
 - **tsconfig excludes scripts**: `prisma/seed*.ts` and `scripts/**` are excluded from TypeScript build checking — they're standalone CLI scripts, not app code.
 - **Always run `CI=true npm run build` before pushing**: See "Deployment Verification Protocol" section below.
