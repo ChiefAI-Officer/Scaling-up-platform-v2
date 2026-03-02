@@ -160,6 +160,7 @@ export const autoBuildWorkshop = inngest.createFunction(
             coach_last_name: workshop.coach.lastName,
             coach_bio: workshop.coach.bio || "",
             coach_company: workshop.coach.company || "",
+            coach_photo: workshop.coach.profileImage || "",
             category_name: workshop.category?.name || "",
             price: workshop.pricingTier
                 ? `$${(workshop.pricingTier.amountCents / 100).toFixed(0)}`

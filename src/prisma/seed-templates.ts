@@ -17,7 +17,7 @@ const prisma = new PrismaClient();
 // ─── Template Content (uses {{variables}} for auto-build interpolation) ───
 
 const soloLandingContent = {
-  coachPhoto: "",
+  coachPhoto: "{{coach_photo}}",
   coachName: "{{coach_name}}",
   coachTitle: "Scaling Up Certified Coach",
   eventDay: "{{workshop_date}}",
@@ -49,7 +49,7 @@ const soloLandingContent = {
 
 const registrationContent = {
   coachName: "{{coach_name}}",
-  coachPhoto: "",
+  coachPhoto: "{{coach_photo}}",
   coachTitle: "Scaling Up Certified Coach",
   workshopTitle: "{{workshop_title}}",
   eventDate: "{{workshop_date}}",
