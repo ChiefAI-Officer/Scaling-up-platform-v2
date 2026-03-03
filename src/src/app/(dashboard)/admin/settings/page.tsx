@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import ChangePasswordForm from "@/components/auth/change-password-form";
+import { InviteAdminSection } from "@/components/admin/invite-admin-section";
 import { FadeUp } from "@/components/ui/animated";
 
 export default async function AdminSettingsPage() {
@@ -31,6 +32,8 @@ export default async function AdminSettingsPage() {
           </p>
           <ChangePasswordForm />
         </div>
+
+        <InviteAdminSection />
       </div>
     </FadeUp>
   );

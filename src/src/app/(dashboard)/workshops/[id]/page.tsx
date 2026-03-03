@@ -19,6 +19,7 @@ import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated"
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 import { WorkshopActions } from "./workshop-actions";
 import { QuickActions } from "./quick-actions";
+import { requireAuth } from "@/lib/authorization";
 
 function executionStatusVariant(status: string): "success" | "warning" | "destructive" | "secondary" {
   switch (status) {
@@ -41,6 +42,7 @@ interface WorkshopDetailPageProps {
 export default async function WorkshopDetailPage({
   params,
 }: WorkshopDetailPageProps) {
+  const session = await requireAuth();
   const { id } = await params;
 
   const [workshop, workflowAssignments] = await Promise.all([
@@ -137,7 +139,7 @@ export default async function WorkshopDetailPage({
             <span className="text-muted-foreground">{workshop.workshopType?.name}</span>
           </div>
         </div>
-        <WorkshopActions workshop={workshop} />
+        <WorkshopActions workshop={workshop} userRole={session.user.role} />
       </div>
       </FadeUp>
 

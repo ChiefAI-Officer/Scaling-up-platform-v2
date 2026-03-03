@@ -221,6 +221,32 @@ export const resetPasswordSchema = z
     });
 
 // ============================================================
+// Admin Feature Schemas
+// ============================================================
+
+export const deleteWorkshopSchema = z.object({
+    confirmTitle: z.string().min(1, "Workshop title confirmation is required"),
+});
+
+export const inviteAdminSchema = z.object({
+    email: emailSchema,
+    name: z.string().max(100).optional(),
+});
+
+export const acceptInviteSchema = z
+    .object({
+        email: emailSchema,
+        token: z.string().min(1, "Invite token is required"),
+        name: z.string().min(1, "Name is required").max(100),
+        password: strongPasswordSchema,
+        confirmPassword: z.string().min(1, "Please confirm your password"),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+        path: ["confirmPassword"],
+        message: "Passwords do not match",
+    });
+
+// ============================================================
 // Landing Page Schemas
 // ============================================================
 

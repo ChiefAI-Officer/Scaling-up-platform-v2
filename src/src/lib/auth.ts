@@ -99,10 +99,16 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (user.role === "ADMIN" && !isCanonicalAdminEmail(user.email)) {
-          console.error(
-            `Blocked non-canonical admin login for ${user.email}. Expected ${process.env.ADMIN_EMAIL}.`
-          );
-          throw new Error(INVALID_CREDENTIALS);
+          // Check if this admin was legitimately invited
+          const invite = await db.adminInvite.findUnique({
+            where: { email: user.email.toLowerCase() },
+          });
+          if (!invite || !invite.acceptedAt) {
+            console.error(
+              `Blocked non-canonical, non-invited admin login for ${user.email}. Expected ${process.env.ADMIN_EMAIL} or an accepted invite.`
+            );
+            throw new Error(INVALID_CREDENTIALS);
+          }
         }
 
         return {

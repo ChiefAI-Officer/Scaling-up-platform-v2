@@ -490,6 +490,54 @@ export async function sendWorkshopCompletionSummary(data: {
 }
 
 // ============================================
+// Admin Invite Email
+// ============================================
+
+export async function sendAdminInviteEmail(data: {
+    recipientEmail: string;
+    recipientName?: string;
+    invitedByName: string;
+    inviteUrl: string;
+}): Promise<void> {
+    const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #1a1a1a;">You've Been Invited as an Admin</h2>
+      <p style="color: #4a4a4a;">Hi${data.recipientName ? ` ${data.recipientName}` : ''},</p>
+      <p style="color: #4a4a4a;">
+        <strong>${data.invitedByName}</strong> has invited you to join the
+        <strong>Scaling Up Workshop Platform</strong> as an administrator.
+      </p>
+      <p style="color: #4a4a4a;">
+        As an admin, you'll have full access to manage workshops, coaches, approvals,
+        workflows, surveys, and all platform settings.
+      </p>
+      <br/>
+      <div style="text-align: center;">
+        <a href="${data.inviteUrl}"
+           style="display: inline-block; background-color: #1D4ED8; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+          Accept Invitation &amp; Set Password
+        </a>
+      </div>
+      <br/>
+      <p style="color: #9ca3af; font-size: 14px;">This invitation expires in 7 days.</p>
+      <p style="color: #9ca3af; font-size: 14px;">If you did not expect this invitation, you can safely ignore this email.</p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;"/>
+      <p style="color: #9ca3af; font-size: 12px;">&mdash; Scaling Up Workshop Platform</p>
+    </div>
+  `;
+
+    await sendNotificationEmail({
+        to: data.recipientEmail,
+        subject: "You've been invited as an admin — Scaling Up Platform",
+        html,
+        telemetry: {
+            recipientRole: "STAFF",
+            metadata: { type: "admin_invite" },
+        },
+    });
+}
+
+// ============================================
 // Internal Helpers
 // ============================================
 

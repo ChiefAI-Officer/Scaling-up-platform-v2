@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 import { AddCertificationModal } from "@/components/coaches/add-certification-modal";
 import { RemoveCertificationButton } from "@/components/coaches/remove-certification-button";
+import { DeleteCoachButton } from "@/components/coaches/delete-coach-button";
+import { requireAuth } from "@/lib/authorization";
 
 interface CoachDetailPageProps {
   params: Promise<{ id: string }>;
@@ -62,6 +64,8 @@ function getWorkshopStatusColor(status: string) {
 export default async function CoachDetailPage({
   params,
 }: CoachDetailPageProps) {
+  const session = await requireAuth();
+  const isAdmin = session.user.role === "ADMIN";
   const { id } = await params;
 
   const coach = await db.coach.findUnique({
@@ -90,6 +94,9 @@ export default async function CoachDetailPage({
   }
 
   const totalWorkshops = coach.workshops.length;
+  const hasActiveWorkshops = coach.workshops.some(
+    (w) => !["COMPLETED", "CANCELED"].includes(w.status)
+  );
   const upcomingWorkshops = coach.workshops.filter(
     (w) => new Date(w.eventDate) > new Date() && w.status !== "CANCELED"
   ).length;
@@ -406,6 +413,15 @@ export default async function CoachDetailPage({
                 coachId={coach.id}
                 existingWorkshopTypeIds={coach.certifications.map((c) => c.workshopTypeId)}
               />
+              {isAdmin && (
+                <div className="pt-2 border-t border-border mt-2">
+                  <DeleteCoachButton
+                    coachId={coach.id}
+                    coachName={`${coach.firstName} ${coach.lastName}`}
+                    hasActiveWorkshops={hasActiveWorkshops}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

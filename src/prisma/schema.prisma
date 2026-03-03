@@ -205,7 +205,7 @@ model Workshop {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  coach           Coach               @relation(fields: [coachId], references: [id])
+  coach           Coach               @relation(fields: [coachId], references: [id], onDelete: Cascade)
   workshopType    WorkshopType?       @relation(fields: [workshopTypeId], references: [id])
   workshopCategory Category?          @relation(fields: [categoryId], references: [id])
   pricingTier     PricingTier?        @relation(fields: [pricingTierId], references: [id])
@@ -475,7 +475,7 @@ model ApprovalQueue {
   escalatedAt DateTime?      // When escalated to higher authority
 
   workshop Workshop? @relation(fields: [workshopId], references: [id])
-  coach    Coach     @relation(fields: [coachId], references: [id])
+  coach    Coach     @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([coachId])
@@ -579,7 +579,7 @@ model FollowUpReport {
   createdAt     DateTime     @default(now())
 
   workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
-  coach    Coach    @relation(fields: [coachId], references: [id])
+  coach    Coach    @relation(fields: [coachId], references: [id], onDelete: Cascade)
 
   @@index([dueDate])
   @@index([status])
@@ -846,4 +846,19 @@ model Contact {
   updatedAt      DateTime @updatedAt
 
   @@map("contacts")
+}
+
+model AdminInvite {
+  id         String    @id @default(cuid())
+  email      String    @unique
+  name       String?
+  invitedBy  String    // userId of admin who sent the invite
+  token      String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([token])
+  @@index([email])
+  @@map("admin_invites")
 }

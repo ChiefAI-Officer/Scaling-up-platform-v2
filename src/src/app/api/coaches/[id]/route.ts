@@ -128,8 +128,8 @@ export async function DELETE(
     if (!actor) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
-    if (!isPrivilegedRole(actor.role)) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    if (actor.role !== "ADMIN") {
+      return NextResponse.json({ success: false, error: "Admin access required" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -155,13 +155,35 @@ export async function DELETE(
       return NextResponse.json(
         {
           success: false,
-          error: "Cannot delete coach with active workshops",
+          error: `Cannot delete coach with ${activeWorkshops.length} active workshop(s). Cancel or complete them first.`,
         },
         { status: 400 }
       );
     }
 
-    await db.coach.delete({ where: { id } });
+    await db.$transaction(async (tx) => {
+      await tx.coach.delete({ where: { id } });
+
+      // Delete linked User account to prevent orphaned logins
+      if (existing.userId) {
+        await tx.user.delete({ where: { id: existing.userId } });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          entityType: "Coach",
+          entityId: id,
+          action: "DELETE",
+          performedBy: actor.email,
+          changes: JSON.stringify({
+            coachName: `${existing.firstName} ${existing.lastName}`,
+            coachEmail: existing.email,
+            userId: existing.userId,
+            workshopsDeleted: existing.workshops.length,
+          }),
+        },
+      });
+    });
 
     return NextResponse.json({
       success: true,

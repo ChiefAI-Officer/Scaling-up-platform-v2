@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import type { Workshop } from "@prisma/client";
+import { DeleteWorkshopDialog } from "@/components/workshops/delete-workshop-dialog";
 
 // JV-02: Jeff Verdun's 6 workshop stages
 type WorkshopStatus =
@@ -16,6 +17,7 @@ type WorkshopStatus =
 
 interface WorkshopActionsProps {
   workshop: Workshop;
+  userRole?: string;
 }
 
 // Sprint 5: Status transitions are now automated via auto-build on approval.
@@ -38,7 +40,7 @@ const statusLabels: Record<WorkshopStatus, string> = {
   CANCELED: "Canceled",
 };
 
-export function WorkshopActions({ workshop }: WorkshopActionsProps) {
+export function WorkshopActions({ workshop, userRole }: WorkshopActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -76,7 +78,11 @@ export function WorkshopActions({ workshop }: WorkshopActionsProps) {
     }
   };
 
-  if (availableTransitions.length === 0) {
+  const canDelete =
+    userRole === "ADMIN" &&
+    ["CANCELED", "COMPLETED"].includes(currentStatus);
+
+  if (availableTransitions.length === 0 && !canDelete) {
     return null;
   }
 
@@ -93,6 +99,12 @@ export function WorkshopActions({ workshop }: WorkshopActionsProps) {
           {loading ? "..." : `Move to ${statusLabels[status]}`}
         </Button>
       ))}
+      {canDelete && (
+        <DeleteWorkshopDialog
+          workshopId={workshop.id}
+          workshopTitle={workshop.title}
+        />
+      )}
     </div>
   );
 }
