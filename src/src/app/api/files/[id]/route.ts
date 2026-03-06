@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { isPrivilegedRole } from "@/lib/authorization";
+import { db } from "@/lib/db";
 import {
   getFile,
   deleteFile,
@@ -23,6 +24,9 @@ const fileRouteParamsSchema = z.object({
 
 const updateFileSchema = z.object({
   workflowStepId: z.string().min(1).optional(),
+  // MR-41: edit file metadata
+  category: z.string().nullable().optional(),
+  workshopId: z.string().nullable().optional(),
 });
 
 export async function GET(
@@ -78,9 +82,25 @@ export async function PATCH(
   }
 
   const { id } = paramsValidation.data;
-  const { workflowStepId } = bodyValidation.data;
+  const { workflowStepId, category, workshopId } = bodyValidation.data;
 
   try {
+    // MR-41: Handle metadata-only updates
+    if (category !== undefined || workshopId !== undefined) {
+      const updated = await db.fileAttachment.update({
+        where: { id },
+        data: {
+          ...(category !== undefined && { category }),
+          ...(workshopId !== undefined && { workshopId }),
+        },
+        include: {
+          workshop: { select: { id: true, title: true, workshopCode: true } },
+          workflowStep: { select: { id: true, stepType: true, subject: true } },
+        },
+      });
+      return NextResponse.json({ success: true, data: mapFileForClient(updated) });
+    }
+
     if (workflowStepId) {
       const updated = await linkFileToWorkflowStep(id, workflowStepId);
       return NextResponse.json({ success: true, data: mapFileForClient(updated) });

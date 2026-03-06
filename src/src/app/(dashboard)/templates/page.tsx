@@ -1,11 +1,13 @@
 export const dynamic = "force-dynamic";
 
+// MR-28: Show 4 global templates only (not workshop-specific)
+// MR-27: Add delete page action
+
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ActiveTemplateToggle } from "@/components/templates/active-template-toggle";
+import { DeleteLandingPageButton } from "@/components/templates/delete-landing-page-button";
 
 const TEMPLATE_OPTIONS = [
   {
@@ -38,239 +40,131 @@ const TEMPLATE_OPTIONS = [
   },
 ] as const;
 
-async function getTemplateData() {
-  const [workshops, pages] = await Promise.all([
-    db.workshop.findMany({
-      select: {
-        id: true,
-        title: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    db.landingPage.findMany({
-      where: {
-        template: {
-          in: ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"],
-        },
-      },
-      select: {
-        id: true,
-        template: true,
-        status: true,
-        slug: true,
-        isActiveTemplate: true,
-        createdAt: true,
-        workshopId: true,
-        workshop: {
-          select: { title: true },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+type TemplateValue = (typeof TEMPLATE_OPTIONS)[number]["value"];
 
-  return { workshops, pages };
+async function getMasterTemplates() {
+  // For each template type, find the page marked as active template (the "master")
+  const pages = await db.landingPage.findMany({
+    where: {
+      isActiveTemplate: true,
+      template: { in: ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] },
+    },
+    select: {
+      id: true,
+      template: true,
+      status: true,
+      slug: true,
+      isActiveTemplate: true,
+      createdAt: true,
+      workshopId: true,
+      workshop: { select: { title: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  // One master per template type (latest updatedAt)
+  const masterByType = new Map<string, typeof pages[number]>();
+  for (const p of pages) {
+    if (!masterByType.has(p.template)) {
+      masterByType.set(p.template, p);
+    }
+  }
+  return masterByType;
 }
 
-function labelForStatus(status: string): "default" | "secondary" | "outline" {
-  if (status === "PUBLISHED") {
-    return "default";
-  }
-  if (status === "DRAFT") {
-    return "secondary";
-  }
+function statusVariant(status: string): "default" | "secondary" | "outline" {
+  if (status === "PUBLISHED") return "default";
+  if (status === "DRAFT") return "secondary";
   return "outline";
 }
 
-export default async function TemplatesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ workshopId?: string; template?: string }>;
-}) {
-  const { workshopId, template } = await searchParams;
-  const { workshops, pages } = await getTemplateData();
-
-  const selectedWorkshopId = workshopId || workshops[0]?.id || "";
-  const selectedTemplate =
-    template && TEMPLATE_OPTIONS.some((option) => option.value === template)
-      ? template
-      : TEMPLATE_OPTIONS[0]?.value;
-  const selectedTemplateMeta =
-    TEMPLATE_OPTIONS.find((option) => option.value === selectedTemplate) || null;
-
-  const selectedPage = pages.find(
-    (page) =>
-      page.workshopId === selectedWorkshopId && page.template === selectedTemplateMeta?.value
-  );
-
-  const templateHref =
-    selectedWorkshopId && selectedTemplateMeta
-      ? `/workshops/${selectedWorkshopId}/landing-pages/${selectedTemplateMeta.route}`
-      : "";
+export default async function TemplatesPage() {
+  const masterByType = await getMasterTemplates();
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Templates</h1>
-        <p className="text-muted-foreground">Select template to edit</p>
+        <p className="text-muted-foreground">
+          Edit the 4 global page templates used when building workshop-specific pages.
+          Mark a workshop landing page as "Auto-Build" to promote it as the master template.
+        </p>
+      </div>
+
+      <div className="grid gap-4">
+        {TEMPLATE_OPTIONS.map((option) => {
+          const master = masterByType.get(option.value as TemplateValue);
+          const editHref = master
+            ? `/workshops/${master.workshopId}/landing-pages/${option.route}`
+            : null;
+          const previewHref = master ? `/workshop/${master.slug}` : null;
+
+          return (
+            <Card key={option.value}>
+              <CardContent className="pt-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">{option.icon}</span>
+                    <div>
+                      <p className="font-semibold text-foreground">{option.label}</p>
+                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                      {master ? (
+                        <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                          <Badge variant={statusVariant(master.status)}>{master.status}</Badge>
+                          <span>Based on: {master.workshop.title}</span>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-warning">
+                          No master template set — mark a landing page as Auto-Build to promote it here.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {master && editHref && (
+                      <>
+                        {previewHref && (
+                          <Link
+                            href={previewHref}
+                            target="_blank"
+                            className="rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+                          >
+                            Preview
+                          </Link>
+                        )}
+                        <Link
+                          href={editHref}
+                          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                        >
+                          Edit
+                        </Link>
+                        <DeleteLandingPageButton pageId={master.id} templateLabel={option.label} />
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Select Template to Edit</CardTitle>
+          <CardTitle>How Templates Work</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <form className="grid gap-4">
-            <div>
-              <label htmlFor="workshopId" className="text-sm font-medium text-foreground">
-                Workshop
-              </label>
-              <select
-                id="workshopId"
-                name="workshopId"
-                defaultValue={selectedWorkshopId}
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2"
-              >
-                {workshops.map((workshop) => (
-                  <option key={workshop.id} value={workshop.id}>
-                    {workshop.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="template" className="text-sm font-medium text-foreground">
-                Landing Page Template
-              </label>
-              <select
-                id="template"
-                name="template"
-                defaultValue={selectedTemplateMeta?.value}
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2"
-              >
-                {TEMPLATE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.icon} {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center rounded-md bg-muted px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
-            >
-              Refresh Selection
-            </button>
-          </form>
-
-          {selectedTemplateMeta && (
-            <div className="rounded-lg border p-4">
-              <p className="font-medium text-foreground">
-                {selectedTemplateMeta.icon} {selectedTemplateMeta.label}
-              </p>
-              <p className="text-sm text-muted-foreground">{selectedTemplateMeta.description}</p>
-              <div className="mt-3 flex items-center gap-3">
-                <Badge variant={selectedPage ? labelForStatus(selectedPage.status) : "outline"}>
-                  {selectedPage ? selectedPage.status : "NOT_CREATED"}
-                </Badge>
-                {templateHref && (
-                  <Link
-                    href={templateHref}
-                    className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                  >
-                    Edit Template
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>All Templates</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {pages.length === 0 ? (
-            <p className="text-muted-foreground">No templates created yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-border">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Template
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Workshop
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Create Date
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Status
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Auto-Build
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {pages.map((page) => {
-                    const templateMeta =
-                      TEMPLATE_OPTIONS.find((option) => option.value === page.template) || null;
-                    const editHref = templateMeta
-                      ? `/workshops/${page.workshopId}/landing-pages/${templateMeta.route}`
-                      : `/workshops/${page.workshopId}/landing-pages`;
-
-                    return (
-                      <tr key={page.id}>
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-foreground">
-                            {templateMeta?.label || page.template}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-foreground">{page.workshop.title}</td>
-                        <td className="px-4 py-3 text-sm text-foreground">
-                          {formatDate(page.createdAt)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant={labelForStatus(page.status)}>{page.status}</Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          <ActiveTemplateToggle pageId={page.id} isActive={page.isActiveTemplate} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <Link href={editHref} className="text-primary hover:underline text-sm">
-                              Edit
-                            </Link>
-                            <Link
-                              href={`/workshop/${page.slug}`}
-                              target="_blank"
-                              className="text-primary hover:underline text-sm"
-                            >
-                              Preview
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <CardContent className="text-sm text-muted-foreground space-y-2">
+          <p>
+            Each workshop has its own set of landing pages. To promote a workshop page as the
+            global master template, open the workshop landing page editor and toggle "Auto-Build" on.
+          </p>
+          <p>
+            The master template's content and layout is used as the starting point when
+            auto-generating pages for new approved workshops.
+          </p>
         </CardContent>
       </Card>
     </div>
   );
 }
-

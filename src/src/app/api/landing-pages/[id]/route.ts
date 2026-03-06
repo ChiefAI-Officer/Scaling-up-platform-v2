@@ -49,3 +49,36 @@ export async function PATCH(
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
+
+/**
+ * DELETE /api/landing-pages/[id]
+ * Delete a landing page (admin only) — MR-27
+ */
+export async function DELETE(
+    _request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const actor = await getApiActor();
+        if (!actor) {
+            return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+        }
+        if (!isPrivilegedRole(actor.role)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
+        const { id } = await params;
+
+        const page = await db.landingPage.findUnique({ where: { id } });
+        if (!page) {
+            return NextResponse.json({ error: "Landing page not found" }, { status: 404 });
+        }
+
+        await db.landingPage.delete({ where: { id } });
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error("Landing page DELETE error:", error);
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    }
+}

@@ -10,11 +10,13 @@
 // ============================================
 
 export const STEP_TYPES = {
-  EMAIL_ATTENDEES: "EMAIL_ATTENDEES",   // Send to all registered attendees
-  EMAIL_COACH: "EMAIL_COACH",           // Send to the workshop's coach
-  EMAIL_STAFF: "EMAIL_STAFF",           // Send to admin/staff (ADMIN_EMAIL)
-  EMAIL_CUSTOM: "EMAIL_CUSTOM",         // Send to specific email addresses
-  NOTIFICATION: "NOTIFICATION",         // Internal Teams/system notification
+  EMAIL_ATTENDEES: "EMAIL_ATTENDEES",         // Send to all registered attendees
+  EMAIL_COACH: "EMAIL_COACH",                 // Send to the workshop's coach
+  EMAIL_STAFF: "EMAIL_STAFF",                 // Send to admin/staff (ADMIN_EMAIL)
+  EMAIL_CUSTOM: "EMAIL_CUSTOM",               // Send to specific email addresses
+  NOTIFICATION: "NOTIFICATION",               // Internal Teams/system notification
+  SEND_SURVEY_LINK: "SEND_SURVEY_LINK",       // MR-38: Send survey link to attendees
+  SEND_FILE_LINK: "SEND_FILE_LINK",           // MR-38: Send file/resource link to attendees
 } as const;
 
 export type StepType = (typeof STEP_TYPES)[keyof typeof STEP_TYPES];
@@ -25,6 +27,8 @@ export const STEP_TYPE_LABELS: Record<StepType, string> = {
   EMAIL_STAFF: "Email Staff",
   EMAIL_CUSTOM: "Email Custom Recipients",
   NOTIFICATION: "System Notification",
+  SEND_SURVEY_LINK: "Send Survey Link",
+  SEND_FILE_LINK: "Send File Access Link",
 };
 
 // ============================================

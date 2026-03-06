@@ -9,6 +9,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
+import { DeleteWorkflowButton } from "@/components/workflows/delete-workflow-button";
 
 async function WorkflowsContent() {
   const workflows = await db.workflow.findMany({
@@ -134,12 +135,25 @@ async function WorkflowsContent() {
                   {workflow.updatedAt.toLocaleDateString()}
                 </td>
                 <td className="px-4 py-4 text-right">
-                  <Link
-                    href={`/admin/workflows/${workflow.id}`}
-                    className="text-sm text-primary hover:text-primary/80 font-medium"
-                  >
-                    Edit
-                  </Link>
+                  <div className="flex items-center justify-end gap-3">
+                    <Link
+                      href={`/admin/workflows/${workflow.id}?preview=1`}
+                      className="text-sm text-muted-foreground hover:text-foreground font-medium"
+                    >
+                      Preview
+                    </Link>
+                    <Link
+                      href={`/admin/workflows/${workflow.id}`}
+                      className="text-sm text-primary hover:text-primary/80 font-medium"
+                    >
+                      Edit
+                    </Link>
+                    <DeleteWorkflowButton
+                      workflowId={workflow.id}
+                      workflowName={workflow.name}
+                      assignmentCount={workflow._count.assignments}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}

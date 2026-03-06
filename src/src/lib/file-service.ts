@@ -14,7 +14,7 @@ import {
   type WorkshopStatus,
 } from "@/lib/file-access";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 250 * 1024 * 1024; // MR-40: 250MB
 
 function sanitizeFilename(name: string): string {
   // Strip path separators and null bytes

@@ -434,7 +434,14 @@ export function WorkflowEditor({
             onChange={(e) => setIsTemplate(e.target.checked)}
             className="rounded border-border text-primary focus:ring-primary"
           />
-          Save as template (reusable across workshops)
+          Save as feature template (reusable across workshops)
+          {/* MR-37: Feature template tooltip */}
+          <span
+            title="A feature template is a reusable workflow that can be automatically assigned to workshops based on category, format, and phase. When a new workshop is approved, any matching feature templates are automatically applied."
+            className="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-xs text-muted-foreground"
+          >
+            ?
+          </span>
         </label>
 
         {/* Auto-assignment filters for auto-build on approval */}

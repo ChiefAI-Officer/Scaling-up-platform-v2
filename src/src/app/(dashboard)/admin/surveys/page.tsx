@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/authorization";
 import { SURVEY_TYPE_LABELS } from "@/lib/survey-types";
 import type { SurveyType } from "@/lib/survey-types";
+import { DeleteSurveyTemplateButton } from "@/components/surveys/delete-survey-template-button";
 
 async function SurveyTemplatesList() {
   await requireAdmin();
@@ -114,6 +115,11 @@ async function SurveyTemplatesList() {
                       Results
                     </Link>
                   )}
+                  <DeleteSurveyTemplateButton
+                    templateId={template.id}
+                    templateName={template.name}
+                    surveyCount={template._count.surveys}
+                  />
                 </div>
               </td>
             </tr>

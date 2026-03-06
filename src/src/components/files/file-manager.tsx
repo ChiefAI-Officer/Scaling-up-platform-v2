@@ -66,6 +66,45 @@ export function FileManager({ initialFiles, workshops }: Props) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // MR-41: Edit file metadata
+  const [editingFile, setEditingFile] = useState<FileRecord | null>(null);
+  const [editCategory, setEditCategory] = useState("");
+  const [editWorkshopId, setEditWorkshopId] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function openEdit(file: FileRecord) {
+    setEditingFile(file);
+    setEditCategory(file.category || "");
+    setEditWorkshopId(file.workshopId || "");
+  }
+
+  async function handleSaveEdit() {
+    if (!editingFile) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/files/${editingFile.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          category: editCategory || null,
+          workshopId: editWorkshopId || null,
+        }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setFiles((prev) => prev.map((f) => (f.id === editingFile.id ? { ...f, ...json.data } : f)));
+        setEditingFile(null);
+        setSuccess("File updated");
+      } else {
+        setError(json.error || "Save failed");
+      }
+    } catch {
+      setError("Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Upload form state
   const [uploadWorkshopId, setUploadWorkshopId] = useState("");
   const [uploadCategory, setUploadCategory] = useState("");
@@ -160,7 +199,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
         <form onSubmit={handleUpload} className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <div className="sm:col-span-2">
             <label htmlFor="file-input" className="block text-sm font-medium text-foreground mb-1">
-              File (max 10MB)
+              File (max 250MB)
             </label>
             <input
               id="file-input"
@@ -365,6 +404,12 @@ export function FileManager({ initialFiles, workshops }: Props) {
                           View
                         </a>
                         <button
+                          onClick={() => openEdit(file)}
+                          className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                        >
+                          Edit
+                        </button>
+                        <button
                           onClick={() => handleDelete(file.id, file.filename)}
                           disabled={deletingId === file.id}
                           className="text-sm font-medium text-destructive hover:text-destructive/80 disabled:opacity-50"
@@ -380,6 +425,62 @@ export function FileManager({ initialFiles, workshops }: Props) {
           </div>
         )}
       </div>
+
+      {/* MR-41: Edit file metadata modal */}
+      {editingFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-card rounded-lg shadow-lg w-full max-w-sm p-6 space-y-4">
+            <h3 className="text-base font-semibold text-foreground">Edit File Metadata</h3>
+            <p className="text-sm text-muted-foreground truncate">{editingFile.filename}</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Workshop</label>
+                <select
+                  value={editWorkshopId}
+                  onChange={(e) => setEditWorkshopId(e.target.value)}
+                  className="block w-full rounded-md border border-border px-3 py-2 text-sm"
+                >
+                  <option value="">No workshop</option>
+                  {workshops.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.workshopCode} — {w.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Category</label>
+                <select
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  className="block w-full rounded-md border border-border px-3 py-2 text-sm"
+                >
+                  {FILE_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setEditingFile(null)}
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-accent"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={saving}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
