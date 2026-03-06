@@ -60,6 +60,8 @@ function paymentBadgeVariant(
   }
 }
 
+const PAGE_SIZE = 25;
+
 export function RegistrationsClient({ registrations: initialRegistrations }: RegistrationsClientProps) {
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [selectedWorkshopId, setSelectedWorkshopId] = useState("all");
@@ -69,6 +71,20 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
     type: "success" | "error";
     message: string;
   } | null>(null);
+  // MR-31: pagination + sort
+  const [page, setPage] = useState(0);
+  const [sortField, setSortField] = useState<"attendee" | "registeredAt" | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  function toggleSort(field: "attendee" | "registeredAt") {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+    setPage(0);
+  }
 
   const workshops = useMemo(() => {
     const seen = new Map<string, { id: string; title: string; date: string }>();
@@ -87,15 +103,27 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
     );
   }, [registrations]);
 
-  const filteredRegistrations = useMemo(() => {
-    if (selectedWorkshopId === "all") {
-      return registrations;
-    }
+  const filteredSorted = useMemo(() => {
+    let result = selectedWorkshopId === "all"
+      ? registrations
+      : registrations.filter((r) => r.workshopId === selectedWorkshopId);
 
-    return registrations.filter(
-      (registration) => registration.workshopId === selectedWorkshopId
-    );
-  }, [registrations, selectedWorkshopId]);
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        let cmp = 0;
+        if (sortField === "attendee") {
+          cmp = `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`);
+        } else {
+          cmp = new Date(a.registeredAt).getTime() - new Date(b.registeredAt).getTime();
+        }
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    }
+    return result;
+  }, [registrations, selectedWorkshopId, sortField, sortDir]);
+
+  const totalPages = Math.ceil(filteredSorted.length / PAGE_SIZE);
+  const filteredRegistrations = filteredSorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const exportCsv = () => {
     const headers = [
@@ -111,7 +139,7 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
       "Registered At",
     ];
 
-    const rows = filteredRegistrations.map((registration) => [
+    const rows = filteredSorted.map((registration) => [
       registration.workshopTitle,
       formatDate(registration.workshopDate),
       registration.firstName,
@@ -250,7 +278,7 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
         </div>
         <Button
           onClick={exportCsv}
-          disabled={filteredRegistrations.length === 0}
+          disabled={filteredSorted.length === 0}
           className="sm:w-auto"
         >
           Export CSV
@@ -295,9 +323,19 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Attendee</TableHead>
+              <TableHead
+                className="cursor-pointer select-none hover:text-foreground"
+                onClick={() => toggleSort("attendee")}
+              >
+                Attendee {sortField === "attendee" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+              </TableHead>
               <TableHead>Workshop</TableHead>
-              <TableHead>Registered</TableHead>
+              <TableHead
+                className="cursor-pointer select-none hover:text-foreground"
+                onClick={() => toggleSort("registeredAt")}
+              >
+                Registered {sortField === "registeredAt" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+              </TableHead>
               <TableHead>Payment</TableHead>
               <TableHead>Attended</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -369,6 +407,30 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
             )}
           </TableBody>
         </Table>
+        {/* MR-31: Pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-border px-4 py-3">
+            <p className="text-sm text-muted-foreground">
+              Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredSorted.length)} of {filteredSorted.length}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(p - 1, 0))}
+                disabled={page === 0}
+                className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-40"
+              >
+                Prev
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(p + 1, totalPages - 1))}
+                disabled={page >= totalPages - 1}
+                className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

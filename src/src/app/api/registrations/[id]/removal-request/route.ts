@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { canManageCoachData, getApiActor } from "@/lib/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { sendApprovalRequest } from "@/services/notifications";
 
 const removalRequestSchema = z.object({
   reason: z.string().trim().max(500).optional(),
@@ -47,12 +48,15 @@ export async function POST(
         lastName: true,
         email: true,
         workshopId: true,
+        paymentStatus: true,  // MR-30: needed to alert admins on paid attendee removal
+        amountPaidCents: true,
         workshop: {
           select: {
             id: true,
             title: true,
             coachId: true,
             eventDate: true,
+            coach: { select: { firstName: true, lastName: true, email: true } },
           },
         },
       },
@@ -120,6 +124,24 @@ export async function POST(
         }),
       },
     });
+
+    // MR-30: Send admin email if the attendee had a paid registration
+    if (registration.paymentStatus === "COMPLETED") {
+      const coachName = registration.workshop.coach
+        ? `${registration.workshop.coach.firstName} ${registration.workshop.coach.lastName}`
+        : actor.email;
+      const amountStr = registration.amountPaidCents
+        ? `$${(registration.amountPaidCents / 100).toFixed(2)}`
+        : "unknown amount";
+      sendApprovalRequest({
+        id: approval.id,
+        type: "CANCELLATION",
+        coachName,
+        requestedAt: new Date(),
+        details: `REFUND REQUIRED — Coach unregistered a paid attendee from "${registration.workshop.title}".\n\nAttendee: ${registration.firstName} ${registration.lastName} (${registration.email})\nAmount paid: ${amountStr}\n\nReason: ${details}`,
+        amount: registration.amountPaidCents ?? undefined,
+      }).catch((err: unknown) => console.error("Failed to send admin cancellation email:", err));
+    }
 
     return NextResponse.json(
       {

@@ -14,6 +14,7 @@ interface Approval {
   details: string;
   requestedAt: string;
   escalatedAt?: string | null;
+  coachResponse?: string | null; // MR-33
 }
 
 interface ApprovalsApiResponse {
@@ -187,6 +188,12 @@ export default function ApprovalsPage() {
                   &nbsp; {approval.coachName}
                 </h3>
                 <p className="text-foreground">{approval.details}</p>
+                {approval.coachResponse && (
+                  <div className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Coach Response</p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{approval.coachResponse}</p>
+                  </div>
+                )}
                 <div className="flex gap-4 text-sm text-muted-foreground mt-1">
                   <span>
                     Requested: {new Date(approval.requestedAt).toLocaleDateString()}

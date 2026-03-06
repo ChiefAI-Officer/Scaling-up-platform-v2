@@ -476,6 +476,7 @@ model ApprovalQueue {
   notes       String?
   responseReason String?     // Reason for approval/denial
   escalatedAt DateTime?      // When escalated to higher authority
+  coachResponse  String?     // MR-33: Coach's response to INFO_REQUESTED questions
 
   workshop Workshop? @relation(fields: [workshopId], references: [id])
   coach    Coach     @relation(fields: [coachId], references: [id], onDelete: Cascade)

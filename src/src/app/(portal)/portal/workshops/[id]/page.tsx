@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { CancelWorkshopDialog } from "@/components/workshops/cancel-workshop-dialog";
 import { ResubmitWorkshop } from "@/components/workshops/resubmit-workshop";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
+import { CoachResponseForm } from "@/components/workshops/coach-response-form";
 
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
@@ -34,7 +35,7 @@ export default async function WorkshopDetailsPage({
   const { id } = await params;
   const { coach } = await requireCoach();
 
-  const [workshop, workflowAssignments, surveyCount, latestDenial] = await Promise.all([
+  const [workshop, workflowAssignments, surveyCount, latestDenial, workshopFiles, registrationFinancials, infoRequestedApproval] = await Promise.all([
     db.workshop.findFirst({
       where: { id, coachId: coach.id },
       select: {
@@ -49,6 +50,7 @@ export default async function WorkshopDetailsPage({
         virtualLink: true,
         landingPageSlug: true,
         maxAttendees: true,
+        isFree: true,
         workshopType: { select: { name: true } },
         _count: { select: { registrations: true } },
       },
@@ -87,6 +89,23 @@ export default async function WorkshopDetailsPage({
         notes: true,
         respondedAt: true,
       },
+    }),
+    // MR-29: Workshop files for download
+    db.fileAttachment.findMany({
+      where: { workshopId: id },
+      select: { id: true, filename: true, blobUrl: true, contentType: true, sizeBytes: true, category: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    // MR-32: Financial summary from paid registrations
+    db.registration.findMany({
+      where: { workshopId: id, paymentStatus: "COMPLETED" },
+      select: { amountPaidCents: true },
+    }),
+    // MR-33: Pending approval for coach response form (when workshop is INFO_REQUESTED)
+    db.approvalQueue.findFirst({
+      where: { workshopId: id, status: "PENDING" },
+      orderBy: { requestedAt: "desc" },
+      select: { id: true, notes: true, coachResponse: true },
     }),
   ]);
 
@@ -167,6 +186,69 @@ export default async function WorkshopDetailsPage({
           {workshop.description || "No workshop description provided yet."}
         </p>
       </div>
+
+      {/* MR-32: Financials card */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Financials
+        </h2>
+        {workshop.isFree ? (
+          <p className="text-sm text-muted-foreground">This is a free workshop</p>
+        ) : registrationFinancials.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No completed payments yet</p>
+        ) : (
+          <div className="space-y-1">
+            <p className="text-3xl font-semibold text-foreground">
+              ${(registrationFinancials.reduce((sum, r) => sum + (r.amountPaidCents ?? 0), 0) / 100).toFixed(2)}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {registrationFinancials.length} paid registration{registrationFinancials.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* MR-33: Coach response to INFO_REQUESTED */}
+      {workshop.status === "INFO_REQUESTED" && infoRequestedApproval && (
+        <CoachResponseForm
+          approvalId={infoRequestedApproval.id}
+          existingResponse={infoRequestedApproval.coachResponse ?? null}
+          adminQuestion={infoRequestedApproval.notes ?? null}
+        />
+      )}
+
+      {/* MR-29: Workshop files for download */}
+      {workshopFiles.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Workshop Files
+          </h2>
+          <div className="space-y-2">
+            {workshopFiles.map((file) => (
+              <div key={file.id} className="flex items-center justify-between text-sm">
+                <div>
+                  <a
+                    href={file.blobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-primary hover:text-primary/80"
+                  >
+                    {file.filename}
+                  </a>
+                  {file.category && (
+                    <span className="ml-2 text-xs text-muted-foreground">[{file.category}]</span>
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {file.sizeBytes < 1024 * 1024
+                    ? `${(file.sizeBytes / 1024).toFixed(1)} KB`
+                    : `${(file.sizeBytes / (1024 * 1024)).toFixed(1)} MB`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Rejection + Resubmit */}
       {["CANCELED", "DENIED"].includes(workshop.status) && (

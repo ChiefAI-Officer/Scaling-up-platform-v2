@@ -156,6 +156,7 @@ export async function GET(request: NextRequest) {
                     escalatedAt: a.escalatedAt,
                     requestedBy: normalized.requestedBy || a.requestedBy || a.coach?.email || "unknown",
                     responseReason: a.responseReason,
+                    coachResponse: a.coachResponse, // MR-33
                 };
             }),
             total: approvals.length,
