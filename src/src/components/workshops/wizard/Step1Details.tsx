@@ -111,7 +111,7 @@ export function Step1Details() {
                 )}
 
                 <div className="space-y-2">
-                    <Label htmlFor="title">Workshop Title</Label>
+                    <Label htmlFor="title">Title</Label>
                     <Input
                         id="title"
                         value={formData.title}

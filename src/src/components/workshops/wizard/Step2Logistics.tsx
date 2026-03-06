@@ -6,10 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-// Minimum event date: 14 days from today (lead-time requirement)
-function getMinDate(): string {
+// MR-18: Minimum event date based on format — 60 days for Virtual, 90 days for In-Person
+function getMinDate(format: string): string {
     const d = new Date();
-    d.setDate(d.getDate() + 14);
+    const leadDays = format === "VIRTUAL" ? 60 : 90;
+    d.setDate(d.getDate() + leadDays);
     return d.toISOString().split("T")[0];
 }
 
@@ -20,7 +21,7 @@ function isValidUrl(str: string): boolean {
 
 export function Step2Logistics() {
     const { formData, updateField, nextStep, prevStep } = useWizard();
-    const minDate = getMinDate();
+    const minDate = getMinDate(formData.format);
 
     const dateIsTooSoon = formData.eventDate && formData.eventDate < minDate;
     const virtualLinkInvalid = formData.virtualLink && !isValidUrl(formData.virtualLink);

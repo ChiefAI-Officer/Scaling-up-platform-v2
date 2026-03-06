@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WorkshopRulesPanel } from "@/components/workshops/workshop-rules-panel";
 
 interface Coach {
   id: string;
@@ -53,6 +54,13 @@ const COUPON_PRESETS = [
   { value: "100", label: "100% discount (free access)" },
 ];
 
+function getMinEventDate(format: string): string {
+  const d = new Date();
+  const leadDays = format === "VIRTUAL" ? 60 : 90;
+  d.setDate(d.getDate() + leadDays);
+  return d.toISOString().split("T")[0];
+}
+
 function normalizeToken(input: string): string {
   return input.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
 }
@@ -87,7 +95,11 @@ function generateCouponCode(discountPercent: string, title: string): string {
   return `${prefix}-${titleToken || "WORK"}-${randomToken}`;
 }
 
-export default function NewWorkshopPage() {
+interface NewWorkshopFormProps {
+  isCoachPortal?: boolean;
+}
+
+export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,6 +109,9 @@ export default function NewWorkshopPage() {
   const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionResponse["user"]>(undefined);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  // MR-17: typeahead state for coach combobox (admin view)
+  const [coachQuery, setCoachQuery] = useState("");
+  const [showCoachDropdown, setShowCoachDropdown] = useState(false);
 
   const [formData, setFormData] = useState({
     coachId: "",
@@ -125,6 +140,7 @@ export default function NewWorkshopPage() {
     maxAttendees: "50",
     couponDiscountPercent: "",
     couponCode: "",
+    customPricingRequest: "",
   });
 
   useEffect(() => {
@@ -166,6 +182,7 @@ export default function NewWorkshopPage() {
 
           if (matchingCoach) {
             setSelectedCoach(matchingCoach);
+            setCoachQuery(`${matchingCoach.firstName} ${matchingCoach.lastName}`);
             setFormData((prev) => ({
               ...prev,
               coachId: matchingCoach.id,
@@ -226,6 +243,20 @@ export default function NewWorkshopPage() {
   );
 
   const coachIsAutoFilled = sessionUser?.role === "COACH" && Boolean(formData.coachId);
+
+  // MR-17: filtered options for typeahead combobox
+  const filteredCoachOptions = coaches.filter((c) => {
+    if (!coachQuery) return true;
+    const fullName = `${c.firstName} ${c.lastName}`.toLowerCase();
+    return fullName.includes(coachQuery.toLowerCase()) || c.email.toLowerCase().includes(coachQuery.toLowerCase());
+  });
+
+  function handleCoachSelect(coach: Coach) {
+    setCoachQuery(`${coach.firstName} ${coach.lastName}`);
+    setSelectedCoach(coach);
+    setFormData((prev) => ({ ...prev, coachId: coach.id }));
+    setShowCoachDropdown(false);
+  }
 
   const handleChange = (
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -383,7 +414,35 @@ export default function NewWorkshopPage() {
           ? Number.parseInt(formData.couponDiscountPercent, 10)
           : undefined,
         couponCode: formData.couponCode || undefined,
+        customPricingRequest: formData.customPricingRequest || undefined,
       };
+
+      if (isCoachPortal) {
+        // MR-16: Coach portal — submit as approval request
+        const approvalPayload = {
+          type: "WORKSHOP_REQUEST",
+          workshopTypeId: formData.workshopTypeId,
+          details: {
+            ...payload,
+            termsAcceptedAt: new Date().toISOString(),
+          },
+        };
+        const response = await fetch("/api/approvals", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(approvalPayload),
+        });
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(
+            typeof data.error === "string"
+              ? data.error
+              : data.error?.[0]?.message || "Failed to submit workshop request"
+          );
+        }
+        router.push("/portal/home?submitted=1");
+        return;
+      }
 
       const response = await fetch("/api/workshops", {
         method: "POST",
@@ -426,8 +485,14 @@ export default function NewWorkshopPage() {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Create New Workshop</h1>
-        <p className="text-muted-foreground">Set up a new workshop event</p>
+        <h1 className="text-2xl font-bold text-foreground">
+          {isCoachPortal ? "Request New Workshop" : "Create New Workshop"}
+        </h1>
+        <p className="text-muted-foreground">
+          {isCoachPortal
+            ? "Complete the form below to submit a workshop request for approval."
+            : "Set up a new workshop event"}
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -437,6 +502,9 @@ export default function NewWorkshopPage() {
           </div>
         )}
 
+        {/* MR-12-form: Workshop rules instructions panel */}
+        <WorkshopRulesPanel />
+
         <Card>
           <CardHeader>
             <CardTitle>Workshop Details</CardTitle>
@@ -444,60 +512,93 @@ export default function NewWorkshopPage() {
           <CardContent className="space-y-4">
             <div>
               <Label htmlFor="coachId">Coach *</Label>
-              <select
-                id="coachId"
-                name="coachId"
-                value={formData.coachId}
-                onChange={handleChange}
-                required
-                disabled={coachIsAutoFilled}
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary disabled:bg-muted"
-              >
-                <option value="">Select a coach...</option>
-                {coaches.map((coach) => (
-                  <option key={coach.id} value={coach.id}>
-                    {coach.firstName} {coach.lastName} ({coach.email})
-                  </option>
-                ))}
-              </select>
-              {coachIsAutoFilled && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Coach is auto-filled from login.
-                </p>
+              {coachIsAutoFilled ? (
+                <>
+                  <Input
+                    id="coachId"
+                    value={coachQuery}
+                    disabled
+                    className="mt-1 bg-muted"
+                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Coach is auto-filled from login.
+                  </p>
+                </>
+              ) : (
+                /* MR-17: Typeahead combobox for admin */
+                <div className="relative mt-1">
+                  <Input
+                    id="coachId"
+                    value={coachQuery}
+                    onChange={(e) => {
+                      setCoachQuery(e.target.value);
+                      setShowCoachDropdown(true);
+                      if (!e.target.value) {
+                        setSelectedCoach(null);
+                        setFormData((prev) => ({ ...prev, coachId: "" }));
+                      }
+                    }}
+                    onFocus={() => setShowCoachDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowCoachDropdown(false), 150)}
+                    placeholder="Type to search coaches..."
+                    required
+                    autoComplete="off"
+                  />
+                  {showCoachDropdown && filteredCoachOptions.length > 0 && (
+                    <div className="absolute z-20 w-full bg-background border border-border rounded-md shadow-lg max-h-48 overflow-auto mt-1">
+                      {filteredCoachOptions.map((coach) => (
+                        <button
+                          key={coach.id}
+                          type="button"
+                          onMouseDown={() => handleCoachSelect(coach)}
+                          className="w-full text-left px-3 py-2 hover:bg-accent text-sm"
+                        >
+                          {coach.firstName} {coach.lastName}{" "}
+                          <span className="text-muted-foreground">({coach.email})</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                id="isDuoWorkshop"
-                name="isDuoWorkshop"
-                type="checkbox"
-                checked={formData.isDuoWorkshop}
-                onChange={handleChange}
-                className="rounded border-border"
-              />
-              <Label htmlFor="isDuoWorkshop">Duo workshop (add Coach 2)</Label>
-            </div>
+            {/* MR-16: Duo workshop is admin-only */}
+            {!isCoachPortal && (
+              <>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="isDuoWorkshop"
+                    name="isDuoWorkshop"
+                    type="checkbox"
+                    checked={formData.isDuoWorkshop}
+                    onChange={handleChange}
+                    className="rounded border-border"
+                  />
+                  <Label htmlFor="isDuoWorkshop">Duo workshop (add Coach 2)</Label>
+                </div>
 
-            {formData.isDuoWorkshop && (
-              <div>
-                <Label htmlFor="secondaryCoachId">Coach 2 *</Label>
-                <select
-                  id="secondaryCoachId"
-                  name="secondaryCoachId"
-                  value={formData.secondaryCoachId}
-                  onChange={handleChange}
-                  required={formData.isDuoWorkshop}
-                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
-                >
-                  <option value="">Select Coach 2...</option>
-                  {secondaryCoachOptions.map((coach) => (
-                    <option key={coach.id} value={coach.id}>
-                      {coach.firstName} {coach.lastName} ({coach.email})
-                    </option>
-                  ))}
-                </select>
-              </div>
+                {formData.isDuoWorkshop && (
+                  <div>
+                    <Label htmlFor="secondaryCoachId">Coach 2 *</Label>
+                    <select
+                      id="secondaryCoachId"
+                      name="secondaryCoachId"
+                      value={formData.secondaryCoachId}
+                      onChange={handleChange}
+                      required={formData.isDuoWorkshop}
+                      className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
+                    >
+                      <option value="">Select Coach 2...</option>
+                      {secondaryCoachOptions.map((coach) => (
+                        <option key={coach.id} value={coach.id}>
+                          {coach.firstName} {coach.lastName} ({coach.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
             )}
 
             <input type="hidden" name="workshopTypeId" value={formData.workshopTypeId} />
@@ -527,7 +628,7 @@ export default function NewWorkshopPage() {
             </div>
 
             <div>
-              <Label htmlFor="title">Workshop Title *</Label>
+              <Label htmlFor="title">Title *</Label>
               <Input
                 id="title"
                 name="title"
@@ -581,7 +682,7 @@ export default function NewWorkshopPage() {
             </div>
 
             <div>
-              <Label htmlFor="excludedClients">Excluded Clients</Label>
+              <Label htmlFor="excludedClients">Excluded Contracted Clients</Label>
               <textarea
                 id="excludedClients"
                 name="excludedClients"
@@ -592,7 +693,7 @@ export default function NewWorkshopPage() {
                 placeholder="e.g., Acme Corp, GlobalTech Inc"
               />
               <p className="text-sm text-muted-foreground mt-1">
-                Companies or clients to exclude from marketing for this workshop.
+                If you would like to exclude existing contracted clients, from the 10% fee, please list those current clients here.
               </p>
             </div>
           </CardContent>
@@ -628,6 +729,7 @@ export default function NewWorkshopPage() {
                   value={formData.eventDate}
                   onChange={handleChange}
                   required
+                  min={getMinEventDate(formData.format)}
                   className="mt-1"
                 />
               </div>
@@ -816,6 +918,22 @@ export default function NewWorkshopPage() {
                   </p>
                 </div>
 
+                <div>
+                  <Label htmlFor="customPricingRequest">Custom Pricing Request</Label>
+                  <textarea
+                    id="customPricingRequest"
+                    name="customPricingRequest"
+                    value={formData.customPricingRequest}
+                    onChange={handleChange}
+                    rows={2}
+                    className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
+                    placeholder="If you need the price of your workshop to be different, please share your pricing here."
+                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Optional. Share any special pricing needs for this workshop.
+                  </p>
+                </div>
+
                 <div className="rounded-lg border border-border p-4 space-y-4">
                   <div>
                     <Label htmlFor="couponDiscountPercent">Coach Coupon Discount</Label>
@@ -894,10 +1012,16 @@ export default function NewWorkshopPage() {
             Cancel
           </Button>
           <Button type="submit" disabled={loading || !termsAccepted} className="flex-1">
-            {loading ? "Creating..." : "Continue to Workshop Editor"}
+            {loading
+              ? isCoachPortal ? "Submitting..." : "Creating..."
+              : isCoachPortal ? "Submit Request" : "Continue to Workshop Editor"}
           </Button>
         </div>
       </form>
     </div>
   );
+}
+
+export default function NewWorkshopPage() {
+  return <NewWorkshopForm isCoachPortal={false} />;
 }

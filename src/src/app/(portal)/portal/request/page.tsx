@@ -1,21 +1,12 @@
-import React from "react";
-import WorkshopWizard from "@/components/workshops/wizard/WorkshopWizard";
 import { requireCoach } from "@/lib/authorization";
+import { NewWorkshopForm } from "@/app/(dashboard)/workshops/new/page";
 
 export default async function RequestWorkshopPage() {
-    // Ensure user is authorized coach
     await requireCoach();
 
     return (
-        <div className="max-w-4xl mx-auto py-8">
-            <div className="mb-8 text-center">
-                <h1 className="text-3xl font-bold text-foreground mb-2">Request New Workshop</h1>
-                <p className="text-muted-foreground">
-                    Follow the steps below to set up your new workshop event. Your progress is saved automatically.
-                </p>
-            </div>
-
-            <WorkshopWizard />
+        <div className="max-w-3xl mx-auto">
+            <NewWorkshopForm isCoachPortal={true} />
         </div>
     );
 }
