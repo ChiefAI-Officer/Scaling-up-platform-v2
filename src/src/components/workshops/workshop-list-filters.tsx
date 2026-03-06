@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { StatusPill } from "@/components/ui/status-pill";
 import { CheckCircle2, Circle } from "lucide-react";
+import { CopyUrlButton } from "@/components/ui/copy-url-button";
 
 interface WorkshopItem {
     id: string;
@@ -15,6 +16,7 @@ interface WorkshopItem {
     maxAttendees: number;
     workshopType: { name: string } | null;
     _count: { registrations: number };
+    landingPageUrl?: string | null;
 }
 
 interface PortalWorkshopListProps {
@@ -23,7 +25,7 @@ interface PortalWorkshopListProps {
 
 const STATUS_OPTIONS = [
     { value: "", label: "All Statuses" },
-    { value: "REQUESTED", label: "Requested" },
+    { value: "INFO_REQUESTED", label: "Info Requested" },
     { value: "AWAITING_APPROVAL", label: "Awaiting Approval" },
     { value: "PRE_EVENT", label: "Pre-Event" },
     { value: "POST_EVENT", label: "Post-Event" },
@@ -117,6 +119,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Registrations</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Validated</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Approved</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Landing Page</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
                         </tr>
@@ -124,7 +127,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                     <tbody className="divide-y divide-border">
                         {filtered.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
+                                <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                                     {hasActiveFilters
                                         ? "No workshops match your search."
                                         : "No workshops found. Request your first one above!"}
@@ -138,7 +141,12 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                                 return (
                                     <tr key={workshop.id} className="hover:bg-accent transition-colors">
                                         <td className="px-6 py-4">
-                                            <div className="font-medium text-foreground">{workshop.title}</div>
+                                            <Link
+                                                href={`/portal/workshops/${workshop.id}`}
+                                                className="font-medium text-primary hover:text-primary/80"
+                                            >
+                                                {workshop.title}
+                                            </Link>
                                             <div className="text-sm text-muted-foreground">
                                                 {workshop.workshopCode && <span className="font-mono mr-2">{workshop.workshopCode}</span>}
                                                 {workshop.workshopType?.name}
@@ -163,6 +171,13 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                                                 <CheckCircle2 className="w-5 h-5 text-success mx-auto" />
                                             ) : (
                                                 <Circle className="w-5 h-5 text-muted-foreground mx-auto" />
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {workshop.landingPageUrl ? (
+                                                <CopyUrlButton url={workshop.landingPageUrl} />
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground">Not published</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4">

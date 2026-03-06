@@ -45,7 +45,7 @@ export function generateSlug(title: string, id?: string): string {
 // JV-02: Jeff Verdun's 6 workshop stages
 export function getWorkshopStatusColor(status: string): string {
   const colors: Record<string, string> = {
-    REQUESTED: "bg-status-requested/10 text-status-requested",
+    INFO_REQUESTED: "bg-status-requested/10 text-status-requested",
     AWAITING_APPROVAL: "bg-status-awaiting/10 text-status-awaiting",
     PRE_EVENT: "bg-status-active/10 text-status-active",
     POST_EVENT: "bg-status-post/10 text-status-post",
@@ -57,7 +57,7 @@ export function getWorkshopStatusColor(status: string): string {
 
 export function getWorkshopStatusLabel(status: string): string {
   const labels: Record<string, string> = {
-    REQUESTED: "Requested",
+    INFO_REQUESTED: "Info Requested",
     AWAITING_APPROVAL: "Awaiting Approval",
     PRE_EVENT: "Pre-Event",
     POST_EVENT: "Post-Event",

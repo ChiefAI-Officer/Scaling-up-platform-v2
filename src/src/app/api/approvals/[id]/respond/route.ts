@@ -12,7 +12,7 @@ const MAX_APPROVAL_LINK_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days guardrail
 
 // Request schema
 const RespondSchema = z.object({
-    action: z.enum(["APPROVE", "DENY"]),
+    action: z.enum(["APPROVE", "DENY", "RESET_TO_PENDING"]),
     reason: z.string().optional(),
     token: z.string().optional(), // For one-click links
 });
@@ -246,6 +246,28 @@ export async function POST(
                 { error: "Approval not found" },
                 { status: 404 }
             );
+        }
+
+        // MR-05: RESET_TO_PENDING only allowed on DENIED approvals
+        if (action === "RESET_TO_PENDING") {
+            if (approval.status !== "DENIED") {
+                return NextResponse.json(
+                    { error: "Can only reset DENIED approvals to pending" },
+                    { status: 400 }
+                );
+            }
+            await db.approvalQueue.update({
+                where: { id },
+                data: { status: "PENDING", respondedBy: null, respondedAt: null, responseReason: null },
+            });
+            await logAudit({
+                entityType: "ApprovalQueue",
+                entityId: id,
+                action: "RESET_TO_PENDING",
+                performedBy: actor.email,
+                changes: { previousStatus: "DENIED", newStatus: "PENDING" },
+            });
+            return NextResponse.json({ success: true, status: "PENDING", message: "Approval reset to pending" });
         }
 
         if (approval.status !== "PENDING") {

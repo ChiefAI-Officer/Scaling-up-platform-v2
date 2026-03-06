@@ -19,8 +19,11 @@ export default async function MyWorkshopsPage() {
         include: {
             workshopType: true,
             _count: { select: { registrations: true } },
+            landingPages: { select: { slug: true }, take: 1 },
         },
     });
+
+    const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
     // Serialize dates for client component
     const serialized = workshops.map((w) => ({
@@ -32,6 +35,9 @@ export default async function MyWorkshopsPage() {
         maxAttendees: w.maxAttendees,
         workshopType: w.workshopType ? { name: w.workshopType.name } : null,
         _count: w._count,
+        landingPageUrl: w.landingPages[0]?.slug
+            ? `${APP_URL}/workshop/${w.landingPages[0].slug}`
+            : null,
     }));
 
     return (

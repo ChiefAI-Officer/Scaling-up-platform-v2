@@ -14,6 +14,13 @@ jest.mock("@/lib/db", () => ({
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    coach: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    workshop: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      update: jest.fn(),
+    },
   },
 }));
 
@@ -24,6 +31,17 @@ jest.mock("@/lib/audit", () => ({
 jest.mock("@/lib/authorization", () => ({
   getApiActor: jest.fn(),
   isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
+}));
+
+jest.mock("@/services/notifications", () => ({
+  sendWorkshopApprovedEmail: jest.fn().mockResolvedValue(undefined),
+  sendWorkshopDeniedEmail: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/inngest/client", () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue(undefined),
+  },
 }));
 
 import { POST } from "@/app/api/approvals/[id]/respond/route";

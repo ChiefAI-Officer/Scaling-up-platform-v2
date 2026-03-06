@@ -23,6 +23,20 @@ jest.mock("@/lib/db", () => ({
     workshopType: {
       findUnique: jest.fn(),
     },
+    category: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    pricingTier: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    automationTask: {
+      create: jest.fn().mockResolvedValue({}),
+    },
+    approvalQueue: {
+      create: jest.fn().mockResolvedValue({}),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
   },
 }));
 

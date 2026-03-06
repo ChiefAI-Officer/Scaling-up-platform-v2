@@ -6,7 +6,7 @@ import { Search, X } from "lucide-react";
 
 const STATUS_OPTIONS = [
     { value: "", label: "All Statuses" },
-    { value: "REQUESTED", label: "Requested" },
+    { value: "INFO_REQUESTED", label: "Info Requested" },
     { value: "AWAITING_APPROVAL", label: "Awaiting Approval" },
     { value: "PRE_EVENT", label: "Pre-Event" },
     { value: "POST_EVENT", label: "Post-Event" },

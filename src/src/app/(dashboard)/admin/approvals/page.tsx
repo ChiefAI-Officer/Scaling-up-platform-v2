@@ -56,7 +56,7 @@ export default function ApprovalsPage() {
     void loadApprovals(filter);
   }, [filter, loadApprovals]);
 
-  const handleAction = async (approvalId: string, action: "APPROVE" | "DENY") => {
+  const handleAction = async (approvalId: string, action: "APPROVE" | "DENY" | "RESET_TO_PENDING") => {
     setProcessing(approvalId);
 
     try {
@@ -73,7 +73,15 @@ export default function ApprovalsPage() {
       setApprovals((prev) =>
         prev.map((approval) =>
           approval.id === approvalId
-            ? { ...approval, status: action === "APPROVE" ? "APPROVED" : "DENIED" }
+            ? {
+                ...approval,
+                status:
+                  action === "APPROVE"
+                    ? "APPROVED"
+                    : action === "DENY"
+                      ? "DENIED"
+                      : "PENDING",
+              }
             : approval
         )
       );
@@ -210,9 +218,21 @@ export default function ApprovalsPage() {
                     </button>
                   </>
                 ) : (
-                  <span className={`px-4 py-2 rounded-md font-medium text-sm ${getStatusBadgeClasses(approval.status)}`}>
-                    {approval.status}
-                  </span>
+                  <>
+                    <span className={`px-4 py-2 rounded-md font-medium text-sm ${getStatusBadgeClasses(approval.status)}`}>
+                      {approval.status}
+                    </span>
+                    {approval.status === "DENIED" && (
+                      <button
+                        className="px-4 py-2 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-muted text-foreground hover:bg-accent border border-border disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => handleAction(approval.id, "RESET_TO_PENDING")}
+                        disabled={processing === approval.id}
+                        title="Move back to pending for re-review"
+                      >
+                        {processing === approval.id ? "..." : "Move to Pending"}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>

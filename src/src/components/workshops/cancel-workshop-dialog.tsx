@@ -89,29 +89,19 @@ export function CancelWorkshopDialog({
                     Are you sure you want to cancel <span className="font-medium">{workshopTitle}</span>?
                 </p>
 
-                {feeRequired && (
-                    <div className="mt-4 rounded-lg border border-warning/20 bg-warning/10 p-4">
-                        <p className="text-sm font-medium text-warning">
-                            Cancellation Fee: ${CANCELLATION_FEE_DOLLARS}
-                        </p>
-                        <p className="mt-1 text-sm text-warning">
-                            This workshop is within {MINIMUM_LEAD_TIME_DAYS} days of the event date
-                            ({daysUntilEvent} days remaining). A ${CANCELLATION_FEE_DOLLARS} cancellation
-                            fee will be billed to your account.
-                        </p>
-                    </div>
-                )}
-
-                {!feeRequired && daysUntilEvent >= 0 && (
-                    <div className="mt-4 rounded-lg border border-primary/20 bg-primary/10 p-4">
-                        <p className="text-sm text-primary">
-                            No cancellation fee applies. The event is {daysUntilEvent} days away
-                            (more than {MINIMUM_LEAD_TIME_DAYS} days).
-                        </p>
-                    </div>
-                )}
-
                 <p className="mt-4 text-sm text-muted-foreground">
+                    Cancellations may result in fees, please refer to{" "}
+                    <a
+                        href="/api/files/terms-and-conditions"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary underline hover:text-primary/80"
+                    >
+                        workshop terms and conditions
+                    </a>.
+                </p>
+
+                <p className="mt-2 text-sm text-muted-foreground">
                     This action cannot be undone. Any registrants will need to be notified separately.
                 </p>
 

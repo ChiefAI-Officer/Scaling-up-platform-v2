@@ -16,7 +16,7 @@ async function main() {
 
   // Find all workshops with status REQUESTED
   const requestedWorkshops = await prisma.workshop.findMany({
-    where: { status: "REQUESTED" },
+    where: { status: "INFO_REQUESTED" },
     include: {
       coach: { select: { id: true, firstName: true, lastName: true, email: true } },
     },

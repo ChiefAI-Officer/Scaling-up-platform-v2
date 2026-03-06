@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 // JV-02: Jeff Verdun's 6 workshop stages
 type WorkshopStatus =
-    | "REQUESTED"
+    | "INFO_REQUESTED"
     | "AWAITING_APPROVAL"
     | "PRE_EVENT"
     | "POST_EVENT"
@@ -19,8 +19,8 @@ interface StatusPillProps {
 }
 
 const STATUS_CONFIG: Record<WorkshopStatus, { label: string; color: string; dotColor: string; animate?: boolean }> = {
-    REQUESTED: {
-        label: "Requested",
+    INFO_REQUESTED: {
+        label: "Info Requested",
         color: "bg-status-requested/10 text-status-requested border-status-requested/20",
         dotColor: "bg-status-requested",
         animate: true,

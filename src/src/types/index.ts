@@ -10,7 +10,7 @@ import type {
 
 // JV-02: Jeff Verdun's 6 workshop stages
 export type WorkshopStatus =
-  | "REQUESTED"
+  | "INFO_REQUESTED"
   | "AWAITING_APPROVAL"
   | "PRE_EVENT"
   | "POST_EVENT"

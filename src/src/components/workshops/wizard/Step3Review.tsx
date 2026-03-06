@@ -171,9 +171,16 @@ export function Step3Review() {
                         I agree to the Terms and Conditions
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                        By submitting this workshop request, I confirm that I have read and agree to the
-                        Scaling Up workshop hosting terms, including cancellation policies, pricing guidelines,
-                        and brand usage requirements.
+                        By submitting this workshop request, I confirm that I have read and agree to the{" "}
+                        <a
+                            href="/api/files/terms-and-conditions"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary underline hover:text-primary/80"
+                        >
+                            SUN Workshop Terms and Conditions
+                        </a>
+                        , including cancellation policies, pricing guidelines, and brand usage requirements.
                     </p>
                 </div>
             </div>

@@ -143,9 +143,6 @@ function LoginForm() {
               </Link>
             </p>
 
-            <p className="text-center text-xs text-muted-foreground">
-              Circle (SunHub) SSO is planned for a later phase.
-            </p>
           </form>
 
           {showDemoCredentials && (

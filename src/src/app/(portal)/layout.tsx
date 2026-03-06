@@ -6,13 +6,12 @@ import {
     Calendar,
     Users,
     PlusCircle,
-    FileText,
     Settings,
-    FileBox
 } from "lucide-react";
 import { CoachMobileNav } from "@/components/layout/coach-mobile-nav";
 import { CoachNavLink } from "@/components/layout/coach-nav-link";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { SignOutButton } from "@/components/layout/sign-out-button";
 
 interface PortalLayoutProps {
     children: React.ReactNode;
@@ -41,15 +40,9 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                     <CoachNavLink href="/portal/registrations" icon={<Users className="w-5 h-5" />}>
                         Registrations
                     </CoachNavLink>
-                    <CoachNavLink href="/portal/templates" icon={<FileBox className="w-5 h-5" />}>
-                        Templates
-                    </CoachNavLink>
                     <NavSeparator />
                     <CoachNavLink href="/portal/request" icon={<PlusCircle className="w-5 h-5" />}>
                         Request Workshop
-                    </CoachNavLink>
-                    <CoachNavLink href="/portal/follow-up" icon={<FileText className="w-5 h-5" />}>
-                        90-Day Follow-Up
                     </CoachNavLink>
 
                     <div className="pt-4 mt-4 border-t border-sidebar-border">
@@ -93,12 +86,7 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                         >
                             Settings
                         </Link>
-                        <Link
-                            href="/api/auth/signout"
-                            className="text-sm font-medium text-muted-foreground hover:text-destructive transition-colors duration-200"
-                        >
-                            Sign Out
-                        </Link>
+                        <SignOutButton className="text-sm font-medium text-muted-foreground hover:text-destructive transition-colors duration-200" />
                     </div>
                 </header>
 

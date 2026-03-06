@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Menu, X, LayoutDashboard, Calendar, Users, PlusCircle, FileText, Settings, FileBox } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNavLinkActive } from "@/lib/nav-utils";
@@ -85,13 +86,12 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
                 </div>
                 <p className="text-sm font-medium truncate">{coachName}</p>
               </Link>
-              <Link
-                href="/api/auth/signout"
-                onClick={() => setOpen(false)}
-                className="mt-3 block text-center text-sm text-destructive hover:text-destructive/80"
+              <button
+                onClick={() => { setOpen(false); void signOut({ callbackUrl: "/login" }); }}
+                className="mt-3 block w-full text-center text-sm text-destructive hover:text-destructive/80"
               >
                 Sign Out
-              </Link>
+              </button>
             </div>
           </div>
         </div>

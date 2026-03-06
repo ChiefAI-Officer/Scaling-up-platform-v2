@@ -6,6 +6,9 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { Badge } from "@/components/ui/badge";
 import { CancelWorkshopDialog } from "@/components/workshops/cancel-workshop-dialog";
 import { ResubmitWorkshop } from "@/components/workshops/resubmit-workshop";
+import { CopyUrlButton } from "@/components/ui/copy-url-button";
+
+const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
 interface WorkshopDetailsPageProps {
   params: Promise<{ id: string }>;
@@ -34,8 +37,19 @@ export default async function WorkshopDetailsPage({
   const [workshop, workflowAssignments, surveyCount, latestDenial] = await Promise.all([
     db.workshop.findFirst({
       where: { id, coachId: coach.id },
-      include: {
-        workshopType: true,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        format: true,
+        eventDate: true,
+        eventTime: true,
+        venueName: true,
+        virtualLink: true,
+        landingPageSlug: true,
+        maxAttendees: true,
+        workshopType: { select: { name: true } },
         _count: { select: { registrations: true } },
       },
     }),
@@ -106,11 +120,32 @@ export default async function WorkshopDetailsPage({
             <p>
               <span className="font-medium">Format:</span> {workshop.format}
             </p>
-            <p>
-              <span className="font-medium">Venue:</span>{" "}
-              {workshop.venueName || "To be announced"}
-            </p>
+            {workshop.format !== "VIRTUAL" && (
+              <p>
+                <span className="font-medium">Venue:</span>{" "}
+                {workshop.venueName || "To be announced"}
+              </p>
+            )}
+            {workshop.virtualLink && (
+              <p>
+                <span className="font-medium">Meeting URL:</span>{" "}
+                <a
+                  href={workshop.virtualLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline break-all"
+                >
+                  {workshop.virtualLink}
+                </a>
+              </p>
+            )}
           </div>
+          {workshop.landingPageSlug && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <p className="text-xs font-medium text-muted-foreground mb-1">Landing Page URL</p>
+              <CopyUrlButton url={`${APP_URL}/workshop/${workshop.landingPageSlug}`} />
+            </div>
+          )}
         </div>
 
         <div className="rounded-xl border border-border bg-card p-5">
@@ -213,7 +248,7 @@ export default async function WorkshopDetailsPage({
             Survey Results ({surveyCount})
           </Link>
         )}
-        {["REQUESTED", "AWAITING_APPROVAL", "PRE_EVENT"].includes(workshop.status) && (
+        {["INFO_REQUESTED", "AWAITING_APPROVAL", "PRE_EVENT"].includes(workshop.status) && (
           <CancelWorkshopDialog
             workshopId={workshop.id}
             workshopTitle={workshop.title}

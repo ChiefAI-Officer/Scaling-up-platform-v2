@@ -111,7 +111,7 @@ async function main() {
         timezone: "America/New_York",
         isFree: true,
         maxAttendees: 0,
-        status: "REQUESTED",
+        status: "INFO_REQUESTED",
         landingPageSlug: "system-template-host",
       },
     });

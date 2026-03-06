@@ -7,7 +7,7 @@ import { z } from "zod";
 
 // JV-02: Jeff Verdun's 6 workshop stages
 const WORKSHOP_STATUSES = [
-  "REQUESTED",
+  "INFO_REQUESTED",
   "AWAITING_APPROVAL",
   "PRE_EVENT",
   "POST_EVENT",
@@ -26,12 +26,12 @@ const updateWorkshopStatusSchema = z.object({
 });
 
 const validTransitions: Record<WorkshopStatus, WorkshopStatus[]> = {
-  REQUESTED: ["CANCELED"], // AWAITING_APPROVAL only via approval queue (respond handler)
-  AWAITING_APPROVAL: ["PRE_EVENT", "REQUESTED", "CANCELED"],
+  INFO_REQUESTED: ["CANCELED"], // AWAITING_APPROVAL only via approval queue (respond handler)
+  AWAITING_APPROVAL: ["PRE_EVENT", "INFO_REQUESTED", "CANCELED"],
   PRE_EVENT: ["POST_EVENT", "CANCELED"],
   POST_EVENT: ["COMPLETED"],
   COMPLETED: [],
-  CANCELED: ["REQUESTED"],
+  CANCELED: ["INFO_REQUESTED"],
 };
 
 export async function PATCH(

@@ -8,7 +8,7 @@ import { DeleteWorkshopDialog } from "@/components/workshops/delete-workshop-dia
 
 // JV-02: Jeff Verdun's 6 workshop stages
 type WorkshopStatus =
-  | "REQUESTED"
+  | "INFO_REQUESTED"
   | "AWAITING_APPROVAL"
   | "PRE_EVENT"
   | "POST_EVENT"
@@ -23,16 +23,16 @@ interface WorkshopActionsProps {
 // Sprint 5: Status transitions are now automated via auto-build on approval.
 // Only manual cancel and re-request remain as admin overrides.
 const statusTransitions: Record<WorkshopStatus, WorkshopStatus[]> = {
-  REQUESTED: ["CANCELED"],
+  INFO_REQUESTED: ["CANCELED"],
   AWAITING_APPROVAL: ["CANCELED"],
   PRE_EVENT: ["POST_EVENT", "CANCELED"],
   POST_EVENT: ["COMPLETED"],
   COMPLETED: [],
-  CANCELED: ["REQUESTED"],
+  CANCELED: ["INFO_REQUESTED"],
 };
 
 const statusLabels: Record<WorkshopStatus, string> = {
-  REQUESTED: "Requested",
+  INFO_REQUESTED: "Info Requested",
   AWAITING_APPROVAL: "Awaiting Approval",
   PRE_EVENT: "Pre-Event",
   POST_EVENT: "Post-Event",

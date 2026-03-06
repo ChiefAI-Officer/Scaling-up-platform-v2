@@ -871,7 +871,7 @@ export default function NewWorkshopPage() {
                 I confirm that all workshop details are accurate and I agree to the Scaling Up
                 workshop{" "}
                 <a
-                  href="/terms-and-conditions"
+                  href="/api/files/terms-and-conditions"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline text-primary hover:text-primary/80"

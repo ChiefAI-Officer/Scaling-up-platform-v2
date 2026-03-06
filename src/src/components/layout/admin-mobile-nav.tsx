@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNavLinkActive } from "@/lib/nav-utils";
@@ -58,13 +59,12 @@ export function AdminMobileNav({ links, email }: AdminMobileNavProps) {
               >
                 Settings
               </Link>
-              <Link
-                href="/api/auth/signout"
-                onClick={() => setOpen(false)}
-                className="block px-3 py-2 rounded-lg text-destructive hover:bg-destructive/10 text-sm font-medium"
+              <button
+                onClick={() => { setOpen(false); void signOut({ callbackUrl: "/login" }); }}
+                className="block w-full text-left px-3 py-2 rounded-lg text-destructive hover:bg-destructive/10 text-sm font-medium"
               >
                 Sign Out
-              </Link>
+              </button>
             </div>
           </div>
         </div>

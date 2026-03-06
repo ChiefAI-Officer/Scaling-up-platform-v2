@@ -6,6 +6,7 @@ import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
 import { AdminNavLinks } from "@/components/layout/admin-nav-links";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { SignOutButton } from "@/components/layout/sign-out-button";
 
 const navLinks = [
   { href: "/admin/dashboard", label: "Dashboard" },
@@ -84,12 +85,7 @@ export default async function DashboardLayout({
                 >
                   Settings
                 </Link>
-                <Link
-                  href="/api/auth/signout"
-                  className="text-sm text-destructive hover:text-destructive/80 transition-colors duration-200 whitespace-nowrap"
-                >
-                  Sign Out
-                </Link>
+                <SignOutButton className="text-sm text-destructive hover:text-destructive/80 transition-colors duration-200 whitespace-nowrap" />
               </div>
               <div className="hidden lg:flex h-8 w-8 rounded-full bg-primary/10 text-primary items-center justify-center text-sm font-semibold flex-shrink-0">
                 {userInitial}

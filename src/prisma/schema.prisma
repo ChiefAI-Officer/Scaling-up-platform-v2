@@ -180,8 +180,8 @@ model Workshop {
   excludedClients String? // Feb25: Comma-separated excluded client names
 
   // Status & Pipeline — JV-02: Jeff's 6 stages
-  // REQUESTED, AWAITING_APPROVAL, PRE_EVENT, POST_EVENT, COMPLETED, CANCELED
-  status String @default("REQUESTED")
+  // INFO_REQUESTED, AWAITING_APPROVAL, PRE_EVENT, POST_EVENT, COMPLETED, CANCELED
+  status String @default("INFO_REQUESTED")
 
   // Generated Assets
   landingPageSlug String? @unique

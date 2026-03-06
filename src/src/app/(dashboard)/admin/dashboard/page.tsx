@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { getWorkshopStatusColor, getWorkshopStatusLabel, formatCurrency } from "@/lib/utils";
@@ -5,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 
 const PIPELINE_STAGES = [
-  { status: "REQUESTED", icon: "📝" },
+  { status: "INFO_REQUESTED", icon: "📝" },
   { status: "AWAITING_APPROVAL", icon: "⏳" },
   { status: "PRE_EVENT", icon: "🟢" },
   { status: "POST_EVENT", icon: "📊" },
@@ -34,7 +36,16 @@ function formatRelativeTime(date: Date): string {
   return `${diffDays}d ago`;
 }
 
-export default async function AdminDashboardPage() {
+export default async function AdminDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ activity?: string }>;
+}) {
+  const { activity } = await searchParams;
+  const showExtendedActivity = activity === "more";
+  const activityTake = showExtendedActivity ? 9 : 6;
+  const activityLimit = showExtendedActivity ? 25 : 15;
+
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -66,21 +77,21 @@ export default async function AdminDashboardPage() {
       _count: { id: true },
     }),
     db.approvalQueue.findMany({
-      take: 5,
+      take: activityTake,
       orderBy: { requestedAt: "desc" },
       include: {
         coach: { select: { firstName: true, lastName: true } },
       },
     }),
     db.registration.findMany({
-      take: 5,
+      take: activityTake,
       orderBy: { createdAt: "desc" },
       include: {
         workshop: { select: { title: true } },
       },
     }),
     db.workshop.findMany({
-      take: 5,
+      take: activityTake,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -121,7 +132,7 @@ export default async function AdminDashboardPage() {
     })),
   ]
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-    .slice(0, 10);
+    .slice(0, activityLimit);
 
   return (
     <div className="space-y-6">
@@ -205,29 +216,41 @@ export default async function AdminDashboardPage() {
           {activities.length === 0 ? (
             <p className="text-sm text-muted-foreground">No recent activity found.</p>
           ) : (
-            <ul className="divide-y divide-border">
-              {activities.map((activity) => (
-                <li key={activity.id} className="flex items-start justify-between py-3">
-                  <div className="pr-4">
-                    <span
-                      className={`mr-2 inline-flex rounded px-2 py-1 text-xs font-medium ${
-                        activity.type === "APPROVAL"
-                          ? "bg-primary/10 text-primary"
-                          : activity.type === "REGISTRATION"
-                            ? "bg-success/10 text-success"
-                            : "bg-info/10 text-info"
-                      }`}
-                    >
-                      {activity.type}
+            <>
+              <ul className="divide-y divide-border">
+                {activities.map((activity) => (
+                  <li key={activity.id} className="flex items-start justify-between py-3">
+                    <div className="pr-4">
+                      <span
+                        className={`mr-2 inline-flex rounded px-2 py-1 text-xs font-medium ${
+                          activity.type === "APPROVAL"
+                            ? "bg-primary/10 text-primary"
+                            : activity.type === "REGISTRATION"
+                              ? "bg-success/10 text-success"
+                              : "bg-info/10 text-info"
+                        }`}
+                      >
+                        {activity.type}
+                      </span>
+                      <span className="text-sm text-foreground">{activity.description}</span>
+                    </div>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatRelativeTime(activity.timestamp)}
                     </span>
-                    <span className="text-sm text-foreground">{activity.description}</span>
-                  </div>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {formatRelativeTime(activity.timestamp)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+                  </li>
+                ))}
+              </ul>
+              {!showExtendedActivity && (
+                <div className="mt-3 pt-3 border-t border-border text-center">
+                  <Link
+                    href="/admin/dashboard?activity=more"
+                    className="text-sm text-primary hover:text-primary/80 font-medium"
+                  >
+                    Show next 10
+                  </Link>
+                </div>
+              )}
+            </>
           )}
         </div>
       </FadeUp>
