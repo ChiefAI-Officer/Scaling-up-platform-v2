@@ -186,7 +186,7 @@ export async function GET() {
                     status: {
                       type: "string",
                       enum: [
-                        "REQUESTED",
+                        "INFO_REQUESTED",
                         "AWAITING_APPROVAL",
                         "PRE_EVENT",
                         "POST_EVENT",

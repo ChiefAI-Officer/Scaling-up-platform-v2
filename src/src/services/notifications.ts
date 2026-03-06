@@ -538,6 +538,49 @@ export async function sendAdminInviteEmail(data: {
 }
 
 // ============================================
+// Coach Welcome / Password Set Email (MR-44)
+// ============================================
+
+export async function sendCoachWelcomeEmail(data: {
+    coachEmail: string;
+    coachName: string;
+    passwordSetUrl: string;
+}): Promise<void> {
+    const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #1a1a1a;">Welcome to the Scaling Up Workshop Platform</h2>
+      <p style="color: #4a4a4a;">Hi ${data.coachName},</p>
+      <p style="color: #4a4a4a;">
+        Your coach account has been created on the <strong>Scaling Up Workshop Platform</strong>.
+        To get started, please set your password by clicking the button below.
+      </p>
+      <br/>
+      <div style="text-align: center;">
+        <a href="${data.passwordSetUrl}"
+           style="display: inline-block; background-color: #1D4ED8; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+          Set Your Password
+        </a>
+      </div>
+      <br/>
+      <p style="color: #9ca3af; font-size: 14px;">This link expires in 24 hours.</p>
+      <p style="color: #9ca3af; font-size: 14px;">If you did not expect this email, you can safely ignore it.</p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;"/>
+      <p style="color: #9ca3af; font-size: 12px;">&mdash; Scaling Up Workshop Platform</p>
+    </div>
+  `;
+
+    await sendNotificationEmail({
+        to: data.coachEmail,
+        subject: "Welcome to Scaling Up — Set your password",
+        html,
+        telemetry: {
+            recipientRole: "COACH",
+            metadata: { type: "coach_welcome" },
+        },
+    });
+}
+
+// ============================================
 // Internal Helpers
 // ============================================
 

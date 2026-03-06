@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
                     isFree: !priceCents,
                     priceCents,
                     maxAttendees: body.maxAttendees || 30,
-                    status: "REQUESTED",
+                    status: "INFO_REQUESTED",
                     termsAcceptedAt: body.termsAcceptedAt ? new Date(body.termsAcceptedAt) : null,
                 },
             });

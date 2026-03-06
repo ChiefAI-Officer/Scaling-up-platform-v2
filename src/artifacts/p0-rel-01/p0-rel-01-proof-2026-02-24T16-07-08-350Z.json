@@ -1,0 +1,84 @@
+{
+  "runTimestamp": "2026-02-24T16:07:08.350Z",
+  "results": [
+    {
+      "integration": "Circle",
+      "status": "FAIL",
+      "summary": "Circle API authentication failed; cannot run coach sync proof.",
+      "evidence": {
+        "status": 200,
+        "payload": {
+          "status": "unauthorized",
+          "message": "Your account could not be authenticated."
+        }
+      },
+      "actions": [
+        "Replace CIRCLE_API_KEY with a valid server-side token from Circle admin settings.",
+        "Re-run `npm run validate:apis` and `npm run validate:p0-rel-proof` after rotating the key."
+      ]
+    },
+    {
+      "integration": "HubSpot",
+      "status": "PASS",
+      "summary": "Real registration synced to HubSpot and linked back to app registration.",
+      "evidence": {
+        "workshopId": "cmlqz7ecw0007f2k3vj5nwxp2",
+        "workshopCode": "WS-2026-L62X",
+        "workshopTitle": "Exit Test",
+        "eventDateIso": "2026-03-19T00:00:00.000Z",
+        "coachName": "Josh Delos Santos",
+        "registrationId": "cmm0stllw0001duk3gniqugco",
+        "email": "p0-rel-hubspot-1771949231779@example.com",
+        "hubspotContactId": "205074763420",
+        "verifiedContactId": "205074763420"
+      }
+    },
+    {
+      "integration": "Stripe",
+      "status": "FAIL",
+      "summary": "Paid registration was created and charged, but webhook status update was not observed in app.",
+      "evidence": {
+        "workshopId": "cmlqq3ksr000rjpvcm3u7cnix",
+        "workshopCode": "WS-2025-S002",
+        "registrationId": "cmm0stozs0003duk3lrkqf4nf",
+        "email": "p0-rel-stripe-1771949236167@example.com",
+        "paymentIntentId": "pi_3T4O8oQuBHwgltXu1GsCqUqA",
+        "paymentIntentStatus": "succeeded",
+        "hasWebhookSecret": false,
+        "webhookInvocationMode": "stripe-native",
+        "webhookResponseSnapshot": null,
+        "registrationState": {
+          "id": "cmm0stozs0003duk3lrkqf4nf",
+          "status": "REGISTERED",
+          "paymentStatus": "PENDING",
+          "stripePaymentId": null,
+          "amountPaidCents": null,
+          "updatedAt": "2026-02-24T16:07:16.168Z"
+        }
+      },
+      "actions": [
+        "Verify Stripe webhook endpoint is active and subscribed to checkout.session.completed / payment_intent.succeeded.",
+        "Set STRIPE_WEBHOOK_SECRET to allow signed fallback webhook replay in proof runs."
+      ]
+    },
+    {
+      "integration": "Inngest",
+      "status": "FAIL",
+      "summary": "Inngest event accepted but no workflow execution record was observed in time window.",
+      "evidence": {
+        "workshopId": "cmlqz7ecw0007f2k3vj5nwxp2",
+        "workshopCode": "WS-2026-L62X",
+        "workflowId": "cmm0subkc0004duk3sx0a7kwk",
+        "workflowStepId": "cmm0subww0006duk37nydn27n",
+        "workflowAssignmentId": "cmm0suc9i0008duk318d29zm2",
+        "eventResponseStatus": 200,
+        "eventResponseBody": "{\"ids\":[\"01KJ86G68N9105QAMJK9EJ1V5W\"],\"status\":200}\n",
+        "executionRecord": null
+      },
+      "actions": [
+        "Confirm Inngest app endpoint points to /api/inngest on active deployment.",
+        "Confirm execute-workflow function is registered and healthy in Inngest dashboard."
+      ]
+    }
+  ]
+}

@@ -120,6 +120,29 @@ export default function CoachBioEditorPage() {
     }
   };
 
+  // MR-25: Clear all bio fields
+  const handleDeleteBio = async () => {
+    if (!confirm("Clear all bio fields for this coach? This cannot be undone.")) return;
+    try {
+      setSaving(true);
+      setError(null);
+      setSuccess(null);
+      const response = await fetch(`/api/coaches/${coachId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bio: "", profileImage: "", company: "", circleId: undefined }),
+      });
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error || "Failed to clear bio");
+      setFormData((prev) => ({ ...prev, titleCredentials: "", biography: "", profileImageUrl: "", circleId: "" }));
+      setSuccess("Bio fields cleared.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear bio");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -266,6 +289,10 @@ export default function CoachBioEditorPage() {
           <div className="flex flex-wrap gap-3">
             <Button onClick={handleSave} disabled={saving}>
               {saving ? "Saving..." : "Save Bio"}
+            </Button>
+            {/* MR-25: Delete bio button */}
+            <Button variant="destructive" onClick={handleDeleteBio} disabled={saving}>
+              Delete Bio
             </Button>
           </div>
         </div>

@@ -96,7 +96,7 @@ export async function POST(
                 maxAttendees: sourceWorkshop.maxAttendees,
 
                 // Reset status and locking
-                status: "REQUESTED",
+                status: "INFO_REQUESTED",
                 isLocked: false,
                 lockedAt: null,
                 lockedBy: null,

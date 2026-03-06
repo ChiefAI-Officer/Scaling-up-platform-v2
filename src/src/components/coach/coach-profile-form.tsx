@@ -13,6 +13,7 @@ interface CoachProfileFormProps {
         lastName: string;
         email: string;
         bio: string;
+        titleCredentials?: string | null; // MR-26: Title / Credentials (company field)
         profileImage?: string | null;
         linkedinUrl?: string | null;
         showBookCallCta?: boolean;
@@ -23,6 +24,7 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
     const [firstName, setFirstName] = useState(initialData.firstName);
     const [lastName, setLastName] = useState(initialData.lastName);
     const [bio, setBio] = useState(initialData.bio);
+    const [titleCredentials, setTitleCredentials] = useState(initialData.titleCredentials || "");
     const [linkedinUrl, setLinkedinUrl] = useState(initialData.linkedinUrl || "");
     const [showBookCallCta, setShowBookCallCta] = useState(initialData.showBookCallCta ?? true);
     const [profileImage, setProfileImage] = useState(initialData.profileImage || "");
@@ -70,7 +72,7 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
             const res = await fetch(`/api/portal/profile`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ firstName, lastName, bio, linkedinUrl: linkedinUrl || null, showBookCallCta }),
+                body: JSON.stringify({ firstName, lastName, bio, company: titleCredentials || null, linkedinUrl: linkedinUrl || null, showBookCallCta }),
             });
 
             const data = await res.json();
@@ -149,6 +151,17 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
                 <Label htmlFor="email">Email Address</Label>
                 <Input id="email" defaultValue={initialData.email} disabled className="bg-muted" />
                 <p className="text-xs text-muted-foreground">Contact support to change your email address.</p>
+            </div>
+
+            {/* MR-26: Title / Credentials field matching admin bio form */}
+            <div className="space-y-2">
+                <Label htmlFor="titleCredentials">Title / Credentials</Label>
+                <Input
+                    id="titleCredentials"
+                    value={titleCredentials}
+                    onChange={(e) => setTitleCredentials(e.target.value)}
+                    placeholder="Scaling Up Certified Coach"
+                />
             </div>
 
             <div className="space-y-2">

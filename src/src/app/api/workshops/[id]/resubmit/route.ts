@@ -59,7 +59,7 @@ export async function POST(
     // Reset status to REQUESTED
     await db.workshop.update({
       where: { id: workshopId },
-      data: { status: "REQUESTED" },
+      data: { status: "INFO_REQUESTED" },
     });
 
     // Create a new approval queue entry

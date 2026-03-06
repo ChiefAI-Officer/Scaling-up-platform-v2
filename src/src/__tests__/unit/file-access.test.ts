@@ -34,14 +34,14 @@ describe("file-access", () => {
     expect(
       canRoleAccessAttachment({
         recipientRole: "STAFF",
-        workshopStatus: "REQUESTED",
+        workshopStatus: "INFO_REQUESTED",
       })
     ).toBe(true);
 
     expect(
       canRoleAccessAttachment({
         recipientRole: "COACH",
-        workshopStatus: "REQUESTED",
+        workshopStatus: "INFO_REQUESTED",
       })
     ).toBe(false);
 

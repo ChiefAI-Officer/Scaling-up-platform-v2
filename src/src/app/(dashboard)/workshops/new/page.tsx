@@ -99,6 +99,13 @@ interface NewWorkshopFormProps {
   isCoachPortal?: boolean;
 }
 
+// MR-21: Multi-coupon entry
+interface CouponEntry {
+  code: string;
+  discountPercent: string;
+  singleUse: boolean;
+}
+
 export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -112,6 +119,8 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
   // MR-17: typeahead state for coach combobox (admin view)
   const [coachQuery, setCoachQuery] = useState("");
   const [showCoachDropdown, setShowCoachDropdown] = useState(false);
+  // MR-21: Multi-coupon list (admin-only)
+  const [coupons, setCoupons] = useState<CouponEntry[]>([]);
 
   const [formData, setFormData] = useState({
     coachId: "",
@@ -138,8 +147,6 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
     geoTargetAreas: "",
     excludedClients: "",
     maxAttendees: "50",
-    couponDiscountPercent: "",
-    couponCode: "",
     customPricingRequest: "",
   });
 
@@ -311,18 +318,7 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
       }
 
       if (name === "isFree" && nextValue === true) {
-        next.couponDiscountPercent = "";
-        next.couponCode = "";
         next.priceCents = "";
-      }
-
-      if (name === "couponDiscountPercent") {
-        const discount = String(nextValue);
-        if (!discount) {
-          next.couponCode = "";
-        } else if (!prev.couponCode) {
-          next.couponCode = generateCouponCode(discount, prev.title);
-        }
       }
 
       return next;
@@ -410,11 +406,9 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
           formData.isDuoWorkshop && formData.secondaryCoachId
             ? formData.secondaryCoachId
             : undefined,
-        couponDiscountPercent: formData.couponDiscountPercent
-          ? Number.parseInt(formData.couponDiscountPercent, 10)
-          : undefined,
-        couponCode: formData.couponCode || undefined,
         customPricingRequest: formData.customPricingRequest || undefined,
+        // MR-21: multi-coupon list (admin-only; empty for coach portal)
+        coupons: coupons.length > 0 ? JSON.stringify(coupons) : undefined,
       };
 
       if (isCoachPortal) {
@@ -462,14 +456,6 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
       if (formData.isDuoWorkshop && formData.secondaryCoachId) {
         const params = new URLSearchParams();
         params.set("coach2Id", formData.secondaryCoachId);
-
-        if (formData.couponCode) {
-          params.set("couponCode", formData.couponCode);
-        }
-        if (formData.couponDiscountPercent) {
-          params.set("couponDiscountPercent", formData.couponDiscountPercent);
-        }
-
         router.push(`/workshops/${data.data.id}/landing-pages/duo-landing?${params.toString()}`);
         return;
       }
@@ -934,42 +920,66 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
                   </p>
                 </div>
 
-                <div className="rounded-lg border border-border p-4 space-y-4">
-                  <div>
-                    <Label htmlFor="couponDiscountPercent">Coach Coupon Discount</Label>
-                    <select
-                      id="couponDiscountPercent"
-                      name="couponDiscountPercent"
-                      value={formData.couponDiscountPercent}
-                      onChange={handleChange}
-                      className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
-                    >
-                      <option value="">No coupon</option>
-                      {COUPON_PRESETS.map((preset) => (
-                        <option key={preset.value} value={preset.value}>
-                          {preset.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {formData.couponDiscountPercent && (
-                    <div>
-                      <Label htmlFor="couponCode">Coupon Code</Label>
-                      <Input
-                        id="couponCode"
-                        name="couponCode"
-                        value={formData.couponCode}
-                        onChange={handleChange}
-                        placeholder="e.g., SU50-DETROIT"
-                        className="mt-1"
-                      />
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Share this code with registrants. Checkout already supports discount codes.
-                      </p>
+                {/* MR-21: Multi-coupon / MR-22: Admin-only */}
+                {!isCoachPortal && (
+                  <div className="rounded-lg border border-border p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Coupon Codes</Label>
+                      <button
+                        type="button"
+                        onClick={() => setCoupons((prev) => [...prev, { code: "", discountPercent: "", singleUse: false }])}
+                        className="text-xs text-primary hover:text-primary/80 font-medium"
+                      >
+                        + Add Coupon
+                      </button>
                     </div>
-                  )}
-                </div>
+                    {coupons.length === 0 && (
+                      <p className="text-xs text-muted-foreground">No coupons added. Click &quot;Add Coupon&quot; to create discount codes for this workshop.</p>
+                    )}
+                    {coupons.map((coupon, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input
+                          value={coupon.code}
+                          onChange={(e) => setCoupons((prev) => prev.map((c, i) => i === idx ? { ...c, code: e.target.value.toUpperCase() } : c))}
+                          placeholder="e.g., SU50-DETROIT"
+                          className="flex-1"
+                        />
+                        <select
+                          value={coupon.discountPercent}
+                          onChange={(e) => setCoupons((prev) => prev.map((c, i) => i === idx ? { ...c, discountPercent: e.target.value } : c))}
+                          className="rounded-md border border-border px-2 py-2 text-sm focus:border-primary"
+                        >
+                          <option value="">%</option>
+                          {COUPON_PRESETS.map((p) => (
+                            <option key={p.value} value={p.value}>{p.label}</option>
+                          ))}
+                        </select>
+                        <label className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={coupon.singleUse}
+                            onChange={(e) => setCoupons((prev) => prev.map((c, i) => i === idx ? { ...c, singleUse: e.target.checked } : c))}
+                            className="rounded border-border"
+                          />
+                          Single-use
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setCoupons((prev) => prev.filter((_, i) => i !== idx))}
+                          className="text-destructive hover:text-destructive/80 text-sm px-1"
+                          title="Remove coupon"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {coupons.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Codes will be validated at checkout. Create matching PromotionCodes in Stripe.
+                      </p>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </CardContent>

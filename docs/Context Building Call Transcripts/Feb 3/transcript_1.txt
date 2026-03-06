@@ -1,0 +1,638 @@
+Workshop Setup Discovery - February 04
+VIEW RECORDING - 48 mins (No highlights)
+@0:00 - Jeff Verdun (Scaling Up)
+People in. One quick second. need to change this. Everybody hear me okay?
+@0:19 - Joshua Delos Santos (ChiefAiOfficer.com)
+Hey, Jeff. Hi, Suzanne. Can you hear me?
+@0:23 - Jeff Verdun (Scaling Up)
+You're on mute, Suzanne.
+@0:26 - Suzanne Krygier (Scaling Up)
+I can hear you, Jeff. Yep. Hi, guys.
+@0:29 - Jeff Verdun (Scaling Up)
+All right. So, um, Josh, uh, Suzanne, Suzanne, Josh, Josh is helping us build this app. Um, what we wanted to do was just be able to let Josh pick your brain a little bit, um, today on the process and different things.
+And let me share something and I'm going to try to get you to this, Josh, later this week, but, um, what I'm trying to build for you is, um, in, to, my um, uh,
+SCREEN SHARING: Jeff started screen sharing - WATCH
+And Figma, just a kind of a process flow and edits for the screen. Perfect.
+@1:07 - Joshua Delos Santos (ChiefAiOfficer.com)
+Thank you for that, Jeff.
+@1:08 - Jeff Verdun (Scaling Up)
+Appreciate it. We this, we want to do this, you know, and I'm about to paste this one in here for the workshop registrations and what I want to do there.
+So I want to keep marking this up for you so you can kind of see where our head's at and work with you as well when I get at least a skeleton built here of this.
+Of what we want to do. So for instance, like in my brain here, after they log in, if it's a coach login, you know, I want just a couple of things here, their dashboard, their bio.
+The dashboard is really just all of their workshops, a button to create a new one. The links for the registration should go to some sort of registration so I can unregister them, see who's registered the list.
+Probably have a button up here that says export list, stuff like that. So I'll document all. So Thank All stuff and the flow that I see, and hopefully they'll help with some of your questions.
+But I wanted to show you, first make sure that this was going to work for you as far as helping you at all.
+If it's not going to help you, I'm not going to waste my time.
+@2:15 - Joshua Delos Santos (ChiefAiOfficer.com)
+It is, Jeff. It is a big help because currently in my process of documenting or in process of context engineering, currently my AI doesn't have capability of ingesting a video.
+So it's currently ingesting time step, time skips, plus screenshots. So this would definitely help. So thank you for doing that.
+@2:38 - Jeff Verdun (Scaling Up)
+Okay. So I hope to get to this in a day or two. So I'm going to let you lead at this point, Josh, to be able to ask whatever questions you need from Suzanne.
+@2:47 - Joshua Delos Santos (ChiefAiOfficer.com)
+All right. So Suzanne, let me just walk you through a bit. Let just share my screen or yeah, let me just share my screen.
+I think that would be faster.
+@2:57 - Suzanne Krygier (Scaling Up)
+Okay. Okay.
+SCREEN SHARING: Joshua started screen sharing - WATCH
+@3:05 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay. I apologize if things are loading a quick slow here. So this is the current dashboard. I believe Jeff gave you the link.
+If not, I'm going to just share this here in the chat. Yep. So if you can open it on, if you have another screen, so you can sort of give you a detail.
+So when you see the screen here, you have go to the dashboard here. So ideally, what would happen is if you get into a window.
+@3:53 - Jeff Verdun (Scaling Up)
+just so just real quick, I believe, Suzanne, you've already kind of clicked around in here and set up a sample of a meeting.
+@3:59 - Suzanne Krygier (Scaling Up)
+you're going So You already, didn't you? Yeah, I was playing around in there.
+@4:04 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay.
+@4:05 - Suzanne Krygier (Scaling Up)
+Yeah.
+@4:06 - Joshua Delos Santos (ChiefAiOfficer.com)
+And so any feedback or any critical things that you want to put in something like a contact section for the coaches or anything that would help you be more efficient in terms of your workflow here?
+I'm trying to piece out the UI, and I would like to know your opinions.
+@4:27 - Suzanne Krygier (Scaling Up)
+There is a couple things. The coaches will need like a discount code option because they'll periodically want to be able to give like a discount to somebody, like for example, like a sponsor that wants to send somebody from their team.
+We need to be able to give them like 100% discount or something so that they can register so we still have their contact information that a human, another body is coming to the register or going to be attending.
+But. I But they don't have to pay for it. So if there's a way we could add like a discount code option in there.
+@5:05 - Joshua Delos Santos (ChiefAiOfficer.com)
+So you mean whenever we create a registration here, so just to be clear and just to be on record as well, you meant here, discount option here?
+@5:17 - Suzanne Krygier (Scaling Up)
+Yes.
+@5:18 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay.
+@5:19 - Suzanne Krygier (Scaling Up)
+So that they have a code that they can create. So a coach can create a code and then give that code to whoever they want to give that code to.
+@5:30 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay. Just a couple of questions here. How does the discount work? Can you walk me through how?
+@5:36 - Suzanne Krygier (Scaling Up)
+So let's say a workshop is $500 and they want to discount that code or they want to discount that workshop for certain people to like say $250 or even free for some people.
+So they might want to give a code to somebody. So when that person's checking out, they would put in the code like workshop100, and then that code would tell the checkout, take 100% off of that, or whatever code name they gave that, it would take a discount and discount that workshop for that person checking out.
+ACTION ITEM: Research Stripe coupons; confirm coach-level multi-use; propose 25/50/100% codes - WATCH
+@6:19 - Joshua Delos Santos (ChiefAiOfficer.com)
+Perfect. So some kind of like a voucher code, like you can just ingest it, and then it would automatically discount the price.
+@6:25 - Jeff Verdun (Scaling Up)
+Correct. And Josh, my guess is you're going to have to handle that through Stripe, because Stripe Handle does coupons as well, so you can create the coupons in Stripe, and then when they do the checkout, they would apply that coupon, and I'm assuming we're going to use Stripe for the checkout.
+It would all be tied together.
+@6:45 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, 100%. Now, let me just do a quick research on how we didn't do that on Stripe, Jeff, but I would definitely suggest give that suggestions, yes.
+Anything else?
+@6:55 - Suzanne Krygier (Scaling Up)
+Well, and just talking that out a little bit more. Yeah. Would the coach, Jeff, when you're saying him doing that through Stripe, would a coach have the ability, like for example, this just happened, where Jeff Donaldson, one of our coaches, they have something coming up.
+He sent me, he said, can I add in these like three discount codes because he's doing three different like potential discounts for different reasons that he has.
+Would a coach be able to modify and like create their own discounts for their workshop? Like not just a generic, like every coach has like a hundred off.
+@7:44 - Joshua Delos Santos (ChiefAiOfficer.com)
+So what you're trying to question here is if they have a custom coupon voucher code for every discount code, right?
+For every discount that they want to give for different workshops. Is that correct?
+@7:57 - Suzanne Krygier (Scaling Up)
+Right.
+@7:59 - Joshua Delos Santos (ChiefAiOfficer.com)
+Right. Let me research on that. Again, I can't really definitely answer on that, Suzanne, because I'm not really quite certain on how Stripe works or how voucher code works on...
+@8:09 - Jeff Verdun (Scaling Up)
+And Josh, if you want to look at it, if you're in Kajabi, you can go in there and you can see the coupons.
+So it's under sales, I believe. And then coupons.
+@8:28 - Joshua Delos Santos (ChiefAiOfficer.com)
+Oh, okay.
+@8:30 - Jeff Verdun (Scaling Up)
+And it kind of shows you the functionality she's using. Right now, in the current setup, the coaches don't have access to any of this.
+This is all backend admin stuff. So like if you do new coupon, yeah, you can see it. And you can create one.
+So just a quick question here.
+@8:49 - Joshua Delos Santos (ChiefAiOfficer.com)
+Would you like it to be some sort of a UI where you can just create a coupon just like this, just embed it directly?
+ACTION ITEM: Decide coupon creation ownership (coach vs admin); inform Josh - WATCH
+Or would you just rather have it like a... Yeah, just like we discussed earlier where they can just have a code and just we can insert it just for the admin sake of making it easier.
+ACTION ITEM: Decide coupon creation ownership (coach vs admin); inform Josh - WATCH
+@9:09 - Jeff Verdun (Scaling Up)
+Well, and I guess that's something me and Suzanne will have to discuss if we want to give the coach the full ability to add coupons and do stuff for their events or not, or if it's got to be an admin function.
+But in my mind, so like just click offer. You're not going to hurt anything here. So next. And it's a single coupon that you could use, meaning that only one person, it's a one and done usage.
+And the bulk codes, I think you can use multiple times or something like that. I can't remember.
+@9:42 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay. So actually, can you walk me through how this works just to imprint it on my mind?
+@9:48 - Jeff Verdun (Scaling Up)
+Like for example, when you go. So just do, Suzanne, just do a single code. Like if we were going to do 100% off an event so they can invite like whoever they wanted to for free.
+@9:58 - Suzanne Krygier (Scaling Up)
+Yeah. Do a single coupon. And then we would put a coupon code like Detroit 60, Detroit 60, and then percent off.
+And that would probably be 60% off because you put Detroit 60, just to try and make it make sense with the percentage.
+@10:20 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay. Okay. And then expiration date here.
+@10:25 - Jeff Verdun (Scaling Up)
+Okay. So you also have, you know, how many times?
+@10:31 - Joshua Delos Santos (ChiefAiOfficer.com)
+Is it once repeating?
+@10:33 - Jeff Verdun (Scaling Up)
+Yeah. So no, it would just be once. You know, some of these, you know, this is built for different things and we're just doing workshops.
+@10:40 - Joshua Delos Santos (ChiefAiOfficer.com)
+So it would be a one-time use for that. Okay. Okay. So I'll press continue here.
+@10:46 - Suzanne Krygier (Scaling Up)
+Okay. Yeah.
+@10:47 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay.
+@10:48 - Jeff Verdun (Scaling Up)
+Like I said, you're not going to hurt anything.
+@10:50 - Suzanne Krygier (Scaling Up)
+We can delete it when you're done. Yeah.
+@10:52 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay. Okay, done. And sometimes-
+@11:00 - Jeff Verdun (Scaling Up)
+You know, we might want it to be done just once for an offer, or we might want to be able to be able to, that code to be used four and five and six times or whatever, and specify how many times that coupon can be used.
+@11:14 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay. A quick clarification here. For a single, whenever they send Detroit 60 to one of their peers, because this coupon is going to be sent for their peers, right?
+Or for the people who are going to be, yep. And so for the single here, this is just a single use for every person, right?
+For a single person.
+@11:34 - Suzanne Krygier (Scaling Up)
+Yeah.
+@11:35 - Joshua Delos Santos (ChiefAiOfficer.com)
+That would sign on through the workshop. Okay. All right.
+@11:40 - Jeff Verdun (Scaling Up)
+Yeah. So Susanna, and I'm going from memory here, so correct me if I'm wrong. I thought single meant once it's used, it's done, nobody can use it again.
+@11:48 - Suzanne Krygier (Scaling Up)
+Yeah. I know. As he was asking that, I don't, I think it's per person, but I could all, I don't know for sure, to be honest.
+@11:57 - Joshua Delos Santos (ChiefAiOfficer.com)
+Hmm.
+@12:00 - Jeff Verdun (Scaling Up)
+Let us research that for you, Josh, and I'll explain the functionality we're looking for. But in essence here, that's what we need to be able to do is do a custom coupon that affects the payment process so we can discount either a portion or completely.
+And, you know, are we going to reuse this coupon or do we have to create? If I, for instance, if we needed to do a half-off coupon, would we create 10 of them and once the 10 of them were done, fine, or do we allow it to be reused 10 times, right?
+@12:35 - Suzanne Krygier (Scaling Up)
+So there's two ways to solve that. And Jeff, another way that it's probably going to be used is the AI workshops.
+You can bring a team of three, let's say, to it. Okay, so your one ticket will cover three people, but an owner might want to send another group of three where we might.
+Might give them a 50% off discount for the second group of three or something. So that one owner is signing up, might be signing up multiple people, so it would need to be probably used.
+And how are we doing that now? Right now, I've done it one time with Jeff. I'm trying to think how I did that.
+I created a second offer. So in the checkout page, they could click a link to add more people, and then that was like a new price.
+I didn't do it as a discount code, but...
+@13:40 - Jeff Verdun (Scaling Up)
+Got it.
+@13:42 - Joshua Delos Santos (ChiefAiOfficer.com)
+Got it. Jeff actually had pretty good points with regards to the landing page asset, and I'm sure you had a glimpse on the landing page editor.
+So I really wanted your opinion on that as well.
+@13:57 - Suzanne Krygier (Scaling Up)
+Yeah. Yeah.
+@13:59 - Joshua Delos Santos (ChiefAiOfficer.com)
+So it's a good So the, let me just create a quick one here.
+@14:04 - Suzanne Krygier (Scaling Up)
+I think that's redundant.
+@14:06 - Jeff Verdun (Scaling Up)
+Yes, we talked about a few of these things.
+@14:09 - Suzanne Krygier (Scaling Up)
+Let's just go over real quick, Josh. Okay.
+@14:13 - Jeff Verdun (Scaling Up)
+To make sure we're on the same page. So we talked about, in my brain, the coach, if we, I don't have it here.
+So the coach is going to log in. It's going to go to their coach's page, their coach's dashboard page, right?
+It's unique to them. I see two things on that dashboard, and it's mocked up on my screen, but I don't want to take control again.
+But basically, they can edit their bio, or they can see their workshops, and there's going to be a button that says, New Workshop.
+So they click the New Workshop, it comes to this screen. Coach is already going to be filled in, because the system should know who it is, right?
+@14:47 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay.
+@14:48 - Jeff Verdun (Scaling Up)
+So that'll be auto-filled in. Then they're going to, remember, we've got these two here, category and title. So we're really just going to have one field there, if we remember, Josh.
+It's going to be... The values are going to be what type of workshop is it? Is it an exit workshop or is it an AI workshop?
+@15:05 - Joshua Delos Santos (ChiefAiOfficer.com)
+Right now, those are the only two values.
+@15:08 - Jeff Verdun (Scaling Up)
+But we had talked about, you know, from an admin perspective, we're going to be able to need to add different workshops to it as we add new workshops and what we deliver, right?
+But for right now, it's AI and exit. The title is fine. They can put in whatever title that they want.
+Description, they can put in whatever they want. Do we want a description even there? Or are we going to can that, Suzanne?
+@15:37 - Suzanne Krygier (Scaling Up)
+I think we can that. I don't think we give them too much option for... Where does that description show up on a user?
+@15:49 - Jeff Verdun (Scaling Up)
+Yeah, so that field description, are you using it somewhere else, Josh?
+@15:54 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, I think in my design here for the description, this would be the description for... The workshop itself.
+@16:02 - Jeff Verdun (Scaling Up)
+So I think we can kind of... here, put something so we see it for right now. This, you know, just so we know, this is what I typed in the description field.
+So, and Suzanne, just so we know, we talked about a couple of things here too. We're going to get rid of duration.
+We're just going to put start and end time. Um, I didn't know if we needed to do, um, for virtual, the maximum attendees shouldn't be there, but for in-persons, we're going to need to know in case there's a limit to how much space is there.
+We talked about that. This is just the, the Zoom or the Teams or whatever they're going to put in.
+Um, this is your pricing. He has an early bird offer there. This is where I would think we could create, there'd be a button or something here that says, um, create coupons.
+@16:58 - Joshua Delos Santos (ChiefAiOfficer.com)
+Mm, yeah. Yeah, definitely. And that coupon would directly reflect into the price in the stripe.
+@17:05 - Jeff Verdun (Scaling Up)
+Correct. Correct. That's what I'm imagining.
+@17:10 - Suzanne Krygier (Scaling Up)
+You mentioned... Sorry. I wonder if we just, we give them, here's your options. You can make a, just to keep it simple and not so flexible, like where it has changed.
+But if we give them, you can have 100% off coupon, a 60%, and a 25% or 50%.
+@17:28 - Jeff Verdun (Scaling Up)
+Yeah, to make our lives easier.
+@17:31 - Suzanne Krygier (Scaling Up)
+Yeah. And then they just click whatever coupon code that they want.
+@17:35 - Jeff Verdun (Scaling Up)
+Yeah. And I'm almost thinking you just do, like you said, 25, 50, 100, and call it a day.
+@17:39 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah. Yeah. We can just put it into an option of percentage here, and then they can just click, right?
+@17:46 - Jeff Verdun (Scaling Up)
+Correct.
+@17:47 - Joshua Delos Santos (ChiefAiOfficer.com)
+Another quick question before I forget, Jeff, you mentioned, as the coaches logging into their unique dashboard, the system must detect automatically who they are.
+Correct. Now, question here is... Thank you. I have the contact details from Kajabi, but the only thing that I had in my mind is how would the system detect where would the information get from?
+So I put that in my notes here.
+@18:18 - Jeff Verdun (Scaling Up)
+So we're going to have to do one of two things. We're going to either have to create a user management system as part of this, or we're going to have to use something else like Circle that we already have our coaches in there.
+ACTION ITEM: Research Circle auth/token passing; propose approach; inform Jeff & Suzanne - WATCH
+And could we use the Circle's authentication to authenticate to here? I don't know.
+@18:37 - Joshua Delos Santos (ChiefAiOfficer.com)
+That's a good question. Let me just research on that. What you're trying to clarify here is the information inside Circle with the coaches' information can be used as user data inside this scaling.
+@18:49 - Jeff Verdun (Scaling Up)
+Correct. So, you know, is there some way we can pass a user token in? So they've logged into Circle and they've launched this and now it's got the token with...
+Their username already in it and that they've been validated, right? They've got a successful login to it. Otherwise, we've got to do it in here, which isn't a big deal.
+You just create another, you know, table that has the user login and password information.
+@19:17 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah. Yes, that would definitely work as well. Yeah. Let me research on the Circle token data passing of how it works.
+But if we cannot use that, if, example, we cannot pass the data from Circle towards this scaling because we have a data management system here.
+I'm using, I'm, I'm, using Neon. So what I'm, I'm suggesting here is just put all the data from the active coaches.
+We do have an active database from the coaches on Circle, right?
+@19:59 - Jeff Verdun (Scaling Up)
+And can. There's users in Circle with all of our coaches.
+@20:03 - Joshua Delos Santos (ChiefAiOfficer.com)
+It's in there. It's also in HubSpot.
+@20:07 - Jeff Verdun (Scaling Up)
+All the coaches are listed in there as well. I'm just saying if we're treating this like any other application in the world, that application would have some sort of authentication mechanism built into it, right?
+With the ability to change their passwords, reset their passwords, forgot their password, all that functionality. I'm just saying if we can leverage something that's already in use by the coaches, that's one less thing we have to build.
+It's just, you know, verifying authentication at that point.
+@20:37 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay. Gotcha. Gotcha. So let me research on that. If we can use the authentication from Circle so that we don't have to implement it here, right?
+@20:48 - Jeff Verdun (Scaling Up)
+Correct.
+ACTION ITEM: Design partner-logo selection (dropdown); implement on landing pages - WATCH
+@20:49 - Joshua Delos Santos (ChiefAiOfficer.com)
+Correct. Copy, copy. All right. Should we continue to the landing page?
+@20:54 - Jeff Verdun (Scaling Up)
+Yeah, that's fine.
+@20:55 - Suzanne Krygier (Scaling Up)
+Well, there's – okay.
+@20:57 - Jeff Verdun (Scaling Up)
+Go ahead.
+@20:58 - Suzanne Krygier (Scaling Up)
+Well, a couple more things. I don't know if we want to talk about it. would be in here that would affect the landing page, but I think we need to have in here for the coach to be able to choose which partner logos are going to show up on the landing page.
+So for example, an AI workshop, they would want our partner AI-driven leader on the landing page. But for an exit workshop, they're going to want to choose two other partners' logos to show up that were in partnership with them, if that makes sense.
+@21:36 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay. Just interrupt me if this is a stupid question, but would they upload the logo themselves or would the admin upload the logo in?
+@21:47 - Jeff Verdun (Scaling Up)
+So we're envisioning, and correct me if I'm wrong, Suzanne, we're going to have a place where we could say, here are the, you know, I'm thinking another table again.
+So here's all of our partners and here's the tag. And here's the logo that goes with each one of those partners.
+And then in here, they would have a drop down to that list that said, hey, do you want to add, which partner do you want to add?
+And then they could pick it, and it knows to add that to the landing page.
+@22:19 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay. I think that would also work, Jeff. But, but, yeah, let me think about that first.
+@22:32 - Jeff Verdun (Scaling Up)
+Yeah, no, and, you know, a lot of what we're telling you here, Josh, is, you know, in perfect world, this is what we want.
+We're, we're, we perfectly, we understand that this has got to be a crawl, walk, run approach, right? But as we're going through this, we're just throwing the ideas out there that we have and the things that we've run across already.
+@22:53 - Joshua Delos Santos (ChiefAiOfficer.com)
+Thank you for that.
+@22:54 - Jeff Verdun (Scaling Up)
+So let's go to the landing page then.
+@22:57 - Joshua Delos Santos (ChiefAiOfficer.com)
+All right. Okay. Workshop title, AIoT, CAIO, let's do it. All right.
+@23:10 - Jeff Verdun (Scaling Up)
+We've already talked about changing the flow of this a little bit, but I'll document that a little better in my documentation on how I want this flow to change from here.
+@23:20 - Joshua Delos Santos (ChiefAiOfficer.com)
+I appreciate that, Jeff.
+@23:22 - Jeff Verdun (Scaling Up)
+Thank you. So let's look at the landing page and this, and, you know, just as a reiteration, you know, how you got solo and duo landing pages on that previous screen, there should have been another thing saying who's, you know, who's the primary coach doing this event?
+Who's the secondary one? If there's two of them in there, it's a dual landing page. If there's only one, it's a, it's a solo.
+@23:46 - Joshua Delos Santos (ChiefAiOfficer.com)
+100%. They should be, they, it should reflect, um, if you're going to choose duo landing page, it should reflect.
+@23:54 - Jeff Verdun (Scaling Up)
+Yeah. Depending on if there was one person picked or two people picked. So let's just do a solo. For because that's the one that's the bulk.
+So what she was saying is with the partnerships that we're talking about, so see where it says Sarah Johnson on the right there, Scaling Up Certificate Coach.
+We'd probably put a tagline under that, right, Suzanne, that said in partnership with STS Capital, and it would have their logo.
+@24:28 - Suzanne Krygier (Scaling Up)
+That's their logos, yeah.
+@24:30 - Joshua Delos Santos (ChiefAiOfficer.com)
+Hmm, 100%. Like, just like the one that you've sent me. Yep, 100%. I forgot to put in there, because you mentioned earlier in the last call that it should be the exact kind of templated view that you made.
+@24:49 - Jeff Verdun (Scaling Up)
+Right, right. You know, I didn't expect you to have that done in a day. Yeah. So what I'm seeing here is you had that description.
+ACTION ITEM: Remove 'Description' from workshop setup; keep internal-only - WATCH
+start. Okay. On that one field, it doesn't show up anywhere here. So to me, that's just an internal description of the event.
+@25:07 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, it is. So it's quite not necessary, right? Or should we? Yeah.
+@25:13 - Suzanne Krygier (Scaling Up)
+I don't think we need it.
+@25:15 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, I don't think we need that description field from before. All right. So anything else in here that might?
+@25:22 - Jeff Verdun (Scaling Up)
+So, Suzanne, what we've got to figure out through here is what pieces and parts in here we're willing to let the coach edit.
+@25:30 - Suzanne Krygier (Scaling Up)
+Mm-hmm.
+@25:37 - Joshua Delos Santos (ChiefAiOfficer.com)
+Question. Another question that pops in my mind, Jeff, is whenever the coach or does the data on Circle have the description of that specific coach?
+@25:51 - Suzanne Krygier (Scaling Up)
+Yeah, each coach has their own bio.
+@25:54 - Joshua Delos Santos (ChiefAiOfficer.com)
+Bio.
+@25:55 - Suzanne Krygier (Scaling Up)
+In Circle.
+@25:55 - Jeff Verdun (Scaling Up)
+Yeah, and once again, in the perfect world.
+@25:58 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, yeah, yeah, It's not a mystery yet.
+@26:00 - Jeff Verdun (Scaling Up)
+On their bio edit screen, I would love to be able to just have a button that says pull from circle.
+@26:05 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, I also would like that as well because it would significantly, this is unnecessary as well. I would like it to pull in the data from that specific database, just map it directly.
+@26:21 - Jeff Verdun (Scaling Up)
+About the free virtual, yeah. so that's, and this is where I don't know if we want to be allowed them to change that, that verbiage there, Suzanne.
+So scroll back up. So the free virtual code led workshop is, is, you know, on the landing page there.
+Do we want them to be able to change that or do we want control?
+@26:42 - Suzanne Krygier (Scaling Up)
+don't think so because the stuff that they're going to be presenting is the slide deck that everybody's using.
+@26:49 - Jeff Verdun (Scaling Up)
+So it's all the same stuff. Right, so I, once again, I want to limit the control that we give these people on what they can edit.
+In here. And almost, you know, I'm almost wondering if there's anything in here that we want them to edit because they've done it all.
+It should match their workshop setup form.
+@27:12 - Suzanne Krygier (Scaling Up)
+Yeah.
+@27:13 - Jeff Verdun (Scaling Up)
+We could give them a preview.
+@27:18 - Joshua Delos Santos (ChiefAiOfficer.com)
+100%.
+@27:18 - Jeff Verdun (Scaling Up)
+And Josh, what I'm thinking where this page would be useful, though, is the admin setup screen. So when we're creating different landing pages for the different events that we create.
+So right now, there's just exit and AI, right? But say in six months, we have a new one for hula dancing, right?
+So she's going to need to set up this whole structure again for the hula dancing course. So I can see this as an admin screen where she can go ahead and manipulate everything in here for the new course and save it as a new course.
+I don't see where the coach is going to use this other than to see a preview of their landing page.
+@28:01 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah. Ideally, if you do want to envision what you had both in mind, I think I would separate the landing page preview with the admin and the coaching view.
+@28:14 - Jeff Verdun (Scaling Up)
+Correct. Correct. And as we go through this, this is just giving me good ideas how to break up that flow in that document I'm creating.
+@28:21 - Joshua Delos Santos (ChiefAiOfficer.com)
+So I think it'll be a little clearer for all of us. Yes. Yes.
+@28:26 - Jeff Verdun (Scaling Up)
+So, Suzanne, you agree, really, there's nothing here that the coach should edit.
+@28:32 - Suzanne Krygier (Scaling Up)
+I agree. Yeah. If anything, if I start getting a few, you know, things of feedback from coaches that are like, hey, this is out of order, and it really kind of doesn't make sense, or we're not really doing this, then I can go in and change it globally, so to speak, for anybody who's using.
+And yeah, so for the admin view, I think that would be much better on your end, because you have all the control, right?
+Yeah.
+@28:57 - Jeff Verdun (Scaling Up)
+So let's go back to the other pieces that. We talked about this too with Suzanne, that the flow is a little wonky right now, but we'll fix that.
+@29:13 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay, let me go back here. Published. What do want to do next?
+@29:21 - Jeff Verdun (Scaling Up)
+I don't think you need to open up the bio page just so we can see it. But once again, I'm assuming this is more already set up as part of the coach's profile, not setting it up each time we do an event.
+@29:34 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yep. And in my mind, Jeff, the way I prompt this is I ultimately didn't really recognize that this was both for the admin and for the coach.
+@29:52 - Jeff Verdun (Scaling Up)
+I was just making it for the admin myself. Got it. Got it. That makes sense. Mm-hmm. Um, yeah. there's...
+I this is pretty standard here. I don't think there's anything there. Once again, it'd be nice if we could do something that pull image from Circle, pull bio from Circle, a couple of buttons that just pull that stuff across, or even just a single button that pulls everything in one, you know, one.
+@30:21 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, basically maps everything.
+@30:24 - Jeff Verdun (Scaling Up)
+Grab the picture, grab the bio, grab the whatever else that we're going to match, you know, match up for these two.
+@30:30 - Suzanne Krygier (Scaling Up)
+And then anytime a coach changes anything on their bio in Circle, like they have a new updated certification or something, it would automatically do it here because it's grabbing it in Circle, right?
+@30:46 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, sorry to interrupt you there. In Circle, the data on Circle, it's been updated regularly, if I assume correctly, right?
+ACTION ITEM: Implement 'Refresh data from Circle' button; consider daily refresh - WATCH
+@30:55 - Jeff Verdun (Scaling Up)
+My guess is they don't update it very often, but it does get updated. updated. It Time to time in there.
+So I'm just wondering, Suzanne, instead of an automatic pull, that it's a button here that says, you know, refresh data from Circle or something like that.
+Because otherwise, this thing is going to have to be constantly going back to Circle and looking for updates.
+@31:20 - Suzanne Krygier (Scaling Up)
+Don't we want them doing that, though? Don't we want them updating in Circle, keeping it as up to date as possible?
+@31:28 - Jeff Verdun (Scaling Up)
+I would like them to, but they won't.
+@31:30 - Suzanne Krygier (Scaling Up)
+Maybe they would if they knew it's about to be shown to the world.
+@31:35 - Jeff Verdun (Scaling Up)
+Yeah, true.
+@31:35 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, true. 100%. So I guess short term, let's start with just a button that says refresh data, right, from Circle.
+For now, yes.
+@31:45 - Jeff Verdun (Scaling Up)
+And then as a process improvement down the line, maybe we do have some sort of a routine that runs once a day that just refreshes all the ones that are in the database.
+But we'll see.
+@31:56 - Joshua Delos Santos (ChiefAiOfficer.com)
+We'll see, yeah. Um, the... So I'm also trying to, that is a good option. I'm also trying to not overcomplicate the code on the backend, but I'll see what I can do on that, Jeff, will it refresh regularly daily.
+@32:15 - Suzanne Krygier (Scaling Up)
+I do think I just saw the two with the page that you were just on, like book a free call with Sarah.
+ACTION ITEM: Add CTA toggle to bio/landing; hide purple CTA when off - WATCH
+@32:25 - Jeff Verdun (Scaling Up)
+Yeah, I don't know if we're going to add that.
+@32:29 - Suzanne Krygier (Scaling Up)
+I think that should be an option because some coaches, what I'm finding, really like it, and other coaches have asked me to take it off.
+So if that's possible, that could be a coach dictated, like toggle, where they're like, yes.
+@32:46 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, that in, is it in the solo landing page, right?
+@32:51 - Jeff Verdun (Scaling Up)
+Well, it was in the bio. Well, in the bio page, go to that real quick. At the very end of that.
+that. Go back to the template. At the very end of this, think, scroll down.
+@33:08 - Suzanne Krygier (Scaling Up)
+Yeah.
+@33:10 - Jeff Verdun (Scaling Up)
+In your call to action, you have a book there with their calendar link. I think she's asking here to have a toggle here to say, turn on the call to action, turn off the call to action.
+@33:25 - Joshua Delos Santos (ChiefAiOfficer.com)
+100%.
+@33:25 - Jeff Verdun (Scaling Up)
+And then, obviously, that would take the purple button on or off on the right.
+@33:31 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yes. Perfect. I would keep that in mind.
+@33:37 - Jeff Verdun (Scaling Up)
+So let's go back through looking. So we looked at the landing page, the registration page. There shouldn't be much to that.
+You don't change the payment page much, do you, Suzanne?
+@33:49 - Suzanne Krygier (Scaling Up)
+No.
+@33:50 - Jeff Verdun (Scaling Up)
+Let's look at the registration page real quick. Let's look at the page. at Let's Let's Yeah, I don't see anything too crazy here, you know, with Senator Johnson, the dates there, picture detail, yeah, I don't have any problem with the way this sits right now, do you, Suzanne?
+ACTION ITEM: Remove 'Coach photo URL' from registration; auto-pull from bio - WATCH
+@34:22 - Suzanne Krygier (Scaling Up)
+No, just the coach photo URL, is that something that the coach would put in, or would that automatically grab that?
+@34:30 - Jeff Verdun (Scaling Up)
+I'm assuming that would pull from the bio, wouldn't it, Josh?
+@34:35 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, 100%.
+@34:37 - Suzanne Krygier (Scaling Up)
+So would we need that there, if it's automatically going to do it?
+@34:43 - Jeff Verdun (Scaling Up)
+Where are you talking about?
+@34:45 - Suzanne Krygier (Scaling Up)
+Under coach title, to the left over there.
+@34:49 - Jeff Verdun (Scaling Up)
+Oh, so you have a field there for the coach photo URL, she's saying, one more down?
+@34:55 - Joshua Delos Santos (ChiefAiOfficer.com)
+Oh yeah, we don't need don't need that if it's pulled automatically.
+@34:59 - Suzanne Krygier (Scaling Up)
+Okay.
+@34:59 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yep. I have a quick question here. Since this is the registration page, forgive me if I'm asking the wrong questions, but is this being sent to a marketing list on the coach's email site, or is it on your?
+@35:17 - Jeff Verdun (Scaling Up)
+Right. So the coach wouldn't have access to this. Once again, we could do it as a preview for them so they could see what it's going to look like at checkout, but they're not going to edit any of this.
+This is once again going to be an admin function.
+@35:31 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay.
+@35:32 - Suzanne Krygier (Scaling Up)
+This exact page, I consider this like the offer page, that exact link is not sent out. We send out the landing page, then that connects.
+@35:43 - Jeff Verdun (Scaling Up)
+The landing page has this registration page built into it.
+@35:48 - Suzanne Krygier (Scaling Up)
+Yep.
+@35:49 - Jeff Verdun (Scaling Up)
+So the only marketing that ever happens is with a landing page.
+@35:52 - Joshua Delos Santos (ChiefAiOfficer.com)
+Right. Okay. Okay. Okay.
+@35:57 - Jeff Verdun (Scaling Up)
+Now let's go back. What else do we have here? Here, you can close the screen. We don't need it.
+And then a thank you page. We are doing some customization with the thank you page, aren't we, Suzanne? I know we're doing it right now because of the affiliate links I'm having you do.
+ACTION ITEM: Implement admin thank-you page templates; enable per-offer selection - WATCH
+But other than that, is there any reason to have separate thank you pages or is it just going to be a unique one again?
+@36:28 - Suzanne Krygier (Scaling Up)
+Yeah, no.
+@36:29 - Jeff Verdun (Scaling Up)
+So the only functionality there, Josh, again, I would like, I think I still want the functionality from an admin perspective to create multiple thank you pages.
+And then when we're creating the template for the registrations, we can still point, take this landing, take the, after they complete the purchase, send them to this landing page.
+And you could pick which landing page you wanted to send them to.
+@36:58 - Joshua Delos Santos (ChiefAiOfficer.com)
+Does that make sense?
+@36:59 - Jeff Verdun (Scaling Up)
+sense?
+@37:00 - Joshua Delos Santos (ChiefAiOfficer.com)
+So the flow is you've got a landing page.
+@37:04 - Jeff Verdun (Scaling Up)
+Inside the landing page is the registration purchase block, right? And then after they complete the purchase, it's going to go to a landing page that we specify.
+@37:19 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yep.
+@37:21 - Jeff Verdun (Scaling Up)
+So that's kind of the flow. And pretty much all of those things were going to have little to no editability by the coach.
+@37:34 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yep. Yep, yep. Only with the admin side of things.
+@37:39 - Jeff Verdun (Scaling Up)
+Only with the admin side. So Suzanne can go in there and build her templates for the offers for the landing pages and for the thank you pages.
+@37:49 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yes.
+@37:54 - Jeff Verdun (Scaling Up)
+And just to try to keep our terminology the same when we're talking about this. Let's call the one, landing page, the piece that's where you're making the payment, we're going to call that the offer, and then the thank you page.
+@38:09 - Joshua Delos Santos (ChiefAiOfficer.com)
+The thank you page. All right. Okay, so anything else here?
+@38:17 - Jeff Verdun (Scaling Up)
+Not off the top of my head that I can think.
+@38:21 - Suzanne Krygier (Scaling Up)
+Well, do you want to talk about the surveys, Jeff?
+@38:24 - Jeff Verdun (Scaling Up)
+Oh, this is a piece we haven't talked about yet, Josh. This part of, is it both the workshops, Exit and AI, Suzanne?
+Yeah. So in those survey, in those workshops, we have surveys that we've built right now in type form, I think you said?
+@38:43 - Suzanne Krygier (Scaling Up)
+Yes.
+@38:44 - Jeff Verdun (Scaling Up)
+Now it doesn't have to be in type form. We can do it within here, or we can continue to point them to type form surveys.
+But there are survey information that goes out, what, before the workshop happens?
+@38:57 - Suzanne Krygier (Scaling Up)
+And then a kind of a, how did you Would you like it survey afterwards? Is that correct? Correct.
+@39:05 - Jeff Verdun (Scaling Up)
+So we need the ability to either embed those surveys in there. If we continue to use Typeform, we can do that.
+And they're just links that go out. that's really part of the process. But in the form setup of these workshops, we need to be able to say, include these surveys.
+@39:27 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yep. But this is after the workshop, right?
+@39:32 - Suzanne Krygier (Scaling Up)
+No, before somebody registers to join the workshop, they get a thank you email, or like you're registered. Congratulations, you've registered with the information of the workshop.
+And then in there, we ask them to complete. It's a pre-assessment prior to the workshop. And if there's a way we could get that out of Typeform and do it in here, that would be ideal.
+Because what's happening right now is... I have to take the survey and duplicate it and make it specific to each coach.
+gets its own URL so that that way when somebody's filling out the form for this coach and this workshop, I have the comments and the answers for that to give to the coach.
+This coach has their own. This coach has their own. So I'm having to go in and duplicate for each event, if that makes sense, its own survey.
+@40:31 - Jeff Verdun (Scaling Up)
+So in order to restrict right now with type form, which event and which coach is there, she has to create a unique type form event.
+If we did something more like in this tool as a different module, if you will, you know, you would have a unique identifier for each one, right?
+That's, okay, it's this event and this coach. And then as a coach, when I'm looking at my workshop, I could have a button that says survey data, and it would go in there and show me everybody that's filled out the surveys and their answers.
+@41:09 - Joshua Delos Santos (ChiefAiOfficer.com)
+The questions for the surveys, would it be different for every workshop?
+@41:13 - Jeff Verdun (Scaling Up)
+Would it be different for... No, it's the same.
+@41:16 - Suzanne Krygier (Scaling Up)
+All the exit surveys have the same exact questions, and all the AI surveys have the same exact questions.
+@41:22 - Jeff Verdun (Scaling Up)
+And then the bigger stuff that we can't do now that would be then nice is then if we had them all in the system, then I could start looking for trends amongst all of the surveys and all of the stuff in a single view, so we can then apply maybe some AI logic to it and say, what are the trends on these answers?
+What are the trends on these answers? And be able to do stuff with that data. Now, that's future, future, future us.
+But that's why if we can build it in here, and it doesn't seem like that would be a huge ask for just to be able to do some questions in a form.
+On here. But, you know, now we're asking you to rebuild Typeform on top of rebuilding Kajabi, which I know that let's take this in stages.
+ACTION ITEM: Add Typeform integration; store responses; enable coach view - WATCH
+So short term, I'm content with continuing to do what we have to do with, well, is that true? Because we can't.
+If we're trying to make this fully automated, I can't have Suzanne creating unique Typeforms for each customer. So if we're not going to build it in here, we're going to have to be able to do some sort of an integration to Typeforms.
+So we do that. And at that point, I'm guessing it's easier just to recreate what we want in here.
+Josh, thoughts?
+@42:44 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, I think there's a feature where we can integrate Typeform inside here as well to make it easier.
+@42:53 - Jeff Verdun (Scaling Up)
+And it's just, to me, then, it's a question of, and it sounds like you do have a data repository in here.
+@42:58 - Joshua Delos Santos (ChiefAiOfficer.com)
+It's just another repository. Dispository of data. Yep. It's possible, Jeff.
+@43:04 - Jeff Verdun (Scaling Up)
+Okay.
+@43:04 - Joshua Delos Santos (ChiefAiOfficer.com)
+possible, I think.
+@43:05 - Jeff Verdun (Scaling Up)
+So I will add that functionality into our list here. And remember, the other piece to this as well that we don't have here is being able to upload materials that then you can assign materials to the courses, to the workshops.
+So like the workshop has a workbook that goes with it, right? And at some point during the process, we're sending the people who sign up a copy of the work, we're not?
+@43:37 - Suzanne Krygier (Scaling Up)
+No, we're not. So I don't even think we need to do that because they only get a workbook if they show up in person.
+@43:44 - Jeff Verdun (Scaling Up)
+Oh, okay. Okay.
+@43:47 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay.
+@43:48 - Jeff Verdun (Scaling Up)
+So disregard that.
+@43:51 - Suzanne Krygier (Scaling Up)
+If you wanted to down the road, Jeff, modify how we do that or something, I think we could send something as like a hyperlink to a PDF, like inside of an email.
+@43:59 - Jeff Verdun (Scaling Up)
+I don't think that. that. I would just be an email, and we could put that in Google Drive or wherever we wanted to put that.
+SCREEN SHARING: Joshua started screen sharing - WATCH
+It wouldn't have to be here.
+SCREEN SHARING: Joshua started screen sharing - WATCH
+@44:05 - Joshua Delos Santos (ChiefAiOfficer.com)
+Yeah, agreed. Agreed. All right. All righty. So I think, Jeff, what I would need moving forward are the Figma and anything else in here, really, that would make it convenient on your end, Suzanne.
+I know we would be approaching the updates for FACES, and you've already given me so much critical feedback that I also have to assess.
+Is there anything else, really, on the workshop setup checklist here that I haven't covered or I haven't really put in as a function?
+@44:44 - Jeff Verdun (Scaling Up)
+Yeah. So I think the two big ones were the discount codes and the survey pieces were the two big edits that we had.
+The rest is kind of manipulating some stuff here, and then the agreement that we had that this is really designed for...
+For an admin functionality, as well as a coach functionality.
+@45:04 - Joshua Delos Santos (ChiefAiOfficer.com)
+Coach, perfect.
+@45:05 - Jeff Verdun (Scaling Up)
+As a divider, if you will.
+@45:07 - Suzanne Krygier (Scaling Up)
+And the add of the potential buttons for the partner logos for that.
+@45:13 - Joshua Delos Santos (ChiefAiOfficer.com)
+Oh, yeah. Partner logos as well. Yep. I do have a quick question here. For the marketing promo kit, what was it for?
+@45:21 - Suzanne Krygier (Scaling Up)
+No, don't even worry about that. They, you won't even, that's the process anymore.
+@45:28 - Joshua Delos Santos (ChiefAiOfficer.com)
+Okay, okay. All right, all right. Okay. So, should we conclude our call here or should, and if there's anything else that you would like to move forward, Jeff?
+ACTION ITEM: Share Figma w/ Josh; send access; build skeleton; share before Fri - WATCH
+@45:38 - Jeff Verdun (Scaling Up)
+I don't think so. I think our next meeting is Friday, right? Friday. So, that'll give you a couple of days to at least get your head wrapped around a few things here.
+And I'm hoping by Friday, before Friday, hopefully, I'm going to give you at least a mock-up in Figma for you.
+@45:55 - Joshua Delos Santos (ChiefAiOfficer.com)
+Perfect, Jeff.
+@45:56 - Jeff Verdun (Scaling Up)
+That would really be helpful, Jeff. I don't use Figma very often. And is there a way for me to add you to this so you can just grab it or have you used it?
+@46:04 - Joshua Delos Santos (ChiefAiOfficer.com)
+there is. I don't use Figma as much because I'm not a designer, but I do know that there is a functionality that you can just give me a memory.
+@46:12 - Jeff Verdun (Scaling Up)
+Okay, I'll figure that out and I'll send you a login to this.
+@46:16 - Joshua Delos Santos (ChiefAiOfficer.com)
+Appreciate it.
+@46:17 - Jeff Verdun (Scaling Up)
+As I edit this, you can just keep seeing what I'm putting in there.
+@46:20 - Joshua Delos Santos (ChiefAiOfficer.com)
+Appreciate it, Jeff. And Suzanne, thank you for your time.
+@46:23 - Suzanne Krygier (Scaling Up)
+Yes, I'm just curious. No pressure because I know we're running. Yes. running, but what are we thinking for ETA of this to drop this?
+@46:34 - Joshua Delos Santos (ChiefAiOfficer.com)
+Well, for the duration of the project, really, Suzanne, I want to be honest as I can. I want to do an iterative loop.
+So basically, I'll be reporting to you every week. And the ETA for the entire project, because this would be an iterative loop, is indefinite for now.
+I can't really say this would be in the next two weeks. In the next. I do know that by March, you would be needing the system, but we're mid into February, so we have four weeks until March, yes?
+And so I will do my best, but by March, we could launch the entire application, really.
+@47:22 - Jeff Verdun (Scaling Up)
+Our goal is going to be March 4, is it going to be, let's just call it March 9.
+@47:29 - Joshua Delos Santos (ChiefAiOfficer.com)
+March 9, March 9.
+@47:31 - Jeff Verdun (Scaling Up)
+Let's march to that date, and get as much as we can done by that point, even if not all the functionality there, we can get a lot of it, that would be useful.
+@47:45 - Joshua Delos Santos (ChiefAiOfficer.com)
+100%, because Chris also put me in here, because he wanted this to be as fast as possible, and so I will do my best, really, and I do, I do really don't want to have promises with.
+So I will just be saying this to you guys that I will do my best on providing the timeline for March, okay?
+And if that's okay.
+@48:08 - Jeff Verdun (Scaling Up)
+all we can ask.
+@48:09 - Suzanne Krygier (Scaling Up)
+Yeah.
+@48:11 - Joshua Delos Santos (ChiefAiOfficer.com)
+100%. So.
+@48:12 - Jeff Verdun (Scaling Up)
+All right. Josh, appreciate it as always, sir. You have a good one, and we will see you on Friday.
+@48:17 - Joshua Delos Santos (ChiefAiOfficer.com)
+I appreciate your time as well. Thank you, Suzanne. Thank you, Jeff. Have a great day. Yeah. Thanks, Jeff.

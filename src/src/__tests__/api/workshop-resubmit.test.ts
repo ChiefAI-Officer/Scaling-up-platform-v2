@@ -111,7 +111,7 @@ describe("Workshop Resubmit API", () => {
     expect(body.approvalId).toBe("apr-new");
     expect(db.workshop.update).toHaveBeenCalledWith({
       where: { id: "ws-1" },
-      data: { status: "REQUESTED" },
+      data: { status: "INFO_REQUESTED" },
     });
   });
 
@@ -134,7 +134,7 @@ describe("Workshop Resubmit API", () => {
     expect(body.success).toBe(true);
     expect(db.workshop.update).toHaveBeenCalledWith({
       where: { id: "ws-1" },
-      data: { status: "REQUESTED" },
+      data: { status: "INFO_REQUESTED" },
     });
   });
 
@@ -209,7 +209,7 @@ describe("Workshop Resubmit API", () => {
     expect(db.workshop.update).toHaveBeenCalledTimes(2);
     expect(db.workshop.update).toHaveBeenNthCalledWith(1, {
       where: { id: "ws-1" },
-      data: { status: "REQUESTED" },
+      data: { status: "INFO_REQUESTED" },
     });
     expect(db.workshop.update).toHaveBeenNthCalledWith(2, {
       where: { id: "ws-1" },

@@ -1,0 +1,64 @@
+{
+  "runTimestamp": "2026-02-24T15:57:51.952Z",
+  "results": [
+    {
+      "integration": "Circle",
+      "status": "FAIL",
+      "summary": "Circle API authentication failed; cannot run coach sync proof.",
+      "evidence": {
+        "status": 200,
+        "payload": {
+          "status": "unauthorized",
+          "message": "Your account could not be authenticated."
+        }
+      },
+      "actions": [
+        "Replace CIRCLE_API_KEY with a valid server-side token from Circle admin settings.",
+        "Re-run `npm run validate:apis` and `npm run validate:p0-rel-proof` after rotating the key."
+      ]
+    },
+    {
+      "integration": "HubSpot",
+      "status": "PASS",
+      "summary": "Real registration synced to HubSpot and linked back to app registration.",
+      "evidence": {
+        "workshopId": "cmlqz7ecw0007f2k3vj5nwxp2",
+        "workshopCode": "WS-2026-L62X",
+        "workshopTitle": "Exit Test",
+        "eventDateIso": "2026-03-19T00:00:00.000Z",
+        "coachName": "Josh Delos Santos",
+        "registrationId": "cmm0sho8u0001udca2zdbu59r",
+        "email": "p0-rel-hubspot-1771948675325@example.com",
+        "hubspotContactId": "205070559903",
+        "verifiedContactId": "205070559903"
+      }
+    },
+    {
+      "integration": "Stripe",
+      "status": "FAIL",
+      "summary": "Stripe proof execution failed.",
+      "evidence": {
+        "error": "This PaymentIntent is configured to accept payment methods enabled in your Dashboard. Because some of these payment methods might redirect your customer off of your page, you must provide a `return_url`. If you don't want to accept redirect-based payment methods, set `automatic_payment_methods[enabled]` to `true` and `automatic_payment_methods[allow_redirects]` to `never` when creating Setup Intents and Payment Intents."
+      }
+    },
+    {
+      "integration": "Inngest",
+      "status": "FAIL",
+      "summary": "Inngest event accepted but no workflow execution record was observed in time window.",
+      "evidence": {
+        "workshopId": "cmlqz7ecw0007f2k3vj5nwxp2",
+        "workshopCode": "WS-2026-L62X",
+        "workflowId": "cmm0shtux0004udcahr7pxj7f",
+        "workflowStepId": "cmm0shu7g0006udcarwo1ychp",
+        "workflowAssignmentId": "cmm0shuk40008udcay58brfz4",
+        "eventResponseStatus": 200,
+        "eventResponseBody": "{\"ids\":[\"01KJ85YD3D5CDBCANW1SPS71KA\"],\"status\":200}\n",
+        "executionRecord": null
+      },
+      "actions": [
+        "Confirm Inngest app endpoint points to /api/inngest on active deployment.",
+        "Confirm execute-workflow function is registered and healthy in Inngest dashboard."
+      ]
+    }
+  ]
+}

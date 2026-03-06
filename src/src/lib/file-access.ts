@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 export const WORKSHOP_STATUS_ORDER = [
-  "REQUESTED",
+  "INFO_REQUESTED",
   "AWAITING_APPROVAL",
   "PRE_EVENT",
   "POST_EVENT",
@@ -164,7 +164,7 @@ export function canRoleAccessAttachment(input: {
   }
 
   const roleMinStatus: Record<FileRecipientRole, WorkshopStatus> = {
-    STAFF: "REQUESTED",
+    STAFF: "INFO_REQUESTED",
     COACH: "AWAITING_APPROVAL",
     ATTENDEE: "PRE_EVENT",
     CUSTOM: "PRE_EVENT",

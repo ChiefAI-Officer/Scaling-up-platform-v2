@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createCoachSchema } from "@/lib/validations";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { generatePasswordResetToken } from "@/lib/password-reset";
+import { sendCoachWelcomeEmail } from "@/services/notifications";
 
 export async function GET(request: NextRequest) {
   try {
@@ -104,6 +106,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // MR-23/MR-44: Create or reuse a User record so the coach can log in
+    let user = await db.user.findUnique({ where: { email: data.email } });
+    if (!user) {
+      user = await db.user.create({
+        data: {
+          email: data.email,
+          name: `${data.firstName} ${data.lastName}`,
+          role: "COACH",
+        },
+      });
+    }
+
     const coach = await db.coach.create({
       data: {
         email: data.email,
@@ -117,8 +131,24 @@ export async function POST(request: NextRequest) {
         circleId: data.circleId,
         certificationStatus: "PENDING",
         paymentStatus: "PENDING",
+        userId: user.id,
       },
     });
+
+    // Send welcome email with password-set link (24h TTL)
+    try {
+      const token = generatePasswordResetToken(data.email, null, 24 * 60 * 60);
+      const baseUrl = process.env.NEXTAUTH_URL || "https://scaling-up-platform-v2.vercel.app";
+      const passwordSetUrl = `${baseUrl}/auth/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(data.email)}`;
+      await sendCoachWelcomeEmail({
+        coachEmail: data.email,
+        coachName: `${data.firstName} ${data.lastName}`,
+        passwordSetUrl,
+      });
+    } catch (emailError) {
+      console.error("Failed to send coach welcome email:", emailError);
+      // Non-fatal — coach is created, email failure shouldn't block response
+    }
 
     return NextResponse.json(
       {

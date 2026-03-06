@@ -22,7 +22,7 @@ export const idSchema = z.string().min(1, "ID is required");
 
 export const strongPasswordSchema = z
     .string()
-    .min(12, "Password must be at least 12 characters")
+    .min(8, "Password must be at least 8 characters")
     .max(128, "Password must be 128 characters or less")
     .regex(/[a-z]/, "Password must include at least one lowercase letter")
     .regex(/[A-Z]/, "Password must include at least one uppercase letter")
@@ -37,7 +37,7 @@ export const workshopFormatSchema = z.enum(["IN_PERSON", "VIRTUAL"]);
 
 // JV-02: Jeff Verdun's 6 workshop stages
 export const workshopStatusSchema = z.enum([
-    "REQUESTED",
+    "INFO_REQUESTED",
     "AWAITING_APPROVAL",
     "PRE_EVENT",
     "POST_EVENT",

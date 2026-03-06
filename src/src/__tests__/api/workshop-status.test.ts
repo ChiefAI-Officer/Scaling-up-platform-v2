@@ -175,7 +175,7 @@ describe("Workshop status API – PATCH /api/workshops/[id]/status", () => {
 
   it("REQUESTED -> AWAITING_APPROVAL is blocked (only via approval queue)", async () => {
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(
-      mockWorkshop("REQUESTED")
+      mockWorkshop("INFO_REQUESTED")
     );
 
     const response = await PATCH(
@@ -254,7 +254,7 @@ describe("Workshop status API – PATCH /api/workshops/[id]/status", () => {
 
   it("rejects REQUESTED -> COMPLETED (invalid transition)", async () => {
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(
-      mockWorkshop("REQUESTED")
+      mockWorkshop("INFO_REQUESTED")
     );
 
     const response = await PATCH(
@@ -309,21 +309,21 @@ describe("Workshop status API – PATCH /api/workshops/[id]/status", () => {
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(
       mockWorkshop("CANCELED")
     );
-    mockUpdateReturns("REQUESTED");
+    mockUpdateReturns("INFO_REQUESTED");
 
     const response = await PATCH(
-      buildPatchRequest({ status: "REQUESTED" }),
+      buildPatchRequest({ status: "INFO_REQUESTED" }),
       routeParams()
     );
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(body.message).toContain("REQUESTED");
+    expect(body.message).toContain("INFO_REQUESTED");
     expect(db.workshop.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "ws-1" },
-        data: { status: "REQUESTED" },
+        data: { status: "INFO_REQUESTED" },
       })
     );
   });

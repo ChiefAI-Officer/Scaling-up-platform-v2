@@ -10,6 +10,7 @@ import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated"
 import { AddCertificationModal } from "@/components/coaches/add-certification-modal";
 import { RemoveCertificationButton } from "@/components/coaches/remove-certification-button";
 import { DeleteCoachButton } from "@/components/coaches/delete-coach-button";
+import { SendPasswordResetButton } from "@/components/coaches/send-password-reset-button";
 import { requireAuth } from "@/lib/authorization";
 
 interface CoachDetailPageProps {
@@ -156,6 +157,7 @@ export default async function CoachDetailPage({
           </div>
         </div>
         <div className="flex gap-2">
+          <SendPasswordResetButton coachId={coach.id} coachEmail={coach.email} />
           <Link
             href={`/coaches/${coach.id}/edit`}
             className="bg-muted text-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent transition-colors"

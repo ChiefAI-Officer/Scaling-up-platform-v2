@@ -179,6 +179,9 @@ model Workshop {
   geoTargetAreas  String? // Feb25: Comma-separated geographic target areas
   excludedClients String? // Feb25: Comma-separated excluded client names
 
+  // MR-21: Multi-coupon codes (JSON array of {code, discountPercent, singleUse})
+  coupons String @default("[]")
+
   // Status & Pipeline — JV-02: Jeff's 6 stages
   // INFO_REQUESTED, AWAITING_APPROVAL, PRE_EVENT, POST_EVENT, COMPLETED, CANCELED
   status String @default("INFO_REQUESTED")

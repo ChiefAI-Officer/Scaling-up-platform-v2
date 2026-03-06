@@ -9,6 +9,7 @@ const updatePortalProfileSchema = z
     firstName: z.string().optional(),
     lastName: z.string().optional(),
     bio: z.string().optional(),
+    company: z.string().nullable().optional(), // MR-26: Title / Credentials
     linkedinUrl: z.string().url().nullable().optional(),
     showBookCallCta: z.boolean().optional(),
   })
@@ -39,7 +40,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { firstName, lastName, bio, linkedinUrl, showBookCallCta } = bodyValidation.data;
+    const { firstName, lastName, bio, company, linkedinUrl, showBookCallCta } = bodyValidation.data;
 
     const updated = await db.coach.update({
       where: { id: coach.id },
@@ -47,6 +48,7 @@ export async function PATCH(request: NextRequest) {
         ...(typeof firstName === "string" && { firstName: firstName.trim() }),
         ...(typeof lastName === "string" && { lastName: lastName.trim() }),
         ...(typeof bio === "string" && { bio: bio.trim() }),
+        ...(company !== undefined && { company: company?.trim() || null }),
         ...(linkedinUrl !== undefined && { linkedinUrl }),
         ...(typeof showBookCallCta === "boolean" && { showBookCallCta }),
       },

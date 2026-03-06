@@ -296,7 +296,7 @@ export async function POST(request: NextRequest) {
         isFree: data.isFree,
         priceCents: data.priceCents,
         maxAttendees: data.maxAttendees,
-        status: "REQUESTED",
+        status: "INFO_REQUESTED",
       },
       include: {
         coach: true,

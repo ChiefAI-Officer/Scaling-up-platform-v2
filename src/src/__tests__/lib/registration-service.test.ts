@@ -57,7 +57,7 @@ describe("registration-service", () => {
   });
 
   it("returns WORKSHOP_CLOSED when status is not registration-open", async () => {
-    mockTx.workshop.findUnique.mockResolvedValue(makeWorkshop({ status: "REQUESTED" }));
+    mockTx.workshop.findUnique.mockResolvedValue(makeWorkshop({ status: "INFO_REQUESTED" }));
 
     await expect(createWorkshopRegistration(makeInput())).rejects.toMatchObject({
       code: "WORKSHOP_CLOSED",
