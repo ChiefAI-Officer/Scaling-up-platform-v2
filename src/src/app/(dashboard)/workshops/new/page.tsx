@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RichTextTextarea } from "@/components/ui/rich-text-textarea";
 import { WorkshopRulesPanel } from "@/components/workshops/workshop-rules-panel";
 
 interface Coach {
@@ -634,14 +635,18 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
 
             <div>
               <Label htmlFor="description">Internal Description</Label>
-              <textarea
+              <RichTextTextarea
                 id="description"
-                name="description"
                 value={formData.description}
-                onChange={handleChange}
+                onChange={(value) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: value,
+                  }))
+                }
                 readOnly={coachIsAutoFilled && Boolean(formData.description)}
                 rows={4}
-                className={`mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary ${coachIsAutoFilled && formData.description ? "bg-muted" : ""}`}
+                className={coachIsAutoFilled && formData.description ? "bg-muted" : undefined}
                 placeholder="Internal notes for operations and setup..."
               />
               <p className="text-sm text-muted-foreground mt-1">

@@ -4,23 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Menu, X, LayoutDashboard, Calendar, Users, PlusCircle, FileText, Settings, FileBox } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNavLinkActive } from "@/lib/nav-utils";
+import { coachPrimaryNavItems } from "@/lib/coach-nav";
 
 interface CoachMobileNavProps {
   coachName: string;
 }
-
-const navLinks = [
-  { href: "/portal/home", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/portal/workshops", label: "My Workshops", icon: Calendar },
-  { href: "/portal/registrations", label: "Registrations", icon: Users },
-  { href: "/portal/templates", label: "Templates", icon: FileBox },
-  { href: "/portal/request", label: "Request Workshop", icon: PlusCircle },
-  { href: "/portal/follow-up", label: "90-Day Follow-Up", icon: FileText },
-  { href: "/portal/settings", label: "Settings", icon: Settings },
-];
 
 export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
   const [open, setOpen] = useState(false);
@@ -52,7 +43,7 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
             </div>
 
             <nav className="flex-1 py-4 px-3 space-y-1">
-              {navLinks.map((link) => {
+              {coachPrimaryNavItems.map((link) => {
                 const Icon = link.icon;
                 const isActive = isNavLinkActive(pathname, link.href);
                 return (

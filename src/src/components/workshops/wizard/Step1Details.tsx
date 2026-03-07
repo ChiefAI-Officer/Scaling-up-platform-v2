@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useWizard } from "./WizardContext";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { RichTextTextarea } from "@/components/ui/rich-text-textarea";
 
 // JV-16: Fallback for when Category model has no data yet
 export const workshopTypes = [
@@ -28,40 +28,6 @@ export function Step1Details() {
     const [categories, setCategories] = useState<CategoryWithTiers[]>([]);
     const [loadingCategories, setLoadingCategories] = useState(true);
     const [touched, setTouched] = useState<Record<string, boolean>>({});
-    const descRef = useRef<HTMLTextAreaElement>(null);
-
-    // MR-43: Insert formatting around selected text in description
-    function insertFormat(prefix: string, suffix: string, placeholder: string) {
-        const el = descRef.current;
-        if (!el) return;
-        const start = el.selectionStart ?? 0;
-        const end = el.selectionEnd ?? 0;
-        const selected = formData.description.slice(start, end) || placeholder;
-        const newValue =
-            formData.description.slice(0, start) +
-            prefix + selected + suffix +
-            formData.description.slice(end);
-        updateField("description", newValue.slice(0, 500));
-        setTimeout(() => {
-            el.focus();
-            el.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
-        }, 0);
-    }
-
-    function insertLink() {
-        const url = prompt("Enter URL:");
-        if (!url) return;
-        const el = descRef.current;
-        if (!el) return;
-        const start = el.selectionStart ?? 0;
-        const end = el.selectionEnd ?? 0;
-        const label = formData.description.slice(start, end) || "link text";
-        const newValue =
-            formData.description.slice(0, start) +
-            `[${label}](${url})` +
-            formData.description.slice(end);
-        updateField("description", newValue.slice(0, 500));
-    }
 
     useEffect(() => {
         async function fetchCategories() {
@@ -164,25 +130,13 @@ export function Step1Details() {
 
                 <div className="space-y-2">
                     <Label htmlFor="description">Description</Label>
-                    {/* MR-43: Basic rich text toolbar */}
-                    <div className="flex items-center gap-1 rounded-t-md border border-b-0 border-border bg-muted px-2 py-1">
-                        <button type="button" onClick={() => insertFormat("**", "**", "bold text")}
-                            className="rounded px-1.5 py-0.5 text-xs font-bold hover:bg-accent">B</button>
-                        <button type="button" onClick={() => insertFormat("*", "*", "italic text")}
-                            className="rounded px-1.5 py-0.5 text-xs italic hover:bg-accent">I</button>
-                        <button type="button" onClick={insertLink}
-                            className="rounded px-1.5 py-0.5 text-xs hover:bg-accent">Link</button>
-                        <button type="button" onClick={() => insertFormat("\n---\n", "", "")}
-                            className="rounded px-1.5 py-0.5 text-xs hover:bg-accent">—</button>
-                    </div>
-                    <Textarea
-                        ref={descRef}
+                    <RichTextTextarea
                         id="description"
                         value={formData.description}
-                        onChange={(e) => updateField("description", e.target.value)}
+                        onChange={(value) => updateField("description", value)}
                         onBlur={() => setTouched(p => ({ ...p, description: true }))}
                         placeholder="Brief description for the landing page..."
-                        className="min-h-[120px] rounded-t-none"
+                        className="min-h-[120px]"
                         maxLength={500}
                     />
                     <div className="flex justify-between">

@@ -1,17 +1,11 @@
 import React from "react";
 import Link from "next/link";
 import { requireCoach } from "@/lib/authorization";
-import {
-    LayoutDashboard,
-    Calendar,
-    Users,
-    PlusCircle,
-    Settings,
-} from "lucide-react";
 import { CoachMobileNav } from "@/components/layout/coach-mobile-nav";
 import { CoachNavLink } from "@/components/layout/coach-nav-link";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SignOutButton } from "@/components/layout/sign-out-button";
+import { coachAccountNavItem, coachPrimaryNavItems } from "@/lib/coach-nav";
 
 interface PortalLayoutProps {
     children: React.ReactNode;
@@ -21,6 +15,7 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
     const { session, coach } = await requireCoach();
 
     const coachName = coach.firstName || session.user.name || "Coach";
+    const AccountIcon = coachAccountNavItem.icon;
 
     return (
         <div className="flex min-h-screen bg-background">
@@ -31,23 +26,23 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                 </div>
 
                 <nav className="flex-1 py-6 px-3 space-y-1">
-                    <CoachNavLink href="/portal/home" icon={<LayoutDashboard className="w-5 h-5" />}>
-                        Dashboard
-                    </CoachNavLink>
-                    <CoachNavLink href="/portal/workshops" icon={<Calendar className="w-5 h-5" />}>
-                        My Workshops
-                    </CoachNavLink>
-                    <CoachNavLink href="/portal/registrations" icon={<Users className="w-5 h-5" />}>
-                        Registrations
-                    </CoachNavLink>
+                    {coachPrimaryNavItems.map((item) => {
+                        const Icon = item.icon;
+
+                        return (
+                            <CoachNavLink key={item.href} href={item.href} icon={<Icon className="w-5 h-5" />}>
+                                {item.label}
+                            </CoachNavLink>
+                        );
+                    })}
                     <NavSeparator />
-                    <CoachNavLink href="/portal/request" icon={<PlusCircle className="w-5 h-5" />}>
-                        Request Workshop
-                    </CoachNavLink>
 
                     <div className="pt-4 mt-4 border-t border-sidebar-border">
-                        <CoachNavLink href="/portal/settings" icon={<Settings className="w-5 h-5" />}>
-                            Settings
+                        <CoachNavLink
+                            href={coachAccountNavItem.href}
+                            icon={<AccountIcon className="w-5 h-5" />}
+                        >
+                            {coachAccountNavItem.label}
                         </CoachNavLink>
                     </div>
                 </nav>

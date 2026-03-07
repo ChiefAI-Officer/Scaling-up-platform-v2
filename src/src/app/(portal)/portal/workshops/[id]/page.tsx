@@ -8,6 +8,10 @@ import { CancelWorkshopDialog } from "@/components/workshops/cancel-workshop-dia
 import { ResubmitWorkshop } from "@/components/workshops/resubmit-workshop";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { CoachResponseForm } from "@/components/workshops/coach-response-form";
+import {
+  calculateWorkshopRevenueSplit,
+  formatUsdFromCents,
+} from "@/lib/workshop-financials";
 
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
@@ -113,6 +117,12 @@ export default async function WorkshopDetailsPage({
     notFound();
   }
 
+  const totalPaidCents = registrationFinancials.reduce(
+    (sum, registration) => sum + (registration.amountPaidCents ?? 0),
+    0
+  );
+  const revenueSplit = calculateWorkshopRevenueSplit(totalPaidCents);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -197,10 +207,33 @@ export default async function WorkshopDetailsPage({
         ) : registrationFinancials.length === 0 ? (
           <p className="text-sm text-muted-foreground">No completed payments yet</p>
         ) : (
-          <div className="space-y-1">
-            <p className="text-3xl font-semibold text-foreground">
-              ${(registrationFinancials.reduce((sum, r) => sum + (r.amountPaidCents ?? 0), 0) / 100).toFixed(2)}
-            </p>
+          <div className="space-y-4">
+            <div>
+              <p className="text-3xl font-semibold text-foreground">
+                {formatUsdFromCents(revenueSplit.grossRevenueCents)}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Gross revenue
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-border/70 bg-background/40 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Scaling Up (25%)
+                </p>
+                <p className="mt-1 text-lg font-semibold text-foreground">
+                  {formatUsdFromCents(revenueSplit.scalingUpShareCents)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/70 bg-background/40 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Coach (75%)
+                </p>
+                <p className="mt-1 text-lg font-semibold text-foreground">
+                  {formatUsdFromCents(revenueSplit.coachShareCents)}
+                </p>
+              </div>
+            </div>
             <p className="text-sm text-muted-foreground">
               {registrationFinancials.length} paid registration{registrationFinancials.length !== 1 ? "s" : ""}
             </p>
