@@ -168,6 +168,14 @@ function makePaidWorkshop(overrides: Record<string, unknown> = {}) {
     title: "Scaling Up Paid Workshop",
     isFree: false,
     priceCents: 50000,
+    coupons: JSON.stringify([
+      {
+        code: "SAVE20",
+        discountPercent: 20,
+        singleUse: false,
+        stripePromotionCodeId: "promo_save20",
+      },
+    ]),
     landingPageSlug: "paid-workshop",
     workshopCode: "WS-PAID-001",
     ...overrides,
@@ -345,6 +353,7 @@ describe("POST /api/workshops/[id]/register", () => {
           registrationId: "reg-1",
           customerEmail: "jane@example.com",
           discountCode: "SAVE20",
+          allowedPromotionCodeIds: ["promo_save20"],
         })
       );
     });

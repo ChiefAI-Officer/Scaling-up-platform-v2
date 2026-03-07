@@ -109,6 +109,7 @@ interface WorkflowEditorProps {
   workshops: WorkshopOption[];
   categories: CategoryOption[];
   isNew: boolean;
+  isPreview?: boolean;
 }
 
 // ============================================
@@ -121,6 +122,7 @@ export function WorkflowEditor({
   workshops,
   categories,
   isNew,
+  isPreview = false,
 }: WorkflowEditorProps) {
   const router = useRouter();
 
@@ -366,20 +368,25 @@ export function WorkflowEditor({
               </svg>
             </Link>
             <h1 className="text-2xl font-bold text-foreground">
-              {isNew && !workflowId ? "New Workflow" : "Edit Workflow"}
+              {isPreview ? "Preview Workflow" : isNew && !workflowId ? "New Workflow" : "Edit Workflow"}
             </h1>
+            {isPreview && <Badge variant="secondary">Read-only</Badge>}
           </div>
           <p className="text-muted-foreground mt-1">
-            Build automated email sequences for your workshops.
+            {isPreview
+              ? "Review this workflow without making changes."
+              : "Build automated email sequences for your workshops."}
           </p>
         </div>
-        <button
-          onClick={saveWorkflow}
-          disabled={saving}
-          className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save Workflow"}
-        </button>
+        {!isPreview && (
+          <button
+            onClick={saveWorkflow}
+            disabled={saving}
+            className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Workflow"}
+          </button>
+        )}
       </div>
 
       {/* Alerts */}
@@ -408,6 +415,7 @@ export function WorkflowEditor({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              readOnly={isPreview}
               placeholder="e.g., Standard Pre-Event Sequence"
               className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary"
             />
@@ -421,6 +429,7 @@ export function WorkflowEditor({
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              readOnly={isPreview}
               placeholder="Brief description of this workflow's purpose"
               className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary"
             />
@@ -432,6 +441,7 @@ export function WorkflowEditor({
             type="checkbox"
             checked={isTemplate}
             onChange={(e) => setIsTemplate(e.target.checked)}
+            disabled={isPreview}
             className="rounded border-border text-primary focus:ring-primary"
           />
           Save as feature template (reusable across workshops)
@@ -454,6 +464,7 @@ export function WorkflowEditor({
               id="wf-category"
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
+              disabled={isPreview}
               className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             >
               <option value="">Any category</option>
@@ -470,6 +481,7 @@ export function WorkflowEditor({
               id="wf-format"
               value={workshopFormat}
               onChange={(e) => setWorkshopFormat(e.target.value)}
+              disabled={isPreview}
               className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             >
               <option value="">Any format</option>
@@ -485,6 +497,7 @@ export function WorkflowEditor({
               id="wf-phase"
               value={workflowPhase}
               onChange={(e) => setWorkflowPhase(e.target.value)}
+              disabled={isPreview}
               className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
             >
               <option value="">Not set</option>
@@ -529,12 +542,14 @@ export function WorkflowEditor({
               >
                 {showVariables ? "Hide" : "Show"} Variables
               </button>
-              <button
-                onClick={() => setShowNewStep(true)}
-                className="inline-flex rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                + Add Step
-              </button>
+              {!isPreview && (
+                <button
+                  onClick={() => setShowNewStep(true)}
+                  className="inline-flex rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  + Add Step
+                </button>
+              )}
             </div>
           </div>
 
@@ -571,6 +586,7 @@ export function WorkflowEditor({
                 step={step}
                 index={index}
                 isEditing={editingStepId === step.id}
+                readOnly={isPreview}
                 emailTemplates={emailTemplates}
                 onEdit={() => setEditingStepId(step.id)}
                 onCancelEdit={() => setEditingStepId(null)}
@@ -581,7 +597,7 @@ export function WorkflowEditor({
           </div>
 
           {/* New step form */}
-          {showNewStep && (
+          {showNewStep && !isPreview && (
             <NewStepForm
               emailTemplates={emailTemplates}
               onAdd={addStep}
@@ -613,36 +629,38 @@ export function WorkflowEditor({
           </h2>
 
           {/* Assignment form */}
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label htmlFor="assign-ws" className="block text-sm font-medium text-foreground mb-1">
-                Assign to Workshop
-              </label>
-              <select
-                id="assign-ws"
-                value={assignWorkshopId}
-                onChange={(e) => setAssignWorkshopId(e.target.value)}
-                className="block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary"
+          {!isPreview && (
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <label htmlFor="assign-ws" className="block text-sm font-medium text-foreground mb-1">
+                  Assign to Workshop
+                </label>
+                <select
+                  id="assign-ws"
+                  value={assignWorkshopId}
+                  onChange={(e) => setAssignWorkshopId(e.target.value)}
+                  className="block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary"
+                >
+                  <option value="">Select a workshop...</option>
+                  {workshops
+                    .filter((w) => !assignments.some((a) => a.workshopId === w.id))
+                    .map((w) => (
+                      <option key={w.id} value={w.id}>
+                        [{w.workshopCode}] {w.title} —{" "}
+                        {new Date(w.eventDate).toLocaleDateString()}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <button
+                onClick={assignWorkshop}
+                disabled={!assignWorkshopId || saving}
+                className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                <option value="">Select a workshop...</option>
-                {workshops
-                  .filter((w) => !assignments.some((a) => a.workshopId === w.id))
-                  .map((w) => (
-                    <option key={w.id} value={w.id}>
-                      [{w.workshopCode}] {w.title} —{" "}
-                      {new Date(w.eventDate).toLocaleDateString()}
-                    </option>
-                  ))}
-              </select>
+                Assign
+              </button>
             </div>
-            <button
-              onClick={assignWorkshop}
-              disabled={!assignWorkshopId || saving}
-              className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              Assign
-            </button>
-          </div>
+          )}
 
           {/* Current assignments */}
           {assignments.length > 0 && (
@@ -666,12 +684,14 @@ export function WorkflowEditor({
                       {assignment.workshop.status}
                     </Badge>
                   </div>
-                  <button
-                    onClick={() => unassignWorkshop(assignment.id)}
-                    className="text-sm text-destructive hover:text-destructive/80"
-                  >
-                    Remove
-                  </button>
+                  {!isPreview && (
+                    <button
+                      onClick={() => unassignWorkshop(assignment.id)}
+                      className="text-sm text-destructive hover:text-destructive/80"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -690,6 +710,7 @@ function StepCard({
   step,
   index,
   isEditing,
+  readOnly,
   emailTemplates,
   onEdit,
   onCancelEdit,
@@ -699,6 +720,7 @@ function StepCard({
   step: SerializedStep;
   index: number;
   isEditing: boolean;
+  readOnly: boolean;
   emailTemplates: EmailTemplateOption[];
   onEdit: () => void;
   onCancelEdit: () => void;
@@ -797,20 +819,22 @@ function StepCard({
             )}
           </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={onEdit}
-            className="text-sm text-primary hover:text-primary/80"
-          >
-            Edit
-          </button>
-          <button
-            onClick={onDelete}
-            className="text-sm text-destructive hover:text-destructive/80"
-          >
-            Delete
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="flex gap-2">
+            <button
+              onClick={onEdit}
+              className="text-sm text-primary hover:text-primary/80"
+            >
+              Edit
+            </button>
+            <button
+              onClick={onDelete}
+              className="text-sm text-destructive hover:text-destructive/80"
+            >
+              Delete
+            </button>
+          </div>
+        )}
       </div>
     );
   }

@@ -62,6 +62,7 @@ describe("Workshop detail API", () => {
     it("requires approval for date changes when original workshop is within lead-time window", async () => {
       (db.workshop.findUnique as jest.Mock).mockResolvedValue({
         id: "ws-1",
+        format: "IN_PERSON",
         eventDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
       });
 
@@ -89,6 +90,7 @@ describe("Workshop detail API", () => {
     it("updates workshop when date change is outside approval window", async () => {
       (db.workshop.findUnique as jest.Mock).mockResolvedValue({
         id: "ws-1",
+        format: "VIRTUAL",
         eventDate: new Date(Date.now() + 40 * 24 * 60 * 60 * 1000),
       });
       (db.workshop.update as jest.Mock).mockResolvedValue({
@@ -104,7 +106,7 @@ describe("Workshop detail API", () => {
             body: JSON.stringify({
               title: "Updated title",
               eventDate: new Date(
-                Date.now() + 60 * 24 * 60 * 60 * 1000
+                Date.now() + 70 * 24 * 60 * 60 * 1000
               ).toISOString(),
             }),
           })

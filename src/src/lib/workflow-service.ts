@@ -241,6 +241,8 @@ export interface WorkflowContext {
   registrantName?: string;
   registrantEmail?: string;
   registrantCompany?: string;
+  surveyUrl?: string;
+  fileLinks?: string;
 }
 
 export function interpolateTemplate(template: string, context: WorkflowContext): string {
@@ -258,6 +260,8 @@ export function interpolateTemplate(template: string, context: WorkflowContext):
     .replace(/\{\{registrantName\}\}/g, context.registrantName || "")
     .replace(/\{\{registrantEmail\}\}/g, context.registrantEmail || "")
     .replace(/\{\{registrantCompany\}\}/g, context.registrantCompany || "")
+    .replace(/\{\{surveyUrl\}\}/g, context.surveyUrl || "")
+    .replace(/\{\{fileLinks\}\}/g, context.fileLinks || "")
     // snake_case aliases (user-friendly, matches landing page convention)
     .replace(/\{\{workshop_title\}\}/g, context.workshopTitle)
     .replace(/\{\{workshop_code\}\}/g, context.workshopCode)
@@ -271,6 +275,8 @@ export function interpolateTemplate(template: string, context: WorkflowContext):
     .replace(/\{\{attendee_name\}\}/g, context.registrantName || "")
     .replace(/\{\{attendee_email\}\}/g, context.registrantEmail || "")
     .replace(/\{\{attendee_company\}\}/g, context.registrantCompany || "")
+    .replace(/\{\{survey_url\}\}/g, context.surveyUrl || "")
+    .replace(/\{\{file_links\}\}/g, context.fileLinks || "")
     .replace(/\{\{registrant_name\}\}/g, context.registrantName || "")
     .replace(/\{\{registrant_email\}\}/g, context.registrantEmail || "")
     .replace(/\{\{registrant_company\}\}/g, context.registrantCompany || "");

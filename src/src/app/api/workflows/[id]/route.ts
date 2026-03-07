@@ -31,6 +31,9 @@ export async function GET(
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const paramsValidation = workflowRouteParamsSchema.safeParse(await params);
   if (!paramsValidation.success) {
@@ -57,6 +60,9 @@ export async function PATCH(
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const paramsValidation = workflowRouteParamsSchema.safeParse(await params);
@@ -97,6 +103,9 @@ export async function DELETE(
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (session.user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const paramsValidation = workflowRouteParamsSchema.safeParse(await params);

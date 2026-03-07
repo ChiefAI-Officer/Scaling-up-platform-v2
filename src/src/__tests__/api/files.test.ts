@@ -28,7 +28,20 @@ jest.mock("@/lib/file-service", () => ({
 }));
 
 jest.mock("@/lib/authorization", () => ({
-  isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
+  getApiActor: jest.fn(),
+  canManageCoachData: jest.fn(),
+  isPrivilegedRole: jest.fn((role: string) => role === "ADMIN" || role === "STAFF"),
+}));
+
+jest.mock("@/lib/db", () => ({
+  db: {
+    fileAttachment: {
+      update: jest.fn(),
+    },
+    workshop: {
+      findUnique: jest.fn(),
+    },
+  },
 }));
 
 import { GET, POST } from "@/app/api/files/route";
@@ -48,6 +61,8 @@ import {
   validateFile,
   mapFileForClient,
 } from "@/lib/file-service";
+import { getApiActor, canManageCoachData } from "@/lib/authorization";
+import { db } from "@/lib/db";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -101,6 +116,17 @@ function buildDeleteRequest(): Parameters<typeof DELETE>[0] {
 describe("Files API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "user-1",
+      email: "user@example.com",
+      role: "COACH",
+      coachId: "coach-1",
+    });
+    (canManageCoachData as jest.Mock).mockImplementation(
+      (actor: { role: string; coachId: string | null }, coachId: string) =>
+        actor.role === "ADMIN" || actor.role === "STAFF" || actor.coachId === coachId
+    );
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue({ coachId: "coach-1" });
   });
 
   // -----------------------------------------------------------------------
@@ -344,7 +370,21 @@ describe("Files API", () => {
   // -----------------------------------------------------------------------
   describe("PATCH /api/files/[id]", () => {
     it("links file to workflow step", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(authenticatedSession());
+      (getServerSession as jest.Mock).mockResolvedValue(
+        authenticatedSession({ id: "admin-1", role: "ADMIN" })
+      );
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      (getFile as jest.Mock).mockResolvedValue({
+        id: "file-1",
+        uploadedBy: "user-1",
+        filename: "report.pdf",
+        workshop: { coachId: "coach-1" },
+      });
       const updatedFile = {
         id: "file-1",
         filename: "report.pdf",
@@ -364,8 +404,22 @@ describe("Files API", () => {
       expect(linkFileToWorkflowStep).toHaveBeenCalledWith("file-1", "step-1");
     });
 
-    it("unlinks file from workflow step when workflowStepId is omitted", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(authenticatedSession());
+    it("unlinks file from workflow step when workflowStepId is null", async () => {
+      (getServerSession as jest.Mock).mockResolvedValue(
+        authenticatedSession({ id: "admin-1", role: "ADMIN" })
+      );
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      (getFile as jest.Mock).mockResolvedValue({
+        id: "file-1",
+        uploadedBy: "user-1",
+        filename: "report.pdf",
+        workshop: { coachId: "coach-1" },
+      });
       const updatedFile = {
         id: "file-1",
         filename: "report.pdf",
@@ -375,7 +429,7 @@ describe("Files API", () => {
       (mapFileForClient as jest.Mock).mockImplementation((f) => f);
 
       const response = await PATCH(
-        buildPatchRequest({}),
+        buildPatchRequest({ workflowStepId: null }),
         routeParams("file-1")
       );
       const body = await response.json();
@@ -394,6 +448,127 @@ describe("Files API", () => {
       );
 
       expect(response.status).toBe(401);
+      expect(linkFileToWorkflowStep).not.toHaveBeenCalled();
+    });
+
+    it("owner can update file metadata", async () => {
+      (getServerSession as jest.Mock).mockResolvedValue(
+        authenticatedSession({ id: "user-1", role: "COACH" })
+      );
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-1",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
+      (getFile as jest.Mock).mockResolvedValue({
+        id: "file-1",
+        uploadedBy: "user-1",
+        filename: "report.pdf",
+        workshop: { coachId: "coach-1" },
+      });
+      (db.fileAttachment.update as jest.Mock).mockResolvedValue({
+        id: "file-1",
+        filename: "report.pdf",
+        category: "resource",
+        workshopId: "ws-1",
+      });
+
+      const response = await PATCH(
+        buildPatchRequest({ category: "resource", workshopId: "ws-1" }),
+        routeParams("file-1")
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(db.fileAttachment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "file-1" },
+          data: expect.objectContaining({
+            category: "resource",
+            workshopId: "ws-1",
+          }),
+        })
+      );
+    });
+
+    it("blocks non-owner metadata edits", async () => {
+      (getServerSession as jest.Mock).mockResolvedValue(
+        authenticatedSession({ id: "user-2", role: "COACH" })
+      );
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-2",
+        email: "other@example.com",
+        role: "COACH",
+        coachId: "coach-2",
+      });
+      (getFile as jest.Mock).mockResolvedValue({
+        id: "file-1",
+        uploadedBy: "user-1",
+        filename: "report.pdf",
+        workshop: { coachId: "coach-1" },
+      });
+
+      const response = await PATCH(
+        buildPatchRequest({ category: "resource" }),
+        routeParams("file-1")
+      );
+
+      expect(response.status).toBe(403);
+      expect(db.fileAttachment.update).not.toHaveBeenCalled();
+    });
+
+    it("blocks owner from moving a file to another coach's workshop", async () => {
+      (getServerSession as jest.Mock).mockResolvedValue(
+        authenticatedSession({ id: "user-1", role: "COACH" })
+      );
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-1",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
+      (getFile as jest.Mock).mockResolvedValue({
+        id: "file-1",
+        uploadedBy: "user-1",
+        filename: "report.pdf",
+        workshop: { coachId: "coach-1" },
+      });
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({ coachId: "coach-2" });
+
+      const response = await PATCH(
+        buildPatchRequest({ workshopId: "ws-other" }),
+        routeParams("file-1")
+      );
+
+      expect(response.status).toBe(403);
+      expect(db.fileAttachment.update).not.toHaveBeenCalled();
+    });
+
+    it("blocks non-privileged workflow attachment changes", async () => {
+      (getServerSession as jest.Mock).mockResolvedValue(
+        authenticatedSession({ id: "user-1", role: "COACH" })
+      );
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-1",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
+      (getFile as jest.Mock).mockResolvedValue({
+        id: "file-1",
+        uploadedBy: "user-1",
+        filename: "report.pdf",
+        workshop: { coachId: "coach-1" },
+      });
+
+      const response = await PATCH(
+        buildPatchRequest({ workflowStepId: "step-1" }),
+        routeParams("file-1")
+      );
+
+      expect(response.status).toBe(403);
       expect(linkFileToWorkflowStep).not.toHaveBeenCalled();
     });
   });

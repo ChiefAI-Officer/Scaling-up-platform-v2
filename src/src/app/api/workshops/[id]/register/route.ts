@@ -15,6 +15,7 @@ import {
 } from "@/lib/ics-generator";
 import { createPreWorkshopSurvey, sendSurveyEmail } from "@/lib/survey-automation";
 import { z } from "zod";
+import { parseStoredWorkshopCoupons } from "@/lib/workshop-coupons";
 
 const workshopRegisterParamsSchema = z.object({
   id: z.string().min(1, "Workshop id is required"),
@@ -271,6 +272,9 @@ export async function POST(
       registrationId: registration.id,
       customerEmail: registration.email,
       discountCode,
+      allowedPromotionCodeIds: parseStoredWorkshopCoupons(workshop.coupons)
+        .map((coupon) => coupon.stripePromotionCodeId)
+        .filter((value): value is string => typeof value === "string" && value.length > 0),
       successUrl: `${appUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: workshop.landingPageSlug
         ? `${appUrl}/workshop/${workshop.landingPageSlug}?cancelled=true`

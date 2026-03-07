@@ -45,9 +45,18 @@ jest.mock("@/lib/authorization", () => ({
   isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
 }));
 
+jest.mock("@/services/notifications", () => ({
+  sendWorkshopRequestedEmail: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/services/stripe", () => ({
+  createWorkshopPromotionCode: jest.fn(),
+}));
+
 import { GET, POST } from "@/app/api/workshops/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/authorization";
+import { createWorkshopPromotionCode } from "@/services/stripe";
 
 function asPostRequest(request: Request): Parameters<typeof POST>[0] {
   return request as unknown as Parameters<typeof POST>[0];
@@ -77,6 +86,12 @@ function buildGetRequest(url: string): Parameters<typeof GET>[0] {
 describe("Workshops API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (createWorkshopPromotionCode as jest.Mock).mockImplementation(
+      async ({ code }: { code: string }) => ({
+        stripeCouponId: `coupon_${code}`,
+        stripePromotionCodeId: `promo_${code}`,
+      })
+    );
   });
 
   describe("GET /api/workshops", () => {
@@ -98,7 +113,7 @@ describe("Workshops API", () => {
   });
 
   describe("POST /api/workshops", () => {
-    it("rejects workshops below minimum lead time", async () => {
+    it("rejects virtual workshops below the 60-day minimum lead time", async () => {
       (getApiActor as jest.Mock).mockResolvedValue({
         userId: "admin-1",
         email: "admin@example.com",
@@ -106,10 +121,13 @@ describe("Workshops API", () => {
         coachId: null,
       });
 
-      const fiveDaysFromNow = new Date(
-        Date.now() + 5 * 24 * 60 * 60 * 1000
+      const fiftyDaysFromNow = new Date(
+        Date.now() + 50 * 24 * 60 * 60 * 1000
       ).toISOString();
-      const payload = buildWorkshopPayload(fiveDaysFromNow);
+      const payload = {
+        ...buildWorkshopPayload(fiftyDaysFromNow),
+        format: "VIRTUAL",
+      };
 
       const response = await POST(
         asPostRequest(
@@ -124,9 +142,39 @@ describe("Workshops API", () => {
 
       expect(response.status).toBe(409);
       expect(body.requiresApproval).toBe(true);
+      expect(body.requiredLeadTimeDays).toBe(60);
     });
 
-    it("creates workshop when lead time and certification checks pass", async () => {
+    it("rejects in-person workshops below the 90-day minimum lead time", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+
+      const eightyDaysFromNow = new Date(
+        Date.now() + 80 * 24 * 60 * 60 * 1000
+      ).toISOString();
+      const payload = buildWorkshopPayload(eightyDaysFromNow);
+
+      const response = await POST(
+        asPostRequest(
+          new Request("http://localhost/api/workshops", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        )
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(body.requiresApproval).toBe(true);
+      expect(body.requiredLeadTimeDays).toBe(90);
+    });
+
+    it("creates workshop when in-person lead time and certification checks pass", async () => {
       (getApiActor as jest.Mock).mockResolvedValue({
         userId: "admin-1",
         email: "admin@example.com",
@@ -150,10 +198,10 @@ describe("Workshops API", () => {
         landingPageSlug: "scaling-up-growth-workshop-ws-1",
       });
 
-      const thirtyDaysFromNow = new Date(
-        Date.now() + 30 * 24 * 60 * 60 * 1000
+      const ninetyFiveDaysFromNow = new Date(
+        Date.now() + 95 * 24 * 60 * 60 * 1000
       ).toISOString();
-      const payload = buildWorkshopPayload(thirtyDaysFromNow);
+      const payload = buildWorkshopPayload(ninetyFiveDaysFromNow);
 
       const response = await POST(
         asPostRequest(
@@ -170,6 +218,79 @@ describe("Workshops API", () => {
       expect(db.workshop.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "ws-1" },
+        })
+      );
+    });
+
+    it("persists admin-created workshop coupons with Stripe promotion code references", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      (db.coach.findUnique as jest.Mock).mockResolvedValue({
+        id: "coach-1",
+        email: "coach@example.com",
+        firstName: "Jamie",
+        lastName: "Coach",
+        certifications: [{ id: "cert-1", status: "ACTIVE" }],
+      });
+      (db.workshopType.findUnique as jest.Mock).mockResolvedValue({
+        id: "wt-1",
+        slug: "scaling-up",
+      });
+      (db.workshop.create as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        title: "Scaling Up Growth Workshop",
+      });
+      (db.workshop.update as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        landingPageSlug: "scaling-up-growth-workshop-ws-1",
+      });
+
+      const payload = {
+        ...buildWorkshopPayload(
+          new Date(Date.now() + 95 * 24 * 60 * 60 * 1000).toISOString()
+        ),
+        coupons: JSON.stringify([
+          { code: "SAVE50", discountPercent: 50, singleUse: false },
+          { code: "VIP100", discountPercent: 100, singleUse: true },
+        ]),
+      };
+
+      const response = await POST(
+        asPostRequest(
+          new Request("http://localhost/api/workshops", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        )
+      );
+
+      expect(response.status).toBe(201);
+      expect(createWorkshopPromotionCode).toHaveBeenCalledTimes(2);
+      expect(db.workshop.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            coupons: JSON.stringify([
+              {
+                code: "SAVE50",
+                discountPercent: 50,
+                singleUse: false,
+                stripeCouponId: "coupon_SAVE50",
+                stripePromotionCodeId: "promo_SAVE50",
+              },
+              {
+                code: "VIP100",
+                discountPercent: 100,
+                singleUse: true,
+                stripeCouponId: "coupon_VIP100",
+                stripePromotionCodeId: "promo_VIP100",
+              },
+            ]),
+          }),
         })
       );
     });

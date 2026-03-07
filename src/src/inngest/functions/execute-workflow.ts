@@ -20,9 +20,39 @@ import {
   canDeliverWorkflowAttachments,
   getWorkflowStepFiles,
 } from "@/lib/file-service";
+import { getOrCreateSurveyLink } from "@/lib/survey-automation";
 import { sendEmailViaSMTP } from "@/lib/smtp-transport";
 import { recordDeliveryTelemetry } from "@/lib/delivery-telemetry";
 import type { FileRecipientRole } from "@/lib/file-access";
+import { SURVEY_TYPES } from "@/lib/survey-types";
+
+function resolveSurveyType(workflowStep: {
+  triggerType: string;
+  offsetDays: number | null;
+}): string {
+  if (workflowStep.triggerType === TRIGGER_TYPES.ON_REGISTRATION) {
+    return SURVEY_TYPES.PRE_WORKSHOP;
+  }
+
+  if (workflowStep.triggerType === TRIGGER_TYPES.ON_APPROVAL) {
+    return SURVEY_TYPES.PRE_WORKSHOP;
+  }
+
+  return (workflowStep.offsetDays ?? 0) < 0
+    ? SURVEY_TYPES.PRE_WORKSHOP
+    : SURVEY_TYPES.POST_WORKSHOP;
+}
+
+function buildFileLinksHtml(
+  links: Array<{ filename: string; path: string }>
+): string {
+  return `<ul>${links
+    .map(
+      (link) =>
+        `<li><a href="${link.path}" target="_blank" rel="noreferrer">${link.filename}</a></li>`
+    )
+    .join("")}</ul>`;
+}
 
 export const executeWorkflow = inngest.createFunction(
   { id: "execute-workflow", retries: 2 },
@@ -283,6 +313,234 @@ export const executeWorkflow = inngest.createFunction(
 
               stepsExecuted++;
               return; // Skip the generic send below
+            }
+
+            case STEP_TYPES.SEND_SURVEY_LINK: {
+              recipientRole = "ATTENDEE";
+
+              const existingExecution = await db.workflowStepExecution.findFirst({
+                where: {
+                  stepId: workflowStep.id,
+                  workshopId: workshop.id,
+                  status: "SENT",
+                },
+              });
+              if (existingExecution) {
+                console.warn(
+                  `[execute-workflow] SEND_SURVEY_LINK step ${workflowStep.id} already sent for workshop ${workshop.id}. Skipping duplicate.`
+                );
+                stepsExecuted++;
+                return;
+              }
+
+              const registrations = await db.registration.findMany({
+                where: { workshopId: workshop.id, status: "REGISTERED" },
+                select: { id: true, email: true, firstName: true, lastName: true, company: true },
+              });
+
+              const surveyType = resolveSurveyType(workflowStep);
+              let sentCount = 0;
+              for (const reg of registrations) {
+                const surveyLink = await getOrCreateSurveyLink({
+                  workshopId: workshop.id,
+                  registrationId: reg.id,
+                  surveyType,
+                });
+
+                if (!surveyLink) {
+                  continue;
+                }
+
+                const personalContext: WorkflowContext = {
+                  ...baseContext,
+                  registrantName: `${reg.firstName} ${reg.lastName}`,
+                  registrantEmail: reg.email,
+                  registrantCompany: reg.company || "",
+                  surveyUrl: surveyLink.surveyUrl,
+                };
+
+                const defaultSubject =
+                  surveyType === SURVEY_TYPES.PRE_WORKSHOP
+                    ? `Pre-Workshop Survey: ${workshop.title}`
+                    : `Workshop Feedback: ${workshop.title}`;
+                const defaultBody =
+                  surveyType === SURVEY_TYPES.PRE_WORKSHOP
+                    ? `<p>Hi {{registrantName}},</p><p>Please complete your pre-workshop survey here:</p><p><a href="{{surveyUrl}}">Complete Survey</a></p>`
+                    : `<p>Hi {{registrantName}},</p><p>Please share your workshop feedback here:</p><p><a href="{{surveyUrl}}">Open Survey</a></p>`;
+
+                const personalSubject = interpolateTemplate(
+                  workflowStep.subject || defaultSubject,
+                  personalContext
+                );
+                const personalBody = interpolateTemplate(
+                  workflowStep.body || defaultBody,
+                  personalContext
+                );
+
+                await sendEmailViaSMTP({
+                  to: reg.email,
+                  subject: personalSubject,
+                  html: personalBody,
+                  telemetry: {
+                    workshopId: workshop.id,
+                    workshopCode: workshop.workshopCode,
+                    workflowId: workflow.id,
+                    workflowStepId: workflowStep.id,
+                    recipientRole,
+                    registrationId: reg.id,
+                    metadata: {
+                      surveyType,
+                      surveyId: surveyLink.surveyId,
+                    },
+                  },
+                });
+                sentCount++;
+              }
+
+              await db.workflowStepExecution.create({
+                data: {
+                  stepId: workflowStep.id,
+                  workshopId: workshop.id,
+                  status: sentCount > 0 ? "SENT" : "SKIPPED",
+                  scheduledFor: new Date(),
+                  executedAt: new Date(),
+                  ...(sentCount === 0 ? { errorMessage: "No survey link could be generated" } : {}),
+                },
+              });
+
+              if (sentCount > 0) {
+                stepsExecuted++;
+              }
+              return;
+            }
+
+            case STEP_TYPES.SEND_FILE_LINK: {
+              recipientRole = "ATTENDEE";
+
+              const existingExecution = await db.workflowStepExecution.findFirst({
+                where: {
+                  stepId: workflowStep.id,
+                  workshopId: workshop.id,
+                  status: "SENT",
+                },
+              });
+              if (existingExecution) {
+                console.warn(
+                  `[execute-workflow] SEND_FILE_LINK step ${workflowStep.id} already sent for workshop ${workshop.id}. Skipping duplicate.`
+                );
+                stepsExecuted++;
+                return;
+              }
+
+              if (stepFiles.length === 0) {
+                await db.workflowStepExecution.create({
+                  data: {
+                    stepId: workflowStep.id,
+                    workshopId: workshop.id,
+                    status: "SKIPPED",
+                    scheduledFor: new Date(),
+                    executedAt: new Date(),
+                    errorMessage: "No files attached to step",
+                  },
+                });
+                return;
+              }
+
+              const canAttach = canDeliverWorkflowAttachments({
+                recipientRole,
+                workshopStatus: workshop.status,
+              });
+
+              if (!canAttach) {
+                await recordDeliveryTelemetry({
+                  recipient: "SYSTEM",
+                  subject: subject || workflowStep.emailTemplate?.subject || "Workflow step execution",
+                  status: "SKIPPED",
+                  provider: process.env.SMTP_HOST ? "SMTP" : "MOCK",
+                  workshopId: workshop.id,
+                  workshopCode: workshop.workshopCode,
+                  workflowId: workflow.id,
+                  workflowStepId: workflowStep.id,
+                  recipientRole,
+                  metadata: {
+                    reason: "attachment_policy_blocked",
+                    workshopStatus: workshop.status,
+                    attemptedAttachmentCount: stepFiles.length,
+                  },
+                });
+                await db.workflowStepExecution.create({
+                  data: {
+                    stepId: workflowStep.id,
+                    workshopId: workshop.id,
+                    status: "SKIPPED",
+                    scheduledFor: new Date(),
+                    executedAt: new Date(),
+                    errorMessage: "Attachment policy blocked file-link delivery",
+                  },
+                });
+                return;
+              }
+
+              const protectedLinks = buildProtectedEmailAttachments({
+                files: stepFiles,
+                workshopId: workshop.id,
+                workshopStatus: workshop.status,
+                recipientRole,
+              });
+              const registrations = await db.registration.findMany({
+                where: { workshopId: workshop.id, status: "REGISTERED" },
+                select: { id: true, email: true, firstName: true, lastName: true, company: true },
+              });
+              const fileLinks = buildFileLinksHtml(protectedLinks);
+
+              for (const reg of registrations) {
+                const personalContext: WorkflowContext = {
+                  ...baseContext,
+                  registrantName: `${reg.firstName} ${reg.lastName}`,
+                  registrantEmail: reg.email,
+                  registrantCompany: reg.company || "",
+                  fileLinks,
+                };
+                const personalSubject = interpolateTemplate(
+                  workflowStep.subject || `Workshop Files: ${workshop.title}`,
+                  personalContext
+                );
+                const personalBody = interpolateTemplate(
+                  workflowStep.body ||
+                    `<p>Hi {{registrantName}},</p><p>Your workshop files are ready:</p>{{fileLinks}}`,
+                  personalContext
+                );
+
+                await sendEmailViaSMTP({
+                  to: reg.email,
+                  subject: personalSubject,
+                  html: personalBody,
+                  telemetry: {
+                    workshopId: workshop.id,
+                    workshopCode: workshop.workshopCode,
+                    workflowId: workflow.id,
+                    workflowStepId: workflowStep.id,
+                    recipientRole,
+                    registrationId: reg.id,
+                    metadata: {
+                      fileLinkCount: protectedLinks.length,
+                    },
+                  },
+                });
+              }
+
+              await db.workflowStepExecution.create({
+                data: {
+                  stepId: workflowStep.id,
+                  workshopId: workshop.id,
+                  status: "SENT",
+                  scheduledFor: new Date(),
+                  executedAt: new Date(),
+                },
+              });
+
+              stepsExecuted++;
+              return;
             }
 
             case STEP_TYPES.NOTIFICATION:

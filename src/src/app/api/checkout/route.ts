@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { createCheckoutSession, StripeDiscountCodeError } from "@/services/stripe";
 import { z } from "zod";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { parseStoredWorkshopCoupons } from "@/lib/workshop-coupons";
 
 const checkoutSchema = z.object({
   registrationId: z.string().min(1, "Registration ID is required"),
@@ -89,6 +90,11 @@ export async function POST(request: NextRequest) {
       registrationId: registration.id,
       customerEmail: registration.email,
       discountCode,
+      allowedPromotionCodeIds: parseStoredWorkshopCoupons(
+        registration.workshop.coupons
+      )
+        .map((coupon) => coupon.stripePromotionCodeId)
+        .filter((value): value is string => typeof value === "string" && value.length > 0),
       successUrl: `${appUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: registration.workshop.landingPageSlug
         ? `${appUrl}/workshop/${registration.workshop.landingPageSlug}?cancelled=true`

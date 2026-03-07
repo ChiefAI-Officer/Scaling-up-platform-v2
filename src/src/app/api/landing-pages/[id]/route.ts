@@ -64,7 +64,8 @@ export async function DELETE(
             return NextResponse.json({ error: "Authentication required" }, { status: 401 });
         }
         if (!isPrivilegedRole(actor.role)) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+            // Return 404 to avoid leaking page existence to non-admin users.
+            return NextResponse.json({ error: "Landing page not found" }, { status: 404 });
         }
 
         const { id } = await params;
@@ -72,6 +73,15 @@ export async function DELETE(
         const page = await db.landingPage.findUnique({ where: { id } });
         if (!page) {
             return NextResponse.json({ error: "Landing page not found" }, { status: 404 });
+        }
+
+        if (page.isActiveTemplate) {
+            return NextResponse.json(
+                {
+                    error: "Active template pages cannot be deleted. Disable Auto-Build on the page first.",
+                },
+                { status: 409 }
+            );
         }
 
         await db.landingPage.delete({ where: { id } });

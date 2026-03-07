@@ -15,7 +15,7 @@ export function DeleteSurveyTemplateButton({ templateId, templateName, surveyCou
 
   async function handleDelete() {
     const warning = surveyCount > 0
-      ? `"${templateName}" has ${surveyCount} response(s). Deleting it will also remove those responses. Continue?`
+      ? `"${templateName}" has ${surveyCount} linked survey record(s). Deleting it will archive the template and preserve historical responses. Continue?`
       : `Delete survey template "${templateName}"? This cannot be undone.`;
     if (!confirm(warning)) return;
 

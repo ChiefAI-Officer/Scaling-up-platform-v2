@@ -46,11 +46,20 @@ jest.mock("@/lib/workflow-types", () => ({
     EMAIL_STAFF: "EMAIL_STAFF",
     EMAIL_CUSTOM: "EMAIL_CUSTOM",
     NOTIFICATION: "NOTIFICATION",
+    SEND_SURVEY_LINK: "SEND_SURVEY_LINK",
+    SEND_FILE_LINK: "SEND_FILE_LINK",
   },
   TRIGGER_TYPES: {
     RELATIVE_TO_EVENT: "RELATIVE_TO_EVENT",
     ON_REGISTRATION: "ON_REGISTRATION",
     ON_APPROVAL: "ON_APPROVAL",
+  },
+}));
+
+jest.mock("@/lib/survey-types", () => ({
+  SURVEY_TYPES: {
+    PRE_WORKSHOP: "PRE_WORKSHOP",
+    POST_WORKSHOP: "POST_WORKSHOP",
   },
 }));
 
@@ -72,6 +81,10 @@ jest.mock("@/lib/delivery-telemetry", () => ({
   recordDeliveryTelemetry: jest.fn(async () => {}),
 }));
 
+jest.mock("@/lib/survey-automation", () => ({
+  getOrCreateSurveyLink: jest.fn(),
+}));
+
 // ============================================
 // Imports (after mocks)
 // ============================================
@@ -88,6 +101,7 @@ import {
   buildProtectedEmailAttachments,
 } from "@/lib/file-service";
 import { recordDeliveryTelemetry } from "@/lib/delivery-telemetry";
+import { getOrCreateSurveyLink } from "@/lib/survey-automation";
 
 // Force the module to load so capturedHandler is assigned
 import "@/inngest/functions/execute-workflow";
@@ -186,6 +200,7 @@ describe("execute-workflow Inngest function", () => {
   const mockCanDeliver = canDeliverWorkflowAttachments as jest.Mock;
   const mockBuildAttachments = buildProtectedEmailAttachments as jest.Mock;
   const mockRecordTelemetry = recordDeliveryTelemetry as jest.Mock;
+  const mockGetOrCreateSurveyLink = getOrCreateSurveyLink as jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -200,6 +215,11 @@ describe("execute-workflow Inngest function", () => {
     registrationFindMany.mockResolvedValue([]);
     mockSendEmail.mockResolvedValue({ messageId: "mock-msg-id" });
     mockRecordTelemetry.mockResolvedValue(undefined);
+    mockGetOrCreateSurveyLink.mockResolvedValue({
+      surveyId: "survey-1",
+      surveyUrl: "https://app.test/survey/survey-1",
+      surveyType: "PRE_WORKSHOP",
+    });
 
     // Default ENV
     process.env.ADMIN_EMAIL = "admin@scalingup.com";
@@ -1001,6 +1021,120 @@ describe("execute-workflow Inngest function", () => {
           workshopCode: "WS-001",
           workflowId: "wf-1",
           workflowStepId: "step-attendee",
+          recipientRole: "ATTENDEE",
+          registrationId: "reg-1",
+        }),
+      })
+    );
+  });
+
+  // ------------------------------------------------------------------
+  // 24. SEND_SURVEY_LINK: creates/uses survey links and emails attendees
+  // ------------------------------------------------------------------
+  it("SEND_SURVEY_LINK: generates survey links and emails attendees", async () => {
+    const assignment = makeAssignment({
+      steps: [
+        makeStep({
+          id: "step-survey",
+          stepType: "SEND_SURVEY_LINK",
+          triggerType: "ON_REGISTRATION",
+          subject: "Survey for {{registrantName}}",
+          body: "<p>Open {{surveyUrl}}</p>",
+        }),
+      ],
+    });
+    findUnique.mockResolvedValue(assignment);
+    registrationFindMany.mockResolvedValue([
+      {
+        id: "reg-1",
+        email: "attendee@test.com",
+        firstName: "Alice",
+        lastName: "Smith",
+        company: "Acme",
+      },
+    ]);
+
+    await invoke();
+
+    expect(mockGetOrCreateSurveyLink).toHaveBeenCalledWith({
+      workshopId: "ws-1",
+      registrationId: "reg-1",
+      surveyType: "PRE_WORKSHOP",
+    });
+    expect(mockInterpolate).toHaveBeenCalledWith(
+      "<p>Open {{surveyUrl}}</p>",
+      expect.objectContaining({
+        registrantName: "Alice Smith",
+        surveyUrl: "https://app.test/survey/survey-1",
+      })
+    );
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "attendee@test.com",
+        telemetry: expect.objectContaining({
+          workflowStepId: "step-survey",
+          recipientRole: "ATTENDEE",
+          registrationId: "reg-1",
+        }),
+      })
+    );
+  });
+
+  // ------------------------------------------------------------------
+  // 25. SEND_FILE_LINK: emails attendees with protected file links
+  // ------------------------------------------------------------------
+  it("SEND_FILE_LINK: emails attendees with protected file links", async () => {
+    mockGetStepFiles.mockResolvedValue([
+      { id: "file-1", filename: "guide.pdf", contentType: "application/pdf" },
+    ]);
+    mockCanDeliver.mockReturnValue(true);
+    mockBuildAttachments.mockReturnValue([
+      {
+        filename: "guide.pdf",
+        path: "https://app.test/api/files/file-1/download?token=abc",
+        contentType: "application/pdf",
+      },
+    ]);
+
+    const assignment = makeAssignment({
+      steps: [
+        makeStep({
+          id: "step-files",
+          stepType: "SEND_FILE_LINK",
+          subject: "Files for {{registrantName}}",
+          body: "<div>{{fileLinks}}</div>",
+        }),
+      ],
+    });
+    findUnique.mockResolvedValue(assignment);
+    registrationFindMany.mockResolvedValue([
+      {
+        id: "reg-1",
+        email: "attendee@test.com",
+        firstName: "Alice",
+        lastName: "Smith",
+        company: "Acme",
+      },
+    ]);
+
+    await invoke();
+
+    expect(mockBuildAttachments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientRole: "ATTENDEE",
+      })
+    );
+    expect(mockInterpolate).toHaveBeenCalledWith(
+      "<div>{{fileLinks}}</div>",
+      expect.objectContaining({
+        fileLinks: expect.stringContaining("guide.pdf"),
+      })
+    );
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "attendee@test.com",
+        telemetry: expect.objectContaining({
+          workflowStepId: "step-files",
           recipientRole: "ATTENDEE",
           registrationId: "reg-1",
         }),

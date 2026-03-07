@@ -107,11 +107,17 @@ describe("POST /api/approvals authorization", () => {
       role: "COACH",
       coachId: "coach-1",
     });
+    const eventDate = new Date(
+      Date.now() + 95 * 24 * 60 * 60 * 1000
+    ).toISOString();
 
     const response = await POST(
       buildPostRequest({
         type: "WORKSHOP_REQUEST",
         workshopTypeId: "scaling-up",
+        title: "Growth Intensive",
+        format: "IN_PERSON",
+        eventDate,
         details: "Need approval",
       })
     );

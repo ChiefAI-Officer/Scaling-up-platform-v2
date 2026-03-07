@@ -14,14 +14,22 @@ import { WorkflowEditor } from "@/components/workflows/workflow-editor";
 
 interface WorkflowEditorPageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ preview?: string }>;
 }
 
-export default async function WorkflowEditorPage({ params }: WorkflowEditorPageProps) {
+export default async function WorkflowEditorPage({ params, searchParams }: WorkflowEditorPageProps) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/login");
+  if (session.user.role !== "ADMIN") redirect("/dashboard");
 
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
   const isNew = id === "new";
+  const isPreview = resolvedSearchParams.preview === "1";
+
+  if (isNew && isPreview) {
+    redirect("/admin/workflows/new");
+  }
 
   // Fetch workflow if editing existing
   let workflow = null;
@@ -112,6 +120,7 @@ export default async function WorkflowEditorPage({ params }: WorkflowEditorPageP
         workshops={serializedWorkshops}
         categories={categories}
         isNew={isNew}
+        isPreview={isPreview}
       />
     </div>
   );

@@ -70,6 +70,14 @@ const baseRegistration = {
     landingPageSlug: "workshop-landing",
     isFree: false,
     priceCents: 50000,
+    coupons: JSON.stringify([
+      {
+        code: "DETROIT60",
+        discountPercent: 60,
+        singleUse: false,
+        stripePromotionCodeId: "promo_detroit60",
+      },
+    ]),
     workshopType: {
       name: "AI Workshop",
     },
@@ -118,6 +126,7 @@ describe("POST /api/checkout", () => {
       expect.objectContaining({
         registrationId: "reg-1",
         discountCode: "DETROIT60",
+        allowedPromotionCodeIds: ["promo_detroit60"],
       })
     );
     expect(body.success).toBe(true);

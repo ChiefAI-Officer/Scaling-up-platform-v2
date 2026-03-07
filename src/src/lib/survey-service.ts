@@ -75,7 +75,32 @@ export async function updateSurveyTemplate(
 }
 
 export async function deleteSurveyTemplate(id: string) {
-  return db.surveyTemplate.delete({ where: { id } });
+  const existing = await db.surveyTemplate.findUnique({
+    where: { id },
+    include: {
+      _count: { select: { surveys: true } },
+      questions: { orderBy: { sortOrder: "asc" } },
+    },
+  });
+
+  if (!existing) {
+    throw new Error("Template not found");
+  }
+
+  if (existing._count.surveys > 0) {
+    const template = await db.surveyTemplate.update({
+      where: { id },
+      data: { isActive: false },
+      include: {
+        questions: { orderBy: { sortOrder: "asc" } },
+        _count: { select: { surveys: true } },
+      },
+    });
+    return { action: "archived" as const, template };
+  }
+
+  const template = await db.surveyTemplate.delete({ where: { id } });
+  return { action: "deleted" as const, template };
 }
 
 // ============================================

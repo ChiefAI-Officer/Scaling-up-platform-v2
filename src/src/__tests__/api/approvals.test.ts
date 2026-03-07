@@ -199,7 +199,7 @@ describe("Approvals API", () => {
       expect(evaluateApproval).not.toHaveBeenCalled();
     });
 
-    it("derives coach identity from session actor and builds fallback details", async () => {
+    it("rejects workshop requests that do not satisfy the March lead-time policy", async () => {
       (getApiActor as jest.Mock).mockResolvedValue({
         userId: "coach-user",
         email: "coach@example.com",
@@ -216,7 +216,45 @@ describe("Approvals API", () => {
               type: "WORKSHOP_REQUEST",
               workshopTypeId: "scaling-up",
               title: "Q2 Growth Intensive",
-              eventDate: "2026-04-10",
+              format: "VIRTUAL",
+              eventDate: new Date(
+                Date.now() + 45 * 24 * 60 * 60 * 1000
+              ).toISOString(),
+            }),
+          })
+        )
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(body.requiresApproval).toBe(true);
+      expect(body.requiredLeadTimeDays).toBe(60);
+      expect(db.workshop.create).not.toHaveBeenCalled();
+      expect(evaluateApproval).not.toHaveBeenCalled();
+    });
+
+    it("derives coach identity from session actor and builds fallback details", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "coach-user",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
+      const eventDate = new Date(
+        Date.now() + 95 * 24 * 60 * 60 * 1000
+      ).toISOString();
+
+      const response = await POST(
+        asPostRequest(
+          buildRequest("http://localhost/api/approvals", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              type: "WORKSHOP_REQUEST",
+              workshopTypeId: "scaling-up",
+              title: "Q2 Growth Intensive",
+              format: "IN_PERSON",
+              eventDate,
             }),
           })
         )
@@ -229,7 +267,7 @@ describe("Approvals API", () => {
           coachEmail: "coach@example.com",
           requestedBy: "coach@example.com",
           workshopTypeSlug: "scaling-up",
-          details: "Workshop: Q2 Growth Intensive on 2026-04-10",
+          details: `Workshop: Q2 Growth Intensive on ${eventDate}`,
         })
       );
     });

@@ -9,6 +9,7 @@ import { generateSlug } from "@/lib/utils";
 import { sendEnrichedApprovalRequest } from "@/services/notifications";
 import { verifyCertification } from "@/services/circle";
 import { getCoachByEmail } from "@/services/hubspot";
+import { validateLeadTime } from "@/lib/lead-time-validator";
 
 // Request schemas
 const CreateApprovalSchema = z.object({
@@ -93,6 +94,15 @@ function buildDetails(input: z.infer<typeof CreateApprovalSchema>): string {
     }
 
     return "Approval request submitted from coach portal";
+}
+
+function parseEventDate(value: unknown): Date | null {
+    if (typeof value !== "string" || value.trim().length === 0) {
+        return null;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 /**
@@ -234,6 +244,30 @@ export async function POST(request: NextRequest) {
             (input.type === "WORKSHOP_REQUEST" || input.type === "CUSTOM_PRICING") &&
             !workshopId
         ) {
+            const requestedEventDate = parseEventDate(body.eventDate);
+            if (!requestedEventDate) {
+                return NextResponse.json(
+                    { error: "A valid eventDate is required for workshop requests" },
+                    { status: 400 }
+                );
+            }
+
+            const leadTimeValidation = validateLeadTime(
+                requestedEventDate,
+                typeof body.format === "string" ? body.format : undefined
+            );
+            if (!leadTimeValidation.valid) {
+                return NextResponse.json(
+                    {
+                        error: leadTimeValidation.reason || "Invalid event date",
+                        requiresApproval: leadTimeValidation.requiresApproval,
+                        leadTimeDays: leadTimeValidation.leadTimeDays,
+                        requiredLeadTimeDays: leadTimeValidation.requiredLeadTimeDays,
+                    },
+                    { status: leadTimeValidation.requiresApproval ? 409 : 400 }
+                );
+            }
+
             // Resolve workshopTypeId from slug or ID
             let resolvedWorkshopTypeId: string | undefined;
             if (workshopTypeSlug) {
@@ -304,9 +338,7 @@ export async function POST(request: NextRequest) {
                     pricingTierId: resolvedPricingTierId,
                     format: body.format || "IN_PERSON",
                     duration: body.duration || "full-day",
-                    eventDate: body.eventDate
-                        ? new Date(body.eventDate)
-                        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                    eventDate: requestedEventDate,
                     eventTime: body.eventTime || "09:00",
                     timezone: body.timezone || "America/New_York",
                     venueName: body.venueName || null,

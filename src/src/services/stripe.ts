@@ -22,8 +22,17 @@ interface CreateCheckoutSessionParams {
   registrationId: string;
   customerEmail: string;
   discountCode?: string;
+  allowedPromotionCodeIds?: string[];
   successUrl: string;
   cancelUrl: string;
+}
+
+interface CreateWorkshopPromotionCodeParams {
+  workshopCode: string;
+  workshopTitle: string;
+  code: string;
+  discountPercent: number;
+  singleUse: boolean;
 }
 
 export class StripeDiscountCodeError extends Error {
@@ -56,6 +65,7 @@ export async function createCheckoutSession({
   registrationId,
   customerEmail,
   discountCode,
+  allowedPromotionCodeIds,
   successUrl,
   cancelUrl,
 }: CreateCheckoutSessionParams): Promise<Stripe.Checkout.Session> {
@@ -70,9 +80,21 @@ export async function createCheckoutSession({
       limit: 10,
     });
 
-    const promotionCode = promotionCodeLookup.data.find((item) =>
-      isPromotionCodeRedeemable(item)
-    );
+    const promotionCode = promotionCodeLookup.data.find((item) => {
+      if (!isPromotionCodeRedeemable(item)) {
+        return false;
+      }
+
+      if (
+        Array.isArray(allowedPromotionCodeIds) &&
+        allowedPromotionCodeIds.length > 0 &&
+        !allowedPromotionCodeIds.includes(item.id)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
 
     if (!promotionCode) {
       throw new StripeDiscountCodeError();
@@ -114,6 +136,48 @@ export async function createCheckoutSession({
   });
 
   return session;
+}
+
+export async function createWorkshopPromotionCode({
+  workshopCode,
+  workshopTitle,
+  code,
+  discountPercent,
+  singleUse,
+}: CreateWorkshopPromotionCodeParams): Promise<{
+  stripeCouponId: string;
+  stripePromotionCodeId: string;
+}> {
+  const stripe = getStripeClient();
+
+  const coupon = await stripe.coupons.create({
+    percent_off: discountPercent,
+    duration: "once",
+    name: `${workshopTitle} (${code})`,
+    metadata: {
+      workshopCode,
+      promotionCode: code,
+    },
+  });
+
+  const promotionCode = await stripe.promotionCodes.create({
+    promotion: {
+      type: "coupon",
+      coupon: coupon.id,
+    },
+    code,
+    max_redemptions: singleUse ? 1 : undefined,
+    metadata: {
+      workshopCode,
+      promotionCode: code,
+      singleUse: String(singleUse),
+    },
+  });
+
+  return {
+    stripeCouponId: coupon.id,
+    stripePromotionCodeId: promotionCode.id,
+  };
 }
 
 export async function retrieveCheckoutSession(

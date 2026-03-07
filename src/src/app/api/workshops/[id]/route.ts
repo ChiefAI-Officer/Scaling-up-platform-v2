@@ -140,7 +140,8 @@ export async function PATCH(
     if (data.eventDate) {
       const dateChangeValidation = validateDateChange(
         existing.eventDate,
-        new Date(data.eventDate)
+        new Date(data.eventDate),
+        existing.format
       );
 
       if (!dateChangeValidation.valid || dateChangeValidation.requiresApproval) {

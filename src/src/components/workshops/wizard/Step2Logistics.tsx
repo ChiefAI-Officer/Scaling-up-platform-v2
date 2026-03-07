@@ -5,13 +5,29 @@ import { useWizard } from "./WizardContext";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+    getMinimumLeadTimeDate,
+    getMinimumLeadTimeDays,
+    normalizeLeadTimeFormat,
+} from "@/lib/lead-time-validator";
 
-// MR-18: Minimum event date based on format — 60 days for Virtual, 90 days for In-Person
 function getMinDate(format: string): string {
-    const d = new Date();
-    const leadDays = format === "VIRTUAL" ? 60 : 90;
-    d.setDate(d.getDate() + leadDays);
-    return d.toISOString().split("T")[0];
+    return getMinimumLeadTimeDate(format).toISOString().split("T")[0];
+}
+
+function getLeadTimeMessage(format: string): string {
+    const normalizedFormat = normalizeLeadTimeFormat(format);
+    const days = getMinimumLeadTimeDays(normalizedFormat);
+
+    if (normalizedFormat === "VIRTUAL") {
+        return `Virtual events must be at least ${days} days out.`;
+    }
+
+    if (normalizedFormat === "HYBRID") {
+        return `Hybrid events must be at least ${days} days out.`;
+    }
+
+    return `In-person events must be at least ${days} days out.`;
 }
 
 function isValidUrl(str: string): boolean {
@@ -92,7 +108,7 @@ export function Step2Logistics() {
                     />
                     {dateIsTooSoon && (
                         <p className="text-xs text-warning">
-                            Events must be at least 14 days out. Earliest: {new Date(minDate).toLocaleDateString()}
+                            {getLeadTimeMessage(formData.format)} Earliest: {new Date(minDate).toLocaleDateString()}
                         </p>
                     )}
                 </div>

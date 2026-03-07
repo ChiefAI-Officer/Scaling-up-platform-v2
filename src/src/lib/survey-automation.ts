@@ -52,6 +52,59 @@ async function findTemplateForWorkshop(
   return genericTemplate?.id || null;
 }
 
+export async function getOrCreateSurveyLink(input: {
+  workshopId: string;
+  registrationId: string;
+  surveyType: string;
+}): Promise<{ surveyId: string; surveyUrl: string; surveyType: string } | null> {
+  const templateId = await findTemplateForWorkshop(input.workshopId, input.surveyType);
+
+  if (!templateId) {
+    return null;
+  }
+
+  const existing = await db.survey.findFirst({
+    where: {
+      templateId,
+      workshopId: input.workshopId,
+      registrationId: input.registrationId,
+      surveyType: input.surveyType,
+    },
+    select: { id: true },
+  });
+
+  const appUrl = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
+  if (existing) {
+    return {
+      surveyId: existing.id,
+      surveyUrl: `${appUrl}/survey/${existing.id}`,
+      surveyType: input.surveyType,
+    };
+  }
+
+  const workshop = await db.workshop.findUnique({
+    where: { id: input.workshopId },
+    select: { workshopCode: true },
+  });
+
+  const survey = await db.survey.create({
+    data: {
+      templateId,
+      workshopId: input.workshopId,
+      workshopCode: workshop?.workshopCode,
+      registrationId: input.registrationId,
+      surveyType: input.surveyType,
+      sentAt: new Date(),
+    },
+  });
+
+  return {
+    surveyId: survey.id,
+    surveyUrl: `${appUrl}/survey/${survey.id}`,
+    surveyType: input.surveyType,
+  };
+}
+
 /**
  * Create a pre-workshop survey for a newly registered attendee.
  * Called after registration confirmation.

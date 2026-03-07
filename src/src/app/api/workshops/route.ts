@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { db } from "@/lib/db";
 import { createWorkshopSchema } from "@/lib/validations";
 import { generateSlug } from "@/lib/utils";
@@ -6,6 +7,8 @@ import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 import { validateLeadTime } from "@/lib/lead-time-validator";
 import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
 import { sendWorkshopRequestedEmail } from "@/services/notifications";
+import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshop-coupons";
+import { createWorkshopPromotionCode } from "@/services/stripe";
 
 function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -137,6 +140,24 @@ export async function POST(request: NextRequest) {
     const eventEndTime = normalizeOptionalString(body.eventEndTime);
     const couponCode = normalizeOptionalString(body.couponCode);
     const couponDiscountPercent = parseOptionalPercentage(body.couponDiscountPercent);
+    let requestedCoupons;
+    try {
+      requestedCoupons = parseWorkshopCouponsInput(body.coupons, {
+        code: couponCode,
+        discountPercent: couponDiscountPercent,
+      });
+    } catch (error) {
+      if (error instanceof SyntaxError || error instanceof ZodError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: error instanceof ZodError ? error.issues : "Invalid coupons payload",
+          },
+          { status: 400 }
+        );
+      }
+      throw error;
+    }
 
     if (isDuoWorkshop && !secondaryCoachId) {
       return NextResponse.json(
@@ -152,7 +173,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const leadTimeValidation = validateLeadTime(new Date(data.eventDate));
+    const leadTimeValidation = validateLeadTime(
+      new Date(data.eventDate),
+      data.format
+    );
     if (!leadTimeValidation.valid) {
       return NextResponse.json(
         {
@@ -160,6 +184,7 @@ export async function POST(request: NextRequest) {
           error: leadTimeValidation.reason || "Invalid event date",
           requiresApproval: leadTimeValidation.requiresApproval,
           leadTimeDays: leadTimeValidation.leadTimeDays,
+          requiredLeadTimeDays: leadTimeValidation.requiredLeadTimeDays,
         },
         { status: leadTimeValidation.requiresApproval ? 409 : 400 }
       );
@@ -271,6 +296,39 @@ export async function POST(request: NextRequest) {
       async (code) => !!(await db.workshop.findUnique({ where: { workshopCode: code }, select: { id: true } }))
     );
 
+    let persistedCoupons = [];
+    try {
+      persistedCoupons =
+        requestedCoupons.length > 0
+          ? await Promise.all(
+              requestedCoupons.map(async (coupon) => {
+                const stripeRecord = await createWorkshopPromotionCode({
+                  workshopCode,
+                  workshopTitle: data.title,
+                  code: coupon.code,
+                  discountPercent: coupon.discountPercent,
+                  singleUse: coupon.singleUse,
+                });
+
+                return {
+                  ...coupon,
+                  stripeCouponId: stripeRecord.stripeCouponId,
+                  stripePromotionCodeId: stripeRecord.stripePromotionCodeId,
+                };
+              })
+            )
+          : [];
+    } catch (error) {
+      console.error("Failed to create Stripe promotion codes:", error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to create Stripe promotion codes for workshop coupons",
+        },
+        { status: 502 }
+      );
+    }
+
     const workshop = await db.workshop.create({
       data: {
         coachId: data.coachId,
@@ -295,6 +353,7 @@ export async function POST(request: NextRequest) {
         excludedClients: data.excludedClients,
         isFree: data.isFree,
         priceCents: data.priceCents,
+        coupons: serializeWorkshopCoupons(persistedCoupons),
         maxAttendees: data.maxAttendees,
         status: "INFO_REQUESTED",
       },
@@ -332,12 +391,7 @@ export async function POST(request: NextRequest) {
               startTime: data.eventTime ?? null,
               endTime: eventEndTime ?? null,
             },
-            coupon: couponCode
-              ? {
-                  code: couponCode,
-                  discountPercent: couponDiscountPercent ?? null,
-                }
-              : null,
+            coupons: persistedCoupons,
           }),
         },
       });
@@ -380,8 +434,7 @@ export async function POST(request: NextRequest) {
           workshopSetup: {
             isDuoWorkshop,
             secondaryCoachId: secondaryCoachSnapshot?.id ?? secondaryCoachId ?? null,
-            couponCode: couponCode ?? null,
-            couponDiscountPercent: couponDiscountPercent ?? null,
+            coupons: persistedCoupons,
           },
         },
         message: "Workshop created successfully",
