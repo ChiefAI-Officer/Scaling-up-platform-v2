@@ -42,6 +42,24 @@ export class StripeDiscountCodeError extends Error {
   }
 }
 
+const STRIPE_COUPON_NAME_MAX_LENGTH = 40;
+
+export function buildWorkshopPromotionName(
+  workshopTitle: string,
+  code: string
+): string {
+  const normalizedTitle = workshopTitle.trim().replace(/\s+/g, " ");
+  const normalizedCode = code.trim().toUpperCase();
+  const suffix = ` (${normalizedCode})`;
+
+  if (suffix.length >= STRIPE_COUPON_NAME_MAX_LENGTH) {
+    return normalizedCode.slice(0, STRIPE_COUPON_NAME_MAX_LENGTH);
+  }
+
+  const maxTitleLength = STRIPE_COUPON_NAME_MAX_LENGTH - suffix.length;
+  return `${normalizedTitle.slice(0, maxTitleLength).trimEnd()}${suffix}`;
+}
+
 function isPromotionCodeRedeemable(code: Stripe.PromotionCode): boolean {
   if (!code.active) {
     return false;
@@ -153,7 +171,7 @@ export async function createWorkshopPromotionCode({
   const coupon = await stripe.coupons.create({
     percent_off: discountPercent,
     duration: "once",
-    name: `${workshopTitle} (${code})`,
+    name: buildWorkshopPromotionName(workshopTitle, code),
     metadata: {
       workshopCode,
       promotionCode: code,

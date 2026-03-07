@@ -980,7 +980,7 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
                     ))}
                     {coupons.length > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Codes will be validated at checkout. Create matching PromotionCodes in Stripe.
+                        Codes will be validated at checkout and synced to Stripe automatically when the workshop is created.
                       </p>
                     )}
                   </div>

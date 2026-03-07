@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { upload } from "@vercel/blob/client";
+import { sanitizeFilename, validateFile } from "@/lib/file-rules";
 
 interface FileRecord {
   id: string;
@@ -59,6 +61,7 @@ function getFileIcon(contentType: string): string {
 export function FileManager({ initialFiles, workshops }: Props) {
   const [files, setFiles] = useState<FileRecord[]>(initialFiles);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [filterWorkshop, setFilterWorkshop] = useState("");
@@ -119,6 +122,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setUploadProgress(null);
 
     const fileEl = fileInputRef.current;
     if (!fileEl?.files?.length) {
@@ -126,44 +130,53 @@ export function FileManager({ initialFiles, workshops }: Props) {
       return;
     }
 
+    const selectedFile = fileEl.files[0];
+    const validationError = validateFile(selectedFile);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("file", fileEl.files[0]);
-      if (uploadWorkshopId) formData.append("workshopId", uploadWorkshopId);
-      if (uploadCategory) formData.append("category", uploadCategory);
-
-      const res = await fetch("/api/files", {
-        method: "POST",
-        body: formData,
+      await upload(sanitizeFilename(selectedFile.name), selectedFile, {
+        access: "public",
+        handleUploadUrl: "/api/files/client-upload",
+        multipart: selectedFile.size > 5 * 1024 * 1024,
+        clientPayload: JSON.stringify({
+          originalFilename: selectedFile.name,
+          contentType: selectedFile.type,
+          sizeBytes: selectedFile.size,
+          workshopId: uploadWorkshopId || null,
+          category: uploadCategory || null,
+        }),
+        onUploadProgress: ({ percentage }) => {
+          setUploadProgress(Math.round(percentage));
+        },
       });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        setError(json.error || "Upload failed");
-        return;
-      }
 
       // Re-fetch all files to get relations
       const listRes = await fetch("/api/files");
       const listJson = await listRes.json();
       if (listRes.ok) {
         setFiles(listJson.data);
-      } else {
-        // Fallback: add the new file without relations
-        setFiles((prev) => [json.data, ...prev]);
       }
 
-      setSuccess(`"${fileEl.files[0].name}" uploaded successfully`);
+      setSuccess(`"${selectedFile.name}" uploaded successfully`);
       fileEl.value = "";
       setUploadWorkshopId("");
       setUploadCategory("");
-    } catch {
-      setError("Upload failed. Please try again.");
+      setUploadProgress(null);
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Upload failed. Please try again."
+      );
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
   }
 
@@ -252,7 +265,11 @@ export function FileManager({ initialFiles, workshops }: Props) {
               disabled={uploading}
               className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
-              {uploading ? "Uploading..." : "Upload"}
+              {uploading
+                ? uploadProgress !== null
+                  ? `Uploading... ${uploadProgress}%`
+                  : "Uploading..."
+                : "Upload"}
             </button>
           </div>
         </form>

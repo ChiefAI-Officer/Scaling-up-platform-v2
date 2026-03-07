@@ -11,7 +11,7 @@ const attendanceSchema = z.object({
 /**
  * DELETE /api/registrations/[id]
  * Directly unregister an attendee. Coach-scoped (coach or admin).
- * Triggers Stripe refund if payment was completed.
+ * Paid coach removals must go through the admin-review removal-request flow.
  */
 export async function DELETE(
   _request: NextRequest,
@@ -58,10 +58,22 @@ export async function DELETE(
       );
     }
 
+    const isPaidRegistration = registration.paymentStatus === "COMPLETED";
+    const isCoachActor = actor.role === "COACH";
+    if (isPaidRegistration && isCoachActor) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Paid registrations require admin review before removal",
+        },
+        { status: 409 }
+      );
+    }
+
     // If payment was completed and we have a Stripe payment ID, issue refund
     let refundId: string | null = null;
     if (
-      registration.paymentStatus === "COMPLETED" &&
+      isPaidRegistration &&
       registration.stripePaymentId
     ) {
       try {

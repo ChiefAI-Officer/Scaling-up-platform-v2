@@ -32,10 +32,15 @@ jest.mock("@/lib/rate-limit", () => ({
   withRateLimit: jest.fn(),
 }));
 
+jest.mock("@/services/notifications", () => ({
+  sendApprovalRequest: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { POST } from "@/app/api/registrations/[id]/removal-request/route";
 import { db } from "@/lib/db";
 import { canManageCoachData, getApiActor } from "@/lib/authorization";
 import { withRateLimit } from "@/lib/rate-limit";
+import { sendApprovalRequest } from "@/services/notifications";
 
 function buildRequest(body: Record<string, unknown>): Request {
   return new Request("http://localhost/api/registrations/reg-1/removal-request", {
@@ -62,6 +67,11 @@ const baseRegistration = {
     title: "Scaling Up Masterclass",
     coachId: "coach-1",
     eventDate: new Date("2026-03-01T10:00:00.000Z"),
+    coach: {
+      firstName: "Coach",
+      lastName: "Owner",
+      email: "coach@example.com",
+    },
   },
 };
 
@@ -146,6 +156,26 @@ describe("POST /api/registrations/[id]/removal-request", () => {
           workshopId: "ws-1",
           requestedBy: "coach@example.com",
         }),
+      })
+    );
+  });
+
+  it("sends an admin approval email when the registration was paid", async () => {
+    (db.registration.findUnique as jest.Mock).mockResolvedValue({
+      ...baseRegistration,
+      paymentStatus: "COMPLETED",
+      amountPaidCents: 49900,
+    });
+
+    const response = await POST(asPostRequest(buildRequest({})), {
+      params: Promise.resolve({ id: "reg-1" }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(sendApprovalRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "CANCELLATION",
+        amount: 49900,
       })
     );
   });

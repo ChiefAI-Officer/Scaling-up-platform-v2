@@ -172,8 +172,9 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
   };
 
   const handleUnregister = async (registration: CoachRegistrationView) => {
+    const requiresAdminRefundReview = registration.paymentStatus === "COMPLETED";
     const confirmed = window.confirm(
-      `Unregister ${registration.firstName} ${registration.lastName}? ${registration.paymentStatus === "COMPLETED" ? "A refund will be issued automatically." : "This cannot be undone."}`
+      `Unregister ${registration.firstName} ${registration.lastName}? ${requiresAdminRefundReview ? "A refund request will be sent to admins for manual processing." : "This cannot be undone."}`
     );
 
     if (!confirmed) {
@@ -185,8 +186,16 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
 
     try {
       const response = await fetch(
-        `/api/registrations/${registration.id}`,
-        { method: "DELETE" }
+        requiresAdminRefundReview
+          ? `/api/registrations/${registration.id}/removal-request`
+          : `/api/registrations/${registration.id}`,
+        requiresAdminRefundReview
+          ? {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({}),
+            }
+          : { method: "DELETE" }
       );
 
       const result = (await response.json()) as {
@@ -199,17 +208,32 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
         throw new Error(result.error || "Failed to unregister attendee");
       }
 
-      setRegistrations((prev) =>
-        prev.map((r) =>
-          r.id === registration.id
-            ? { ...r, status: "CANCELLED", paymentStatus: r.paymentStatus === "COMPLETED" ? "REFUNDED" : r.paymentStatus }
-            : r
-        )
-      );
+      setRegistrations((prev) => {
+        return prev.map((r) => {
+          if (r.id !== registration.id) {
+            return r;
+          }
+
+          if (requiresAdminRefundReview) {
+            return { ...r, status: "PENDING_REMOVAL" };
+          }
+
+          return {
+            ...r,
+            status: "CANCELLED",
+            paymentStatus:
+              r.paymentStatus === "COMPLETED" ? "REFUNDED" : r.paymentStatus,
+          };
+        });
+      });
 
       setFeedback({
         type: "success",
-        message: result.message || "Attendee unregistered successfully.",
+        message:
+          result.message ||
+          (requiresAdminRefundReview
+            ? "Removal request submitted for admin review."
+            : "Attendee unregistered successfully."),
       });
     } catch (error) {
       setFeedback({
@@ -375,7 +399,8 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {registration.status !== "CANCELLED" && (
+                    {registration.status !== "CANCELLED" &&
+                      registration.status !== "PENDING_REMOVAL" && (
                       <input
                         type="checkbox"
                         checked={registration.attended}
@@ -387,7 +412,9 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {registration.status !== "CANCELLED" ? (
+                    {registration.status === "PENDING_REMOVAL" ? (
+                      <Badge variant="secondary">Pending Removal</Badge>
+                    ) : registration.status !== "CANCELLED" ? (
                       <Button
                         variant="outline"
                         size="sm"

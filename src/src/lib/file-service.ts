@@ -14,41 +14,11 @@ import {
   type WorkshopStatus,
 } from "@/lib/file-access";
 import { getSessionDownloadPath } from "@/lib/file-download-path";
-
-const MAX_FILE_SIZE = 250 * 1024 * 1024; // MR-40: 250MB
-
-function sanitizeFilename(name: string): string {
-  // Strip path separators and null bytes
-  let sanitized = name.replace(/[/\\]/g, "_").replace(/\0/g, "").replace(/\.\./g, "_");
-  // Remove leading dots (hidden files)
-  sanitized = sanitized.replace(/^\.+/, "");
-  // Limit length
-  if (sanitized.length > 255) {
-    const ext = sanitized.slice(sanitized.lastIndexOf("."));
-    sanitized = sanitized.slice(0, 255 - ext.length) + ext;
-  }
-  // Fallback if empty
-  if (sanitized.trim().length === 0) {
-    sanitized = `upload-${Date.now()}`;
-  }
-  return sanitized;
-}
-
-const ALLOWED_CONTENT_TYPES = [
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "text/plain",
-  "text/csv",
-];
+import {
+  sanitizeFilename,
+  validateFile,
+} from "@/lib/file-rules";
+export { validateFile } from "@/lib/file-rules";
 
 export interface UploadFileInput {
   file: File;
@@ -56,16 +26,6 @@ export interface UploadFileInput {
   workshopId?: string;
   workflowStepId?: string;
   category?: string;
-}
-
-export function validateFile(file: File): string | null {
-  if (file.size > MAX_FILE_SIZE) {
-    return `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`;
-  }
-  if (!ALLOWED_CONTENT_TYPES.includes(file.type)) {
-    return `File type "${file.type}" is not allowed`;
-  }
-  return null;
 }
 
 export async function uploadFile(input: UploadFileInput) {
