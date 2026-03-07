@@ -13,6 +13,7 @@ import {
   type FileRecipientRole,
   type WorkshopStatus,
 } from "@/lib/file-access";
+import { getSessionDownloadPath } from "@/lib/file-download-path";
 
 const MAX_FILE_SIZE = 250 * 1024 * 1024; // MR-40: 250MB
 
@@ -182,10 +183,6 @@ export async function getWorkflowStepFiles(workflowStepId: string) {
       workshop: { select: { status: true } },
     },
   });
-}
-
-export function getSessionDownloadPath(fileId: string): string {
-  return `/api/files/${fileId}/download`;
 }
 
 export function mapFileForClient<T extends { id: string; blobUrl?: string | null }>(file: T) {

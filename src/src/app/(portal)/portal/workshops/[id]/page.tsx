@@ -8,6 +8,7 @@ import { CancelWorkshopDialog } from "@/components/workshops/cancel-workshop-dia
 import { ResubmitWorkshop } from "@/components/workshops/resubmit-workshop";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { CoachResponseForm } from "@/components/workshops/coach-response-form";
+import { getSessionDownloadPath } from "@/lib/file-download-path";
 import {
   calculateWorkshopRevenueSplit,
   formatUsdFromCents,
@@ -97,7 +98,7 @@ export default async function WorkshopDetailsPage({
     // MR-29: Workshop files for download
     db.fileAttachment.findMany({
       where: { workshopId: id },
-      select: { id: true, filename: true, blobUrl: true, contentType: true, sizeBytes: true, category: true },
+      select: { id: true, filename: true, contentType: true, sizeBytes: true, category: true },
       orderBy: { createdAt: "desc" },
     }),
     // MR-32: Financial summary from paid registrations
@@ -261,7 +262,7 @@ export default async function WorkshopDetailsPage({
               <div key={file.id} className="flex items-center justify-between text-sm">
                 <div>
                   <a
-                    href={file.blobUrl}
+                    href={getSessionDownloadPath(file.id)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-primary hover:text-primary/80"
