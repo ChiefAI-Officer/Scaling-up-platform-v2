@@ -62,7 +62,7 @@ export const autoBuildWorkshop = inngest.createFunction(
             const status = ws?.status ?? "NOT_FOUND";
             const statusAlreadyAdvanced = status === "PRE_EVENT" || status === "POST_EVENT" || status === "COMPLETED";
 
-            if (pageCount > 0 || statusAlreadyAdvanced) {
+            if (statusAlreadyAdvanced) {
                 console.warn(
                     `[auto-build] SKIP workshopId=${workshopId} pages=${pageCount} status=${status}`
                 );

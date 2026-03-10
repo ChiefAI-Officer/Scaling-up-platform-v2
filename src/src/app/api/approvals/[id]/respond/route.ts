@@ -109,6 +109,14 @@ export async function GET(
             }
         });
 
+        // When approving, advance workshop status to PRE_EVENT
+        if (newStatus === "APPROVED" && approval.workshopId) {
+            await db.workshop.update({
+                where: { id: approval.workshopId },
+                data: { status: "PRE_EVENT" },
+            });
+        }
+
         // Send notification email to coach (non-blocking)
         // Use coachId directly (always non-null) instead of workshop→coach join
         {
@@ -280,6 +288,14 @@ export async function POST(
                 responseReason: reason,
             }
         });
+
+        // When approving, advance workshop status to PRE_EVENT
+        if (newStatus === "APPROVED" && approval.workshopId) {
+            await db.workshop.update({
+                where: { id: approval.workshopId },
+                data: { status: "PRE_EVENT" },
+            });
+        }
 
         // Send notification email to coach (non-blocking)
         // Use coachId directly (always non-null) instead of workshop→coach join
