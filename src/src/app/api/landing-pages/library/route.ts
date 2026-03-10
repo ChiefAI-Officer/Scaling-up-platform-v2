@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/authorization";
-import { interpolateContent, buildWorkshopVariables } from "@/lib/template-interpolation";
+import { rewriteIdentityFields, buildWorkshopVariables } from "@/lib/template-interpolation";
 import { z } from "zod";
 
 const TEMPLATE_OPTIONS = ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION"] as const;
@@ -186,11 +186,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Re-interpolate template variables for the target workshop (e.g. coach name, title)
+    // Rewrite identity fields (coachName, workshopTitle, etc.) to match the target workshop
     const variables = await buildWorkshopVariables(targetWorkshopId);
-    const interpolatedContent = variables
-      ? interpolateContent(sourcePage.content, variables)
+    let finalContent = variables
+      ? rewriteIdentityFields(sourcePage.content, variables)
       : sourcePage.content;
+
+    // Also do text-level replacement of source coach name in free-text fields
+    // (e.g., "Join Michael Chen for..." → "Join JC DS for...")
+    if (sourcePage.workshop.coachId !== targetWorkshop.coachId) {
+      const [sourceCoach, targetCoach] = await Promise.all([
+        db.coach.findUnique({
+          where: { id: sourcePage.workshop.coachId },
+          select: { firstName: true, lastName: true },
+        }),
+        db.coach.findUnique({
+          where: { id: targetWorkshop.coachId },
+          select: { firstName: true, lastName: true },
+        }),
+      ]);
+
+      if (sourceCoach && targetCoach) {
+        const sourceName = `${sourceCoach.firstName} ${sourceCoach.lastName}`;
+        const targetName = `${targetCoach.firstName} ${targetCoach.lastName}`;
+        if (sourceName !== targetName) {
+          finalContent = finalContent.replaceAll(sourceName, targetName);
+          finalContent = finalContent.replaceAll(sourceCoach.firstName, targetCoach.firstName);
+        }
+      }
+    }
 
     const existingTargetPage = await db.landingPage.findUnique({
       where: {
@@ -205,7 +229,7 @@ export async function POST(request: NextRequest) {
       ? await db.landingPage.update({
           where: { id: existingTargetPage.id },
           data: {
-            content: interpolatedContent,
+            content: finalContent,
             status: "DRAFT",
             updatedAt: new Date(),
           },
@@ -215,7 +239,7 @@ export async function POST(request: NextRequest) {
             workshopId: targetWorkshopId,
             template: targetTemplateRaw,
             slug: generateSlug(targetWorkshop.title, targetTemplateRaw),
-            content: interpolatedContent,
+            content: finalContent,
             status: "DRAFT",
             publishedAt: null,
           },

@@ -41,15 +41,20 @@ export async function buildWorkshopVariables(workshopId: string): Promise<Record
 
     if (!workshop) return null;
 
+    const formattedDate = workshop.eventDate.toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+
+    const coachFullName = `${workshop.coach.firstName} ${workshop.coach.lastName}`;
+
     return {
+        // snake_case — used by {{placeholder}} interpolation in auto-build templates
         workshop_title: workshop.title,
         workshop_description: workshop.description || "",
-        workshop_date: workshop.eventDate.toLocaleDateString("en-US", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-        }),
+        workshop_date: formattedDate,
         workshop_time: workshop.eventTime || "",
         workshop_format: workshop.format,
         workshop_code: workshop.workshopCode,
@@ -57,7 +62,7 @@ export async function buildWorkshopVariables(workshopId: string): Promise<Record
         venue_address: workshop.venueAddress || "",
         venue_instructions: workshop.venueInstructions || "",
         virtual_link: workshop.virtualLink || "",
-        coach_name: `${workshop.coach.firstName} ${workshop.coach.lastName}`,
+        coach_name: coachFullName,
         coach_first_name: workshop.coach.firstName,
         coach_last_name: workshop.coach.lastName,
         coach_bio: workshop.coach.bio || "",
@@ -71,5 +76,30 @@ export async function buildWorkshopVariables(workshopId: string): Promise<Record
                 : workshop.priceCents
                     ? `$${(workshop.priceCents / 100).toFixed(0)}`
                     : "TBD",
+        // camelCase — matches JSON field names in editor content (solo-landing, registration, etc.)
+        coachName: coachFullName,
+        coachPhoto: workshop.coach.profileImage || "",
+        coachTitle: workshop.coach.company || "Scaling Up Certified Coach",
+        workshopTitle: workshop.title,
+        eventDate: formattedDate,
+        eventTime: workshop.eventTime || "",
     };
+}
+
+/**
+ * Replace known identity fields in landing page content JSON.
+ * Parses the JSON, overwrites structured fields (coachName, workshopTitle, etc.)
+ * with target workshop values, then re-serializes.
+ */
+export function rewriteIdentityFields(
+    contentJson: string,
+    targetFields: Record<string, string>
+): string {
+    const content = JSON.parse(contentJson);
+    for (const [key, value] of Object.entries(targetFields)) {
+        if (key in content) {
+            content[key] = value;
+        }
+    }
+    return JSON.stringify(content);
 }
