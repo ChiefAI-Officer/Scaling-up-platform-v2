@@ -50,10 +50,20 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
         }),
       });
 
+      if (!registrationResponse.ok) {
+        const contentType = registrationResponse.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error(`Registration failed (${registrationResponse.status})`);
+        }
+      }
+
       const registrationData = await registrationResponse.json();
 
       if (!registrationData.success) {
-        throw new Error(registrationData.error || "Registration failed");
+        const errorMsg = Array.isArray(registrationData.error)
+          ? registrationData.error.map((e: { message?: string }) => e.message).join(", ")
+          : registrationData.error || "Registration failed";
+        throw new Error(errorMsg);
       }
 
       if (isFree) {
@@ -69,6 +79,13 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
             discountCode: formData.discountCode.trim() || undefined,
           }),
         });
+
+        if (!checkoutResponse.ok) {
+          const contentType = checkoutResponse.headers.get("content-type") || "";
+          if (!contentType.includes("application/json")) {
+            throw new Error(`Checkout failed (${checkoutResponse.status})`);
+          }
+        }
 
         const checkoutData = await checkoutResponse.json();
 

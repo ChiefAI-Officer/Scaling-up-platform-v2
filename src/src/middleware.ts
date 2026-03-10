@@ -73,6 +73,7 @@ export default withAuth(
       // Allow public API endpoints without auth
       if (
         pathname.startsWith("/api/registrations") ||
+        pathname.startsWith("/api/checkout") ||
         pathname.startsWith("/api/webhooks") ||
         pathname.startsWith("/api/inngest") ||
         pathname.startsWith("/api/health") ||
@@ -117,6 +118,7 @@ export default withAuth(
           pathname.startsWith("/api/health") ||
           pathname.startsWith("/api/docs") ||
           pathname.startsWith("/api/registrations") ||
+          pathname.startsWith("/api/checkout") ||
           pathname.match(/^\/api\/workshops\/[^/]+\/register$/) ||
           pathname.startsWith("/_next") ||
           pathname.includes(".")
