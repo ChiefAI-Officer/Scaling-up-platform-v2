@@ -168,6 +168,22 @@ export async function createWorkshopPromotionCode({
 }> {
   const stripe = getStripeClient();
 
+  // Check if promotion code already exists (handles retries after partial failures)
+  const existing = await stripe.promotionCodes.list({
+    code,
+    active: true,
+    limit: 1,
+  });
+
+  if (existing.data.length > 0 && isPromotionCodeRedeemable(existing.data[0])) {
+    const promo = existing.data[0];
+    const couponRef = promo.promotion.coupon;
+    return {
+      stripeCouponId: couponRef ? (typeof couponRef === "string" ? couponRef : couponRef.id) : "",
+      stripePromotionCodeId: promo.id,
+    };
+  }
+
   const coupon = await stripe.coupons.create({
     percent_off: discountPercent,
     duration: "once",
