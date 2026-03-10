@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
+import { useToast } from "@/components/ui/use-toast";
 import { Trash2 } from "lucide-react";
 
 interface DeleteCoachButtonProps {
@@ -18,6 +19,7 @@ export function DeleteCoachButton({
   hasActiveWorkshops,
 }: DeleteCoachButtonProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -28,14 +30,26 @@ export function DeleteCoachButton({
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Failed to delete coach");
+        toast({
+          title: "Delete failed",
+          description: data.error || "Failed to delete coach",
+          variant: "destructive",
+        });
         return;
       }
 
+      toast({
+        title: "Coach deleted",
+        description: `${coachName} has been permanently deleted.`,
+      });
       router.push("/coaches");
       router.refresh();
     } catch {
-      alert("Failed to delete coach");
+      toast({
+        title: "Delete failed",
+        description: "Network error. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
       setIsOpen(false);
@@ -64,7 +78,7 @@ export function DeleteCoachButton({
         onClose={() => setIsOpen(false)}
         onConfirm={handleDelete}
         title="Delete Coach"
-        description={`This will permanently delete ${coachName}'s profile, all their completed/canceled workshops, registrations, and their login account.`}
+        description={`This will permanently delete ${coachName}'s profile, all their completed/canceled workshops, registrations, approval queue entries, follow-up reports, and their login account.`}
         warningText="This action cannot be undone."
         confirmLabel="Delete Coach"
         variant="destructive"

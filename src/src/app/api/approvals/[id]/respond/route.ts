@@ -109,14 +109,6 @@ export async function GET(
             }
         });
 
-        // JV-20: When approving a workshop request, advance the workshop status
-        if (newStatus === "APPROVED" && approval.workshopId) {
-            await db.workshop.update({
-                where: { id: approval.workshopId },
-                data: { status: "AWAITING_APPROVAL" },
-            });
-        }
-
         // Send notification email to coach (non-blocking)
         // Use coachId directly (always non-null) instead of workshop→coach join
         {
@@ -155,7 +147,7 @@ export async function GET(
             }
         }
 
-        // Sprint 5: Emit workshop/approved event to trigger auto-build
+        // Sprint 5: Emit workshop/approved event to trigger auto-build (advances status to PRE_EVENT)
         let inngestSent = false;
         if (newStatus === "APPROVED" && approval.workshopId) {
             try {
@@ -289,14 +281,6 @@ export async function POST(
             }
         });
 
-        // JV-20: When approving a workshop request, advance the workshop status
-        if (newStatus === "APPROVED" && approval.workshopId) {
-            await db.workshop.update({
-                where: { id: approval.workshopId },
-                data: { status: "AWAITING_APPROVAL" },
-            });
-        }
-
         // Send notification email to coach (non-blocking)
         // Use coachId directly (always non-null) instead of workshop→coach join
         {
@@ -335,7 +319,7 @@ export async function POST(
             }
         }
 
-        // Sprint 5: Emit workshop/approved event to trigger auto-build
+        // Sprint 5: Emit workshop/approved event to trigger auto-build (advances status to PRE_EVENT)
         let inngestSent = false;
         if (newStatus === "APPROVED" && approval.workshopId) {
             try {

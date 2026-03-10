@@ -94,10 +94,16 @@ export default async function CoachDetailPage({
     notFound();
   }
 
+  // Check ALL workshops for active status (not limited by take: 10 display query)
+  const activeWorkshopCount = await db.workshop.count({
+    where: {
+      coachId: id,
+      status: { notIn: ["COMPLETED", "CANCELED"] },
+    },
+  });
+
   const totalWorkshops = coach.workshops.length;
-  const hasActiveWorkshops = coach.workshops.some(
-    (w) => !["COMPLETED", "CANCELED"].includes(w.status)
-  );
+  const hasActiveWorkshops = activeWorkshopCount > 0;
   const upcomingWorkshops = coach.workshops.filter(
     (w) => new Date(w.eventDate) > new Date() && w.status !== "CANCELED"
   ).length;

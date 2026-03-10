@@ -11,7 +11,8 @@ enforceProductionSafeAuthPosture("startup");
 
 function isCanonicalAdminEmail(email: string): boolean {
   const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  return !configuredAdminEmail || email.toLowerCase() === configuredAdminEmail;
+  if (!configuredAdminEmail) return false; // Fail closed — no canonical admin when env var unset
+  return email.toLowerCase() === configuredAdminEmail;
 }
 
 declare module "next-auth" {

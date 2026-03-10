@@ -319,11 +319,18 @@ export async function POST(request: NextRequest) {
             )
           : [];
     } catch (error) {
-      console.error("Failed to create Stripe promotion codes:", error);
+      const stripeKeySet = !!process.env.STRIPE_SECRET_KEY;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(
+        `Failed to create Stripe promotion codes: stripeKeySet=${stripeKeySet} error=${errorMessage}`,
+        error
+      );
       return NextResponse.json(
         {
           success: false,
-          error: "Failed to create Stripe promotion codes for workshop coupons",
+          error: stripeKeySet
+            ? `Stripe API error while creating coupon: ${errorMessage}`
+            : "Stripe is not configured. Please set STRIPE_SECRET_KEY in environment variables.",
         },
         { status: 502 }
       );

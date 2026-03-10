@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { interpolateContent, buildWorkshopVariables } from "@/lib/template-interpolation";
 import { z } from "zod";
 
 const TEMPLATE_OPTIONS = ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION"] as const;
@@ -185,6 +186,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Re-interpolate template variables for the target workshop (e.g. coach name, title)
+    const variables = await buildWorkshopVariables(targetWorkshopId);
+    const interpolatedContent = variables
+      ? interpolateContent(sourcePage.content, variables)
+      : sourcePage.content;
+
     const existingTargetPage = await db.landingPage.findUnique({
       where: {
         workshopId_template: {
@@ -198,7 +205,7 @@ export async function POST(request: NextRequest) {
       ? await db.landingPage.update({
           where: { id: existingTargetPage.id },
           data: {
-            content: sourcePage.content,
+            content: interpolatedContent,
             status: "DRAFT",
             updatedAt: new Date(),
           },
@@ -208,7 +215,7 @@ export async function POST(request: NextRequest) {
             workshopId: targetWorkshopId,
             template: targetTemplateRaw,
             slug: generateSlug(targetWorkshop.title, targetTemplateRaw),
-            content: sourcePage.content,
+            content: interpolatedContent,
             status: "DRAFT",
             publishedAt: null,
           },

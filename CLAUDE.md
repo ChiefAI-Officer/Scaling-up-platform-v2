@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | March 3, 2026 — Production go-live (analytics installed, go-live checklist, handoff document) |
+| **Last Updated** | March 10, 2026 — Verification hardening (security fixes, accessibility, audit trail improvements) |
 
 ## Current Status
 
@@ -129,6 +129,25 @@ the full workshop lifecycle from request through post-event follow-up.
 - Go-live checklist: `plans/GO_LIVE_CHECKLIST.md`
 - Handoff document: `plans/PRODUCTION_HANDOFF_MARCH_2026.md`
 - Commits: `c0c002d` (variable aliases), pending commit (analytics + handoff docs)
+
+**Admin Capabilities (Mar 6-10, 2026)** — Complete:
+- Workshop permanent delete: `POST /api/workshops/[id]/delete` (ADMIN-only, CANCELED/COMPLETED only, title confirmation)
+- Coach delete fix: CASCADE on Workshop/ApprovalQueue/FollowUpReport FKs, transaction deletes Coach + User, cascade counts in audit log
+- Admin invite system: `AdminInvite` model, crypto token (7-day TTL), accept-invite page, bcrypt(12) passwords
+- Auth modification: `src/lib/auth.ts` — non-canonical ADMIN emails checked against AdminInvite (must have acceptedAt set)
+- New files: `delete-workshop-dialog.tsx`, `delete-coach-button.tsx`, `invite-admin-section.tsx`, `accept-invite/page.tsx`
+- New API routes: `/api/workshops/[id]/delete`, `/api/admin/invite`, `/api/admin/invite/[id]`, `/api/auth/accept-invite`
+
+**Verification Hardening (Mar 10, 2026)** — Complete:
+- MR-28: Auto-build logs warning + returns `noTemplatesAvailable` flag when no active templates exist
+- MR-37: Workflow tooltip replaced with Radix `<Tooltip>` (accessible, keyboard-navigable, aria-label)
+- Coach delete: audit trail counts inside transaction, `hasActiveWorkshops` uses dedicated count query (not limited by `take: 10`)
+- Coach delete UI: uses `useToast` instead of `alert()`, confirmation mentions approvals + follow-up reports
+- Security: `isCanonicalAdminEmail` now fails closed (returns false when `ADMIN_EMAIL` unset)
+- Security: accept-invite token comparison uses `crypto.timingSafeEqual` (timing-safe)
+- Security: admin invite API routes properly return 401 for unauthenticated (not 403)
+- Invite UI: loading state prevents false "No invitations yet" flash during initial fetch
+- March audit state: 34 PASS, 12 CONCERN (5 resolved by design, 2 fixed, 3 need manual proof, 2 flagged for Jeff), 0 GAP
 
 **Design Token Consolidation + Color Sweep (Feb 27, 2026)** — Complete:
 - Single source of truth: `globals.css` (`brand-tokens.css` deleted — had zero imports)

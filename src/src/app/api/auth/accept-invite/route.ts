@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { acceptInviteSchema } from "@/lib/validations";
@@ -29,7 +30,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (invite.token !== token) {
+    // Timing-safe token comparison to prevent side-channel attacks
+    const inviteTokenBuf = Buffer.from(invite.token, "hex");
+    const providedTokenBuf = Buffer.from(token, "hex");
+    if (
+      inviteTokenBuf.length !== providedTokenBuf.length ||
+      !crypto.timingSafeEqual(inviteTokenBuf, providedTokenBuf)
+    ) {
       return NextResponse.json(
         { success: false, error: "Invalid or expired invitation" },
         { status: 400 }

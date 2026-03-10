@@ -10,11 +10,11 @@ const INVITE_TTL_DAYS = 7;
 export async function GET() {
   try {
     const actor = await getApiActor();
-    if (!actor || actor.role !== "ADMIN") {
-      return NextResponse.json(
-        { success: false, error: "Admin access required" },
-        { status: 403 }
-      );
+    if (!actor) {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
+    }
+    if (actor.role !== "ADMIN") {
+      return NextResponse.json({ success: false, error: "Admin access required" }, { status: 403 });
     }
 
     const invites = await db.adminInvite.findMany({
@@ -34,11 +34,11 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const actor = await getApiActor();
-    if (!actor || actor.role !== "ADMIN") {
-      return NextResponse.json(
-        { success: false, error: "Admin access required" },
-        { status: 403 }
-      );
+    if (!actor) {
+      return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
+    }
+    if (actor.role !== "ADMIN") {
+      return NextResponse.json({ success: false, error: "Admin access required" }, { status: 403 });
     }
 
     const body = await request.json();

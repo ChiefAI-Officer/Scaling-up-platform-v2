@@ -10,6 +10,7 @@
 
 import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
+import { interpolateContent } from "@/lib/template-interpolation";
 import { sendWorkshopBuiltEmail } from "@/services/notifications";
 
 interface WorkshopData {
@@ -38,19 +39,6 @@ interface WorkshopData {
     };
     category: { id: string; name: string; slug: string } | null;
     pricingTier: { name: string; amountCents: number } | null;
-}
-
-/**
- * Interpolate {{variables}} in template content JSON string.
- * Replaces placeholders like {{workshop_title}}, {{coach_name}}, {{event_date}}, etc.
- */
-function interpolateContent(contentJson: string, variables: Record<string, string>): string {
-    let result = contentJson;
-    for (const [key, value] of Object.entries(variables)) {
-        // Replace both {{key}} and {{ key }} (with optional spaces)
-        result = result.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g"), value);
-    }
-    return result;
 }
 
 export const autoBuildWorkshop = inngest.createFunction(
@@ -179,7 +167,11 @@ export const autoBuildWorkshop = inngest.createFunction(
             });
 
             if (activeTemplates.length === 0) {
-                return { count: 0, templates: [] as string[] };
+                console.warn(
+                    `[auto-build] WARNING: No active templates found for workshopId=${workshop.id}. ` +
+                    `Workshop will proceed without landing pages. Set isActiveTemplate=true on at least one landing page template.`
+                );
+                return { count: 0, templates: [] as string[], noTemplatesAvailable: true };
             }
 
             const created: string[] = [];
@@ -348,6 +340,7 @@ export const autoBuildWorkshop = inngest.createFunction(
         return {
             workshopId,
             pagesCreated: pagesCreated.count,
+            noTemplatesAvailable: "noTemplatesAvailable" in pagesCreated && pagesCreated.noTemplatesAvailable === true,
             preEventWorkflow: preEventAssigned?.name || null,
             postEventWorkflow: postEventAssigned?.name || null,
             status: "PRE_EVENT",

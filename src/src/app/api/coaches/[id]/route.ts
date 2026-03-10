@@ -162,6 +162,12 @@ export async function DELETE(
     }
 
     await db.$transaction(async (tx) => {
+      // Count cascade-affected records inside transaction for accuracy
+      const [approvalQueueCount, followUpReportCount] = await Promise.all([
+        tx.approvalQueue.count({ where: { coachId: id } }),
+        tx.followUpReport.count({ where: { coachId: id } }),
+      ]);
+
       await tx.coach.delete({ where: { id } });
 
       // Delete linked User account to prevent orphaned logins
@@ -180,6 +186,8 @@ export async function DELETE(
             coachEmail: existing.email,
             userId: existing.userId,
             workshopsDeleted: existing.workshops.length,
+            approvalQueueDeleted: approvalQueueCount,
+            followUpReportsDeleted: followUpReportCount,
           }),
         },
       });

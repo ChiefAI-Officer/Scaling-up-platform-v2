@@ -166,7 +166,9 @@ export function InviteAdminSection() {
             </Button>
           </div>
 
-          {invites.length === 0 ? (
+          {isLoading && invites.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Loading invitations...</p>
+          ) : invites.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No admin invitations yet.
             </p>

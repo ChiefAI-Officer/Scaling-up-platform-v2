@@ -26,6 +26,12 @@ import {
   WORKFLOW_VARIABLES,
 } from "@/lib/workflow-types";
 import type { StepType, TriggerType } from "@/lib/workflow-types";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ============================================
 // Types (serialized from server)
@@ -445,13 +451,23 @@ export function WorkflowEditor({
             className="rounded border-border text-primary focus:ring-primary"
           />
           Save as feature template (reusable across workshops)
-          {/* MR-37: Feature template tooltip */}
-          <span
-            title="A feature template is a reusable workflow that can be automatically assigned to workshops based on category, format, and phase. When a new workshop is approved, any matching feature templates are automatically applied."
-            className="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-xs text-muted-foreground"
-          >
-            ?
-          </span>
+          {/* MR-37: Feature template tooltip (accessible via Radix Tooltip) */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="What is a feature template?"
+                  className="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-xs text-muted-foreground hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
+                >
+                  ?
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                A feature template is a reusable workflow that can be automatically assigned to workshops based on category, format, and phase. When a new workshop is approved, any matching feature templates are automatically applied.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </label>
 
         {/* Auto-assignment filters for auto-build on approval */}
