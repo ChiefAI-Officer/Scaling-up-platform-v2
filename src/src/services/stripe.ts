@@ -145,7 +145,7 @@ export async function createCheckoutSession({
       },
     ],
     mode: "payment",
-    allow_promotion_codes: true,
+    ...(discounts ? {} : { allow_promotion_codes: true }),
     discounts,
     success_url: successUrl,
     cancel_url: cancelUrl,

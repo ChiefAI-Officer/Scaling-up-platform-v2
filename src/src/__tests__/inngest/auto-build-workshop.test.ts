@@ -229,33 +229,59 @@ describe("autoBuildWorkshop Inngest function", () => {
     expect(result).toEqual({
       workshopId: "ws-1",
       pagesCreated: 2,
+      noTemplatesAvailable: false,
       preEventWorkflow: "Pre-Event Welcome Series",
       postEventWorkflow: "Post-Event Follow Up",
       status: "PRE_EVENT",
     });
   });
 
-  // ---- 2. Idempotency: pages already exist ----
-  it("skips build if landing pages already exist (idempotency guard)", async () => {
-    (db.landingPage.findMany as jest.Mock).mockResolvedValue([{ id: "lp-1" }]);
-    (db.workshop.findUnique as jest.Mock).mockResolvedValueOnce({
-      status: "AWAITING_APPROVAL",
-    });
+  // ---- 2. Pages exist but status NOT advanced → should STILL proceed ----
+  it("proceeds with build when pages exist but status has not advanced (per-template dedup handles duplicates)", async () => {
+    // Idempotency check: pages exist, but status is still AWAITING_APPROVAL
+    (db.landingPage.findMany as jest.Mock)
+      .mockResolvedValueOnce([{ id: "lp-1" }])   // idempotency check: 1 existing page
+      .mockResolvedValueOnce(mockTemplates);       // find active templates
+
+    (db.workshop.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ status: "AWAITING_APPROVAL" }) // idempotency
+      .mockResolvedValueOnce(mockWorkshop);                    // fetch-workshop
+
+    // Per-template dedup: first template already exists, second does not
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ id: "lp-1" })  // REGISTRATION exists → skip
+      .mockResolvedValueOnce(null);            // THANK_YOU → create
+
+    (db.landingPage.create as jest.Mock).mockResolvedValue({});
+
+    (db.workflow.findFirst as jest.Mock)
+      .mockResolvedValueOnce(mockPreWorkflow)
+      .mockResolvedValueOnce(mockPostWorkflow);
+    (db.workflowAssignment.findUnique as jest.Mock).mockResolvedValue(null);
+    (db.workflowAssignment.create as jest.Mock)
+      .mockResolvedValueOnce({ id: "assign-pre-1" })
+      .mockResolvedValueOnce({ id: "assign-post-1" });
+    (db.workshop.update as jest.Mock).mockResolvedValue({});
+    (sendWorkshopBuiltEmail as jest.Mock).mockResolvedValue(undefined);
+    (inngest.send as jest.Mock).mockResolvedValue(undefined);
 
     const result = await capturedHandler({
       event: makeEvent(),
       step: mockStep,
     });
 
-    expect(result).toEqual({
-      workshopId: "ws-1",
-      skipped: true,
-      reason: "Idempotency guard: pages=1, status=AWAITING_APPROVAL",
+    // Should NOT have been skipped — only status-based idempotency triggers skip
+    expect(result.skipped).toBeUndefined();
+    expect(result.status).toBe("PRE_EVENT");
+    // Only 1 page created (THANK_YOU), REGISTRATION skipped by per-template dedup
+    expect(db.landingPage.create).toHaveBeenCalledTimes(1);
+    // Status updated to PRE_EVENT
+    expect(db.workshop.update).toHaveBeenCalledWith({
+      where: { id: "ws-1" },
+      data: { status: "PRE_EVENT" },
     });
-    // Should NOT have proceeded to fetch workshop or create pages
-    expect(db.landingPage.create).not.toHaveBeenCalled();
-    expect(db.workshop.update).not.toHaveBeenCalled();
-    expect(sendWorkshopBuiltEmail).not.toHaveBeenCalled();
+    // Email sent
+    expect(sendWorkshopBuiltEmail).toHaveBeenCalledTimes(1);
   });
 
   // ---- 3. Idempotency: status already PRE_EVENT ----
@@ -321,6 +347,7 @@ describe("autoBuildWorkshop Inngest function", () => {
 
     expect(db.landingPage.create).not.toHaveBeenCalled();
     expect(result.pagesCreated).toBe(0);
+    expect(result.noTemplatesAvailable).toBe(true);
 
     // Workflows still assigned
     expect(db.workflowAssignment.create).toHaveBeenCalledTimes(2);

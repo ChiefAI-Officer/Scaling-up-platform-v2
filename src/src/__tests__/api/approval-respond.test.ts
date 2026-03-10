@@ -48,6 +48,7 @@ import { POST } from "@/app/api/approvals/[id]/respond/route";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { getApiActor } from "@/lib/authorization";
+import { inngest } from "@/inngest/client";
 
 function routeParams(id = "apr-1") {
   return { params: Promise.resolve({ id }) };
@@ -118,5 +119,84 @@ describe("Approval respond API", () => {
         action: "APPROVE",
       })
     );
+  });
+
+  it("advances workshop status to PRE_EVENT when approving with workshopId", async () => {
+    (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
+      id: "apr-2",
+      status: "PENDING",
+      workshopId: "ws-99",
+      coachId: "coach-1",
+    });
+    (db.approvalQueue.update as jest.Mock).mockResolvedValue({
+      id: "apr-2",
+      status: "APPROVED",
+    });
+
+    const response = await POST(
+      requestWithJson({ action: "APPROVE" }),
+      routeParams("apr-2")
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.status).toBe("APPROVED");
+
+    // Workshop status should advance to PRE_EVENT
+    expect(db.workshop.update).toHaveBeenCalledWith({
+      where: { id: "ws-99" },
+      data: { status: "PRE_EVENT" },
+    });
+  });
+
+  it("does NOT update workshop status when denying", async () => {
+    (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
+      id: "apr-3",
+      status: "PENDING",
+      workshopId: "ws-99",
+      coachId: "coach-1",
+    });
+    (db.approvalQueue.update as jest.Mock).mockResolvedValue({
+      id: "apr-3",
+      status: "DENIED",
+    });
+
+    await POST(
+      requestWithJson({ action: "DENY", reason: "Not ready" }),
+      routeParams("apr-3")
+    );
+
+    // Workshop status should NOT be updated on denial
+    expect(db.workshop.update).not.toHaveBeenCalled();
+  });
+
+  it("emits workshop/approved Inngest event when approving with workshopId", async () => {
+    (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
+      id: "apr-4",
+      status: "PENDING",
+      workshopId: "ws-100",
+      coachId: "coach-2",
+    });
+    (db.approvalQueue.update as jest.Mock).mockResolvedValue({
+      id: "apr-4",
+      status: "APPROVED",
+    });
+
+    const response = await POST(
+      requestWithJson({ action: "APPROVE" }),
+      routeParams("apr-4")
+    );
+    const body = await response.json();
+
+    expect(body.autoBuildTriggered).toBe(true);
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: "workshop/approved",
+      data: {
+        approvalId: "apr-4",
+        workshopId: "ws-100",
+        coachId: "coach-2",
+      },
+    });
   });
 });

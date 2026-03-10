@@ -178,6 +178,7 @@ describe("auto-build-workshop Inngest function", () => {
       expect(result).toEqual({
         workshopId: "ws-test-123",
         pagesCreated: 3,
+        noTemplatesAvailable: false,
         preEventWorkflow: "Pre-Event Email Sequence",
         postEventWorkflow: "Post-Event Follow-Up",
         status: "PRE_EVENT",
@@ -252,23 +253,33 @@ describe("auto-build-workshop Inngest function", () => {
   // 2. IDEMPOTENCY
   // -----------------------------------------------------------------------
   describe("Idempotency: skip if already built", () => {
-    it("should skip when workshop already has landing pages", async () => {
+    it("should proceed when pages exist but status has not advanced (per-template dedup handles duplicates)", async () => {
       step.run = jest.fn(async (name: string, fn: () => Promise<unknown>) => {
         if (name === "idempotency-check") {
           (db.landingPage.findMany as jest.Mock).mockResolvedValueOnce([{ id: "existing-lp" }]);
           (db.workshop.findUnique as jest.Mock).mockResolvedValueOnce({ status: "APPROVED" });
+        } else if (name === "fetch-workshop") {
+          (db.workshop.findUnique as jest.Mock).mockResolvedValueOnce(createWorkshopRecord());
+        } else if (name === "create-landing-pages") {
+          (db.landingPage.findMany as jest.Mock).mockResolvedValueOnce(createActiveTemplates());
+          (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+          (db.landingPage.create as jest.Mock).mockResolvedValue({ id: "lp-new" });
+        } else if (name === "assign-pre-event-workflow") {
+          (db.workflow.findFirst as jest.Mock).mockResolvedValueOnce(null);
+        } else if (name === "assign-post-event-workflow") {
+          (db.workflow.findFirst as jest.Mock).mockResolvedValueOnce(null);
+        } else if (name === "update-status") {
+          (db.workshop.update as jest.Mock).mockResolvedValueOnce({ id: "ws-test-123" });
         }
         return fn();
       });
 
-      const result = await handler({ event: createEvent(), step });
-      expect(result).toEqual({
-        workshopId: "ws-test-123",
-        skipped: true,
-        reason: "Idempotency guard: pages=1, status=APPROVED",
-      });
-      // Should only run the idempotency-check step
-      expect(step.run).toHaveBeenCalledTimes(1);
+      const result = await handler({ event: createEvent(), step }) as Record<string, unknown>;
+      // Should NOT skip — only status-based idempotency triggers skip
+      expect(result.skipped).toBeUndefined();
+      expect(result.status).toBe("PRE_EVENT");
+      // All steps should run
+      expect(step.run).toHaveBeenCalledTimes(7);
     });
 
     it("should skip when workshop status is already PRE_EVENT", async () => {
@@ -331,6 +342,7 @@ describe("auto-build-workshop Inngest function", () => {
       expect(result).toEqual({
         workshopId: "ws-test-123",
         pagesCreated: 0,
+        noTemplatesAvailable: true,
         preEventWorkflow: null,
         postEventWorkflow: null,
         status: "PRE_EVENT",
@@ -426,6 +438,7 @@ describe("auto-build-workshop Inngest function", () => {
       expect(result).toEqual({
         workshopId: "ws-test-123",
         pagesCreated: 0,
+        noTemplatesAvailable: true,
         preEventWorkflow: null,
         postEventWorkflow: null,
         status: "PRE_EVENT",
