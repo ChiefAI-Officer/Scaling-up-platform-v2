@@ -1,0 +1,2 @@
+-- AddValue
+ALTER TYPE "ApprovalStatus" ADD VALUE IF NOT EXISTS 'INFO_REQUESTED';
