@@ -40,6 +40,9 @@ jest.mock("@/lib/db", () => ({
     registration: {
       findMany: jest.fn(),
     },
+    landingPage: {
+      findFirst: jest.fn(),
+    },
   },
 }));
 
@@ -111,6 +114,7 @@ describe("Coach workshop detail file links", () => {
     (db.registration.findMany as jest.Mock).mockResolvedValue([
       { amountPaidCents: 10000 },
     ]);
+    (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
   });
 
   it("renders protected internal download links instead of raw blob URLs", async () => {

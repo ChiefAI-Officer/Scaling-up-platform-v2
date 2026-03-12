@@ -37,20 +37,6 @@ function getCertificationStatusColor(status: string) {
   }
 }
 
-function getPaymentStatusColor(status: string) {
-  switch (status) {
-    case "CURRENT":
-      return "bg-success/10 text-success";
-    case "PENDING":
-      return "bg-warning/10 text-warning";
-    case "OVERDUE":
-      return "bg-destructive/10 text-destructive";
-    case "GRACE_PERIOD":
-      return "bg-warning/10 text-warning";
-    default:
-      return "bg-muted text-foreground";
-  }
-}
 
 export default async function CoachesPage() {
   const coaches = await getCoaches();
@@ -102,16 +88,6 @@ export default async function CoachesPage() {
             </CardContent>
           </Card>
         </StaggerItem>
-        <StaggerItem>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">Payment Overdue</p>
-              <p className="text-2xl font-bold text-destructive">
-                {coaches.filter((c) => c.paymentStatus === "OVERDUE").length}
-              </p>
-            </CardContent>
-          </Card>
-        </StaggerItem>
       </StaggerContainer>
 
       {/* Coaches Table */}
@@ -138,9 +114,6 @@ export default async function CoachesPage() {
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                       Certification
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
-                      Payment
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                       Certifications
@@ -180,14 +153,6 @@ export default async function CoachesPage() {
                           variant="secondary"
                         >
                           {coach.certificationStatus}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge
-                          className={getPaymentStatusColor(coach.paymentStatus)}
-                          variant="secondary"
-                        >
-                          {coach.paymentStatus}
                         </Badge>
                       </td>
                       <td className="px-4 py-4">

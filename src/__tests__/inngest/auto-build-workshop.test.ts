@@ -214,7 +214,7 @@ describe("auto-build-workshop Inngest function", () => {
 
       expect(db.workshop.update).toHaveBeenCalledWith({
         where: { id: "ws-test-123" },
-        data: { status: "PRE_EVENT" },
+        data: expect.objectContaining({ status: "PRE_EVENT" }),
       });
     });
 

@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | March 10, 2026 — Verification hardening (security fixes, accessibility, audit trail improvements) |
+| **Last Updated** | March 11, 2026 — MR-21 coupon/checkout verified, Stripe + middleware + form fixes |
 
 ## Current Status
 
@@ -147,7 +147,22 @@ the full workshop lifecycle from request through post-event follow-up.
 - Security: accept-invite token comparison uses `crypto.timingSafeEqual` (timing-safe)
 - Security: admin invite API routes properly return 401 for unauthenticated (not 403)
 - Invite UI: loading state prevents false "No invitations yet" flash during initial fetch
-- March audit state: 34 PASS, 12 CONCERN (5 resolved by design, 2 fixed, 3 need manual proof, 2 flagged for Jeff), 0 GAP
+- March audit state: 36 PASS, 10 CONCERN (5 resolved by design, 2 fixed, 1 need manual proof, 2 flagged for Jeff), 0 GAP
+
+**MR-21 Coupon/Checkout Fix (Mar 11, 2026)** — Complete (commits `0556da5`, `5abcda2`):
+- Stripe `allow_promotion_codes` and `discounts` are mutually exclusive — conditional spread in `services/stripe.ts:148`
+- `/api/checkout` added to middleware public routes (both `authorized` callback and middleware function)
+- `registration-form.tsx` — defensive content-type check before `.json()` parsing, Zod error array formatting
+- TDD tests added: `stripe.test.ts` (allow_promotion_codes exclusion), `checkout.test.ts` (discount forwarding + StripeDiscountCodeError), `template-interpolation.test.ts` (10 tests)
+- Test totals: 51 suites / 488 tests (up from 50/473)
+
+**MR-30 Paid Attendee Removal Verified (Mar 11, 2026):**
+- Coach unregister on paid attendee → routes to approval queue (not direct delete)
+- Admin email: "[ACTION REQUIRED] Cancellation Request" with "REFUND REQUIRED", attendee name, $199.50
+- CANCELLATION approval in admin queue with Approve/Deny
+- Refund is manual via Stripe dashboard — by design
+- Verified via fake paid registration seeded in Neon SQL (no real payment)
+- Known gap: approval respond route treats CANCELLATION same as WORKSHOP_REQUEST (advances status to PRE_EVENT, sends workshop-approved email) — needs CANCELLATION-specific branch
 
 **Design Token Consolidation + Color Sweep (Feb 27, 2026)** — Complete:
 - Single source of truth: `globals.css` (`brand-tokens.css` deleted — had zero imports)

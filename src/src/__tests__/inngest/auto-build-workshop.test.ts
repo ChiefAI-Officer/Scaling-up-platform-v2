@@ -219,7 +219,7 @@ describe("autoBuildWorkshop Inngest function", () => {
     // Status updated to PRE_EVENT
     expect(db.workshop.update).toHaveBeenCalledWith({
       where: { id: "ws-1" },
-      data: { status: "PRE_EVENT" },
+      data: expect.objectContaining({ status: "PRE_EVENT" }),
     });
 
     // Email sent
@@ -278,7 +278,7 @@ describe("autoBuildWorkshop Inngest function", () => {
     // Status updated to PRE_EVENT
     expect(db.workshop.update).toHaveBeenCalledWith({
       where: { id: "ws-1" },
-      data: { status: "PRE_EVENT" },
+      data: expect.objectContaining({ status: "PRE_EVENT" }),
     });
     // Email sent
     expect(sendWorkshopBuiltEmail).toHaveBeenCalledTimes(1);
@@ -354,7 +354,7 @@ describe("autoBuildWorkshop Inngest function", () => {
     // Status still updated
     expect(db.workshop.update).toHaveBeenCalledWith({
       where: { id: "ws-1" },
-      data: { status: "PRE_EVENT" },
+      data: expect.objectContaining({ status: "PRE_EVENT" }),
     });
     // Email still sent
     expect(sendWorkshopBuiltEmail).toHaveBeenCalledTimes(1);

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import crypto from "crypto";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
-import { sendWorkshopApprovedEmail, sendWorkshopDeniedEmail } from "@/services/notifications";
+import { sendWorkshopApprovedEmail, sendWorkshopDeniedEmail, sendApprovalInfoRequestEmail } from "@/services/notifications";
 import { inngest } from "@/inngest/client";
 
 const DEFAULT_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
@@ -12,7 +12,7 @@ const MAX_APPROVAL_LINK_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days guardrail
 
 // Request schema
 const RespondSchema = z.object({
-    action: z.enum(["APPROVE", "DENY", "RESET_TO_PENDING"]),
+    action: z.enum(["APPROVE", "DENY", "RESET_TO_PENDING", "INFO_REQUESTED"]),
     reason: z.string().optional(),
     token: z.string().optional(), // For one-click links
 });
@@ -109,13 +109,8 @@ export async function GET(
             }
         });
 
-        // When approving, advance workshop status to PRE_EVENT
-        if (newStatus === "APPROVED" && approval.workshopId) {
-            await db.workshop.update({
-                where: { id: approval.workshopId },
-                data: { status: "PRE_EVENT" },
-            });
-        }
+        // NOTE: Do NOT set workshop.status = PRE_EVENT here — auto-build owns that transition.
+        // Setting it here causes the auto-build idempotency guard to skip the build on Inngest retries.
 
         // Send notification email to coach (non-blocking)
         // Use coachId directly (always non-null) instead of workshop→coach join
@@ -270,6 +265,58 @@ export async function POST(
             return NextResponse.json({ success: true, status: "PENDING", message: "Approval reset to pending" });
         }
 
+        // INFO_REQUESTED: ask coach for more info without changing approval status to approved/denied
+        if (action === "INFO_REQUESTED") {
+            if (approval.status !== "PENDING") {
+                return NextResponse.json(
+                    { error: "Can only request info on PENDING approvals" },
+                    { status: 400 }
+                );
+            }
+            await db.approvalQueue.update({
+                where: { id },
+                data: {
+                    status: "INFO_REQUESTED",
+                    notes: reason,
+                },
+            });
+            // Also update workshop status so coach portal shows the info request card
+            if (approval.workshopId) {
+                await db.workshop.update({
+                    where: { id: approval.workshopId },
+                    data: { status: "INFO_REQUESTED" },
+                });
+            }
+            // Notify coach (non-blocking)
+            {
+                const coach = await db.coach.findUnique({
+                    where: { id: approval.coachId },
+                    select: { email: true, firstName: true, lastName: true },
+                });
+                if (coach && approval.workshopId) {
+                    const w = await db.workshop.findUnique({
+                        where: { id: approval.workshopId },
+                        select: { title: true },
+                    });
+                    await sendApprovalInfoRequestEmail({
+                        coachEmail: coach.email,
+                        coachName: `${coach.firstName} ${coach.lastName}`,
+                        workshopTitle: w?.title ?? "Workshop",
+                        workshopId: approval.workshopId,
+                        question: reason || "Please provide additional information.",
+                    }).catch((err) => console.error("Failed to send info request email:", err));
+                }
+            }
+            await logAudit({
+                entityType: "ApprovalQueue",
+                entityId: id,
+                action: "INFO_REQUESTED",
+                performedBy: actor.email,
+                changes: { previousStatus: "PENDING", newStatus: "INFO_REQUESTED", question: reason },
+            });
+            return NextResponse.json({ success: true, status: "INFO_REQUESTED", message: "Info requested from coach" });
+        }
+
         if (approval.status !== "PENDING") {
             return NextResponse.json(
                 { error: `Approval already ${approval.status.toLowerCase()}` },
@@ -289,13 +336,8 @@ export async function POST(
             }
         });
 
-        // When approving, advance workshop status to PRE_EVENT
-        if (newStatus === "APPROVED" && approval.workshopId) {
-            await db.workshop.update({
-                where: { id: approval.workshopId },
-                data: { status: "PRE_EVENT" },
-            });
-        }
+        // NOTE: Do NOT set workshop.status = PRE_EVENT here — auto-build owns that transition.
+        // Setting it here causes the auto-build idempotency guard to skip the build on Inngest retries.
 
         // Send notification email to coach (non-blocking)
         // Use coachId directly (always non-null) instead of workshop→coach join

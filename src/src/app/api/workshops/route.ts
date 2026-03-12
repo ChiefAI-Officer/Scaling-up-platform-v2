@@ -9,6 +9,7 @@ import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
 import { sendWorkshopRequestedEmail } from "@/services/notifications";
 import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshop-coupons";
 import { createWorkshopPromotionCode } from "@/services/stripe";
+import { inngest } from "@/inngest/client";
 
 function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -329,7 +330,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: stripeKeySet
-            ? `Stripe API error while creating coupon: ${errorMessage}`
+            ? "Failed to create discount codes. Please try again or contact support."
             : "Stripe is not configured. Please set STRIPE_SECRET_KEY in environment variables.",
         },
         { status: 502 }
@@ -362,7 +363,7 @@ export async function POST(request: NextRequest) {
         priceCents: data.priceCents,
         coupons: serializeWorkshopCoupons(persistedCoupons),
         maxAttendees: data.maxAttendees,
-        status: "INFO_REQUESTED",
+        status: isPrivilegedRole(actor.role) ? "AWAITING_APPROVAL" : "REQUESTED",
       },
       include: {
         coach: true,
@@ -422,6 +423,20 @@ export async function POST(request: NextRequest) {
         }),
       },
     });
+
+    // Admin/staff bypass: immediately trigger auto-build (skips approval queue)
+    if (isPrivilegedRole(actor.role)) {
+      try {
+        await inngest.send({
+          name: "workshop/approved",
+          data: { approvalId: "", workshopId: workshop.id, coachId: workshop.coachId },
+        });
+        console.log(`[INNGEST] workshop/approved emitted for admin-created workshop=${workshop.id}`);
+      } catch (err) {
+        // Non-fatal: auto-build can be manually triggered from admin if needed
+        console.error("[INNGEST] Failed to emit workshop/approved for admin workshop:", err);
+      }
+    }
 
     // Send workshop requested notification (non-blocking)
     sendWorkshopRequestedEmail({

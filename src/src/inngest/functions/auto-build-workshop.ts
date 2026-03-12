@@ -171,10 +171,11 @@ export const autoBuildWorkshop = inngest.createFunction(
                     `[auto-build] WARNING: No active templates found for workshopId=${workshop.id}. ` +
                     `Workshop will proceed without landing pages. Set isActiveTemplate=true on at least one landing page template.`
                 );
-                return { count: 0, templates: [] as string[], noTemplatesAvailable: true };
+                return { count: 0, templates: [] as string[], primarySlug: null as string | null, noTemplatesAvailable: true };
             }
 
             const created: string[] = [];
+            let primarySlug: string | null = null;
 
             for (const tpl of activeTemplates) {
                 // Check if this workshop already has a page for this template type
@@ -211,9 +212,10 @@ export const autoBuildWorkshop = inngest.createFunction(
                 });
 
                 created.push(tpl.template);
+                if (!primarySlug) primarySlug = slug;
             }
 
-            return { count: created.length, templates: created };
+            return { count: created.length, templates: created, primarySlug };
         });
 
         // Step 3: Assign matching workflows (PRE_EVENT)
@@ -316,11 +318,14 @@ export const autoBuildWorkshop = inngest.createFunction(
             return { workflowId: workflow_.id, name: workflow_.name, assignmentId: assignment.id };
         });
 
-        // Step 5: Update workshop status to PRE_EVENT
+        // Step 5: Update workshop status to PRE_EVENT and set landingPageSlug
         await step.run("update-status", async () => {
             await db.workshop.update({
                 where: { id: workshopId },
-                data: { status: "PRE_EVENT" },
+                data: {
+                    status: "PRE_EVENT",
+                    ...(pagesCreated.primarySlug ? { landingPageSlug: pagesCreated.primarySlug } : {}),
+                },
             });
         });
 

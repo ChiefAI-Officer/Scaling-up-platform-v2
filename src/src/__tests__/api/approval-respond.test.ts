@@ -143,11 +143,8 @@ describe("Approval respond API", () => {
     expect(body.success).toBe(true);
     expect(body.status).toBe("APPROVED");
 
-    // Workshop status should advance to PRE_EVENT
-    expect(db.workshop.update).toHaveBeenCalledWith({
-      where: { id: "ws-99" },
-      data: { status: "PRE_EVENT" },
-    });
+    // Workshop status should NOT be directly updated — auto-build owns that transition
+    expect(db.workshop.update).not.toHaveBeenCalled();
   });
 
   it("does NOT update workshop status when denying", async () => {

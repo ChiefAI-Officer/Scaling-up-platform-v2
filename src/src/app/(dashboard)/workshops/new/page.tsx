@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RichTextTextarea } from "@/components/ui/rich-text-textarea";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WorkshopRulesPanel } from "@/components/workshops/workshop-rules-panel";
 
 interface Coach {
@@ -98,6 +99,7 @@ function generateCouponCode(discountPercent: string, title: string): string {
 
 interface NewWorkshopFormProps {
   isCoachPortal?: boolean;
+  prefilledCoach?: Coach;
 }
 
 // MR-21: Multi-coupon entry
@@ -107,24 +109,26 @@ interface CouponEntry {
   singleUse: boolean;
 }
 
-export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps) {
+export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWorkshopFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [workshopTypes, setWorkshopTypes] = useState<WorkshopType[]>([]);
   const [categories, setCategories] = useState<CategoryData[]>([]);
-  const [selectedCoach, setSelectedCoach] = useState<Coach | null>(null);
+  const [selectedCoach, setSelectedCoach] = useState<Coach | null>(prefilledCoach ?? null);
   const [sessionUser, setSessionUser] = useState<SessionResponse["user"]>(undefined);
   const [termsAccepted, setTermsAccepted] = useState(false);
   // MR-17: typeahead state for coach combobox (admin view)
-  const [coachQuery, setCoachQuery] = useState("");
+  const [coachQuery, setCoachQuery] = useState(
+    prefilledCoach ? `${prefilledCoach.firstName} ${prefilledCoach.lastName}` : ""
+  );
   const [showCoachDropdown, setShowCoachDropdown] = useState(false);
   // MR-21: Multi-coupon list (admin-only)
   const [coupons, setCoupons] = useState<CouponEntry[]>([]);
 
   const [formData, setFormData] = useState({
-    coachId: "",
+    coachId: prefilledCoach?.id ?? "",
     secondaryCoachId: "",
     isDuoWorkshop: false,
     workshopTypeId: "",
@@ -145,6 +149,7 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
     virtualLink: "",
     isFree: false,
     priceCents: "",
+    pricingTierId: "",
     geoTargetAreas: "",
     excludedClients: "",
     maxAttendees: "50",
@@ -154,48 +159,59 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
   useEffect(() => {
     async function loadData() {
       try {
-        const [coachesRes, typesRes, sessionRes, categoriesRes] = await Promise.all([
-          fetch("/api/coaches"),
+        // Coach portal: prefilledCoach is passed from server — skip the coaches list fetch entirely
+        const fetchPromises: Promise<Response>[] = [
           fetch("/api/workshop-types"),
-          fetch("/api/auth/session"),
           fetch("/api/categories"),
-        ]);
-
-        const coachesData = await coachesRes.json();
-        const typesData = await typesRes.json();
-        const sessionData = (await sessionRes.json()) as SessionResponse;
-        const categoriesData = await categoriesRes.json();
-
-        const coachesList: Coach[] = coachesData.success ? coachesData.data : [];
-        const workshopTypeList: WorkshopType[] = typesData.success ? typesData.data : [];
-        const categoriesList: CategoryData[] = Array.isArray(categoriesData) ? categoriesData : [];
-
-        setCoaches(coachesList);
-        setWorkshopTypes(workshopTypeList);
-        setCategories(categoriesList);
-        setSessionUser(sessionData.user);
-
-        // Auto-select first category
-        if (categoriesList.length > 0) {
-          setFormData((prev) => ({
-            ...prev,
-            categoryId: prev.categoryId || categoriesList[0].id,
-          }));
+        ];
+        if (!prefilledCoach) {
+          fetchPromises.unshift(fetch("/api/coaches"), fetch("/api/auth/session"));
         }
 
-        if (sessionData.user?.role === "COACH" && sessionData.user.email) {
-          const matchingCoach = coachesList.find(
-            (coach) => coach.email.toLowerCase() === sessionData.user?.email?.toLowerCase()
-          );
+        const results = await Promise.all(fetchPromises);
 
-          if (matchingCoach) {
-            setSelectedCoach(matchingCoach);
-            setCoachQuery(`${matchingCoach.firstName} ${matchingCoach.lastName}`);
-            setFormData((prev) => ({
-              ...prev,
-              coachId: matchingCoach.id,
-            }));
+        let coachesList: Coach[] = [];
+        let sessionData: SessionResponse = {};
+
+        if (!prefilledCoach) {
+          const [coachesRes, sessionRes, typesRes, categoriesRes] = results as [Response, Response, Response, Response];
+          const coachesData = await coachesRes.json();
+          sessionData = (await sessionRes.json()) as SessionResponse;
+          const typesData = await typesRes.json();
+          const categoriesData = await categoriesRes.json();
+          coachesList = coachesData.success ? coachesData.data : [];
+          setCoaches(coachesList);
+          setSessionUser(sessionData.user);
+          setWorkshopTypes(typesData.success ? typesData.data : []);
+          const categoriesList: CategoryData[] = Array.isArray(categoriesData) ? categoriesData : [];
+          setCategories(categoriesList);
+          if (categoriesList.length > 0) {
+            setFormData((prev) => ({ ...prev, categoryId: prev.categoryId || categoriesList[0].id }));
           }
+          // Legacy email-based auto-populate for sessions without prefilledCoach
+          if (sessionData.user?.role === "COACH" && sessionData.user.email) {
+            const matchingCoach = coachesList.find(
+              (coach) => coach.email.toLowerCase() === sessionData.user?.email?.toLowerCase()
+            );
+            if (matchingCoach) {
+              setSelectedCoach(matchingCoach);
+              setCoachQuery(`${matchingCoach.firstName} ${matchingCoach.lastName}`);
+              setFormData((prev) => ({ ...prev, coachId: matchingCoach.id }));
+            }
+          }
+        } else {
+          // Coach portal with prefilledCoach: only fetch types and categories
+          const [typesRes, categoriesRes] = results as [Response, Response];
+          const typesData = await typesRes.json();
+          const categoriesData = await categoriesRes.json();
+          setWorkshopTypes(typesData.success ? typesData.data : []);
+          const categoriesList: CategoryData[] = Array.isArray(categoriesData) ? categoriesData : [];
+          setCategories(categoriesList);
+          if (categoriesList.length > 0) {
+            setFormData((prev) => ({ ...prev, categoryId: prev.categoryId || categoriesList[0].id }));
+          }
+          // Simulate session role for coachIsAutoFilled flag
+          setSessionUser({ role: "COACH", email: prefilledCoach.email });
         }
       } catch (loadError) {
         console.error("Failed to load data:", loadError);
@@ -203,6 +219,7 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
     }
 
     void loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const availableWorkshopTypes = useMemo(() => {
@@ -454,14 +471,8 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
         );
       }
 
-      if (formData.isDuoWorkshop && formData.secondaryCoachId) {
-        const params = new URLSearchParams();
-        params.set("coach2Id", formData.secondaryCoachId);
-        router.push(`/workshops/${data.data.id}/landing-pages/duo-landing?${params.toString()}`);
-        return;
-      }
-
-      router.push(`/workshops/${data.data.id}/landing-pages`);
+      // Redirect to workshop detail — auto-build fires server-side via Inngest
+      router.push(`/workshops/${data.data.id}`);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Something went wrong");
     } finally {
@@ -635,18 +646,14 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
 
             <div>
               <Label htmlFor="description">Internal Description</Label>
-              <RichTextTextarea
+              <Textarea
                 id="description"
+                name="description"
                 value={formData.description}
-                onChange={(value) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    description: value,
-                  }))
-                }
+                onChange={handleChange}
                 readOnly={coachIsAutoFilled && Boolean(formData.description)}
                 rows={4}
-                className={coachIsAutoFilled && formData.description ? "bg-muted" : undefined}
+                className={`mt-1 ${coachIsAutoFilled && formData.description ? "bg-muted" : ""}`}
                 placeholder="Internal notes for operations and setup..."
               />
               <p className="text-sm text-muted-foreground mt-1">
@@ -733,6 +740,7 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
                   id="eventTime"
                   name="eventTime"
                   type="time"
+                  step="900"
                   value={formData.eventTime}
                   onChange={handleChange}
                   className="mt-1"
@@ -745,11 +753,30 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
                   id="eventEndTime"
                   name="eventEndTime"
                   type="time"
+                  step="900"
                   value={formData.eventEndTime}
                   onChange={handleChange}
                   className="mt-1"
                 />
               </div>
+            </div>
+
+            <div>
+              <Label htmlFor="timezone">Timezone</Label>
+              <select
+                id="timezone"
+                name="timezone"
+                value={formData.timezone}
+                onChange={handleChange}
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary bg-background"
+              >
+                <option value="America/New_York">Eastern Time (ET)</option>
+                <option value="America/Chicago">Central Time (CT)</option>
+                <option value="America/Denver">Mountain Time (MT)</option>
+                <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                <option value="America/Phoenix">Arizona (no DST)</option>
+                <option value="Pacific/Honolulu">Hawaii (HT)</option>
+              </select>
             </div>
 
             {formData.format !== "VIRTUAL" && (
@@ -891,37 +918,65 @@ export function NewWorkshopForm({ isCoachPortal = false }: NewWorkshopFormProps)
             {!formData.isFree && (
               <>
                 <div>
-                  <Label htmlFor="priceCents">Workshop Price ($) *</Label>
-                  <Input
-                    id="priceCents"
-                    name="priceCents"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.priceCents}
-                    onChange={handleChange}
-                    required={!formData.isFree}
-                    placeholder="395"
-                    className="mt-1"
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Suggested: $395 (half-day), $595 (full-day)
-                  </p>
+                  <Label htmlFor="pricingTierId">Workshop Price *</Label>
+                  {selectedCategory?.pricingTiers && selectedCategory.pricingTiers.length > 0 ? (
+                    <Select
+                      value={formData.pricingTierId}
+                      onValueChange={(val) => {
+                        const tier = selectedCategory.pricingTiers.find((t) => t.id === val);
+                        setFormData((prev) => ({
+                          ...prev,
+                          pricingTierId: val,
+                          priceCents: tier ? String(Math.round(tier.amountCents / 100)) : prev.priceCents,
+                        }));
+                      }}
+                    >
+                      <SelectTrigger id="pricingTierId" className="mt-1">
+                        <SelectValue placeholder="Choose a pricing tier..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedCategory.pricingTiers.map((tier) => (
+                          <SelectItem key={tier.id} value={tier.id}>
+                            {tier.name} — ${(tier.amountCents / 100).toFixed(0)}
+                            {tier.description ? ` (${tier.description})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <>
+                      <Input
+                        id="priceCents"
+                        name="priceCents"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={formData.priceCents}
+                        onChange={handleChange}
+                        required={!formData.isFree}
+                        placeholder="395"
+                        className="mt-1"
+                      />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        No pricing tiers defined for this category. Enter a price manually.
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 <div>
-                  <Label htmlFor="customPricingRequest">Custom Pricing Request</Label>
-                  <textarea
+                  <Label htmlFor="customPricingRequest">Custom Price (free form)</Label>
+                  <Textarea
                     id="customPricingRequest"
                     name="customPricingRequest"
                     value={formData.customPricingRequest}
                     onChange={handleChange}
                     rows={2}
-                    className="mt-1 block w-full rounded-md border border-border px-3 py-2 focus:border-primary focus:ring-primary"
-                    placeholder="If you need the price of your workshop to be different, please share your pricing here."
+                    className="mt-1"
+                    placeholder="If you need the price of your workshop to be different from the tiers above, enter it here."
                   />
                   <p className="text-sm text-muted-foreground mt-1">
-                    Optional. Share any special pricing needs for this workshop.
+                    Optional. Overrides the selected pricing tier if provided.
                   </p>
                 </div>
 

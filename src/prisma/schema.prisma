@@ -676,6 +676,7 @@ enum ApprovalStatus {
   APPROVED
   DENIED
   EXPIRED
+  INFO_REQUESTED
 }
 
 enum EmailType {

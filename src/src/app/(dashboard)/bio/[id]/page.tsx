@@ -130,7 +130,7 @@ export default function CoachBioEditorPage() {
       const response = await fetch(`/api/coaches/${coachId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bio: "", profileImage: "", company: "", circleId: undefined }),
+        body: JSON.stringify({ bio: "", profileImage: "", company: "", circleId: null }),
       });
       const data = await response.json();
       if (!data.success) throw new Error(data.error || "Failed to clear bio");
@@ -158,7 +158,7 @@ export default function CoachBioEditorPage() {
           company: formData.titleCredentials.trim(),
           bio: formData.biography.trim(),
           profileImage: formData.profileImageUrl.trim(),
-          circleId: formData.circleId.trim() || undefined,
+          circleId: formData.circleId.trim() || null,
         }),
       });
 

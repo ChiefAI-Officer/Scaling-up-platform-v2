@@ -581,6 +581,108 @@ export async function sendCoachWelcomeEmail(data: {
 }
 
 // ============================================
+// Sprint 4: Approval Info Request Emails
+// ============================================
+
+function escapeHtml(str: string): string {
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+export async function sendApprovalInfoRequestEmail(data: {
+    coachEmail: string;
+    coachName: string;
+    workshopTitle: string;
+    workshopId: string;
+    question: string;
+}): Promise<void> {
+    const portalUrl = `${process.env.APP_URL}/portal/workshops/${data.workshopId}`;
+    const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #1a1a1a;">Additional Information Requested</h2>
+      <p style="color: #4a4a4a;">Hi ${data.coachName},</p>
+      <p style="color: #4a4a4a;">
+        Our team has reviewed your workshop request for <strong>${data.workshopTitle}</strong> and
+        needs some additional information before we can approve it.
+      </p>
+      <div style="background: #f8f9fa; border-left: 4px solid #1D4ED8; padding: 16px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; color: #1a1a1a; font-weight: 600;">Question from our team:</p>
+        <p style="margin: 8px 0 0; color: #374151;">${escapeHtml(data.question)}</p>
+      </div>
+      <p style="color: #4a4a4a;">
+        Please log in to your portal and submit your response on the workshop detail page.
+      </p>
+      <br/>
+      <div style="text-align: center;">
+        <a href="${portalUrl}"
+           style="display: inline-block; background-color: #1D4ED8; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+          Respond in Portal
+        </a>
+      </div>
+      <br/>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;"/>
+      <p style="color: #9ca3af; font-size: 12px;">&mdash; Scaling Up Workshop Platform</p>
+    </div>
+  `;
+
+    await sendNotificationEmail({
+        to: data.coachEmail,
+        subject: `Action Required: Additional info needed for "${data.workshopTitle}"`,
+        html,
+        telemetry: {
+            workshopId: data.workshopId,
+            recipientRole: "COACH",
+            metadata: { type: "approval_info_request" },
+        },
+    });
+}
+
+export async function sendApprovalCoachRespondedEmail(data: {
+    adminEmail: string;
+    coachName: string;
+    workshopTitle: string;
+    approvalId: string;
+    coachResponse: string;
+}): Promise<void> {
+    const approvalUrl = `${process.env.APP_URL}/admin/approvals`;
+    const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 560px; margin: 0 auto;">
+      <h2 style="color: #1a1a1a;">Coach Responded to Info Request</h2>
+      <p style="color: #4a4a4a;"><strong>${data.coachName}</strong> has responded to your information request for <strong>${data.workshopTitle}</strong>.</p>
+      <div style="background: #f8f9fa; border-left: 4px solid #22c55e; padding: 16px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0; color: #1a1a1a; font-weight: 600;">Coach&apos;s response:</p>
+        <p style="margin: 8px 0 0; color: #374151; white-space: pre-wrap;">${escapeHtml(data.coachResponse)}</p>
+      </div>
+      <p style="color: #4a4a4a;">The approval is now back in the pending queue for your review.</p>
+      <br/>
+      <div style="text-align: center;">
+        <a href="${approvalUrl}"
+           style="display: inline-block; background-color: #1D4ED8; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+          Review in Approval Queue
+        </a>
+      </div>
+      <br/>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;"/>
+      <p style="color: #9ca3af; font-size: 12px;">&mdash; Scaling Up Workshop Platform</p>
+    </div>
+  `;
+
+    await sendNotificationEmail({
+        to: data.adminEmail,
+        subject: `Coach Responded: "${data.workshopTitle}" — Ready for Review`,
+        html,
+        telemetry: {
+            recipientRole: "STAFF",
+            metadata: { type: "approval_coach_responded", approvalId: data.approvalId },
+        },
+    });
+}
+
+// ============================================
 // Internal Helpers
 // ============================================
 

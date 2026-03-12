@@ -1,6 +1,6 @@
 import { db } from "./db";
 
-export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'DENY' | 'LOGIN' | 'LOGOUT' | 'RESET_TO_PENDING';
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'DENY' | 'LOGIN' | 'LOGOUT' | 'RESET_TO_PENDING' | 'INFO_REQUESTED' | 'COACH_RESPONSE';
 
 interface AuditLogParams {
     entityType: string;

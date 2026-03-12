@@ -40,7 +40,7 @@ export default async function WorkshopDetailsPage({
   const { id } = await params;
   const { coach } = await requireCoach();
 
-  const [workshop, workflowAssignments, surveyCount, latestDenial, workshopFiles, registrationFinancials, infoRequestedApproval] = await Promise.all([
+  const [workshop, workflowAssignments, surveyCount, latestDenial, workshopFiles, registrationFinancials, infoRequestedApproval, fallbackLandingPage] = await Promise.all([
     db.workshop.findFirst({
       where: { id, coachId: coach.id },
       select: {
@@ -106,11 +106,17 @@ export default async function WorkshopDetailsPage({
       where: { workshopId: id, paymentStatus: "COMPLETED" },
       select: { amountPaidCents: true },
     }),
-    // MR-33: Pending approval for coach response form (when workshop is INFO_REQUESTED)
+    // MR-33: INFO_REQUESTED approval for coach response form
     db.approvalQueue.findFirst({
-      where: { workshopId: id, status: "PENDING" },
+      where: { workshopId: id, status: "INFO_REQUESTED" },
       orderBy: { requestedAt: "desc" },
       select: { id: true, notes: true, coachResponse: true },
+    }),
+    // Sprint 3: Fallback landing page URL in case landingPageSlug not yet set on workshop
+    db.landingPage.findFirst({
+      where: { workshopId: id },
+      select: { slug: true },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
 
@@ -170,10 +176,10 @@ export default async function WorkshopDetailsPage({
               </p>
             )}
           </div>
-          {workshop.landingPageSlug && (
+          {(workshop.landingPageSlug || fallbackLandingPage?.slug) && (
             <div className="mt-3 pt-3 border-t border-border">
               <p className="text-xs font-medium text-muted-foreground mb-1">Landing Page URL</p>
-              <CopyUrlButton url={`${APP_URL}/workshop/${workshop.landingPageSlug}`} />
+              <CopyUrlButton url={`${APP_URL}/workshop/${workshop.landingPageSlug ?? fallbackLandingPage!.slug}`} />
             </div>
           )}
         </div>

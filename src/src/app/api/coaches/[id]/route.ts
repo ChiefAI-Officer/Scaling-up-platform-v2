@@ -102,6 +102,7 @@ export async function PATCH(
         ...(data.showBookCallCta !== undefined && { showBookCallCta: data.showBookCallCta }),
         ...(data.hubspotId !== undefined && { hubspotId: data.hubspotId }),
         ...(data.circleId !== undefined && { circleId: data.circleId }),
+        ...(data.territory !== undefined && { territory: data.territory }),
       },
     });
 
