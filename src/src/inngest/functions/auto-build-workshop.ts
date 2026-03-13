@@ -318,13 +318,21 @@ export const autoBuildWorkshop = inngest.createFunction(
             return { workflowId: workflow_.id, name: workflow_.name, assignmentId: assignment.id };
         });
 
-        // Step 5: Update workshop status to PRE_EVENT and set landingPageSlug
+        // Step 5: Update workshop status to PRE_EVENT and set landingPageSlug (prefer SOLO_LANDING)
         await step.run("update-status", async () => {
+            let landingPageSlug = pagesCreated.primarySlug;
+            if (pagesCreated.count > 0) {
+                const soloPage = await db.landingPage.findFirst({
+                    where: { workshopId, template: "SOLO_LANDING" },
+                    select: { slug: true },
+                });
+                if (soloPage?.slug) landingPageSlug = soloPage.slug;
+            }
             await db.workshop.update({
                 where: { id: workshopId },
                 data: {
                     status: "PRE_EVENT",
-                    ...(pagesCreated.primarySlug ? { landingPageSlug: pagesCreated.primarySlug } : {}),
+                    ...(landingPageSlug ? { landingPageSlug } : {}),
                 },
             });
         });

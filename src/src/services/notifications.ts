@@ -37,12 +37,19 @@ export interface ApprovalRequest {
 export async function sendApprovalRequest(approval: ApprovalRequest): Promise<void> {
     const approvalUrl = `${process.env.APP_URL}/admin/approvals/${approval.id}`;
     const typeLabel = APPROVAL_TYPE_LABELS[approval.type] || approval.type;
-    const amountLine = approval.amount
-        ? `<p><strong>Amount:</strong> $${(approval.amount / 100).toFixed(2)}</p>`
+    const isCustomPricing = approval.type === "CUSTOM_PRICING" && approval.amount;
+    const customPriceLine = isCustomPricing
+        ? `<p style="font-size:1.1em; color:#b45309; font-weight:bold;">CUSTOM PRICE: $${(approval.amount! / 100).toLocaleString()}</p>`
         : "";
+    const amountLine =
+        !isCustomPricing && approval.amount
+            ? `<p><strong>Amount:</strong> $${(approval.amount / 100).toFixed(2)}</p>`
+            : "";
+    const subjectPrefix = isCustomPricing ? "[CUSTOM PRICING] " : "";
 
     const html = `
     <h2 style="color: #1e293b;">${typeLabel}</h2>
+    ${customPriceLine}
     <p><strong>Coach:</strong> ${approval.coachName}</p>
     <p><strong>Details:</strong> ${approval.details}</p>
     ${amountLine}
@@ -53,7 +60,7 @@ export async function sendApprovalRequest(approval: ApprovalRequest): Promise<vo
 
     await sendNotificationEmail({
         to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
-        subject: `[ACTION REQUIRED] ${typeLabel} — ${approval.coachName}`,
+        subject: `${subjectPrefix}[ACTION REQUIRED] ${typeLabel} — ${approval.coachName}`,
         html,
     });
 
@@ -174,6 +181,7 @@ export async function sendEnrichedApprovalRequest(data: {
     coachEmail: string;
     details: string;
     requestedAt: Date;
+    amount?: number; // In cents — populated for CUSTOM_PRICING
     circleCertification?: {
         verified: boolean;
         confidence: number;
@@ -214,9 +222,15 @@ export async function sendEnrichedApprovalRequest(data: {
     }
 
     const typeLabel = APPROVAL_TYPE_LABELS[data.type] || data.type;
+    const isCustomPricing = data.type === "CUSTOM_PRICING" && data.amount;
+    const customPriceLine = isCustomPricing
+        ? `<p style="font-size:1.1em; color:#b45309; font-weight:bold;">CUSTOM PRICE: $${(data.amount! / 100).toLocaleString()}</p>`
+        : "";
+    const subjectPrefix = isCustomPricing ? "[CUSTOM PRICING] " : "";
 
     const html = `
     <h2 style="color: #1e293b;">${typeLabel}</h2>
+    ${customPriceLine}
     <p><strong>Coach:</strong> ${data.coachName} (${data.coachEmail})</p>
     <p><strong>Details:</strong> ${data.details}</p>
     <p><strong>Requested:</strong> ${data.requestedAt.toLocaleString()}</p>
@@ -227,7 +241,7 @@ export async function sendEnrichedApprovalRequest(data: {
 
     await sendNotificationEmail({
         to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
-        subject: `[ACTION REQUIRED] ${typeLabel} — ${data.coachName}`,
+        subject: `${subjectPrefix}[ACTION REQUIRED] ${typeLabel} — ${data.coachName}`,
         html,
     });
 

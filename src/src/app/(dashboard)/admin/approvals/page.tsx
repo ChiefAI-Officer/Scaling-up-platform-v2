@@ -15,6 +15,7 @@ interface Approval {
   requestedAt: string;
   escalatedAt?: string | null;
   coachResponse?: string | null; // MR-33
+  requestData?: Record<string, unknown> | null;
 }
 
 interface ApprovalsApiResponse {
@@ -240,6 +241,11 @@ export default function ApprovalsPage() {
                   >
                     {approval.type.replace(/_/g, " ")}
                   </span>
+                  {approval.type === "CUSTOM_PRICING" && typeof approval.requestData?.amount === "number" && (
+                    <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
+                      Custom Price: ${(approval.requestData.amount / 100).toLocaleString()}
+                    </span>
+                  )}
                   &nbsp; {approval.coachName}
                 </h3>
                 <p className="text-foreground">{approval.details}</p>

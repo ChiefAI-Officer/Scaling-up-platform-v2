@@ -19,6 +19,8 @@ import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated"
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 import { WorkshopActions } from "./workshop-actions";
 import { QuickActions } from "./quick-actions";
+import { RegistrationRemoveButton } from "./registration-remove-button";
+import { WorkshopInlineEditForm } from "@/components/workshops/WorkshopInlineEditForm";
 import { requireAuth } from "@/lib/authorization";
 
 function executionStatusVariant(status: string): "success" | "warning" | "destructive" | "secondary" {
@@ -62,6 +64,7 @@ export default async function WorkshopDetailPage({
             id: true,
             slug: true,
             status: true,
+            template: true,
           },
         },
       },
@@ -260,11 +263,27 @@ export default async function WorkshopDetailPage({
                 </div>
               )}
 
-              {workshop.landingPageSlug && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Landing Page</p>
-                  <CopyUrlButton url={`${APP_URL}/workshop/${workshop.landingPageSlug}`} />
-                </div>
+              {(() => {
+                const soloPage = workshop.landingPages?.find((p) => p.template === "SOLO_LANDING");
+                const copySlug = soloPage?.slug ?? workshop.landingPageSlug;
+                return copySlug ? (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Landing Page</p>
+                    <CopyUrlButton url={`${APP_URL}/workshop/${copySlug}`} />
+                  </div>
+                ) : null;
+              })()}
+
+              {session.user.role === "ADMIN" && (
+                <WorkshopInlineEditForm
+                  workshopId={workshop.id}
+                  eventDate={workshop.eventDate.toISOString()}
+                  eventTime={workshop.eventTime}
+                  timezone={workshop.timezone}
+                  virtualLink={workshop.virtualLink}
+                  venueName={workshop.venueName}
+                  venueAddress={workshop.venueAddress}
+                />
               )}
             </CardContent>
           </Card>
@@ -299,6 +318,11 @@ export default async function WorkshopDetailPage({
                         <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
                           Date
                         </th>
+                        {session.user.role === "ADMIN" && (
+                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">
+                            Actions
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -328,6 +352,18 @@ export default async function WorkshopDetailPage({
                           <td className="px-4 py-3 text-sm text-muted-foreground">
                             {formatDate(reg.createdAt)}
                           </td>
+                          {session.user.role === "ADMIN" && (
+                            <td className="px-4 py-3">
+                              {reg.status !== "CANCELLED" && (
+                                <RegistrationRemoveButton
+                                  registrationId={reg.id}
+                                  firstName={reg.firstName}
+                                  lastName={reg.lastName}
+                                  email={reg.email}
+                                />
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

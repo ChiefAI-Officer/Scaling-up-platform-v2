@@ -4,6 +4,7 @@ import { updateWorkshopSchema } from "@/lib/validations";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/authorization";
 import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/lead-time-validator";
 import { chargeCancellationFee } from "@/services/stripe";
+import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/template-interpolation";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;
 
@@ -191,10 +192,33 @@ export async function PATCH(
       },
     });
 
+    // R4B: Sync landing page content when logistics fields change
+    const syncFields = ["eventDate", "eventTime", "timezone", "virtualLink", "venueName", "venueAddress"] as const;
+    const hasRelevantChange = syncFields.some((f) => data[f] !== undefined);
+    let landingPageSyncWarning: string | undefined;
+    if (hasRelevantChange) {
+      try {
+        const variables = await buildWorkshopVariables(id);
+        if (variables) {
+          const landingPages = await db.landingPage.findMany({ where: { workshopId: id }, select: { id: true, content: true } });
+          for (const page of landingPages) {
+            if (!page.content) continue;
+            let updated = interpolateContent(page.content, variables);
+            updated = rewriteIdentityFields(updated, variables);
+            await db.landingPage.update({ where: { id: page.id }, data: { content: updated } });
+          }
+        }
+      } catch (syncError) {
+        console.error("[R4B] Landing page sync failed (non-blocking):", syncError);
+        landingPageSyncWarning = "Landing page content sync failed — please refresh landing pages manually.";
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: workshop,
       message: "Workshop updated successfully",
+      ...(landingPageSyncWarning ? { warning: landingPageSyncWarning } : {}),
     });
   } catch (error) {
     console.error("Error updating workshop:", error);

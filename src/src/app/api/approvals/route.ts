@@ -417,6 +417,7 @@ export async function POST(request: NextRequest) {
                     coachEmail,
                     details,
                     requestedAt: new Date(),
+                    amount: input.amount,
                     circleCertification: circleData ? {
                         verified: circleData.verified,
                         confidence: circleData.confidence,

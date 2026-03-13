@@ -14,7 +14,7 @@ const attendanceSchema = z.object({
  * Paid coach removals must go through the admin-review removal-request flow.
  */
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -25,6 +25,10 @@ export async function DELETE(
         { status: 401 }
       );
     }
+
+    const skipRefund =
+      actor.role === "ADMIN" &&
+      request.nextUrl.searchParams.get("skipRefund") === "true";
 
     const { id: registrationId } = await params;
 
@@ -70,12 +74,9 @@ export async function DELETE(
       );
     }
 
-    // If payment was completed and we have a Stripe payment ID, issue refund
+    // Issue Stripe refund unless admin explicitly skips it
     let refundId: string | null = null;
-    if (
-      isPaidRegistration &&
-      registration.stripePaymentId
-    ) {
+    if (isPaidRegistration && registration.stripePaymentId && !skipRefund) {
       try {
         const refund = await processRefund(registration.stripePaymentId);
         refundId = refund.id;
@@ -91,13 +92,18 @@ export async function DELETE(
       }
     }
 
-    // Update registration status
+    // CANCELLED = removed by admin without platform refund (manual Stripe refund pending)
+    // REFUNDED  = removed with Stripe refund processed by platform
     await db.registration.update({
       where: { id: registrationId },
       data: {
         status: "CANCELLED",
         paymentStatus:
-          registration.paymentStatus === "COMPLETED" ? "REFUNDED" : registration.paymentStatus,
+          registration.paymentStatus === "COMPLETED"
+            ? skipRefund
+              ? "CANCELLED"
+              : "REFUNDED"
+            : registration.paymentStatus,
       },
     });
 

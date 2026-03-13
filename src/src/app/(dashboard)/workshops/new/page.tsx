@@ -154,6 +154,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
     excludedClients: "",
     maxAttendees: "50",
     customPricingRequest: "",
+    customPrice: "",
   });
 
   useEffect(() => {
@@ -222,17 +223,11 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // All workshop types are available regardless of certification.
+  // Uncertified requests route to manual admin approval via approval-engine.ts.
   const availableWorkshopTypes = useMemo(() => {
-    if (!selectedCoach) {
-      return workshopTypes;
-    }
-
-    return workshopTypes.filter((type) =>
-      selectedCoach.certifications.some(
-        (cert) => cert.workshopTypeId === type.id && cert.status === "ACTIVE"
-      )
-    );
-  }, [selectedCoach, workshopTypes]);
+    return workshopTypes;
+  }, [workshopTypes]);
 
   const selectedCategory = useMemo(
     () => categories.find((c) => c.id === formData.categoryId) || null,
@@ -431,13 +426,19 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
 
       if (isCoachPortal) {
         // MR-16: Coach portal — submit as approval request
+        // Spread payload fields at top level so /api/approvals can read body.* directly.
+        // venueAddress must be sent as separate street/city/state/zip fields (API contract).
+        const parsedCustomPrice = formData.customPrice ? Number(formData.customPrice) : null;
+        const hasCustomPrice = parsedCustomPrice !== null && parsedCustomPrice > 0;
         const approvalPayload = {
-          type: "WORKSHOP_REQUEST",
-          workshopTypeId: formData.workshopTypeId,
-          details: {
-            ...payload,
-            termsAcceptedAt: new Date().toISOString(),
-          },
+          type: hasCustomPrice ? "CUSTOM_PRICING" : "WORKSHOP_REQUEST",
+          ...payload,
+          venueAddress: formData.venueStreet || undefined,
+          venueCity: formData.venueCity || undefined,
+          venueState: formData.venueState || undefined,
+          venueZip: formData.venueZip || undefined,
+          termsAcceptedAt: new Date().toISOString(),
+          ...(hasCustomPrice ? { amount: Math.round(parsedCustomPrice * 100) } : {}),
         };
         const response = await fetch("/api/approvals", {
           method: "POST",
@@ -543,7 +544,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                     autoComplete="off"
                   />
                   {showCoachDropdown && filteredCoachOptions.length > 0 && (
-                    <div className="absolute z-20 w-full bg-background border border-border rounded-md shadow-lg max-h-48 overflow-auto mt-1">
+                    <div className="absolute z-50 w-full bg-background border border-border rounded-md shadow-lg max-h-48 overflow-auto mt-1">
                       {filteredCoachOptions.map((coach) => (
                         <button
                           key={coach.id}
@@ -965,7 +966,25 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                 </div>
 
                 <div>
-                  <Label htmlFor="customPricingRequest">Custom Price (free form)</Label>
+                  <Label htmlFor="customPrice">Custom Price (USD)</Label>
+                  <Input
+                    id="customPrice"
+                    name="customPrice"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.customPrice}
+                    onChange={handleChange}
+                    className="mt-1"
+                    placeholder="e.g. 495"
+                  />
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Optional. If provided, overrides the pricing tier and routes to admin for approval.
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="customPricingRequest">Custom Pricing Notes</Label>
                   <Textarea
                     id="customPricingRequest"
                     name="customPricingRequest"
@@ -973,11 +992,8 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                     onChange={handleChange}
                     rows={2}
                     className="mt-1"
-                    placeholder="If you need the price of your workshop to be different from the tiers above, enter it here."
+                    placeholder="Any context for the custom price request (optional)."
                   />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Optional. Overrides the selected pricing tier if provided.
-                  </p>
                 </div>
 
                 {/* MR-21: Multi-coupon / MR-22: Admin-only */}
