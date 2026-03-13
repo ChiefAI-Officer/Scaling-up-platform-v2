@@ -433,6 +433,7 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({
+            success: true,
             autoApproved: result.autoApproved,
             reason: result.reason,
             approvalId: result.approvalId,
