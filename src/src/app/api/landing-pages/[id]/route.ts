@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { Prisma } from "@prisma/client";
 import type { LandingPage } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
@@ -50,7 +49,8 @@ export async function PATCH(
             const effectiveCategoryId = data.categoryId !== undefined ? data.categoryId : page.categoryId;
 
             // Atomic: deactivate any competing active template for this slot, then activate this one
-            const txResult = await db.$transaction<[Prisma.BatchPayload, LandingPage]>([
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const txResult = await (db.$transaction as (ops: any[]) => Promise<any[]>)([
                 db.landingPage.updateMany({
                     where: {
                         template: page.template,
