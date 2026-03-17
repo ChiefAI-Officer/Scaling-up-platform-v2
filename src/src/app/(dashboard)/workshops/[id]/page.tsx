@@ -459,6 +459,7 @@ export default async function WorkshopDetailPage({
             <CardContent className="space-y-2">
               <QuickActions
                 workshopId={workshop.id}
+                workshopStatus={workshop.status}
                 landingPageSlug={workshop.landingPageSlug}
                 landingPages={workshop.landingPages}
               />
