@@ -328,12 +328,15 @@ export async function POST(request: NextRequest) {
                 }
             }
 
+            // Resolve the workshop title with category fallback
+            const resolvedTitle = body.title || (resolvedCat ? (resolvedCat.defaultTitle || `Scaling Up ${resolvedCat.name}`) : "Workshop Request");
+
             const workshop = await db.workshop.create({
                 data: {
                     coachId,
                     workshopTypeId: resolvedWorkshopTypeId,
                     workshopCode,
-                    title: body.title || (resolvedCat ? (resolvedCat.defaultTitle || `Scaling Up ${resolvedCat.name}`) : `Workshop Request`),
+                    title: resolvedTitle,
                     description: body.description || details,
                     category,
                     categoryId: resolvedCategoryId,
@@ -355,8 +358,8 @@ export async function POST(request: NextRequest) {
 
             workshopId = workshop.id;
 
-            // Generate landing page slug
-            const slug = generateSlug(body.title || "workshop", workshop.id);
+            // Generate landing page slug using the resolved title
+            const slug = generateSlug(resolvedTitle, workshop.id);
             await db.workshop.update({
                 where: { id: workshop.id },
                 data: { landingPageSlug: slug },
