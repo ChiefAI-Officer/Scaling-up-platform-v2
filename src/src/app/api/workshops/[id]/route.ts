@@ -5,6 +5,7 @@ import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/authori
 import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/lead-time-validator";
 import { chargeCancellationFee } from "@/services/stripe";
 import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/template-interpolation";
+import { sendCustomPriceChangeEmail } from "@/services/notifications";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;
 
@@ -105,6 +106,19 @@ export async function GET(
   }
 }
 
+// Fields coaches are allowed to edit on their own workshops.
+// priceCents and pricingTierId are included here so they don't get a 403 —
+// but the PATCH handler intercepts them and routes to CUSTOM_PRICING approval
+// instead of updating the workshop directly.
+const COACH_EDITABLE_FIELDS = new Set([
+  "title", "description", "categoryId", "format", "eventDate", "eventTime",
+  "timezone", "venueName", "venueAddress", "venueInstructions", "virtualLink",
+  "priceCents", "pricingTierId",
+]);
+
+// Pricing fields that trigger an approval flow instead of a direct update
+const COACH_PRICING_FIELDS = new Set(["priceCents", "pricingTierId"]);
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -114,12 +128,17 @@ export async function PATCH(
     if (!actor) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
-    if (!isPrivilegedRole(actor.role)) {
+
+    const isPrivileged = isPrivilegedRole(actor.role);
+    const isCoach = actor.role === "COACH";
+
+    if (!isPrivileged && !isCoach) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
     const { id } = await params;
-    const body = await request.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = await request.json() as any;
     const validation = updateWorkshopSchema.safeParse(body);
 
     if (!validation.success) {
@@ -137,26 +156,123 @@ export async function PATCH(
       );
     }
 
+    // Coaches can only patch their own workshop
+    if (isCoach && existing.coachId !== actor.coachId) {
+      return NextResponse.json({ success: false, error: "Workshop not found" }, { status: 404 });
+    }
+
     const data = validation.data;
-    if (data.eventDate) {
-      const dateChangeValidation = validateDateChange(
-        existing.eventDate,
-        new Date(data.eventDate),
-        existing.format
+
+    // Coaches cannot edit fields outside their allowed set
+    if (isCoach) {
+      const forbiddenFields = Object.keys(data).filter(
+        (k) => !COACH_EDITABLE_FIELDS.has(k) && data[k as keyof typeof data] !== undefined
+      );
+      if (forbiddenFields.length > 0) {
+        return NextResponse.json(
+          { success: false, error: `Coaches cannot edit: ${forbiddenFields.join(", ")}` },
+          { status: 403 }
+        );
+      }
+    }
+
+    // FIG-007: When a coach submits pricing fields, intercept and create a
+    // CUSTOM_PRICING ApprovalQueue entry instead of updating the workshop directly.
+    if (isCoach) {
+      const hasPricingChange = Object.keys(data).some(
+        (k) => COACH_PRICING_FIELDS.has(k) && data[k as keyof typeof data] !== undefined
       );
 
-      if (!dateChangeValidation.valid || dateChangeValidation.requiresApproval) {
+      if (hasPricingChange) {
+        // Resolve new priceCents: either direct value or from the selected tier
+        let newPriceCents = data.priceCents ?? existing.priceCents ?? 0;
+        if (data.pricingTierId && data.pricingTierId !== existing.pricingTierId) {
+          const tier = await db.pricingTier.findUnique({
+            where: { id: data.pricingTierId },
+            select: { amountCents: true },
+          });
+          if (tier) {
+            newPriceCents = tier.amountCents;
+          }
+        }
+
+        const oldPriceCents = existing.priceCents ?? 0;
+        const notes = typeof body.customPricingNotes === "string" ? body.customPricingNotes : undefined;
+
+        // Fetch the coach record for the email
+        const coachRecord = await db.coach.findUnique({
+          where: { id: existing.coachId },
+          select: { firstName: true, lastName: true, email: true },
+        });
+        const coachName = coachRecord
+          ? `${coachRecord.firstName} ${coachRecord.lastName}`.trim()
+          : actor.email;
+
+        // Create CUSTOM_PRICING approval queue entry
+        await db.approvalQueue.create({
+          data: {
+            type: "CUSTOM_PRICING",
+            workshopId: existing.id,
+            coachId: existing.coachId,
+            requestedBy: actor.email,
+            requestData: JSON.stringify({
+              oldPriceCents,
+              newPriceCents,
+              pricingTierId: data.pricingTierId ?? existing.pricingTierId,
+              customPricingNotes: notes,
+              requestedBy: actor.email,
+            }),
+            notes: notes ?? null,
+          },
+        });
+
+        // Fire-and-forget email notification to admin
+        sendCustomPriceChangeEmail({
+          adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+          coachName,
+          workshopTitle: existing.title,
+          workshopCode: existing.workshopCode ?? "",
+          workshopId: existing.id,
+          oldPriceCents,
+          newPriceCents,
+          customPricingNotes: notes,
+        }).catch((err: unknown) => console.error("[FIG-007] sendCustomPriceChangeEmail failed:", err));
+
         return NextResponse.json(
           {
-            success: false,
-            error:
-              dateChangeValidation.reason ||
-              "Date change requires manual approval",
-            requiresApproval: dateChangeValidation.requiresApproval,
-            leadTimeDays: dateChangeValidation.leadTimeDays,
+            success: true,
+            pendingApproval: true,
+            message: "Price change submitted for admin approval",
           },
-          { status: dateChangeValidation.requiresApproval ? 409 : 400 }
+          { status: 202 }
         );
+      }
+    }
+
+    if (data.eventDate) {
+      // FIG-009: Bypass lead-time check when coach edits during INFO_REQUESTED flow
+      const shouldValidateDateChange = !(isCoach && existing.status === "INFO_REQUESTED");
+
+      if (shouldValidateDateChange) {
+        const dateChangeValidation = validateDateChange(
+          existing.eventDate,
+          new Date(data.eventDate),
+          existing.format
+        );
+
+        if (!dateChangeValidation.valid || dateChangeValidation.requiresApproval) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                dateChangeValidation.reason ||
+                "Date change requires manual approval",
+              requiresApproval: dateChangeValidation.requiresApproval,
+              leadTimeDays: dateChangeValidation.leadTimeDays,
+            },
+            { status: dateChangeValidation.requiresApproval ? 409 : 400 }
+          );
+        }
       }
     }
 
@@ -165,6 +281,7 @@ export async function PATCH(
       data: {
         ...(data.title && { title: data.title }),
         ...(data.description !== undefined && { description: data.description }),
+        ...(data.categoryId !== undefined && { categoryId: data.categoryId || null }),
         ...(data.format && { format: data.format }),
         ...(data.duration && { duration: data.duration }),
         ...(data.eventDate && { eventDate: new Date(data.eventDate) }),
@@ -172,7 +289,7 @@ export async function PATCH(
         ...(data.timezone && { timezone: data.timezone }),
         ...(data.venueName !== undefined && { venueName: data.venueName }),
         ...(data.venueAddress !== undefined && {
-          venueAddress: data.venueAddress ? JSON.stringify(data.venueAddress) : null
+          venueAddress: data.venueAddress || null
         }),
         ...(data.venueInstructions !== undefined && {
           venueInstructions: data.venueInstructions,
@@ -180,11 +297,12 @@ export async function PATCH(
         ...(data.virtualLink !== undefined && {
           virtualLink: data.virtualLink || null,
         }),
-        ...(data.geoTargetAreas !== undefined && { geoTargetAreas: data.geoTargetAreas }),
-        ...(data.excludedClients !== undefined && { excludedClients: data.excludedClients }),
-        ...(data.isFree !== undefined && { isFree: data.isFree }),
-        ...(data.priceCents !== undefined && { priceCents: data.priceCents }),
-        ...(data.maxAttendees !== undefined && { maxAttendees: data.maxAttendees }),
+        // Admin-only fields
+        ...(!isCoach && data.geoTargetAreas !== undefined && { geoTargetAreas: data.geoTargetAreas }),
+        ...(!isCoach && data.excludedClients !== undefined && { excludedClients: data.excludedClients }),
+        ...(!isCoach && data.isFree !== undefined && { isFree: data.isFree }),
+        ...(!isCoach && data.priceCents !== undefined && { priceCents: data.priceCents }),
+        ...(!isCoach && data.maxAttendees !== undefined && { maxAttendees: data.maxAttendees }),
       },
       include: {
         coach: true,

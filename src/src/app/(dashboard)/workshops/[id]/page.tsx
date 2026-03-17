@@ -47,12 +47,13 @@ export default async function WorkshopDetailPage({
   const session = await requireAuth();
   const { id } = await params;
 
-  const [workshop, workflowAssignments] = await Promise.all([
+  const [workshop, categories, workflowAssignments] = await Promise.all([
     db.workshop.findUnique({
       where: { id },
       include: {
         coach: true,
         workshopType: true,
+        pricingTier: { select: { name: true, amountCents: true } },
         registrations: {
           orderBy: { createdAt: "desc" },
         },
@@ -69,6 +70,7 @@ export default async function WorkshopDetailPage({
         },
       },
     }),
+    db.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     db.workflowAssignment.findMany({
       where: { workshopId: id },
       include: {
@@ -277,12 +279,18 @@ export default async function WorkshopDetailPage({
               {session.user.role === "ADMIN" && (
                 <WorkshopInlineEditForm
                   workshopId={workshop.id}
+                  title={workshop.title}
+                  description={workshop.description}
+                  categoryId={workshop.categoryId}
+                  format={workshop.format}
+                  pricingTier={workshop.pricingTier ? { name: workshop.pricingTier.name, amountCents: workshop.pricingTier.amountCents } : null}
                   eventDate={workshop.eventDate.toISOString()}
                   eventTime={workshop.eventTime}
                   timezone={workshop.timezone}
                   virtualLink={workshop.virtualLink}
                   venueName={workshop.venueName}
                   venueAddress={workshop.venueAddress}
+                  categories={categories}
                 />
               )}
             </CardContent>
@@ -459,6 +467,7 @@ export default async function WorkshopDetailPage({
             <CardContent className="space-y-2">
               <QuickActions
                 workshopId={workshop.id}
+                workshopStatus={workshop.status}
                 landingPageSlug={workshop.landingPageSlug}
                 landingPages={workshop.landingPages}
               />

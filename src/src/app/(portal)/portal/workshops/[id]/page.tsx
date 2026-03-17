@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { CancelWorkshopDialog } from "@/components/workshops/cancel-workshop-dialog";
 import { ResubmitWorkshop } from "@/components/workshops/resubmit-workshop";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
-import { CoachResponseForm } from "@/components/workshops/coach-response-form";
 import { getSessionDownloadPath } from "@/lib/file-download-path";
 import {
   calculateWorkshopRevenueSplit,
@@ -40,7 +39,7 @@ export default async function WorkshopDetailsPage({
   const { id } = await params;
   const { coach } = await requireCoach();
 
-  const [workshop, workflowAssignments, surveyCount, latestDenial, workshopFiles, registrationFinancials, infoRequestedApproval, fallbackLandingPage] = await Promise.all([
+  const [workshop, workflowAssignments, surveyCount, latestDenial, workshopFiles, registrationFinancials, infoRequestedApproval, fallbackLandingPage, pendingPriceChange] = await Promise.all([
     db.workshop.findFirst({
       where: { id, coachId: coach.id },
       select: {
@@ -51,11 +50,16 @@ export default async function WorkshopDetailsPage({
         format: true,
         eventDate: true,
         eventTime: true,
+        timezone: true,
         venueName: true,
+        venueAddress: true,
         virtualLink: true,
+        categoryId: true,
         landingPageSlug: true,
         maxAttendees: true,
         isFree: true,
+        priceCents: true,
+        pricingTierId: true,
         workshopType: { select: { name: true } },
         _count: { select: { registrations: true } },
       },
@@ -117,6 +121,12 @@ export default async function WorkshopDetailsPage({
       where: { workshopId: id },
       select: { slug: true },
       orderBy: { createdAt: "asc" },
+    }),
+    // FIG-007: Check for pending CUSTOM_PRICING approval on this workshop
+    db.approvalQueue.findFirst({
+      where: { workshopId: id, type: "CUSTOM_PRICING", status: "PENDING" },
+      select: { id: true, requestData: true, requestedAt: true },
+      orderBy: { requestedAt: "desc" },
     }),
   ]);
 
@@ -248,12 +258,39 @@ export default async function WorkshopDetailsPage({
         )}
       </div>
 
-      {/* MR-33: Coach response to INFO_REQUESTED */}
+      {/* FIG-007: Pending price change indicator */}
+      {pendingPriceChange && (
+        <div className="rounded-xl border border-warning/40 bg-warning/5 p-4 flex items-start gap-3">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-warning">Price Change Pending Approval</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              You have a price change request awaiting admin review. The current pricing remains active until approved.
+            </p>
+          </div>
+          <Badge variant="warning">Pending</Badge>
+        </div>
+      )}
+
+      {/* FIG-009: Full edit form for INFO_REQUESTED status */}
       {workshop.status === "INFO_REQUESTED" && infoRequestedApproval && (
-        <CoachResponseForm
+        <ResubmitWorkshop
+          variant="info_requested"
+          workshopId={workshop.id}
           approvalId={infoRequestedApproval.id}
-          existingResponse={infoRequestedApproval.coachResponse ?? null}
-          adminQuestion={infoRequestedApproval.notes ?? null}
+          adminMessage={infoRequestedApproval.notes ?? null}
+          title={workshop.title}
+          description={workshop.description}
+          eventDate={workshop.eventDate.toISOString()}
+          eventTime={workshop.eventTime}
+          timezone={workshop.timezone}
+          venueName={workshop.venueName}
+          venueAddress={workshop.venueAddress}
+          virtualLink={workshop.virtualLink}
+          categoryId={workshop.categoryId}
+          format={workshop.format}
+          priceCents={workshop.priceCents}
+          isFree={workshop.isFree}
+          pricingTierId={workshop.pricingTierId}
         />
       )}
 
@@ -293,13 +330,19 @@ export default async function WorkshopDetailsPage({
       {/* Rejection + Resubmit */}
       {["CANCELED", "DENIED"].includes(workshop.status) && (
         <ResubmitWorkshop
+          variant="denied"
           workshopId={workshop.id}
           rejectionReason={latestDenial?.responseReason || latestDenial?.notes || null}
           title={workshop.title}
           description={workshop.description}
           eventDate={workshop.eventDate.toISOString()}
           eventTime={workshop.eventTime}
+          timezone={workshop.timezone}
           venueName={workshop.venueName}
+          venueAddress={workshop.venueAddress}
+          virtualLink={workshop.virtualLink}
+          categoryId={workshop.categoryId}
+          format={workshop.format}
         />
       )}
 

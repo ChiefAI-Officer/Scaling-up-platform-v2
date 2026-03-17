@@ -3,8 +3,11 @@
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
+const PRE_EVENT_AND_LATER = ["PRE_EVENT", "POST_EVENT", "COMPLETED"];
+
 interface QuickActionsProps {
     workshopId: string;
+    workshopStatus: string;
     landingPageSlug: string | null;
     landingPages: Array<{
         id: string;
@@ -15,19 +18,27 @@ interface QuickActionsProps {
 
 export function QuickActions({
     workshopId,
+    workshopStatus,
     landingPageSlug,
     landingPages,
 }: QuickActionsProps) {
     const router = useRouter();
-    const publishedPage = landingPages.find((p) => p.status === "PUBLISHED" && p.slug === landingPageSlug);
 
-    const handleViewLandingPage = () => {
-        if (landingPageSlug && publishedPage) {
-            window.open(`${window.location.origin}/workshop/${landingPageSlug}`, "_blank");
-        } else {
-            // Redirect to editor if not published or no slug
-            router.push(`/workshops/${workshopId}/landing-pages`);
-        }
+    const publishedPage = landingPages.find(
+        (p) => p.status === "PUBLISHED" && p.slug === landingPageSlug
+    );
+
+    const showViewPublicPage =
+        PRE_EVENT_AND_LATER.includes(workshopStatus) &&
+        !!publishedPage &&
+        !!landingPageSlug;
+
+    const handleEditLandingPage = () => {
+        router.push(`/workshops/${workshopId}/landing-pages`);
+    };
+
+    const handleViewPublicPage = () => {
+        window.open(`/workshop/${landingPageSlug}`, "_blank");
     };
 
     const handleExport = () => {
@@ -37,11 +48,21 @@ export function QuickActions({
     return (
         <div className="space-y-2">
             <Button
-                onClick={handleViewLandingPage}
+                onClick={handleEditLandingPage}
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-                {landingPageSlug && publishedPage ? "View Landing Page" : "Edit Landing Page"}
+                Edit Landing Page
             </Button>
+
+            {showViewPublicPage && (
+                <Button
+                    variant="secondary"
+                    onClick={handleViewPublicPage}
+                    className="w-full bg-muted text-foreground hover:bg-accent border-0 justify-center"
+                >
+                    View Public Page
+                </Button>
+            )}
 
             <Button
                 variant="secondary"

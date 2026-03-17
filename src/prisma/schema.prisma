@@ -539,13 +539,16 @@ model LandingPage {
   content          String              // JSON with all dynamic variables
   status           PageStatus          @default(DRAFT)
   isActiveTemplate Boolean             @default(false) // Feb25 Sprint 5: marks this page as the active template for auto-build
+  categoryId       String?             // FIG-005: FK to Category — null = global template (applies to all)
   publishedAt      DateTime?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
-  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  workshop Workshop  @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@unique([workshopId, template])
+  @@index([categoryId])
   @@map("landing_pages")
 }
 
@@ -609,6 +612,7 @@ model Category {
   pricingTiers    PricingTier[]
   surveyTemplates SurveyTemplate[]
   workflows       Workflow[]
+  landingPages    LandingPage[]    // FIG-005: Templates scoped to this category
 
   @@map("categories")
 }

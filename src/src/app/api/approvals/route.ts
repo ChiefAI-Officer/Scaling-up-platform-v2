@@ -24,6 +24,7 @@ const CreateApprovalSchema = z.object({
     requestedBy: z.string().optional(),
     title: z.string().optional(),
     eventDate: z.string().optional(),
+    customPricingNotes: z.string().optional(),
 });
 
 const APPROVAL_STATUSES = new Set(["PENDING", "APPROVED", "DENIED", "EXPIRED"]);
@@ -268,6 +269,14 @@ export async function POST(request: NextRequest) {
                 );
             }
 
+            // FIG-011: Virtual workshops must have a meeting link
+            if (body.format === "VIRTUAL" && !body.virtualLink) {
+                return NextResponse.json(
+                    { error: "Meeting link is required for virtual workshops" },
+                    { status: 400 }
+                );
+            }
+
             // Resolve workshopTypeId from slug or ID
             let resolvedWorkshopTypeId: string | undefined;
             if (workshopTypeSlug) {
@@ -300,17 +309,14 @@ export async function POST(request: NextRequest) {
                       })
                     : null;
 
-            const priceCents =
-                typeof body.customPrice === "number" && body.customPrice > 0
-                    ? Math.round(body.customPrice * 100)
-                    : undefined;
-
             // JV-16: Resolve category from categoryId
             let resolvedCategoryId: string | null = null;
             let category: "AI" | "EXIT_AND_VALUATION" = "AI";
+            let resolvedCat: { id: string; name: string; slug: string; defaultTitle: string | null } | null = null;
             if (body.categoryId) {
                 const cat = await db.category.findUnique({ where: { id: body.categoryId } });
                 if (cat) {
+                    resolvedCat = cat;
                     resolvedCategoryId = cat.id;
                     category = cat.slug.includes("exit") || cat.slug.includes("valuation")
                         ? "EXIT_AND_VALUATION" : "AI";
@@ -319,19 +325,33 @@ export async function POST(request: NextRequest) {
 
             // JV-17: Resolve pricing tier
             let resolvedPricingTierId: string | null = null;
+            let tierAmountCents: number | null = null;
             if (body.pricingTierId) {
                 const tier = await db.pricingTier.findUnique({ where: { id: body.pricingTierId } });
                 if (tier) {
                     resolvedPricingTierId = tier.id;
+                    tierAmountCents = tier.amountCents;
                 }
             }
+
+            // FIG-010: Resolve priceCents from customPrice OR the selected pricing tier.
+            // If neither is provided, the workshop is truly free (priceCents = 0).
+            const resolvedPriceCents: number =
+                typeof body.customPrice === "number" && body.customPrice > 0
+                    ? Math.round(body.customPrice * 100)
+                    : tierAmountCents !== null && tierAmountCents > 0
+                        ? tierAmountCents
+                        : 0;
+
+            // Resolve the workshop title with category fallback
+            const resolvedTitle = body.title || (resolvedCat ? (resolvedCat.defaultTitle || `Scaling Up ${resolvedCat.name}`) : "Workshop Request");
 
             const workshop = await db.workshop.create({
                 data: {
                     coachId,
                     workshopTypeId: resolvedWorkshopTypeId,
                     workshopCode,
-                    title: body.title || `Workshop Request`,
+                    title: resolvedTitle,
                     description: body.description || details,
                     category,
                     categoryId: resolvedCategoryId,
@@ -343,8 +363,9 @@ export async function POST(request: NextRequest) {
                     timezone: body.timezone || "America/New_York",
                     venueName: body.venueName || null,
                     venueAddress,
-                    isFree: !priceCents,
-                    priceCents,
+                    virtualLink: body.virtualLink || null,
+                    isFree: resolvedPriceCents === 0,
+                    priceCents: resolvedPriceCents,
                     maxAttendees: body.maxAttendees || 30,
                     status: "INFO_REQUESTED",
                     termsAcceptedAt: body.termsAcceptedAt ? new Date(body.termsAcceptedAt) : null,
@@ -353,8 +374,8 @@ export async function POST(request: NextRequest) {
 
             workshopId = workshop.id;
 
-            // Generate landing page slug
-            const slug = generateSlug(body.title || "workshop", workshop.id);
+            // Generate landing page slug using the resolved title
+            const slug = generateSlug(resolvedTitle, workshop.id);
             await db.workshop.update({
                 where: { id: workshop.id },
                 data: { landingPageSlug: slug },
@@ -371,6 +392,7 @@ export async function POST(request: NextRequest) {
             amount: input.amount,
             details,
             requestedBy,
+            customPricingNotes: input.customPricingNotes,
         });
 
         // If auto-approved, advance workshop status and trigger auto-build
@@ -418,6 +440,7 @@ export async function POST(request: NextRequest) {
                     details,
                     requestedAt: new Date(),
                     amount: input.amount,
+                    customPricingNotes: input.customPricingNotes,
                     circleCertification: circleData ? {
                         verified: circleData.verified,
                         confidence: circleData.confidence,

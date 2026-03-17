@@ -32,6 +32,7 @@ export interface ApprovalEvaluationInput {
     amount?: number; // For refunds, in cents
     details: string;
     requestedBy: string;
+    customPricingNotes?: string;
 }
 
 export interface ApprovalEvaluationResult {
@@ -137,6 +138,7 @@ async function createManualApproval(
             workshopId: input.workshopId,
             requestedBy: input.requestedBy,
             requestedAt: new Date(),
+            notes: input.customPricingNotes ? input.customPricingNotes : undefined,
         }
     });
 

@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | March 11, 2026 — MR-21 coupon/checkout verified, Stripe + middleware + form fixes |
+| **Last Updated** | March 17, 2026 — Figma board ingested (11 revisions, 4 sprints planned) |
 
 ## Current Status
 
@@ -148,6 +148,14 @@ the full workshop lifecycle from request through post-event follow-up.
 - Security: admin invite API routes properly return 401 for unauthenticated (not 403)
 - Invite UI: loading state prevents false "No invitations yet" flash during initial fetch
 - March audit state: 36 PASS, 10 CONCERN (5 resolved by design, 2 fixed, 1 need manual proof, 2 flagged for Jeff), 0 GAP
+
+**Figma Revisions Batch (Mar 17, 2026)** — 11 revisions extracted from Figma board, 4 sprints planned:
+- Sprint 1 (P0 bugs): FIG-001 auto-title category bug, FIG-010 pricing shows as Free, FIG-002 WS code visible to coaches
+- Sprint 2 (edit access): FIG-004 View LP bug + PRE_EVENT editing, FIG-006 full edit form, FIG-009 INFO_REQUESTED full edit
+- Sprint 3 (pricing flow): FIG-007 coach pricing escalation + approvals, FIG-008 emails include pricing notes, FIG-003 dropdown UI
+- Sprint 4 (validation + templates): FIG-011 Zoom link required, FIG-005 per-category templates
+- Parsed revisions: `plans/FIGMA_REVISIONS_PARSED.md`
+- Sprint plan: `plans/FIGMA_REVISIONS_SPRINT_PLAN_MAR2026.md`
 
 **MR-21 Coupon/Checkout Fix (Mar 11, 2026)** — Complete (commits `0556da5`, `5abcda2`):
 - Stripe `allow_promotion_codes` and `discounts` are mutually exclusive — conditional spread in `services/stripe.ts:148`

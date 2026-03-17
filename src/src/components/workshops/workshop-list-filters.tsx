@@ -17,10 +17,16 @@ interface WorkshopItem {
     workshopType: { name: string } | null;
     _count: { registrations: number };
     landingPageUrl?: string | null;
+    // FIG-007: Pricing display
+    isFree?: boolean;
+    priceCents?: number | null;
+    pricingTier?: { name: string; amountCents: number } | null;
+    hasPendingPriceChange?: boolean;
 }
 
 interface PortalWorkshopListProps {
     workshops: WorkshopItem[];
+    isAdmin?: boolean;
 }
 
 const STATUS_OPTIONS = [
@@ -33,7 +39,7 @@ const STATUS_OPTIONS = [
     { value: "CANCELED", label: "Canceled" },
 ];
 
-export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
+export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorkshopListProps) {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [showFilters, setShowFilters] = useState(false);
@@ -119,6 +125,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Registrations</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Validated</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Approved</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pricing</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Landing Page</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
@@ -127,7 +134,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                     <tbody className="divide-y divide-border">
                         {filtered.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
+                                <td colSpan={9} className="px-6 py-12 text-center text-muted-foreground">
                                     {hasActiveFilters
                                         ? "No workshops match your search."
                                         : "No workshops found. Request your first one above!"}
@@ -148,7 +155,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                                                 {workshop.title}
                                             </Link>
                                             <div className="text-sm text-muted-foreground">
-                                                {workshop.workshopCode && <span className="font-mono mr-2">{workshop.workshopCode}</span>}
+                                                {isAdmin && workshop.workshopCode && <span className="font-mono mr-2">{workshop.workshopCode}</span>}
                                                 {workshop.workshopType?.name}
                                             </div>
                                         </td>
@@ -171,6 +178,25 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                                                 <CheckCircle2 className="w-5 h-5 text-success mx-auto" />
                                             ) : (
                                                 <Circle className="w-5 h-5 text-muted-foreground mx-auto" />
+                                            )}
+                                        </td>
+                                        {/* FIG-007: Pricing column */}
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm text-foreground">
+                                                {workshop.isFree
+                                                    ? "Free"
+                                                    : workshop.pricingTier
+                                                    ? `${workshop.pricingTier.name} — $${(workshop.pricingTier.amountCents / 100).toFixed(0)}`
+                                                    : workshop.priceCents != null && workshop.priceCents > 0
+                                                    ? `$${(workshop.priceCents / 100).toFixed(0)}`
+                                                    : <span className="text-muted-foreground">Not set</span>}
+                                            </div>
+                                            {workshop.hasPendingPriceChange && (
+                                                <div className="mt-1">
+                                                    <span className="inline-flex items-center rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning border border-warning/30">
+                                                        Price Change Pending
+                                                    </span>
+                                                </div>
                                             )}
                                         </td>
                                         <td className="px-6 py-4">

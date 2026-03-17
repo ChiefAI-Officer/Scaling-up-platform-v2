@@ -159,12 +159,36 @@ export const autoBuildWorkshop = inngest.createFunction(
                         : "TBD",
         };
 
-        // Step 2: Find and copy active templates
+        // Step 2: Find and copy active templates (FIG-005: filter by categoryId)
         const pagesCreated = await step.run("create-landing-pages", async () => {
-            const activeTemplates = await db.landingPage.findMany({
-                where: { isActiveTemplate: true },
-                select: { id: true, template: true, content: true, slug: true },
+            // FIG-005: Prefer templates that match the workshop's category.
+            // Templates with categoryId=null are "global" and apply to all workshops.
+            const categoryFilter: { OR?: Array<{ categoryId: string | null }> } = workshop.categoryId
+                ? {
+                      OR: [
+                          { categoryId: workshop.categoryId },
+                          { categoryId: null },
+                      ],
+                  }
+                : {};
+
+            let activeTemplates = await db.landingPage.findMany({
+                where: { isActiveTemplate: true, ...categoryFilter },
+                select: { id: true, template: true, content: true, slug: true, categoryId: true },
             });
+
+            // FIG-005: If category-filtered query returns nothing, fall back to ALL active templates
+            // (graceful degradation so existing global templates still work)
+            if (activeTemplates.length === 0 && workshop.categoryId) {
+                console.warn(
+                    `[auto-build] WARNING: No category-matched templates for categoryId=${workshop.categoryId}. ` +
+                    `Falling back to all active templates (global fallback).`
+                );
+                activeTemplates = await db.landingPage.findMany({
+                    where: { isActiveTemplate: true },
+                    select: { id: true, template: true, content: true, slug: true, categoryId: true },
+                });
+            }
 
             if (activeTemplates.length === 0) {
                 console.warn(
