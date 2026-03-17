@@ -165,6 +165,7 @@ export async function PATCH(
       data: {
         ...(data.title && { title: data.title }),
         ...(data.description !== undefined && { description: data.description }),
+        ...(data.categoryId !== undefined && { categoryId: data.categoryId || null }),
         ...(data.format && { format: data.format }),
         ...(data.duration && { duration: data.duration }),
         ...(data.eventDate && { eventDate: new Date(data.eventDate) }),
@@ -172,7 +173,7 @@ export async function PATCH(
         ...(data.timezone && { timezone: data.timezone }),
         ...(data.venueName !== undefined && { venueName: data.venueName }),
         ...(data.venueAddress !== undefined && {
-          venueAddress: data.venueAddress ? JSON.stringify(data.venueAddress) : null
+          venueAddress: data.venueAddress || null
         }),
         ...(data.venueInstructions !== undefined && {
           venueInstructions: data.venueInstructions,

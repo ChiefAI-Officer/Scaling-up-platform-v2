@@ -84,12 +84,12 @@ describe("Workshop Validation Schemas", () => {
       });
     });
 
-    it("should reject HYBRID format (removed)", () => {
+    it("should accept HYBRID format (FIG-006: re-added to format selector)", () => {
       const result = createWorkshopSchema.safeParse({
         ...validWorkshop,
         format: "HYBRID",
       });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
     it("should reject negative priceCents", () => {

@@ -33,7 +33,7 @@ export const strongPasswordSchema = z
 // Workshop Schemas
 // ============================================================
 
-export const workshopFormatSchema = z.enum(["IN_PERSON", "VIRTUAL"]);
+export const workshopFormatSchema = z.enum(["IN_PERSON", "VIRTUAL", "HYBRID"]);
 
 // JV-02: Jeff Verdun's 6 workshop stages
 export const workshopStatusSchema = z.enum([
