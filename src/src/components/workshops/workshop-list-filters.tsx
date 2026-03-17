@@ -21,6 +21,7 @@ interface WorkshopItem {
 
 interface PortalWorkshopListProps {
     workshops: WorkshopItem[];
+    isAdmin?: boolean;
 }
 
 const STATUS_OPTIONS = [
@@ -33,7 +34,7 @@ const STATUS_OPTIONS = [
     { value: "CANCELED", label: "Canceled" },
 ];
 
-export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
+export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorkshopListProps) {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [showFilters, setShowFilters] = useState(false);
@@ -148,7 +149,7 @@ export function PortalWorkshopList({ workshops }: PortalWorkshopListProps) {
                                                 {workshop.title}
                                             </Link>
                                             <div className="text-sm text-muted-foreground">
-                                                {workshop.workshopCode && <span className="font-mono mr-2">{workshop.workshopCode}</span>}
+                                                {isAdmin && workshop.workshopCode && <span className="font-mono mr-2">{workshop.workshopCode}</span>}
                                                 {workshop.workshopType?.name}
                                             </div>
                                         </td>
