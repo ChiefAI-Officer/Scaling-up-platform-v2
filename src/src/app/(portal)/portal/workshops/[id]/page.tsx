@@ -39,7 +39,7 @@ export default async function WorkshopDetailsPage({
   const { id } = await params;
   const { coach } = await requireCoach();
 
-  const [workshop, workflowAssignments, surveyCount, latestDenial, workshopFiles, registrationFinancials, infoRequestedApproval, fallbackLandingPage] = await Promise.all([
+  const [workshop, workflowAssignments, surveyCount, latestDenial, workshopFiles, registrationFinancials, infoRequestedApproval, fallbackLandingPage, pendingPriceChange] = await Promise.all([
     db.workshop.findFirst({
       where: { id, coachId: coach.id },
       select: {
@@ -59,6 +59,7 @@ export default async function WorkshopDetailsPage({
         maxAttendees: true,
         isFree: true,
         priceCents: true,
+        pricingTierId: true,
         workshopType: { select: { name: true } },
         _count: { select: { registrations: true } },
       },
@@ -120,6 +121,12 @@ export default async function WorkshopDetailsPage({
       where: { workshopId: id },
       select: { slug: true },
       orderBy: { createdAt: "asc" },
+    }),
+    // FIG-007: Check for pending CUSTOM_PRICING approval on this workshop
+    db.approvalQueue.findFirst({
+      where: { workshopId: id, type: "CUSTOM_PRICING", status: "PENDING" },
+      select: { id: true, requestData: true, requestedAt: true },
+      orderBy: { requestedAt: "desc" },
     }),
   ]);
 
@@ -251,6 +258,19 @@ export default async function WorkshopDetailsPage({
         )}
       </div>
 
+      {/* FIG-007: Pending price change indicator */}
+      {pendingPriceChange && (
+        <div className="rounded-xl border border-warning/40 bg-warning/5 p-4 flex items-start gap-3">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-warning">Price Change Pending Approval</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              You have a price change request awaiting admin review. The current pricing remains active until approved.
+            </p>
+          </div>
+          <Badge variant="warning">Pending</Badge>
+        </div>
+      )}
+
       {/* FIG-009: Full edit form for INFO_REQUESTED status */}
       {workshop.status === "INFO_REQUESTED" && infoRequestedApproval && (
         <ResubmitWorkshop
@@ -270,6 +290,7 @@ export default async function WorkshopDetailsPage({
           format={workshop.format}
           priceCents={workshop.priceCents}
           isFree={workshop.isFree}
+          pricingTierId={workshop.pricingTierId}
         />
       )}
 

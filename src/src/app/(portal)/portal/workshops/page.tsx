@@ -20,6 +20,13 @@ export default async function MyWorkshopsPage() {
             workshopType: true,
             _count: { select: { registrations: true } },
             landingPages: { select: { slug: true }, take: 1 },
+            pricingTier: { select: { name: true, amountCents: true } },
+            // FIG-007: Check for pending CUSTOM_PRICING approvals
+            approvals: {
+                where: { type: "CUSTOM_PRICING", status: "PENDING" },
+                select: { id: true },
+                take: 1,
+            },
         },
     });
 
@@ -38,6 +45,11 @@ export default async function MyWorkshopsPage() {
         landingPageUrl: w.landingPages[0]?.slug
             ? `${APP_URL}/workshop/${w.landingPages[0].slug}`
             : null,
+        // FIG-007: Pricing display
+        isFree: w.isFree,
+        priceCents: w.priceCents,
+        pricingTier: w.pricingTier ? { name: w.pricingTier.name, amountCents: w.pricingTier.amountCents } : null,
+        hasPendingPriceChange: w.approvals.length > 0,
     }));
 
     return (

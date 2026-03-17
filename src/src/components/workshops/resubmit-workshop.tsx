@@ -33,9 +33,16 @@ interface ResubmitWorkshopDeniedProps {
   adminMessage?: never;
   priceCents?: never;
   isFree?: never;
+  pricingTierId?: never;
 }
 
 // ─── Info-requested variant props ─────────────────────────────────────────────
+
+interface PricingTierOption {
+  id: string;
+  name: string;
+  amountCents: number;
+}
 
 interface ResubmitWorkshopInfoRequestedProps {
   variant: "info_requested";
@@ -52,9 +59,10 @@ interface ResubmitWorkshopInfoRequestedProps {
   timezone?: string | null;
   venueAddress?: string | null;
   virtualLink?: string | null;
-  // Pricing (read-only in info_requested)
+  // Pricing (editable — triggers CUSTOM_PRICING approval flow)
   priceCents?: number | null;
   isFree?: boolean;
+  pricingTierId?: string | null;
   // Denial fields not used
   rejectionReason?: never;
 }
@@ -85,14 +93,16 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
   const approvalId = isInfoRequested ? props.approvalId : undefined;
   const adminMessage = isInfoRequested ? props.adminMessage : undefined;
   const rejectionReason = !isInfoRequested ? props.rejectionReason : undefined;
-  const priceCents = isInfoRequested ? props.priceCents : undefined;
-  const isFree = isInfoRequested ? props.isFree : undefined;
+  const initialPriceCents = isInfoRequested ? (props.priceCents ?? null) : null;
+  const initialIsFree = isInfoRequested ? (props.isFree ?? false) : false;
+  const initialPricingTierId = isInfoRequested ? (props.pricingTierId ?? null) : null;
 
   // ── State ──
   const [isEditing, setIsEditing] = useState(isInfoRequested); // Auto-open for info_requested
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [pricingTiers, setPricingTiers] = useState<PricingTierOption[]>([]);
 
   // Editable fields
   const [title, setTitle] = useState(initialTitle);
@@ -106,7 +116,11 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
   const [venueAddress, setVenueAddress] = useState(initialVenueAddress || "");
   const [virtualLink, setVirtualLink] = useState(initialVirtualLink || "");
 
-  // Fetch categories for the dropdown
+  // FIG-007: Pricing fields (info_requested only)
+  const [pricingTierId, setPricingTierId] = useState(initialPricingTierId || "");
+  const [customPricingNotes, setCustomPricingNotes] = useState("");
+
+  // Fetch categories and pricing tiers for dropdowns
   useEffect(() => {
     fetch("/api/categories")
       .then((r) => r.json())
@@ -116,7 +130,18 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
         }
       })
       .catch(() => {/* non-critical, silently ignore */});
-  }, []);
+
+    if (isInfoRequested) {
+      fetch("/api/pricing-tiers")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && Array.isArray(d.data)) {
+            setPricingTiers(d.data as PricingTierOption[]);
+          }
+        })
+        .catch(() => {/* non-critical, silently ignore */});
+    }
+  }, [isInfoRequested]);
 
   // ── Submit handler ──
   async function handleSaveAndResubmit() {
@@ -124,7 +149,36 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
     setFeedback(null);
 
     try {
-      // Always save edits for info_requested; conditional for denied
+      // Check whether the coach has changed pricing (only for info_requested)
+      const hasPricingChange = isInfoRequested && (
+        (pricingTierId && pricingTierId !== (initialPricingTierId || "")) ||
+        false // priceCents changes only come through pricingTierId selection in this form
+      );
+
+      // FIG-007: If pricing changed, send a separate PATCH just for pricing
+      // The server will intercept and return 202 + pendingApproval: true
+      if (hasPricingChange) {
+        const pricingPayload: Record<string, unknown> = {};
+        if (pricingTierId) pricingPayload.pricingTierId = pricingTierId;
+        if (customPricingNotes.trim()) pricingPayload.customPricingNotes = customPricingNotes.trim();
+
+        const priceRes = await fetch(`/api/workshops/${workshopId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pricingPayload),
+        });
+
+        const priceData = await priceRes.json() as { success?: boolean; pendingApproval?: boolean; error?: string };
+
+        if (priceRes.status === 202 && priceData.pendingApproval) {
+          // Price change submitted — continue saving non-pricing fields below
+          // but show the pending message after the full save
+        } else if (!priceRes.ok) {
+          throw new Error(priceData.error || "Failed to submit price change");
+        }
+      }
+
+      // Always save non-pricing edits for info_requested; conditional for denied
       if (isInfoRequested || isEditing) {
         const updateRes = await fetch(`/api/workshops/${workshopId}`, {
           method: "PATCH",
@@ -164,7 +218,9 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
 
         setFeedback({
           type: "success",
-          message: "Workshop updated and resubmitted for review. You'll be notified of the decision.",
+          message: hasPricingChange
+            ? "Workshop updated and resubmitted for review. Your price change request is pending admin approval."
+            : "Workshop updated and resubmitted for review. You'll be notified of the decision.",
         });
       } else {
         // Denied variant: call resubmit endpoint
@@ -384,22 +440,52 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
             </div>
           )}
 
-          {/* Pricing (read-only for info_requested; Sprint 3 will add editing) */}
+          {/* FIG-007: Pricing (editable for info_requested — triggers CUSTOM_PRICING approval) */}
           {isInfoRequested && (
-            <div className="rounded-lg border border-border bg-muted/30 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
-                Pricing (read-only)
-              </p>
-              <p className="text-sm text-foreground">
-                {isFree
-                  ? "Free workshop"
-                  : priceCents != null
-                  ? `$${(priceCents / 100).toFixed(2)}`
-                  : "Not set"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Pricing changes require a separate admin approval (Sprint 3).
-              </p>
+            <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-warning mb-1">
+                  Request Price Change (Optional)
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Current price:{" "}
+                  <strong>
+                    {initialIsFree
+                      ? "Free"
+                      : initialPriceCents != null && initialPriceCents > 0
+                      ? `$${(initialPriceCents / 100).toFixed(2)}`
+                      : "Not set"}
+                  </strong>
+                  {" "}— selecting a new tier will submit a price change request for admin approval.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Proposed Pricing Tier</label>
+                <select
+                  value={pricingTierId}
+                  onChange={(e) => setPricingTierId(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-background focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="">— Keep current pricing —</option>
+                  {pricingTiers.map((tier) => (
+                    <option key={tier.id} value={tier.id}>
+                      {tier.name} — ${(tier.amountCents / 100).toFixed(0)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {pricingTierId && pricingTierId !== (initialPricingTierId || "") && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Reason for price change (optional)</label>
+                  <textarea
+                    value={customPricingNotes}
+                    onChange={(e) => setCustomPricingNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Explain why you're requesting this price change..."
+                    className="w-full px-3 py-2 border rounded-lg text-sm bg-background focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

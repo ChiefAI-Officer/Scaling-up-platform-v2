@@ -552,6 +552,84 @@ export async function sendAdminInviteEmail(data: {
 }
 
 // ============================================
+// FIG-007: Custom Price Change Request Email
+// ============================================
+
+/**
+ * FIG-007: Notify admin when a coach proposes a price change.
+ * The workshop price is NOT changed — this creates a CUSTOM_PRICING
+ * ApprovalQueue entry and sends this email to trigger manual review.
+ */
+export async function sendCustomPriceChangeEmail(params: {
+    adminEmail: string;
+    coachName: string;
+    workshopTitle: string;
+    workshopCode: string;
+    workshopId: string;
+    oldPriceCents: number;
+    newPriceCents: number;
+    customPricingNotes?: string;
+}): Promise<void> {
+    const approvalUrl = `${process.env.APP_URL}/admin/approvals`;
+    const workshopUrl = `${process.env.APP_URL}/workshops/${params.workshopId}`;
+    const oldPrice = params.oldPriceCents === 0 ? "Free" : `$${(params.oldPriceCents / 100).toFixed(2)}`;
+    const newPrice = params.newPriceCents === 0 ? "Free" : `$${(params.newPriceCents / 100).toFixed(2)}`;
+    const notesHtml = params.customPricingNotes
+        ? `<div style="background:#fef3c7;border-left:4px solid #d97706;padding:12px 16px;margin:16px 0;border-radius:4px;">
+            <p style="margin:0;font-weight:600;color:#92400e;">Coach&apos;s notes:</p>
+            <p style="margin:8px 0 0;color:#374151;">${escapeHtml(params.customPricingNotes)}</p>
+           </div>`
+        : "";
+
+    const html = `
+    <div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">
+      <h2 style="color:#1e293b;">[CUSTOM PRICING] Price Change Request</h2>
+      <p style="color:#4a4a4a;">Coach <strong>${escapeHtml(params.coachName)}</strong> has requested a price change requiring admin approval.</p>
+      <table style="border-collapse:collapse;margin:16px 0;width:100%;font-size:14px;">
+        <tr>
+          <td style="padding:6px 12px 6px 0;font-weight:600;color:#374151;">Workshop:</td>
+          <td style="padding:6px 0;color:#1e293b;">
+            <a href="${workshopUrl}" style="color:#1D4ED8;text-decoration:none;">${escapeHtml(params.workshopTitle)}</a>
+            &nbsp;<span style="font-family:monospace;font-size:12px;color:#6b7280;">(${escapeHtml(params.workshopCode)})</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:6px 12px 6px 0;font-weight:600;color:#374151;">Old Price:</td>
+          <td style="padding:6px 0;color:#6b7280;text-decoration:line-through;">${oldPrice}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 12px 6px 0;font-weight:600;color:#374151;">New Price:</td>
+          <td style="padding:6px 0;color:#b45309;font-weight:700;font-size:1.05em;">${newPrice}</td>
+        </tr>
+      </table>
+      ${notesHtml}
+      <p style="color:#4a4a4a;font-size:14px;">The workshop price has <strong>not</strong> been changed. Approve or deny this request in the approval queue.</p>
+      <br/>
+      <div style="text-align:center;">
+        <a href="${approvalUrl}" style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">
+          Review in Approval Queue
+        </a>
+      </div>
+      <br/>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+      <p style="color:#9ca3af;font-size:12px;">&mdash; Scaling Up Workshop Platform</p>
+    </div>
+  `;
+
+    await sendNotificationEmail({
+        to: params.adminEmail,
+        subject: `[CUSTOM PRICING] Price Change Request — ${params.coachName} / ${params.workshopTitle}`,
+        html,
+        telemetry: {
+            workshopId: params.workshopId,
+            workshopCode: params.workshopCode,
+            recipientRole: "STAFF" as const,
+            metadata: { type: "custom_pricing_request" },
+        },
+    });
+}
+
+// ============================================
 // Coach Welcome / Password Set Email (MR-44)
 // ============================================
 

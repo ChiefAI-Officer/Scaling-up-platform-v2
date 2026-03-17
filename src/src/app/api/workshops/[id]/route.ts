@@ -5,6 +5,7 @@ import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/authori
 import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/lead-time-validator";
 import { chargeCancellationFee } from "@/services/stripe";
 import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/template-interpolation";
+import { sendCustomPriceChangeEmail } from "@/services/notifications";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;
 
@@ -105,11 +106,18 @@ export async function GET(
   }
 }
 
-// Fields coaches are allowed to edit on their own workshops
+// Fields coaches are allowed to edit on their own workshops.
+// priceCents and pricingTierId are included here so they don't get a 403 —
+// but the PATCH handler intercepts them and routes to CUSTOM_PRICING approval
+// instead of updating the workshop directly.
 const COACH_EDITABLE_FIELDS = new Set([
   "title", "description", "categoryId", "format", "eventDate", "eventTime",
   "timezone", "venueName", "venueAddress", "venueInstructions", "virtualLink",
+  "priceCents", "pricingTierId",
 ]);
+
+// Pricing fields that trigger an approval flow instead of a direct update
+const COACH_PRICING_FIELDS = new Set(["priceCents", "pricingTierId"]);
 
 export async function PATCH(
   request: NextRequest,
@@ -129,7 +137,8 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await request.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = await request.json() as any;
     const validation = updateWorkshopSchema.safeParse(body);
 
     if (!validation.success) {
@@ -154,7 +163,7 @@ export async function PATCH(
 
     const data = validation.data;
 
-    // Coaches cannot edit pricing fields
+    // Coaches cannot edit fields outside their allowed set
     if (isCoach) {
       const forbiddenFields = Object.keys(data).filter(
         (k) => !COACH_EDITABLE_FIELDS.has(k) && data[k as keyof typeof data] !== undefined
@@ -163,6 +172,79 @@ export async function PATCH(
         return NextResponse.json(
           { success: false, error: `Coaches cannot edit: ${forbiddenFields.join(", ")}` },
           { status: 403 }
+        );
+      }
+    }
+
+    // FIG-007: When a coach submits pricing fields, intercept and create a
+    // CUSTOM_PRICING ApprovalQueue entry instead of updating the workshop directly.
+    if (isCoach) {
+      const hasPricingChange = Object.keys(data).some(
+        (k) => COACH_PRICING_FIELDS.has(k) && data[k as keyof typeof data] !== undefined
+      );
+
+      if (hasPricingChange) {
+        // Resolve new priceCents: either direct value or from the selected tier
+        let newPriceCents = data.priceCents ?? existing.priceCents ?? 0;
+        if (data.pricingTierId && data.pricingTierId !== existing.pricingTierId) {
+          const tier = await db.pricingTier.findUnique({
+            where: { id: data.pricingTierId },
+            select: { amountCents: true },
+          });
+          if (tier) {
+            newPriceCents = tier.amountCents;
+          }
+        }
+
+        const oldPriceCents = existing.priceCents ?? 0;
+        const notes = typeof body.customPricingNotes === "string" ? body.customPricingNotes : undefined;
+
+        // Fetch the coach record for the email
+        const coachRecord = await db.coach.findUnique({
+          where: { id: existing.coachId },
+          select: { firstName: true, lastName: true, email: true },
+        });
+        const coachName = coachRecord
+          ? `${coachRecord.firstName} ${coachRecord.lastName}`.trim()
+          : actor.email;
+
+        // Create CUSTOM_PRICING approval queue entry
+        await db.approvalQueue.create({
+          data: {
+            type: "CUSTOM_PRICING",
+            workshopId: existing.id,
+            coachId: existing.coachId,
+            requestedBy: actor.email,
+            requestData: JSON.stringify({
+              oldPriceCents,
+              newPriceCents,
+              pricingTierId: data.pricingTierId ?? existing.pricingTierId,
+              customPricingNotes: notes,
+              requestedBy: actor.email,
+            }),
+            notes: notes ?? null,
+          },
+        });
+
+        // Fire-and-forget email notification to admin
+        sendCustomPriceChangeEmail({
+          adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+          coachName,
+          workshopTitle: existing.title,
+          workshopCode: existing.workshopCode ?? "",
+          workshopId: existing.id,
+          oldPriceCents,
+          newPriceCents,
+          customPricingNotes: notes,
+        }).catch((err: unknown) => console.error("[FIG-007] sendCustomPriceChangeEmail failed:", err));
+
+        return NextResponse.json(
+          {
+            success: true,
+            pendingApproval: true,
+            message: "Price change submitted for admin approval",
+          },
+          { status: 202 }
         );
       }
     }
