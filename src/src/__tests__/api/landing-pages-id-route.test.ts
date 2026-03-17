@@ -289,6 +289,95 @@ describe("PATCH /api/landing-pages/[id]", () => {
     });
   });
 
+  it("categoryId-only PATCH on currently-active page triggers deactivation transaction", async () => {
+    // An already-active page being re-scoped to a new category should atomically deactivate
+    // any competing active template in the new slot — even when isActiveTemplate is not in the payload.
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue({
+      id: "page-4",
+      template: "WORKSHOP",
+      categoryId: "cat-old",
+      isActiveTemplate: true, // page is currently active
+    });
+
+    const rescoped = {
+      id: "page-4",
+      template: "WORKSHOP",
+      categoryId: "cat-new",
+      isActiveTemplate: true,
+    };
+    (db.$transaction as jest.Mock).mockResolvedValue([{ count: 1 }, rescoped]);
+
+    const response = await PATCH(
+      buildPatchRequest({ categoryId: "cat-new" }), // no isActiveTemplate in payload
+      routeParams("page-4")
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.page.categoryId).toBe("cat-new");
+
+    // Must use transaction (not a plain update) to deactivate competitors in the new slot
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+
+    // updateMany should target the NEW category slot to clear competitors
+    expect(db.landingPage.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          categoryId: "cat-new",
+          template: "WORKSHOP",
+          isActiveTemplate: true,
+          id: { not: "page-4" },
+        }),
+      })
+    );
+
+    // update should persist the new categoryId
+    expect(db.landingPage.update).toHaveBeenCalledWith({
+      where: { id: "page-4" },
+      data: { categoryId: "cat-new" },
+    });
+
+    // No direct (non-transaction) update call
+    expect(db.landingPage.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("categoryId-only PATCH on inactive page does NOT trigger transaction", async () => {
+    // An inactive page being re-scoped should not run the deactivation transaction.
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue({
+      id: "page-5",
+      template: "WORKSHOP",
+      categoryId: "cat-old",
+      isActiveTemplate: false, // page is currently inactive
+    });
+
+    const updated = {
+      id: "page-5",
+      template: "WORKSHOP",
+      categoryId: "cat-new",
+      isActiveTemplate: false,
+    };
+    (db.landingPage.update as jest.Mock).mockResolvedValue(updated);
+
+    const response = await PATCH(
+      buildPatchRequest({ categoryId: "cat-new" }), // no isActiveTemplate in payload
+      routeParams("page-5")
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.page.categoryId).toBe("cat-new");
+
+    // No transaction needed for an inactive page re-scope
+    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(db.landingPage.update).toHaveBeenCalledWith({
+      where: { id: "page-5" },
+      data: { categoryId: "cat-new" },
+    });
+  });
+
   it("returns 400 for invalid payload", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
 

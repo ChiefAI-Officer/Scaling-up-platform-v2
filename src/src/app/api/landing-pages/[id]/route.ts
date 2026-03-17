@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
+import type { LandingPage } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 
@@ -34,14 +36,21 @@ export async function PATCH(
             return NextResponse.json({ error: "Landing page not found" }, { status: 404 });
         }
 
-        let updated;
-        if (data.isActiveTemplate === true) {
+        // Should we run the deactivation transaction?
+        // Yes if: we're activating this page, OR we're re-scoping an already-active page to a new slot.
+        const needsTransaction =
+            data.isActiveTemplate === true ||
+            (data.categoryId !== undefined && page.isActiveTemplate && data.isActiveTemplate !== false);
+
+        let updated: LandingPage;
+
+        if (needsTransaction) {
             // Determine the effective categoryId for the slot
             // (use data.categoryId if explicitly provided, otherwise use the page's existing categoryId)
             const effectiveCategoryId = data.categoryId !== undefined ? data.categoryId : page.categoryId;
 
             // Atomic: deactivate any competing active template for this slot, then activate this one
-            const [, activatedPage] = await db.$transaction([
+            const txResult = await db.$transaction<[Prisma.BatchPayload, LandingPage]>([
                 db.landingPage.updateMany({
                     where: {
                         template: page.template,
@@ -54,12 +63,12 @@ export async function PATCH(
                 db.landingPage.update({
                     where: { id },
                     data: {
-                        isActiveTemplate: true,
+                        ...(data.isActiveTemplate !== undefined && { isActiveTemplate: data.isActiveTemplate }),
                         ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
                     },
                 }),
             ]);
-            updated = activatedPage;
+            updated = txResult[1];
         } else {
             updated = await db.landingPage.update({
                 where: { id },
