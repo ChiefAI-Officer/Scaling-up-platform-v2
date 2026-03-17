@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DeleteLandingPageButton } from "@/components/templates/delete-landing-page-button";
+import { ActivateTemplateModal } from "@/components/templates/activate-template-modal";
 
 const TEMPLATE_OPTIONS = [
   {
@@ -80,6 +81,34 @@ async function getMasterTemplates(categoryId: string | null) {
   return masterByType;
 }
 
+async function getGlobalMasterTemplates() {
+  const pages = await db.landingPage.findMany({
+    where: {
+      isActiveTemplate: true,
+      categoryId: null,
+      template: { in: ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] },
+    },
+    select: {
+      id: true,
+      template: true,
+      status: true,
+      slug: true,
+      isActiveTemplate: true,
+      createdAt: true,
+      workshopId: true,
+      categoryId: true,
+      workshop: { select: { title: true } },
+      category: { select: { id: true, name: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+  const globalByType = new Map<string, typeof pages[number]>();
+  for (const p of pages) {
+    if (!globalByType.has(p.template)) globalByType.set(p.template, p);
+  }
+  return globalByType;
+}
+
 async function getCategories() {
   return db.category.findMany({
     where: { isActive: true },
@@ -102,9 +131,10 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
   const params = await searchParams;
   const selectedCategoryId = params.category ?? null;
 
-  const [masterByType, categories] = await Promise.all([
+  const [masterByType, categories, globalByType] = await Promise.all([
     getMasterTemplates(selectedCategoryId),
     getCategories(),
+    selectedCategoryId ? getGlobalMasterTemplates() : Promise.resolve(new Map() as Awaited<ReturnType<typeof getGlobalMasterTemplates>>),
   ]);
 
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId) ?? null;
@@ -152,13 +182,14 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
       {selectedCategory && (
         <div className="rounded-md border border-border bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
           Showing templates for <span className="font-semibold text-foreground">{selectedCategory.name}</span>.
-          Templates with no category (global) are <span className="font-semibold">not</span> shown — use &quot;All&quot; to see them.
+          Category overrides take priority. Slots showing &quot;Using Global&quot; will use the global template for auto-build.
         </div>
       )}
 
       <div className="grid gap-4">
         {TEMPLATE_OPTIONS.map((option) => {
           const master = masterByType.get(option.value as TemplateValue);
+          const globalFallback = globalByType.get(option.value as TemplateValue);
           const editHref = master
             ? `/workshops/${master.workshopId}/landing-pages/${option.route}`
             : null;
@@ -186,20 +217,27 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
                       </div>
                       <p className="text-sm text-muted-foreground">{option.description}</p>
                       {master ? (
+                        // State 1: Has category override (or on All tab with a master set)
                         <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                           <Badge variant={statusVariant(master.status)}>{master.status}</Badge>
                           <span>Based on: {master.workshop.title}</span>
                         </div>
+                      ) : selectedCategoryId && globalFallback ? (
+                        // State 2: No category override, but global fallback exists
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Using Global: {globalFallback.workshop.title}
+                        </p>
                       ) : (
-                        <p className="mt-2 text-xs text-warning">
-                          No master template set{selectedCategory ? ` for ${selectedCategory.name}` : ""} — mark a landing page as Auto-Build to promote it here.
+                        // State 3: No template at all (or on All tab with nothing)
+                        <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
+                          No template set{selectedCategory ? ` for ${selectedCategory.name}` : ""} — mark a landing page as Auto-Build to promote it here.
                         </p>
                       )}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {master && editHref && (
+                    {master && editHref ? (
                       <>
                         {previewHref && (
                           <Link
@@ -218,7 +256,16 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
                         </Link>
                         <DeleteLandingPageButton pageId={master.id} templateLabel={option.label} />
                       </>
-                    )}
+                    ) : selectedCategoryId ? (
+                      // Show Set Override or Set Template button when on a category tab
+                      <ActivateTemplateModal
+                        template={option.value as TemplateValue}
+                        categoryId={selectedCategoryId}
+                        categoryName={selectedCategory?.name ?? "Global"}
+                        templateLabel={option.label}
+                        hasGlobalFallback={!!globalFallback}
+                      />
+                    ) : null}
                   </div>
                 </div>
               </CardContent>
