@@ -308,9 +308,11 @@ export async function POST(request: NextRequest) {
             // JV-16: Resolve category from categoryId
             let resolvedCategoryId: string | null = null;
             let category: "AI" | "EXIT_AND_VALUATION" = "AI";
+            let resolvedCat: { id: string; name: string; slug: string; defaultTitle: string | null } | null = null;
             if (body.categoryId) {
                 const cat = await db.category.findUnique({ where: { id: body.categoryId } });
                 if (cat) {
+                    resolvedCat = cat;
                     resolvedCategoryId = cat.id;
                     category = cat.slug.includes("exit") || cat.slug.includes("valuation")
                         ? "EXIT_AND_VALUATION" : "AI";
@@ -331,7 +333,7 @@ export async function POST(request: NextRequest) {
                     coachId,
                     workshopTypeId: resolvedWorkshopTypeId,
                     workshopCode,
-                    title: body.title || `Workshop Request`,
+                    title: body.title || (resolvedCat ? (resolvedCat.defaultTitle || `Scaling Up ${resolvedCat.name}`) : `Workshop Request`),
                     description: body.description || details,
                     category,
                     categoryId: resolvedCategoryId,
