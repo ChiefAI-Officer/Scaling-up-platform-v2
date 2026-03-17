@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
 
     const templateParam = queryValidation.data.template || "";
     const normalizedTemplate = templateParam.toUpperCase();
+    // activeOnly defaults to true (no isActiveTemplate filter = return all pages, backward compatible).
+    // Pass activeOnly=false to retrieve only inactive templates (candidates for activation).
     const activeOnly = queryValidation.data.activeOnly !== "false";
     const categoryId = queryValidation.data.categoryId;
 
@@ -78,6 +80,7 @@ export async function GET(request: NextRequest) {
         : { in: [...TEMPLATE_OPTIONS] },
       ...(!activeOnly && { isActiveTemplate: false }),
       ...(!activeOnly && categoryId && {
+        // Include both category-specific templates AND global templates (categoryId: null = applies to all categories)
         OR: [{ categoryId }, { categoryId: null }],
       }),
       ...(isPrivilegedRole(actor.role)
