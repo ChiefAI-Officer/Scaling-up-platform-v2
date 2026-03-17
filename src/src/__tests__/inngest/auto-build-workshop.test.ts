@@ -826,4 +826,38 @@ describe("autoBuildWorkshop Inngest function", () => {
     expect(db.landingPage.create).toHaveBeenCalledTimes(2);
     expect(result.pagesCreated).toBe(2);
   });
+
+  // ---- 22. Deduplication is order-independent ----
+  it("deduplication correctly selects category-specific template regardless of array order", async () => {
+    // Reverse order from test 19: category-specific first, then global
+    const catSolo = { id: "tpl-cat-solo-rev", template: "SOLO_LANDING", content: '{"title":"Cat Solo Rev"}', slug: "cat-solo-rev", categoryId: "cat-1" };
+    const globalSolo = { id: "tpl-global-solo-rev", template: "SOLO_LANDING", content: '{"title":"Global Solo Rev"}', slug: "global-solo-rev", categoryId: null };
+
+    (db.landingPage.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([catSolo, globalSolo]); // category-specific FIRST
+
+    (db.workshop.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ status: "AWAITING_APPROVAL" })
+      .mockResolvedValueOnce(mockWorkshop);
+
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+    (db.landingPage.create as jest.Mock).mockResolvedValue({});
+    (db.workflow.findFirst as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
+    (db.workshop.update as jest.Mock).mockResolvedValue({});
+    (sendWorkshopBuiltEmail as jest.Mock).mockResolvedValue(undefined);
+
+    await capturedHandler({ event: makeEvent(), step: mockStep });
+
+    // Still only 1 page created (dedup removes global), using category-specific content
+    expect(db.landingPage.create).toHaveBeenCalledTimes(1);
+    expect(db.landingPage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ content: '{"title":"Cat Solo Rev"}' }),
+      })
+    );
+  });
 });
