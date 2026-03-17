@@ -956,8 +956,8 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                         }));
                       }}
                     >
-                      <SelectTrigger id="pricingTierId" className="mt-1">
-                        <SelectValue placeholder="Choose a pricing tier..." />
+                      <SelectTrigger id="pricingTierId" className="mt-1 bg-background">
+                        <SelectValue placeholder="Select pricing tier" />
                       </SelectTrigger>
                       <SelectContent>
                         {selectedCategory.pricingTiers.map((tier) => (
