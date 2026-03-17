@@ -177,6 +177,16 @@ export const autoBuildWorkshop = inngest.createFunction(
                 select: { id: true, template: true, content: true, slug: true, categoryId: true },
             });
 
+            // FIG-005: Deduplicate — prefer category-scoped over global for same template type
+            const deduped = new Map<string, typeof activeTemplates[number]>();
+            for (const tpl of activeTemplates) {
+                const existing = deduped.get(tpl.template);
+                if (!existing || (tpl.categoryId !== null && existing.categoryId === null)) {
+                    deduped.set(tpl.template, tpl);
+                }
+            }
+            activeTemplates = Array.from(deduped.values());
+
             // FIG-005: If category-filtered query returns nothing, fall back to ALL active templates
             // (graceful degradation so existing global templates still work)
             if (activeTemplates.length === 0 && workshop.categoryId) {

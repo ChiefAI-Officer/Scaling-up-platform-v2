@@ -736,4 +736,94 @@ describe("autoBuildWorkshop Inngest function", () => {
       })
     );
   });
+
+  // ---- 19. Category-specific template wins over global for same template type ----
+  it("prefers category-specific template over global when both exist for the same template type", async () => {
+    const globalSolo = { id: "tpl-global-solo", template: "SOLO_LANDING", content: '{"title":"Global Solo"}', slug: "global-solo", categoryId: null };
+    const catSolo = { id: "tpl-cat-solo", template: "SOLO_LANDING", content: '{"title":"Cat Solo"}', slug: "cat-solo", categoryId: "cat-1" };
+
+    (db.landingPage.findMany as jest.Mock)
+      .mockResolvedValueOnce([])  // idempotency
+      .mockResolvedValueOnce([globalSolo, catSolo]); // findMany returns both
+
+    (db.workshop.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ status: "AWAITING_APPROVAL" })
+      .mockResolvedValueOnce(mockWorkshop); // has categoryId: "cat-1"
+
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+    (db.landingPage.create as jest.Mock).mockResolvedValue({});
+    (db.workflow.findFirst as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
+    (db.workshop.update as jest.Mock).mockResolvedValue({});
+    (sendWorkshopBuiltEmail as jest.Mock).mockResolvedValue(undefined);
+
+    await capturedHandler({ event: makeEvent(), step: mockStep });
+
+    // Only 1 page created (deduplication removed the duplicate), from the category-specific template
+    expect(db.landingPage.create).toHaveBeenCalledTimes(1);
+    expect(db.landingPage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ content: '{"title":"Cat Solo"}' }),
+      })
+    );
+  });
+
+  // ---- 20. Global template used as fallback when no category-specific exists ----
+  it("uses global template as fallback when no category-specific template exists", async () => {
+    const globalReg = { id: "tpl-global-reg", template: "REGISTRATION", content: '{"form":"global"}', slug: "global-reg", categoryId: null };
+
+    (db.landingPage.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([globalReg]);
+
+    (db.workshop.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ status: "AWAITING_APPROVAL" })
+      .mockResolvedValueOnce(mockWorkshop);
+
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+    (db.landingPage.create as jest.Mock).mockResolvedValue({});
+    (db.workflow.findFirst as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
+    (db.workshop.update as jest.Mock).mockResolvedValue({});
+    (sendWorkshopBuiltEmail as jest.Mock).mockResolvedValue(undefined);
+
+    const result = await capturedHandler({ event: makeEvent(), step: mockStep });
+
+    expect(db.landingPage.create).toHaveBeenCalledTimes(1);
+    expect(result.pagesCreated).toBe(1);
+    expect(result.status).toBe("PRE_EVENT");
+  });
+
+  // ---- 21. Different template types from different scopes both used ----
+  it("uses both category-specific and global templates when they are for different template types", async () => {
+    const catSolo = { id: "tpl-cat-solo", template: "SOLO_LANDING", content: '{"c":"cat"}', slug: "cat-solo", categoryId: "cat-1" };
+    const globalReg = { id: "tpl-global-reg", template: "REGISTRATION", content: '{"f":"global"}', slug: "global-reg", categoryId: null };
+
+    (db.landingPage.findMany as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([catSolo, globalReg]);
+
+    (db.workshop.findUnique as jest.Mock)
+      .mockResolvedValueOnce({ status: "AWAITING_APPROVAL" })
+      .mockResolvedValueOnce(mockWorkshop);
+
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+    (db.landingPage.create as jest.Mock).mockResolvedValue({});
+    (db.workflow.findFirst as jest.Mock)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
+    (db.workshop.update as jest.Mock).mockResolvedValue({});
+    (sendWorkshopBuiltEmail as jest.Mock).mockResolvedValue(undefined);
+
+    const result = await capturedHandler({ event: makeEvent(), step: mockStep });
+
+    // Both pages created (different types, no dedup needed)
+    expect(db.landingPage.create).toHaveBeenCalledTimes(2);
+    expect(result.pagesCreated).toBe(2);
+  });
 });
