@@ -102,7 +102,7 @@ export function WorkshopInlineEditForm({
         body: JSON.stringify({
           title: form.title || undefined,
           description: form.description || undefined,
-          categoryId: form.categoryId || undefined,
+          categoryId: form.categoryId !== "" ? form.categoryId : null,
           format: form.format || undefined,
           eventDate: form.eventDate || undefined,
           eventTime: form.eventTime || undefined,
