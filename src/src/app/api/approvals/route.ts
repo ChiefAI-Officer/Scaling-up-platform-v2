@@ -300,11 +300,6 @@ export async function POST(request: NextRequest) {
                       })
                     : null;
 
-            const priceCents =
-                typeof body.customPrice === "number" && body.customPrice > 0
-                    ? Math.round(body.customPrice * 100)
-                    : undefined;
-
             // JV-16: Resolve category from categoryId
             let resolvedCategoryId: string | null = null;
             let category: "AI" | "EXIT_AND_VALUATION" = "AI";
@@ -321,12 +316,23 @@ export async function POST(request: NextRequest) {
 
             // JV-17: Resolve pricing tier
             let resolvedPricingTierId: string | null = null;
+            let tierAmountCents: number | null = null;
             if (body.pricingTierId) {
                 const tier = await db.pricingTier.findUnique({ where: { id: body.pricingTierId } });
                 if (tier) {
                     resolvedPricingTierId = tier.id;
+                    tierAmountCents = tier.amountCents;
                 }
             }
+
+            // FIG-010: Resolve priceCents from customPrice OR the selected pricing tier.
+            // If neither is provided, the workshop is truly free (priceCents = 0).
+            const resolvedPriceCents: number =
+                typeof body.customPrice === "number" && body.customPrice > 0
+                    ? Math.round(body.customPrice * 100)
+                    : tierAmountCents !== null && tierAmountCents > 0
+                        ? tierAmountCents
+                        : 0;
 
             // Resolve the workshop title with category fallback
             const resolvedTitle = body.title || (resolvedCat ? (resolvedCat.defaultTitle || `Scaling Up ${resolvedCat.name}`) : "Workshop Request");
@@ -348,8 +354,8 @@ export async function POST(request: NextRequest) {
                     timezone: body.timezone || "America/New_York",
                     venueName: body.venueName || null,
                     venueAddress,
-                    isFree: !priceCents,
-                    priceCents,
+                    isFree: resolvedPriceCents === 0,
+                    priceCents: resolvedPriceCents,
                     maxAttendees: body.maxAttendees || 30,
                     status: "INFO_REQUESTED",
                     termsAcceptedAt: body.termsAcceptedAt ? new Date(body.termsAcceptedAt) : null,
