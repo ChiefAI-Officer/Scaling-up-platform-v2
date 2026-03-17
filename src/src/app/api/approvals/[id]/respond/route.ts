@@ -335,15 +335,17 @@ export async function POST(
                 } catch {
                     console.error(`[APPROVAL RESPOND POST] Failed to parse requestData for CUSTOM_PRICING approvalId=${id}`);
                 }
+                const updateData: { priceCents?: number; isFree?: boolean; pricingTierId?: string } = {};
+                if (typeof reqData.newPriceCents === "number") {
+                    updateData.priceCents = reqData.newPriceCents;
+                    updateData.isFree = reqData.newPriceCents === 0;
+                }
+                if (reqData.pricingTierId && typeof reqData.pricingTierId === "string") {
+                    updateData.pricingTierId = reqData.pricingTierId;
+                }
                 await db.workshop.update({
                     where: { id: approval.workshopId },
-                    data: {
-                        ...(typeof reqData.newPriceCents === "number" && {
-                            priceCents: reqData.newPriceCents,
-                            isFree: reqData.newPriceCents === 0,
-                        }),
-                        ...(reqData.pricingTierId && { pricingTierId: reqData.pricingTierId as string }),
-                    },
+                    data: updateData,
                 });
                 console.log(`[CUSTOM_PRICING] Applied priceCents=${reqData.newPriceCents} to workshop=${approval.workshopId}`);
             }
