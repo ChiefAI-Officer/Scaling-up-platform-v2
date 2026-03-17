@@ -179,8 +179,12 @@ describe("PATCH /api/landing-pages/[id]", () => {
       isActiveTemplate: true,
     };
 
-    // $transaction receives an array and returns an array; we return [{count:1}, activatedPage]
-    (db.$transaction as jest.Mock).mockResolvedValue([{ count: 1 }, activatedPage]);
+    // Interactive transaction: invoke the callback with the db mock as the tx proxy
+    (db.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => {
+      (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (db.landingPage.update as jest.Mock).mockResolvedValue(activatedPage);
+      return fn(db);
+    });
 
     const response = await PATCH(
       buildPatchRequest({ isActiveTemplate: true }),
@@ -192,10 +196,9 @@ describe("PATCH /api/landing-pages/[id]", () => {
     expect(body.success).toBe(true);
     expect(body.page).toEqual(activatedPage);
 
-    // $transaction should have been called with the array of operations
+    // $transaction should have been called once with a callback
     expect(db.$transaction).toHaveBeenCalledTimes(1);
 
-    // Building the transaction array invokes both db methods to construct their promise arguments
     // The updateMany call inside the transaction should target the same slot
     expect(db.landingPage.updateMany).toHaveBeenCalledWith({
       where: {
@@ -229,7 +232,11 @@ describe("PATCH /api/landing-pages/[id]", () => {
       categoryId: "cat-abc",
       isActiveTemplate: true,
     };
-    (db.$transaction as jest.Mock).mockResolvedValue([{ count: 0 }, activatedPage]);
+    (db.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => {
+      (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+      (db.landingPage.update as jest.Mock).mockResolvedValue(activatedPage);
+      return fn(db);
+    });
 
     const response = await PATCH(
       buildPatchRequest({ isActiveTemplate: true, categoryId: "cat-abc" }),
@@ -306,7 +313,11 @@ describe("PATCH /api/landing-pages/[id]", () => {
       categoryId: "cat-new",
       isActiveTemplate: true,
     };
-    (db.$transaction as jest.Mock).mockResolvedValue([{ count: 1 }, rescoped]);
+    (db.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => {
+      (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (db.landingPage.update as jest.Mock).mockResolvedValue(rescoped);
+      return fn(db);
+    });
 
     const response = await PATCH(
       buildPatchRequest({ categoryId: "cat-new" }), // no isActiveTemplate in payload

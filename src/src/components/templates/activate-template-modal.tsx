@@ -143,7 +143,7 @@ export function ActivateTemplateModal({
         <button className={triggerClassName}>{triggerLabel}</button>
       </DialogTrigger>
 
-      <DialogContent className="max-w-xl">
+      <DialogContent aria-describedby={undefined} className="max-w-xl">
         <DialogHeader>
           <DialogTitle>
             {hasGlobalFallback ? "Set Category Override" : "Set Template"} — {templateLabel}
@@ -168,7 +168,15 @@ export function ActivateTemplateModal({
 
           {/* Fetch error */}
           {!loading && fetchError && (
-            <p className="text-sm text-destructive">{fetchError}</p>
+            <div className="py-4 text-center space-y-3">
+              <p className="text-sm text-destructive">{fetchError}</p>
+              <button
+                onClick={fetchCandidates}
+                className="text-sm text-primary underline hover:no-underline"
+              >
+                Try again
+              </button>
+            </div>
           )}
 
           {/* Empty state */}

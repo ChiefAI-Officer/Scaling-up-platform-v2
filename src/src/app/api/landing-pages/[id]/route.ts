@@ -49,9 +49,8 @@ export async function PATCH(
             const effectiveCategoryId = data.categoryId !== undefined ? data.categoryId : page.categoryId;
 
             // Atomic: deactivate any competing active template for this slot, then activate this one
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const txResult = await (db.$transaction as (ops: any[]) => Promise<any[]>)([
-                db.landingPage.updateMany({
+            const txResult = await db.$transaction(async (tx) => {
+                await tx.landingPage.updateMany({
                     where: {
                         template: page.template,
                         categoryId: effectiveCategoryId,  // null = global slot
@@ -59,16 +58,16 @@ export async function PATCH(
                         id: { not: id },
                     },
                     data: { isActiveTemplate: false },
-                }),
-                db.landingPage.update({
+                });
+                return tx.landingPage.update({
                     where: { id },
                     data: {
                         ...(data.isActiveTemplate !== undefined && { isActiveTemplate: data.isActiveTemplate }),
                         ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
                     },
-                }),
-            ]);
-            updated = txResult[1];
+                });
+            });
+            updated = txResult;
         } else {
             updated = await db.landingPage.update({
                 where: { id },

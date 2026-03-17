@@ -229,7 +229,7 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
                         </p>
                       ) : (
                         // State 3: No template at all (or on All tab with nothing)
-                        <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
+                        <p className="mt-2 text-xs text-warning">
                           No template set{selectedCategory ? ` for ${selectedCategory.name}` : ""} — mark a landing page as Auto-Build to promote it here.
                         </p>
                       )}
