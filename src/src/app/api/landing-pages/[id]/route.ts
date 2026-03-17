@@ -5,6 +5,7 @@ import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 
 const UpdateSchema = z.object({
     isActiveTemplate: z.boolean().optional(),
+    categoryId: z.string().nullable().optional(),  // allow re-scoping page to a specific category
 });
 
 /**
@@ -33,12 +34,41 @@ export async function PATCH(
             return NextResponse.json({ error: "Landing page not found" }, { status: 404 });
         }
 
-        const updated = await db.landingPage.update({
-            where: { id },
-            data: {
-                ...(data.isActiveTemplate !== undefined && { isActiveTemplate: data.isActiveTemplate }),
-            },
-        });
+        let updated;
+        if (data.isActiveTemplate === true) {
+            // Determine the effective categoryId for the slot
+            // (use data.categoryId if explicitly provided, otherwise use the page's existing categoryId)
+            const effectiveCategoryId = data.categoryId !== undefined ? data.categoryId : page.categoryId;
+
+            // Atomic: deactivate any competing active template for this slot, then activate this one
+            const [, activatedPage] = await db.$transaction([
+                db.landingPage.updateMany({
+                    where: {
+                        template: page.template,
+                        categoryId: effectiveCategoryId,  // null = global slot
+                        isActiveTemplate: true,
+                        id: { not: id },
+                    },
+                    data: { isActiveTemplate: false },
+                }),
+                db.landingPage.update({
+                    where: { id },
+                    data: {
+                        isActiveTemplate: true,
+                        ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+                    },
+                }),
+            ]);
+            updated = activatedPage;
+        } else {
+            updated = await db.landingPage.update({
+                where: { id },
+                data: {
+                    ...(data.isActiveTemplate !== undefined && { isActiveTemplate: data.isActiveTemplate }),
+                    ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+                },
+            });
+        }
 
         return NextResponse.json({ success: true, page: updated });
     } catch (error) {
