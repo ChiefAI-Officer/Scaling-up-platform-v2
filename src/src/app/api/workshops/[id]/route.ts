@@ -168,24 +168,29 @@ export async function PATCH(
     }
 
     if (data.eventDate) {
-      const dateChangeValidation = validateDateChange(
-        existing.eventDate,
-        new Date(data.eventDate),
-        existing.format
-      );
+      // FIG-009: Bypass lead-time check when coach edits during INFO_REQUESTED flow
+      const shouldValidateDateChange = !(isCoach && existing.status === "INFO_REQUESTED");
 
-      if (!dateChangeValidation.valid || dateChangeValidation.requiresApproval) {
-        return NextResponse.json(
-          {
-            success: false,
-            error:
-              dateChangeValidation.reason ||
-              "Date change requires manual approval",
-            requiresApproval: dateChangeValidation.requiresApproval,
-            leadTimeDays: dateChangeValidation.leadTimeDays,
-          },
-          { status: dateChangeValidation.requiresApproval ? 409 : 400 }
+      if (shouldValidateDateChange) {
+        const dateChangeValidation = validateDateChange(
+          existing.eventDate,
+          new Date(data.eventDate),
+          existing.format
         );
+
+        if (!dateChangeValidation.valid || dateChangeValidation.requiresApproval) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                dateChangeValidation.reason ||
+                "Date change requires manual approval",
+              requiresApproval: dateChangeValidation.requiresApproval,
+              leadTimeDays: dateChangeValidation.leadTimeDays,
+            },
+            { status: dateChangeValidation.requiresApproval ? 409 : 400 }
+          );
+        }
       }
     }
 
