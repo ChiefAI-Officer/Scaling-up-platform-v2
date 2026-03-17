@@ -269,6 +269,14 @@ export async function POST(request: NextRequest) {
                 );
             }
 
+            // FIG-011: Virtual workshops must have a meeting link
+            if (body.format === "VIRTUAL" && !body.virtualLink) {
+                return NextResponse.json(
+                    { error: "Meeting link is required for virtual workshops" },
+                    { status: 400 }
+                );
+            }
+
             // Resolve workshopTypeId from slug or ID
             let resolvedWorkshopTypeId: string | undefined;
             if (workshopTypeSlug) {
@@ -355,6 +363,7 @@ export async function POST(request: NextRequest) {
                     timezone: body.timezone || "America/New_York",
                     venueName: body.venueName || null,
                     venueAddress,
+                    virtualLink: body.virtualLink || null,
                     isFree: resolvedPriceCents === 0,
                     priceCents: resolvedPriceCents,
                     maxAttendees: body.maxAttendees || 30,

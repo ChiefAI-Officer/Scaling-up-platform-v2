@@ -191,6 +191,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // FIG-011: Virtual workshops must have a meeting link
+    if (data.format === "VIRTUAL" && !data.virtualLink) {
+      return NextResponse.json(
+        { success: false, error: "Meeting link is required for virtual workshops" },
+        { status: 400 }
+      );
+    }
+
     // Verify coach exists and is eligible
     const coach = await db.coach.findUnique({
       where: { id: data.coachId },

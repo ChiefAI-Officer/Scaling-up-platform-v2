@@ -393,6 +393,10 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
         throw new Error("Please enter a workshop price before creating a paid workshop.");
       }
 
+      if (formData.format === "VIRTUAL" && !formData.virtualLink) {
+        throw new Error("Meeting link is required for virtual workshops");
+      }
+
       const parsedPrice = Number.parseInt(formData.priceCents || "0", 10);
       const parsedMaxAttendees = Number.parseInt(formData.maxAttendees || "50", 10);
 
@@ -906,7 +910,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="virtualLink">Meeting Link</Label>
+                <Label htmlFor="virtualLink">Meeting Link *</Label>
                 <Input
                   id="virtualLink"
                   name="virtualLink"
@@ -914,6 +918,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                   value={formData.virtualLink}
                   onChange={handleChange}
                   placeholder="https://..."
+                  required
                   className="mt-1"
                 />
               </div>
