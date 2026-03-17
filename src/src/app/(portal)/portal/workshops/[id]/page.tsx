@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { CancelWorkshopDialog } from "@/components/workshops/cancel-workshop-dialog";
 import { ResubmitWorkshop } from "@/components/workshops/resubmit-workshop";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
-import { CoachResponseForm } from "@/components/workshops/coach-response-form";
 import { getSessionDownloadPath } from "@/lib/file-download-path";
 import {
   calculateWorkshopRevenueSplit,
@@ -51,11 +50,15 @@ export default async function WorkshopDetailsPage({
         format: true,
         eventDate: true,
         eventTime: true,
+        timezone: true,
         venueName: true,
+        venueAddress: true,
         virtualLink: true,
+        categoryId: true,
         landingPageSlug: true,
         maxAttendees: true,
         isFree: true,
+        priceCents: true,
         workshopType: { select: { name: true } },
         _count: { select: { registrations: true } },
       },
@@ -248,12 +251,25 @@ export default async function WorkshopDetailsPage({
         )}
       </div>
 
-      {/* MR-33: Coach response to INFO_REQUESTED */}
+      {/* FIG-009: Full edit form for INFO_REQUESTED status */}
       {workshop.status === "INFO_REQUESTED" && infoRequestedApproval && (
-        <CoachResponseForm
+        <ResubmitWorkshop
+          variant="info_requested"
+          workshopId={workshop.id}
           approvalId={infoRequestedApproval.id}
-          existingResponse={infoRequestedApproval.coachResponse ?? null}
-          adminQuestion={infoRequestedApproval.notes ?? null}
+          adminMessage={infoRequestedApproval.notes ?? null}
+          title={workshop.title}
+          description={workshop.description}
+          eventDate={workshop.eventDate.toISOString()}
+          eventTime={workshop.eventTime}
+          timezone={workshop.timezone}
+          venueName={workshop.venueName}
+          venueAddress={workshop.venueAddress}
+          virtualLink={workshop.virtualLink}
+          categoryId={workshop.categoryId}
+          format={workshop.format}
+          priceCents={workshop.priceCents}
+          isFree={workshop.isFree}
         />
       )}
 
@@ -293,13 +309,19 @@ export default async function WorkshopDetailsPage({
       {/* Rejection + Resubmit */}
       {["CANCELED", "DENIED"].includes(workshop.status) && (
         <ResubmitWorkshop
+          variant="denied"
           workshopId={workshop.id}
           rejectionReason={latestDenial?.responseReason || latestDenial?.notes || null}
           title={workshop.title}
           description={workshop.description}
           eventDate={workshop.eventDate.toISOString()}
           eventTime={workshop.eventTime}
+          timezone={workshop.timezone}
           venueName={workshop.venueName}
+          venueAddress={workshop.venueAddress}
+          virtualLink={workshop.virtualLink}
+          categoryId={workshop.categoryId}
+          format={workshop.format}
         />
       )}
 

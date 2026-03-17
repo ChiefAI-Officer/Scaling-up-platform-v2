@@ -105,6 +105,12 @@ export async function GET(
   }
 }
 
+// Fields coaches are allowed to edit on their own workshops
+const COACH_EDITABLE_FIELDS = new Set([
+  "title", "description", "categoryId", "format", "eventDate", "eventTime",
+  "timezone", "venueName", "venueAddress", "venueInstructions", "virtualLink",
+]);
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -114,7 +120,11 @@ export async function PATCH(
     if (!actor) {
       return NextResponse.json({ success: false, error: "Authentication required" }, { status: 401 });
     }
-    if (!isPrivilegedRole(actor.role)) {
+
+    const isPrivileged = isPrivilegedRole(actor.role);
+    const isCoach = actor.role === "COACH";
+
+    if (!isPrivileged && !isCoach) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
@@ -137,7 +147,26 @@ export async function PATCH(
       );
     }
 
+    // Coaches can only patch their own workshop
+    if (isCoach && existing.coachId !== actor.coachId) {
+      return NextResponse.json({ success: false, error: "Workshop not found" }, { status: 404 });
+    }
+
     const data = validation.data;
+
+    // Coaches cannot edit pricing fields
+    if (isCoach) {
+      const forbiddenFields = Object.keys(data).filter(
+        (k) => !COACH_EDITABLE_FIELDS.has(k) && data[k as keyof typeof data] !== undefined
+      );
+      if (forbiddenFields.length > 0) {
+        return NextResponse.json(
+          { success: false, error: `Coaches cannot edit: ${forbiddenFields.join(", ")}` },
+          { status: 403 }
+        );
+      }
+    }
+
     if (data.eventDate) {
       const dateChangeValidation = validateDateChange(
         existing.eventDate,
@@ -181,11 +210,12 @@ export async function PATCH(
         ...(data.virtualLink !== undefined && {
           virtualLink: data.virtualLink || null,
         }),
-        ...(data.geoTargetAreas !== undefined && { geoTargetAreas: data.geoTargetAreas }),
-        ...(data.excludedClients !== undefined && { excludedClients: data.excludedClients }),
-        ...(data.isFree !== undefined && { isFree: data.isFree }),
-        ...(data.priceCents !== undefined && { priceCents: data.priceCents }),
-        ...(data.maxAttendees !== undefined && { maxAttendees: data.maxAttendees }),
+        // Admin-only fields
+        ...(!isCoach && data.geoTargetAreas !== undefined && { geoTargetAreas: data.geoTargetAreas }),
+        ...(!isCoach && data.excludedClients !== undefined && { excludedClients: data.excludedClients }),
+        ...(!isCoach && data.isFree !== undefined && { isFree: data.isFree }),
+        ...(!isCoach && data.priceCents !== undefined && { priceCents: data.priceCents }),
+        ...(!isCoach && data.maxAttendees !== undefined && { maxAttendees: data.maxAttendees }),
       },
       include: {
         coach: true,
