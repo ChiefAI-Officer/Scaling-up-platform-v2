@@ -326,6 +326,41 @@ export async function POST(
 
         const newStatus = action === "APPROVE" ? "APPROVED" : "DENIED";
 
+        // FIG-007: Handle CUSTOM_PRICING approvals specially — update priceCents, skip auto-build and wrong emails
+        if (approval.type === "CUSTOM_PRICING") {
+            if (newStatus === "APPROVED" && approval.workshopId) {
+                let reqData: { newPriceCents?: unknown; pricingTierId?: unknown } = {};
+                try {
+                    reqData = JSON.parse(approval.requestData ?? "{}");
+                } catch {
+                    console.error(`[APPROVAL RESPOND POST] Failed to parse requestData for CUSTOM_PRICING approvalId=${id}`);
+                }
+                await db.workshop.update({
+                    where: { id: approval.workshopId },
+                    data: {
+                        ...(typeof reqData.newPriceCents === "number" && {
+                            priceCents: reqData.newPriceCents,
+                            isFree: reqData.newPriceCents === 0,
+                        }),
+                        ...(reqData.pricingTierId && { pricingTierId: reqData.pricingTierId as string }),
+                    },
+                });
+                console.log(`[CUSTOM_PRICING] Applied priceCents=${reqData.newPriceCents} to workshop=${approval.workshopId}`);
+            }
+            await db.approvalQueue.update({
+                where: { id },
+                data: { status: newStatus, respondedBy: actor.email, respondedAt: new Date(), responseReason: reason },
+            });
+            await logAudit({
+                entityType: "ApprovalQueue",
+                entityId: id,
+                action,
+                performedBy: actor.email,
+                changes: { previousStatus: "PENDING", newStatus, reason, approvalType: "CUSTOM_PRICING" },
+            });
+            return NextResponse.json({ success: true, status: newStatus, message: `Price change request ${newStatus.toLowerCase()}` });
+        }
+
         await db.approvalQueue.update({
             where: { id },
             data: {
