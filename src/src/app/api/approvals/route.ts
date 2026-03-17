@@ -24,6 +24,7 @@ const CreateApprovalSchema = z.object({
     requestedBy: z.string().optional(),
     title: z.string().optional(),
     eventDate: z.string().optional(),
+    customPricingNotes: z.string().optional(),
 });
 
 const APPROVAL_STATUSES = new Set(["PENDING", "APPROVED", "DENIED", "EXPIRED"]);
@@ -382,6 +383,7 @@ export async function POST(request: NextRequest) {
             amount: input.amount,
             details,
             requestedBy,
+            customPricingNotes: input.customPricingNotes,
         });
 
         // If auto-approved, advance workshop status and trigger auto-build
@@ -429,6 +431,7 @@ export async function POST(request: NextRequest) {
                     details,
                     requestedAt: new Date(),
                     amount: input.amount,
+                    customPricingNotes: input.customPricingNotes,
                     circleCertification: circleData ? {
                         verified: circleData.verified,
                         confidence: circleData.confidence,

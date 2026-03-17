@@ -182,6 +182,7 @@ export async function sendEnrichedApprovalRequest(data: {
     details: string;
     requestedAt: Date;
     amount?: number; // In cents — populated for CUSTOM_PRICING
+    customPricingNotes?: string;
     circleCertification?: {
         verified: boolean;
         confidence: number;
@@ -228,12 +229,20 @@ export async function sendEnrichedApprovalRequest(data: {
         : "";
     const subjectPrefix = isCustomPricing ? "[CUSTOM PRICING] " : "";
 
+    const notesHtml = data.customPricingNotes
+        ? `<div style="background:#fef3c7;border-left:4px solid #d97706;padding:12px 16px;margin:16px 0;border-radius:4px;">
+            <p style="margin:0;font-weight:600;color:#92400e;">Coach's Pricing Notes:</p>
+            <p style="margin:8px 0 0;color:#374151;">${escapeHtml(data.customPricingNotes)}</p>
+           </div>`
+        : "";
+
     const html = `
     <h2 style="color: #1e293b;">${typeLabel}</h2>
     ${customPriceLine}
     <p><strong>Coach:</strong> ${data.coachName} (${data.coachEmail})</p>
     <p><strong>Details:</strong> ${data.details}</p>
     <p><strong>Requested:</strong> ${data.requestedAt.toLocaleString()}</p>
+    ${notesHtml}
     ${enrichmentHtml}
     <br/>
     <a href="${approvalUrl}" style="background-color: #1D4ED8; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Review Request</a>
@@ -267,10 +276,18 @@ export async function sendWorkshopRequestedEmail(data: {
     workshopTitle: string;
     workshopId?: string;
     linkedinUrl?: string | null;
+    customPricingNotes?: string;
 }): Promise<void> {
     const dashboardUrl = `${process.env.APP_URL}/workshops`;
     const linkedinHtml = data.linkedinUrl
         ? `<p><strong>LinkedIn:</strong> <a href="${data.linkedinUrl}">${data.linkedinUrl}</a></p>`
+        : "";
+
+    const notesHtml = data.customPricingNotes
+        ? `<div style="background:#fef3c7;border-left:4px solid #d97706;padding:12px 16px;margin:16px 0;border-radius:4px;">
+            <p style="margin:0;font-weight:600;color:#92400e;">Coach's Pricing Notes:</p>
+            <p style="margin:8px 0 0;color:#374151;">${escapeHtml(data.customPricingNotes)}</p>
+           </div>`
         : "";
 
     const adminHtml = `
@@ -278,6 +295,7 @@ export async function sendWorkshopRequestedEmail(data: {
     <p><strong>Coach:</strong> ${data.coachName}</p>
     <p><strong>Workshop:</strong> ${data.workshopTitle}</p>
     ${linkedinHtml}
+    ${notesHtml}
     <br/>
     <a href="${dashboardUrl}" style="background-color: #1D4ED8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View in Dashboard</a>
     `;
