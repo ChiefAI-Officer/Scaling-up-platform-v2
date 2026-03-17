@@ -26,6 +26,7 @@ jest.mock("@/lib/db", () => ({
     landingPage: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
     workflow: {
@@ -160,6 +161,9 @@ function setupHappyPath() {
     .mockResolvedValueOnce({ id: "assign-pre-1" })
     .mockResolvedValueOnce({ id: "assign-post-1" });
 
+  // SOLO_LANDING slug lookup (update-status step)
+  (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
+
   // Status update
   (db.workshop.update as jest.Mock).mockResolvedValue({});
 
@@ -261,6 +265,7 @@ describe("autoBuildWorkshop Inngest function", () => {
     (db.workflowAssignment.create as jest.Mock)
       .mockResolvedValueOnce({ id: "assign-pre-1" })
       .mockResolvedValueOnce({ id: "assign-post-1" });
+    (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
     (db.workshop.update as jest.Mock).mockResolvedValue({});
     (sendWorkshopBuiltEmail as jest.Mock).mockResolvedValue(undefined);
     (inngest.send as jest.Mock).mockResolvedValue(undefined);
@@ -385,6 +390,7 @@ describe("autoBuildWorkshop Inngest function", () => {
     (db.workflowAssignment.create as jest.Mock)
       .mockResolvedValueOnce({ id: "assign-pre-1" })
       .mockResolvedValueOnce({ id: "assign-post-1" });
+    (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
     (db.workshop.update as jest.Mock).mockResolvedValue({});
     (sendWorkshopBuiltEmail as jest.Mock).mockResolvedValue(undefined);
     (inngest.send as jest.Mock).mockResolvedValue(undefined);
@@ -505,6 +511,7 @@ describe("autoBuildWorkshop Inngest function", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
 
+    (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
     (db.workshop.update as jest.Mock).mockResolvedValue({});
     (sendWorkshopBuiltEmail as jest.Mock).mockResolvedValue(undefined);
 
@@ -656,6 +663,7 @@ describe("autoBuildWorkshop Inngest function", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
 
+    (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
     (db.workshop.update as jest.Mock).mockResolvedValue({});
     (sendWorkshopBuiltEmail as jest.Mock).mockResolvedValue(undefined);
 

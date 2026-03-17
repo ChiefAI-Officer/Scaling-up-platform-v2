@@ -108,7 +108,10 @@ describe("DELETE /api/registrations/[id]", () => {
       stripePaymentId: "pi_123",
     });
 
-    const response = await DELETE({} as Parameters<typeof DELETE>[0], routeParams());
+    const mockRequest = {
+      nextUrl: { searchParams: new URLSearchParams() },
+    } as unknown as Parameters<typeof DELETE>[0];
+    const response = await DELETE(mockRequest, routeParams());
     const body = await response.json();
 
     expect(response.status).toBe(200);
