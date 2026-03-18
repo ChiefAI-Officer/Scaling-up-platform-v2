@@ -125,8 +125,8 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
     fetch("/api/categories")
       .then((r) => r.json())
       .then((d) => {
-        if (d.success && Array.isArray(d.data)) {
-          setCategories(d.data as Category[]);
+        if (Array.isArray(d)) {
+          setCategories(d as Category[]);
         }
       })
       .catch(() => {/* non-critical, silently ignore */});
