@@ -17,7 +17,7 @@
 jest.mock("@/lib/db", () => ({
   db: {
     workshop: { findUnique: jest.fn(), update: jest.fn() },
-    landingPage: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn() },
+    landingPage: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), findFirst: jest.fn() },
     workflow: { findFirst: jest.fn() },
     workflowAssignment: { findUnique: jest.fn(), create: jest.fn() },
   },
@@ -137,6 +137,7 @@ function createStepRunForHappyPath(workshopOverrides: Record<string, unknown> = 
       (db.workflowAssignment.findUnique as jest.Mock).mockResolvedValueOnce(null);
       (db.workflowAssignment.create as jest.Mock).mockResolvedValueOnce({ id: "wa-post-001" });
     } else if (name === "update-status") {
+      (db.landingPage.findFirst as jest.Mock).mockResolvedValueOnce(null);
       (db.workshop.update as jest.Mock).mockResolvedValueOnce({ id: "ws-test-123" });
     }
     // "notify-coach" uses sendWorkshopBuiltEmail which is already mocked
@@ -269,6 +270,7 @@ describe("auto-build-workshop Inngest function", () => {
         } else if (name === "assign-post-event-workflow") {
           (db.workflow.findFirst as jest.Mock).mockResolvedValueOnce(null);
         } else if (name === "update-status") {
+          (db.landingPage.findFirst as jest.Mock).mockResolvedValueOnce(null);
           (db.workshop.update as jest.Mock).mockResolvedValueOnce({ id: "ws-test-123" });
         }
         return fn();
@@ -327,12 +329,15 @@ describe("auto-build-workshop Inngest function", () => {
         } else if (name === "fetch-workshop") {
           (db.workshop.findUnique as jest.Mock).mockResolvedValueOnce(createWorkshopRecord());
         } else if (name === "create-landing-pages") {
-          (db.landingPage.findMany as jest.Mock).mockResolvedValueOnce([]); // no templates
+          (db.landingPage.findMany as jest.Mock)
+            .mockResolvedValueOnce([]) // no category-matched templates
+            .mockResolvedValueOnce([]); // no global templates (fallback)
         } else if (name === "assign-pre-event-workflow") {
           (db.workflow.findFirst as jest.Mock).mockResolvedValueOnce(null);
         } else if (name === "assign-post-event-workflow") {
           (db.workflow.findFirst as jest.Mock).mockResolvedValueOnce(null);
         } else if (name === "update-status") {
+          (db.landingPage.findFirst as jest.Mock).mockResolvedValueOnce(null);
           (db.workshop.update as jest.Mock).mockResolvedValueOnce({ id: "ws-test-123" });
         }
         return fn();
@@ -369,6 +374,7 @@ describe("auto-build-workshop Inngest function", () => {
           (db.workflowAssignment.findUnique as jest.Mock).mockResolvedValueOnce(null);
           (db.workflowAssignment.create as jest.Mock).mockResolvedValueOnce({ id: "wa-002" });
         } else if (name === "update-status") {
+          (db.landingPage.findFirst as jest.Mock).mockResolvedValueOnce(null);
           (db.workshop.update as jest.Mock).mockResolvedValueOnce({ id: "ws-test-123" });
         }
         return fn();
@@ -403,6 +409,7 @@ describe("auto-build-workshop Inngest function", () => {
           (db.workflow.findFirst as jest.Mock).mockResolvedValueOnce(createPostEventWorkflow());
           (db.workflowAssignment.findUnique as jest.Mock).mockResolvedValueOnce({ id: "existing-wa-2" });
         } else if (name === "update-status") {
+          (db.landingPage.findFirst as jest.Mock).mockResolvedValueOnce(null);
           (db.workshop.update as jest.Mock).mockResolvedValueOnce({ id: "ws-test-123" });
         }
         return fn();
@@ -429,6 +436,7 @@ describe("auto-build-workshop Inngest function", () => {
         } else if (name === "assign-post-event-workflow") {
           (db.workflow.findFirst as jest.Mock).mockResolvedValueOnce(null);
         } else if (name === "update-status") {
+          (db.landingPage.findFirst as jest.Mock).mockResolvedValueOnce(null);
           (db.workshop.update as jest.Mock).mockResolvedValueOnce({ id: "ws-test-123" });
         }
         return fn();
@@ -470,6 +478,7 @@ describe("auto-build-workshop Inngest function", () => {
         } else if (name === "assign-post-event-workflow") {
           (db.workflow.findFirst as jest.Mock).mockResolvedValueOnce(null);
         } else if (name === "update-status") {
+          (db.landingPage.findFirst as jest.Mock).mockResolvedValueOnce(null);
           (db.workshop.update as jest.Mock).mockResolvedValueOnce({ id: "ws-test-123" });
         }
         return fn();

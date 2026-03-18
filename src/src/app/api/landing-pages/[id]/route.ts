@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { LandingPage } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 
 const UpdateSchema = z.object({
     isActiveTemplate: z.boolean().optional(),
+    categoryId: z.string().nullable().optional(),  // allow re-scoping page to a specific category
 });
 
 /**
@@ -33,12 +35,48 @@ export async function PATCH(
             return NextResponse.json({ error: "Landing page not found" }, { status: 404 });
         }
 
-        const updated = await db.landingPage.update({
-            where: { id },
-            data: {
-                ...(data.isActiveTemplate !== undefined && { isActiveTemplate: data.isActiveTemplate }),
-            },
-        });
+        // Should we run the deactivation transaction?
+        // Yes if: we're activating this page, OR we're re-scoping an already-active page to a new slot.
+        const needsTransaction =
+            data.isActiveTemplate === true ||
+            (data.categoryId !== undefined && page.isActiveTemplate && data.isActiveTemplate !== false);
+
+        let updated: LandingPage;
+
+        if (needsTransaction) {
+            // Determine the effective categoryId for the slot
+            // (use data.categoryId if explicitly provided, otherwise use the page's existing categoryId)
+            const effectiveCategoryId = data.categoryId !== undefined ? data.categoryId : page.categoryId;
+
+            // Atomic: deactivate any competing active template for this slot, then activate this one
+            const txResult = await db.$transaction(async (tx) => {
+                await tx.landingPage.updateMany({
+                    where: {
+                        template: page.template,
+                        categoryId: effectiveCategoryId,  // null = global slot
+                        isActiveTemplate: true,
+                        id: { not: id },
+                    },
+                    data: { isActiveTemplate: false },
+                });
+                return tx.landingPage.update({
+                    where: { id },
+                    data: {
+                        ...(data.isActiveTemplate !== undefined && { isActiveTemplate: data.isActiveTemplate }),
+                        ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+                    },
+                });
+            });
+            updated = txResult;
+        } else {
+            updated = await db.landingPage.update({
+                where: { id },
+                data: {
+                    ...(data.isActiveTemplate !== undefined && { isActiveTemplate: data.isActiveTemplate }),
+                    ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+                },
+            });
+        }
 
         return NextResponse.json({ success: true, page: updated });
     } catch (error) {

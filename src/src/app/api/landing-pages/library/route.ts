@@ -5,11 +5,13 @@ import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/authori
 import { rewriteIdentityFields, buildWorkshopVariables } from "@/lib/template-interpolation";
 import { z } from "zod";
 
-const TEMPLATE_OPTIONS = ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION"] as const;
+const TEMPLATE_OPTIONS = ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] as const;
 type TemplateType = (typeof TEMPLATE_OPTIONS)[number];
 
 const landingPageLibraryQuerySchema = z.object({
   template: z.string().trim().optional(),
+  activeOnly: z.string().optional(),
+  categoryId: z.string().trim().optional(),
 });
 
 const applyLandingPageTemplateSchema = z.object({
@@ -23,7 +25,7 @@ function isTemplateType(value: string): value is TemplateType {
 }
 
 function toTemplateEditorPath(template: TemplateType): string {
-  return template.toLowerCase().replace("_", "-");
+  return template.toLowerCase().replace(/_/g, "-");
 }
 
 function generateSlug(workshopTitle: string, template: TemplateType): string {
@@ -56,6 +58,10 @@ export async function GET(request: NextRequest) {
 
     const templateParam = queryValidation.data.template || "";
     const normalizedTemplate = templateParam.toUpperCase();
+    // activeOnly defaults to true (no isActiveTemplate filter = return all pages, backward compatible).
+    // Pass activeOnly=false to retrieve only inactive templates (candidates for activation).
+    const activeOnly = queryValidation.data.activeOnly !== "false";
+    const categoryId = queryValidation.data.categoryId;
 
     if (templateParam && !isTemplateType(normalizedTemplate)) {
       return NextResponse.json(
@@ -72,6 +78,11 @@ export async function GET(request: NextRequest) {
       template: isTemplateType(normalizedTemplate)
         ? normalizedTemplate
         : { in: [...TEMPLATE_OPTIONS] },
+      ...(!activeOnly && { isActiveTemplate: false }),
+      ...(!activeOnly && categoryId && {
+        // Include both category-specific templates AND global templates (categoryId: null = applies to all categories)
+        OR: [{ categoryId }, { categoryId: null }],
+      }),
       ...(isPrivilegedRole(actor.role)
         ? {}
         : {
@@ -89,10 +100,14 @@ export async function GET(request: NextRequest) {
         status: true,
         slug: true,
         createdAt: true,
+        updatedAt: true,
         workshopId: true,
+        isActiveTemplate: true,
+        categoryId: true,
         workshop: {
           select: {
             title: true,
+            workshopCode: true,
           },
         },
       },
@@ -108,8 +123,12 @@ export async function GET(request: NextRequest) {
       status: page.status,
       slug: page.slug,
       createdAt: page.createdAt.toISOString(),
+      updatedAt: page.updatedAt.toISOString(),
       workshopId: page.workshopId,
+      isActiveTemplate: page.isActiveTemplate,
+      categoryId: page.categoryId,
       workshopTitle: page.workshop.title,
+      workshopCode: page.workshop.workshopCode,
       editPath: `/workshops/${page.workshopId}/landing-pages/${toTemplateEditorPath(
         page.template as TemplateType
       )}`,
