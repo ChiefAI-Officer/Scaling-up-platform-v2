@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ActiveTemplateToggleProps {
     pageId: string;
@@ -10,6 +11,7 @@ interface ActiveTemplateToggleProps {
 export function ActiveTemplateToggle({ pageId, isActive }: ActiveTemplateToggleProps) {
     const [active, setActive] = useState(isActive);
     const [loading, setLoading] = useState(false);
+    const { toast } = useToast();
 
     const handleToggle = async () => {
         setLoading(true);
@@ -22,7 +24,7 @@ export function ActiveTemplateToggle({ pageId, isActive }: ActiveTemplateToggleP
             if (!res.ok) throw new Error("Failed to update");
             setActive(!active);
         } catch {
-            alert("Failed to update template status");
+            toast({ title: "Error", description: "Failed to update template status", variant: "destructive" });
         } finally {
             setLoading(false);
         }

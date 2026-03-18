@@ -48,7 +48,7 @@ async function getMasterTemplates(categoryId: string | null) {
   // FIG-005: Filter templates by category. "null" means global (no categoryId filter).
   const categoryWhere = categoryId
     ? { categoryId }
-    : {}; // no filter → show all active templates (original behaviour when "All" is selected)
+    : { categoryId: null }; // All tab = global templates only (categoryId: null)
 
   const pages = await db.landingPage.findMany({
     where: {
@@ -230,7 +230,7 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
                       ) : (
                         // State 3: No template at all (or on All tab with nothing)
                         <p className="mt-2 text-xs text-warning">
-                          No template set{selectedCategory ? ` for ${selectedCategory.name}` : ""} — mark a landing page as Auto-Build to promote it here.
+                          No template set{selectedCategory ? ` for ${selectedCategory.name}` : ""} — use the Set Template button to promote a landing page.
                         </p>
                       )}
                     </div>
@@ -265,7 +265,16 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
                         templateLabel={option.label}
                         hasGlobalFallback={!!globalFallback}
                       />
-                    ) : null}
+                    ) : (
+                      // Show Set Global Template button on the All tab
+                      <ActivateTemplateModal
+                        template={option.value as TemplateValue}
+                        categoryId={null}
+                        categoryName="Global"
+                        templateLabel={option.label}
+                        hasGlobalFallback={false}
+                      />
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -280,17 +289,21 @@ export default async function TemplatesPage({ searchParams }: TemplatesPageProps
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           <p>
-            Each workshop has its own set of landing pages. To promote a workshop page as the
-            master template, open the workshop landing page editor and toggle &quot;Auto-Build&quot; on.
+            To set a global template, use the <strong>Set Template</strong> button on the{" "}
+            <strong>All</strong> tab. To set a category-specific override, switch to that
+            category tab and use <strong>Set Override</strong> or <strong>Set Template</strong>.
+            In both cases the system will show you a list of existing workshop landing pages to
+            promote as the master.
           </p>
           <p>
             Templates can be scoped to a category (AI or Exit &amp; Valuation). When auto-build runs,
-            it picks templates matching the workshop&apos;s category first. Templates with no category
-            are &quot;global&quot; and apply to all workshops as a fallback.
+            it picks the category-specific template first and falls back to the global template if
+            no override exists. Templates on the <strong>All</strong> tab have no category and
+            apply to all workshops as a fallback.
           </p>
           <p>
             <strong>Important:</strong> Exit &amp; Valuation templates are seeded but inactive by default.
-            Activate them from the workshop landing page editor only after verifying their content.
+            Activate them from this page only after verifying their content.
           </p>
         </CardContent>
       </Card>
