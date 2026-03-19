@@ -48,8 +48,21 @@ function normalizeRequestData(raw: unknown): ApprovalRequestData {
     }
 
     const data = raw as Record<string, unknown>;
+
+    // Construct details from explicit field or from workshopTitle/workshopEventDate
+    // (CUSTOM_PRICING approvals created via PATCH /api/workshops/[id] store these)
+    let details: string | undefined;
+    if (typeof data.details === "string") {
+        details = data.details;
+    } else if (typeof data.workshopTitle === "string" && data.workshopTitle) {
+        const datePart = typeof data.workshopEventDate === "string"
+            ? ` on ${new Date(data.workshopEventDate).toLocaleDateString("en-US", { year: "numeric", month: "numeric", day: "numeric" })}`
+            : "";
+        details = `Workshop: ${data.workshopTitle}${datePart}`;
+    }
+
     return {
-        details: typeof data.details === "string" ? data.details : undefined,
+        details,
         requestedBy: typeof data.requestedBy === "string" ? data.requestedBy : undefined,
     };
 }
@@ -168,6 +181,7 @@ export async function GET(request: NextRequest) {
                     requestedBy: normalized.requestedBy || a.requestedBy || a.coach?.email || "unknown",
                     responseReason: a.responseReason,
                     coachResponse: a.coachResponse, // MR-33
+                    notes: a.notes,
                 };
             }),
             total: approvals.length,

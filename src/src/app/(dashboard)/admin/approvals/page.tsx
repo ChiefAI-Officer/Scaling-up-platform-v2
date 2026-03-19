@@ -241,14 +241,19 @@ export default function ApprovalsPage() {
                   >
                     {approval.type.replace(/_/g, " ")}
                   </span>
-                  {approval.type === "CUSTOM_PRICING" && typeof approval.requestData?.amount === "number" && (
+                  {approval.type === "CUSTOM_PRICING" && typeof approval.requestData?.newPriceCents === "number" && (
                     <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-                      Custom Price: ${(approval.requestData.amount / 100).toLocaleString()}
+                      Custom Price: ${(approval.requestData.newPriceCents / 100).toLocaleString()}
                     </span>
                   )}
                   &nbsp; {approval.coachName}
                 </h3>
                 <p className="text-foreground">{approval.details}</p>
+                {approval.type === "CUSTOM_PRICING" && approval.notes && (
+                  <p className="text-sm text-muted-foreground mt-1 italic">
+                    Coach&apos;s note: {approval.notes}
+                  </p>
+                )}
                 {approval.coachResponse && (
                   <div className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2">
                     <p className="text-xs font-medium text-muted-foreground mb-1">Coach Response</p>

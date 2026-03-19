@@ -227,6 +227,8 @@ export async function PATCH(
             requestData: JSON.stringify({
               oldPriceCents,
               newPriceCents,
+              workshopTitle: existing.title,
+              workshopEventDate: existing.eventDate.toISOString(),
               pricingTierId: data.pricingTierId ?? existing.pricingTierId,
               customPricingNotes: notes,
               requestedBy: actor.email,

@@ -272,4 +272,103 @@ describe("Approvals API", () => {
       );
     });
   });
+
+  describe("GET /api/approvals — CUSTOM_PRICING card data", () => {
+    beforeEach(() => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+    });
+
+    it("preserves newPriceCents in requestData for CUSTOM_PRICING approvals", async () => {
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-cp-1",
+          type: "CUSTOM_PRICING",
+          status: "PENDING",
+          requestData: JSON.stringify({
+            oldPriceCents: 0,
+            newPriceCents: 29900,
+            workshopTitle: "Workshop Request",
+            workshopEventDate: "2026-08-17T00:00:00.000Z",
+            customPricingNotes: "Testing M1 - please ignore",
+            requestedBy: "coach@example.com",
+          }),
+          coachId: "coach-1",
+          workshopId: "ws-1",
+          requestedAt: new Date("2026-03-19T10:00:00.000Z"),
+          escalatedAt: null,
+          responseReason: null,
+          coachResponse: null,
+          notes: "Testing M1 - please ignore",
+          coach: { firstName: "JC", lastName: "DS", email: "coach@example.com" },
+        },
+      ]);
+
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.approvals[0].requestData.newPriceCents).toBe(29900);
+    });
+
+    it("constructs details from workshopTitle and workshopEventDate in requestData", async () => {
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-cp-2",
+          type: "CUSTOM_PRICING",
+          status: "PENDING",
+          requestData: JSON.stringify({
+            oldPriceCents: 0,
+            newPriceCents: 29900,
+            workshopTitle: "Workshop Request",
+            workshopEventDate: "2026-08-17T00:00:00.000Z",
+            requestedBy: "coach@example.com",
+          }),
+          coachId: "coach-1",
+          workshopId: "ws-1",
+          requestedAt: new Date("2026-03-19T10:00:00.000Z"),
+          escalatedAt: null,
+          responseReason: null,
+          coachResponse: null,
+          notes: null,
+          coach: { firstName: "JC", lastName: "DS", email: "coach@example.com" },
+        },
+      ]);
+
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.approvals[0].details).toMatch(/Workshop: Workshop Request on/);
+    });
+
+    it("includes notes field in GET response for CUSTOM_PRICING approvals", async () => {
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-cp-3",
+          type: "CUSTOM_PRICING",
+          status: "PENDING",
+          requestData: JSON.stringify({ requestedBy: "coach@example.com" }),
+          coachId: "coach-1",
+          workshopId: "ws-1",
+          requestedAt: new Date("2026-03-19T10:00:00.000Z"),
+          escalatedAt: null,
+          responseReason: null,
+          coachResponse: null,
+          notes: "Testing M1 - please ignore",
+          coach: { firstName: "JC", lastName: "DS", email: "coach@example.com" },
+        },
+      ]);
+
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.approvals[0].notes).toBe("Testing M1 - please ignore");
+    });
+  });
 });
