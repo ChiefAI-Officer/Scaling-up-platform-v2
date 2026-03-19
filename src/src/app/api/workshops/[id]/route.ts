@@ -139,7 +139,14 @@ export async function PATCH(
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = await request.json() as any;
-    const validation = updateWorkshopSchema.safeParse(body);
+    // Normalize null → undefined before Zod validation: the schema uses .optional()
+    // which accepts undefined but not null. Null values in PATCH payloads (sent by
+    // the frontend to represent "empty optional field") would fail with a type error.
+    // The Prisma update already applies || null patterns to handle DB clearing.
+    const bodyForValidation = Object.fromEntries(
+      Object.entries(body as Record<string, unknown>).map(([k, v]) => [k, v === null ? undefined : v])
+    );
+    const validation = updateWorkshopSchema.safeParse(bodyForValidation);
 
     if (!validation.success) {
       return NextResponse.json(
