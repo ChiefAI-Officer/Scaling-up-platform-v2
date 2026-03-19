@@ -113,7 +113,7 @@ export async function GET(
 const COACH_EDITABLE_FIELDS = new Set([
   "title", "description", "categoryId", "format", "eventDate", "eventTime",
   "timezone", "venueName", "venueAddress", "venueInstructions", "virtualLink",
-  "priceCents", "pricingTierId",
+  "priceCents", "pricingTierId", "customPricingNotes",
 ]);
 
 // Pricing fields that trigger an approval flow instead of a direct update
@@ -139,7 +139,14 @@ export async function PATCH(
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = await request.json() as any;
-    const validation = updateWorkshopSchema.safeParse(body);
+    // Normalize null → undefined before Zod validation: the schema uses .optional()
+    // which accepts undefined but not null. Null values in PATCH payloads (sent by
+    // the frontend to represent "empty optional field") would fail with a type error.
+    // The Prisma update already applies || null patterns to handle DB clearing.
+    const bodyForValidation = Object.fromEntries(
+      Object.entries(body as Record<string, unknown>).map(([k, v]) => [k, v === null ? undefined : v])
+    );
+    const validation = updateWorkshopSchema.safeParse(bodyForValidation);
 
     if (!validation.success) {
       return NextResponse.json(
@@ -165,8 +172,10 @@ export async function PATCH(
 
     // Coaches cannot edit fields outside their allowed set
     if (isCoach) {
-      const forbiddenFields = Object.keys(data).filter(
-        (k) => !COACH_EDITABLE_FIELDS.has(k) && data[k as keyof typeof data] !== undefined
+      // Check raw body keys (not Zod-transformed data) — Zod defaults would
+      // inject isFree/maxAttendees even when not sent, causing false 403s.
+      const forbiddenFields = Object.keys(body).filter(
+        (k) => !COACH_EDITABLE_FIELDS.has(k) && body[k] !== undefined
       );
       if (forbiddenFields.length > 0) {
         return NextResponse.json(
@@ -218,6 +227,8 @@ export async function PATCH(
             requestData: JSON.stringify({
               oldPriceCents,
               newPriceCents,
+              workshopTitle: existing.title,
+              workshopEventDate: existing.eventDate.toISOString(),
               pricingTierId: data.pricingTierId ?? existing.pricingTierId,
               customPricingNotes: notes,
               requestedBy: actor.email,

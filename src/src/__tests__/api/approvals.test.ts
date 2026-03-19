@@ -272,4 +272,286 @@ describe("Approvals API", () => {
       );
     });
   });
+
+  describe("GET /api/approvals — CUSTOM_PRICING card data", () => {
+    beforeEach(() => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+    });
+
+    it("preserves newPriceCents in requestData for CUSTOM_PRICING approvals", async () => {
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-cp-1",
+          type: "CUSTOM_PRICING",
+          status: "PENDING",
+          requestData: JSON.stringify({
+            oldPriceCents: 0,
+            newPriceCents: 29900,
+            workshopTitle: "Workshop Request",
+            workshopEventDate: "2026-08-17T00:00:00.000Z",
+            customPricingNotes: "Testing M1 - please ignore",
+            requestedBy: "coach@example.com",
+          }),
+          coachId: "coach-1",
+          workshopId: "ws-1",
+          requestedAt: new Date("2026-03-19T10:00:00.000Z"),
+          escalatedAt: null,
+          responseReason: null,
+          coachResponse: null,
+          notes: "Testing M1 - please ignore",
+          coach: { firstName: "JC", lastName: "DS", email: "coach@example.com" },
+        },
+      ]);
+
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.approvals[0].requestData.newPriceCents).toBe(29900);
+    });
+
+    it("constructs details from workshopTitle and workshopEventDate in requestData", async () => {
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-cp-2",
+          type: "CUSTOM_PRICING",
+          status: "PENDING",
+          requestData: JSON.stringify({
+            oldPriceCents: 0,
+            newPriceCents: 29900,
+            workshopTitle: "Workshop Request",
+            workshopEventDate: "2026-08-17T00:00:00.000Z",
+            requestedBy: "coach@example.com",
+          }),
+          coachId: "coach-1",
+          workshopId: "ws-1",
+          requestedAt: new Date("2026-03-19T10:00:00.000Z"),
+          escalatedAt: null,
+          responseReason: null,
+          coachResponse: null,
+          notes: null,
+          coach: { firstName: "JC", lastName: "DS", email: "coach@example.com" },
+        },
+      ]);
+
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.approvals[0].details).toMatch(/Workshop: Workshop Request on/);
+    });
+
+    it("includes notes field in GET response for CUSTOM_PRICING approvals", async () => {
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-cp-3",
+          type: "CUSTOM_PRICING",
+          status: "PENDING",
+          requestData: JSON.stringify({ requestedBy: "coach@example.com" }),
+          coachId: "coach-1",
+          workshopId: "ws-1",
+          requestedAt: new Date("2026-03-19T10:00:00.000Z"),
+          escalatedAt: null,
+          responseReason: null,
+          coachResponse: null,
+          notes: "Testing M1 - please ignore",
+          coach: { firstName: "JC", lastName: "DS", email: "coach@example.com" },
+        },
+      ]);
+
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.approvals[0].notes).toBe("Testing M1 - please ignore");
+    });
+
+    it("includes workshopCode in GET approvals response", async () => {
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-ws-code",
+          type: "CUSTOM_PRICING",
+          status: "PENDING",
+          requestData: JSON.stringify({ requestedBy: "coach@example.com" }),
+          coachId: "coach-1",
+          workshopId: "ws-1",
+          requestedAt: new Date("2026-03-20T10:00:00.000Z"),
+          escalatedAt: null,
+          responseReason: null,
+          coachResponse: null,
+          notes: null,
+          coach: { firstName: "JC", lastName: "DS", email: "coach@example.com" },
+          workshop: { id: "ws-1", title: "Test Workshop", eventDate: new Date(), workshopCode: "WS-2026-2YE2" },
+        },
+      ]);
+
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.approvals[0].workshopCode).toBe("WS-2026-2YE2");
+    });
+
+    it("uses workshop relation as fallback for details when requestData lacks workshopTitle", async () => {
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-fallback",
+          type: "CUSTOM_PRICING",
+          status: "PENDING",
+          requestData: JSON.stringify({ requestedBy: "coach@example.com" }), // no workshopTitle
+          coachId: "coach-1",
+          workshopId: "ws-fallback",
+          requestedAt: new Date("2026-03-19T10:00:00.000Z"),
+          escalatedAt: null,
+          responseReason: null,
+          coachResponse: null,
+          notes: null,
+          coach: { firstName: "JC", lastName: "DS", email: "coach@example.com" },
+          workshop: { id: "ws-fallback", title: "Workshop Request", eventDate: new Date("2026-08-17T00:00:00.000Z") },
+        },
+      ]);
+
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.approvals[0].details).toMatch(/Workshop: Workshop Request on/);
+    });
+  });
+
+  describe("POST /api/approvals — pricing resolution", () => {
+    const farFutureDate = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString();
+
+    beforeEach(() => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-c1",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
+      (db.workshopType.findFirst as jest.Mock).mockResolvedValue({ id: "wt-1" });
+      (db.workshop.create as jest.Mock).mockImplementation((args: { data: unknown }) =>
+        Promise.resolve({ id: "ws-new", ...(args.data as object) })
+      );
+      (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-new" });
+    });
+
+    it("saves priceCents from pricing tier when pricingTierId is sent", async () => {
+      (db.pricingTier.findUnique as jest.Mock).mockResolvedValue({
+        id: "tier-halfday",
+        amountCents: 29900,
+      });
+      const req = buildRequest("http://localhost/api/approvals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "WORKSHOP_REQUEST",
+          pricingTierId: "tier-halfday",
+          eventDate: farFutureDate,
+          format: "IN_PERSON",
+          timezone: "America/New_York",
+        }),
+      });
+      await POST(asPostRequest(req));
+      expect(db.workshop.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ priceCents: 29900, isFree: false }),
+        })
+      );
+    });
+
+    it("saves priceCents from customPrice when CUSTOM_PRICING is submitted", async () => {
+      (db.pricingTier.findUnique as jest.Mock).mockResolvedValue(null);
+      const req = buildRequest("http://localhost/api/approvals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "CUSTOM_PRICING",
+          customPrice: 259,
+          eventDate: farFutureDate,
+          format: "IN_PERSON",
+          timezone: "America/New_York",
+        }),
+      });
+      await POST(asPostRequest(req));
+      expect(db.workshop.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ priceCents: 25900, isFree: false }),
+        })
+      );
+    });
+
+    it("creates workshop with TIER price (not custom price) for CUSTOM_PRICING when tier exists", async () => {
+      (db.pricingTier.findUnique as jest.Mock).mockResolvedValue({
+        id: "tier-halfday",
+        amountCents: 29900,
+      });
+      const req = buildRequest("http://localhost/api/approvals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "CUSTOM_PRICING",
+          pricingTierId: "tier-halfday",
+          customPrice: 249,
+          eventDate: farFutureDate,
+          format: "IN_PERSON",
+          timezone: "America/New_York",
+        }),
+      });
+      await POST(asPostRequest(req));
+      expect(db.workshop.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ priceCents: 29900, isFree: false }),
+        })
+      );
+    });
+
+    it("passes newPriceCents to evaluateApproval for CUSTOM_PRICING", async () => {
+      (db.pricingTier.findUnique as jest.Mock).mockResolvedValue({
+        id: "tier-halfday",
+        amountCents: 29900,
+      });
+      const req = buildRequest("http://localhost/api/approvals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "CUSTOM_PRICING",
+          pricingTierId: "tier-halfday",
+          customPrice: 249,
+          eventDate: farFutureDate,
+          format: "IN_PERSON",
+          timezone: "America/New_York",
+        }),
+      });
+      await POST(asPostRequest(req));
+      expect(evaluateApproval).toHaveBeenCalledWith(
+        expect.objectContaining({ newPriceCents: 24900 })
+      );
+    });
+
+    it("passes customPricingNotes to evaluateApproval when sent in body", async () => {
+      (db.pricingTier.findUnique as jest.Mock).mockResolvedValue(null);
+      const req = buildRequest("http://localhost/api/approvals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "CUSTOM_PRICING",
+          customPrice: 249,
+          customPricingNotes: "Testing notes for M1",
+          eventDate: farFutureDate,
+          format: "IN_PERSON",
+          timezone: "America/New_York",
+        }),
+      });
+      await POST(asPostRequest(req));
+      expect(evaluateApproval).toHaveBeenCalledWith(
+        expect.objectContaining({ customPricingNotes: "Testing notes for M1" })
+      );
+    });
+  });
 });

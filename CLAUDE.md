@@ -149,20 +149,34 @@ the full workshop lifecycle from request through post-event follow-up.
 - Invite UI: loading state prevents false "No invitations yet" flash during initial fetch
 - March audit state: 36 PASS, 10 CONCERN (5 resolved by design, 2 fixed, 1 need manual proof, 2 flagged for Jeff), 0 GAP
 
-**Figma Revisions Batch (Mar 17, 2026)** — 11 revisions extracted from Figma board, 4 sprints planned:
-- Sprint 1 (P0 bugs): FIG-001 auto-title category bug, FIG-010 pricing shows as Free, FIG-002 WS code visible to coaches
-- Sprint 2 (edit access): FIG-004 View LP bug + PRE_EVENT editing, FIG-006 full edit form, FIG-009 INFO_REQUESTED full edit
-- Sprint 3 (pricing flow): FIG-007 coach pricing escalation + approvals, FIG-008 emails include pricing notes, FIG-003 dropdown UI
-- Sprint 4 (validation + templates): FIG-011 Zoom link required, FIG-005 per-category templates
-- Parsed revisions: `plans/FIGMA_REVISIONS_PARSED.md`
-- Sprint plan: `plans/FIGMA_REVISIONS_SPRINT_PLAN_MAR2026.md`
+**Figma Revisions Batch (Mar 17–18, 2026)** — **ALL 11 REVISIONS COMPLETE** (52 suites / 488 tests):
+- Sprint 1 (P0 bugs): FIG-001 auto-title category reactive useEffect; FIG-010 isFree = priceCents===0 fix; FIG-003 dropdown bg-background fix
+- Sprint 2 (edit access): FIG-004 View Public Page conditional button (PRE_EVENT+); FIG-006 WorkshopInlineEditForm full field set incl. category/format
+- Sprint 3 (pricing flow): FIG-007 CUSTOM_PRICING approval flow (coach submits → admin approves → Workshop.priceCents updated, no auto-build); FIG-008 customPricingNotes in emails; FIG-009 ResubmitWorkshop `variant="info_requested"` — full edit + pricing read-only
+- Sprint 4 (validation + templates): FIG-011 virtualLink required server+client; FIG-005 LandingPage.categoryId + per-category template matching in auto-build
+- PRE-3: Deleted `coach-respond/route.ts` duplicate; canonical is `coach-response/route.ts` (added rate limiting)
+- Key new capability: PATCH `/api/workshops/[id]` expanded for COACH role with `COACH_EDITABLE_FIELDS` allowlist; pricing fields create CUSTOM_PRICING approval instead of direct update
+- Key new email: `sendCustomPriceChangeEmail()` — old/new price comparison + custom notes
+- Lead-time bypass: `isCoach && existing.status === "INFO_REQUESTED"` skips 14-day date validation
+- E&V templates seeded via `prisma/seed-ev-templates.ts` (inactive — admin must activate at `/templates`)
+- Branch: `figma-revisions-mar2026` — PR open at github.com/jcbdelo26/Scaling-up-platform-v2/compare/figma-revisions-mar2026
+- Parsed revisions: `plans/FIGMA_REVISIONS_PARSED.md` | Sprint plan: `plans/FIGMA_REVISIONS_SPRINT_PLAN_MAR2026.md`
+
+**New API Routes (Figma Batch):**
+- `PATCH /api/workshops/[id]` — Expanded: COACH role now allowed with `COACH_EDITABLE_FIELDS` allowlist; pricing fields intercepted → CUSTOM_PRICING approval
+- `POST /api/approvals/[id]/coach-response` — Coach respond to INFO_REQUESTED (canonical; `coach-respond` deleted)
+- CUSTOM_PRICING approval type fully handled in `approvals/[id]/respond/route.ts` — updates priceCents/isFree/pricingTierId, returns early (no auto-build)
+
+**Schema Changes (Figma Batch):**
+- `LandingPage.categoryId` (String?, FK→Category) — per-category template matching in auto-build
+- Migration: `add_landing_page_category`
 
 **MR-21 Coupon/Checkout Fix (Mar 11, 2026)** — Complete (commits `0556da5`, `5abcda2`):
 - Stripe `allow_promotion_codes` and `discounts` are mutually exclusive — conditional spread in `services/stripe.ts:148`
 - `/api/checkout` added to middleware public routes (both `authorized` callback and middleware function)
 - `registration-form.tsx` — defensive content-type check before `.json()` parsing, Zod error array formatting
 - TDD tests added: `stripe.test.ts` (allow_promotion_codes exclusion), `checkout.test.ts` (discount forwarding + StripeDiscountCodeError), `template-interpolation.test.ts` (10 tests)
-- Test totals: 51 suites / 488 tests (up from 50/473)
+- Test totals: 51 suites / 488 tests (up from 50/473); Figma batch brought to 52 suites / 488 tests
 
 **MR-30 Paid Attendee Removal Verified (Mar 11, 2026):**
 - Coach unregister on paid attendee → routes to approval queue (not direct delete)
@@ -271,6 +285,7 @@ the full workshop lifecycle from request through post-event follow-up.
 - Production Readiness: `plans/PRODUCTION_READINESS_ROADMAP.md` + `plans/PRODUCTION_READINESS_TASKS.md`
 - JV Revisions (Feb 15): `plans/JEFF_VERDUN_REVISIONS_IMPLEMENTATION_ROADMAP.md` + `plans/JEFF_VERDUN_REVISION_TASKS.md`
 - CIO Audit (Feb 20): `plans/CIO_WORD_FOR_WORD_REVISION_AUDIT_AND_IMPLEMENTATION_PLAN_FEB20_2026.md`
+- Figma Revisions (Mar 17): `plans/FIGMA_REVISIONS_SPRINT_PLAN_MAR2026.md` (11 revisions, 4 sprints — COMPLETE)
 
 ## Tech Stack
 

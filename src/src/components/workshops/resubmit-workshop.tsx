@@ -125,8 +125,8 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
     fetch("/api/categories")
       .then((r) => r.json())
       .then((d) => {
-        if (d.success && Array.isArray(d.data)) {
-          setCategories(d.data as Category[]);
+        if (Array.isArray(d)) {
+          setCategories(d as Category[]);
         }
       })
       .catch(() => {/* non-critical, silently ignore */});
@@ -135,8 +135,8 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
       fetch("/api/pricing-tiers")
         .then((r) => r.json())
         .then((d) => {
-          if (d.success && Array.isArray(d.data)) {
-            setPricingTiers(d.data as PricingTierOption[]);
+          if (Array.isArray(d)) {
+            setPricingTiers(d as PricingTierOption[]);
           }
         })
         .catch(() => {/* non-critical, silently ignore */});

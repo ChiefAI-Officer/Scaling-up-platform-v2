@@ -33,6 +33,8 @@ export interface ApprovalEvaluationInput {
     details: string;
     requestedBy: string;
     customPricingNotes?: string;
+    newPriceCents?: number;
+    workshopCode?: string;
 }
 
 export interface ApprovalEvaluationResult {

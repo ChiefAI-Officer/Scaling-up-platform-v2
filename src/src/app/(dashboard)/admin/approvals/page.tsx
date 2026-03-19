@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 
 type ApprovalStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" | "INFO_REQUESTED";
@@ -12,9 +13,12 @@ interface Approval {
   status: ApprovalStatus;
   coachName: string;
   details: string;
+  workshopId?: string | null;
+  workshopCode?: string | null;
   requestedAt: string;
   escalatedAt?: string | null;
   coachResponse?: string | null; // MR-33
+  notes?: string | null;
   requestData?: Record<string, unknown> | null;
 }
 
@@ -241,14 +245,28 @@ export default function ApprovalsPage() {
                   >
                     {approval.type.replace(/_/g, " ")}
                   </span>
-                  {approval.type === "CUSTOM_PRICING" && typeof approval.requestData?.amount === "number" && (
+                  {approval.type === "CUSTOM_PRICING" && typeof approval.requestData?.newPriceCents === "number" && (
                     <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-                      Custom Price: ${(approval.requestData.amount / 100).toLocaleString()}
+                      Custom Price: ${(approval.requestData.newPriceCents / 100).toLocaleString()}
                     </span>
                   )}
                   &nbsp; {approval.coachName}
                 </h3>
-                <p className="text-foreground">{approval.details}</p>
+                {approval.workshopId ? (
+                  <Link
+                    href={`/workshops/${approval.workshopId}`}
+                    className="text-foreground hover:underline hover:text-primary transition-colors"
+                  >
+                    {approval.details}
+                  </Link>
+                ) : (
+                  <p className="text-foreground">{approval.details}</p>
+                )}
+                {approval.type === "CUSTOM_PRICING" && approval.notes && (
+                  <p className="text-sm text-muted-foreground mt-1 italic">
+                    Coach&apos;s note: {approval.notes}
+                  </p>
+                )}
                 {approval.coachResponse && (
                   <div className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2">
                     <p className="text-xs font-medium text-muted-foreground mb-1">Coach Response</p>
@@ -259,6 +277,9 @@ export default function ApprovalsPage() {
                   <span>
                     Requested: {new Date(approval.requestedAt).toLocaleDateString()}
                   </span>
+                  {approval.workshopCode && (
+                    <span className="font-mono">{approval.workshopCode}</span>
+                  )}
                 </div>
                 {approval.escalatedAt && (
                   <p className="text-destructive font-medium text-sm mt-2">
