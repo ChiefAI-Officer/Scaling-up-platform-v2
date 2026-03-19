@@ -156,6 +156,13 @@ export async function GET(request: NextRequest) {
                         email: true,
                     },
                 },
+                workshop: {
+                    select: {
+                        id: true,
+                        title: true,
+                        eventDate: true,
+                    },
+                },
             },
         });
 
@@ -173,7 +180,10 @@ export async function GET(request: NextRequest) {
                     status: a.status,
                     requestData,
                     coachName,
-                    details: normalized.details || "Approval request submitted from coach portal",
+                    details: normalized.details
+                        || (a.workshop?.title
+                            ? `Workshop: ${a.workshop.title}${a.workshop.eventDate ? ` on ${new Date(a.workshop.eventDate).toLocaleDateString("en-US")}` : ""}`
+                            : "Approval request submitted from coach portal"),
                     coachId: a.coachId,
                     workshopId: a.workshopId,
                     requestedAt: a.requestedAt,

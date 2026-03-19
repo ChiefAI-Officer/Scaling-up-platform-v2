@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 
 type ApprovalStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" | "INFO_REQUESTED";
@@ -12,6 +13,7 @@ interface Approval {
   status: ApprovalStatus;
   coachName: string;
   details: string;
+  workshopId?: string | null;
   requestedAt: string;
   escalatedAt?: string | null;
   coachResponse?: string | null; // MR-33
@@ -249,7 +251,16 @@ export default function ApprovalsPage() {
                   )}
                   &nbsp; {approval.coachName}
                 </h3>
-                <p className="text-foreground">{approval.details}</p>
+                {approval.workshopId ? (
+                  <Link
+                    href={`/workshops/${approval.workshopId}`}
+                    className="text-foreground hover:underline hover:text-primary transition-colors"
+                  >
+                    {approval.details}
+                  </Link>
+                ) : (
+                  <p className="text-foreground">{approval.details}</p>
+                )}
                 {approval.type === "CUSTOM_PRICING" && approval.notes && (
                   <p className="text-sm text-muted-foreground mt-1 italic">
                     Coach&apos;s note: {approval.notes}

@@ -370,5 +370,31 @@ describe("Approvals API", () => {
       expect(response.status).toBe(200);
       expect(body.approvals[0].notes).toBe("Testing M1 - please ignore");
     });
+
+    it("uses workshop relation as fallback for details when requestData lacks workshopTitle", async () => {
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-fallback",
+          type: "CUSTOM_PRICING",
+          status: "PENDING",
+          requestData: JSON.stringify({ requestedBy: "coach@example.com" }), // no workshopTitle
+          coachId: "coach-1",
+          workshopId: "ws-fallback",
+          requestedAt: new Date("2026-03-19T10:00:00.000Z"),
+          escalatedAt: null,
+          responseReason: null,
+          coachResponse: null,
+          notes: null,
+          coach: { firstName: "JC", lastName: "DS", email: "coach@example.com" },
+          workshop: { id: "ws-fallback", title: "Workshop Request", eventDate: new Date("2026-08-17T00:00:00.000Z") },
+        },
+      ]);
+
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.approvals[0].details).toMatch(/Workshop: Workshop Request on/);
+    });
   });
 });
