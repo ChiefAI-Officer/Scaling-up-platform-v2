@@ -15,6 +15,7 @@ interface Approval {
   requestedAt: string;
   escalatedAt?: string | null;
   coachResponse?: string | null; // MR-33
+  notes?: string | null;
   requestData?: Record<string, unknown> | null;
 }
 
