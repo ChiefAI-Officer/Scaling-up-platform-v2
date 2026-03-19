@@ -113,7 +113,7 @@ export async function GET(
 const COACH_EDITABLE_FIELDS = new Set([
   "title", "description", "categoryId", "format", "eventDate", "eventTime",
   "timezone", "venueName", "venueAddress", "venueInstructions", "virtualLink",
-  "priceCents", "pricingTierId",
+  "priceCents", "pricingTierId", "customPricingNotes",
 ]);
 
 // Pricing fields that trigger an approval flow instead of a direct update
@@ -165,8 +165,10 @@ export async function PATCH(
 
     // Coaches cannot edit fields outside their allowed set
     if (isCoach) {
-      const forbiddenFields = Object.keys(data).filter(
-        (k) => !COACH_EDITABLE_FIELDS.has(k) && data[k as keyof typeof data] !== undefined
+      // Check raw body keys (not Zod-transformed data) — Zod defaults would
+      // inject isFree/maxAttendees even when not sent, causing false 403s.
+      const forbiddenFields = Object.keys(body).filter(
+        (k) => !COACH_EDITABLE_FIELDS.has(k) && body[k] !== undefined
       );
       if (forbiddenFields.length > 0) {
         return NextResponse.json(
