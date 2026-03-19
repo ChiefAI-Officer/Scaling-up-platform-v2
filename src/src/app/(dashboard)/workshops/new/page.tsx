@@ -468,6 +468,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
           venueState: formData.venueState || undefined,
           venueZip: formData.venueZip || undefined,
           termsAcceptedAt: new Date().toISOString(),
+          customPricingNotes: formData.customPricingRequest || undefined,
           ...(hasCustomPrice ? { amount: Math.round(parsedCustomPrice * 100) } : {}),
           ...(hasCustomPrice ? { customPrice: parsedCustomPrice } : {}),
         };
