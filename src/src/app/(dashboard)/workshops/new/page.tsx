@@ -413,6 +413,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
         coachId: formData.coachId,
         workshopTypeId: formData.workshopTypeId,
         categoryId: formData.categoryId || undefined,
+        pricingTierId: formData.pricingTierId || undefined,
         title: formData.title,
         description: formData.description || undefined,
         format: formData.format,
@@ -468,6 +469,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
           venueZip: formData.venueZip || undefined,
           termsAcceptedAt: new Date().toISOString(),
           ...(hasCustomPrice ? { amount: Math.round(parsedCustomPrice * 100) } : {}),
+          ...(hasCustomPrice ? { customPrice: parsedCustomPrice } : {}),
         };
         const response = await fetch("/api/approvals", {
           method: "POST",

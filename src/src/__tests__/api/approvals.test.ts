@@ -397,4 +397,67 @@ describe("Approvals API", () => {
       expect(body.approvals[0].details).toMatch(/Workshop: Workshop Request on/);
     });
   });
+
+  describe("POST /api/approvals — pricing resolution", () => {
+    const farFutureDate = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString();
+
+    beforeEach(() => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-c1",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
+      (db.workshopType.findFirst as jest.Mock).mockResolvedValue({ id: "wt-1" });
+      (db.workshop.create as jest.Mock).mockImplementation((args: { data: unknown }) =>
+        Promise.resolve({ id: "ws-new", ...(args.data as object) })
+      );
+      (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-new" });
+    });
+
+    it("saves priceCents from pricing tier when pricingTierId is sent", async () => {
+      (db.pricingTier.findUnique as jest.Mock).mockResolvedValue({
+        id: "tier-halfday",
+        amountCents: 29900,
+      });
+      const req = buildRequest("http://localhost/api/approvals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "WORKSHOP_REQUEST",
+          pricingTierId: "tier-halfday",
+          eventDate: farFutureDate,
+          format: "IN_PERSON",
+          timezone: "America/New_York",
+        }),
+      });
+      await POST(asPostRequest(req));
+      expect(db.workshop.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ priceCents: 29900, isFree: false }),
+        })
+      );
+    });
+
+    it("saves priceCents from customPrice when CUSTOM_PRICING is submitted", async () => {
+      (db.pricingTier.findUnique as jest.Mock).mockResolvedValue(null);
+      const req = buildRequest("http://localhost/api/approvals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "CUSTOM_PRICING",
+          customPrice: 259,
+          eventDate: farFutureDate,
+          format: "IN_PERSON",
+          timezone: "America/New_York",
+        }),
+      });
+      await POST(asPostRequest(req));
+      expect(db.workshop.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ priceCents: 25900, isFree: false }),
+        })
+      );
+    });
+  });
 });
