@@ -14,6 +14,7 @@ interface Approval {
   coachName: string;
   details: string;
   workshopId?: string | null;
+  workshopCode?: string | null;
   requestedAt: string;
   escalatedAt?: string | null;
   coachResponse?: string | null; // MR-33
@@ -276,6 +277,9 @@ export default function ApprovalsPage() {
                   <span>
                     Requested: {new Date(approval.requestedAt).toLocaleDateString()}
                   </span>
+                  {approval.workshopCode && (
+                    <span className="font-mono">{approval.workshopCode}</span>
+                  )}
                 </div>
                 {approval.escalatedAt && (
                   <p className="text-destructive font-medium text-sm mt-2">

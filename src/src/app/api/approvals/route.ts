@@ -161,6 +161,7 @@ export async function GET(request: NextRequest) {
                         id: true,
                         title: true,
                         eventDate: true,
+                        workshopCode: true,
                     },
                 },
             },
@@ -186,6 +187,7 @@ export async function GET(request: NextRequest) {
                             : "Approval request submitted from coach portal"),
                     coachId: a.coachId,
                     workshopId: a.workshopId,
+                    workshopCode: a.workshop?.workshopCode ?? null,
                     requestedAt: a.requestedAt,
                     escalatedAt: a.escalatedAt,
                     requestedBy: normalized.requestedBy || a.requestedBy || a.coach?.email || "unknown",
@@ -264,6 +266,8 @@ export async function POST(request: NextRequest) {
         // JV-20: For workshop requests, create the Workshop record first so it
         // appears in the coach's "My Workshops" list immediately.
         let workshopId: string | undefined = input.workshopId;
+        let createdWorkshopCode: string | undefined;
+        let requestedCustomPriceCents: number | null = null;
 
         if (
             (input.type === "WORKSHOP_REQUEST" || input.type === "CUSTOM_PRICING") &&
@@ -358,13 +362,20 @@ export async function POST(request: NextRequest) {
                 }
             }
 
-            // FIG-010: Resolve priceCents from customPrice OR the selected pricing tier.
-            // If neither is provided, the workshop is truly free (priceCents = 0).
-            const resolvedPriceCents: number =
+            // FIG-010: Resolve priceCents.
+            // For CUSTOM_PRICING, the workshop is created at the tier price; the custom
+            // override is stored as newPriceCents in the approval for admin to review.
+            // For WORKSHOP_REQUEST with no custom price, use tier price directly.
+            requestedCustomPriceCents =
                 typeof body.customPrice === "number" && body.customPrice > 0
                     ? Math.round(body.customPrice * 100)
-                    : tierAmountCents !== null && tierAmountCents > 0
-                        ? tierAmountCents
+                    : null;
+
+            const resolvedPriceCents: number =
+                tierAmountCents !== null && tierAmountCents > 0
+                    ? tierAmountCents
+                    : requestedCustomPriceCents !== null
+                        ? requestedCustomPriceCents
                         : 0;
 
             // Resolve the workshop title with category fallback
@@ -397,6 +408,7 @@ export async function POST(request: NextRequest) {
             });
 
             workshopId = workshop.id;
+            createdWorkshopCode = workshop.workshopCode;
 
             // Generate landing page slug using the resolved title
             const slug = generateSlug(resolvedTitle, workshop.id);
@@ -417,6 +429,8 @@ export async function POST(request: NextRequest) {
             details,
             requestedBy,
             customPricingNotes: input.customPricingNotes,
+            newPriceCents: requestedCustomPriceCents ?? undefined,
+            workshopCode: createdWorkshopCode,
         });
 
         // If auto-approved, advance workshop status and trigger auto-build

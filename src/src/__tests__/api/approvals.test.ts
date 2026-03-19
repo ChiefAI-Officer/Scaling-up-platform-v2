@@ -371,6 +371,32 @@ describe("Approvals API", () => {
       expect(body.approvals[0].notes).toBe("Testing M1 - please ignore");
     });
 
+    it("includes workshopCode in GET approvals response", async () => {
+      (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "apr-ws-code",
+          type: "CUSTOM_PRICING",
+          status: "PENDING",
+          requestData: JSON.stringify({ requestedBy: "coach@example.com" }),
+          coachId: "coach-1",
+          workshopId: "ws-1",
+          requestedAt: new Date("2026-03-20T10:00:00.000Z"),
+          escalatedAt: null,
+          responseReason: null,
+          coachResponse: null,
+          notes: null,
+          coach: { firstName: "JC", lastName: "DS", email: "coach@example.com" },
+          workshop: { id: "ws-1", title: "Test Workshop", eventDate: new Date(), workshopCode: "WS-2026-2YE2" },
+        },
+      ]);
+
+      const response = await GET(asGetRequest(buildRequest("http://localhost/api/approvals")));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.approvals[0].workshopCode).toBe("WS-2026-2YE2");
+    });
+
     it("uses workshop relation as fallback for details when requestData lacks workshopTitle", async () => {
       (db.approvalQueue.findMany as jest.Mock).mockResolvedValue([
         {
@@ -457,6 +483,74 @@ describe("Approvals API", () => {
         expect.objectContaining({
           data: expect.objectContaining({ priceCents: 25900, isFree: false }),
         })
+      );
+    });
+
+    it("creates workshop with TIER price (not custom price) for CUSTOM_PRICING when tier exists", async () => {
+      (db.pricingTier.findUnique as jest.Mock).mockResolvedValue({
+        id: "tier-halfday",
+        amountCents: 29900,
+      });
+      const req = buildRequest("http://localhost/api/approvals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "CUSTOM_PRICING",
+          pricingTierId: "tier-halfday",
+          customPrice: 249,
+          eventDate: farFutureDate,
+          format: "IN_PERSON",
+          timezone: "America/New_York",
+        }),
+      });
+      await POST(asPostRequest(req));
+      expect(db.workshop.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ priceCents: 29900, isFree: false }),
+        })
+      );
+    });
+
+    it("passes newPriceCents to evaluateApproval for CUSTOM_PRICING", async () => {
+      (db.pricingTier.findUnique as jest.Mock).mockResolvedValue({
+        id: "tier-halfday",
+        amountCents: 29900,
+      });
+      const req = buildRequest("http://localhost/api/approvals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "CUSTOM_PRICING",
+          pricingTierId: "tier-halfday",
+          customPrice: 249,
+          eventDate: farFutureDate,
+          format: "IN_PERSON",
+          timezone: "America/New_York",
+        }),
+      });
+      await POST(asPostRequest(req));
+      expect(evaluateApproval).toHaveBeenCalledWith(
+        expect.objectContaining({ newPriceCents: 24900 })
+      );
+    });
+
+    it("passes customPricingNotes to evaluateApproval when sent in body", async () => {
+      (db.pricingTier.findUnique as jest.Mock).mockResolvedValue(null);
+      const req = buildRequest("http://localhost/api/approvals", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "CUSTOM_PRICING",
+          customPrice: 249,
+          customPricingNotes: "Testing notes for M1",
+          eventDate: farFutureDate,
+          format: "IN_PERSON",
+          timezone: "America/New_York",
+        }),
+      });
+      await POST(asPostRequest(req));
+      expect(evaluateApproval).toHaveBeenCalledWith(
+        expect.objectContaining({ customPricingNotes: "Testing notes for M1" })
       );
     });
   });
