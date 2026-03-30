@@ -21,11 +21,11 @@ jest.mock("@/lib/db", () => ({
 }));
 
 // eslint-disable-next-line no-var
-var capturedHandler: Function;
+var capturedHandler: (...args: unknown[]) => unknown;
 jest.mock("@/inngest/client", () => ({
   inngest: {
     createFunction: jest.fn(
-      (_config: unknown, _trigger: unknown, handler: Function) => {
+      (_config: unknown, _trigger: unknown, handler: (...args: unknown[]) => unknown) => {
         capturedHandler = handler;
         return handler;
       }

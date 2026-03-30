@@ -26,10 +26,22 @@ jest.mock("@/lib/approval-engine", () => ({
   evaluateApproval: jest.fn(),
 }));
 
+jest.mock("@/lib/auto-build-service", () => ({
+  runAutoBuild: jest.fn().mockResolvedValue({
+    success: true,
+    pagesCreated: 0,
+    templates: [],
+    status: "PRE_EVENT",
+    preEventWorkflow: null,
+    postEventWorkflow: null,
+  }),
+}));
+
 import { POST } from "@/app/api/workshops/[id]/resubmit/route";
 import { db } from "@/lib/db";
 import { getApiActor, canManageCoachData } from "@/lib/authorization";
 import { evaluateApproval } from "@/lib/approval-engine";
+import { runAutoBuild } from "@/lib/auto-build-service";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -187,7 +199,7 @@ describe("Workshop Resubmit API", () => {
     expect(db.workshop.update).not.toHaveBeenCalled();
   });
 
-  it("auto-approved: transitions directly to PRE_EVENT", async () => {
+  it("auto-approved: calls runAutoBuild instead of direct PRE_EVENT", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(actorAsAdmin());
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(
       workshopRecord({ status: "DENIED" })
@@ -205,15 +217,13 @@ describe("Workshop Resubmit API", () => {
     expect(response.status).toBe(200);
     expect(body.autoApproved).toBe(true);
     expect(body.message).toContain("auto-approved");
-    // First call: REQUESTED, second call: PRE_EVENT
-    expect(db.workshop.update).toHaveBeenCalledTimes(2);
-    expect(db.workshop.update).toHaveBeenNthCalledWith(1, {
+    // runAutoBuild should be called instead of direct status update to PRE_EVENT
+    expect(runAutoBuild).toHaveBeenCalledWith("ws-1");
+    // Only one workshop.update call: the initial INFO_REQUESTED reset
+    expect(db.workshop.update).toHaveBeenCalledTimes(1);
+    expect(db.workshop.update).toHaveBeenCalledWith({
       where: { id: "ws-1" },
       data: { status: "INFO_REQUESTED" },
-    });
-    expect(db.workshop.update).toHaveBeenNthCalledWith(2, {
-      where: { id: "ws-1" },
-      data: { status: "PRE_EVENT" },
     });
   });
 

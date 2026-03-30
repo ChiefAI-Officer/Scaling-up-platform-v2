@@ -190,6 +190,7 @@ export default function DuoLandingEditor() {
             month: "long",
             day: "numeric",
             year: "numeric",
+            timeZone: "UTC",
           });
           nextData.eventTime = w.eventTime || "11am - 12pm";
           nextData.registrationUrl = `/workshop/${workshopId}/register`;

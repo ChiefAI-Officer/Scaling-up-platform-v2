@@ -83,8 +83,8 @@ export default function RegistrationPageEditor() {
             coachName: `${w.coach.firstName} ${w.coach.lastName}`,
             coachPhoto: bioProfileImage || w.coach.profileImage || "",
             workshopTitle: w.title,
-            eventDate: eventDate.toLocaleDateString("en-US", { 
-              weekday: "long", month: "long", day: "numeric", year: "numeric" 
+            eventDate: eventDate.toLocaleDateString("en-US", {
+              weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC"
             }),
             eventTime: w.eventTime || "",
           }));

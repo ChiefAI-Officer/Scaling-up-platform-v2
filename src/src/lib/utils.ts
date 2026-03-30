@@ -26,6 +26,20 @@ export function formatDate(date: Date | string): string {
   }
 }
 
+/** Format a calendar date (eventDate) using UTC to prevent timezone off-by-one */
+export function formatEventDate(date: Date | string): string {
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return "Invalid Date";
+    return new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeZone: "UTC",
+    }).format(d);
+  } catch {
+    return "Invalid Date";
+  }
+}
+
 export function formatDateTime(date: Date | string): string {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
@@ -65,6 +79,19 @@ export function getWorkshopStatusLabel(status: string): string {
     CANCELED: "Canceled",
   };
   return labels[status] || status;
+}
+
+export function getWorkshopStatusExplanation(status: string): string {
+  const explanations: Record<string, string> = {
+    REQUESTED: "Submitted — awaiting admin review",
+    AWAITING_APPROVAL: "Under review by admin team",
+    INFO_REQUESTED: "Admin requested changes — respond below",
+    PRE_EVENT: "Approved — workshop pages are live",
+    POST_EVENT: "Event concluded — collecting feedback",
+    COMPLETED: "All follow-up complete",
+    CANCELED: "Workshop canceled",
+  };
+  return explanations[status] || "";
 }
 
 // Helper to parse JSON fields stored as strings (for SQLite compatibility)

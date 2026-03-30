@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { CancelWorkshopDialog } from "@/components/workshops/cancel-workshop-dialog";
 import { ResubmitWorkshop } from "@/components/workshops/resubmit-workshop";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
+import { InlineEditDescription } from "@/components/workshops/inline-edit-description";
 import { getSessionDownloadPath } from "@/lib/file-download-path";
+import { getWorkshopStatusExplanation } from "@/lib/utils";
 import {
   calculateWorkshopRevenueSplit,
   formatUsdFromCents,
@@ -60,6 +62,7 @@ export default async function WorkshopDetailsPage({
         isFree: true,
         priceCents: true,
         pricingTierId: true,
+        pricingTier: { select: { name: true, amountCents: true } },
         workshopType: { select: { name: true } },
         _count: { select: { registrations: true } },
       },
@@ -147,8 +150,23 @@ export default async function WorkshopDetailsPage({
           <h1 className="text-2xl font-bold text-foreground">{workshop.title}</h1>
           <p className="text-muted-foreground">{workshop.workshopType?.name}</p>
         </div>
-        <StatusPill status={workshop.status} />
+        <div className="text-right">
+          <StatusPill status={workshop.status} />
+          <p className="text-xs text-muted-foreground mt-1">
+            {getWorkshopStatusExplanation(workshop.status)}
+          </p>
+        </div>
       </div>
+
+      {/* Fix #2: Post-approval lockdown banner */}
+      {["PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(workshop.status) && (
+        <div className="rounded-xl border border-border bg-muted/50 p-4">
+          <p className="text-sm text-muted-foreground">
+            This workshop is approved. Only attendee management is available.
+            For other changes, contact your admin.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-border bg-card p-5">
@@ -158,13 +176,23 @@ export default async function WorkshopDetailsPage({
           <div className="space-y-2 text-sm text-foreground">
             <p>
               <span className="font-medium">Date:</span>{" "}
-              {new Date(workshop.eventDate).toLocaleDateString()}
+              {new Date(workshop.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}
             </p>
             <p>
               <span className="font-medium">Time:</span> {workshop.eventTime || "TBD"}
             </p>
             <p>
               <span className="font-medium">Format:</span> {workshop.format}
+            </p>
+            <p>
+              <span className="font-medium">Price:</span>{" "}
+              {workshop.isFree
+                ? "Free"
+                : workshop.pricingTier
+                  ? `${formatUsdFromCents(workshop.pricingTier.amountCents)} — ${workshop.pricingTier.name}`
+                  : workshop.priceCents
+                    ? formatUsdFromCents(workshop.priceCents)
+                    : "TBD"}
             </p>
             {workshop.format !== "VIRTUAL" && (
               <p>
@@ -209,9 +237,16 @@ export default async function WorkshopDetailsPage({
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Description
         </h2>
-        <p className="text-sm text-foreground">
-          {workshop.description || "No workshop description provided yet."}
-        </p>
+        {["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED"].includes(workshop.status) ? (
+          <InlineEditDescription
+            workshopId={workshop.id}
+            initialValue={workshop.description || ""}
+          />
+        ) : (
+          <p className="text-sm text-foreground">
+            {workshop.description || "No workshop description provided yet."}
+          </p>
+        )}
       </div>
 
       {/* MR-32: Financials card */}
@@ -413,7 +448,7 @@ export default async function WorkshopDetailsPage({
             Survey Results ({surveyCount})
           </Link>
         )}
-        {["INFO_REQUESTED", "AWAITING_APPROVAL", "PRE_EVENT"].includes(workshop.status) && (
+        {["INFO_REQUESTED", "AWAITING_APPROVAL"].includes(workshop.status) && (
           <CancelWorkshopDialog
             workshopId={workshop.id}
             workshopTitle={workshop.title}

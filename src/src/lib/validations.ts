@@ -371,3 +371,60 @@ export function formatZodErrors(error: z.ZodError): Record<string, string[]> {
 
     return formatted;
 }
+
+// ============================================================
+// Coach Bio Completeness (Fix #2 — Jeff's Revisions)
+// ============================================================
+
+// Coerce null/empty-string → undefined so Zod refine emits custom messages
+// instead of the generic Zod 4 "Invalid input: expected string, received undefined"
+const _bioNullToUndefined = (v: unknown) => (v === null || v === "" ? undefined : v);
+
+// Helpers for required string, required URL, and required string with min length
+const _reqStr = (msg: string) =>
+    z.preprocess(
+        _bioNullToUndefined,
+        z.string().optional().refine((v): v is string => v !== undefined && v.length >= 1, { message: msg })
+    );
+
+const _reqUrl = (msg: string) =>
+    z.preprocess(
+        _bioNullToUndefined,
+        z.string().optional().refine(
+            (v): v is string => {
+                if (v === undefined) return false;
+                try { new URL(v); return true; } catch { return false; }
+            },
+            { message: msg }
+        )
+    );
+
+const _reqMinStr = (min: number, msg: string) =>
+    z.preprocess(
+        _bioNullToUndefined,
+        z.string().optional().refine((v): v is string => v !== undefined && v.length >= min, { message: msg })
+    );
+
+export const coachBioCompleteSchema = z.object({
+    firstName: _reqStr("First name is required"),
+    lastName: _reqStr("Last name is required"),
+    email: _reqStr("Valid email is required"),
+    title: _reqStr("Professional title is required"),
+    linkedinUrl: _reqUrl("LinkedIn URL is required"),
+    bio: _reqMinStr(10, "Bio must be at least 10 characters"),
+    profileImage: _reqUrl("Profile photo is required"),
+});
+
+export function getCoachBioMissingFields(coach: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    title: string | null;
+    linkedinUrl: string | null;
+    bio: string | null;
+    profileImage: string | null;
+}): string[] {
+    const result = coachBioCompleteSchema.safeParse(coach);
+    if (result.success) return [];
+    return result.error.issues.map((i) => i.message);
+}

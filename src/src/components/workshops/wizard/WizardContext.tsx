@@ -18,6 +18,7 @@ export interface WorkshopFormData {
     format: "IN_PERSON" | "VIRTUAL" | "HYBRID";
     eventDate: string;
     eventTime: string;
+    timezone: string;
     venueName: string;
     venueAddress: string;
     venueCity: string;
@@ -59,6 +60,7 @@ const defaultFormData: WorkshopFormData = {
     format: "IN_PERSON",
     eventDate: "",
     eventTime: "09:00",
+    timezone: "America/New_York",
     venueName: "",
     venueAddress: "",
     venueCity: "",

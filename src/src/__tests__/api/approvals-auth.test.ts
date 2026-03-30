@@ -29,6 +29,7 @@ jest.mock("@/lib/db", () => ({
     },
     coach: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
     },
   },
 }));
@@ -85,6 +86,15 @@ describe("POST /api/approvals authorization", () => {
     (db.category.findUnique as jest.Mock).mockResolvedValue(null);
     (db.pricingTier.findUnique as jest.Mock).mockResolvedValue(null);
     (db.coach.findFirst as jest.Mock).mockResolvedValue(null);
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      firstName: "Jane",
+      lastName: "Smith",
+      email: "jane@example.com",
+      title: "Scaling Up Coach",
+      linkedinUrl: "https://linkedin.com/in/jane",
+      bio: "Experienced coach with 15 years of expertise.",
+      profileImage: "https://example.com/photo.jpg",
+    });
   });
 
   it("returns 401 when unauthenticated", async () => {

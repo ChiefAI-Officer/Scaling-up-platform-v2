@@ -75,10 +75,42 @@ describe("registration-service", () => {
     });
   });
 
+  it("returns existing PENDING registration instead of DUPLICATE error", async () => {
+    mockTx.workshop.findUnique.mockResolvedValue(makeWorkshop());
+    mockTx.registration.count.mockResolvedValue(1);
+    mockTx.registration.findFirst.mockResolvedValue({ id: "reg-pending", paymentStatus: "PENDING" });
+    mockTx.registration.findUnique.mockResolvedValue({
+      id: "reg-pending",
+      email: "user@example.com",
+      workshopId: "ws-1",
+      paymentStatus: "PENDING",
+      status: "REGISTERED",
+    });
+
+    const result = await createWorkshopRegistration(makeInput());
+
+    expect(result.registration).toMatchObject({
+      id: "reg-pending",
+      paymentStatus: "PENDING",
+    });
+    expect(mockTx.registration.create).not.toHaveBeenCalled();
+  });
+
+  it("throws DUPLICATE_REGISTRATION for completed registrations", async () => {
+    mockTx.workshop.findUnique.mockResolvedValue(makeWorkshop());
+    mockTx.registration.count.mockResolvedValue(1);
+    mockTx.registration.findFirst.mockResolvedValue({ id: "reg-done", paymentStatus: "COMPLETED" });
+
+    await expect(createWorkshopRegistration(makeInput())).rejects.toMatchObject({
+      code: "DUPLICATE_REGISTRATION",
+      status: 409,
+    });
+  });
+
   it("returns DUPLICATE_REGISTRATION when attendee already exists", async () => {
     mockTx.workshop.findUnique.mockResolvedValue(makeWorkshop());
     mockTx.registration.count.mockResolvedValue(1);
-    mockTx.registration.findFirst.mockResolvedValue({ id: "reg-existing" });
+    mockTx.registration.findFirst.mockResolvedValue({ id: "reg-existing", paymentStatus: "COMPLETED" });
 
     await expect(createWorkshopRegistration(makeInput())).rejects.toMatchObject({
       code: "DUPLICATE_REGISTRATION",

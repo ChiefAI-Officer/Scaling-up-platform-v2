@@ -10,6 +10,7 @@ jest.mock("next/server", () => ({
 
 jest.mock("@/lib/db", () => ({
   db: {
+    $transaction: jest.fn(),
     approvalQueue: {
       findUnique: jest.fn(),
       update: jest.fn(),
@@ -44,11 +45,23 @@ jest.mock("@/inngest/client", () => ({
   },
 }));
 
+jest.mock("@/lib/auto-build-service", () => ({
+  runAutoBuild: jest.fn().mockResolvedValue({
+    success: true,
+    pagesCreated: 0,
+    templates: [],
+    status: "PRE_EVENT",
+    preEventWorkflow: null,
+    postEventWorkflow: null,
+  }),
+}));
+
 import { POST } from "@/app/api/approvals/[id]/respond/route";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { getApiActor } from "@/lib/authorization";
 import { inngest } from "@/inngest/client";
+import { runAutoBuild } from "@/lib/auto-build-service";
 
 function routeParams(id = "apr-1") {
   return { params: Promise.resolve({ id }) };
@@ -76,6 +89,10 @@ describe("Approval respond API", () => {
       role: "ADMIN",
       coachId: null,
     });
+    // $transaction pass-through: execute callback with db as tx client
+    (db.$transaction as jest.Mock).mockImplementation(
+      async (fn: (...args: unknown[]) => unknown) => fn(db)
+    );
   });
 
   it("returns 400 for malformed or empty JSON payload", async () => {
@@ -216,7 +233,7 @@ describe("Approval respond API", () => {
       );
     });
 
-    it("does NOT emit Inngest event or trigger auto-build for CUSTOM_PRICING approval", async () => {
+    it("does NOT emit Inngest event or trigger auto-build for CUSTOM_PRICING approval (mid-lifecycle)", async () => {
       (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
         id: "apr-cp-3",
         type: "CUSTOM_PRICING",
@@ -225,13 +242,69 @@ describe("Approval respond API", () => {
         coachId: "coach-1",
         requestData: JSON.stringify({ newPriceCents: 24900 }),
       });
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({ status: "PRE_EVENT" });
       (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-cp-3", status: "APPROVED" });
 
       const response = await POST(requestWithJson({ action: "APPROVE" }), routeParams("apr-cp-3"));
       const body = await response.json();
 
-      expect(body.autoBuildTriggered).not.toBe(true);
+      expect(runAutoBuild).not.toHaveBeenCalled();
       expect(inngest.send).not.toHaveBeenCalled();
+    });
+
+    it("triggers auto-build when workshop status is AWAITING_APPROVAL", async () => {
+      (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
+        id: "apr-cp-build",
+        type: "CUSTOM_PRICING",
+        status: "PENDING",
+        workshopId: "ws-cp-build",
+        coachId: "coach-1",
+        requestData: JSON.stringify({ newPriceCents: 50000 }),
+      });
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({ status: "AWAITING_APPROVAL" });
+      (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-cp-build", status: "APPROVED" });
+
+      await POST(requestWithJson({ action: "APPROVE" }), routeParams("apr-cp-build"));
+
+      expect(runAutoBuild).toHaveBeenCalledWith("ws-cp-build");
+    });
+
+    it("does NOT trigger auto-build when workshop status is PRE_EVENT (mid-lifecycle price change)", async () => {
+      (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
+        id: "apr-cp-mid",
+        type: "CUSTOM_PRICING",
+        status: "PENDING",
+        workshopId: "ws-cp-mid",
+        coachId: "coach-1",
+        requestData: JSON.stringify({ newPriceCents: 35000 }),
+      });
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({ status: "PRE_EVENT" });
+      (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-cp-mid", status: "APPROVED" });
+
+      await POST(requestWithJson({ action: "APPROVE" }), routeParams("apr-cp-mid"));
+
+      expect(runAutoBuild).not.toHaveBeenCalled();
+      expect(inngest.send).not.toHaveBeenCalled();
+    });
+
+    it("emits Inngest backup event for CUSTOM_PRICING when workshop needs build", async () => {
+      (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
+        id: "apr-cp-inngest",
+        type: "CUSTOM_PRICING",
+        status: "PENDING",
+        workshopId: "ws-cp-inngest",
+        coachId: "coach-1",
+        requestData: JSON.stringify({ newPriceCents: 50000 }),
+      });
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({ status: "AWAITING_APPROVAL" });
+      (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-cp-inngest", status: "APPROVED" });
+
+      await POST(requestWithJson({ action: "APPROVE" }), routeParams("apr-cp-inngest"));
+
+      expect(inngest.send).toHaveBeenCalledWith({
+        name: "workshop/approved",
+        data: { approvalId: "apr-cp-inngest", workshopId: "ws-cp-inngest", coachId: "coach-1" },
+      });
     });
   });
 
@@ -253,7 +326,7 @@ describe("Approval respond API", () => {
     );
     const body = await response.json();
 
-    expect(body.autoBuildTriggered).toBe(true);
+    expect(body.pagesCreated).toBeDefined();
     expect(inngest.send).toHaveBeenCalledWith({
       name: "workshop/approved",
       data: {

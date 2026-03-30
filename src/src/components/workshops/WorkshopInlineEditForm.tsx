@@ -49,6 +49,23 @@ const TIMEZONES = [
   "America/Vancouver",
 ];
 
+/** Parse venueAddress JSON blob into components, or return empty defaults */
+function parseVenueAddress(raw: string | null): { street: string; city: string; state: string; zip: string } {
+  if (!raw) return { street: "", city: "", state: "", zip: "" };
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      street: parsed.street || "",
+      city: parsed.city || "",
+      state: parsed.state || "",
+      zip: parsed.zip || "",
+    };
+  } catch {
+    // If not JSON, treat the whole string as street address
+    return { street: raw, city: "", state: "", zip: "" };
+  }
+}
+
 const FORMATS = [
   { value: "IN_PERSON", label: "In-Person" },
   { value: "VIRTUAL", label: "Virtual" },
@@ -76,6 +93,8 @@ export function WorkshopInlineEditForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const parsedVenue = parseVenueAddress(venueAddress);
+
   const [form, setForm] = useState({
     title: title || "",
     description: description || "",
@@ -86,7 +105,10 @@ export function WorkshopInlineEditForm({
     timezone: timezone || "America/New_York",
     virtualLink: virtualLink || "",
     venueName: venueName || "",
-    venueAddress: venueAddress || "",
+    venueStreet: parsedVenue.street,
+    venueCity: parsedVenue.city,
+    venueState: parsedVenue.state,
+    venueZip: parsedVenue.zip,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,7 +131,14 @@ export function WorkshopInlineEditForm({
           timezone: form.timezone || undefined,
           virtualLink: form.virtualLink || undefined,
           venueName: form.venueName || undefined,
-          venueAddress: form.venueAddress || undefined,
+          venueAddress: (form.venueStreet || form.venueCity || form.venueState || form.venueZip)
+            ? JSON.stringify({
+                street: form.venueStreet,
+                city: form.venueCity,
+                state: form.venueState,
+                zip: form.venueZip,
+              })
+            : null,
         }),
       });
 
@@ -215,7 +244,15 @@ export function WorkshopInlineEditForm({
               <select
                 id="ie-format"
                 value={form.format}
-                onChange={(e) => setForm((p) => ({ ...p, format: e.target.value }))}
+                onChange={(e) => {
+                  const newFormat = e.target.value;
+                  setForm((p) => ({
+                    ...p,
+                    format: newFormat,
+                    ...(newFormat === "VIRTUAL" ? { venueName: "", venueStreet: "", venueCity: "", venueState: "", venueZip: "" } : {}),
+                    ...(newFormat === "IN_PERSON" ? { virtualLink: "" } : {}),
+                  }));
+                }}
                 className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary bg-background"
               >
                 {FORMATS.map((f) => (
@@ -260,9 +297,10 @@ export function WorkshopInlineEditForm({
               <Label htmlFor="ie-eventTime" className="text-xs">Event Time</Label>
               <Input
                 id="ie-eventTime"
-                type="time"
+                type="text"
                 value={form.eventTime}
                 onChange={(e) => setForm((p) => ({ ...p, eventTime: e.target.value }))}
+                placeholder="e.g., 09:00 - 17:00"
                 className="mt-1 text-sm"
               />
             </div>
@@ -279,6 +317,7 @@ export function WorkshopInlineEditForm({
                 ))}
               </select>
             </div>
+            {form.format !== "IN_PERSON" && (
             <div>
               <Label htmlFor="ie-virtualLink" className="text-xs">Virtual Meeting Link</Label>
               <Input
@@ -290,25 +329,62 @@ export function WorkshopInlineEditForm({
                 className="mt-1 text-sm"
               />
             </div>
-            <div>
+            )}
+            {form.format !== "VIRTUAL" && (<>
+            <div className="sm:col-span-2">
               <Label htmlFor="ie-venueName" className="text-xs">Venue Name</Label>
               <Input
                 id="ie-venueName"
                 value={form.venueName}
                 onChange={(e) => setForm((p) => ({ ...p, venueName: e.target.value }))}
+                placeholder="e.g., Marriott Conference Center"
+                className="mt-1 text-sm"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label htmlFor="ie-venueStreet" className="text-xs">Street Address</Label>
+              <Input
+                id="ie-venueStreet"
+                value={form.venueStreet}
+                onChange={(e) => setForm((p) => ({ ...p, venueStreet: e.target.value }))}
+                placeholder="123 Conference Way"
                 className="mt-1 text-sm"
               />
             </div>
             <div>
-              <Label htmlFor="ie-venueAddress" className="text-xs">Venue Address</Label>
+              <Label htmlFor="ie-venueCity" className="text-xs">City</Label>
               <Input
-                id="ie-venueAddress"
-                value={form.venueAddress}
-                onChange={(e) => setForm((p) => ({ ...p, venueAddress: e.target.value }))}
-                placeholder="123 Main St, City, ST 12345"
+                id="ie-venueCity"
+                value={form.venueCity}
+                onChange={(e) => setForm((p) => ({ ...p, venueCity: e.target.value }))}
                 className="mt-1 text-sm"
               />
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label htmlFor="ie-venueState" className="text-xs">State</Label>
+                <Input
+                  id="ie-venueState"
+                  value={form.venueState}
+                  onChange={(e) => setForm((p) => ({ ...p, venueState: e.target.value }))}
+                  placeholder="TX"
+                  maxLength={2}
+                  className="mt-1 text-sm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="ie-venueZip" className="text-xs">ZIP</Label>
+                <Input
+                  id="ie-venueZip"
+                  value={form.venueZip}
+                  onChange={(e) => setForm((p) => ({ ...p, venueZip: e.target.value.replace(/[^\d-]/g, "") }))}
+                  placeholder="12345"
+                  maxLength={10}
+                  className="mt-1 text-sm"
+                />
+              </div>
+            </div>
+            </>)}
           </div>
         </div>
 

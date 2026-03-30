@@ -160,7 +160,7 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-muted-foreground">
-                                            {new Date(workshop.eventDate).toLocaleDateString()}
+                                            {new Date(workshop.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-medium">{workshop._count.registrations}</div>

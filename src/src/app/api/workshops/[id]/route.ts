@@ -168,6 +168,17 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "Workshop not found" }, { status: 404 });
     }
 
+    // Fix #2: Post-approval lockdown — coaches cannot edit approved workshops
+    if (isCoach) {
+      const LOCKED_STATUSES = new Set(["PRE_EVENT", "POST_EVENT", "COMPLETED"]);
+      if (LOCKED_STATUSES.has(existing.status)) {
+        return NextResponse.json({
+          success: false,
+          error: "This workshop is approved and locked. Contact admin for changes.",
+        }, { status: 403 });
+      }
+    }
+
     const data = validation.data;
 
     // Coaches cannot edit fields outside their allowed set
@@ -322,7 +333,7 @@ export async function PATCH(
     });
 
     // R4B: Sync landing page content when logistics fields change
-    const syncFields = ["eventDate", "eventTime", "timezone", "virtualLink", "venueName", "venueAddress"] as const;
+    const syncFields = ["title", "description", "eventDate", "eventTime", "timezone", "virtualLink", "venueName", "venueAddress"] as const;
     const hasRelevantChange = syncFields.some((f) => data[f] !== undefined);
     let landingPageSyncWarning: string | undefined;
     if (hasRelevantChange) {
@@ -381,6 +392,17 @@ export async function DELETE(
     // JV-28: Allow coaches to cancel their own workshops
     if (!isPrivilegedRole(actor.role) && !canManageCoachData(actor, existing.coachId)) {
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    }
+
+    // Fix #2: Post-approval lockdown — coaches cannot cancel approved workshops
+    if (!isPrivilegedRole(actor.role)) {
+      const COACH_LOCKED_STATUSES = new Set(["PRE_EVENT", "POST_EVENT", "COMPLETED"]);
+      if (COACH_LOCKED_STATUSES.has(existing.status)) {
+        return NextResponse.json({
+          success: false,
+          error: "Approved workshops cannot be cancelled by coaches. Contact admin.",
+        }, { status: 403 });
+      }
     }
 
     // Prevent cancellation of already canceled or completed workshops

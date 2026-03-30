@@ -663,7 +663,7 @@ export function WorkflowEditor({
                     .map((w) => (
                       <option key={w.id} value={w.id}>
                         [{w.workshopCode}] {w.title} —{" "}
-                        {new Date(w.eventDate).toLocaleDateString()}
+                        {new Date(w.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}
                       </option>
                     ))}
                 </select>
@@ -694,7 +694,7 @@ export function WorkflowEditor({
                       [{assignment.workshopCode}]
                     </span>
                     <span className="ml-2 text-sm text-muted-foreground">
-                      {new Date(assignment.workshop.eventDate).toLocaleDateString()}
+                      {new Date(assignment.workshop.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}
                     </span>
                     <Badge variant="secondary" className="ml-2">
                       {assignment.workshop.status}
@@ -759,6 +759,7 @@ function StepCard({
 
   useEffect(() => {
     if (!isEditing) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingFiles(true);
     // Fetch files attached to this step and all available workshop files
     Promise.all([

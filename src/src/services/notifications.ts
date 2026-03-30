@@ -461,6 +461,7 @@ export async function sendWorkshopCompletionSummary(data: {
         year: "numeric",
         month: "long",
         day: "numeric",
+        timeZone: "UTC",
     });
     const revenue = `$${(data.totalRevenueCents / 100).toFixed(2)}`;
     const workshopUrl = `${process.env.APP_URL}/workshops/${data.workshopId}`;

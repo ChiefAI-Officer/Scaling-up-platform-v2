@@ -1,4 +1,4 @@
-import { interpolateContent, rewriteIdentityFields } from "@/lib/template-interpolation";
+import { interpolateContent, rewriteIdentityFields, templateHasPlaceholders, findRemainingPlaceholders, formatVenueAddress, formatWorkshopDate, formatWorkshopDay, formatWorkshopDateNoWeekday } from "@/lib/template-interpolation";
 
 describe("interpolateContent", () => {
   it("replaces {{variable}} placeholders with values", () => {
@@ -136,4 +136,64 @@ describe("rewriteIdentityFields", () => {
     expect(parsed.eventDate).toBe("Friday, June 15, 2026");
     expect(parsed.eventTime).toBe("2:00 PM");
   });
+});
+
+describe("templateHasPlaceholders", () => {
+    it("returns true when content has placeholders", () => {
+        expect(templateHasPlaceholders('{"title":"{{workshop_title}}"}')).toBe(true);
+    });
+    it("returns false when content has no placeholders", () => {
+        expect(templateHasPlaceholders('{"title":"Real Workshop Name"}')).toBe(false);
+    });
+    it("returns false for empty string", () => {
+        expect(templateHasPlaceholders("")).toBe(false);
+    });
+});
+
+describe("findRemainingPlaceholders", () => {
+    it("returns placeholder names when present", () => {
+        expect(findRemainingPlaceholders('{"a":"{{x}}","b":"{{y_z}}"}')).toEqual(["x", "y_z"]);
+    });
+    it("returns empty array when no placeholders", () => {
+        expect(findRemainingPlaceholders('{"a":"done"}')).toEqual([]);
+    });
+    it("returns empty array for empty string", () => {
+        expect(findRemainingPlaceholders("")).toEqual([]);
+    });
+});
+
+describe("date formatting with UTC timezone", () => {
+    const julyFirst = new Date("2026-07-01T00:00:00.000Z");
+
+    it("formatWorkshopDate includes weekday and uses UTC", () => {
+        expect(formatWorkshopDate(julyFirst)).toBe("Wednesday, July 1, 2026");
+    });
+
+    it("formatWorkshopDay returns weekday only in UTC", () => {
+        expect(formatWorkshopDay(julyFirst)).toBe("Wednesday");
+    });
+
+    it("formatWorkshopDateNoWeekday returns date without weekday in UTC", () => {
+        expect(formatWorkshopDateNoWeekday(julyFirst)).toBe("July 1, 2026");
+    });
+});
+
+describe("formatVenueAddress", () => {
+    it("parses JSON venue address into readable string", () => {
+        const json = JSON.stringify({ street: "123 Main St", city: "Dallas", state: "TX", zip: "75201" });
+        expect(formatVenueAddress(json)).toBe("123 Main St, Dallas, TX, 75201");
+    });
+    it("handles partial address fields", () => {
+        const json = JSON.stringify({ city: "Austin", state: "TX" });
+        expect(formatVenueAddress(json)).toBe("Austin, TX");
+    });
+    it("returns empty string for null", () => {
+        expect(formatVenueAddress(null)).toBe("");
+    });
+    it("returns raw string for non-JSON input", () => {
+        expect(formatVenueAddress("123 Main St, Dallas, TX")).toBe("123 Main St, Dallas, TX");
+    });
+    it("returns empty string for empty JSON object", () => {
+        expect(formatVenueAddress("{}")).toBe("");
+    });
 });

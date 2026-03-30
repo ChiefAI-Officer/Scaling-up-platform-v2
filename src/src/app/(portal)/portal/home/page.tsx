@@ -142,6 +142,7 @@ export default async function CoachDashboardPage() {
                           month: "long",
                           day: "numeric",
                           year: "numeric",
+                          timeZone: "UTC",
                         })}
                         {workshop.eventTime && ` at ${workshop.eventTime}`}
                       </p>

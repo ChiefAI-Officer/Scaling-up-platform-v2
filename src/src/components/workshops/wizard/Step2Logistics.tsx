@@ -114,14 +114,36 @@ export function Step2Logistics() {
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="eventTime">Start Time</Label>
+                    <Label htmlFor="eventTime">Event Time</Label>
                     <Input
-                        type="time"
+                        type="text"
                         id="eventTime"
                         value={formData.eventTime}
                         onChange={(e) => updateField("eventTime", e.target.value)}
+                        placeholder="e.g., 09:00 - 17:00"
                     />
+                    <p className="text-xs text-muted-foreground">Enter start and end time (e.g., 09:00 - 12:00)</p>
                 </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="timezone">Timezone</Label>
+                <select
+                    id="timezone"
+                    value={formData.timezone || "America/New_York"}
+                    onChange={(e) => updateField("timezone", e.target.value)}
+                    className="w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary bg-background"
+                >
+                    <option value="America/New_York">Eastern (America/New_York)</option>
+                    <option value="America/Chicago">Central (America/Chicago)</option>
+                    <option value="America/Denver">Mountain (America/Denver)</option>
+                    <option value="America/Los_Angeles">Pacific (America/Los_Angeles)</option>
+                    <option value="America/Phoenix">Arizona (America/Phoenix)</option>
+                    <option value="America/Anchorage">Alaska (America/Anchorage)</option>
+                    <option value="Pacific/Honolulu">Hawaii (Pacific/Honolulu)</option>
+                    <option value="America/Toronto">Toronto (America/Toronto)</option>
+                    <option value="America/Vancouver">Vancouver (America/Vancouver)</option>
+                </select>
             </div>
 
             {/* Venue section — shown for IN_PERSON and HYBRID */}

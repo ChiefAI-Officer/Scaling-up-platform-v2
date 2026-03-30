@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, canManageCoachData } from "@/lib/authorization";
 import { evaluateApproval } from "@/lib/approval-engine";
+import { runAutoBuild } from "@/lib/auto-build-service";
 
 /**
  * POST /api/workshops/[id]/resubmit
@@ -74,12 +75,18 @@ export async function POST(
       requestedBy: coachName,
     });
 
-    // If auto-approved, move to the next status
+    // If auto-approved, run auto-build inline (creates pages, assigns workflows, advances status)
     if (result.autoApproved) {
-      await db.workshop.update({
-        where: { id: workshopId },
-        data: { status: "PRE_EVENT" },
-      });
+      try {
+        await runAutoBuild(workshopId);
+      } catch (err) {
+        console.error("[AUTO-BUILD] Resubmit auto-approval build failed:", err);
+        // Fallback: at least set the status
+        await db.workshop.update({
+          where: { id: workshopId },
+          data: { status: "AWAITING_APPROVAL" },
+        });
+      }
     }
 
     return NextResponse.json({

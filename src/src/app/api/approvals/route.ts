@@ -4,12 +4,14 @@ import { db } from "@/lib/db";
 import { evaluateApproval, ApprovalType } from "@/lib/approval-engine";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 import { inngest } from "@/inngest/client";
+import { runAutoBuild } from "@/lib/auto-build-service";
 import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
 import { generateSlug } from "@/lib/utils";
 import { sendEnrichedApprovalRequest } from "@/services/notifications";
 import { verifyCertification } from "@/services/circle";
 import { getCoachByEmail } from "@/services/hubspot";
 import { validateLeadTime } from "@/lib/lead-time-validator";
+import { getCoachBioMissingFields } from "@/lib/validations";
 
 // Request schemas
 const CreateApprovalSchema = z.object({
@@ -56,7 +58,7 @@ function normalizeRequestData(raw: unknown): ApprovalRequestData {
         details = data.details;
     } else if (typeof data.workshopTitle === "string" && data.workshopTitle) {
         const datePart = typeof data.workshopEventDate === "string"
-            ? ` on ${new Date(data.workshopEventDate).toLocaleDateString("en-US", { year: "numeric", month: "numeric", day: "numeric" })}`
+            ? ` on ${new Date(data.workshopEventDate).toLocaleDateString("en-US", { year: "numeric", month: "numeric", day: "numeric", timeZone: "UTC" })}`
             : "";
         details = `Workshop: ${data.workshopTitle}${datePart}`;
     }
@@ -183,7 +185,7 @@ export async function GET(request: NextRequest) {
                     coachName,
                     details: normalized.details
                         || (a.workshop?.title
-                            ? `Workshop: ${a.workshop.title}${a.workshop.eventDate ? ` on ${new Date(a.workshop.eventDate).toLocaleDateString("en-US")}` : ""}`
+                            ? `Workshop: ${a.workshop.title}${a.workshop.eventDate ? ` on ${new Date(a.workshop.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}` : ""}`
                             : "Approval request submitted from coach portal"),
                     coachId: a.coachId,
                     workshopId: a.workshopId,
@@ -261,6 +263,29 @@ export async function POST(request: NextRequest) {
             coachId = input.coachId;
             coachEmail = input.coachEmail.toLowerCase();
             requestedBy = input.requestedBy || actor.email;
+        }
+
+        // Fix #2: Validate coach bio completeness before allowing workshop request
+        const coachBio = await db.coach.findUnique({
+            where: { id: coachId },
+            select: {
+                firstName: true, lastName: true, email: true,
+                title: true, linkedinUrl: true, bio: true, profileImage: true,
+            },
+        });
+        if (!coachBio) {
+            return NextResponse.json({ error: "Coach not found" }, { status: 404 });
+        }
+        // Only gate workshop creation requests on bio completeness
+        if (input.type === "WORKSHOP_REQUEST" || input.type === "CUSTOM_PRICING") {
+            const bioMissing = getCoachBioMissingFields(coachBio);
+            if (bioMissing.length > 0) {
+                return NextResponse.json({
+                    success: false,
+                    error: `Coach profile is incomplete. Missing: ${bioMissing.join(", ")}`,
+                    missingFields: bioMissing,
+                }, { status: 400 });
+            }
         }
 
         // JV-20: For workshop requests, create the Workshop record first so it
@@ -433,7 +458,7 @@ export async function POST(request: NextRequest) {
             workshopCode: createdWorkshopCode,
         });
 
-        // If auto-approved, advance workshop status and trigger auto-build
+        // If auto-approved, run auto-build inline (creates pages, assigns workflows, advances status)
         if (result.autoApproved && workshopId) {
             await db.workshop.update({
                 where: { id: workshopId },
@@ -441,13 +466,20 @@ export async function POST(request: NextRequest) {
             });
 
             try {
+                const buildResult = await runAutoBuild(workshopId);
+                console.log(`[AUTO-BUILD] Auto-approval inline build: pages=${buildResult.pagesCreated}`);
+            } catch (err) {
+                console.error("[AUTO-BUILD] Auto-approval inline build failed:", err);
+            }
+
+            // Keep Inngest as backup
+            try {
                 await inngest.send({
                     name: "workshop/approved",
                     data: { approvalId: result.approvalId || "", workshopId, coachId },
                 });
-                console.log(`[INNGEST] workshop/approved event sent (auto-approved) for workshop=${workshopId}`);
             } catch (err) {
-                console.error("[INNGEST] Failed to emit workshop/approved (auto-approved):", err);
+                console.error("[INNGEST] Backup event failed:", err);
             }
         }
 
@@ -464,12 +496,11 @@ export async function POST(request: NextRequest) {
                 : requestedBy;
 
             // Fetch enrichment data in parallel (non-blocking)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             Promise.all([
                 verifyCertification(coachEmail, workshopTypeSlug || "").catch(() => null),
                 getCoachByEmail(coachEmail).catch(() => null),
             ]).then(([circleData, hubspotRaw]) => {
-                const hsProps = (hubspotRaw as any)?.properties;
+                const hsProps = (hubspotRaw as Record<string, unknown> | null)?.properties as Record<string, unknown> | undefined;
                 sendEnrichedApprovalRequest({
                     approvalId: result.approvalId!,
                     type: input.type,

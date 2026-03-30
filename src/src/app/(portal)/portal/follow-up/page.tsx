@@ -173,7 +173,7 @@ export default function FollowUpPage() {
                                 <option value="">Choose a workshop...</option>
                                 {availableWorkshops.map((ws) => (
                                     <option key={ws.id} value={ws.id}>
-                                        {ws.title} {ws.workshopCode ? `(${ws.workshopCode})` : ""} — {new Date(ws.eventDate).toLocaleDateString()}
+                                        {ws.title} {ws.workshopCode ? `(${ws.workshopCode})` : ""} — {new Date(ws.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}
                                     </option>
                                 ))}
                             </select>

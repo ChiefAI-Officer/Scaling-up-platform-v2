@@ -5,6 +5,7 @@
 import {
   cn,
   formatDate,
+  formatEventDate,
   formatCurrency,
   generateSlug,
   getWorkshopStatusLabel,
@@ -37,7 +38,7 @@ describe("cn (class name merger)", () => {
 
 describe("formatDate", () => {
   it("should format date string correctly", () => {
-    const result = formatDate("2025-03-15");
+    const result = formatDate("2025-03-15T12:00:00Z");
     expect(result).toMatch(/Mar(ch)?\s+15,?\s+2025/);
   });
 
@@ -50,6 +51,24 @@ describe("formatDate", () => {
   it("should handle invalid date", () => {
     const result = formatDate("invalid");
     expect(result).toBe("Invalid Date");
+  });
+});
+
+describe("formatEventDate", () => {
+  it("formats July 1 UTC midnight as Jul 1, not Jun 30", () => {
+    const result = formatEventDate(new Date("2026-07-01T00:00:00.000Z"));
+    expect(result).toContain("Jul");
+    expect(result).toContain("1");
+    expect(result).not.toContain("Jun");
+  });
+
+  it("formats string dates correctly", () => {
+    const result = formatEventDate("2026-07-01T00:00:00.000Z");
+    expect(result).toContain("Jul");
+  });
+
+  it("returns Invalid Date for bad input", () => {
+    expect(formatEventDate("not-a-date")).toBe("Invalid Date");
   });
 });
 

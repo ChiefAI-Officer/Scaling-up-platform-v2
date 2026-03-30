@@ -34,7 +34,7 @@ function buildPostRequest(body: Record<string, unknown>): Request {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-  }) as any;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ questionId: "q-1", value: "Excellent" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -84,7 +84,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ questionId: "q-1", value: "Yes" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams("nonexistent-survey"),
     );
     const body = await response.json();
@@ -104,7 +104,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ questionId: "q-1", value: "Good" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -118,7 +118,7 @@ describe("POST /api/surveys/[id]/submit", () => {
   // -----------------------------------------------------------------------
   it("returns 400 when answers array is empty", async () => {
     const response = await POST(
-      buildPostRequest({ answers: [] }) as any,
+      buildPostRequest({ answers: [] }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -136,7 +136,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ value: "Some answer" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -153,7 +153,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ questionId: "q-1" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -174,7 +174,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ questionId: "q-unknown", value: "Answer" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -195,7 +195,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ questionId: "q-1", value: "Yes" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -219,7 +219,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     ];
 
     const response = await POST(
-      buildPostRequest({ answers }) as any,
+      buildPostRequest({ answers }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -241,7 +241,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     ];
 
     const response = await POST(
-      buildPostRequest({ answers }) as any,
+      buildPostRequest({ answers }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -258,7 +258,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ questionId: "q-1", value: "Yes" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams(""),
     );
     const body = await response.json();
@@ -283,7 +283,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ questionId: "q-1", value: "Yes" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -305,7 +305,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ questionId: "q-1", value: "Yes" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -321,7 +321,7 @@ describe("POST /api/surveys/[id]/submit", () => {
   // -----------------------------------------------------------------------
   it("returns 400 when the answers key is missing from body", async () => {
     const response = await POST(
-      buildPostRequest({}) as any,
+      buildPostRequest({}) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -338,7 +338,7 @@ describe("POST /api/surveys/[id]/submit", () => {
     const response = await POST(
       buildPostRequest({
         answers: [{ questionId: "", value: "Answer" }],
-      }) as any,
+      }) as unknown as Parameters<typeof POST>[0],
       routeParams(),
     );
     const body = await response.json();
@@ -358,7 +358,7 @@ describe("POST /api/surveys/[id]/submit", () => {
       answers: [{ questionId: "q-1", value: "Yes" }],
     });
 
-    await POST(req as any, routeParams());
+    await POST(req as unknown as Parameters<typeof POST>[0], routeParams());
 
     expect(withRateLimit).toHaveBeenCalledTimes(1);
     expect(withRateLimit).toHaveBeenCalledWith(

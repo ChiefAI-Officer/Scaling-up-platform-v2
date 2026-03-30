@@ -75,6 +75,7 @@ model Coach {
   lastName            String
   phone               String?
   company             String?
+  title               String?   // Professional title/credentials, e.g., "Scaling Up Certified Coach"
   bio                 String?
   profileImage        String?
   linkedinUrl         String?
@@ -540,6 +541,7 @@ model LandingPage {
   status           PageStatus          @default(DRAFT)
   isActiveTemplate Boolean             @default(false) // Feb25 Sprint 5: marks this page as the active template for auto-build
   categoryId       String?             // FIG-005: FK to Category — null = global template (applies to all)
+  sourceTemplateId String?             // Tracks which PageTemplate this page was cloned from (informational, no FK)
   publishedAt      DateTime?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
@@ -550,6 +552,27 @@ model LandingPage {
   @@unique([workshopId, template])
   @@index([categoryId])
   @@map("landing_pages")
+}
+
+// ============================================
+// V2: Page Templates (independent of workshops)
+// ============================================
+
+model PageTemplate {
+  id           String              @id @default(cuid())
+  name         String              // e.g., "AI Workshop Solo Landing"
+  templateType LandingPageTemplate // BIO_PAGE, SOLO_LANDING, DUO_LANDING, REGISTRATION, THANK_YOU
+  categoryId   String?             // null = global template (applies to all categories)
+  content      String              // JSON string with {{variable}} placeholders (TEXT column)
+  isActive     Boolean             @default(false)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([isActive])
+  @@index([templateType, categoryId])
+  @@map("page_templates")
 }
 
 // ============================================
@@ -613,6 +636,7 @@ model Category {
   surveyTemplates SurveyTemplate[]
   workflows       Workflow[]
   landingPages    LandingPage[]    // FIG-005: Templates scoped to this category
+  pageTemplates   PageTemplate[]
 
   @@map("categories")
 }

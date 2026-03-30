@@ -14,6 +14,9 @@ jest.mock("@/lib/db", () => ({
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    landingPage: {
+      findFirst: jest.fn().mockResolvedValue({ slug: "workshop-thank-you" }),
+    },
   },
 }));
 

@@ -112,10 +112,20 @@ async function createRegistrationTransaction(
       email: input.email,
       status: { not: "CANCELLED" },
     },
-    select: { id: true },
+    select: { id: true, paymentStatus: true },
   });
 
   if (existing) {
+    if (existing.paymentStatus === "PENDING") {
+      // Allow retry — full fetch for caller compatibility
+      const full = await tx.registration.findUnique({
+        where: { id: existing.id },
+        ...(includeWorkshopDetails
+          ? { include: { workshop: { include: { workshopType: true, coach: true } } } }
+          : {}),
+      });
+      return { registration: full!, workshop };
+    }
     throw new RegistrationServiceError(
       "DUPLICATE_REGISTRATION",
       "You are already registered for this workshop",

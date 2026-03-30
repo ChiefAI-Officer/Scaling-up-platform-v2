@@ -6,6 +6,7 @@ import crypto from "crypto";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
 import { sendWorkshopApprovedEmail, sendWorkshopDeniedEmail, sendApprovalInfoRequestEmail } from "@/services/notifications";
 import { inngest } from "@/inngest/client";
+import { runAutoBuild, type AutoBuildResult } from "@/lib/auto-build-service";
 
 const DEFAULT_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const MAX_APPROVAL_LINK_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days guardrail
@@ -100,17 +101,18 @@ export async function GET(
         // Process the action
         const newStatus = action === "approve" ? "APPROVED" : "DENIED";
 
-        await db.approvalQueue.update({
-            where: { id },
-            data: {
-                status: newStatus,
-                respondedBy: "EMAIL_LINK",
-                respondedAt: new Date(),
-            }
+        await db.$transaction(async (tx) => {
+            await tx.approvalQueue.update({
+                where: { id },
+                data: {
+                    status: newStatus,
+                    respondedBy: "EMAIL_LINK",
+                    respondedAt: new Date(),
+                }
+            });
+            // NOTE: Do NOT set workshop.status = PRE_EVENT here — auto-build owns that transition.
+            // Setting it here causes the auto-build idempotency guard to skip the build on Inngest retries.
         });
-
-        // NOTE: Do NOT set workshop.status = PRE_EVENT here — auto-build owns that transition.
-        // Setting it here causes the auto-build idempotency guard to skip the build on Inngest retries.
 
         // Send notification email to coach (non-blocking)
         // Use coachId directly (always non-null) instead of workshop→coach join
@@ -150,18 +152,26 @@ export async function GET(
             }
         }
 
-        // Sprint 5: Emit workshop/approved event to trigger auto-build (advances status to PRE_EVENT)
-        let inngestSent = false;
+        // Run auto-build inline — don't depend on Inngest for critical path
+        let buildNote = "";
         if (newStatus === "APPROVED" && approval.workshopId) {
+            try {
+                const buildResult = await runAutoBuild(approval.workshopId);
+                console.log(`[AUTO-BUILD] GET inline build completed: pages=${buildResult.pagesCreated}, status=${buildResult.status}`);
+                buildNote = `<p style="color: #718096; font-size: 0.9em;">Auto-build: ${buildResult.pagesCreated} pages created</p>`;
+            } catch (err) {
+                console.error("[AUTO-BUILD] GET inline build failed:", err);
+                buildNote = `<p style="color: #718096; font-size: 0.9em;">Auto-build: failed (check logs)</p>`;
+            }
+
+            // Emit Inngest event as retry backup
             try {
                 await inngest.send({
                     name: "workshop/approved",
                     data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
                 });
-                inngestSent = true;
-                console.log(`[INNGEST] workshop/approved event sent for workshop=${approval.workshopId}`);
             } catch (err) {
-                console.error("[INNGEST] Failed to emit workshop/approved:", err);
+                console.error("[INNGEST] Backup event failed:", err);
             }
         }
 
@@ -174,9 +184,7 @@ export async function GET(
         });
 
         // Return success HTML page
-        const autoBuildNote = newStatus === "APPROVED"
-            ? `<p style="color: #718096; font-size: 0.9em;">Auto-build: ${inngestSent ? "triggered" : "not triggered (check Inngest)"}</p>`
-            : "";
+        const autoBuildNote = newStatus === "APPROVED" ? buildNote : "";
         return new NextResponse(
             `<html>
         <head><title>Request ${newStatus}</title></head>
@@ -273,20 +281,22 @@ export async function POST(
                     { status: 400 }
                 );
             }
-            await db.approvalQueue.update({
-                where: { id },
-                data: {
-                    status: "INFO_REQUESTED",
-                    notes: reason,
-                },
-            });
-            // Also update workshop status so coach portal shows the info request card
-            if (approval.workshopId) {
-                await db.workshop.update({
-                    where: { id: approval.workshopId },
-                    data: { status: "INFO_REQUESTED" },
+            await db.$transaction(async (tx) => {
+                await tx.approvalQueue.update({
+                    where: { id },
+                    data: {
+                        status: "INFO_REQUESTED",
+                        notes: reason,
+                    },
                 });
-            }
+                // Also update workshop status so coach portal shows the info request card
+                if (approval.workshopId) {
+                    await tx.workshop.update({
+                        where: { id: approval.workshopId },
+                        data: { status: "INFO_REQUESTED" },
+                    });
+                }
+            });
             // Notify coach (non-blocking)
             {
                 const coach = await db.coach.findUnique({
@@ -348,6 +358,29 @@ export async function POST(
                     data: updateData,
                 });
                 console.log(`[CUSTOM_PRICING] Applied priceCents=${reqData.newPriceCents} to workshop=${approval.workshopId}`);
+
+                // If workshop hasn't been built yet, run auto-build + Inngest backup
+                const ws = await db.workshop.findUnique({
+                    where: { id: approval.workshopId },
+                    select: { status: true },
+                });
+                const PRE_BUILD_STATUSES = ["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED"];
+                if (ws && PRE_BUILD_STATUSES.includes(ws.status)) {
+                    try {
+                        const buildResult = await runAutoBuild(approval.workshopId);
+                        console.log(`[AUTO-BUILD] CUSTOM_PRICING inline build: pages=${buildResult.pagesCreated}, status=${buildResult.status}`);
+                    } catch (err) {
+                        console.error("[AUTO-BUILD] CUSTOM_PRICING inline build failed:", err);
+                    }
+                    try {
+                        await inngest.send({
+                            name: "workshop/approved",
+                            data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
+                        });
+                    } catch (err) {
+                        console.error("[INNGEST] CUSTOM_PRICING backup event failed:", err);
+                    }
+                }
             }
             await db.approvalQueue.update({
                 where: { id },
@@ -363,18 +396,19 @@ export async function POST(
             return NextResponse.json({ success: true, status: newStatus, message: `Price change request ${newStatus.toLowerCase()}` });
         }
 
-        await db.approvalQueue.update({
-            where: { id },
-            data: {
-                status: newStatus,
-                respondedBy: actor.email,
-                respondedAt: new Date(),
-                responseReason: reason,
-            }
+        await db.$transaction(async (tx) => {
+            await tx.approvalQueue.update({
+                where: { id },
+                data: {
+                    status: newStatus,
+                    respondedBy: actor.email,
+                    respondedAt: new Date(),
+                    responseReason: reason,
+                }
+            });
+            // NOTE: Do NOT set workshop.status = PRE_EVENT here — auto-build owns that transition.
+            // Setting it here causes the auto-build idempotency guard to skip the build on Inngest retries.
         });
-
-        // NOTE: Do NOT set workshop.status = PRE_EVENT here — auto-build owns that transition.
-        // Setting it here causes the auto-build idempotency guard to skip the build on Inngest retries.
 
         // Send notification email to coach (non-blocking)
         // Use coachId directly (always non-null) instead of workshop→coach join
@@ -414,18 +448,24 @@ export async function POST(
             }
         }
 
-        // Sprint 5: Emit workshop/approved event to trigger auto-build (advances status to PRE_EVENT)
-        let inngestSent = false;
+        // Run auto-build inline — don't depend on Inngest for critical path
+        let buildResult: AutoBuildResult | null = null;
         if (newStatus === "APPROVED" && approval.workshopId) {
+            try {
+                buildResult = await runAutoBuild(approval.workshopId);
+                console.log(`[AUTO-BUILD] Inline build completed: pages=${buildResult.pagesCreated}, status=${buildResult.status}`);
+            } catch (err) {
+                console.error("[AUTO-BUILD] Inline build failed, falling back to Inngest:", err);
+            }
+
+            // Emit Inngest event as retry backup (idempotency guard prevents duplicate work)
             try {
                 await inngest.send({
                     name: "workshop/approved",
                     data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
                 });
-                inngestSent = true;
-                console.log(`[INNGEST] workshop/approved event sent for workshop=${approval.workshopId}`);
             } catch (err) {
-                console.error("[INNGEST] Failed to emit workshop/approved — check INNGEST_EVENT_KEY:", err);
+                console.error("[INNGEST] Backup event failed:", err);
             }
         }
 
@@ -441,7 +481,11 @@ export async function POST(
             success: true,
             status: newStatus,
             message: `Request ${newStatus.toLowerCase()}`,
-            autoBuildTriggered: inngestSent,
+            pagesCreated: buildResult?.pagesCreated ?? 0,
+            workshopStatus: buildResult?.status ?? (newStatus === "APPROVED" ? "AWAITING_APPROVAL" : undefined),
+            ...(newStatus === "APPROVED" && !buildResult?.success
+                ? { autoBuildError: buildResult?.error || "Auto-build failed. Check server logs." }
+                : {}),
         });
     } catch (error) {
         console.error("Approval respond POST error:", error);

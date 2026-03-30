@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -126,6 +126,8 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
   const [showCoachDropdown, setShowCoachDropdown] = useState(false);
   // MR-21: Multi-coupon list (admin-only)
   const [coupons, setCoupons] = useState<CouponEntry[]>([]);
+  // Track whether coach manually edited description (prevents category change from clobbering)
+  const descriptionManuallyEdited = useRef(false);
 
   const [formData, setFormData] = useState({
     coachId: prefilledCoach?.id ?? "",
@@ -324,6 +326,10 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
     const nextValue =
       type === "checkbox" ? (event.target as HTMLInputElement).checked : value;
 
+    if (name === "description") {
+      descriptionManuallyEdited.current = true;
+    }
+
     setFormData((prev) => {
       const next = { ...prev, [name]: nextValue };
 
@@ -344,7 +350,8 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
       if (name === "categoryId") {
         next.priceCents = "";
         // Auto-populate description from category defaults when category changes
-        if (typeof nextValue === "string" && nextValue) {
+        // but only if coach hasn't manually edited it
+        if (!descriptionManuallyEdited.current && typeof nextValue === "string" && nextValue) {
           const cat = categories.find((c) => c.id === nextValue);
           if (cat?.defaultDescription) {
             next.description = cat.defaultDescription;
@@ -684,15 +691,12 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                readOnly={coachIsAutoFilled && Boolean(formData.description)}
                 rows={4}
-                className={`mt-1 ${coachIsAutoFilled && formData.description ? "bg-muted" : ""}`}
+                className="mt-1"
                 placeholder="Internal notes for operations and setup..."
               />
               <p className="text-sm text-muted-foreground mt-1">
-                {coachIsAutoFilled && formData.description
-                  ? "Description auto-populated from category."
-                  : "Internal only. Not shown in landing page editors."}
+                {"Internal only. Not shown in landing page editors."}
               </p>
             </div>
 

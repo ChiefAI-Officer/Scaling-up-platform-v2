@@ -1,4 +1,19 @@
 @import "tailwindcss";
+@import "react-phone-number-input/style.css";
+
+/* Phone input styling to match design system */
+.PhoneInputInput {
+    border: none !important;
+    background: transparent !important;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    outline: none;
+    flex: 1;
+}
+.PhoneInputCountry {
+    margin-right: 0;
+    padding-left: 0.75rem;
+}
 
 /* ===========================================
    Scaling Up Platform v2 — Design System

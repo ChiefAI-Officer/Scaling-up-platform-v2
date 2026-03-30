@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,8 @@ interface CoachProfileFormProps {
         lastName: string;
         email: string;
         bio: string;
-        titleCredentials?: string | null; // MR-26: Title / Credentials (company field)
+        title?: string | null; // Professional title (e.g., "Scaling Up Certified Coach")
+        titleCredentials?: string | null; // MR-26: Title / Credentials (company field / business entity)
         profileImage?: string | null;
         linkedinUrl?: string | null;
         showBookCallCta?: boolean;
@@ -21,9 +23,11 @@ interface CoachProfileFormProps {
 }
 
 export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps) {
+    const router = useRouter();
     const [firstName, setFirstName] = useState(initialData.firstName);
     const [lastName, setLastName] = useState(initialData.lastName);
     const [bio, setBio] = useState(initialData.bio);
+    const [title, setTitle] = useState(initialData.title || "");
     const [titleCredentials, setTitleCredentials] = useState(initialData.titleCredentials || "");
     const [linkedinUrl, setLinkedinUrl] = useState(initialData.linkedinUrl || "");
     const [showBookCallCta, setShowBookCallCta] = useState(initialData.showBookCallCta ?? true);
@@ -72,13 +76,14 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
             const res = await fetch(`/api/portal/profile`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ firstName, lastName, bio, company: titleCredentials || null, linkedinUrl: linkedinUrl || null, showBookCallCta }),
+                body: JSON.stringify({ firstName, lastName, bio, title: title || null, company: titleCredentials || null, linkedinUrl: linkedinUrl || null, showBookCallCta }),
             });
 
             const data = await res.json();
 
             if (res.ok && data.success) {
                 setMessage({ type: "success", text: "Profile updated successfully." });
+                router.refresh();
             } else {
                 setMessage({ type: "error", text: data.error || "Failed to save changes." });
             }
@@ -153,7 +158,23 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
                 <p className="text-xs text-muted-foreground">Contact support to change your email address.</p>
             </div>
 
-            {/* MR-26: Title / Credentials field matching admin bio form */}
+            <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                    Professional Title <span className="text-destructive">*</span>
+                </label>
+                <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g., Scaling Up Certified Coach"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                    Your professional title — shown on landing pages
+                </p>
+            </div>
+
+            {/* MR-26: Title / Credentials field matching admin bio form (business entity) */}
             <div className="space-y-2">
                 <Label htmlFor="titleCredentials">Title / Credentials</Label>
                 <Input

@@ -50,7 +50,7 @@ export function Step3Review() {
 
     const formattedDate = formData.eventDate
         ? new Date(formData.eventDate).toLocaleDateString("en-US", {
-            weekday: "long", month: "long", day: "numeric", year: "numeric"
+            weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC"
         })
         : "Date not selected";
 

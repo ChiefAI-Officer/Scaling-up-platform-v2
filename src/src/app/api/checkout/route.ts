@@ -83,6 +83,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Find the workshop's THANK_YOU landing page for post-payment redirect
+    const thankYouPage = await db.landingPage.findFirst({
+      where: { workshopId: registration.workshop.id, template: "THANK_YOU", status: "PUBLISHED" },
+      select: { slug: true },
+    });
+    const successRedirect = thankYouPage
+      ? `${appUrl}/workshop/${thankYouPage.slug}`
+      : `${appUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`;
+
     const session = await createCheckoutSession({
       workshopId: registration.workshop.id,
       workshopTitle: registration.workshop.title,
@@ -95,7 +104,7 @@ export async function POST(request: NextRequest) {
       )
         .map((coupon) => coupon.stripePromotionCodeId)
         .filter((value): value is string => typeof value === "string" && value.length > 0),
-      successUrl: `${appUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
+      successUrl: successRedirect,
       cancelUrl: registration.workshop.landingPageSlug
         ? `${appUrl}/workshop/${registration.workshop.landingPageSlug}?cancelled=true`
         : `${appUrl}/`,

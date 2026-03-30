@@ -5,6 +5,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import {
   formatDate,
+  formatEventDate,
   formatCurrency,
   getWorkshopStatusColor,
   getWorkshopStatusLabel,
@@ -12,6 +13,7 @@ import {
   VenueAddress,
 } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
@@ -106,6 +108,7 @@ export default async function WorkshopDetailPage({
   );
 
   // S3-08: Auto-lock 48h before event
+  // eslint-disable-next-line react-hooks/purity
   const hoursUntilEvent = (new Date(workshop.eventDate).getTime() - Date.now()) / (1000 * 60 * 60);
   const isLocked = workshop.isLocked || (hoursUntilEvent >= 0 && hoursUntilEvent <= 48);
 
@@ -148,13 +151,24 @@ export default async function WorkshopDetailPage({
       </div>
       </FadeUp>
 
+      {/* Warning: Workshop approved but no landing pages created */}
+      {(workshop.status === "PRE_EVENT" || workshop.status === "APPROVED") && workshop.landingPages.length === 0 && (
+        <Alert variant="warning" className="mt-4">
+          <AlertTitle>No landing pages created</AlertTitle>
+          <AlertDescription>
+            This workshop was approved but no landing pages were generated during auto-build.
+            Ensure active <Link href="/templates" className="underline font-medium">page templates</Link> exist, then re-trigger the build or create pages manually.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Quick Stats */}
       <StaggerContainer className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <StaggerItem>
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Event Date</p>
-              <p className="text-xl font-semibold">{formatDate(workshop.eventDate)}</p>
+              <p className="text-xl font-semibold">{formatEventDate(workshop.eventDate)}</p>
               {workshop.eventTime && (
                 <p className="text-muted-foreground">{workshop.eventTime}</p>
               )}

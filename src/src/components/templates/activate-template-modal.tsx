@@ -206,7 +206,7 @@ export function ActivateTemplateModal({
 
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant={page.categoryId === null ? "secondary" : "outline"} className="text-xs">
-                        {page.categoryId === null ? "Global" : "Category"}
+                        {page.categoryId === null ? "All Categories" : "Category"}
                       </Badge>
                       <Badge
                         variant={page.status === "PUBLISHED" ? "default" : "secondary"}

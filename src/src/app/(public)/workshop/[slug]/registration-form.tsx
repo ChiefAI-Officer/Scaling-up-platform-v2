@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { emailSchema } from "@/lib/validations";
+import { PhoneInputField } from "@/components/ui/phone-input";
 
 interface RegistrationFormProps {
   workshopId: string;
@@ -15,6 +17,7 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [registrationId, setRegistrationId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -25,6 +28,19 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
     discountCode: "",
     marketingOptIn: false,
   });
+
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const validateEmail = (email: string): boolean => {
+    if (!email) { setEmailError("Email is required"); return false; }
+    const result = emailSchema.safeParse(email);
+    setEmailError(result.success ? null : "Please enter a valid email address");
+    return result.success;
+  };
+
+  const handlePhoneChange = (value: string) => {
+    setFormData((prev) => ({ ...prev, phone: value }));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -40,42 +56,54 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
     setError(null);
 
     try {
-      // Create registration
-      const registrationResponse = await fetch("/api/registrations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workshopId,
-          ...formData,
-        }),
-      });
-
-      if (!registrationResponse.ok) {
-        const contentType = registrationResponse.headers.get("content-type") || "";
-        if (!contentType.includes("application/json")) {
-          throw new Error(`Registration failed (${registrationResponse.status})`);
-        }
+      if (!validateEmail(formData.email)) { setLoading(false); return; }
+      if (!formData.phone || formData.phone.length < 4) {
+        setError("Phone number is required");
+        setLoading(false);
+        return;
       }
 
-      const registrationData = await registrationResponse.json();
+      let regId = registrationId;
 
-      if (!registrationData.success) {
-        const errorMsg = Array.isArray(registrationData.error)
-          ? registrationData.error.map((e: { message?: string }) => e.message).join(", ")
-          : registrationData.error || "Registration failed";
-        throw new Error(errorMsg);
+      if (!regId) {
+        // Create registration (or get existing PENDING one back)
+        const registrationResponse = await fetch("/api/registrations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workshopId,
+            ...formData,
+          }),
+        });
+
+        if (!registrationResponse.ok) {
+          const contentType = registrationResponse.headers.get("content-type") || "";
+          if (!contentType.includes("application/json")) {
+            throw new Error(`Registration failed (${registrationResponse.status})`);
+          }
+        }
+
+        const registrationData = await registrationResponse.json();
+
+        if (!registrationData.success) {
+          const errorMsg = Array.isArray(registrationData.error)
+            ? registrationData.error.map((e: { message?: string }) => e.message).join(", ")
+            : registrationData.error || "Registration failed";
+          throw new Error(errorMsg);
+        }
+
+        regId = registrationData.data.id;
+        setRegistrationId(regId);
       }
 
       if (isFree) {
-        // For free workshops, redirect to success page
-        router.push(`/registration/success?id=${registrationData.data.id}`);
+        router.push(`/registration/success?id=${regId}`);
       } else {
-        // For paid workshops, create checkout session
         const checkoutResponse = await fetch("/api/checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            registrationId: registrationData.data.id,
+            registrationId: regId,
             discountCode: formData.discountCode.trim() || undefined,
           }),
         });
@@ -93,7 +121,6 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
           throw new Error(checkoutData.error || "Failed to create checkout");
         }
 
-        // Redirect to Stripe Checkout
         window.location.href = checkoutData.data.url;
       }
     } catch (err) {
@@ -143,10 +170,12 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
           name="email"
           type="email"
           value={formData.email}
-          onChange={handleChange}
+          onChange={(e) => { handleChange(e); if (emailError) validateEmail(e.target.value); }}
+          onBlur={(e) => validateEmail(e.target.value)}
           required
-          className="mt-1"
+          className={`mt-1 ${emailError ? "border-destructive focus-visible:ring-destructive" : ""}`}
         />
+        {emailError && <p className="text-xs text-destructive mt-1">{emailError}</p>}
       </div>
 
       <div>
@@ -163,14 +192,10 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
 
       <div>
         <Label htmlFor="phone">Phone *</Label>
-        <Input
+        <PhoneInputField
           id="phone"
-          name="phone"
-          type="tel"
           value={formData.phone}
-          onChange={handleChange}
-          required
-          className="mt-1"
+          onChange={handlePhoneChange}
         />
       </div>
 

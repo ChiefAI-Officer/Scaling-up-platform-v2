@@ -102,6 +102,7 @@ export const executeWorkflow = inngest.createFunction(
         year: "numeric",
         month: "long",
         day: "numeric",
+        timeZone: "UTC",
       }),
       workshopTime: workshop.eventTime || "TBD",
       workshopLocation: buildLocationString(workshop),

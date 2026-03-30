@@ -53,6 +53,10 @@ jest.mock("@/services/stripe", () => ({
   createWorkshopPromotionCode: jest.fn(),
 }));
 
+jest.mock("@/inngest/client", () => ({
+  inngest: { send: jest.fn().mockResolvedValue(undefined) },
+}));
+
 import { GET, POST } from "@/app/api/workshops/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/authorization";

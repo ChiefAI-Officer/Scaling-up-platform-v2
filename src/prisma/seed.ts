@@ -773,6 +773,101 @@ async function main() {
 
   console.log("Created post-event coach survey workflow");
 
+  // ─── Page Templates for Auto-Build ────────────────────────────────────
+  // These are the global templates that auto-build clones into landing pages
+  // when a workshop is approved. Idempotent via findFirst + update/create.
+
+  const soloLandingContent = JSON.stringify({
+    coachPhoto: "{{coach_photo}}",
+    coachName: "{{coach_name}}",
+    coachTitle: "Scaling Up Certified Coach",
+    eventDay: "{{workshop_date}}",
+    eventDate: "{{workshop_date}}",
+    eventTime: "{{workshop_time}}",
+    eventTimezone: "America/New_York",
+    heroTitle: "{{workshop_title}}",
+    heroSubtitle: "{{workshop_description}}",
+    bodyContent:
+      "Join {{coach_name}} from {{coach_company}} for this {{category_name}} workshop. Whether you're looking to scale your business, optimize operations, or plan your next strategic move — this hands-on session will give you the frameworks and tools you need to take action immediately.",
+    aboutTitle: "About This Workshop",
+    aboutDescription: "{{workshop_description}}",
+    partnerId: "",
+    partnerName: "",
+    partnerTagline: "",
+    partnerLogoUrl: "",
+    benefits: [
+      "Proven frameworks used by 80,000+ companies worldwide",
+      "Hands-on exercises you can apply immediately",
+      "Personalized coaching and Q&A with {{coach_first_name}}",
+      "Networking with fellow business leaders",
+      "Post-workshop resources and follow-up support",
+    ],
+    videoUrl: "",
+    ctaText: "Register Now — {{price}}",
+    registrationUrl: "",
+  });
+
+  const registrationContent = JSON.stringify({
+    coachName: "{{coach_name}}",
+    coachPhoto: "{{coach_photo}}",
+    coachTitle: "Scaling Up Certified Coach",
+    workshopTitle: "{{workshop_title}}",
+    eventDate: "{{workshop_date}}",
+    eventTime: "{{workshop_time}}",
+    heroHeadline: "Register for {{workshop_title}}",
+    heroDescription: "{{workshop_date}} — Facilitated by {{coach_name}}",
+    formTitle: "Complete Your Registration",
+    emailPlaceholder: "your@email.com",
+    namePlaceholder: "Full Name",
+    companyPlaceholder: "Company Name",
+    optInText:
+      "I agree to receive workshop updates, logistics information, and follow-up communications.",
+    submitButtonText: "Register Now",
+    privacyText:
+      "Your information is secure. We never share your data with third parties.",
+  });
+
+  const thankYouContent = JSON.stringify({
+    headline: "You're Registered!",
+    subheadline:
+      "Thank you for registering for {{workshop_title}} with {{coach_name}}.",
+    videoUrl: "",
+    additionalMessage:
+      "We've sent a confirmation email to your inbox with all the details. Please add {{workshop_date}} at {{workshop_time}} to your calendar so you don't miss it.",
+    calendarReminderText: "Add this event to your calendar",
+  });
+
+  const pageTemplates = [
+    { name: "Standard Solo Landing Page", templateType: "SOLO_LANDING", content: soloLandingContent },
+    { name: "Standard Registration Page", templateType: "REGISTRATION", content: registrationContent },
+    { name: "Standard Thank You Page", templateType: "THANK_YOU", content: thankYouContent },
+  ] as const;
+
+  for (const tpl of pageTemplates) {
+    const existing = await prisma.pageTemplate.findFirst({
+      where: { templateType: tpl.templateType, categoryId: null },
+    });
+
+    if (existing) {
+      await prisma.pageTemplate.update({
+        where: { id: existing.id },
+        data: { name: tpl.name, content: tpl.content, isActive: true },
+      });
+    } else {
+      await prisma.pageTemplate.create({
+        data: {
+          name: tpl.name,
+          templateType: tpl.templateType,
+          categoryId: null,
+          content: tpl.content,
+          isActive: true,
+        },
+      });
+    }
+  }
+
+  console.log("Created/updated 3 global PageTemplates (SOLO_LANDING, REGISTRATION, THANK_YOU)");
+
   console.log("Seeding completed!");
 }
 

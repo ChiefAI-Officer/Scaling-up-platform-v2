@@ -5,16 +5,46 @@
 
 import { db } from "@/lib/db";
 
+export { interpolateContent, rewriteIdentityFields, templateHasPlaceholders, findRemainingPlaceholders } from "@/lib/template-interpolation-core";
+
 /**
- * Interpolate {{variables}} in template content JSON string.
- * Replaces placeholders like {{workshop_title}}, {{coach_name}}, {{event_date}}, etc.
+ * Format a venue address that may be stored as a JSON object or plain string.
+ * JSON fields: street, city, state, zip — joined with ", ".
+ * Returns empty string for null/undefined or empty JSON objects.
  */
-export function interpolateContent(contentJson: string, variables: Record<string, string>): string {
-    let result = contentJson;
-    for (const [key, value] of Object.entries(variables)) {
-        result = result.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, "g"), value);
+export function formatVenueAddress(raw: string | null): string {
+    if (!raw) return "";
+    try {
+        const parsed = JSON.parse(raw);
+        return [parsed.street, parsed.city, parsed.state, parsed.zip].filter(Boolean).join(", ");
+    } catch {
+        return raw;
     }
-    return result;
+}
+
+/**
+ * Format a workshop date with weekday, using UTC to prevent off-by-one date bugs.
+ */
+export function formatWorkshopDate(date: Date): string {
+    return date.toLocaleDateString("en-US", {
+        weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
+    });
+}
+
+/**
+ * Format a workshop date as weekday only, using UTC.
+ */
+export function formatWorkshopDay(date: Date): string {
+    return date.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+}
+
+/**
+ * Format a workshop date without weekday, using UTC.
+ */
+export function formatWorkshopDateNoWeekday(date: Date): string {
+    return date.toLocaleDateString("en-US", {
+        year: "numeric", month: "long", day: "numeric", timeZone: "UTC",
+    });
 }
 
 /**
@@ -32,6 +62,7 @@ export async function buildWorkshopVariables(workshopId: string): Promise<Record
                     bio: true,
                     profileImage: true,
                     company: true,
+                    title: true,
                 },
             },
             workshopCategory: { select: { name: true } },
@@ -41,12 +72,7 @@ export async function buildWorkshopVariables(workshopId: string): Promise<Record
 
     if (!workshop) return null;
 
-    const formattedDate = workshop.eventDate.toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
+    const formattedDate = formatWorkshopDate(workshop.eventDate);
 
     const coachFullName = `${workshop.coach.firstName} ${workshop.coach.lastName}`;
 
@@ -55,11 +81,14 @@ export async function buildWorkshopVariables(workshopId: string): Promise<Record
         workshop_title: workshop.title,
         workshop_description: workshop.description || "",
         workshop_date: formattedDate,
+        event_day: formatWorkshopDay(workshop.eventDate),
+        event_date: formattedDate,
+        event_date_no_weekday: formatWorkshopDateNoWeekday(workshop.eventDate),
         workshop_time: workshop.eventTime || "",
         workshop_format: workshop.format,
         workshop_code: workshop.workshopCode,
         venue_name: workshop.venueName || "",
-        venue_address: workshop.venueAddress || "",
+        venue_address: formatVenueAddress(workshop.venueAddress),
         venue_instructions: workshop.venueInstructions || "",
         virtual_link: workshop.virtualLink || "",
         coach_name: coachFullName,
@@ -79,27 +108,17 @@ export async function buildWorkshopVariables(workshopId: string): Promise<Record
         // camelCase — matches JSON field names in editor content (solo-landing, registration, etc.)
         coachName: coachFullName,
         coachPhoto: workshop.coach.profileImage || "",
-        coachTitle: workshop.coach.company || "Scaling Up Certified Coach",
+        coachTitle: workshop.coach.title || workshop.coach.company || "Scaling Up Certified Coach",
+        coach_title: workshop.coach.title || workshop.coach.company || "Scaling Up Certified Coach",
         workshopTitle: workshop.title,
         eventDate: formattedDate,
         eventTime: workshop.eventTime || "",
+        // camelCase venue aliases (match template preview data)
+        venueName: workshop.venueName || "",
+        venueAddress: formatVenueAddress(workshop.venueAddress),
+        // Structured JSON field mappings for solo-landing editor content
+        heroTitle: workshop.title,
+        heroSubtitle: workshop.description || "",
+        aboutDescription: workshop.description || "",
     };
-}
-
-/**
- * Replace known identity fields in landing page content JSON.
- * Parses the JSON, overwrites structured fields (coachName, workshopTitle, etc.)
- * with target workshop values, then re-serializes.
- */
-export function rewriteIdentityFields(
-    contentJson: string,
-    targetFields: Record<string, string>
-): string {
-    const content = JSON.parse(contentJson);
-    for (const [key, value] of Object.entries(targetFields)) {
-        if (key in content) {
-            content[key] = value;
-        }
-    }
-    return JSON.stringify(content);
 }
