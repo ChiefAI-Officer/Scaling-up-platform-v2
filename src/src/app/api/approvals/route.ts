@@ -517,8 +517,8 @@ export async function POST(request: NextRequest) {
                         issues: circleData.issues,
                     } : undefined,
                     hubspotStanding: hsProps ? {
-                        paymentStatus: hsProps.coach_payment_status || undefined,
-                        territory: hsProps.coach_territory || undefined,
+                        paymentStatus: String(hsProps.coach_payment_status || "") || undefined,
+                        territory: String(hsProps.coach_territory || "") || undefined,
                     } : undefined,
                 }).catch((err: unknown) => console.error("Enriched approval email failed:", err));
             }).catch((err: unknown) => console.error("Enrichment data fetch failed:", err));
