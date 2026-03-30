@@ -65,6 +65,7 @@ function getVercelToken() {
   if (process.env.VERCEL_TOKEN) return process.env.VERCEL_TOKEN;
 
   const candidates = [
+    join(homedir(), "Library", "Application Support", "com.vercel.cli", "auth.json"),
     join(homedir(), ".local", "share", "com.vercel.cli", "auth.json"),
     join(homedir(), ".vercel", "auth.json"),
     // Windows-specific path
