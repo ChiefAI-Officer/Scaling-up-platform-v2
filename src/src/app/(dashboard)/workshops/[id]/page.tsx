@@ -18,7 +18,10 @@ import { Badge } from "@/components/ui/badge";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 
-const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
+const APP_URL =
+  process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 import { WorkshopActions } from "./workshop-actions";
 import { QuickActions } from "./quick-actions";
 import { RegistrationRemoveButton } from "./registration-remove-button";
