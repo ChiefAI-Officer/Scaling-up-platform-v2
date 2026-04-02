@@ -46,6 +46,8 @@ export async function POST(
             registrations: true,
             landingPages: true,
             surveys: true,
+            approvals: true,
+            workflowStepExecutions: true,
           },
         },
       },
@@ -96,6 +98,8 @@ export async function POST(
             registrationsDeleted: workshop._count.registrations,
             landingPagesDeleted: workshop._count.landingPages,
             surveysDeleted: workshop._count.surveys,
+            approvalsDeleted: workshop._count.approvals,
+            workflowExecutionsDeleted: workshop._count.workflowStepExecutions,
           }),
         },
       });

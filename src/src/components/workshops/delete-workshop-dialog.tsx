@@ -90,11 +90,13 @@ export function DeleteWorkshopDialog({
         </p>
 
         <ul className="mt-3 text-sm text-muted-foreground list-disc pl-5 space-y-1">
-          <li>All registrations</li>
+          <li>All registrations (including paid registration records)</li>
           <li>All landing pages</li>
           <li>All surveys and responses</li>
-          <li>All workflow assignments</li>
-          <li>All audit history</li>
+          <li>All workflow assignments and execution logs</li>
+          <li>All approval queue entries for this workshop</li>
+          <li>All follow-up reports</li>
+          <li>File links (uploaded files remain in Blob storage)</li>
         </ul>
 
         <div className="mt-4 rounded-lg border border-destructive/20 bg-destructive/10 p-4">

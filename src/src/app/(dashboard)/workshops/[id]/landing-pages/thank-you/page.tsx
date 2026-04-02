@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ThankYouPageTemplate, SAMPLE_WORKSHOP } from "@/components/templates/thank-you-page-template";
 
 interface ThankYouPageData {
   headline: string;
@@ -173,85 +174,12 @@ export default function ThankYouPageEditor() {
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div
-                className="min-h-[500px] relative overflow-hidden bg-sidebar"
-              >
-                {/* Decorative patterns */}
-                <div className="absolute left-4 top-1/4 opacity-20">
-                  <svg width="60" height="200" viewBox="0 0 60 200" className="text-sidebar-foreground">
-                    <path d="M30 0 L30 40 M30 60 L30 100 M30 120 L30 160 M30 180 L30 200" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" fill="none" />
-                    <circle cx="30" cy="50" r="5" fill="currentColor" />
-                    <circle cx="30" cy="110" r="5" fill="currentColor" />
-                    <circle cx="30" cy="170" r="5" fill="currentColor" />
-                  </svg>
-                </div>
-                <div className="absolute right-4 top-1/4 opacity-20">
-                  <svg width="60" height="200" viewBox="0 0 60 200" className="text-sidebar-foreground">
-                    <path d="M30 0 L30 40 M30 60 L30 100 M30 120 L30 160 M30 180 L30 200" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" fill="none" />
-                    <circle cx="30" cy="50" r="5" fill="currentColor" />
-                    <circle cx="30" cy="110" r="5" fill="currentColor" />
-                    <circle cx="30" cy="170" r="5" fill="currentColor" />
-                  </svg>
-                </div>
-
-                <div className="relative z-10 text-sidebar-foreground text-center p-8">
-                  {/* Logo */}
-                  <div className="font-bold text-lg tracking-wider mb-8">
-                    SCALING UP
-                  </div>
-
-                  {/* Headline */}
-                  <h1 className="text-2xl font-serif mb-2">
-                    {formData.headline}
-                  </h1>
-
-                  {/* Sub-headline */}
-                  <p className="text-sidebar-muted italic mb-8 max-w-md mx-auto text-sm">
-                    {formData.subheadline}
-                  </p>
-
-                  {/* Video */}
-                  {formData.videoUrl ? (
-                    <div className="max-w-sm mx-auto mb-6">
-                      <div className="border-4 border-sidebar-foreground rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="w-12 h-12 rounded-full bg-success flex items-center justify-center mx-auto mb-2">
-                            <svg className="w-6 h-6 text-sidebar-foreground ml-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                            </svg>
-                          </div>
-                          <span className="text-sidebar-foreground text-xs">Video Preview</span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="max-w-sm mx-auto mb-6 border-2 border-dashed border-sidebar-muted rounded-lg p-8 text-sidebar-muted text-sm">
-                      No video configured
-                    </div>
-                  )}
-
-                  {/* Additional Message */}
-                  {formData.additionalMessage && (
-                    <p className="text-sidebar-muted text-sm mb-6 max-w-md mx-auto">
-                      {formData.additionalMessage}
-                    </p>
-                  )}
-
-                  {/* Calendar Reminder */}
-                  <p className="text-sidebar-muted text-xs mb-4">
-                    {formData.calendarReminderText}
-                  </p>
-
-                  {/* Calendar buttons placeholder */}
-                  <div className="flex gap-2 justify-center">
-                    <button className="bg-card/20 text-sidebar-foreground text-xs px-3 py-1.5 rounded hover:bg-card/30">
-                      Google Calendar
-                    </button>
-                    <button className="bg-card/20 text-sidebar-foreground text-xs px-3 py-1.5 rounded hover:bg-card/30">
-                      Outlook
-                    </button>
-                  </div>
-                </div>
+              <div className="overflow-hidden rounded-b-lg">
+                <ThankYouPageTemplate
+                  content={formData}
+                  workshop={SAMPLE_WORKSHOP}
+                  isPreview={true}
+                />
               </div>
             </CardContent>
           </Card>

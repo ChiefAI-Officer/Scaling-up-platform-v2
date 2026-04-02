@@ -276,16 +276,13 @@ export async function POST(request: NextRequest) {
         if (!coachBio) {
             return NextResponse.json({ error: "Coach not found" }, { status: 404 });
         }
-        // Only gate workshop creation requests on bio completeness
-        if (input.type === "WORKSHOP_REQUEST" || input.type === "CUSTOM_PRICING") {
-            const bioMissing = getCoachBioMissingFields(coachBio);
-            if (bioMissing.length > 0) {
-                return NextResponse.json({
-                    success: false,
-                    error: `Coach profile is incomplete. Missing: ${bioMissing.join(", ")}`,
-                    missingFields: bioMissing,
-                }, { status: 400 });
-            }
+        const bioMissing = getCoachBioMissingFields(coachBio);
+        if (bioMissing.length > 0) {
+            return NextResponse.json({
+                success: false,
+                error: `Coach profile is incomplete. Missing: ${bioMissing.join(", ")}`,
+                missingFields: bioMissing,
+            }, { status: 400 });
         }
 
         // JV-20: For workshop requests, create the Workshop record first so it
@@ -517,8 +514,8 @@ export async function POST(request: NextRequest) {
                         issues: circleData.issues,
                     } : undefined,
                     hubspotStanding: hsProps ? {
-                        paymentStatus: String(hsProps.coach_payment_status || "") || undefined,
-                        territory: String(hsProps.coach_territory || "") || undefined,
+                        paymentStatus: hsProps.coach_payment_status ? String(hsProps.coach_payment_status) : undefined,
+                        territory: hsProps.coach_territory ? String(hsProps.coach_territory) : undefined,
                     } : undefined,
                 }).catch((err: unknown) => console.error("Enriched approval email failed:", err));
             }).catch((err: unknown) => console.error("Enrichment data fetch failed:", err));

@@ -126,6 +126,8 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
   const [showCoachDropdown, setShowCoachDropdown] = useState(false);
   // MR-21: Multi-coupon list (admin-only)
   const [coupons, setCoupons] = useState<CouponEntry[]>([]);
+  // Custom pricing toggle: coach portal hides these fields until explicitly requested
+  const [showCustomPricing, setShowCustomPricing] = useState(false);
   // Track whether coach manually edited description (prevents category change from clobbering)
   const descriptionManuallyEdited = useRef(false);
 
@@ -364,6 +366,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
 
       if (name === "isFree" && nextValue === true) {
         next.priceCents = "";
+        setShowCustomPricing(false);
       }
 
       return next;
@@ -1002,36 +1005,54 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                   )}
                 </div>
 
-                <div>
-                  <Label htmlFor="customPrice">Custom Price (USD)</Label>
-                  <Input
-                    id="customPrice"
-                    name="customPrice"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.customPrice}
-                    onChange={handleChange}
-                    className="mt-1"
-                    placeholder="e.g. 495"
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Optional. If provided, overrides the pricing tier and routes to admin for approval.
-                  </p>
-                </div>
+                {/* Coach portal: hide custom pricing behind a toggle. Admin: always visible. */}
+                {isCoachPortal && !showCustomPricing && !formData.customPrice && !formData.customPricingRequest && (
+                  <button
+                    type="button"
+                    aria-expanded={false}
+                    aria-controls="custom-pricing-section"
+                    className="text-sm text-primary underline-offset-2 hover:underline"
+                    onClick={() => setShowCustomPricing(true)}
+                  >
+                    Request custom pricing <span aria-hidden="true">→</span>
+                  </button>
+                )}
 
-                <div>
-                  <Label htmlFor="customPricingRequest">Custom Pricing Notes</Label>
-                  <Textarea
-                    id="customPricingRequest"
-                    name="customPricingRequest"
-                    value={formData.customPricingRequest}
-                    onChange={handleChange}
-                    rows={2}
-                    className="mt-1"
-                    placeholder="Any context for the custom price request (optional)."
-                  />
-                </div>
+                {/* Toggle is one-way by design: once opened, only closes on page refresh or isFree toggle */}
+                {(!isCoachPortal || showCustomPricing || !!formData.customPrice || !!formData.customPricingRequest) && (
+                  <div id="custom-pricing-section">
+                    <div>
+                      <Label htmlFor="customPrice">Custom Price (USD)</Label>
+                      <Input
+                        id="customPrice"
+                        name="customPrice"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={formData.customPrice}
+                        onChange={handleChange}
+                        className="mt-1"
+                        placeholder="e.g. 495"
+                      />
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Optional. If provided, overrides the pricing tier and routes to admin for approval.
+                      </p>
+                    </div>
+
+                    <div className="mt-4">
+                      <Label htmlFor="customPricingRequest">Custom Pricing Notes</Label>
+                      <Textarea
+                        id="customPricingRequest"
+                        name="customPricingRequest"
+                        value={formData.customPricingRequest}
+                        onChange={handleChange}
+                        rows={2}
+                        className="mt-1"
+                        placeholder="Any context for the custom price request (optional)."
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* MR-21: Multi-coupon / MR-22: Admin-only */}
                 {!isCoachPortal && (
