@@ -29,6 +29,7 @@ import { POST } from "@/app/api/webhooks/stripe/route";
 import { db } from "@/lib/db";
 import { constructWebhookEvent } from "@/services/stripe";
 import { createOrUpdateContact } from "@/services/hubspot";
+import Stripe from "stripe";
 
 function buildWebhookRequest(options: {
   signature?: string;
@@ -53,6 +54,29 @@ describe("Stripe webhook API", () => {
     jest.clearAllMocks();
   });
 
+  beforeEach(() => {
+    process.env.STRIPE_WEBHOOK_SECRET = "test-whsec-value";
+  });
+
+  describe("configuration guard", () => {
+    beforeEach(() => {
+      delete process.env.STRIPE_WEBHOOK_SECRET;
+    });
+
+    afterEach(() => {
+      process.env.STRIPE_WEBHOOK_SECRET = "test-whsec-value";
+    });
+
+    it("returns 503 when STRIPE_WEBHOOK_SECRET is not set", async () => {
+      const response = await POST(
+        buildWebhookRequest({ signature: "any-sig", body: "{}" })
+      );
+      expect(response.status).toBe(503);
+      const body = await response.json();
+      expect(body.error).toBe("Webhook misconfigured");
+    });
+  });
+
   it("returns 400 when stripe signature header is missing", async () => {
     const response = await POST(
       buildWebhookRequest({ body: "{}" })
@@ -63,7 +87,10 @@ describe("Stripe webhook API", () => {
 
   it("returns 400 for invalid webhook signature", async () => {
     (constructWebhookEvent as jest.Mock).mockImplementation(() => {
-      throw new Error("invalid signature");
+      const err = new Error("No signatures found matching the expected signature for payload.");
+      err.name = "StripeSignatureVerificationError";
+      Object.setPrototypeOf(err, Stripe.errors.StripeSignatureVerificationError.prototype);
+      throw err;
     });
 
     const response = await POST(

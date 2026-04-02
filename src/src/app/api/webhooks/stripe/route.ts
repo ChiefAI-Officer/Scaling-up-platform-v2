@@ -5,6 +5,13 @@ import { createOrUpdateContact } from "@/services/hubspot";
 import Stripe from "stripe";
 
 export async function POST(request: NextRequest) {
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.error(
+      "[Stripe Webhook] STRIPE_WEBHOOK_SECRET is not set — add it to your environment variables"
+    );
+    return NextResponse.json({ error: "Webhook misconfigured" }, { status: 503 });
+  }
+
   try {
     const body = await request.text();
     const signature = request.headers.get("stripe-signature");
@@ -16,16 +23,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let event: Stripe.Event;
-    try {
-      event = constructWebhookEvent(body, signature);
-    } catch (err) {
-      console.error("Webhook signature verification failed:", err);
-      return NextResponse.json(
-        { error: "Invalid signature" },
-        { status: 400 }
-      );
-    }
+    const event = constructWebhookEvent(body, signature);
 
     console.log(`Stripe webhook received: ${event.id} (${event.type})`);
 
@@ -54,7 +52,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Webhook error:", error);
+    if (error instanceof Stripe.errors.StripeSignatureVerificationError) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    }
+    console.error("[Stripe Webhook] Unexpected error:", error);
     return NextResponse.json(
       { error: "Webhook handler failed" },
       { status: 500 }
