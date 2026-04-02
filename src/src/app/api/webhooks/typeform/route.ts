@@ -16,15 +16,7 @@ import type {
  * when computing the signature. We check both with and without.
  */
 function verifySignature(body: string, signature: string | null): boolean {
-  const secret = process.env.TYPEFORM_WEBHOOK_SECRET;
-
-  if (!secret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("TYPEFORM_WEBHOOK_SECRET is not configured. Refusing to process webhook in production without signature verification.");
-    }
-    console.warn("TYPEFORM_WEBHOOK_SECRET not set — skipping signature verification (dev only)");
-    return true;
-  }
+  const secret = process.env.TYPEFORM_WEBHOOK_SECRET!;
 
   if (!signature) {
     return false;
