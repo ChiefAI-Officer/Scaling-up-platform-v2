@@ -1,6 +1,7 @@
 import { LandingPageRenderer } from "@/components/templates/landing-page-renderer";
 import { LandingPageData } from "@/types/landing-page";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { db } from "@/lib/db";
 
 // Mock Data Storage for Demo
 const MOCK_PAGES: Record<string, LandingPageData> = {
@@ -105,11 +106,17 @@ export default async function LandingPageComponent(props: PageProps) {
     const params = await props.params;
     const slug = params.slug;
 
-    // 1. Try to find in Mock Data
+    // 1. Try real DB — redirect to canonical URL if found and published
+    const landingPage = await db.landingPage.findUnique({
+        where: { slug },
+        select: { slug: true, status: true },
+    });
+    if (landingPage?.status === "PUBLISHED") {
+        redirect(`/workshop/${slug}`);
+    }
+
+    // 2. Fall back to demo mock data
     const mockData = MOCK_PAGES[slug];
-
-    // 2. TODO: If not mock, try to find in DB (db.landingPage.findUnique...)
-
     if (mockData) {
         return <LandingPageRenderer data={mockData} />;
     }

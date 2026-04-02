@@ -16,6 +16,9 @@ import {
     THANKYOU_DEFAULTS,
 } from "@/lib/template-editor-utils";
 import type { SoloLandingFields, RegistrationFields, ThankYouFields } from "@/lib/template-editor-utils";
+import { ThankYouPageTemplate, SAMPLE_WORKSHOP } from "@/components/templates/thank-you-page-template";
+import { RegistrationPageTemplate, SAMPLE_WORKSHOP_REGISTRATION } from "@/components/templates/registration-page-template";
+import { SoloLandingPageTemplate, SAMPLE_WORKSHOP_SOLO } from "@/components/templates/solo-landing-page-template";
 
 // Types, defaults, and utilities imported from @/lib/template-editor-utils
 
@@ -459,124 +462,26 @@ function SoloForm({
 
 function SoloPreview({ data }: { data: SoloLandingFields }) {
     const pv = (v: string) => previewValue(v);
-    const partnerName = pv(TEMPLATE_PREVIEW_DATA.partnerName ?? "");
-    const partnerLogoUrl = TEMPLATE_PREVIEW_DATA.partnerLogoUrl ?? "";
-    const partnerTagline = pv(TEMPLATE_PREVIEW_DATA.partnerTagline ?? "");
-    const hasPartner = partnerName || partnerLogoUrl || partnerTagline;
-
     return (
-        <>
-            {/* Hero */}
-            <div className="bg-sidebar text-sidebar-foreground p-8">
-                <div className="grid grid-cols-2 gap-6 items-center">
-                    <div>
-                        <span className="bg-warning text-xs px-3 py-1 rounded-full uppercase font-semibold">
-                            Scaling Up
-                        </span>
-                        <h1 className="text-2xl font-bold mt-3 mb-2">{pv(data.heroTitle)}</h1>
-                        <p className="text-sidebar-muted mb-4">{pv(data.heroSubtitle)}</p>
-                        <div className="space-y-2 text-sm">
-                            <div className="flex items-center gap-2">
-                                <span>📅</span>
-                                <span>
-                                    {pv(data.eventDay)}, {pv(data.eventDate)}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span>⏰</span>
-                                <span>
-                                    {pv(data.eventTime)} {pv(data.eventTimezone)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="text-center">
-                        {pv(data.coachPhoto) && !pv(data.coachPhoto).startsWith("{{") ? (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img
-                                src={pv(data.coachPhoto)}
-                                alt={pv(data.coachName)}
-                                className="w-28 h-28 rounded-full object-cover mx-auto mb-3 border-4 border-sidebar-foreground"
-                            />
-                        ) : (
-                            <div className="w-28 h-28 rounded-full bg-primary/80 mx-auto mb-3 flex items-center justify-center text-sidebar-muted text-xs">
-                                Coach Photo
-                            </div>
-                        )}
-                        <div className="font-bold">{pv(data.coachName)}</div>
-                        <div className="text-sidebar-muted text-sm">{pv(data.coachTitle)}</div>
-                        {hasPartner && (
-                            <div className="mt-4 border-t border-sidebar-foreground/20 pt-4">
-                                <div className="text-[10px] uppercase tracking-wide text-sidebar-muted mb-2">
-                                    In Partnership With
-                                </div>
-                                {partnerLogoUrl ? (
-                                    /* eslint-disable-next-line @next/next/no-img-element */
-                                    <img
-                                        src={partnerLogoUrl}
-                                        alt={partnerName || "Partner"}
-                                        className="mx-auto h-10 w-auto object-contain rounded bg-card p-1"
-                                    />
-                                ) : null}
-                                {partnerName ? (
-                                    <div className="mt-2 text-sm font-semibold text-sidebar-foreground">
-                                        {partnerName}
-                                    </div>
-                                ) : null}
-                                {partnerTagline ? (
-                                    <div className="text-xs text-sidebar-muted">
-                                        {partnerTagline}
-                                    </div>
-                                ) : null}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 grid grid-cols-3 gap-6">
-                <div className="col-span-2">
-                    <h2 className="text-xl font-bold mb-4">
-                        {pv(data.aboutTitle) || `Join us for the ${pv(data.heroTitle)}`}
-                    </h2>
-                    <p className="text-muted-foreground mb-6">{pv(data.aboutDescription)}</p>
-
-                    {data.videoUrl && (
-                        <div className="bg-muted aspect-video rounded-lg mb-6 flex items-center justify-center">
-                            <span className="text-muted-foreground text-sm">
-                                Video: {data.videoUrl}
-                            </span>
-                        </div>
-                    )}
-
-                    <h3 className="font-bold text-primary mb-3">What You&rsquo;ll Learn</h3>
-                    <ul className="space-y-2 text-sm text-foreground">
-                        {data.benefits.map((b, i) => (
-                            <li key={i} className="flex items-start gap-2">
-                                <span className="text-primary">✓</span>
-                                <span>{pv(b)}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-
-                {/* Registration Card */}
-                <div className="bg-card border rounded-lg p-4 shadow-sm self-start">
-                    <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground p-3 -m-4 mb-4 rounded-t-lg">
-                        <div className="text-xs uppercase font-semibold">Register Now</div>
-                    </div>
-                    <div className="text-sm font-bold mb-1">{pv(data.eventDate)}</div>
-                    <div className="text-xs text-muted-foreground mb-3">
-                        with {pv(data.coachName)}
-                    </div>
-                    <div className="text-lg font-bold text-primary mb-3">Free</div>
-                    <button className="w-full bg-primary text-primary-foreground py-2 rounded-md text-sm font-semibold">
-                        {pv(data.ctaText)}
-                    </button>
-                </div>
-            </div>
-        </>
+        <SoloLandingPageTemplate
+            content={{
+                heroTitle: pv(data.heroTitle),
+                heroSubtitle: pv(data.heroSubtitle),
+                coachName: pv(data.coachName),
+                coachPhoto: data.coachPhoto,
+                coachTitle: pv(data.coachTitle),
+                eventDay: pv(data.eventDay),
+                eventDate: pv(data.eventDate),
+                eventTime: pv(data.eventTime),
+                eventTimezone: pv(data.eventTimezone),
+                aboutTitle: pv(data.aboutTitle),
+                aboutDescription: pv(data.aboutDescription),
+                benefits: data.benefits.map(pv),
+                videoUrl: data.videoUrl,
+            }}
+            workshop={SAMPLE_WORKSHOP_SOLO}
+            isPreview={true}
+        />
     );
 }
 
@@ -708,102 +613,21 @@ function RegistrationForm({
 
 function RegistrationPreview({ data }: { data: RegistrationFields }) {
     const pv = (v: string) => previewValue(v);
-    const coachName = pv(TEMPLATE_PREVIEW_DATA.coachName ?? "Coach");
-    const coachTitle = pv(TEMPLATE_PREVIEW_DATA.coachTitle ?? "Scaling Up Certified Coach");
-    const coachPhoto = TEMPLATE_PREVIEW_DATA.coachPhoto ?? "";
-    const eventDate = pv(
-        TEMPLATE_PREVIEW_DATA.eventDate ?? TEMPLATE_PREVIEW_DATA.workshop_date ?? ""
-    );
-    const eventTime = pv(
-        TEMPLATE_PREVIEW_DATA.eventTime ?? TEMPLATE_PREVIEW_DATA.event_time ?? ""
-    );
-    const workshopTitle = pv(TEMPLATE_PREVIEW_DATA.workshopTitle ?? "{{workshop_title}}");
-
     return (
-        <div className="grid grid-cols-2 min-h-[500px]">
-            {/* Left — Hero */}
-            <div className="bg-sidebar text-sidebar-foreground p-6 flex flex-col">
-                <div className="flex-1">
-                    <div className="bg-primary/50 rounded-lg p-4 mb-4">
-                        <div className="flex items-center gap-3 mb-3">
-                            {coachPhoto ? (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img
-                                    src={coachPhoto}
-                                    alt={coachName}
-                                    className="w-12 h-12 rounded-full object-cover border-2 border-sidebar-foreground"
-                                />
-                            ) : (
-                                <div className="w-12 h-12 rounded-full bg-primary/60 flex items-center justify-center text-xs text-sidebar-foreground">
-                                    Coach
-                                </div>
-                            )}
-                            <div>
-                                <div className="font-medium text-sm">{coachName}</div>
-                                <div className="text-sidebar-muted text-xs">{coachTitle}</div>
-                            </div>
-                        </div>
-                        <div className="text-xs space-y-1 text-sidebar-muted">
-                            <div>📅 {eventDate}</div>
-                            <div>⏰ {eventTime}</div>
-                        </div>
-                    </div>
-
-                    <h2 className="text-lg font-bold mb-2">{pv(data.heroHeadline)}</h2>
-                    <p className="text-sidebar-muted text-sm">{pv(data.heroDescription)}</p>
-                </div>
-            </div>
-
-            {/* Right — Form */}
-            <div className="bg-card p-6">
-                <div className="border rounded-lg p-4 shadow-sm">
-                    <div className="bg-gradient-to-r from-primary to-primary/80 -m-4 mb-4 p-3 rounded-t-lg">
-                        <div className="text-primary-foreground text-sm font-medium">
-                            {workshopTitle}
-                        </div>
-                        <div className="text-primary-foreground/70 text-xs">
-                            with {coachName}
-                        </div>
-                    </div>
-
-                    <h3 className="font-medium text-sm mb-4">{pv(data.formTitle)}</h3>
-
-                    <div className="space-y-3">
-                        <input
-                            type="text"
-                            placeholder={pv(data.emailPlaceholder)}
-                            className="w-full border rounded px-3 py-2 text-sm bg-background"
-                            disabled
-                        />
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <input type="checkbox" checked readOnly className="rounded" />
-                            <span>{pv(data.optInText)}</span>
-                        </div>
-                        <input
-                            type="text"
-                            placeholder={pv(data.namePlaceholder)}
-                            className="w-full border rounded px-3 py-2 text-sm bg-background"
-                            disabled
-                        />
-                        <div className="text-xs text-muted-foreground font-medium">
-                            Additional information
-                        </div>
-                        <input
-                            type="text"
-                            placeholder={pv(data.companyPlaceholder)}
-                            className="w-full border rounded px-3 py-2 text-sm bg-background"
-                            disabled
-                        />
-                        <button className="w-full bg-primary text-primary-foreground py-2 rounded font-medium text-sm">
-                            {pv(data.submitButtonText)}
-                        </button>
-                        <p className="text-xs text-muted-foreground text-center">
-                            {pv(data.privacyText)}
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <RegistrationPageTemplate
+            content={{
+                heroHeadline: pv(data.heroHeadline),
+                heroDescription: pv(data.heroDescription),
+                submitButtonText: pv(data.submitButtonText),
+                privacyText: pv(data.privacyText),
+                emailPlaceholder: pv(data.emailPlaceholder),
+                namePlaceholder: pv(data.namePlaceholder),
+                companyPlaceholder: pv(data.companyPlaceholder),
+                optInText: pv(data.optInText),
+            }}
+            workshop={SAMPLE_WORKSHOP_REGISTRATION}
+            isPreview={true}
+        />
     );
 }
 
@@ -907,107 +731,18 @@ function ThankYouForm({
 // ---------------------------------------------------------------------------
 
 function ThankYouPreview({ data }: { data: ThankYouFields }) {
-    const pv = (v: string) => previewValue(v);
-    const headline = pv(data.headline);
-    const subheadline = pv(data.subheadline);
-    const videoUrl = pv(data.videoUrl);
-    const additionalMessage = pv(data.additionalMessage);
-    const calendarReminderText = pv(data.calendarReminderText);
-
     return (
-        <div className="min-h-[500px] relative overflow-hidden bg-sidebar">
-            {/* Decorative dots */}
-            <div className="absolute left-4 top-1/4 opacity-20">
-                <svg
-                    width="60"
-                    height="200"
-                    viewBox="0 0 60 200"
-                    className="text-sidebar-foreground"
-                >
-                    <path
-                        d="M30 0 L30 40 M30 60 L30 100 M30 120 L30 160 M30 180 L30 200"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeDasharray="4 4"
-                        fill="none"
-                    />
-                    <circle cx="30" cy="50" r="5" fill="currentColor" />
-                    <circle cx="30" cy="110" r="5" fill="currentColor" />
-                    <circle cx="30" cy="170" r="5" fill="currentColor" />
-                </svg>
-            </div>
-            <div className="absolute right-4 top-1/4 opacity-20">
-                <svg
-                    width="60"
-                    height="200"
-                    viewBox="0 0 60 200"
-                    className="text-sidebar-foreground"
-                >
-                    <path
-                        d="M30 0 L30 40 M30 60 L30 100 M30 120 L30 160 M30 180 L30 200"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeDasharray="4 4"
-                        fill="none"
-                    />
-                    <circle cx="30" cy="50" r="5" fill="currentColor" />
-                    <circle cx="30" cy="110" r="5" fill="currentColor" />
-                    <circle cx="30" cy="170" r="5" fill="currentColor" />
-                </svg>
-            </div>
-
-            <div className="relative z-10 text-sidebar-foreground text-center p-8">
-                <div className="font-bold text-lg tracking-wider mb-8">SCALING UP</div>
-
-                <h1 className="text-2xl font-serif mb-2">{headline}</h1>
-
-                <p className="text-sidebar-muted italic mb-8 max-w-md mx-auto text-sm">
-                    {subheadline}
-                </p>
-
-                {videoUrl ? (
-                    <div className="max-w-sm mx-auto mb-6">
-                        <div className="border-4 border-sidebar-foreground rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
-                            <div className="text-center">
-                                <div className="w-12 h-12 rounded-full bg-success flex items-center justify-center mx-auto mb-2">
-                                    <svg
-                                        className="w-6 h-6 text-sidebar-foreground ml-1"
-                                        fill="currentColor"
-                                        viewBox="0 0 20 20"
-                                    >
-                                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                                    </svg>
-                                </div>
-                                <span className="text-sidebar-foreground text-xs">
-                                    Video Preview
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="max-w-sm mx-auto mb-6 border-2 border-dashed border-sidebar-muted rounded-lg p-8 text-sidebar-muted text-sm">
-                        No video configured
-                    </div>
-                )}
-
-                {additionalMessage && (
-                    <p className="text-sidebar-muted text-sm mb-6 max-w-md mx-auto">
-                        {additionalMessage}
-                    </p>
-                )}
-
-                <p className="text-sidebar-muted text-xs mb-4">{calendarReminderText}</p>
-
-                <div className="flex gap-2 justify-center">
-                    <button className="bg-card/20 text-sidebar-foreground text-xs px-3 py-1.5 rounded hover:bg-card/30">
-                        Google Calendar
-                    </button>
-                    <button className="bg-card/20 text-sidebar-foreground text-xs px-3 py-1.5 rounded hover:bg-card/30">
-                        Outlook
-                    </button>
-                </div>
-            </div>
-        </div>
+        <ThankYouPageTemplate
+            content={{
+                headline: previewValue(data.headline),
+                subheadline: previewValue(data.subheadline),
+                videoUrl: data.videoUrl,
+                additionalMessage: previewValue(data.additionalMessage),
+                calendarReminderText: previewValue(data.calendarReminderText),
+            }}
+            workshop={SAMPLE_WORKSHOP}
+            isPreview={true}
+        />
     );
 }
 
