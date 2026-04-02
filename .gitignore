@@ -37,3 +37,6 @@ Thumbs.db
 *.swp
 *.swo
 .vercel
+
+# Git worktrees (local isolation — never commit these)
+.worktrees/
