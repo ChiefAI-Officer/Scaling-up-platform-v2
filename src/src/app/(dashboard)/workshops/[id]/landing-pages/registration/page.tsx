@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RegistrationPageTemplate, SAMPLE_WORKSHOP_REGISTRATION } from "@/components/templates/registration-page-template";
 
 interface RegistrationPageData {
   coachName: string;
@@ -233,75 +234,11 @@ export default function RegistrationPageEditor() {
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="grid grid-cols-2 min-h-[500px]">
-                {/* Left - Hero */}
-                <div className="bg-sidebar text-sidebar-foreground p-6 flex flex-col">
-                  <div className="flex-1">
-                    <div className="bg-primary/50 rounded-lg p-4 mb-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        {formData.coachPhoto ? (
-                          <img src={formData.coachPhoto} alt={formData.coachName} className="w-12 h-12 rounded-full object-cover border-2 border-sidebar-foreground" />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-primary/60 flex items-center justify-center text-xs">No Img</div>
-                        )}
-                        <div>
-                          <div className="font-medium text-sm">{formData.coachName}</div>
-                          <div className="text-sidebar-muted text-xs">{formData.coachTitle}</div>
-                        </div>
-                      </div>
-                      <div className="text-xs space-y-1 text-sidebar-muted">
-                        <div>📅 {formData.eventDate}</div>
-                        <div>⏰ {formData.eventTime}</div>
-                      </div>
-                    </div>
-                    
-                    <h2 className="text-lg font-bold mb-2">{formData.heroHeadline}</h2>
-                    <p className="text-sidebar-muted text-sm">{formData.heroDescription}</p>
-                  </div>
-                </div>
-
-                {/* Right - Form */}
-                <div className="bg-card p-6">
-                  <div className="border rounded-lg p-4 shadow-sm">
-                    <div className="bg-gradient-to-r from-primary to-primary/80 -m-4 mb-4 p-3 rounded-t-lg">
-                      <div className="text-primary-foreground text-sm font-medium">{formData.workshopTitle}</div>
-                      <div className="text-primary-foreground/70 text-xs">with {formData.coachName}</div>
-                    </div>
-
-                    <h3 className="font-medium text-sm mb-4">{formData.formTitle}</h3>
-
-                    <div className="space-y-3">
-                      <input
-                        type="text"
-                        placeholder={formData.emailPlaceholder}
-                        className="w-full border rounded px-3 py-2 text-sm"
-                        disabled
-                      />
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <input type="checkbox" checked readOnly className="rounded" />
-                        <span>{formData.optInText}</span>
-                      </div>
-                      <input
-                        type="text"
-                        placeholder={formData.namePlaceholder}
-                        className="w-full border rounded px-3 py-2 text-sm"
-                        disabled
-                      />
-                      <div className="text-xs text-muted-foreground font-medium">Additional information</div>
-                      <input
-                        type="text"
-                        placeholder={formData.companyPlaceholder}
-                        className="w-full border rounded px-3 py-2 text-sm"
-                        disabled
-                      />
-                      <button className="w-full bg-primary text-primary-foreground py-2 rounded font-medium text-sm">
-                        {formData.submitButtonText}
-                      </button>
-                      <p className="text-xs text-muted-foreground text-center">{formData.privacyText}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <RegistrationPageTemplate
+                content={formData}
+                workshop={SAMPLE_WORKSHOP_REGISTRATION}
+                isPreview={true}
+              />
             </CardContent>
           </Card>
         </div>

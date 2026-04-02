@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DuoLandingPageTemplate, SAMPLE_WORKSHOP_DUO } from "@/components/templates/duo-landing-page-template";
 
 interface Coach {
   name: string;
@@ -531,77 +532,13 @@ export default function DuoLandingEditor() {
             <CardHeader className="bg-muted border-b py-2">
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
-            <CardContent className="p-0 max-h-[calc(100vh-200px)] overflow-y-auto">
-              {/* Hero */}
-              <div className="bg-sidebar text-sidebar-foreground p-6">
-                <div className="grid grid-cols-5 gap-4 items-center">
-                  <div className="col-span-3">
-                    <span className="bg-card/20 text-xs px-3 py-1 rounded-full">Scaling Up</span>
-                    <h1 className="text-xl font-bold mt-2">{formData.heroTitle}</h1>
-                    <p className="text-sidebar-muted text-sm mt-1">{formData.subtitle}</p>
-                    <div className="mt-4 space-y-1 text-sm">
-                      <div>📅 {formData.eventDate}</div>
-                      <div>⏰ {formData.eventTime}</div>
-                      <div>📍 Live Virtual Event</div>
-                    </div>
-                  </div>
-                  <div className="col-span-2 flex gap-3 justify-center">
-                    {[formData.coach1, formData.coach2].map((c, i) => (
-                      <div key={i} className="text-center">
-                        {c.photo ? (
-                          <img src={c.photo} alt={c.name} className="w-16 h-16 rounded-full object-cover mx-auto mb-1 border-2 border-sidebar-foreground" />
-                        ) : (
-                          <div className="w-16 h-16 rounded-full bg-primary/70 mx-auto mb-1 flex items-center justify-center text-xs">No Img</div>
-                        )}
-                        <div className="text-xs font-medium">{c.name || `Coach ${i+1}`}</div>
-                        <div className="text-[10px] text-sidebar-muted">{c.title}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="p-6 space-y-6 text-sm">
-                <p className="text-muted-foreground">{formData.description}</p>
-
-                {/* What It Is/Isn't */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-medium text-success mb-2">What This Is ✓</h4>
-                    <ul className="space-y-1">{formData.whatItIs.map((i, idx) => <li key={idx} className="text-muted-foreground">• {i}</li>)}</ul>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-destructive mb-2">What This Is Not ✗</h4>
-                    <ul className="space-y-1">{formData.whatItIsNot.map((i, idx) => <li key={idx} className="text-muted-foreground">• {i}</li>)}</ul>
-                  </div>
-                </div>
-
-                {/* Who For / Skip */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-muted p-3 rounded">
-                    <h4 className="font-medium mb-2">Who This Is For</h4>
-                    <ul className="space-y-1">{formData.whoIsFor.map((i, idx) => <li key={idx} className="text-muted-foreground text-xs">• {i}</li>)}</ul>
-                  </div>
-                  <div className="bg-destructive/10 p-3 rounded">
-                    <h4 className="font-medium mb-2">Who Should Skip</h4>
-                    <ul className="space-y-1">{formData.whoShouldSkip.map((i, idx) => <li key={idx} className="text-muted-foreground text-xs">• {i}</li>)}</ul>
-                  </div>
-                </div>
-
-                {/* Why Now */}
-                <div className="bg-sidebar text-sidebar-foreground p-4 rounded-lg text-center">
-                  <h4 className="font-medium mb-2">Why This Matters Now</h4>
-                  <p className="text-sm text-sidebar-muted">{formData.whyNow}</p>
-                </div>
-
-                {/* CTA */}
-                <div className="text-center py-4">
-                  <button className="bg-primary text-primary-foreground px-8 py-3 rounded-lg font-semibold">
-                    {formData.ctaText}
-                  </button>
-                  <p className="text-muted-foreground text-xs mt-2">Free</p>
-                </div>
+            <CardContent className="p-0">
+              <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
+                <DuoLandingPageTemplate
+                  content={formData}
+                  workshop={SAMPLE_WORKSHOP_DUO}
+                  isPreview={true}
+                />
               </div>
             </CardContent>
           </Card>

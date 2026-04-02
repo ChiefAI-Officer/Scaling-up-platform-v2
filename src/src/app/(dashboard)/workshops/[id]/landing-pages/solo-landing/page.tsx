@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SoloLandingPageTemplate, SAMPLE_WORKSHOP_SOLO } from "@/components/templates/solo-landing-page-template";
 
 interface SoloLandingData {
   coachPhoto: string;
@@ -466,116 +467,20 @@ export default function SoloLandingEditor() {
           </div>
         </div>
 
+
         {/* Preview Panel - 3 columns */}
         <div className="col-span-3 sticky top-4">
           <Card className="overflow-hidden">
-            <CardHeader className="bg-muted border-b">
+            <CardHeader className="bg-muted border-b py-2">
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
-                {/* Hero */}
-                <div className="bg-sidebar text-sidebar-foreground p-8">
-                  <div className="grid grid-cols-2 gap-6 items-center">
-                    <div>
-                      <span className="bg-warning text-xs px-3 py-1 rounded-full uppercase font-semibold">
-                        Scaling Up
-                      </span>
-                      <h1 className="text-2xl font-bold mt-3 mb-2">
-                        {formData.heroTitle}
-                      </h1>
-                      <p className="text-sidebar-muted mb-4">{formData.heroSubtitle}</p>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span>📅</span>
-                          <span>{formData.eventDay}, {formData.eventDate}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>⏰</span>
-                          <span>{formData.eventTime} {formData.eventTimezone}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span>📍</span>
-                          <span>Virtual Workshop</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      {formData.coachPhoto ? (
-                        <img
-                          src={formData.coachPhoto}
-                          alt={formData.coachName}
-                          className="w-28 h-28 rounded-full object-cover mx-auto mb-3 border-4 border-sidebar-foreground"
-                        />
-                      ) : (
-                        <div className="w-28 h-28 rounded-full bg-primary/80 mx-auto mb-3 flex items-center justify-center text-sidebar-muted">
-                          No Photo
-                        </div>
-                      )}
-                      <div className="font-bold">{formData.coachName}</div>
-                      <div className="text-sidebar-muted text-sm">{formData.coachTitle}</div>
-                      {formData.partnerId && (formData.partnerName || formData.partnerLogoUrl || formData.partnerTagline) ? (
-                        <div className="mt-4 border-t border-sidebar-foreground/20 pt-4">
-                          <div className="text-[10px] uppercase tracking-wide text-sidebar-muted mb-2">
-                            In Partnership With
-                          </div>
-                          {formData.partnerLogoUrl ? (
-                            <img
-                              src={formData.partnerLogoUrl}
-                              alt={formData.partnerName || "Partner"}
-                              className="mx-auto h-10 w-auto object-contain rounded bg-card p-1"
-                            />
-                          ) : null}
-                          {formData.partnerName ? (
-                            <div className="mt-2 text-sm font-semibold text-sidebar-foreground">{formData.partnerName}</div>
-                          ) : null}
-                          {formData.partnerTagline ? (
-                            <div className="text-xs text-sidebar-muted">{formData.partnerTagline}</div>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className="p-6 grid grid-cols-3 gap-6">
-                  <div className="col-span-2">
-                    <h2 className="text-xl font-bold mb-4">
-                      {formData.aboutTitle || `Join us for the ${formData.heroTitle}`}
-                    </h2>
-                    <p className="text-muted-foreground mb-6">{formData.aboutDescription}</p>
-
-                    {formData.videoUrl && (
-                      <div className="bg-muted aspect-video rounded-lg mb-6 flex items-center justify-center">
-                        <span className="text-muted-foreground">Video: {formData.videoUrl}</span>
-                      </div>
-                    )}
-
-                    <h3 className="font-bold text-primary mb-3">What You&rsquo;ll Learn</h3>
-                    <ul className="space-y-2 text-sm text-foreground">
-                      {formData.benefits.map((b, i) => (
-                        <li key={i} className="flex items-start gap-2">
-                          <span className="text-primary">✓</span>
-                          <span>{b}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Registration Card */}
-                  <div className="bg-card border rounded-lg p-4 shadow-sm">
-                    <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground p-3 -m-4 mb-4 rounded-t-lg">
-                      <div className="text-xs uppercase font-semibold">Register Now</div>
-                    </div>
-                    <div className="text-sm font-bold mb-1">{formData.eventDate}</div>
-                    <div className="text-xs text-muted-foreground mb-3">with {formData.coachName}</div>
-                    <div className="text-lg font-bold text-primary mb-3">Free</div>
-                    <button className="w-full bg-primary text-primary-foreground py-2 rounded-md text-sm font-semibold">
-                      {formData.ctaText}
-                    </button>
-                  </div>
-                </div>
+                <SoloLandingPageTemplate
+                  content={formData}
+                  workshop={SAMPLE_WORKSHOP_SOLO}
+                  isPreview={true}
+                />
               </div>
             </CardContent>
           </Card>

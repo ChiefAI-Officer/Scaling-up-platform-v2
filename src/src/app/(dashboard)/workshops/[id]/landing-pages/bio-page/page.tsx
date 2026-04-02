@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BioPageTemplate } from "@/components/templates/bio-page-template";
 
 interface BioPageData {
   coachName: string;
@@ -338,63 +339,12 @@ export default function BioPageEditor() {
 
         {/* Preview Panel */}
         <div className="sticky top-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Preview</CardTitle>
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-muted border-b py-2">
+              <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="border rounded-lg overflow-hidden bg-card">
-                <div className="p-6 text-center">
-                  {/* Logo */}
-                  <div className="text-primary font-bold text-xl mb-8">
-                    SCALING UP COACHES
-                  </div>
-
-                  {/* Profile Image */}
-                  {formData.profileImageUrl ? (
-                    <img
-                      src={formData.profileImageUrl}
-                      alt={formData.coachName}
-                      className="w-32 h-32 rounded-full object-cover mx-auto mb-4 border-4 border-primary/20"
-                    />
-                  ) : (
-                    <div className="w-32 h-32 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
-                      <span className="text-muted-foreground">No Image</span>
-                    </div>
-                  )}
-
-                  {/* Name & Title */}
-                  <h1 className="text-2xl font-bold text-foreground mb-1">
-                    {formData.coachName || "Coach Name"}
-                  </h1>
-                  <p className="text-muted-foreground mb-6">
-                    {formData.coachTitle || "Scaling Up Certified Coach"}
-                  </p>
-
-                  {/* Biography */}
-                  <div className="text-left text-sm text-foreground space-y-3 mb-6 max-h-48 overflow-y-auto">
-                    {formData.biography ? (
-                      formData.biography.split("\n\n").map((para, i) => (
-                        <p key={i}>{para}</p>
-                      ))
-                    ) : (
-                      <p className="text-muted-foreground italic">Biography will appear here...</p>
-                    )}
-                  </div>
-
-                  {/* CTA Button */}
-                  {formData.showCtaButton && (
-                    <button className="bg-primary text-primary-foreground px-6 py-3 rounded-full font-medium hover:bg-primary/90 transition">
-                      {formData.ctaButtonText || "Book a Free Call"}
-                    </button>
-                  )}
-                </div>
-
-                {/* Footer */}
-                <div className="border-t px-6 py-4 text-center text-sm text-muted-foreground">
-                  © {new Date().getFullYear()} Scaling Up Coach {formData.coachName?.split(" ")[0]}
-                </div>
-              </div>
+            <CardContent className="p-0">
+              <BioPageTemplate content={formData} isPreview={true} />
             </CardContent>
           </Card>
         </div>
