@@ -1,6 +1,7 @@
 "use client";
 
 import { formatCurrency } from "@/lib/utils";
+import { stripPlaceholders } from "@/lib/template-utils";
 
 export interface SoloContent {
   heroTitle?: string;
@@ -37,13 +38,6 @@ export const SAMPLE_WORKSHOP_SOLO: SoloWorkshopData = {
   priceCents: 19900,
 };
 
-function stripPlaceholders(text: string | undefined): string {
-  if (!text) return "";
-  if (/\{\{[^}]+\}\}/.test(text)) {
-    console.warn(`[solo-landing-template] Unresolved placeholder: ${text.substring(0, 80)}`);
-  }
-  return text.replace(/\{\{[^}]+\}\}/g, "").replace(/\s{2,}/g, " ").trim();
-}
 
 export function SoloLandingPageTemplate({
   content,

@@ -1,6 +1,7 @@
 "use client";
 
 import { formatCurrency } from "@/lib/utils";
+import { stripPlaceholders } from "@/lib/template-utils";
 
 export interface DuoContent {
   heroTitle?: string;
@@ -26,13 +27,6 @@ export interface DuoWorkshopData {
   priceCents?: number | null;
 }
 
-function stripPlaceholders(text: string | undefined): string {
-  if (!text) return "";
-  if (/\{\{[^}]+\}\}/.test(text)) {
-    console.warn(`[duo-landing-template] Unresolved placeholder: ${text.substring(0, 80)}`);
-  }
-  return text.replace(/\{\{[^}]+\}\}/g, "").replace(/\s{2,}/g, " ").trim();
-}
 
 export const SAMPLE_WORKSHOP_DUO: DuoWorkshopData = {
   id: "preview",

@@ -1,6 +1,7 @@
 "use client";
 
 import { RegistrationForm } from "@/app/(public)/workshop/[slug]/registration-form";
+import { stripPlaceholders } from "@/lib/template-utils";
 
 export interface RegistrationContent {
   coachPhoto?: string;
@@ -35,13 +36,6 @@ export const SAMPLE_WORKSHOP_REGISTRATION: RegistrationWorkshopData = {
   format: "VIRTUAL",
 };
 
-function stripPlaceholders(text: string | undefined): string {
-  if (!text) return "";
-  if (/\{\{[^}]+\}\}/.test(text)) {
-    console.warn(`[registration-template] Unresolved placeholder: ${text.substring(0, 80)}`);
-  }
-  return text.replace(/\{\{[^}]+\}\}/g, "").replace(/\s{2,}/g, " ").trim();
-}
 
 export function RegistrationPageTemplate({
   content,

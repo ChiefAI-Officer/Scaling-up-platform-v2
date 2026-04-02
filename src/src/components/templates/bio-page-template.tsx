@@ -1,5 +1,7 @@
 "use client";
 
+import { stripPlaceholders } from "@/lib/template-utils";
+
 export interface BioContent {
   profileImageUrl?: string;
   coachName?: string;
@@ -10,13 +12,6 @@ export interface BioContent {
   ctaButtonText?: string;
 }
 
-function stripPlaceholders(text: string | undefined): string {
-  if (!text) return "";
-  if (/\{\{[^}]+\}\}/.test(text)) {
-    console.warn(`[bio-page-template] Unresolved placeholder: ${text.substring(0, 80)}`);
-  }
-  return text.replace(/\{\{[^}]+\}\}/g, "").replace(/\s{2,}/g, " ").trim();
-}
 
 export const SAMPLE_BIO_CONTENT: BioContent = {
   coachName: "Sample Coach",

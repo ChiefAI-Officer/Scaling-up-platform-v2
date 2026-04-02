@@ -1,5 +1,6 @@
 "use client";
 
+import { stripPlaceholders } from "@/lib/template-utils";
 import {
   buildGoogleCalendarUrl,
   parseDurationHours,
@@ -37,14 +38,6 @@ interface ThankYouPageTemplateProps {
   isPreview?: boolean;
 }
 
-/** Strip any unresolved {{variable}} placeholders — safety net with logging */
-function stripPlaceholders(text: string | undefined): string {
-  if (!text) return "";
-  if (/\{\{[^}]+\}\}/.test(text)) {
-    console.warn(`[thank-you-page] Unresolved placeholder in rendered content: ${text.substring(0, 80)}`);
-  }
-  return text.replace(/\{\{[^}]+\}\}/g, "").replace(/\s{2,}/g, " ").trim();
-}
 
 export const SAMPLE_WORKSHOP: ThankYouWorkshopData = {
   id: "preview",
