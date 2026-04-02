@@ -69,6 +69,13 @@ function extractNpsScore(answers: TypeformAnswer[]): number | null {
 }
 
 export async function POST(request: NextRequest) {
+  if (!process.env.TYPEFORM_WEBHOOK_SECRET) {
+    console.error(
+      "[Typeform Webhook] TYPEFORM_WEBHOOK_SECRET is not set — add it to your environment variables"
+    );
+    return NextResponse.json({ error: "Webhook misconfigured" }, { status: 503 });
+  }
+
   try {
     const body = await request.text();
     const signature = request.headers.get("typeform-signature");
@@ -177,7 +184,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Typeform webhook error:", error);
+    console.error("[Typeform Webhook] Unexpected error:", error);
     return NextResponse.json(
       { error: "Webhook handler failed" },
       { status: 500 }

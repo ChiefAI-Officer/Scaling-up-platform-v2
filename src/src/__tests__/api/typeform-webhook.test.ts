@@ -104,6 +104,23 @@ describe("Typeform webhook API", () => {
     process.env.TYPEFORM_WEBHOOK_SECRET = originalSecret;
   });
 
+  describe("configuration guard", () => {
+    beforeEach(() => {
+      // Override the outer beforeEach which sets TYPEFORM_WEBHOOK_SECRET = TEST_SECRET
+      delete process.env.TYPEFORM_WEBHOOK_SECRET;
+    });
+
+    it("returns 503 when TYPEFORM_WEBHOOK_SECRET is not set", async () => {
+      const body = JSON.stringify({ event_id: "x" });
+      const response = await POST(
+        buildRequest({ body, signature: "sha256=fakesig" })
+      );
+      expect(response.status).toBe(503);
+      const json = await response.json();
+      expect(json.error).toBe("Webhook misconfigured");
+    });
+  });
+
   // -----------------------------------------------------------------------
   // Signature verification
   // -----------------------------------------------------------------------
