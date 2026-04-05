@@ -272,8 +272,18 @@ export async function PATCH(
     }
 
     if (data.eventDate) {
-      // FIG-009: Bypass lead-time check when coach edits during INFO_REQUESTED flow
-      const shouldValidateDateChange = !(isCoach && existing.status === "INFO_REQUESTED");
+      // Past dates are always rejected, even for admins
+      if (new Date(data.eventDate) < new Date()) {
+        return NextResponse.json(
+          { success: false, error: "Event date cannot be in the past" },
+          { status: 400 }
+        );
+      }
+
+      // Admins bypass all lead-time checks; coaches bypass only in INFO_REQUESTED flow (FIG-009)
+      const shouldValidateDateChange =
+        !isPrivilegedRole(actor.role) &&
+        !(isCoach && existing.status === "INFO_REQUESTED");
 
       if (shouldValidateDateChange) {
         const dateChangeValidation = validateDateChange(

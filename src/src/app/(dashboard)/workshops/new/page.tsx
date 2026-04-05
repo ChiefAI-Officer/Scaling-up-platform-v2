@@ -56,13 +56,6 @@ const COUPON_PRESETS = [
   { value: "100", label: "100% discount (free access)" },
 ];
 
-function getMinEventDate(format: string): string {
-  const d = new Date();
-  const leadDays = format === "VIRTUAL" ? 60 : 90;
-  d.setDate(d.getDate() + leadDays);
-  return d.toISOString().split("T")[0];
-}
-
 function normalizeToken(input: string): string {
   return input.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ");
 }
@@ -767,7 +760,6 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                   value={formData.eventDate}
                   onChange={handleChange}
                   required
-                  min={getMinEventDate(formData.format)}
                   className="mt-1"
                 />
               </div>

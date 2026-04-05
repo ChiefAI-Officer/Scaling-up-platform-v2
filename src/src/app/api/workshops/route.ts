@@ -178,7 +178,8 @@ export async function POST(request: NextRequest) {
       new Date(data.eventDate),
       data.format
     );
-    if (!leadTimeValidation.valid) {
+    // Admins bypass the minimum lead-time threshold but are still blocked from past dates
+    if (!leadTimeValidation.valid && (!isPrivilegedRole(actor.role) || leadTimeValidation.leadTimeDays < 0)) {
       return NextResponse.json(
         {
           success: false,

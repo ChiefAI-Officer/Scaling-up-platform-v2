@@ -117,12 +117,14 @@ describe("Workshops API", () => {
   });
 
   describe("POST /api/workshops", () => {
-    it("rejects virtual workshops below the 60-day minimum lead time", async () => {
+    it("blocks coaches from using POST /api/workshops (admin-only endpoint)", async () => {
+      // POST /api/workshops is admin-only; coaches use /api/approvals instead.
+      // The 403 fires before any lead-time logic runs.
       (getApiActor as jest.Mock).mockResolvedValue({
-        userId: "admin-1",
-        email: "admin@example.com",
-        role: "ADMIN",
-        coachId: null,
+        userId: "coach-user-1",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
       });
 
       const fiftyDaysFromNow = new Date(
@@ -142,19 +144,17 @@ describe("Workshops API", () => {
           })
         )
       );
-      const body = await response.json();
 
-      expect(response.status).toBe(409);
-      expect(body.requiresApproval).toBe(true);
-      expect(body.requiredLeadTimeDays).toBe(60);
+      expect(response.status).toBe(403);
     });
 
-    it("rejects in-person workshops below the 90-day minimum lead time", async () => {
+    it("blocks staff from using POST /api/workshops when below the minimum lead time — still returns 403 for non-admin privileged roles", async () => {
+      // Coaches reach 403 before lead-time; this test documents coach-only access restriction.
       (getApiActor as jest.Mock).mockResolvedValue({
-        userId: "admin-1",
-        email: "admin@example.com",
-        role: "ADMIN",
-        coachId: null,
+        userId: "coach-user-1",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
       });
 
       const eightyDaysFromNow = new Date(
@@ -171,11 +171,81 @@ describe("Workshops API", () => {
           })
         )
       );
+
+      expect(response.status).toBe(403);
+    });
+
+    it("admin can create a workshop with tomorrow's date (bypasses lead-time threshold)", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      (db.coach.findUnique as jest.Mock).mockResolvedValue({
+        id: "coach-1",
+        email: "coach@example.com",
+        firstName: "Jamie",
+        lastName: "Coach",
+        linkedinUrl: null,
+        certifications: [{ id: "cert-1", status: "ACTIVE" }],
+      });
+      (db.workshopType.findUnique as jest.Mock).mockResolvedValue({
+        id: "wt-1",
+        slug: "scaling-up",
+      });
+      (db.workshop.create as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        title: "Scaling Up Growth Workshop",
+        coachId: "coach-1",
+        workshopCode: "WS-2026-A1B2",
+      });
+      (db.workshop.update as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        landingPageSlug: "scaling-up-growth-workshop-ws-1",
+      });
+
+      const tomorrow = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString();
+      const payload = buildWorkshopPayload(tomorrow);
+
+      const response = await POST(
+        asPostRequest(
+          new Request("http://localhost/api/workshops", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        )
+      );
+
+      expect(response.status).toBe(201);
+      expect(db.workshop.create).toHaveBeenCalled();
+    });
+
+    it("admin cannot create a workshop with yesterday's date (past dates still blocked)", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+
+      const yesterday = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+      const payload = buildWorkshopPayload(yesterday);
+
+      const response = await POST(
+        asPostRequest(
+          new Request("http://localhost/api/workshops", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        )
+      );
       const body = await response.json();
 
-      expect(response.status).toBe(409);
-      expect(body.requiresApproval).toBe(true);
-      expect(body.requiredLeadTimeDays).toBe(90);
+      expect(response.status).toBe(400);
+      expect(body.success).toBe(false);
     });
 
     it("creates workshop when in-person lead time and certification checks pass", async () => {

@@ -59,10 +59,19 @@ describe("Workshop detail API", () => {
   });
 
   describe("PATCH /api/workshops/[id]", () => {
-    it("requires approval for date changes when original workshop is within lead-time window", async () => {
+    it("requires approval for coach date changes when original workshop is within the 14-day window", async () => {
+      // Use COACH actor — admins bypass date validation entirely
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "coach-user-1",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
       (db.workshop.findUnique as jest.Mock).mockResolvedValue({
         id: "ws-1",
         format: "IN_PERSON",
+        status: "REQUESTED",
+        coachId: "coach-1",
         eventDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
       });
 
@@ -87,10 +96,19 @@ describe("Workshop detail API", () => {
       expect(db.workshop.update).not.toHaveBeenCalled();
     });
 
-    it("updates workshop when date change is outside approval window", async () => {
+    it("coach can update workshop when date change is outside the approval window", async () => {
+      // Use COACH actor so the date validation logic actually runs (admins bypass it)
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "coach-user-1",
+        email: "coach@example.com",
+        role: "COACH",
+        coachId: "coach-1",
+      });
       (db.workshop.findUnique as jest.Mock).mockResolvedValue({
         id: "ws-1",
         format: "VIRTUAL",
+        status: "REQUESTED",
+        coachId: "coach-1",
         eventDate: new Date(Date.now() + 40 * 24 * 60 * 60 * 1000),
       });
       (db.workshop.update as jest.Mock).mockResolvedValue({
@@ -104,11 +122,70 @@ describe("Workshop detail API", () => {
             method: "PATCH",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
-              title: "Updated title",
               eventDate: new Date(
                 Date.now() + 70 * 24 * 60 * 60 * 1000
               ).toISOString(),
             }),
+          })
+        ),
+        routeParams("ws-1")
+      );
+
+      expect(response.status).toBe(200);
+      expect(db.workshop.update).toHaveBeenCalled();
+    });
+
+    it("admin cannot PATCH a workshop date to yesterday (past-date guard still enforced)", async () => {
+      // Default actor is ADMIN (set in beforeEach)
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        format: "IN_PERSON",
+        status: "AWAITING_APPROVAL",
+        coachId: "coach-1",
+        eventDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      });
+
+      const yesterday = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+
+      const response = await PATCH(
+        asPatchRequest(
+          new Request("http://localhost/api/workshops/ws-1", {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ eventDate: yesterday }),
+          })
+        ),
+        routeParams("ws-1")
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.success).toBe(false);
+      expect(db.workshop.update).not.toHaveBeenCalled();
+    });
+
+    it("admin can PATCH a workshop date to tomorrow (bypasses lead-time threshold)", async () => {
+      // Default actor is ADMIN (set in beforeEach)
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        format: "IN_PERSON",
+        status: "AWAITING_APPROVAL",
+        coachId: "coach-1",
+        eventDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      });
+      (db.workshop.update as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        title: "Scaling Up Workshop",
+      });
+
+      const tomorrow = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString();
+
+      const response = await PATCH(
+        asPatchRequest(
+          new Request("http://localhost/api/workshops/ws-1", {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ eventDate: tomorrow }),
           })
         ),
         routeParams("ws-1")
