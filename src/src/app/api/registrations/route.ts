@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const where = { workshopId };
+    const where = { workshopId, paymentStatus: { not: "PENDING" as const } };
 
     const [registrations, total] = await Promise.all([
       db.registration.findMany({
