@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-type ApprovalStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" | "INFO_REQUESTED";
+type ApprovalStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" | "INFO_REQUESTED" | "COUNTER_OFFERED";
 type FilterStatus = ApprovalStatus | "ALL";
 
 interface Approval {
@@ -18,6 +18,8 @@ interface Approval {
   requestedAt: string;
   escalatedAt?: string | null;
   coachResponse?: string | null; // MR-33
+  counterOfferCents?: number | null;
+  counterOfferNote?: string | null;
   notes?: string | null;
   requestData?: Record<string, unknown> | null;
 }
@@ -26,7 +28,7 @@ interface ApprovalsApiResponse {
   approvals?: Approval[];
 }
 
-const FILTERS: FilterStatus[] = ["PENDING", "INFO_REQUESTED", "APPROVED", "DENIED", "ALL"];
+const FILTERS: FilterStatus[] = ["PENDING", "COUNTER_OFFERED", "INFO_REQUESTED", "APPROVED", "DENIED", "ALL"];
 
 export default function ApprovalsPage() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
@@ -37,6 +39,9 @@ export default function ApprovalsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [infoModalId, setInfoModalId] = useState<string | null>(null);
   const [infoQuestion, setInfoQuestion] = useState("");
+  const [counterOfferModalId, setCounterOfferModalId] = useState<string | null>(null);
+  const [counterOfferAmount, setCounterOfferAmount] = useState("");
+  const [counterOfferNoteInput, setCounterOfferNoteInput] = useState("");
 
   const loadApprovals = useCallback(async (status: FilterStatus) => {
     setIsLoading(true);
@@ -108,6 +113,41 @@ export default function ApprovalsPage() {
     setInfoQuestion("");
   };
 
+  const handleCounterOfferSubmit = async () => {
+    if (!counterOfferModalId || !counterOfferAmount.trim()) return;
+    const cents = Math.round(parseFloat(counterOfferAmount) * 100);
+    if (isNaN(cents) || cents <= 0) return;
+    setProcessing(counterOfferModalId);
+    setActionError(null);
+    try {
+      const response = await fetch(`/api/approvals/${counterOfferModalId}/respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "COUNTER_OFFER",
+          counterOfferCents: cents,
+          counterOfferNote: counterOfferNoteInput.trim() || undefined,
+        }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setActionError((payload as { error?: string }).error || "Counter-offer failed");
+        return;
+      }
+      setApprovals((prev) =>
+        prev.map((a) => a.id === counterOfferModalId ? { ...a, status: "COUNTER_OFFERED" as ApprovalStatus } : a)
+      );
+      setCounterOfferModalId(null);
+      setCounterOfferAmount("");
+      setCounterOfferNoteInput("");
+    } catch (err) {
+      console.error("Counter-offer failed:", err);
+      setActionError("Unexpected error — please try again");
+    } finally {
+      setProcessing(null);
+    }
+  };
+
   const titleText = useMemo(
     () => (filter === "ALL" ? "all approvals" : `${filter.toLowerCase()} approvals`),
     [filter]
@@ -138,6 +178,8 @@ export default function ApprovalsPage() {
         return "bg-destructive/10 text-destructive";
       case "INFO_REQUESTED":
         return "bg-warning/10 text-warning";
+      case "COUNTER_OFFERED":
+        return "bg-amber-100 text-amber-800 border border-amber-300";
       case "EXPIRED":
         return "bg-muted text-muted-foreground";
       default:
@@ -147,6 +189,7 @@ export default function ApprovalsPage() {
 
   const getStatusLabel = (status: ApprovalStatus) => {
     if (status === "INFO_REQUESTED") return "Awaiting Coach Response";
+    if (status === "COUNTER_OFFERED") return "Counter-Offered";
     return status.charAt(0) + status.slice(1).toLowerCase();
   };
 
@@ -163,6 +206,49 @@ export default function ApprovalsPage() {
         <div className="mb-4 flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <span>{actionError}</span>
           <button onClick={() => setActionError(null)} className="ml-4 font-bold">×</button>
+        </div>
+      )}
+
+      {/* Counter-Offer Modal */}
+      {counterOfferModalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl border border-border mx-4">
+            <h3 className="text-lg font-semibold text-foreground mb-2">Send Counter-Offer</h3>
+            <p className="text-sm text-muted-foreground mb-4">Propose an alternative price for this custom pricing request.</p>
+            <label className="block text-sm font-medium text-foreground mb-1">Counter-offer price (USD)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary mb-3"
+              placeholder="e.g. 450.00"
+              value={counterOfferAmount}
+              onChange={(e) => setCounterOfferAmount(e.target.value)}
+            />
+            <label className="block text-sm font-medium text-foreground mb-1">Note (optional)</label>
+            <textarea
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              rows={3}
+              placeholder="Explain your offer..."
+              value={counterOfferNoteInput}
+              onChange={(e) => setCounterOfferNoteInput(e.target.value)}
+            />
+            <div className="flex gap-3 mt-4 justify-end">
+              <button
+                className="px-4 py-2 rounded-md text-sm font-medium border border-border text-foreground hover:bg-accent"
+                onClick={() => { setCounterOfferModalId(null); setCounterOfferAmount(""); setCounterOfferNoteInput(""); }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 rounded-md text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                onClick={handleCounterOfferSubmit}
+                disabled={!counterOfferAmount.trim() || processing === counterOfferModalId}
+              >
+                {processing === counterOfferModalId ? "Sending..." : "Send Counter-Offer"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -209,7 +295,7 @@ export default function ApprovalsPage() {
             }`}
             onClick={() => setFilter(status)}
           >
-            {status === "ALL" ? "All" : status === "INFO_REQUESTED" ? "Info Requested" : status.charAt(0) + status.slice(1).toLowerCase()}
+            {status === "ALL" ? "All" : status === "INFO_REQUESTED" ? "Info Requested" : status === "COUNTER_OFFERED" ? "Counter-Offered" : status.charAt(0) + status.slice(1).toLowerCase()}
           </button>
         ))}
       </div>
@@ -248,6 +334,11 @@ export default function ApprovalsPage() {
                   {approval.type === "CUSTOM_PRICING" && typeof approval.requestData?.newPriceCents === "number" && (
                     <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
                       Custom Price: ${(approval.requestData.newPriceCents / 100).toLocaleString()}
+                    </span>
+                  )}
+                  {approval.status === "COUNTER_OFFERED" && typeof approval.counterOfferCents === "number" && (
+                    <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-500 text-white">
+                      Offered: ${(approval.counterOfferCents / 100).toLocaleString()}
                     </span>
                   )}
                   &nbsp; {approval.coachName}
@@ -312,6 +403,15 @@ export default function ApprovalsPage() {
                     >
                       Request Info
                     </button>
+                    {approval.type === "CUSTOM_PRICING" && (
+                      <button
+                        className="px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => { setCounterOfferModalId(approval.id); setCounterOfferAmount(""); setCounterOfferNoteInput(""); }}
+                        disabled={processing === approval.id}
+                      >
+                        Counter-Offer
+                      </button>
+                    )}
                   </>
                 ) : (
                   <>

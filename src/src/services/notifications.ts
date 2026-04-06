@@ -793,6 +793,141 @@ export async function sendApprovalCoachRespondedEmail(data: {
     });
 }
 
+export async function sendCounterOfferEmail(data: {
+    coachEmail: string;
+    coachName: string;
+    workshopTitle: string;
+    workshopId: string;
+    originalPriceCents: number;
+    counterOfferCents: number;
+    counterOfferNote?: string;
+}): Promise<void> {
+    const portalUrl = `${process.env.APP_URL}/portal/workshops/${data.workshopId}`;
+    const originalFormatted = `$${(data.originalPriceCents / 100).toFixed(2)}`;
+    const offerFormatted = `$${(data.counterOfferCents / 100).toFixed(2)}`;
+    const noteBlock = data.counterOfferNote
+        ? `<div style="background:#fffbeb;border-left:4px solid #f59e0b;padding:16px;margin:20px 0;border-radius:4px;">
+            <p style="margin:0;color:#92400e;font-weight:600;">Note from admin:</p>
+            <p style="margin:8px 0 0;color:#374151;">${escapeHtml(data.counterOfferNote)}</p>
+          </div>`
+        : "";
+    const html = `
+    <div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">
+      <h2 style="color:#1a1a1a;">Counter-Offer on Your Price Request</h2>
+      <p style="color:#4a4a4a;">Hi <strong>${escapeHtml(data.coachName)}</strong>, the admin has sent a counter-offer for <strong>${escapeHtml(data.workshopTitle)}</strong>.</p>
+      <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+        <tr>
+          <td style="padding:12px;border:1px solid #e5e7eb;color:#9ca3af;text-decoration:line-through;">Your request: ${originalFormatted}</td>
+        </tr>
+        <tr>
+          <td style="padding:12px;border:1px solid #f59e0b;background:#fffbeb;color:#d97706;font-weight:700;font-size:18px;">Admin offering: ${offerFormatted}</td>
+        </tr>
+      </table>
+      ${noteBlock}
+      <p style="color:#4a4a4a;">Visit your portal to accept or decline this offer.</p>
+      <br/>
+      <div style="text-align:center;">
+        <a href="${portalUrl}" style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
+          Review Offer in Portal
+        </a>
+      </div>
+      <br/>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+      <p style="color:#9ca3af;font-size:12px;">&mdash; Scaling Up Workshop Platform</p>
+    </div>
+  `;
+    await sendNotificationEmail({
+        to: data.coachEmail,
+        subject: `Counter-Offer: "${data.workshopTitle}" — Please Review`,
+        html,
+        telemetry: {
+            workshopId: data.workshopId,
+            recipientRole: "COACH",
+            metadata: { type: "counter_offer", workshopId: data.workshopId },
+        },
+    });
+}
+
+export async function sendCounterOfferAcceptedEmail(data: {
+    adminEmail: string;
+    coachName: string;
+    workshopTitle: string;
+    approvalId: string;
+    acceptedPriceCents: number;
+}): Promise<void> {
+    const approvalsUrl = `${process.env.APP_URL}/admin/approvals`;
+    const priceFormatted = `$${(data.acceptedPriceCents / 100).toFixed(2)}`;
+    const html = `
+    <div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">
+      <h2 style="color:#1a1a1a;">Counter-Offer Accepted</h2>
+      <p style="color:#4a4a4a;"><strong>${escapeHtml(data.coachName)}</strong> has accepted your counter-offer of <strong>${priceFormatted}</strong> for <strong>${escapeHtml(data.workshopTitle)}</strong>.</p>
+      <div style="background:#f0fdf4;border-left:4px solid #22c55e;padding:16px;margin:20px 0;border-radius:4px;">
+        <p style="margin:0;color:#166534;font-weight:600;">The price has been applied to the workshop.</p>
+      </div>
+      <br/>
+      <div style="text-align:center;">
+        <a href="${approvalsUrl}" style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
+          View Approval Queue
+        </a>
+      </div>
+      <br/>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+      <p style="color:#9ca3af;font-size:12px;">&mdash; Scaling Up Workshop Platform</p>
+    </div>
+  `;
+    await sendNotificationEmail({
+        to: data.adminEmail,
+        subject: `Counter-Offer Accepted: "${data.workshopTitle}" — ${priceFormatted}`,
+        html,
+        telemetry: {
+            recipientRole: "STAFF",
+            metadata: { type: "counter_offer_accepted", approvalId: data.approvalId },
+        },
+    });
+}
+
+export async function sendCoachDeclinedCounterEmail(data: {
+    adminEmail: string;
+    coachName: string;
+    workshopTitle: string;
+    approvalId: string;
+    newPriceCents?: number;
+}): Promise<void> {
+    const approvalsUrl = `${process.env.APP_URL}/admin/approvals`;
+    const isNewOffer = typeof data.newPriceCents === "number";
+    const newPriceFormatted = isNewOffer ? `$${(data.newPriceCents! / 100).toFixed(2)}` : "";
+    const subject = isNewOffer
+        ? `New Counter-Offer from Coach: "${data.workshopTitle}"`
+        : `Counter-Offer Declined: "${data.workshopTitle}"`;
+    const bodyText = isNewOffer
+        ? `<strong>${escapeHtml(data.coachName)}</strong> declined your counter-offer and proposed a new price of <strong>${newPriceFormatted}</strong> for <strong>${escapeHtml(data.workshopTitle)}</strong>. The approval is back in the pending queue.`
+        : `<strong>${escapeHtml(data.coachName)}</strong> declined your counter-offer for <strong>${escapeHtml(data.workshopTitle)}</strong> with no alternative price. The negotiation has ended.`;
+    const html = `
+    <div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">
+      <h2 style="color:#1a1a1a;">${isNewOffer ? "New Counter-Offer from Coach" : "Counter-Offer Declined"}</h2>
+      <p style="color:#4a4a4a;">${bodyText}</p>
+      <br/>
+      <div style="text-align:center;">
+        <a href="${approvalsUrl}" style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px;">
+          View Approval Queue
+        </a>
+      </div>
+      <br/>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+      <p style="color:#9ca3af;font-size:12px;">&mdash; Scaling Up Workshop Platform</p>
+    </div>
+  `;
+    await sendNotificationEmail({
+        to: data.adminEmail,
+        subject,
+        html,
+        telemetry: {
+            recipientRole: "STAFF",
+            metadata: { type: isNewOffer ? "counter_declined_new_price" : "counter_declined_final", approvalId: data.approvalId },
+        },
+    });
+}
+
 // ============================================
 // Internal Helpers
 // ============================================

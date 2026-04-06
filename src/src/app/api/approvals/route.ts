@@ -29,7 +29,7 @@ const CreateApprovalSchema = z.object({
     customPricingNotes: z.string().optional(),
 });
 
-const APPROVAL_STATUSES = new Set(["PENDING", "APPROVED", "DENIED", "EXPIRED"]);
+const APPROVAL_STATUSES = new Set(["PENDING", "APPROVED", "DENIED", "EXPIRED", "INFO_REQUESTED", "COUNTER_OFFERED"]);
 
 function safeJsonParse(raw: string): unknown {
     try {
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
                 : 50;
 
         const approvals = await db.approvalQueue.findMany({
-            where: includeAll ? {} : { status: status as "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" },
+            where: includeAll ? {} : { status: status as "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" | "INFO_REQUESTED" | "COUNTER_OFFERED" },
             orderBy: { requestedAt: "desc" },
             take: limit,
             include: {
@@ -195,6 +195,8 @@ export async function GET(request: NextRequest) {
                     requestedBy: normalized.requestedBy || a.requestedBy || a.coach?.email || "unknown",
                     responseReason: a.responseReason,
                     coachResponse: a.coachResponse, // MR-33
+                    counterOfferCents: a.counterOfferCents ?? null,
+                    counterOfferNote: a.counterOfferNote ?? null,
                     notes: a.notes,
                 };
             }),

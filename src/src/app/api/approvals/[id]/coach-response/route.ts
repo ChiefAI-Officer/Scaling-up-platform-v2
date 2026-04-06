@@ -3,23 +3,31 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { getApiActor } from "@/lib/authorization";
-import { sendApprovalCoachRespondedEmail } from "@/services/notifications";
+import {
+    sendApprovalCoachRespondedEmail,
+    sendCounterOfferAcceptedEmail,
+    sendCoachDeclinedCounterEmail,
+} from "@/services/notifications";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { runAutoBuild } from "@/lib/auto-build-service";
+import { inngest } from "@/inngest/client";
 
-const CoachResponseSchema = z.object({
-    response: z.string().min(1, "Response cannot be empty").max(2000),
-});
+const CoachResponseSchema = z.discriminatedUnion("action", [
+    z.object({ action: z.literal("INFO_RESPONSE"), response: z.string().min(1, "Response cannot be empty").max(2000) }),
+    z.object({ action: z.literal("ACCEPT_COUNTER") }),
+    z.object({ action: z.literal("DECLINE_COUNTER"), newPriceCents: z.number().int().min(1).max(10_000_000).optional() }),
+]);
+
+const PRE_BUILD_STATUSES = ["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED"];
 
 /**
  * POST /api/approvals/[id]/coach-response
- * Coach submits a response to an INFO_REQUESTED approval.
- * Resets approval status to PENDING and workshop status to AWAITING_APPROVAL.
+ * Coach submits a response to an INFO_REQUESTED or COUNTER_OFFERED approval.
  */
 export async function POST(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    // Apply rate limiting
     const rateLimit = await withRateLimit(request, RateLimits.standard);
     if (!rateLimit.allowed) {
         return NextResponse.json(
@@ -38,7 +46,15 @@ export async function POST(
 
         const approval = await db.approvalQueue.findUnique({
             where: { id },
-            select: { id: true, coachId: true, workshopId: true, status: true },
+            select: {
+                id: true,
+                coachId: true,
+                workshopId: true,
+                status: true,
+                counterOfferCents: true,
+                counterOfferNote: true,
+                requestData: true,
+            },
         });
 
         if (!approval) {
@@ -50,7 +66,7 @@ export async function POST(
             return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: rateLimit.headers });
         }
 
-        if (approval.status !== "INFO_REQUESTED") {
+        if (!["INFO_REQUESTED", "COUNTER_OFFERED"].includes(approval.status)) {
             return NextResponse.json(
                 { error: "This approval is not awaiting a response" },
                 { status: 400, headers: rateLimit.headers }
@@ -64,57 +80,260 @@ export async function POST(
             return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400, headers: rateLimit.headers });
         }
 
-        const { response } = CoachResponseSchema.parse(body);
+        const parsed = CoachResponseSchema.parse(body);
 
-        // Save response and reset approval to PENDING
-        await db.approvalQueue.update({
-            where: { id },
-            data: {
-                coachResponse: response,
-                status: "PENDING",
-            },
-        });
-
-        // Reset workshop status to AWAITING_APPROVAL so it shows in admin queue
-        if (approval.workshopId) {
-            await db.workshop.update({
-                where: { id: approval.workshopId },
-                data: { status: "AWAITING_APPROVAL" },
-            });
-        }
-
-        // Notify admin (non-blocking)
-        {
-            const coach = await db.coach.findUnique({
-                where: { id: approval.coachId },
-                select: { firstName: true, lastName: true },
-            });
-            let workshopTitle = "Workshop";
-            if (approval.workshopId) {
-                const w = await db.workshop.findUnique({
-                    where: { id: approval.workshopId },
-                    select: { title: true },
-                });
-                if (w) workshopTitle = w.title;
+        // ── INFO_RESPONSE ──────────────────────────────────────────────────────
+        if (parsed.action === "INFO_RESPONSE") {
+            if (approval.status !== "INFO_REQUESTED") {
+                return NextResponse.json(
+                    { error: "INFO_RESPONSE only allowed on INFO_REQUESTED approvals" },
+                    { status: 400, headers: rateLimit.headers }
+                );
             }
-            await sendApprovalCoachRespondedEmail({
-                adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
-                coachName: coach ? `${coach.firstName} ${coach.lastName}` : "Coach",
-                workshopTitle,
-                approvalId: id,
-                coachResponse: response,
-            }).catch((err) => console.error("Failed to send coach responded email:", err));
+
+            await db.approvalQueue.update({
+                where: { id },
+                data: { coachResponse: parsed.response, status: "PENDING" },
+            });
+
+            if (approval.workshopId) {
+                await db.workshop.update({
+                    where: { id: approval.workshopId },
+                    data: { status: "AWAITING_APPROVAL" },
+                });
+            }
+
+            {
+                const coach = await db.coach.findUnique({
+                    where: { id: approval.coachId },
+                    select: { firstName: true, lastName: true },
+                });
+                let workshopTitle = "Workshop";
+                if (approval.workshopId) {
+                    const w = await db.workshop.findUnique({
+                        where: { id: approval.workshopId },
+                        select: { title: true },
+                    });
+                    if (w) workshopTitle = w.title;
+                }
+                await sendApprovalCoachRespondedEmail({
+                    adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+                    coachName: coach ? `${coach.firstName} ${coach.lastName}` : "Coach",
+                    workshopTitle,
+                    approvalId: id,
+                    coachResponse: parsed.response,
+                }).catch((err) => console.error("Failed to send coach responded email:", err));
+            }
+
+            await logAudit({
+                entityType: "ApprovalQueue",
+                entityId: id,
+                action: "COACH_RESPONSE",
+                performedBy: actor.email,
+                changes: { previousStatus: "INFO_REQUESTED", newStatus: "PENDING" },
+            });
+
+            return NextResponse.json({ success: true, message: "Response submitted successfully" }, { headers: rateLimit.headers });
         }
 
-        await logAudit({
-            entityType: "ApprovalQueue",
-            entityId: id,
-            action: "COACH_RESPONSE",
-            performedBy: actor.email,
-            changes: { previousStatus: "INFO_REQUESTED", newStatus: "PENDING" },
-        });
+        // ── ACCEPT_COUNTER ────────────────────────────────────────────────────
+        if (parsed.action === "ACCEPT_COUNTER") {
+            if (approval.status !== "COUNTER_OFFERED") {
+                return NextResponse.json(
+                    { error: "Cannot accept counter-offer — approval is not in COUNTER_OFFERED status" },
+                    { status: 400, headers: rateLimit.headers }
+                );
+            }
 
-        return NextResponse.json({ success: true, message: "Response submitted successfully" }, { headers: rateLimit.headers });
+            const counterCents = approval.counterOfferCents;
+            if (!counterCents) {
+                return NextResponse.json({ error: "No counter-offer amount found" }, { status: 400, headers: rateLimit.headers });
+            }
+
+            // Atomic: update workshop price + set approval to APPROVED
+            await db.$transaction(async (tx) => {
+                if (approval.workshopId) {
+                    await tx.workshop.update({
+                        where: { id: approval.workshopId },
+                        data: { priceCents: counterCents, isFree: counterCents === 0 },
+                    });
+                }
+                await tx.approvalQueue.update({
+                    where: { id },
+                    data: {
+                        status: "APPROVED",
+                        counterOfferCents: null,
+                        counterOfferNote: null,
+                        respondedAt: new Date(),
+                        respondedBy: actor.email,
+                    },
+                });
+            });
+
+            // Auto-build trigger if workshop hasn't been built yet
+            if (approval.workshopId) {
+                const ws = await db.workshop.findUnique({
+                    where: { id: approval.workshopId },
+                    select: { status: true },
+                });
+                if (ws && PRE_BUILD_STATUSES.includes(ws.status)) {
+                    try {
+                        await runAutoBuild(approval.workshopId);
+                    } catch (err) {
+                        console.error("[AUTO-BUILD] ACCEPT_COUNTER inline build failed:", err);
+                    }
+                    try {
+                        await inngest.send({
+                            name: "workshop/approved",
+                            data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId },
+                        });
+                    } catch (err) {
+                        console.error("[INNGEST] ACCEPT_COUNTER backup event failed:", err);
+                    }
+                }
+            }
+
+            // Notify admin (non-blocking)
+            {
+                const coach = await db.coach.findUnique({
+                    where: { id: approval.coachId },
+                    select: { firstName: true, lastName: true },
+                });
+                let workshopTitle = "Workshop";
+                if (approval.workshopId) {
+                    const w = await db.workshop.findUnique({
+                        where: { id: approval.workshopId },
+                        select: { title: true },
+                    });
+                    if (w) workshopTitle = w.title;
+                }
+                await sendCounterOfferAcceptedEmail({
+                    adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+                    coachName: coach ? `${coach.firstName} ${coach.lastName}` : "Coach",
+                    workshopTitle,
+                    approvalId: id,
+                    acceptedPriceCents: counterCents,
+                }).catch((err) => console.error("Failed to send counter accepted email:", err));
+            }
+
+            await logAudit({
+                entityType: "ApprovalQueue",
+                entityId: id,
+                action: "ACCEPT_COUNTER",
+                performedBy: actor.email,
+                changes: { previousStatus: "COUNTER_OFFERED", newStatus: "APPROVED", acceptedPriceCents: counterCents },
+            });
+
+            return NextResponse.json({ success: true, status: "APPROVED" }, { headers: rateLimit.headers });
+        }
+
+        // ── DECLINE_COUNTER ───────────────────────────────────────────────────
+        if (parsed.action === "DECLINE_COUNTER") {
+            if (approval.status !== "COUNTER_OFFERED") {
+                return NextResponse.json(
+                    { error: "Cannot decline counter-offer — approval is not in COUNTER_OFFERED status" },
+                    { status: 400, headers: rateLimit.headers }
+                );
+            }
+
+            if (parsed.newPriceCents) {
+                // Coach proposes a new price — reset to PENDING with updated requestData
+                let reqData: Record<string, unknown> = {};
+                try {
+                    reqData = JSON.parse(approval.requestData ?? "{}") as Record<string, unknown>;
+                } catch { /* ignore */ }
+                reqData.newPriceCents = parsed.newPriceCents;
+
+                await db.approvalQueue.update({
+                    where: { id },
+                    data: {
+                        requestData: JSON.stringify(reqData),
+                        status: "PENDING",
+                        counterOfferCents: null,
+                        counterOfferNote: null,
+                        respondedBy: null,
+                        respondedAt: null,
+                    },
+                });
+
+                // Notify admin (non-blocking)
+                {
+                    const coach = await db.coach.findUnique({
+                        where: { id: approval.coachId },
+                        select: { firstName: true, lastName: true },
+                    });
+                    let workshopTitle = "Workshop";
+                    if (approval.workshopId) {
+                        const w = await db.workshop.findUnique({
+                            where: { id: approval.workshopId },
+                            select: { title: true },
+                        });
+                        if (w) workshopTitle = w.title;
+                    }
+                    await sendCoachDeclinedCounterEmail({
+                        adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+                        coachName: coach ? `${coach.firstName} ${coach.lastName}` : "Coach",
+                        workshopTitle,
+                        approvalId: id,
+                        newPriceCents: parsed.newPriceCents,
+                    }).catch((err) => console.error("Failed to send coach declined counter email:", err));
+                }
+
+                await logAudit({
+                    entityType: "ApprovalQueue",
+                    entityId: id,
+                    action: "DECLINE_COUNTER",
+                    performedBy: actor.email,
+                    changes: { previousStatus: "COUNTER_OFFERED", newStatus: "PENDING", newPriceCents: parsed.newPriceCents },
+                });
+
+                return NextResponse.json({ success: true, status: "PENDING" }, { headers: rateLimit.headers });
+            } else {
+                // No new price — final decline, end negotiation
+                await db.approvalQueue.update({
+                    where: { id },
+                    data: {
+                        status: "DENIED",
+                        counterOfferCents: null,
+                        counterOfferNote: null,
+                    },
+                });
+
+                // Notify admin (non-blocking)
+                {
+                    const coach = await db.coach.findUnique({
+                        where: { id: approval.coachId },
+                        select: { firstName: true, lastName: true },
+                    });
+                    let workshopTitle = "Workshop";
+                    if (approval.workshopId) {
+                        const w = await db.workshop.findUnique({
+                            where: { id: approval.workshopId },
+                            select: { title: true },
+                        });
+                        if (w) workshopTitle = w.title;
+                    }
+                    await sendCoachDeclinedCounterEmail({
+                        adminEmail: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+                        coachName: coach ? `${coach.firstName} ${coach.lastName}` : "Coach",
+                        workshopTitle,
+                        approvalId: id,
+                    }).catch((err) => console.error("Failed to send coach declined counter email:", err));
+                }
+
+                await logAudit({
+                    entityType: "ApprovalQueue",
+                    entityId: id,
+                    action: "DECLINE_COUNTER",
+                    performedBy: actor.email,
+                    changes: { previousStatus: "COUNTER_OFFERED", newStatus: "DENIED" },
+                });
+
+                return NextResponse.json({ success: true, status: "DENIED" }, { headers: rateLimit.headers });
+            }
+        }
+
+        return NextResponse.json({ error: "Unhandled action" }, { status: 400, headers: rateLimit.headers });
     } catch (error) {
         if (error instanceof z.ZodError) {
             return NextResponse.json(

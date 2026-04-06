@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import crypto from "crypto";
 import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
-import { sendWorkshopApprovedEmail, sendWorkshopDeniedEmail, sendApprovalInfoRequestEmail } from "@/services/notifications";
+import { sendWorkshopApprovedEmail, sendWorkshopDeniedEmail, sendApprovalInfoRequestEmail, sendCounterOfferEmail } from "@/services/notifications";
 import { inngest } from "@/inngest/client";
 import { runAutoBuild, type AutoBuildResult } from "@/lib/auto-build-service";
 
@@ -13,9 +13,15 @@ const MAX_APPROVAL_LINK_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days guardrail
 
 // Request schema
 const RespondSchema = z.object({
-    action: z.enum(["APPROVE", "DENY", "RESET_TO_PENDING", "INFO_REQUESTED"]),
+    action: z.enum(["APPROVE", "DENY", "RESET_TO_PENDING", "INFO_REQUESTED", "COUNTER_OFFER"]),
     reason: z.string().optional(),
     token: z.string().optional(), // For one-click links
+    counterOfferCents: z.number().int().min(1).max(10_000_000).optional(),
+    counterOfferNote: z.string().max(1000).optional(),
+}).superRefine((data, ctx) => {
+    if (data.action === "COUNTER_OFFER" && !data.counterOfferCents) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "counterOfferCents required for COUNTER_OFFER action", path: ["counterOfferCents"] });
+    }
 });
 
 /**
@@ -238,7 +244,7 @@ export async function POST(
                 { status: 400 }
             );
         }
-        const { action, reason } = RespondSchema.parse(body);
+        const { action, reason, counterOfferCents, counterOfferNote } = RespondSchema.parse(body);
 
         const approval = await db.approvalQueue.findUnique({
             where: { id }
@@ -325,6 +331,67 @@ export async function POST(
                 changes: { previousStatus: "PENDING", newStatus: "INFO_REQUESTED", question: reason },
             });
             return NextResponse.json({ success: true, status: "INFO_REQUESTED", message: "Info requested from coach" });
+        }
+
+        // COUNTER_OFFER: admin proposes alternative price for CUSTOM_PRICING approvals
+        if (action === "COUNTER_OFFER") {
+            if (approval.status !== "PENDING") {
+                return NextResponse.json(
+                    { error: "Can only counter-offer on PENDING approvals" },
+                    { status: 400 }
+                );
+            }
+            if (approval.type !== "CUSTOM_PRICING") {
+                return NextResponse.json(
+                    { error: "Counter-offers only apply to CUSTOM_PRICING approvals" },
+                    { status: 400 }
+                );
+            }
+            await db.approvalQueue.update({
+                where: { id },
+                data: {
+                    status: "COUNTER_OFFERED",
+                    counterOfferCents: counterOfferCents!,
+                    counterOfferNote: counterOfferNote ?? null,
+                    respondedBy: actor.email,
+                    respondedAt: new Date(),
+                },
+            });
+            // Notify coach (non-blocking)
+            {
+                const coach = await db.coach.findUnique({
+                    where: { id: approval.coachId },
+                    select: { email: true, firstName: true, lastName: true },
+                });
+                let originalPriceCents = 0;
+                try {
+                    const reqData = JSON.parse(approval.requestData ?? "{}") as { newPriceCents?: unknown };
+                    if (typeof reqData.newPriceCents === "number") originalPriceCents = reqData.newPriceCents;
+                } catch { /* ignore */ }
+                if (coach && approval.workshopId) {
+                    const w = await db.workshop.findUnique({
+                        where: { id: approval.workshopId },
+                        select: { title: true },
+                    });
+                    await sendCounterOfferEmail({
+                        coachEmail: coach.email,
+                        coachName: `${coach.firstName} ${coach.lastName}`,
+                        workshopTitle: w?.title ?? "Workshop",
+                        workshopId: approval.workshopId,
+                        originalPriceCents,
+                        counterOfferCents: counterOfferCents!,
+                        counterOfferNote: counterOfferNote,
+                    }).catch((err) => console.error("Failed to send counter-offer email:", err));
+                }
+            }
+            await logAudit({
+                entityType: "ApprovalQueue",
+                entityId: id,
+                action: "COUNTER_OFFER",
+                performedBy: actor.email,
+                changes: { previousStatus: "PENDING", newStatus: "COUNTER_OFFERED", counterOfferCents, counterOfferNote },
+            });
+            return NextResponse.json({ success: true, status: "COUNTER_OFFERED" });
         }
 
         if (approval.status !== "PENDING") {

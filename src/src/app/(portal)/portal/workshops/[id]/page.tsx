@@ -6,6 +6,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { Badge } from "@/components/ui/badge";
 import { CancelWorkshopDialog } from "@/components/workshops/cancel-workshop-dialog";
 import { ResubmitWorkshop } from "@/components/workshops/resubmit-workshop";
+import { CounterOfferCard } from "@/components/workshops/counter-offer-card";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { InlineEditDescription } from "@/components/workshops/inline-edit-description";
 import { getSessionDownloadPath } from "@/lib/file-download-path";
@@ -125,10 +126,10 @@ export default async function WorkshopDetailsPage({
       select: { slug: true },
       orderBy: { createdAt: "asc" },
     }),
-    // FIG-007: Check for pending CUSTOM_PRICING approval on this workshop
+    // FIG-007 + Counter-Offer: Check for pending or counter-offered CUSTOM_PRICING approval
     db.approvalQueue.findFirst({
-      where: { workshopId: id, type: "CUSTOM_PRICING", status: "PENDING" },
-      select: { id: true, requestData: true, requestedAt: true },
+      where: { workshopId: id, type: "CUSTOM_PRICING", status: { in: ["PENDING", "COUNTER_OFFERED"] } },
+      select: { id: true, requestData: true, requestedAt: true, status: true, counterOfferCents: true, counterOfferNote: true },
       orderBy: { requestedAt: "desc" },
     }),
   ]);
@@ -142,6 +143,11 @@ export default async function WorkshopDetailsPage({
     0
   );
   const revenueSplit = calculateWorkshopRevenueSplit(totalPaidCents);
+
+  const priceChangeRequestData = (() => {
+    try { return JSON.parse(pendingPriceChange?.requestData ?? "{}") as { newPriceCents?: number }; }
+    catch { return {}; }
+  })();
 
   return (
     <div className="space-y-6">
@@ -293,8 +299,17 @@ export default async function WorkshopDetailsPage({
         )}
       </div>
 
-      {/* FIG-007: Pending price change indicator */}
-      {pendingPriceChange && (
+      {/* FIG-007 + Counter-Offer: Pending price change or counter-offer */}
+      {pendingPriceChange?.status === "COUNTER_OFFERED" && pendingPriceChange.counterOfferCents && (
+        <CounterOfferCard
+          approvalId={pendingPriceChange.id}
+          workshopId={workshop.id}
+          originalPriceCents={priceChangeRequestData.newPriceCents ?? 0}
+          counterOfferCents={pendingPriceChange.counterOfferCents}
+          counterOfferNote={pendingPriceChange.counterOfferNote}
+        />
+      )}
+      {pendingPriceChange?.status === "PENDING" && (
         <div className="rounded-xl border border-warning/40 bg-warning/5 p-4 flex items-start gap-3">
           <div className="flex-1">
             <p className="text-sm font-semibold text-warning">Price Change Pending Approval</p>
