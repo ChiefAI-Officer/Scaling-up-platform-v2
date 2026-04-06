@@ -65,7 +65,7 @@ export default async function WorkshopDetailsPage({
         pricingTierId: true,
         pricingTier: { select: { name: true, amountCents: true } },
         workshopType: { select: { name: true } },
-        _count: { select: { registrations: true } },
+        _count: { select: { registrations: { where: { paymentStatus: { not: "PENDING" } } } } },
       },
     }),
     db.workflowAssignment.findMany({
