@@ -230,7 +230,7 @@ describe("POST /api/approvals/[id]/coach-response — counter-offer actions", ()
       );
     });
 
-    it("returns 409 when approval is not COUNTER_OFFERED (race condition guard)", async () => {
+    it("returns 400 when approval is not COUNTER_OFFERED (pre-transaction guard)", async () => {
       (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
         ...counterOfferedApproval,
         status: "APPROVED",

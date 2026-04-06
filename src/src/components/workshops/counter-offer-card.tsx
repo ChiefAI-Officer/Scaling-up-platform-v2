@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
 
 interface CounterOfferCardProps {
@@ -18,13 +19,16 @@ export function CounterOfferCard({
   counterOfferCents,
   counterOfferNote,
 }: CounterOfferCardProps) {
+  const router = useRouter();
   const [phase, setPhase] = useState<"idle" | "declining">("idle");
   const [newPrice, setNewPrice] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<"accepted" | "declined" | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleAccept = async () => {
     setSubmitting(true);
+    setError(null);
     try {
       const res = await fetch(`/api/approvals/${approvalId}/coach-response`, {
         method: "POST",
@@ -33,8 +37,10 @@ export function CounterOfferCard({
       });
       if (res.ok) {
         setResult("accepted");
-        // Reload after a short delay to reflect the price change
-        setTimeout(() => window.location.reload(), 1200);
+        setTimeout(() => router.refresh(), 1200);
+      } else {
+        const payload = await res.json().catch(() => ({})) as { error?: string };
+        setError(payload.error || "Failed to accept offer — please try again");
       }
     } finally {
       setSubmitting(false);
@@ -43,6 +49,7 @@ export function CounterOfferCard({
 
   const handleDecline = async () => {
     setSubmitting(true);
+    setError(null);
     const newPriceCents = newPrice.trim() ? Math.round(parseFloat(newPrice) * 100) : undefined;
     try {
       const res = await fetch(`/api/approvals/${approvalId}/coach-response`, {
@@ -55,7 +62,10 @@ export function CounterOfferCard({
       });
       if (res.ok) {
         setResult("declined");
-        setTimeout(() => window.location.reload(), 1200);
+        setTimeout(() => router.refresh(), 1200);
+      } else {
+        const payload = await res.json().catch(() => ({})) as { error?: string };
+        setError(payload.error || "Failed to submit — please try again");
       }
     } finally {
       setSubmitting(false);
@@ -64,8 +74,8 @@ export function CounterOfferCard({
 
   if (result === "accepted") {
     return (
-      <div className="rounded-xl border border-green-300 bg-green-50 p-5">
-        <p className="text-sm font-medium text-green-800">
+      <div className="rounded-xl border border-success/30 bg-success/10 p-5">
+        <p className="text-sm font-medium text-success">
           Price accepted — {formatCurrency(counterOfferCents)} will be applied to your workshop.
         </p>
       </div>
@@ -81,29 +91,33 @@ export function CounterOfferCard({
   }
 
   return (
-    <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-5 space-y-4">
+    <div className="rounded-xl border-2 border-warning bg-warning/5 p-5 space-y-4">
       <div>
-        <p className="text-sm font-semibold text-amber-900 mb-3">Admin Counter-Offer on Your Price Request</p>
+        <p className="text-sm font-semibold text-warning mb-3">Admin Counter-Offer on Your Price Request</p>
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground line-through">
             Your requested: {formatCurrency(originalPriceCents)}
           </p>
-          <p className="text-lg font-bold text-amber-700">
+          <p className="text-lg font-bold text-warning">
             Admin offering: {formatCurrency(counterOfferCents)}
           </p>
         </div>
         {counterOfferNote && (
-          <div className="mt-3 rounded-md border-l-4 border-amber-400 bg-white px-3 py-2">
-            <p className="text-xs font-medium text-amber-800 mb-1">Note from admin</p>
+          <div className="mt-3 rounded-md border-l-4 border-warning bg-card px-3 py-2">
+            <p className="text-xs font-medium text-warning mb-1">Note from admin</p>
             <p className="text-sm text-foreground">{counterOfferNote}</p>
           </div>
         )}
       </div>
 
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
+
       {phase === "idle" && (
         <div className="flex gap-3">
           <button
-            className="px-4 py-2 rounded-md text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+            className="px-4 py-2 rounded-md text-sm font-medium bg-warning text-white hover:bg-warning/90 disabled:opacity-50"
             onClick={handleAccept}
             disabled={submitting}
           >
@@ -148,7 +162,7 @@ export function CounterOfferCard({
             </button>
             <button
               className="px-4 py-2 rounded-md text-sm font-medium border border-border text-foreground hover:bg-accent"
-              onClick={() => { setPhase("idle"); setNewPrice(""); }}
+              onClick={() => { setPhase("idle"); setNewPrice(""); setError(null); }}
               disabled={submitting}
             >
               Cancel

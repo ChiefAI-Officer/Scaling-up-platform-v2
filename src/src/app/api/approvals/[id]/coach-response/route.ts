@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { getApiActor } from "@/lib/authorization";
@@ -151,15 +152,23 @@ export async function POST(
             }
 
             // Atomic: update workshop price + set approval to APPROVED
+            // Capture workshop status inside transaction to avoid TOCTOU on auto-build decision
+            let workshopStatusAtAccept: string | null = null;
             await db.$transaction(async (tx) => {
                 if (approval.workshopId) {
+                    const ws = await tx.workshop.findUnique({
+                        where: { id: approval.workshopId },
+                        select: { status: true },
+                    });
+                    workshopStatusAtAccept = ws?.status ?? null;
                     await tx.workshop.update({
                         where: { id: approval.workshopId },
                         data: { priceCents: counterCents, isFree: counterCents === 0 },
                     });
                 }
+                // DB-level race guard: throws P2025 if status already changed
                 await tx.approvalQueue.update({
-                    where: { id },
+                    where: { id, status: "COUNTER_OFFERED" },
                     data: {
                         status: "APPROVED",
                         counterOfferCents: null,
@@ -170,27 +179,23 @@ export async function POST(
                 });
             });
 
-            // Auto-build trigger if workshop hasn't been built yet
+            // Auto-build trigger if workshop hadn't been built yet (status captured inside transaction)
             if (approval.workshopId) {
-                const ws = await db.workshop.findUnique({
-                    where: { id: approval.workshopId },
-                    select: { status: true },
-                });
-                if (ws && PRE_BUILD_STATUSES.includes(ws.status)) {
-                    try {
-                        await runAutoBuild(approval.workshopId);
-                    } catch (err) {
-                        console.error("[AUTO-BUILD] ACCEPT_COUNTER inline build failed:", err);
+                    if (workshopStatusAtAccept && PRE_BUILD_STATUSES.includes(workshopStatusAtAccept)) {
+                        try {
+                            await runAutoBuild(approval.workshopId);
+                        } catch (err) {
+                            console.error("[AUTO-BUILD] ACCEPT_COUNTER inline build failed:", err);
+                        }
+                        try {
+                            await inngest.send({
+                                name: "workshop/approved",
+                                data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId },
+                            });
+                        } catch (err) {
+                            console.error("[INNGEST] ACCEPT_COUNTER backup event failed:", err);
+                        }
                     }
-                    try {
-                        await inngest.send({
-                            name: "workshop/approved",
-                            data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId },
-                        });
-                    } catch (err) {
-                        console.error("[INNGEST] ACCEPT_COUNTER backup event failed:", err);
-                    }
-                }
             }
 
             // Notify admin (non-blocking)
@@ -244,8 +249,9 @@ export async function POST(
                 } catch { /* ignore */ }
                 reqData.newPriceCents = parsed.newPriceCents;
 
+                // DB-level race guard on decline-with-new-price
                 await db.approvalQueue.update({
-                    where: { id },
+                    where: { id, status: "COUNTER_OFFERED" },
                     data: {
                         requestData: JSON.stringify(reqData),
                         status: "PENDING",
@@ -290,12 +296,15 @@ export async function POST(
                 return NextResponse.json({ success: true, status: "PENDING" }, { headers: rateLimit.headers });
             } else {
                 // No new price — final decline, end negotiation
+                // DB-level race guard on final decline + record coach as respondent
                 await db.approvalQueue.update({
-                    where: { id },
+                    where: { id, status: "COUNTER_OFFERED" },
                     data: {
                         status: "DENIED",
                         counterOfferCents: null,
                         counterOfferNote: null,
+                        respondedBy: actor.email,
+                        respondedAt: new Date(),
                     },
                 });
 
@@ -339,6 +348,12 @@ export async function POST(
             return NextResponse.json(
                 { error: "Validation error", details: error.issues },
                 { status: 400, headers: rateLimit.headers }
+            );
+        }
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+            return NextResponse.json(
+                { error: "Approval state changed — please refresh and try again" },
+                { status: 409, headers: rateLimit.headers }
             );
         }
         console.error("Coach response POST error:", error);

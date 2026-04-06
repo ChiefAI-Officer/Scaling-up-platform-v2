@@ -179,7 +179,7 @@ export default function ApprovalsPage() {
       case "INFO_REQUESTED":
         return "bg-warning/10 text-warning";
       case "COUNTER_OFFERED":
-        return "bg-amber-100 text-amber-800 border border-amber-300";
+        return "bg-warning/15 text-warning border border-warning/30";
       case "EXPIRED":
         return "bg-muted text-muted-foreground";
       default:
@@ -241,7 +241,7 @@ export default function ApprovalsPage() {
                 Cancel
               </button>
               <button
-                className="px-4 py-2 rounded-md text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                className="px-4 py-2 rounded-md text-sm font-medium bg-warning text-white hover:bg-warning/90 disabled:opacity-50"
                 onClick={handleCounterOfferSubmit}
                 disabled={!counterOfferAmount.trim() || processing === counterOfferModalId}
               >
@@ -337,7 +337,7 @@ export default function ApprovalsPage() {
                     </span>
                   )}
                   {approval.status === "COUNTER_OFFERED" && typeof approval.counterOfferCents === "number" && (
-                    <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-500 text-white">
+                    <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-warning text-white">
                       Offered: ${(approval.counterOfferCents / 100).toLocaleString()}
                     </span>
                   )}
@@ -405,7 +405,7 @@ export default function ApprovalsPage() {
                     </button>
                     {approval.type === "CUSTOM_PRICING" && (
                       <button
-                        className="px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-5 py-2.5 rounded-md font-medium text-sm cursor-pointer transition-all duration-200 bg-warning text-white hover:bg-warning/90 disabled:opacity-50 disabled:cursor-not-allowed"
                         onClick={() => { setCounterOfferModalId(approval.id); setCounterOfferAmount(""); setCounterOfferNoteInput(""); }}
                         disabled={processing === approval.id}
                       >
