@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         if (registrationId) {
           await db.registration.updateMany({
             where: { id: registrationId, paymentStatus: "PENDING" },
-            data: { status: "CANCELLED" },
+            data: { status: "CANCELLED", paymentStatus: "CANCELLED" },
           });
           console.log(`Cancelled PENDING registration ${registrationId} due to expired checkout session`);
         }

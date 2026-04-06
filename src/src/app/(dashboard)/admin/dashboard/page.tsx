@@ -62,7 +62,7 @@ export default async function AdminDashboardPage({
     db.approvalQueue.count({ where: { status: "PENDING" } }),
     db.coach.count(),
     db.registration.count({
-      where: { createdAt: { gte: monthStart } },
+      where: { createdAt: { gte: monthStart }, paymentStatus: { not: "PENDING" } },
     }),
     db.registration.aggregate({
       _sum: { amountPaidCents: true },

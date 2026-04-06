@@ -18,7 +18,7 @@ export default async function MyWorkshopsPage() {
         orderBy: { eventDate: "desc" },
         include: {
             workshopType: true,
-            _count: { select: { registrations: true } },
+            _count: { select: { registrations: { where: { paymentStatus: { not: "PENDING" } } } } },
             landingPages: { select: { slug: true }, take: 1 },
             pricingTier: { select: { name: true, amountCents: true } },
             // FIG-007: Check for pending CUSTOM_PRICING approvals

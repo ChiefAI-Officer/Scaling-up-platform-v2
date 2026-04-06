@@ -227,7 +227,7 @@ describe("Stripe webhook API", () => {
     expect(body.received).toBe(true);
     expect(db.registration.updateMany).toHaveBeenCalledWith({
       where: { id: "reg-expired", paymentStatus: "PENDING" },
-      data: { status: "CANCELLED" },
+      data: { status: "CANCELLED", paymentStatus: "CANCELLED" },
     });
   });
 

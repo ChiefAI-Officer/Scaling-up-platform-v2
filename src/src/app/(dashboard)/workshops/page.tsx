@@ -75,7 +75,7 @@ async function getWorkshops(
           select: { id: true },
           take: 1,
         },
-        _count: { select: { registrations: true } },
+        _count: { select: { registrations: { where: { paymentStatus: { not: "PENDING" } } } } },
       },
       orderBy,
       skip: (page - 1) * perPage,

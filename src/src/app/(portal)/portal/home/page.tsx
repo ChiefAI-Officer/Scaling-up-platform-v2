@@ -24,7 +24,7 @@ export default async function CoachDashboardPage() {
     orderBy: { eventDate: "asc" },
     take: 5,
     include: {
-      _count: { select: { registrations: true } },
+      _count: { select: { registrations: { where: { paymentStatus: { not: "PENDING" } } } } },
       workshopType: { select: { name: true } },
     },
   });
@@ -46,7 +46,7 @@ export default async function CoachDashboardPage() {
     }),
     // Total registrations across all workshops (NOT revenue)
     db.registration.count({
-      where: { workshop: { coachId: coach.id } },
+      where: { workshop: { coachId: coach.id }, paymentStatus: { not: "PENDING" } },
     }),
     // Pending follow-up reports
     db.followUpReport.count({
