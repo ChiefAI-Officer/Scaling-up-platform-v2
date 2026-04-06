@@ -46,6 +46,20 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      // NOTE: checkout.session.expired must be enabled in the Stripe Dashboard webhook settings
+      case "checkout.session.expired": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const { registrationId } = session.metadata || {};
+        if (registrationId) {
+          await db.registration.updateMany({
+            where: { id: registrationId, paymentStatus: "PENDING" },
+            data: { status: "CANCELLED" },
+          });
+          console.log(`Cancelled PENDING registration ${registrationId} due to expired checkout session`);
+        }
+        break;
+      }
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
