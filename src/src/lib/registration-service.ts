@@ -99,6 +99,7 @@ async function createRegistrationTransaction(
     where: {
       workshopId: workshop.id,
       status: { not: "CANCELLED" },
+      paymentStatus: { not: "PENDING" },
     },
   });
 

@@ -75,6 +75,29 @@ describe("registration-service", () => {
     });
   });
 
+  it("excludes PENDING registrations from the capacity count", async () => {
+    mockTx.workshop.findUnique.mockResolvedValue(makeWorkshop({ maxAttendees: 10 }));
+    mockTx.registration.count.mockResolvedValue(5);
+    mockTx.registration.findFirst.mockResolvedValue(null);
+    mockTx.registration.create.mockResolvedValue({
+      id: "reg-new",
+      email: "user@example.com",
+      workshopId: "ws-1",
+      paymentStatus: "PENDING",
+      status: "REGISTERED",
+    });
+
+    await createWorkshopRegistration(makeInput());
+
+    expect(mockTx.registration.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          paymentStatus: { not: "PENDING" },
+        }),
+      })
+    );
+  });
+
   it("returns existing PENDING registration instead of DUPLICATE error", async () => {
     mockTx.workshop.findUnique.mockResolvedValue(makeWorkshop());
     mockTx.registration.count.mockResolvedValue(1);
