@@ -161,9 +161,14 @@ export async function POST(
                         select: { status: true },
                     });
                     workshopStatusAtAccept = ws?.status ?? null;
+                    const needsStatusReset = workshopStatusAtAccept && PRE_BUILD_STATUSES.includes(workshopStatusAtAccept);
                     await tx.workshop.update({
                         where: { id: approval.workshopId },
-                        data: { priceCents: counterCents, isFree: counterCents === 0 },
+                        data: {
+                            priceCents: counterCents,
+                            isFree: counterCents === 0,
+                            ...(needsStatusReset ? { status: "AWAITING_APPROVAL" } : {}),
+                        },
                     });
                 }
                 // DB-level race guard: throws P2025 if status already changed
@@ -180,22 +185,28 @@ export async function POST(
             });
 
             // Auto-build trigger if workshop hadn't been built yet (status captured inside transaction)
+            let buildWarning: string | undefined;
             if (approval.workshopId) {
-                    if (workshopStatusAtAccept && PRE_BUILD_STATUSES.includes(workshopStatusAtAccept)) {
-                        try {
-                            await runAutoBuild(approval.workshopId);
-                        } catch (err) {
-                            console.error("[AUTO-BUILD] ACCEPT_COUNTER inline build failed:", err);
+                if (workshopStatusAtAccept && PRE_BUILD_STATUSES.includes(workshopStatusAtAccept)) {
+                    try {
+                        const buildResult = await runAutoBuild(approval.workshopId);
+                        if (!buildResult.success) {
+                            buildWarning = buildResult.error ?? "Auto-build did not complete";
+                            console.warn(`[ACCEPT_COUNTER] ${buildWarning}`);
                         }
-                        try {
-                            await inngest.send({
-                                name: "workshop/approved",
-                                data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId },
-                            });
-                        } catch (err) {
-                            console.error("[INNGEST] ACCEPT_COUNTER backup event failed:", err);
-                        }
+                    } catch (err) {
+                        buildWarning = "Auto-build failed unexpectedly";
+                        console.error("[AUTO-BUILD] ACCEPT_COUNTER inline build failed:", err);
                     }
+                    try {
+                        await inngest.send({
+                            name: "workshop/approved",
+                            data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId },
+                        });
+                    } catch (err) {
+                        console.error("[INNGEST] ACCEPT_COUNTER backup event failed:", err);
+                    }
+                }
             }
 
             // Notify admin (non-blocking)
@@ -229,7 +240,11 @@ export async function POST(
                 changes: { previousStatus: "COUNTER_OFFERED", newStatus: "APPROVED", acceptedPriceCents: counterCents },
             });
 
-            return NextResponse.json({ success: true, status: "APPROVED" }, { headers: rateLimit.headers });
+            return NextResponse.json({
+                success: true,
+                status: "APPROVED",
+                ...(buildWarning ? { warning: buildWarning } : {}),
+            }, { headers: rateLimit.headers });
         }
 
         // ── DECLINE_COUNTER ───────────────────────────────────────────────────

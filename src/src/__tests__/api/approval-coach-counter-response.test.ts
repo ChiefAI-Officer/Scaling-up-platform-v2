@@ -158,9 +158,52 @@ describe("POST /api/approvals/[id]/coach-response — counter-offer actions", ()
       expect(db.workshop.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "ws-1" },
+          data: expect.objectContaining({ priceCents: 40000, isFree: false, status: "AWAITING_APPROVAL" }),
+        })
+      );
+    });
+
+    it("sets workshop status to AWAITING_APPROVAL even if auto-build fails", async () => {
+      (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue(counterOfferedApproval);
+      (db.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => fn(db));
+      (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-1", status: "APPROVED" });
+      (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({ id: "ws-1", status: "INFO_REQUESTED" });
+      (runAutoBuild as jest.Mock).mockResolvedValue({ success: false, error: "No active PageTemplates found" });
+
+      const response = await POST(requestWithJson({ action: "ACCEPT_COUNTER" }), routeParams());
+      const body = await response.json();
+
+      // Workshop status was reset inside the transaction
+      expect(db.workshop.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "AWAITING_APPROVAL" }),
+        })
+      );
+      // Response includes the build warning
+      expect(body.success).toBe(true);
+      expect(body.warning).toContain("No active PageTemplates");
+    });
+
+    it("does NOT regress workshop status if already PRE_EVENT", async () => {
+      (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue(counterOfferedApproval);
+      (db.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => fn(db));
+      (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-1", status: "APPROVED" });
+      (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({ id: "ws-1", status: "PRE_EVENT" });
+
+      await POST(requestWithJson({ action: "ACCEPT_COUNTER" }), routeParams());
+
+      // Workshop update should NOT include status field (only price)
+      expect(db.workshop.update).toHaveBeenCalledWith(
+        expect.objectContaining({
           data: expect.objectContaining({ priceCents: 40000, isFree: false }),
         })
       );
+      const updateCall = (db.workshop.update as jest.Mock).mock.calls[0][0];
+      expect(updateCall.data.status).toBeUndefined();
+      // Auto-build should NOT run for PRE_EVENT workshops
+      expect(runAutoBuild).not.toHaveBeenCalled();
     });
 
     it("sets approval to APPROVED and clears counter fields", async () => {
