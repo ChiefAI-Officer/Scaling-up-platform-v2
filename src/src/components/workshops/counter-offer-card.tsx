@@ -6,7 +6,6 @@ import { formatCurrency } from "@/lib/utils";
 
 interface CounterOfferCardProps {
   approvalId: string;
-  workshopId: string;
   originalPriceCents: number;
   counterOfferCents: number;
   counterOfferNote?: string | null;
@@ -14,7 +13,6 @@ interface CounterOfferCardProps {
 
 export function CounterOfferCard({
   approvalId,
-  workshopId: _workshopId,
   originalPriceCents,
   counterOfferCents,
   counterOfferNote,

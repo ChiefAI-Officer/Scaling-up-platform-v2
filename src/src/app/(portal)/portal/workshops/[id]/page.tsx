@@ -303,7 +303,6 @@ export default async function WorkshopDetailsPage({
       {pendingPriceChange?.status === "COUNTER_OFFERED" && pendingPriceChange.counterOfferCents && (
         <CounterOfferCard
           approvalId={pendingPriceChange.id}
-          workshopId={workshop.id}
           originalPriceCents={priceChangeRequestData.newPriceCents ?? 0}
           counterOfferCents={pendingPriceChange.counterOfferCents}
           counterOfferNote={pendingPriceChange.counterOfferNote}

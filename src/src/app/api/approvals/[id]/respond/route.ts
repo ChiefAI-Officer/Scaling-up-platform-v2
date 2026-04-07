@@ -347,11 +347,17 @@ export async function POST(
                     { status: 400 }
                 );
             }
+            if (!counterOfferCents) {
+                return NextResponse.json(
+                    { error: "counterOfferCents required for COUNTER_OFFER action" },
+                    { status: 400 }
+                );
+            }
             await db.approvalQueue.update({
                 where: { id },
                 data: {
                     status: "COUNTER_OFFERED",
-                    counterOfferCents: counterOfferCents!,
+                    counterOfferCents,
                     counterOfferNote: counterOfferNote ?? null,
                     respondedBy: actor.email,
                     respondedAt: new Date(),
@@ -379,7 +385,7 @@ export async function POST(
                         workshopTitle: w?.title ?? "Workshop",
                         workshopId: approval.workshopId,
                         originalPriceCents,
-                        counterOfferCents: counterOfferCents!,
+                        counterOfferCents,
                         counterOfferNote: counterOfferNote,
                     }).catch((err) => console.error("Failed to send counter-offer email:", err));
                 }
