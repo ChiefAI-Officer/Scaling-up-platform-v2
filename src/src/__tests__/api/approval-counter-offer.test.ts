@@ -163,7 +163,9 @@ describe("POST /api/approvals/[id]/respond — COUNTER_OFFER action", () => {
 
   it("sets status to COUNTER_OFFERED with correct fields on happy path", async () => {
     (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue(pendingCustomPricingApproval);
+    (db.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => fn(db));
     (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-1", status: "COUNTER_OFFERED" });
+    (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
 
     const response = await POST(
       requestWithJson({ action: "COUNTER_OFFER", counterOfferCents: 40000, counterOfferNote: "Best we can do" }),
@@ -189,7 +191,9 @@ describe("POST /api/approvals/[id]/respond — COUNTER_OFFER action", () => {
 
   it("stores null counterOfferNote when not provided", async () => {
     (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue(pendingCustomPricingApproval);
+    (db.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => fn(db));
     (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-1", status: "COUNTER_OFFERED" });
+    (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
 
     await POST(
       requestWithJson({ action: "COUNTER_OFFER", counterOfferCents: 40000 }),
@@ -207,7 +211,9 @@ describe("POST /api/approvals/[id]/respond — COUNTER_OFFER action", () => {
 
   it("calls sendCounterOfferEmail with originalPriceCents from requestData.newPriceCents", async () => {
     (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue(pendingCustomPricingApproval);
+    (db.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => fn(db));
     (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-1" });
+    (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
     (db.coach.findUnique as jest.Mock).mockResolvedValue({
       id: "coach-1",
       email: "coach@example.com",
@@ -236,7 +242,9 @@ describe("POST /api/approvals/[id]/respond — COUNTER_OFFER action", () => {
 
   it("calls logAudit with action COUNTER_OFFER", async () => {
     (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue(pendingCustomPricingApproval);
+    (db.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => fn(db));
     (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-1" });
+    (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
 
     await POST(
       requestWithJson({ action: "COUNTER_OFFER", counterOfferCents: 40000 }),

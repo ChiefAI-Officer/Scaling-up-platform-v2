@@ -353,15 +353,24 @@ export async function POST(
                     { status: 400 }
                 );
             }
-            await db.approvalQueue.update({
-                where: { id },
-                data: {
-                    status: "COUNTER_OFFERED",
-                    counterOfferCents,
-                    counterOfferNote: counterOfferNote ?? null,
-                    respondedBy: actor.email,
-                    respondedAt: new Date(),
-                },
+            await db.$transaction(async (tx) => {
+                await tx.approvalQueue.update({
+                    where: { id },
+                    data: {
+                        status: "COUNTER_OFFERED",
+                        counterOfferCents,
+                        counterOfferNote: counterOfferNote ?? null,
+                        respondedBy: actor.email,
+                        respondedAt: new Date(),
+                    },
+                });
+                // Update workshop status so coach portal shows "Awaiting Approval" not "Info Requested"
+                if (approval.workshopId) {
+                    await tx.workshop.update({
+                        where: { id: approval.workshopId },
+                        data: { status: "AWAITING_APPROVAL" },
+                    });
+                }
             });
             // Notify coach (non-blocking)
             {

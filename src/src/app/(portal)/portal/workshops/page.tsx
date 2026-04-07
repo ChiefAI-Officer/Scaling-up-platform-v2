@@ -21,10 +21,10 @@ export default async function MyWorkshopsPage() {
             _count: { select: { registrations: { where: { paymentStatus: { not: "PENDING" } } } } },
             landingPages: { select: { slug: true }, take: 1 },
             pricingTier: { select: { name: true, amountCents: true } },
-            // FIG-007: Check for pending CUSTOM_PRICING approvals
+            // FIG-007: Check for pending or counter-offered CUSTOM_PRICING approvals
             approvals: {
-                where: { type: "CUSTOM_PRICING", status: "PENDING" },
-                select: { id: true },
+                where: { type: "CUSTOM_PRICING", status: { in: ["PENDING", "COUNTER_OFFERED"] } },
+                select: { id: true, status: true },
                 take: 1,
             },
         },
@@ -50,6 +50,7 @@ export default async function MyWorkshopsPage() {
         priceCents: w.priceCents,
         pricingTier: w.pricingTier ? { name: w.pricingTier.name, amountCents: w.pricingTier.amountCents } : null,
         hasPendingPriceChange: w.approvals.length > 0,
+        hasCounterOffer: w.approvals.some((a) => a.status === "COUNTER_OFFERED"),
     }));
 
     return (

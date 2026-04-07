@@ -16,7 +16,7 @@ import { inngest } from "@/inngest/client";
 const CoachResponseSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("INFO_RESPONSE"), response: z.string().min(1, "Response cannot be empty").max(2000) }),
     z.object({ action: z.literal("ACCEPT_COUNTER") }),
-    z.object({ action: z.literal("DECLINE_COUNTER"), newPriceCents: z.number().int().min(1).max(10_000_000).optional() }),
+    z.object({ action: z.literal("DECLINE_COUNTER"), newPriceCents: z.number().int().min(1).max(10_000_000).optional(), counterNote: z.string().max(1000).optional() }),
 ]);
 
 const PRE_BUILD_STATUSES = ["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED"];
@@ -263,6 +263,9 @@ export async function POST(
                     reqData = JSON.parse(approval.requestData ?? "{}") as Record<string, unknown>;
                 } catch { /* ignore */ }
                 reqData.newPriceCents = parsed.newPriceCents;
+                if (parsed.counterNote) {
+                    reqData.counterNote = parsed.counterNote;
+                }
 
                 // DB-level race guard on decline-with-new-price
                 await db.approvalQueue.update({

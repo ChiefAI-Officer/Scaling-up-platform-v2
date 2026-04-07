@@ -22,6 +22,7 @@ interface WorkshopItem {
     priceCents?: number | null;
     pricingTier?: { name: string; amountCents: number } | null;
     hasPendingPriceChange?: boolean;
+    hasCounterOffer?: boolean;
 }
 
 interface PortalWorkshopListProps {
@@ -191,13 +192,19 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                                                     ? `$${(workshop.priceCents / 100).toFixed(0)}`
                                                     : <span className="text-muted-foreground">Not set</span>}
                                             </div>
-                                            {workshop.hasPendingPriceChange && (
+                                            {workshop.hasCounterOffer ? (
+                                                <div className="mt-1">
+                                                    <span className="inline-flex items-center rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning border border-warning/30">
+                                                        Counter-Offer — Review
+                                                    </span>
+                                                </div>
+                                            ) : workshop.hasPendingPriceChange ? (
                                                 <div className="mt-1">
                                                     <span className="inline-flex items-center rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning border border-warning/30">
                                                         Price Change Pending
                                                     </span>
                                                 </div>
-                                            )}
+                                            ) : null}
                                         </td>
                                         <td className="px-6 py-4">
                                             {workshop.landingPageUrl ? (
@@ -207,7 +214,14 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                                             )}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <StatusPill status={workshop.status} />
+                                            {workshop.hasCounterOffer ? (
+                                                <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/15 px-3 py-1 text-xs font-semibold text-warning border border-warning/30">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
+                                                    Counter-Offer
+                                                </span>
+                                            ) : (
+                                                <StatusPill status={workshop.status} />
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <Link

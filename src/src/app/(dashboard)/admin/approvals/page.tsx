@@ -358,6 +358,11 @@ export default function ApprovalsPage() {
                     Coach&apos;s note: {approval.notes}
                   </p>
                 )}
+                {approval.type === "CUSTOM_PRICING" && typeof approval.requestData?.counterNote === "string" && (
+                  <p className="text-sm text-muted-foreground mt-1 italic">
+                    Coach&apos;s counter-offer reason: {approval.requestData.counterNote as string}
+                  </p>
+                )}
                 {approval.coachResponse && (
                   <div className="mt-3 rounded-md border border-border bg-muted/40 px-3 py-2">
                     <p className="text-xs font-medium text-muted-foreground mb-1">Coach Response</p>

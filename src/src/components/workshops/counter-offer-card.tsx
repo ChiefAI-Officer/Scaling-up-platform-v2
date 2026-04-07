@@ -20,6 +20,7 @@ export function CounterOfferCard({
   const router = useRouter();
   const [phase, setPhase] = useState<"idle" | "declining">("idle");
   const [newPrice, setNewPrice] = useState("");
+  const [counterNote, setCounterNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<"accepted" | "declined" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export function CounterOfferCard({
         body: JSON.stringify({
           action: "DECLINE_COUNTER",
           ...(newPriceCents ? { newPriceCents } : {}),
+          ...(counterNote.trim() ? { counterNote: counterNote.trim() } : {}),
         }),
       });
       if (res.ok) {
@@ -150,6 +152,19 @@ export function CounterOfferCard({
               Leave blank to decline without a counter-offer.
             </p>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Reason / notes (optional)
+            </label>
+            <textarea
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              rows={3}
+              placeholder="Explain why you're proposing this price..."
+              value={counterNote}
+              onChange={(e) => setCounterNote(e.target.value)}
+              maxLength={1000}
+            />
+          </div>
           <div className="flex gap-3">
             <button
               className="px-4 py-2 rounded-md text-sm font-medium bg-destructive text-primary-foreground hover:bg-destructive/90 disabled:opacity-50"
@@ -160,7 +175,7 @@ export function CounterOfferCard({
             </button>
             <button
               className="px-4 py-2 rounded-md text-sm font-medium border border-border text-foreground hover:bg-accent"
-              onClick={() => { setPhase("idle"); setNewPrice(""); setError(null); }}
+              onClick={() => { setPhase("idle"); setNewPrice(""); setCounterNote(""); setError(null); }}
               disabled={submitting}
             >
               Cancel
