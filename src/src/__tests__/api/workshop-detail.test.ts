@@ -27,9 +27,9 @@ jest.mock("@/services/stripe", () => ({
   chargeCancellationFee: jest.fn(),
 }));
 
-import { PATCH, DELETE } from "@/app/api/workshops/[id]/route";
+import { GET, PATCH, DELETE } from "@/app/api/workshops/[id]/route";
 import { db } from "@/lib/db";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor, canManageCoachData } from "@/lib/authorization";
 import { chargeCancellationFee } from "@/services/stripe";
 
 function routeParams(id = "ws-1") {
@@ -193,6 +193,63 @@ describe("Workshop detail API", () => {
 
       expect(response.status).toBe(200);
       expect(db.workshop.update).toHaveBeenCalled();
+    });
+  });
+
+  describe("GET /api/workshops/[id]", () => {
+    function buildGetRequest(id = "ws-1"): Parameters<typeof GET>[0] {
+      return new Request(`http://localhost/api/workshops/${id}`) as unknown as Parameters<typeof GET>[0];
+    }
+
+    it("excludes PENDING registrations from workshop detail response", async () => {
+      (canManageCoachData as jest.Mock).mockReturnValue(true);
+      // First findUnique call is the access check, second is the full include query
+      (db.workshop.findUnique as jest.Mock)
+        .mockResolvedValueOnce({ id: "ws-1", coachId: "coach-1" })
+        .mockResolvedValueOnce({
+          id: "ws-1",
+          title: "Test Workshop",
+          coach: {},
+          workshopType: null,
+          registrations: [],
+          campaigns: [],
+          tasks: [],
+          landingPages: [],
+        });
+
+      await GET(buildGetRequest("ws-1"), routeParams("ws-1"));
+
+      // The second call (full include) must filter out PENDING registrations
+      const calls = (db.workshop.findUnique as jest.Mock).mock.calls;
+      const fullIncludeCall = calls[1][0];
+      expect(fullIncludeCall.include.registrations.where).toEqual({
+        paymentStatus: { not: "PENDING" },
+      });
+    });
+
+    it("still returns FREE and COMPLETED registrations", async () => {
+      (canManageCoachData as jest.Mock).mockReturnValue(true);
+      (db.workshop.findUnique as jest.Mock)
+        .mockResolvedValueOnce({ id: "ws-1", coachId: "coach-1" })
+        .mockResolvedValueOnce({
+          id: "ws-1",
+          title: "Test Workshop",
+          coach: {},
+          workshopType: null,
+          registrations: [
+            { id: "r1", paymentStatus: "FREE" },
+            { id: "r2", paymentStatus: "COMPLETED" },
+          ],
+          campaigns: [],
+          tasks: [],
+          landingPages: [],
+        });
+
+      const response = await GET(buildGetRequest("ws-1"), routeParams("ws-1"));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.data.registrations).toHaveLength(2);
     });
   });
 

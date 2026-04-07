@@ -14,6 +14,7 @@ export default async function RegistrationsPage() {
       workshop: {
         coachId: coach.id,
       },
+      paymentStatus: { not: "PENDING" },
     },
     orderBy: {
       createdAt: "desc",

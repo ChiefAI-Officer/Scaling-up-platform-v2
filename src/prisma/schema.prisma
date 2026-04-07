@@ -479,6 +479,8 @@ model ApprovalQueue {
   responseReason String?     // Reason for approval/denial
   escalatedAt DateTime?      // When escalated to higher authority
   coachResponse  String?     // MR-33: Coach's response to INFO_REQUESTED questions
+  counterOfferCents Int?
+  counterOfferNote  String?
 
   workshop Workshop? @relation(fields: [workshopId], references: [id], onDelete: Cascade)
   coach    Coach     @relation(fields: [coachId], references: [id], onDelete: Cascade)
@@ -706,6 +708,7 @@ enum ApprovalStatus {
   DENIED
   EXPIRED
   INFO_REQUESTED
+  COUNTER_OFFERED
 }
 
 enum EmailType {

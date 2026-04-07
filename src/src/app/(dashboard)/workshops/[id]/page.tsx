@@ -184,10 +184,10 @@ export default async function WorkshopDetailPage({
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Registrations</p>
               <p className="text-xl font-semibold">
-                {workshop.registrations.length} / {workshop.maxAttendees}
+                {workshop.registrations.filter(r => r.paymentStatus !== "PENDING").length} / {workshop.maxAttendees}
               </p>
               <p className="text-muted-foreground">
-                {workshop.maxAttendees - workshop.registrations.length} spots left
+                {workshop.maxAttendees - workshop.registrations.filter(r => r.paymentStatus !== "PENDING").length} spots left
               </p>
             </CardContent>
           </Card>

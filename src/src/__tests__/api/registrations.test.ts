@@ -9,7 +9,15 @@ jest.mock("next/server", () => ({
 }));
 
 jest.mock("@/lib/db", () => ({
-  db: {},
+  db: {
+    workshop: {
+      findUnique: jest.fn(),
+    },
+    registration: {
+      findMany: jest.fn(),
+      count: jest.fn(),
+    },
+  },
 }));
 
 jest.mock("@/lib/authorization", () => ({
@@ -48,13 +56,15 @@ jest.mock("@/lib/registration-service", () => {
   };
 });
 
-import { POST } from "@/app/api/registrations/route";
+import { GET, POST } from "@/app/api/registrations/route";
 import { withRateLimit } from "@/lib/rate-limit";
 import { createRegistrationSchema } from "@/lib/validations";
 import {
   createWorkshopRegistration,
   RegistrationServiceError,
 } from "@/lib/registration-service";
+import { db } from "@/lib/db";
+import { canManageCoachData, getApiActor } from "@/lib/authorization";
 
 function buildRequest(body: Record<string, unknown>): Request {
   return new Request("http://localhost/api/registrations", {
@@ -165,5 +175,53 @@ describe("POST /api/registrations", () => {
 
     expect(response.status).toBe(409);
     expect(body.error).toBe("You are already registered for this workshop");
+  });
+});
+
+describe("GET /api/registrations", () => {
+  function buildGetRequest(workshopId: string): Parameters<typeof GET>[0] {
+    const searchParams = new URLSearchParams({ workshopId });
+    return {
+      nextUrl: { searchParams },
+    } as unknown as Parameters<typeof GET>[0];
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getApiActor as jest.Mock).mockResolvedValue({
+      userId: "admin-1",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    (canManageCoachData as jest.Mock).mockReturnValue(true);
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue({
+      id: "ws-1",
+      coachId: "coach-1",
+    });
+    (db.registration.findMany as jest.Mock).mockResolvedValue([]);
+    (db.registration.count as jest.Mock).mockResolvedValue(0);
+  });
+
+  it("excludes PENDING registrations from the list query", async () => {
+    await GET(buildGetRequest("ws-1"));
+
+    const findManyCall = (db.registration.findMany as jest.Mock).mock.calls[0][0];
+    expect(findManyCall.where).toEqual(
+      expect.objectContaining({
+        paymentStatus: { not: "PENDING" },
+      })
+    );
+  });
+
+  it("also excludes PENDING from the count query", async () => {
+    await GET(buildGetRequest("ws-1"));
+
+    const countCall = (db.registration.count as jest.Mock).mock.calls[0][0];
+    expect(countCall.where).toEqual(
+      expect.objectContaining({
+        paymentStatus: { not: "PENDING" },
+      })
+    );
   });
 });

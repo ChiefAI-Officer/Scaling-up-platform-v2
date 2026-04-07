@@ -200,6 +200,61 @@ describe("Stripe webhook API", () => {
     expect(createOrUpdateContact).not.toHaveBeenCalled();
   });
 
+  it("cancels PENDING registration when checkout.session.expired fires", async () => {
+    (constructWebhookEvent as jest.Mock).mockReturnValue({
+      id: "evt_expired_1",
+      type: "checkout.session.expired",
+      data: {
+        object: {
+          id: "cs_expired",
+          metadata: {
+            registrationId: "reg-expired",
+          },
+        },
+      },
+    });
+    (db.registration.updateMany as jest.Mock) = jest.fn().mockResolvedValue({ count: 1 });
+
+    const response = await POST(
+      buildWebhookRequest({
+        signature: "good-signature",
+        body: JSON.stringify({}),
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.received).toBe(true);
+    expect(db.registration.updateMany).toHaveBeenCalledWith({
+      where: { id: "reg-expired", paymentStatus: "PENDING" },
+      data: { status: "CANCELLED", paymentStatus: "CANCELLED" },
+    });
+  });
+
+  it("does nothing when checkout.session.expired has no registrationId metadata", async () => {
+    (constructWebhookEvent as jest.Mock).mockReturnValue({
+      id: "evt_expired_2",
+      type: "checkout.session.expired",
+      data: {
+        object: {
+          id: "cs_expired_no_meta",
+          metadata: {},
+        },
+      },
+    });
+    (db.registration.updateMany as jest.Mock) = jest.fn().mockResolvedValue({ count: 0 });
+
+    const response = await POST(
+      buildWebhookRequest({
+        signature: "good-signature",
+        body: JSON.stringify({}),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(db.registration.updateMany).not.toHaveBeenCalled();
+  });
+
   it("processes payment_intent.succeeded when registrationId metadata exists", async () => {
     process.env.HUBSPOT_ACCESS_TOKEN = "test-token";
     (constructWebhookEvent as jest.Mock).mockReturnValue({

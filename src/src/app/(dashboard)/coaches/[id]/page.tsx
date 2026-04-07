@@ -81,7 +81,7 @@ export default async function CoachDetailPage({
         include: {
           workshopType: true,
           _count: {
-            select: { registrations: true },
+            select: { registrations: { where: { paymentStatus: { not: "PENDING" } } } },
           },
         },
         orderBy: { eventDate: "desc" },

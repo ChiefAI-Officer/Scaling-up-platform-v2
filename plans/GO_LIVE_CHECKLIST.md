@@ -44,6 +44,7 @@
   - `schedule-email-sequence`
   - `workshop-completion-summary`
 - [x] Stripe webhook — Configured (3 events: checkout.session.completed, payment_intent.succeeded, payment_intent.payment_failed)
+- [ ] Stripe webhook — Enable `checkout.session.expired` event in Stripe Dashboard webhook settings (required to clean up PENDING registrations when Stripe Checkout sessions expire without payment)
 - [x] Azure Communication Services — SMTP transport configured
 - [x] HubSpot — Lazy-init client with `isHubSpotConfigured()` guard
 - [x] Circle.so — Read-only cert verification (sync removed)

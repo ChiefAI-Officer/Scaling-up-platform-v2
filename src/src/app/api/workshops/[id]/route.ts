@@ -72,6 +72,7 @@ export async function GET(
         coach: true,
         workshopType: true,
         registrations: {
+          where: { paymentStatus: { not: "PENDING" } },
           orderBy: { createdAt: "desc" },
         },
         campaigns: true,
