@@ -145,12 +145,16 @@ export async function POST(request: NextRequest) {
       includeWorkshopDetails: true,
     });
 
-    await publishRegistrationCreatedEvent({
-      id: registration.id,
-      workshopId: registration.workshopId,
-      email: registration.email,
-      firstName: registration.firstName,
-    });
+    // Only publish event for free workshops immediately.
+    // For paid workshops, the Stripe webhook publishes this after payment confirmation.
+    if (registration.paymentStatus === "FREE") {
+      await publishRegistrationCreatedEvent({
+        id: registration.id,
+        workshopId: registration.workshopId,
+        email: registration.email,
+        firstName: registration.firstName,
+      });
+    }
 
     return NextResponse.json(
       {

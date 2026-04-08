@@ -316,7 +316,7 @@ export default async function WorkshopDetailPage({
           {/* Registrations */}
           <Card id="registrations">
             <CardHeader>
-              <CardTitle>Registrations ({workshop.registrations.length})</CardTitle>
+              <CardTitle>Registrations ({workshop.registrations.filter((r) => r.status !== "PENDING_PAYMENT").length})</CardTitle>
             </CardHeader>
             <CardContent>
               {workshop.registrations.length === 0 ? (
@@ -360,7 +360,9 @@ export default async function WorkshopDetailPage({
                             {reg.email}
                           </td>
                           <td className="px-4 py-3">
-                            <Badge variant="secondary">{reg.status}</Badge>
+                            <Badge variant={reg.status === "PENDING_PAYMENT" ? "warning" : "secondary"}>
+                              {reg.status === "PENDING_PAYMENT" ? "Awaiting Payment" : reg.status}
+                            </Badge>
                           </td>
                           <td className="px-4 py-3">
                             <Badge

@@ -171,7 +171,7 @@ export async function createPostWorkshopSurveys(workshopId: string): Promise<{
 
   // Get all registered attendees
   const registrations = await db.registration.findMany({
-    where: { workshopId, status: "REGISTERED" },
+    where: { workshopId, status: { in: ["REGISTERED", "CONFIRMED"] } },
     select: { id: true, email: true, firstName: true, lastName: true },
   });
 

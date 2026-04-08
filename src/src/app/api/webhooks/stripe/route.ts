@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { constructWebhookEvent } from "@/services/stripe";
 import { createOrUpdateContact } from "@/services/hubspot";
+import { inngest } from "@/inngest/client";
+import { sendRegistrationNotification } from "@/services/notifications";
+import {
+  generateIcsContent,
+  parseDurationHours,
+  buildLocationString,
+} from "@/lib/ics-generator";
 import Stripe from "stripe";
 
 export async function POST(request: NextRequest) {
@@ -187,6 +194,57 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
   await syncRegistrationToHubSpot(registration, registrationId);
 
+  // Publish registration/created event now that payment is confirmed.
+  // For paid workshops, this is deferred from registration creation to here.
+  if (existing.paymentStatus !== "COMPLETED") {
+    try {
+      await inngest.send({
+        name: "registration/created",
+        data: {
+          registrationId: registration.id,
+          workshopId: registration.workshop.id,
+          email: registration.email,
+          firstName: registration.firstName,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to publish registration/created event:", error);
+    }
+
+    try {
+      const workshop = registration.workshop;
+      const coach = workshop.coach;
+      const icsContent = generateIcsContent({
+        uid: workshop.id,
+        title: workshop.title,
+        description: workshop.description,
+        eventDate: workshop.eventDate,
+        eventTime: workshop.eventTime,
+        timezone: workshop.timezone,
+        durationHours: parseDurationHours(workshop.duration),
+        location: buildLocationString(workshop),
+      });
+      const safeTitle = workshop.title
+        .replace(/[^a-zA-Z0-9-_ ]/g, "")
+        .replace(/\s+/g, "-")
+        .substring(0, 50);
+
+      await sendRegistrationNotification({
+        workshopId: workshop.id,
+        workshopTitle: workshop.title,
+        workshopCode: workshop.workshopCode,
+        coachEmail: coach.email,
+        coachName: `${coach.firstName} ${coach.lastName}`,
+        registrantName: `${registration.firstName} ${registration.lastName}`,
+        registrantEmail: registration.email,
+        registrantCompany: registration.company ?? undefined,
+        icsAttachment: { filename: `${safeTitle}.ics`, content: icsContent },
+      });
+    } catch (error) {
+      console.error("Failed to send registration notification:", error);
+    }
+  }
+
   console.log(`Payment completed for registration: ${registrationId}`);
 }
 
@@ -239,6 +297,57 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
   });
 
   await syncRegistrationToHubSpot(registration, registrationId);
+
+  // Publish Inngest event + send notifications if not already done by checkout handler
+  if (existing.paymentStatus !== "COMPLETED") {
+    try {
+      await inngest.send({
+        name: "registration/created",
+        data: {
+          registrationId: registration.id,
+          workshopId: registration.workshop.id,
+          email: registration.email,
+          firstName: registration.firstName,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to publish registration/created event (payment_intent):", error);
+    }
+
+    try {
+      const workshop = registration.workshop;
+      const coach = workshop.coach;
+      const icsContent = generateIcsContent({
+        uid: workshop.id,
+        title: workshop.title,
+        description: workshop.description,
+        eventDate: workshop.eventDate,
+        eventTime: workshop.eventTime,
+        timezone: workshop.timezone,
+        durationHours: parseDurationHours(workshop.duration),
+        location: buildLocationString(workshop),
+      });
+      const safeTitle = workshop.title
+        .replace(/[^a-zA-Z0-9-_ ]/g, "")
+        .replace(/\s+/g, "-")
+        .substring(0, 50);
+
+      await sendRegistrationNotification({
+        workshopId: workshop.id,
+        workshopTitle: workshop.title,
+        workshopCode: workshop.workshopCode,
+        coachEmail: coach.email,
+        coachName: `${coach.firstName} ${coach.lastName}`,
+        registrantName: `${registration.firstName} ${registration.lastName}`,
+        registrantEmail: registration.email,
+        registrantCompany: registration.company ?? undefined,
+        icsAttachment: { filename: `${safeTitle}.ics`, content: icsContent },
+      });
+    } catch (error) {
+      console.error("Failed to send registration notification (payment_intent):", error);
+    }
+  }
+
   console.log(`Payment intent succeeded for registration: ${registrationId}`);
 }
 

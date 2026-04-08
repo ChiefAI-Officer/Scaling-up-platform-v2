@@ -125,7 +125,7 @@ export async function PATCH(
           if (result.created > 0) {
             // Fetch registrations to get names for emails
             const registrations = await db.registration.findMany({
-              where: { workshopId: id, status: "REGISTERED" },
+              where: { workshopId: id, status: { in: ["REGISTERED", "CONFIRMED"] } },
               select: { email: true, firstName: true, lastName: true },
             });
 

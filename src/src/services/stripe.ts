@@ -151,6 +151,7 @@ export async function createCheckoutSession({
     cancel_url: cancelUrl,
     customer_email: customerEmail,
     metadata,
+    payment_intent_data: { metadata },
   });
 
   return session;

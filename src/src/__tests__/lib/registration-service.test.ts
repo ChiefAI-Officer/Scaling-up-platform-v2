@@ -141,7 +141,7 @@ describe("registration-service", () => {
     });
   });
 
-  it("creates paid registration with normalized lowercase email", async () => {
+  it("creates paid registration with PENDING_PAYMENT status", async () => {
     mockTx.workshop.findUnique.mockResolvedValue(makeWorkshop({ isFree: false }));
     mockTx.registration.count.mockResolvedValue(0);
     mockTx.registration.findFirst.mockResolvedValue(null);
@@ -150,7 +150,7 @@ describe("registration-service", () => {
       email: "user@example.com",
       workshopId: "ws-1",
       paymentStatus: "PENDING",
-      status: "REGISTERED",
+      status: "PENDING_PAYMENT",
     });
 
     const result = await createWorkshopRegistration(makeInput());
@@ -160,6 +160,7 @@ describe("registration-service", () => {
         data: expect.objectContaining({
           email: "user@example.com",
           paymentStatus: "PENDING",
+          status: "PENDING_PAYMENT",
         }),
       })
     );
@@ -167,6 +168,30 @@ describe("registration-service", () => {
       id: "reg-1",
       email: "user@example.com",
     });
+  });
+
+  it("creates free registration with REGISTERED status", async () => {
+    mockTx.workshop.findUnique.mockResolvedValue(makeWorkshop({ isFree: true }));
+    mockTx.registration.count.mockResolvedValue(0);
+    mockTx.registration.findFirst.mockResolvedValue(null);
+    mockTx.registration.create.mockResolvedValue({
+      id: "reg-2",
+      email: "user@example.com",
+      workshopId: "ws-1",
+      paymentStatus: "FREE",
+      status: "REGISTERED",
+    });
+
+    await createWorkshopRegistration(makeInput());
+
+    expect(mockTx.registration.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentStatus: "FREE",
+          status: "REGISTERED",
+        }),
+      })
+    );
   });
 
   it("returns workshop details when includeWorkshopDetails is enabled", async () => {

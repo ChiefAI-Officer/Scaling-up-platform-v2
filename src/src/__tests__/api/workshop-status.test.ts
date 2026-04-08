@@ -388,7 +388,7 @@ describe("Workshop status API – PATCH /api/workshops/[id]/status", () => {
     expect(createPostWorkshopSurveys).toHaveBeenCalledWith("ws-1");
     expect(db.registration.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { workshopId: "ws-1", status: "REGISTERED" },
+        where: { workshopId: "ws-1", status: { in: ["REGISTERED", "CONFIRMED"] } },
       })
     );
     expect(sendSurveyEmail).toHaveBeenCalledTimes(2);

@@ -48,6 +48,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
 
   let checkoutAmountCents: number | null = null;
   let checkoutCurrency = "usd";
+  let paymentVerified = true;
   if (session_id) {
     try {
       const checkoutSession = await retrieveCheckoutSession(session_id);
@@ -57,8 +58,16 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
       if (checkoutSession.currency) {
         checkoutCurrency = checkoutSession.currency;
       }
+      // Verify payment for PENDING_PAYMENT registrations (webhook may not have fired yet)
+      if (registration && registration.status === "PENDING_PAYMENT") {
+        paymentVerified = checkoutSession.payment_status === "paid";
+      }
     } catch (error) {
-      console.error("Unable to retrieve checkout session for affiliate tracking:", error);
+      console.error("Unable to retrieve checkout session:", error);
+      // If we can't verify and registration is pending, don't show success
+      if (registration && registration.status === "PENDING_PAYMENT") {
+        paymentVerified = false;
+      }
     }
   }
 
@@ -72,6 +81,33 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
           <p className="text-muted-foreground mb-6">
             We couldn&apos;t find your registration. Please check your email for
             confirmation.
+          </p>
+          <Link
+            href="/"
+            className="text-primary hover:text-primary/80 font-medium"
+          >
+            Return Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // If payment not verified for a paid workshop, show pending message
+  if (!paymentVerified) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-16 h-16 bg-warning/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-4">
+            Payment Not Completed
+          </h1>
+          <p className="text-muted-foreground mb-6">
+            Your payment has not been confirmed yet. If you completed the payment, please check your email for a confirmation — it may take a moment to process.
           </p>
           <Link
             href="/"

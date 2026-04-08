@@ -25,10 +25,28 @@ jest.mock("@/services/hubspot", () => ({
   createOrUpdateContact: jest.fn(),
 }));
 
+jest.mock("@/inngest/client", () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue({ ids: [] }),
+  },
+}));
+
+jest.mock("@/services/notifications", () => ({
+  sendRegistrationNotification: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/ics-generator", () => ({
+  generateIcsContent: jest.fn().mockReturnValue("BEGIN:VCALENDAR\nEND:VCALENDAR"),
+  parseDurationHours: jest.fn().mockReturnValue(2),
+  buildLocationString: jest.fn().mockReturnValue("Virtual"),
+}));
+
 import { POST } from "@/app/api/webhooks/stripe/route";
 import { db } from "@/lib/db";
 import { constructWebhookEvent } from "@/services/stripe";
 import { createOrUpdateContact } from "@/services/hubspot";
+import { sendRegistrationNotification } from "@/services/notifications";
+import { inngest } from "@/inngest/client";
 import Stripe from "stripe";
 
 function buildWebhookRequest(options: {
@@ -198,6 +216,141 @@ describe("Stripe webhook API", () => {
     expect(response.status).toBe(200);
     expect(db.registration.update).not.toHaveBeenCalled();
     expect(createOrUpdateContact).not.toHaveBeenCalled();
+  });
+
+  it("publishes registration/created Inngest event after checkout completion", async () => {
+    process.env.HUBSPOT_ACCESS_TOKEN = "test-token";
+    (constructWebhookEvent as jest.Mock).mockReturnValue({
+      id: "evt_inngest_1",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_inngest",
+          amount_total: 10000,
+          payment_intent: "pi_inngest",
+          metadata: {
+            registrationId: "reg-inngest",
+          },
+        },
+      },
+    });
+    (db.registration.findUnique as jest.Mock).mockResolvedValue({
+      id: "reg-inngest",
+      email: "buyer@example.com",
+      paymentStatus: "PENDING",
+      stripePaymentId: null,
+    });
+    (db.registration.update as jest.Mock).mockResolvedValueOnce({
+      id: "reg-inngest",
+      email: "buyer@example.com",
+      firstName: "Jane",
+      lastName: "Doe",
+      company: "Acme",
+      jobTitle: "CTO",
+      phone: "555-1234",
+      workshop: {
+        id: "ws-inngest",
+        title: "Test Workshop",
+        workshopCode: "WS-2026-ABCD",
+        eventDate: new Date("2026-06-01T10:00:00.000Z"),
+        eventTime: "10:00",
+        timezone: "America/New_York",
+        duration: "2 hours",
+        format: "VIRTUAL",
+        virtualLink: "https://zoom.us/j/123",
+        coach: {
+          id: "coach-1",
+          firstName: "Coach",
+          lastName: "Smith",
+          email: "coach@example.com",
+        },
+      },
+    }).mockResolvedValue({});
+    (createOrUpdateContact as jest.Mock).mockResolvedValue("hs_inngest");
+
+    await POST(
+      buildWebhookRequest({
+        signature: "good-signature",
+        body: JSON.stringify({}),
+      })
+    );
+
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "registration/created",
+        data: expect.objectContaining({
+          registrationId: "reg-inngest",
+          workshopId: "ws-inngest",
+        }),
+      })
+    );
+  });
+
+  it("sends registration notification after checkout completion", async () => {
+    process.env.HUBSPOT_ACCESS_TOKEN = "test-token";
+    (constructWebhookEvent as jest.Mock).mockReturnValue({
+      id: "evt_notif_1",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_notif",
+          amount_total: 10000,
+          payment_intent: "pi_notif",
+          metadata: {
+            registrationId: "reg-notif",
+          },
+        },
+      },
+    });
+    (db.registration.findUnique as jest.Mock).mockResolvedValue({
+      id: "reg-notif",
+      email: "notif@example.com",
+      paymentStatus: "PENDING",
+      stripePaymentId: null,
+    });
+    (db.registration.update as jest.Mock).mockResolvedValueOnce({
+      id: "reg-notif",
+      email: "notif@example.com",
+      firstName: "Notify",
+      lastName: "User",
+      company: "TestCo",
+      jobTitle: null,
+      phone: "555-0000",
+      workshop: {
+        id: "ws-notif",
+        title: "Notification Workshop",
+        workshopCode: "WS-2026-NOTF",
+        eventDate: new Date("2026-06-15T09:00:00.000Z"),
+        eventTime: "09:00",
+        timezone: "America/New_York",
+        duration: "2 hours",
+        format: "VIRTUAL",
+        virtualLink: "https://zoom.us/j/456",
+        coach: {
+          id: "coach-2",
+          firstName: "Notify",
+          lastName: "Coach",
+          email: "ncoach@example.com",
+        },
+      },
+    }).mockResolvedValue({});
+    (createOrUpdateContact as jest.Mock).mockResolvedValue("hs_notif");
+
+    await POST(
+      buildWebhookRequest({
+        signature: "good-signature",
+        body: JSON.stringify({}),
+      })
+    );
+
+    expect(sendRegistrationNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workshopId: "ws-notif",
+        workshopTitle: "Notification Workshop",
+        coachEmail: "ncoach@example.com",
+        registrantEmail: "notif@example.com",
+      })
+    );
   });
 
   it("cancels PENDING registration when checkout.session.expired fires", async () => {

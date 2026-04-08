@@ -222,7 +222,7 @@ export const executeWorkflow = inngest.createFunction(
 
               // Fetch all registrations for this workshop
               const registrations = await db.registration.findMany({
-                where: { workshopId: workshop.id, status: "REGISTERED" },
+                where: { workshopId: workshop.id, status: { in: ["REGISTERED", "CONFIRMED"] } },
                 select: { id: true, email: true, firstName: true, lastName: true, company: true },
               });
               const canAttach = canDeliverWorkflowAttachments({
@@ -335,7 +335,7 @@ export const executeWorkflow = inngest.createFunction(
               }
 
               const registrations = await db.registration.findMany({
-                where: { workshopId: workshop.id, status: "REGISTERED" },
+                where: { workshopId: workshop.id, status: { in: ["REGISTERED", "CONFIRMED"] } },
                 select: { id: true, email: true, firstName: true, lastName: true, company: true },
               });
 
@@ -489,7 +489,7 @@ export const executeWorkflow = inngest.createFunction(
                 recipientRole,
               });
               const registrations = await db.registration.findMany({
-                where: { workshopId: workshop.id, status: "REGISTERED" },
+                where: { workshopId: workshop.id, status: { in: ["REGISTERED", "CONFIRMED"] } },
                 select: { id: true, email: true, firstName: true, lastName: true, company: true },
               });
               const fileLinks = buildFileLinksHtml(protectedLinks);

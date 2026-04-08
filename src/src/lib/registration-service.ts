@@ -145,7 +145,7 @@ async function createRegistrationTransaction(
       phone: input.phone,
       marketingOptIn: input.marketingOptIn ?? false,
       paymentStatus: workshop.isFree ? "FREE" : "PENDING",
-      status: "REGISTERED",
+      status: workshop.isFree ? "REGISTERED" : "PENDING_PAYMENT",
     },
   });
 

@@ -23,7 +23,7 @@ export type CertificationStatus = "PENDING" | "ACTIVE" | "EXPIRED" | "REVOKED";
 
 export type PaymentStatus = "PENDING" | "CURRENT" | "OVERDUE" | "SUSPENDED";
 
-export type RegistrationStatus = "REGISTERED" | "CONFIRMED" | "CHECKED_IN" | "NO_SHOW" | "CANCELLED";
+export type RegistrationStatus = "PENDING_PAYMENT" | "REGISTERED" | "CONFIRMED" | "CHECKED_IN" | "NO_SHOW" | "CANCELLED";
 
 export type RegistrationPaymentStatus = "PENDING" | "COMPLETED" | "REFUNDED" | "FAILED" | "FREE";
 
