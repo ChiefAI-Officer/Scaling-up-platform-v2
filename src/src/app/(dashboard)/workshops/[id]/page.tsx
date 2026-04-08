@@ -9,6 +9,7 @@ import {
   formatCurrency,
   getWorkshopStatusColor,
   getWorkshopStatusLabel,
+  getRegistrationDisplayStatus,
   parseJsonField,
   VenueAddress,
 } from "@/lib/utils";
@@ -316,7 +317,7 @@ export default async function WorkshopDetailPage({
           {/* Registrations */}
           <Card id="registrations">
             <CardHeader>
-              <CardTitle>Registrations ({workshop.registrations.filter((r) => r.status !== "PENDING_PAYMENT").length})</CardTitle>
+              <CardTitle>Registrations ({workshop.registrations.filter((r) => r.paymentStatus !== "PENDING").length})</CardTitle>
             </CardHeader>
             <CardContent>
               {workshop.registrations.length === 0 ? (
@@ -360,9 +361,14 @@ export default async function WorkshopDetailPage({
                             {reg.email}
                           </td>
                           <td className="px-4 py-3">
-                            <Badge variant={reg.status === "PENDING_PAYMENT" ? "warning" : "secondary"}>
-                              {reg.status === "PENDING_PAYMENT" ? "Awaiting Payment" : reg.status}
-                            </Badge>
+                            {(() => {
+                              const displayStatus = getRegistrationDisplayStatus(reg.status, reg.paymentStatus);
+                              return (
+                                <Badge variant={displayStatus === "Awaiting Payment" ? "warning" : "secondary"}>
+                                  {displayStatus}
+                                </Badge>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-3">
                             <Badge

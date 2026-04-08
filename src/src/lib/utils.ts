@@ -5,6 +5,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function getRegistrationDisplayStatus(status: string, paymentStatus: string): string {
+  if (paymentStatus === "PENDING" && status !== "CANCELLED") return "Awaiting Payment";
+  return status;
+}
+
 export function formatCurrency(cents: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

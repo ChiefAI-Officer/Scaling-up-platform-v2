@@ -116,7 +116,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
       where: { paymentStatus: "COMPLETED", ...registrationWhere },
     }),
     db.registration.count({
-      where: registrationWhere,
+      where: { paymentStatus: { not: "PENDING" }, ...registrationWhere },
     }),
     db.registration.count({
       where: { paymentStatus: "COMPLETED", ...registrationWhere },
@@ -148,7 +148,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
           },
           select: { amountPaidCents: true },
         },
-        _count: { select: { registrations: true } },
+        _count: { select: { registrations: { where: { paymentStatus: { not: "PENDING" } } } } },
       },
       orderBy: { eventDate: "desc" },
     }),
