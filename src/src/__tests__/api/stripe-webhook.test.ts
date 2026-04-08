@@ -138,6 +138,7 @@ describe("Stripe webhook API", () => {
       id: "reg-1",
       email: "user@example.com",
       paymentStatus: "PENDING",
+      status: "PENDING_PAYMENT",
       stripePaymentId: null,
     });
     (db.registration.update as jest.Mock)
@@ -181,6 +182,79 @@ describe("Stripe webhook API", () => {
         workshop_name: "Scaling Up",
       })
     );
+  });
+
+  it("sets status to REGISTERED (not CONFIRMED) after checkout completion", async () => {
+    (constructWebhookEvent as jest.Mock).mockReturnValue({
+      id: "evt_status_1",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_status",
+          amount_total: 5000,
+          payment_intent: "pi_status",
+          metadata: { registrationId: "reg-status" },
+        },
+      },
+    });
+    (db.registration.findUnique as jest.Mock).mockResolvedValue({
+      id: "reg-status",
+      email: "status@example.com",
+      paymentStatus: "PENDING",
+      status: "PENDING_PAYMENT",
+      stripePaymentId: null,
+    });
+    (db.registration.update as jest.Mock).mockResolvedValue({
+      id: "reg-status",
+      email: "status@example.com",
+      firstName: "Test",
+      lastName: "User",
+      company: null,
+      workshop: {
+        id: "ws-status",
+        title: "Status Test",
+        workshopCode: "WS-2026-STAT",
+        eventDate: new Date(),
+        coach: { id: "c1", firstName: "C", lastName: "O", email: "c@e.com" },
+      },
+    });
+
+    await POST(buildWebhookRequest({ signature: "good-sig", body: "{}" }));
+
+    expect(db.registration.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "REGISTERED",
+        }),
+      })
+    );
+  });
+
+  it("does not overwrite CANCELLED registration on checkout completion", async () => {
+    (constructWebhookEvent as jest.Mock).mockReturnValue({
+      id: "evt_cancelled_1",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_cancelled",
+          amount_total: 5000,
+          payment_intent: "pi_cancelled",
+          metadata: { registrationId: "reg-cancelled" },
+        },
+      },
+    });
+    (db.registration.findUnique as jest.Mock).mockResolvedValue({
+      id: "reg-cancelled",
+      email: "cancelled@example.com",
+      paymentStatus: "CANCELLED",
+      status: "CANCELLED",
+      stripePaymentId: null,
+    });
+
+    await POST(buildWebhookRequest({ signature: "good-sig", body: "{}" }));
+
+    // Should not update — registration was already cancelled
+    expect(db.registration.update).not.toHaveBeenCalled();
   });
 
   it("ignores duplicate checkout completion events idempotently", async () => {
@@ -238,6 +312,7 @@ describe("Stripe webhook API", () => {
       id: "reg-inngest",
       email: "buyer@example.com",
       paymentStatus: "PENDING",
+      status: "PENDING_PAYMENT",
       stripePaymentId: null,
     });
     (db.registration.update as jest.Mock).mockResolvedValueOnce({
@@ -306,6 +381,7 @@ describe("Stripe webhook API", () => {
       id: "reg-notif",
       email: "notif@example.com",
       paymentStatus: "PENDING",
+      status: "PENDING_PAYMENT",
       stripePaymentId: null,
     });
     (db.registration.update as jest.Mock).mockResolvedValueOnce({
@@ -429,6 +505,7 @@ describe("Stripe webhook API", () => {
       id: "reg-2",
       email: "paid@example.com",
       paymentStatus: "PENDING",
+      status: "PENDING_PAYMENT",
       stripePaymentId: null,
     });
 

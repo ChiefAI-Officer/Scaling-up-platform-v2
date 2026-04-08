@@ -154,6 +154,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       id: true,
       email: true,
       paymentStatus: true,
+      status: true,
       stripePaymentId: true,
     },
   });
@@ -173,6 +174,12 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     return;
   }
 
+  // Don't overwrite cancelled registrations
+  if (existing.status === "CANCELLED") {
+    console.log(`Skipping checkout completion for CANCELLED registration ${registrationId}`);
+    return;
+  }
+
   // Update registration with payment info
   const registration = await db.registration.update({
     where: { id: registrationId },
@@ -180,7 +187,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       paymentStatus: "COMPLETED",
       stripePaymentId: paymentIntentId,
       amountPaidCents: session.amount_total || 0,
-      status: "CONFIRMED",
+      status: "REGISTERED",
     },
     include: {
       workshop: {
@@ -261,6 +268,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       id: true,
       email: true,
       paymentStatus: true,
+      status: true,
       stripePaymentId: true,
     },
   });
@@ -279,13 +287,18 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     return;
   }
 
+  if (existing.status === "CANCELLED") {
+    console.log(`Skipping payment_intent.succeeded for CANCELLED registration ${registrationId}`);
+    return;
+  }
+
   const registration = await db.registration.update({
     where: { id: registrationId },
     data: {
       paymentStatus: "COMPLETED",
       stripePaymentId: paymentIntent.id,
       amountPaidCents: paymentIntent.amount_received || paymentIntent.amount || 0,
-      status: "CONFIRMED",
+      status: "REGISTERED",
     },
     include: {
       workshop: {
