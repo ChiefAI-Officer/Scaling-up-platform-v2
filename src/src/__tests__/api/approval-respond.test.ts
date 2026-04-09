@@ -391,6 +391,42 @@ describe("Approval respond API", () => {
         data: { approvalId: "apr-cp-inngest", workshopId: "ws-cp-inngest", coachId: "coach-1" },
       });
     });
+
+    it("CUSTOM_PRICING: deny sets approval status DENIED and does not update workshop status", async () => {
+      (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
+        id: "apr-cp-deny",
+        type: "CUSTOM_PRICING",
+        status: "PENDING",
+        workshopId: "ws-cp-deny",
+        coachId: "coach-1",
+        requestData: JSON.stringify({ newPriceCents: 24900 }),
+      });
+      (db.approvalQueue.update as jest.Mock).mockResolvedValue({
+        id: "apr-cp-deny",
+        status: "DENIED",
+      });
+
+      const response = await POST(
+        requestWithJson({ action: "DENY", reason: "Pricing not approved" }),
+        routeParams("apr-cp-deny")
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(db.approvalQueue.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "apr-cp-deny" },
+          data: expect.objectContaining({
+            status: "DENIED",
+            responseReason: "Pricing not approved",
+          }),
+        })
+      );
+      // CUSTOM_PRICING denial does NOT touch workshop status —
+      // workshop is already at INFO_REQUESTED and the branch returns early
+      expect(db.workshop.update).not.toHaveBeenCalled();
+    });
   });
 
   it("emits workshop/approved Inngest event when approving with workshopId", async () => {

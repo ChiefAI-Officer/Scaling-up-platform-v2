@@ -96,7 +96,7 @@ export default async function WorkshopDetailsPage({
     db.approvalQueue.findFirst({
       where: {
         workshopId: id,
-        type: "WORKSHOP_REQUEST",
+        type: { in: ["WORKSHOP_REQUEST", "CUSTOM_PRICING"] },
         status: "DENIED",
       },
       orderBy: { respondedAt: "desc" },
