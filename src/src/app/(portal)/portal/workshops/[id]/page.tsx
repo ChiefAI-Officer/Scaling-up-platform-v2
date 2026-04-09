@@ -96,6 +96,7 @@ export default async function WorkshopDetailsPage({
     db.approvalQueue.findFirst({
       where: {
         workshopId: id,
+        // CANCELLATION denials are excluded: workshop stays active when cancellation is rejected (status is PRE_EVENT, not INFO_REQUESTED)
         type: { in: ["WORKSHOP_REQUEST", "CUSTOM_PRICING"] },
         status: "DENIED",
       },

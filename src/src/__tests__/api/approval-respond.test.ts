@@ -62,6 +62,7 @@ import { logAudit } from "@/lib/audit";
 import { getApiActor } from "@/lib/authorization";
 import { inngest } from "@/inngest/client";
 import { runAutoBuild } from "@/lib/auto-build-service";
+import { sendWorkshopDeniedEmail } from "@/services/notifications";
 
 function routeParams(id = "apr-1") {
   return { params: Promise.resolve({ id }) };
@@ -414,6 +415,7 @@ describe("Approval respond API", () => {
 
       expect(response.status).toBe(200);
       expect(body.success).toBe(true);
+      expect(body.status).toBe("DENIED");
       expect(db.approvalQueue.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "apr-cp-deny" },
@@ -423,9 +425,9 @@ describe("Approval respond API", () => {
           }),
         })
       );
-      // CUSTOM_PRICING denial does NOT touch workshop status —
-      // workshop is already at INFO_REQUESTED and the branch returns early
+      // CUSTOM_PRICING branch returns early on denial — does not touch workshop record
       expect(db.workshop.update).not.toHaveBeenCalled();
+      expect(sendWorkshopDeniedEmail).not.toHaveBeenCalled();
     });
   });
 
