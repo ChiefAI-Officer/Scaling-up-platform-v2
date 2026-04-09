@@ -164,9 +164,10 @@ describe("Approval respond API", () => {
     expect(db.workshop.update).not.toHaveBeenCalled();
   });
 
-  it("does NOT update workshop status when denying", async () => {
+  it("updates workshop status to INFO_REQUESTED when denying", async () => {
     (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
       id: "apr-3",
+      type: "WORKSHOP_REQUEST",
       status: "PENDING",
       workshopId: "ws-99",
       coachId: "coach-1",
@@ -175,14 +176,20 @@ describe("Approval respond API", () => {
       id: "apr-3",
       status: "DENIED",
     });
+    (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-99" });
 
     await POST(
       requestWithJson({ action: "DENY", reason: "Not ready" }),
       routeParams("apr-3")
     );
 
-    // Workshop status should NOT be updated on denial
-    expect(db.workshop.update).not.toHaveBeenCalled();
+    // Workshop status IS updated to INFO_REQUESTED on denial
+    expect(db.workshop.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ws-99" },
+        data: { status: "INFO_REQUESTED" },
+      })
+    );
   });
 
   describe("CUSTOM_PRICING approvals", () => {

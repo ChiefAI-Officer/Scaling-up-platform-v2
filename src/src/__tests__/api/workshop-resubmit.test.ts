@@ -77,7 +77,7 @@ function workshopRecord(overrides: Record<string, unknown> = {}) {
   return {
     id: "ws-1",
     title: "Scaling Up Workshop",
-    status: "DENIED",
+    status: "INFO_REQUESTED",
     coachId: "coach-1",
     coach: {
       id: "coach-1",
@@ -102,10 +102,10 @@ describe("Workshop Resubmit API", () => {
     jest.clearAllMocks();
   });
 
-  it("resubmits DENIED workshop, status transitions to REQUESTED", async () => {
+  it("resubmits INFO_REQUESTED (denied) workshop, status transitions to REQUESTED", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(actorAsCoach());
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(
-      workshopRecord({ status: "DENIED" })
+      workshopRecord({ status: "INFO_REQUESTED" })
     );
     (canManageCoachData as jest.Mock).mockReturnValue(true);
     (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
@@ -202,7 +202,7 @@ describe("Workshop Resubmit API", () => {
   it("auto-approved: calls runAutoBuild instead of direct PRE_EVENT", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(actorAsAdmin());
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(
-      workshopRecord({ status: "DENIED" })
+      workshopRecord({ status: "INFO_REQUESTED" })
     );
     (canManageCoachData as jest.Mock).mockReturnValue(true);
     (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
@@ -230,7 +230,7 @@ describe("Workshop Resubmit API", () => {
   it("creates new approval queue entry via evaluateApproval", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(actorAsCoach());
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(
-      workshopRecord({ status: "DENIED" })
+      workshopRecord({ status: "INFO_REQUESTED" })
     );
     (canManageCoachData as jest.Mock).mockReturnValue(true);
     (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
@@ -259,7 +259,7 @@ describe("Workshop Resubmit API", () => {
   it("returns 500 when evaluateApproval throws", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(actorAsCoach());
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(
-      workshopRecord({ status: "DENIED" })
+      workshopRecord({ status: "INFO_REQUESTED" })
     );
     (canManageCoachData as jest.Mock).mockReturnValue(true);
     (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
