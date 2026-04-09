@@ -17,7 +17,7 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   canManageCoachData: jest.fn(),
 }));
@@ -39,7 +39,7 @@ jest.mock("@/lib/auto-build-service", () => ({
 
 import { POST } from "@/app/api/workshops/[id]/resubmit/route";
 import { db } from "@/lib/db";
-import { getApiActor, canManageCoachData } from "@/lib/authorization";
+import { getApiActor, canManageCoachData } from "@/lib/auth/authorization";
 import { evaluateApproval } from "@/lib/approval-engine";
 import { runAutoBuild } from "@/lib/auto-build-service";
 

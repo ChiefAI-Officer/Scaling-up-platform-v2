@@ -1,4 +1,4 @@
-import { resolveAuthPosture } from "@/lib/auth-posture";
+import { resolveAuthPosture } from "@/lib/auth/auth-posture";
 
 describe("resolveAuthPosture", () => {
   it("enables demo mode only in local development", () => {

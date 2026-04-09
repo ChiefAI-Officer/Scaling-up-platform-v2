@@ -25,7 +25,7 @@ jest.mock("@/lib/audit", () => ({
   logAudit: jest.fn(),
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   canManageCoachData: jest.fn(),
 }));
@@ -33,7 +33,7 @@ jest.mock("@/lib/authorization", () => ({
 import { GET, POST } from "@/app/api/landing-pages/route";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
-import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { canManageCoachData, getApiActor } from "@/lib/auth/authorization";
 
 function buildRequest(url: string, init?: RequestInit): Request {
   return new Request(url, init);

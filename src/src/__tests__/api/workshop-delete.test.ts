@@ -1,7 +1,7 @@
 // src/src/__tests__/api/workshop-delete.test.ts
 import { POST } from "@/app/api/workshops/[id]/delete/route";
 import { db } from "@/lib/db";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 
 jest.mock("next/server", () => ({
   NextResponse: {
@@ -26,7 +26,7 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
 }));
 

@@ -17,7 +17,7 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   canManageCoachData: jest.fn(),
 }));
@@ -28,7 +28,7 @@ jest.mock("@/services/stripe", () => ({
 
 import { DELETE } from "@/app/api/registrations/[id]/route";
 import { db } from "@/lib/db";
-import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { canManageCoachData, getApiActor } from "@/lib/auth/authorization";
 import { processRefund } from "@/services/stripe";
 
 function routeParams(id = "reg-1") {

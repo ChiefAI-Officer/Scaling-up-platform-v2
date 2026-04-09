@@ -19,7 +19,7 @@ jest.mock("@/lib/db", () => ({
     },
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
     getApiActor: jest.fn(),
     isPrivilegedRole: (r: string) => r === "ADMIN" || r === "STAFF",
 }));
@@ -30,7 +30,7 @@ jest.mock("@/lib/audit", () => ({
 
 import { PATCH } from "@/app/api/page-templates/[id]/route";
 import { db } from "@/lib/db";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 
 function routeParams(id: string) {
     return { params: Promise.resolve({ id }) };

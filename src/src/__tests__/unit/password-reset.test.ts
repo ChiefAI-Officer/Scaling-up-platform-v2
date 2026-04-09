@@ -1,7 +1,7 @@
 import {
   generatePasswordResetToken,
   verifyPasswordResetToken,
-} from "@/lib/password-reset";
+} from "@/lib/auth/password-reset";
 
 describe("password-reset token helpers", () => {
   const originalSecret = process.env.APPROVAL_LINK_SECRET;

@@ -1,4 +1,4 @@
-import { ApiActor, canManageCoachData, isPrivilegedRole } from "@/lib/access-control";
+import { ApiActor, canManageCoachData, isPrivilegedRole } from "@/lib/auth/access-control";
 
 function createActor(overrides: Partial<ApiActor> = {}): ApiActor {
   return {

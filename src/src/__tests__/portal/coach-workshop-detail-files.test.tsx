@@ -16,7 +16,7 @@ jest.mock("next/navigation", () => ({
   }),
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   requireCoach: jest.fn(),
 }));
 
@@ -71,7 +71,7 @@ jest.mock("@/components/workshops/coach-response-form", () => ({
 }));
 
 import WorkshopDetailsPage from "@/app/(portal)/portal/workshops/[id]/page";
-import { requireCoach } from "@/lib/authorization";
+import { requireCoach } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 
 describe("Coach workshop detail file links", () => {

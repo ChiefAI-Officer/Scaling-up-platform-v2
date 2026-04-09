@@ -26,7 +26,7 @@ jest.mock("@/lib/rate-limit", () => ({
   withRateLimit: jest.fn(),
 }));
 
-jest.mock("@/lib/password-reset", () => ({
+jest.mock("@/lib/auth/password-reset", () => ({
   generatePasswordResetToken: jest.fn(),
   verifyPasswordResetToken: jest.fn(),
 }));
@@ -55,7 +55,7 @@ import { withRateLimit } from "@/lib/rate-limit";
 import {
   generatePasswordResetToken,
   verifyPasswordResetToken,
-} from "@/lib/password-reset";
+} from "@/lib/auth/password-reset";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 

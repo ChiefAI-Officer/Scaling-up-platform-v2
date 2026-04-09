@@ -12,7 +12,7 @@ jest.mock("next-auth", () => ({
   getServerSession: jest.fn(),
 }));
 
-jest.mock("@/lib/auth", () => ({
+jest.mock("@/lib/auth/auth", () => ({
   authOptions: {},
 }));
 
@@ -27,7 +27,7 @@ jest.mock("@/lib/file-service", () => ({
   mapFileForClient: jest.fn((f: unknown) => f),
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   canManageCoachData: jest.fn(),
   isPrivilegedRole: jest.fn((role: string) => role === "ADMIN" || role === "STAFF"),
@@ -61,7 +61,7 @@ import {
   validateFile,
   mapFileForClient,
 } from "@/lib/file-service";
-import { getApiActor, canManageCoachData } from "@/lib/authorization";
+import { getApiActor, canManageCoachData } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 
 // ---------------------------------------------------------------------------

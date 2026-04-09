@@ -32,7 +32,7 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
   canManageCoachData: jest.fn(),
@@ -46,7 +46,7 @@ jest.mock("@/lib/template-interpolation", () => ({
 import { GET } from "@/app/api/landing-pages/library/route";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 
 const adminActor = {
   userId: "admin-1",

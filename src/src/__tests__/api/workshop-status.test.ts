@@ -16,7 +16,7 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
 }));
@@ -38,7 +38,7 @@ jest.mock("@/lib/survey-automation", () => ({
 
 import { PATCH } from "@/app/api/workshops/[id]/status/route";
 import { db } from "@/lib/db";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 import { inngest } from "@/inngest/client";
 import {
   createPostWorkshopSurveys,

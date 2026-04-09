@@ -40,7 +40,7 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
 }));
@@ -59,7 +59,7 @@ jest.mock("@/inngest/client", () => ({
 
 import { GET, POST } from "@/app/api/workshops/route";
 import { db } from "@/lib/db";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 import { createWorkshopPromotionCode } from "@/services/stripe";
 
 function asPostRequest(request: Request): Parameters<typeof POST>[0] {

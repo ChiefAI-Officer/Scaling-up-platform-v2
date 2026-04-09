@@ -12,7 +12,7 @@ jest.mock("@vercel/blob/client", () => ({
   handleUpload: jest.fn(),
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   canManageCoachData: jest.fn(),
 }));
@@ -31,7 +31,7 @@ jest.mock("@/lib/db", () => ({
 
 import { POST } from "@/app/api/files/client-upload/route";
 import { handleUpload } from "@vercel/blob/client";
-import { getApiActor, canManageCoachData } from "@/lib/authorization";
+import { getApiActor, canManageCoachData } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 
 describe("POST /api/files/client-upload", () => {

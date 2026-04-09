@@ -29,7 +29,7 @@ jest.mock("@/lib/audit", () => ({
   logAudit: jest.fn(),
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
 }));
@@ -59,7 +59,7 @@ jest.mock("@/lib/auto-build-service", () => ({
 import { POST } from "@/app/api/approvals/[id]/respond/route";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 import { inngest } from "@/inngest/client";
 import { runAutoBuild } from "@/lib/auto-build-service";
 import { sendWorkshopDeniedEmail } from "@/services/notifications";

@@ -20,7 +20,7 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   canManageCoachData: jest.fn(),
   getApiActor: jest.fn(),
 }));
@@ -64,7 +64,7 @@ import {
   RegistrationServiceError,
 } from "@/lib/registration-service";
 import { db } from "@/lib/db";
-import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { canManageCoachData, getApiActor } from "@/lib/auth/authorization";
 
 function buildRequest(body: Record<string, unknown>): Request {
   return new Request("http://localhost/api/registrations", {

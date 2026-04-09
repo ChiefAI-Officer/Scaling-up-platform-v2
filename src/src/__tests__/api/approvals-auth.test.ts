@@ -50,7 +50,7 @@ jest.mock("@/services/notifications", () => ({
   sendEnrichedApprovalRequest: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
 }));
@@ -58,7 +58,7 @@ jest.mock("@/lib/authorization", () => ({
 import { POST } from "@/app/api/approvals/route";
 import { db } from "@/lib/db";
 import { evaluateApproval } from "@/lib/approval-engine";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 
 function buildPostRequest(body: Record<string, unknown>): Parameters<typeof POST>[0] {
   return new Request("http://localhost/api/approvals", {

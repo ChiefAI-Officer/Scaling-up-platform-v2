@@ -20,11 +20,11 @@ jest.mock("next-auth", () => ({
   getServerSession: jest.fn(),
 }));
 
-jest.mock("@/lib/auth", () => ({
+jest.mock("@/lib/auth/auth", () => ({
   authOptions: {},
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
 }));
 
@@ -47,7 +47,7 @@ jest.mock("@/lib/db", () => ({
 
 import { GET } from "@/app/api/files/[id]/download/route";
 import { getServerSession } from "next-auth";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 import { getFile } from "@/lib/file-service";
 import { canRoleAccessAttachment, verifyFileAccessToken } from "@/lib/file-access";
 

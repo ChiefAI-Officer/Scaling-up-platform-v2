@@ -17,7 +17,7 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
   canManageCoachData: jest.fn(),
@@ -29,7 +29,7 @@ jest.mock("@/services/stripe", () => ({
 
 import { GET, PATCH, DELETE } from "@/app/api/workshops/[id]/route";
 import { db } from "@/lib/db";
-import { getApiActor, canManageCoachData } from "@/lib/authorization";
+import { getApiActor, canManageCoachData } from "@/lib/auth/authorization";
 import { chargeCancellationFee } from "@/services/stripe";
 
 function routeParams(id = "ws-1") {

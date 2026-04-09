@@ -1,4 +1,4 @@
-jest.mock("@/lib/authorization", () => ({
+jest.mock("@/lib/auth/authorization", () => ({
   requireCoach: jest.fn(),
 }));
 
@@ -24,7 +24,7 @@ jest.mock(
 );
 
 import RegistrationsPage from "@/app/(portal)/portal/registrations/page";
-import { requireCoach } from "@/lib/authorization";
+import { requireCoach } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 
 describe("Portal registrations page", () => {
