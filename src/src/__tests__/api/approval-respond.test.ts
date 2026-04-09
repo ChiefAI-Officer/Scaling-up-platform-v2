@@ -229,6 +229,37 @@ describe("Approval respond API", () => {
     );
   });
 
+  it("allows APPROVE when approval is in INFO_REQUESTED state", async () => {
+    (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
+      id: "apr-6",
+      type: "WORKSHOP_REQUEST",
+      status: "INFO_REQUESTED",
+      workshopId: "ws-102",
+      coachId: "coach-4",
+    });
+    (db.approvalQueue.update as jest.Mock).mockResolvedValue({
+      id: "apr-6",
+      status: "APPROVED",
+    });
+
+    const response = await POST(
+      requestWithJson({ action: "APPROVE" }),
+      routeParams("apr-6")
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.status).toBe("APPROVED");
+    expect(db.approvalQueue.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "apr-6" },
+        data: expect.objectContaining({ status: "APPROVED" }),
+      })
+    );
+    expect(inngest.send).toHaveBeenCalled();
+  });
+
   describe("CUSTOM_PRICING approvals", () => {
     it("applies newPriceCents from requestData to workshop when approved", async () => {
       (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({

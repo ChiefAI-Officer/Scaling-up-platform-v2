@@ -58,6 +58,7 @@ export async function GET(
             );
         }
 
+        // Email links are single-use and generated when PENDING; dashboard POST supports INFO_REQUESTED→DENY.
         if (approval.status !== "PENDING") {
             return new NextResponse(
                 `<html><body><h1>Already Processed</h1><p>This request has already been ${approval.status.toLowerCase()}.</p></body></html>`,
@@ -568,7 +569,7 @@ export async function POST(
             entityId: id,
             action,
             performedBy: actor.email,
-            changes: { previousStatus: "PENDING", newStatus, reason }
+            changes: { previousStatus: approval.status, newStatus, reason }
         });
 
         return NextResponse.json({
