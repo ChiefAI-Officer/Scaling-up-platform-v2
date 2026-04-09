@@ -94,7 +94,8 @@ export default async function WorkshopDetailsPage({
     db.approvalQueue.findFirst({
       where: {
         workshopId: id,
-        decision: "DENIED",
+        type: "WORKSHOP_REQUEST",
+        status: "DENIED",
       },
       orderBy: { respondedAt: "desc" },
       select: {
@@ -321,7 +322,7 @@ export default async function WorkshopDetailsPage({
       )}
 
       {/* FIG-009: Full edit form for INFO_REQUESTED status */}
-      {workshop.status === "INFO_REQUESTED" && infoRequestedApproval && (
+      {workshop.status === "INFO_REQUESTED" && infoRequestedApproval && !latestDenial && (
         <ResubmitWorkshop
           variant="info_requested"
           workshopId={workshop.id}
@@ -377,7 +378,7 @@ export default async function WorkshopDetailsPage({
       )}
 
       {/* Rejection + Resubmit */}
-      {["CANCELED", "DENIED"].includes(workshop.status) && (
+      {(workshop.status === "CANCELED" || (workshop.status === "INFO_REQUESTED" && !!latestDenial)) && (
         <ResubmitWorkshop
           variant="denied"
           workshopId={workshop.id}
