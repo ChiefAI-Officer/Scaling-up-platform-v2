@@ -76,8 +76,9 @@ export function getWorkshopStatusColor(status: string): string {
 
 export function getWorkshopStatusLabel(status: string): string {
   const labels: Record<string, string> = {
+    REQUESTED: "Approval Pending",
     INFO_REQUESTED: "Info Requested",
-    AWAITING_APPROVAL: "Awaiting Approval",
+    AWAITING_APPROVAL: "Approval Pending",
     PRE_EVENT: "Pre-Event",
     POST_EVENT: "Post-Event",
     COMPLETED: "Completed",
