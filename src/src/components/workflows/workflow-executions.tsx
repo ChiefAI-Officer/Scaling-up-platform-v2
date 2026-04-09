@@ -28,6 +28,7 @@ interface Execution {
     stepType: string;
     subject: string | null;
     offsetDays: number | null;
+    offsetHours: number | null;
   };
 }
 

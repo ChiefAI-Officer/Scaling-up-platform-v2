@@ -23,9 +23,10 @@ import {
   TRIGGER_TYPES,
   TRIGGER_TYPE_LABELS,
   OFFSET_PRESETS,
+  HOUR_OFFSET_PRESETS,
   WORKFLOW_VARIABLES,
 } from "@/lib/workflow-types";
-import type { StepType, TriggerType } from "@/lib/workflow-types";
+import type { StepType, TriggerType, OffsetMode } from "@/lib/workflow-types";
 import {
   Tooltip,
   TooltipContent,
@@ -229,7 +230,7 @@ export function WorkflowEditor({
       emailTemplateId?: string;
       offsetDays?: number;
       offsetHours?: number;
-      sendTimeOfDay?: string;
+      sendTimeOfDay?: string | null;
       customRecipients?: string[];
     }) => {
       if (!workflowId) return;
@@ -748,6 +749,11 @@ function StepCard({
   const [offsetDays, setOffsetDays] = useState<number>(step.offsetDays ?? 0);
   const [offsetHours, setOffsetHours] = useState<number>(step.offsetHours ?? 0);
   const [sendTime, setSendTime] = useState(step.sendTimeOfDay ?? "");
+  const [offsetMode, setOffsetMode] = useState<OffsetMode>(
+    step.offsetHours && step.offsetHours !== 0 && (step.offsetDays ?? 0) === 0 && !step.sendTimeOfDay
+      ? "hours"
+      : "days"
+  );
   const [subject, setSubject] = useState(step.subject ?? "");
   const [body, setBody] = useState(step.body ?? "");
   const [templateId, setTemplateId] = useState(step.emailTemplateId ?? "");
@@ -806,6 +812,19 @@ function StepCard({
       }
     }
   }
+
+  const handleModeSwitch = (mode: OffsetMode) => {
+    setOffsetMode(mode);
+    if (mode === "days") {
+      setOffsetDays(-1);
+      setOffsetHours(0);
+      setSendTime("09:00");
+    } else {
+      setOffsetDays(0);
+      setOffsetHours(-1);
+      setSendTime("");
+    }
+  };
 
   const timingLabel = formatTimingLabel(step);
 
@@ -894,44 +913,79 @@ function StepCard({
 
       {/* Timing fields for RELATIVE_TO_EVENT */}
       {triggerType === TRIGGER_TYPES.RELATIVE_TO_EVENT && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-foreground">Offset (days)</label>
-            <select
-              value={offsetDays}
-              onChange={(e) => setOffsetDays(Number(e.target.value))}
-              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+        <div className="space-y-3">
+          {/* Mode toggle */}
+          <div className="inline-flex rounded-lg bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => handleModeSwitch("days")}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
+                offsetMode === "days"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              {OFFSET_PRESETS.filter((p) => !("hours" in p)).map((preset) => (
-                <option key={preset.days} value={preset.days}>
-                  {preset.label}
-                </option>
-              ))}
-              <option value={-30}>30 days before</option>
-              <option value={60}>60 days after</option>
-              <option value={90}>90 days after</option>
-            </select>
+              Days
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeSwitch("hours")}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
+                offsetMode === "hours"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Hours
+            </button>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground">Hours offset</label>
-            <input
-              type="number"
-              value={offsetHours}
-              onChange={(e) => setOffsetHours(Number(e.target.value))}
-              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
-              min={-24}
-              max={24}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground">Send time</label>
-            <input
-              type="time"
-              value={sendTime}
-              onChange={(e) => setSendTime(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
-            />
-          </div>
+
+          {/* Fields based on mode */}
+          {offsetMode === "days" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground">Timing</label>
+                <select
+                  value={offsetDays}
+                  onChange={(e) => setOffsetDays(Number(e.target.value))}
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+                >
+                  {OFFSET_PRESETS.map((preset) => (
+                    <option key={preset.days} value={preset.days}>
+                      {preset.label}
+                    </option>
+                  ))}
+                  <option value={-30}>30 days before</option>
+                  <option value={60}>60 days after</option>
+                  <option value={90}>90 days after</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground">Send at</label>
+                <input
+                  type="time"
+                  value={sendTime}
+                  onChange={(e) => setSendTime(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-foreground">Timing</label>
+              <select
+                value={offsetHours}
+                onChange={(e) => setOffsetHours(Number(e.target.value))}
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+              >
+                {HOUR_OFFSET_PRESETS.map((preset) => (
+                  <option key={preset.hours} value={preset.hours}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
@@ -1037,9 +1091,9 @@ function StepCard({
             onSave({
               stepType,
               triggerType,
-              offsetDays,
-              offsetHours,
-              sendTimeOfDay: sendTime || null,
+              offsetDays: offsetMode === "hours" ? 0 : offsetDays,
+              offsetHours: offsetMode === "days" ? 0 : offsetHours,
+              sendTimeOfDay: offsetMode === "hours" ? null : (sendTime || "09:00"),
               subject: subject || null,
               body: body || null,
               emailTemplateId: templateId || null,
@@ -1079,7 +1133,7 @@ function NewStepForm({
     emailTemplateId?: string;
     offsetDays?: number;
     offsetHours?: number;
-    sendTimeOfDay?: string;
+    sendTimeOfDay?: string | null;
   }) => void;
   onCancel: () => void;
   saving: boolean;
@@ -1089,9 +1143,23 @@ function NewStepForm({
   const [offsetDays, setOffsetDays] = useState(-1);
   const [offsetHours, setOffsetHours] = useState(0);
   const [sendTime, setSendTime] = useState("09:00");
+  const [offsetMode, setOffsetMode] = useState<OffsetMode>("days");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [templateId, setTemplateId] = useState("");
+
+  const handleModeSwitch = (mode: OffsetMode) => {
+    setOffsetMode(mode);
+    if (mode === "days") {
+      setOffsetDays(-1);
+      setOffsetHours(0);
+      setSendTime("09:00");
+    } else {
+      setOffsetDays(0);
+      setOffsetHours(-1);
+      setSendTime("");
+    }
+  };
 
   return (
     <div className="border-2 border-success/30 rounded-lg p-4 space-y-3 bg-success/5">
@@ -1129,41 +1197,79 @@ function NewStepForm({
       </div>
 
       {triggerType === TRIGGER_TYPES.RELATIVE_TO_EVENT && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-foreground">Timing</label>
-            <select
-              value={offsetDays}
-              onChange={(e) => setOffsetDays(Number(e.target.value))}
-              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+        <div className="space-y-3">
+          {/* Mode toggle */}
+          <div className="inline-flex rounded-lg bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => handleModeSwitch("days")}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
+                offsetMode === "days"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
-              {OFFSET_PRESETS.filter((p) => !("hours" in p)).map((preset) => (
-                <option key={preset.days} value={preset.days}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
+              Days
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModeSwitch("hours")}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-all ${
+                offsetMode === "hours"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Hours
+            </button>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground">Hours offset</label>
-            <input
-              type="number"
-              value={offsetHours}
-              onChange={(e) => setOffsetHours(Number(e.target.value))}
-              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
-              min={-24}
-              max={24}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground">Send time</label>
-            <input
-              type="time"
-              value={sendTime}
-              onChange={(e) => setSendTime(e.target.value)}
-              className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
-            />
-          </div>
+
+          {/* Fields based on mode */}
+          {offsetMode === "days" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground">Timing</label>
+                <select
+                  value={offsetDays}
+                  onChange={(e) => setOffsetDays(Number(e.target.value))}
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+                >
+                  {OFFSET_PRESETS.map((preset) => (
+                    <option key={preset.days} value={preset.days}>
+                      {preset.label}
+                    </option>
+                  ))}
+                  <option value={-30}>30 days before</option>
+                  <option value={60}>60 days after</option>
+                  <option value={90}>90 days after</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground">Send at</label>
+                <input
+                  type="time"
+                  value={sendTime}
+                  onChange={(e) => setSendTime(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-foreground">Timing</label>
+              <select
+                value={offsetHours}
+                onChange={(e) => setOffsetHours(Number(e.target.value))}
+                className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+              >
+                {HOUR_OFFSET_PRESETS.map((preset) => (
+                  <option key={preset.hours} value={preset.hours}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 
@@ -1219,9 +1325,9 @@ function NewStepForm({
               subject: subject || undefined,
               body: body || undefined,
               emailTemplateId: templateId || undefined,
-              offsetDays,
-              offsetHours: offsetHours || undefined,
-              sendTimeOfDay: sendTime || undefined,
+              offsetDays: offsetMode === "hours" ? 0 : offsetDays,
+              offsetHours: offsetMode === "days" ? 0 : offsetHours,
+              sendTimeOfDay: offsetMode === "hours" ? null : (sendTime || "09:00"),
             })
           }
           disabled={saving}

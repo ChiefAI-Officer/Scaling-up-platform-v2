@@ -25,7 +25,7 @@ const createWorkflowStepSchema = z.object({
   customRecipients: z.array(z.string().email()).optional(),
   offsetDays: z.coerce.number().int().optional(),
   offsetHours: z.coerce.number().int().optional(),
-  sendTimeOfDay: z.string().optional(),
+  sendTimeOfDay: z.string().optional().nullable(),
 });
 
 const reorderWorkflowStepsSchema = z.object({
@@ -90,7 +90,7 @@ export async function POST(
     customRecipients,
     offsetDays,
     offsetHours,
-    sendTimeOfDay,
+    sendTimeOfDay: sendTimeOfDay ?? undefined,
   });
 
   return NextResponse.json({ success: true, data: step }, { status: 201 });

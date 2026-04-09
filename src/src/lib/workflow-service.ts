@@ -304,7 +304,8 @@ export function calculateSendDate(
   }
 
   // Override time-of-day if specified (e.g., "09:00")
-  if (sendTimeOfDay) {
+  // Skip when offsetHours is set — hour offsets are relative to event start time
+  if (sendTimeOfDay && !offsetHours) {
     const [hours, minutes] = sendTimeOfDay.split(":").map(Number);
     sendDate.setHours(hours, minutes, 0, 0);
   }

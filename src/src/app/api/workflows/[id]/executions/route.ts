@@ -44,7 +44,7 @@ export async function GET(
   // Get all step IDs for this workflow
   const steps = await db.workflowStep.findMany({
     where: { workflowId },
-    select: { id: true, sortOrder: true, stepType: true, subject: true, offsetDays: true },
+    select: { id: true, sortOrder: true, stepType: true, subject: true, offsetDays: true, offsetHours: true },
     orderBy: { sortOrder: "asc" },
   });
 
@@ -73,6 +73,7 @@ export async function GET(
           stepType: "UNKNOWN",
           subject: null,
           offsetDays: null,
+          offsetHours: null,
         },
       })),
   }));

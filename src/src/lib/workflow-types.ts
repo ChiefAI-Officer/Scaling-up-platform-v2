@@ -73,8 +73,6 @@ export const OFFSET_PRESETS = [
   { label: "5 days before event", days: -5 },
   { label: "3 days before event", days: -3 },
   { label: "1 day before event", days: -1 },
-  { label: "2 hours before event", days: 0, hours: -2 },
-  { label: "1 hour before event", days: 0, hours: -1 },
   { label: "Day of event", days: 0 },
   { label: "1 day after event", days: 1 },
   { label: "3 days after event", days: 3 },
@@ -82,6 +80,28 @@ export const OFFSET_PRESETS = [
   { label: "2 weeks after event", days: 14 },
   { label: "30 days after event", days: 30 },
 ] as const;
+
+// ============================================
+// Hour-interval presets for same-day scheduling
+// ============================================
+
+export const HOUR_OFFSET_PRESETS = [
+  { label: "12 hours before event", hours: -12 },
+  { label: "6 hours before event", hours: -6 },
+  { label: "3 hours before event", hours: -3 },
+  { label: "2 hours before event", hours: -2 },
+  { label: "1 hour before event", hours: -1 },
+  { label: "1 hour after event", hours: 1 },
+  { label: "2 hours after event", hours: 2 },
+  { label: "3 hours after event", hours: 3 },
+  { label: "6 hours after event", hours: 6 },
+] as const;
+
+// ============================================
+// Offset mode type for UI toggle
+// ============================================
+
+export type OffsetMode = "days" | "hours";
 
 // ============================================
 // Email template variables available in workflows
