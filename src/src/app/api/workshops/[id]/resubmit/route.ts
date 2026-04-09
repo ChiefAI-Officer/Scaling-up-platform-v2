@@ -46,8 +46,8 @@ export async function POST(
       );
     }
 
-    // Only allow resubmission for denied/canceled workshops
-    if (!["CANCELED", "DENIED"].includes(workshop.status)) {
+    // Only allow resubmission for info-requested/canceled workshops
+    if (!["CANCELED", "INFO_REQUESTED"].includes(workshop.status)) {
       return NextResponse.json(
         {
           success: false,
