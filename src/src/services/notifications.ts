@@ -364,9 +364,9 @@ export async function sendWorkshopDeniedEmail(data: {
     const portalUrl = `${process.env.APP_URL}/portal/workshops`;
 
     const html = `
-    <h2>Workshop Changes Requested</h2>
+    <h2>Workshop Denied</h2>
     <p>Hi ${data.coachName},</p>
-    <p>Your workshop <strong>${data.workshopTitle}</strong> requires changes before it can be approved.</p>
+    <p>Your workshop <strong>${data.workshopTitle}</strong> has been denied.</p>
     <p><strong>Reason:</strong> ${data.reason}</p>
     <p>Please review the feedback, make any necessary edits, and resubmit your workshop from the portal.</p>
     <br/>
@@ -376,7 +376,7 @@ export async function sendWorkshopDeniedEmail(data: {
 
     await sendNotificationEmail({
         to: data.coachEmail,
-        subject: `Changes Requested: ${data.workshopTitle}`,
+        subject: `Workshop Denied: ${data.workshopTitle}`,
         html,
         telemetry: { workshopId: data.workshopId, recipientRole: "COACH" as const },
     });
