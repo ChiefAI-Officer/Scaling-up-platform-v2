@@ -415,7 +415,7 @@ export async function POST(
             return NextResponse.json({ success: true, status: "COUNTER_OFFERED" });
         }
 
-        if (approval.status !== "PENDING") {
+        if (!["PENDING", "INFO_REQUESTED"].includes(approval.status)) {
             return NextResponse.json(
                 { error: `Approval already ${approval.status.toLowerCase()}` },
                 { status: 400 }
