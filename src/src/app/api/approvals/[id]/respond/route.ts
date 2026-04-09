@@ -118,6 +118,12 @@ export async function GET(
             });
             // NOTE: Do NOT set workshop.status = PRE_EVENT here — auto-build owns that transition.
             // Setting it here causes the auto-build idempotency guard to skip the build on Inngest retries.
+            if (newStatus === "DENIED" && approval.workshopId && approval.type !== "CUSTOM_PRICING") {
+                await tx.workshop.update({
+                    where: { id: approval.workshopId },
+                    data: { status: "INFO_REQUESTED" },
+                });
+            }
         });
 
         // Send notification email to coach (non-blocking)
@@ -490,6 +496,12 @@ export async function POST(
             });
             // NOTE: Do NOT set workshop.status = PRE_EVENT here — auto-build owns that transition.
             // Setting it here causes the auto-build idempotency guard to skip the build on Inngest retries.
+            if (newStatus === "DENIED" && approval.workshopId) {
+                await tx.workshop.update({
+                    where: { id: approval.workshopId },
+                    data: { status: "INFO_REQUESTED" },
+                });
+            }
         });
 
         // Send notification email to coach (non-blocking)
