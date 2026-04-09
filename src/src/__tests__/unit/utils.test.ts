@@ -124,7 +124,7 @@ describe("generateSlug", () => {
 describe("getWorkshopStatusLabel", () => {
   it("should return human-readable labels for all statuses", () => {
     expect(getWorkshopStatusLabel("INFO_REQUESTED")).toBe("Info Requested");
-    expect(getWorkshopStatusLabel("AWAITING_APPROVAL")).toBe("Awaiting Approval");
+    expect(getWorkshopStatusLabel("AWAITING_APPROVAL")).toBe("Approval Pending");
     expect(getWorkshopStatusLabel("PRE_EVENT")).toBe("Pre-Event");
     expect(getWorkshopStatusLabel("POST_EVENT")).toBe("Post-Event");
     expect(getWorkshopStatusLabel("COMPLETED")).toBe("Completed");
