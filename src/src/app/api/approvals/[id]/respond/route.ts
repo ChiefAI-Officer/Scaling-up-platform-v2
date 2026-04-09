@@ -480,7 +480,7 @@ export async function POST(
                 entityId: id,
                 action,
                 performedBy: actor.email,
-                changes: { previousStatus: "PENDING", newStatus, reason, approvalType: "CUSTOM_PRICING" },
+                changes: { previousStatus: approval.status, newStatus, reason, approvalType: "CUSTOM_PRICING" },
             });
             return NextResponse.json({ success: true, status: newStatus, message: `Price change request ${newStatus.toLowerCase()}` });
         }

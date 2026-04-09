@@ -227,6 +227,11 @@ describe("Approval respond API", () => {
         data: { status: "INFO_REQUESTED" },
       })
     );
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        changes: expect.objectContaining({ previousStatus: "INFO_REQUESTED" }),
+      })
+    );
   });
 
   it("allows APPROVE when approval is in INFO_REQUESTED state", async () => {
@@ -258,6 +263,11 @@ describe("Approval respond API", () => {
       })
     );
     expect(inngest.send).toHaveBeenCalled();
+    expect(logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        changes: expect.objectContaining({ previousStatus: "INFO_REQUESTED" }),
+      })
+    );
   });
 
   describe("CUSTOM_PRICING approvals", () => {
