@@ -247,7 +247,7 @@ export default async function WorkshopDetailsPage({
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Description
         </h2>
-        {["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED"].includes(workshop.status) ? (
+        {["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED", "DENIED"].includes(workshop.status) ? (
           <InlineEditDescription
             workshopId={workshop.id}
             initialValue={workshop.description || ""}
@@ -381,7 +381,7 @@ export default async function WorkshopDetailsPage({
       )}
 
       {/* Rejection + Resubmit */}
-      {(workshop.status === "CANCELED" || (workshop.status === "INFO_REQUESTED" && !!latestDenial)) && (
+      {(workshop.status === "CANCELED" || workshop.status === "DENIED") && (
         <ResubmitWorkshop
           variant="denied"
           workshopId={workshop.id}
@@ -466,7 +466,7 @@ export default async function WorkshopDetailsPage({
             Survey Results ({surveyCount})
           </Link>
         )}
-        {["INFO_REQUESTED", "AWAITING_APPROVAL"].includes(workshop.status) && (
+        {["INFO_REQUESTED", "AWAITING_APPROVAL", "DENIED"].includes(workshop.status) && (
           <CancelWorkshopDialog
             workshopId={workshop.id}
             workshopTitle={workshop.title}
