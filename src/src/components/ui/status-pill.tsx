@@ -11,6 +11,7 @@ type WorkshopStatus =
     | "PRE_EVENT"
     | "POST_EVENT"
     | "COMPLETED"
+    | "DENIED"
     | "CANCELED";
 
 interface StatusPillProps {
@@ -53,6 +54,12 @@ const STATUS_CONFIG: Record<WorkshopStatus, { label: string; color: string; dotC
         label: "Completed",
         color: "bg-muted text-status-completed border-border",
         dotColor: "bg-status-completed",
+    },
+    DENIED: {
+        label: "Denied",
+        color: "bg-destructive/10 text-destructive border-destructive/20",
+        dotColor: "bg-destructive",
+        animate: false,
     },
     CANCELED: {
         label: "Canceled",

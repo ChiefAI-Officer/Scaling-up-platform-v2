@@ -69,6 +69,7 @@ export function getWorkshopStatusColor(status: string): string {
     PRE_EVENT: "bg-status-active/10 text-status-active",
     POST_EVENT: "bg-status-post/10 text-status-post",
     COMPLETED: "bg-muted text-status-completed",
+    DENIED: "bg-destructive/10 text-destructive",
     CANCELED: "bg-status-canceled/10 text-status-canceled",
   };
   return colors[status] || "bg-muted text-muted-foreground";
@@ -82,6 +83,7 @@ export function getWorkshopStatusLabel(status: string): string {
     PRE_EVENT: "Pre-Event",
     POST_EVENT: "Post-Event",
     COMPLETED: "Completed",
+    DENIED: "Denied",
     CANCELED: "Canceled",
   };
   return labels[status] || status;
@@ -95,6 +97,7 @@ export function getWorkshopStatusExplanation(status: string): string {
     PRE_EVENT: "Approved — workshop pages are live",
     POST_EVENT: "Event concluded — collecting feedback",
     COMPLETED: "All follow-up complete",
+    DENIED: "Your workshop was denied — edit and resubmit below",
     CANCELED: "Workshop canceled",
   };
   return explanations[status] || "";
