@@ -130,7 +130,10 @@ export default function RegistrationPageEditor() {
       );
 
       const data = await response.json();
-      if (!data.success) throw new Error(data.error || "Failed to save");
+      if (!response.ok || !data.success) {
+        const detail = data.details ? `: ${JSON.stringify(data.details)}` : "";
+        throw new Error(`[${response.status}] ${data.error || "Failed to save"}${detail}`);
+      }
       
       setSuccess(true);
       if (publish) window.open(`/workshop/${data.data.slug}`, "_blank");
@@ -224,6 +227,11 @@ export default function RegistrationPageEditor() {
             <Button onClick={() => handleSave(true)} disabled={saving} className="flex-1">
               {saving ? "Publishing..." : "Save & Publish"}
             </Button>
+          </div>
+          <div className="mt-2 text-center">
+            <Link href={`/workshops/${workshopId}`} className="text-sm text-muted-foreground hover:text-foreground">
+              ← Back to Workshop
+            </Link>
           </div>
         </div>
 
