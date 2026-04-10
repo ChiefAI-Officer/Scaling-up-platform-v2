@@ -103,6 +103,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const actor = await getApiActor();
     if (!actor) {
+      console.error("[landing-page PUT] unauthenticated request");
       return NextResponse.json(
         { success: false, error: "Authentication required" },
         { status: 401 }
@@ -111,6 +112,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const paramsValidation = landingPageParamsSchema.safeParse(await params);
     if (!paramsValidation.success) {
+      console.error("[landing-page PUT] invalid params:", paramsValidation.error.issues);
       return NextResponse.json(
         { success: false, error: "Invalid route parameters", details: paramsValidation.error.issues },
         { status: 400 }
@@ -121,6 +123,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const normalizedTemplate = normalizeTemplate(template);
 
     if (!normalizedTemplate) {
+      console.error("[landing-page PUT] invalid template:", template);
       return NextResponse.json(
         { success: false, error: "Invalid template type" },
         { status: 400 }
@@ -129,6 +132,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
     const bodyValidation = updateLandingPageBodySchema.safeParse(await request.json());
     if (!bodyValidation.success) {
+      console.error("[landing-page PUT] body validation failed:", bodyValidation.error.issues);
       return NextResponse.json(
         { success: false, error: "Invalid request body", details: bodyValidation.error.issues },
         { status: 400 }
@@ -144,6 +148,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     });
 
     if (!workshop || !canManageCoachData(actor, workshop.coachId)) {
+      console.error("[landing-page PUT] workshop not found or access denied:", id);
       return NextResponse.json(
         { success: false, error: "Workshop not found" },
         { status: 404 }
