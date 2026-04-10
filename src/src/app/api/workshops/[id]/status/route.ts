@@ -12,6 +12,7 @@ const WORKSHOP_STATUSES = [
   "PRE_EVENT",
   "POST_EVENT",
   "COMPLETED",
+  "DENIED",
   "CANCELED",
 ] as const;
 
@@ -31,6 +32,7 @@ const validTransitions: Record<WorkshopStatus, WorkshopStatus[]> = {
   PRE_EVENT: ["POST_EVENT", "CANCELED"],
   POST_EVENT: ["COMPLETED"],
   COMPLETED: [],
+  DENIED: ["CANCELED"],
   CANCELED: ["INFO_REQUESTED"],
 };
 

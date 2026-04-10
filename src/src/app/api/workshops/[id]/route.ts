@@ -281,10 +281,10 @@ export async function PATCH(
         );
       }
 
-      // Admins bypass all lead-time checks; coaches bypass only in INFO_REQUESTED flow (FIG-009)
+      // Admins bypass all lead-time checks; coaches bypass only in INFO_REQUESTED/DENIED flow (FIG-009)
       const shouldValidateDateChange =
         !isPrivilegedRole(actor.role) &&
-        !(isCoach && existing.status === "INFO_REQUESTED");
+        !(isCoach && ["INFO_REQUESTED", "DENIED"].includes(existing.status));
 
       if (shouldValidateDateChange) {
         const dateChangeValidation = validateDateChange(

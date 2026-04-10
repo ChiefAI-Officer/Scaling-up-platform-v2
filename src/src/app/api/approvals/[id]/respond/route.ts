@@ -122,7 +122,7 @@ export async function GET(
             if (newStatus === "DENIED" && approval.workshopId && approval.type !== "CUSTOM_PRICING") {
                 await tx.workshop.update({
                     where: { id: approval.workshopId },
-                    data: { status: "INFO_REQUESTED" },
+                    data: { status: "DENIED" },
                 });
             }
         });
@@ -471,9 +471,19 @@ export async function POST(
                     }
                 }
             }
-            await db.approvalQueue.update({
-                where: { id },
-                data: { status: newStatus, respondedBy: actor.email, respondedAt: new Date(), responseReason: reason },
+            // For CUSTOM_PRICING denials on initial submissions (status=INFO_REQUESTED), set to DENIED.
+            // PRE_EVENT price-change denials stay untouched. Use updateMany to avoid P2025 on no-match.
+            await db.$transaction(async (tx) => {
+                if (newStatus === "DENIED" && approval.workshopId) {
+                    await tx.workshop.updateMany({
+                        where: { id: approval.workshopId, status: "INFO_REQUESTED" },
+                        data: { status: "DENIED" },
+                    });
+                }
+                await tx.approvalQueue.update({
+                    where: { id },
+                    data: { status: newStatus, respondedBy: actor.email, respondedAt: new Date(), responseReason: reason },
+                });
             });
             await logAudit({
                 entityType: "ApprovalQueue",
@@ -500,7 +510,7 @@ export async function POST(
             if (newStatus === "DENIED" && approval.workshopId) {
                 await tx.workshop.update({
                     where: { id: approval.workshopId },
-                    data: { status: "INFO_REQUESTED" },
+                    data: { status: "DENIED" },
                 });
             }
         });
