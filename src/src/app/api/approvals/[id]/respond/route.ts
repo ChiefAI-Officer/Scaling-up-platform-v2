@@ -453,7 +453,7 @@ export async function POST(
                     where: { id: approval.workshopId },
                     select: { status: true },
                 });
-                const PRE_BUILD_STATUSES = ["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED"];
+                const PRE_BUILD_STATUSES = ["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED", "DENIED"];
                 if (ws && PRE_BUILD_STATUSES.includes(ws.status)) {
                     try {
                         const buildResult = await runAutoBuild(approval.workshopId);

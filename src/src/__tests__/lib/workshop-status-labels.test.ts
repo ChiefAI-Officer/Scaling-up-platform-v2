@@ -5,7 +5,7 @@
  * that provides human-readable explanations for each workshop status.
  */
 
-import { getWorkshopStatusExplanation } from "@/lib/utils";
+import { getWorkshopStatusExplanation, getWorkshopStatusLabel, getWorkshopStatusColor } from "@/lib/utils";
 
 describe("getWorkshopStatusExplanation", () => {
   it("returns correct label for each status", () => {
@@ -38,5 +38,17 @@ describe("getWorkshopStatusExplanation", () => {
   it("returns empty string for unknown status", () => {
     expect(getWorkshopStatusExplanation("UNKNOWN")).toBe("");
     expect(getWorkshopStatusExplanation("")).toBe("");
+  });
+});
+
+describe("getWorkshopStatusLabel", () => {
+  it("returns Denied for DENIED status", () => {
+    expect(getWorkshopStatusLabel("DENIED")).toBe("Denied");
+  });
+});
+
+describe("getWorkshopStatusColor", () => {
+  it("returns destructive color for DENIED status", () => {
+    expect(getWorkshopStatusColor("DENIED")).toBe("bg-destructive/10 text-destructive");
   });
 });

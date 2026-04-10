@@ -73,5 +73,20 @@ describe("file-access", () => {
         workshopStatus: "PRE_EVENT",
       })
     ).toBe(true);
+
+    // DENIED workshops block COACH and ATTENDEE access (rank below AWAITING_APPROVAL threshold)
+    expect(
+      canRoleAccessAttachment({
+        recipientRole: "COACH",
+        workshopStatus: "DENIED",
+      })
+    ).toBe(false);
+
+    expect(
+      canRoleAccessAttachment({
+        recipientRole: "STAFF",
+        workshopStatus: "DENIED",
+      })
+    ).toBe(true);
   });
 });

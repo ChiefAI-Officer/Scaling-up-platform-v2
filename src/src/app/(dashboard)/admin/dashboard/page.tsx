@@ -8,12 +8,12 @@ import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated"
 
 const PIPELINE_STAGES = [
   { status: "INFO_REQUESTED", icon: "📝" },
-  { status: "DENIED", icon: "❌" },
   { status: "AWAITING_APPROVAL", icon: "⏳" },
   { status: "PRE_EVENT", icon: "🟢" },
   { status: "POST_EVENT", icon: "📊" },
   { status: "COMPLETED", icon: "✅" },
   { status: "CANCELED", icon: "🚫" },
+  { status: "DENIED", icon: "❌" },
 ] as const;
 
 type ActivityItem = {
