@@ -127,6 +127,30 @@ describe("Workshop Resubmit API", () => {
     });
   });
 
+  it("resubmits DENIED workshop, status transitions to REQUESTED", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(actorAsCoach());
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue(
+      workshopRecord({ status: "DENIED" })
+    );
+    (canManageCoachData as jest.Mock).mockReturnValue(true);
+    (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
+    (evaluateApproval as jest.Mock).mockResolvedValue({
+      autoApproved: false,
+      approvalId: "apr-denied-resubmit",
+    });
+
+    const response = await POST(buildRequest(), routeParams("ws-1"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.approvalId).toBe("apr-denied-resubmit");
+    expect(db.workshop.update).toHaveBeenCalledWith({
+      where: { id: "ws-1" },
+      data: { status: "REQUESTED" },
+    });
+  });
+
   it("resubmits CANCELED workshop", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(actorAsCoach());
     (db.workshop.findUnique as jest.Mock).mockResolvedValue(

@@ -21,6 +21,7 @@ jest.mock("@/lib/db", () => ({
     workshop: {
       findUnique: jest.fn().mockResolvedValue(null),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
   },
 }));
@@ -165,7 +166,7 @@ describe("Approval respond API", () => {
     expect(db.workshop.update).not.toHaveBeenCalled();
   });
 
-  it("updates workshop status to INFO_REQUESTED when denying", async () => {
+  it("updates workshop status to DENIED when denying", async () => {
     (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
       id: "apr-3",
       type: "WORKSHOP_REQUEST",
@@ -184,11 +185,11 @@ describe("Approval respond API", () => {
       routeParams("apr-3")
     );
 
-    // Workshop status IS updated to INFO_REQUESTED on denial
+    // Workshop status IS updated to DENIED on denial
     expect(db.workshop.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "ws-99" },
-        data: { status: "INFO_REQUESTED" },
+        data: { status: "DENIED" },
       })
     );
   });
@@ -225,7 +226,7 @@ describe("Approval respond API", () => {
     expect(db.workshop.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "ws-101" },
-        data: { status: "INFO_REQUESTED" },
+        data: { status: "DENIED" },
       })
     );
     expect(logAudit).toHaveBeenCalledWith(
@@ -393,7 +394,7 @@ describe("Approval respond API", () => {
       });
     });
 
-    it("CUSTOM_PRICING: deny sets approval status DENIED and does not update workshop status", async () => {
+    it("CUSTOM_PRICING: deny calls updateMany to set DENIED on INFO_REQUESTED workshops", async () => {
       (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue({
         id: "apr-cp-deny",
         type: "CUSTOM_PRICING",
@@ -406,6 +407,7 @@ describe("Approval respond API", () => {
         id: "apr-cp-deny",
         status: "DENIED",
       });
+      (db.workshop.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
 
       const response = await POST(
         requestWithJson({ action: "DENY", reason: "Pricing not approved" }),
@@ -425,8 +427,15 @@ describe("Approval respond API", () => {
           }),
         })
       );
-      // CUSTOM_PRICING branch returns early on denial — does not touch workshop record
+      // updateMany used (not update) to avoid P2025 on no-match
       expect(db.workshop.update).not.toHaveBeenCalled();
+      expect(db.workshop.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "ws-cp-deny", status: "INFO_REQUESTED" },
+          data: { status: "DENIED" },
+        })
+      );
+      // CUSTOM_PRICING branch returns early — does not send denial email
       expect(sendWorkshopDeniedEmail).not.toHaveBeenCalled();
     });
   });

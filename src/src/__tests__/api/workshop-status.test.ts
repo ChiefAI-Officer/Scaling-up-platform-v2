@@ -353,6 +353,30 @@ describe("Workshop status API – PATCH /api/workshops/[id]/status", () => {
     expect(inngest.send).not.toHaveBeenCalled();
   });
 
+  /* ---------- DENIED status --------------------------------------- */
+
+  it("allows DENIED → CANCELED transition", async () => {
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue(
+      mockWorkshop("DENIED")
+    );
+    mockUpdateReturns("CANCELED");
+
+    const response = await PATCH(
+      buildPatchRequest({ status: "CANCELED" }),
+      routeParams()
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(db.workshop.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ws-1" },
+        data: expect.objectContaining({ status: "CANCELED" }),
+      })
+    );
+  });
+
   /* ---------- Side-effects ---------------------------------------- */
 
   it("POST_EVENT transition triggers post-workshop survey creation", async () => {

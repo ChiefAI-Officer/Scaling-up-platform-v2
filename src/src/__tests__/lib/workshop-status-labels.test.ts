@@ -30,6 +30,9 @@ describe("getWorkshopStatusExplanation", () => {
     expect(getWorkshopStatusExplanation("CANCELED")).toBe(
       "Workshop canceled"
     );
+    expect(getWorkshopStatusExplanation("DENIED")).toBe(
+      "Your workshop was denied — edit and resubmit below"
+    );
   });
 
   it("returns empty string for unknown status", () => {
