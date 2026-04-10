@@ -258,8 +258,8 @@ export default function SoloLandingEditor() {
 
       const data = await response.json();
       if (!response.ok || !data.success) {
-        const detail = data.details ? `: ${JSON.stringify(data.details)}` : "";
-        throw new Error(`[${response.status}] ${data.error || "Failed to save"}${detail}`);
+        console.error("[landing-page save] error details:", data.details);
+        throw new Error(`[${response.status}] ${data.error || "Failed to save"}`);
       }
 
       setSuccess(true);
@@ -303,7 +303,7 @@ export default function SoloLandingEditor() {
 
       {success && (
         <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg mb-6">
-          Changes saved successfully!
+          Changes saved!
         </div>
       )}
 

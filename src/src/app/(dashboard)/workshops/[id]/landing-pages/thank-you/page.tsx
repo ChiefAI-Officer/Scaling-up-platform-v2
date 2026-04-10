@@ -80,8 +80,8 @@ export default function ThankYouPageEditor() {
 
       const data = await response.json();
       if (!response.ok || !data.success) {
-        const detail = data.details ? `: ${JSON.stringify(data.details)}` : "";
-        throw new Error(`[${response.status}] ${data.error || "Failed to save"}${detail}`);
+        console.error("[landing-page save] error details:", data.details);
+        throw new Error(`[${response.status}] ${data.error || "Failed to save"}`);
       }
       
       setSuccess(true);

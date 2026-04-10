@@ -318,10 +318,10 @@ export default function DuoLandingEditor() {
 
       const data = await response.json();
       if (!response.ok || !data.success) {
-        const detail = data.details ? `: ${JSON.stringify(data.details)}` : "";
-        throw new Error(`[${response.status}] ${data.error || "Failed to save"}${detail}`);
+        console.error("[landing-page save] error details:", data.details);
+        throw new Error(`[${response.status}] ${data.error || "Failed to save"}`);
       }
-      
+
       setSuccess(true);
       if (publish) window.open(`/workshop/${data.data.slug}`, "_blank");
     } catch (err) {
@@ -350,7 +350,7 @@ export default function DuoLandingEditor() {
       </div>
 
       {error && <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg mb-6">{error}</div>}
-      {success && <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg mb-6">Changes saved successfully!</div>}
+      {success && <div className="bg-success/10 border border-success/20 text-success px-4 py-3 rounded-lg mb-6">Changes saved!</div>}
 
       <div className="grid grid-cols-5 gap-6">
         {/* Editor Panel */}
@@ -526,11 +526,11 @@ export default function DuoLandingEditor() {
             <Button onClick={() => handleSave(true)} disabled={saving} className="flex-1">
               {saving ? "Publishing..." : "Save & Publish"}
             </Button>
-          </div>
-          <div className="mt-2 text-center">
-            <Link href={`/workshops/${workshopId}`} className="text-sm text-muted-foreground hover:text-foreground">
-              ← Back to Workshop
-            </Link>
+            <div className="text-center">
+              <Link href={`/workshops/${workshopId}`} className="text-sm text-muted-foreground hover:text-foreground">
+                ← Back to Workshop
+              </Link>
+            </div>
           </div>
         </div>
 
