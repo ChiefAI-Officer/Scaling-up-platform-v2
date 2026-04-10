@@ -42,6 +42,7 @@ export const workshopStatusSchema = z.enum([
     "PRE_EVENT",
     "POST_EVENT",
     "COMPLETED",
+    "DENIED",
     "CANCELED",
 ]);
 

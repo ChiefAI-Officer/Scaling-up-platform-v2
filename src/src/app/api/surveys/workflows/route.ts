@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 
 const SURVEY_WORKFLOW_TASK_TYPE = "SURVEY_WORKFLOW_CONFIG";
 

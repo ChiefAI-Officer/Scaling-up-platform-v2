@@ -6,7 +6,7 @@
  */
 
 import { db } from "@/lib/db";
-import type { StepType, TriggerType } from "@/lib/workflow-types";
+import type { StepType, TriggerType } from "@/lib/workflows/workflow-types";
 
 // ============================================
 // Types

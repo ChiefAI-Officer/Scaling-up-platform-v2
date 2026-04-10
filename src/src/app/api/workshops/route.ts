@@ -3,11 +3,11 @@ import { ZodError } from "zod";
 import { db } from "@/lib/db";
 import { createWorkshopSchema } from "@/lib/validations";
 import { generateSlug } from "@/lib/utils";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
-import { validateLeadTime } from "@/lib/lead-time-validator";
-import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { validateLeadTime } from "@/lib/workshops/lead-time-validator";
+import { generateUniqueWorkshopCode } from "@/lib/workshops/workshop-code";
 import { sendWorkshopRequestedEmail } from "@/services/notifications";
-import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshop-coupons";
+import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 import { createWorkshopPromotionCode } from "@/services/stripe";
 import { inngest } from "@/inngest/client";
 

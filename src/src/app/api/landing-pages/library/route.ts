@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/authorization";
-import { rewriteIdentityFields, buildWorkshopVariables } from "@/lib/template-interpolation";
+import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { rewriteIdentityFields, buildWorkshopVariables } from "@/lib/templates/template-interpolation";
 import { z } from "zod";
 
 const TEMPLATE_OPTIONS = ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] as const;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireCoach, isWorkshopLocked, canAccessWorkshop } from "@/lib/authorization";
+import { requireCoach, isWorkshopLocked, canAccessWorkshop } from "@/lib/auth/authorization";
 import { z } from "zod";
 
 const requestEditParamsSchema = z.object({

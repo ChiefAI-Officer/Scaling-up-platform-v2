@@ -12,19 +12,19 @@ import {
   interpolateTemplate,
   calculateSendDate,
   type WorkflowContext,
-} from "@/lib/workflow-service";
-import { TRIGGER_TYPES, STEP_TYPES } from "@/lib/workflow-types";
+} from "@/lib/workflows/workflow-service";
+import { TRIGGER_TYPES, STEP_TYPES } from "@/lib/workflows/workflow-types";
 import { buildLocationString } from "@/lib/ics-generator";
 import {
   buildProtectedEmailAttachments,
   canDeliverWorkflowAttachments,
   getWorkflowStepFiles,
-} from "@/lib/file-service";
-import { getOrCreateSurveyLink } from "@/lib/survey-automation";
+} from "@/lib/files/file-service";
+import { getOrCreateSurveyLink } from "@/lib/surveys/survey-automation";
 import { sendEmailViaSMTP } from "@/lib/smtp-transport";
 import { recordDeliveryTelemetry } from "@/lib/delivery-telemetry";
-import type { FileRecipientRole } from "@/lib/file-access";
-import { SURVEY_TYPES } from "@/lib/survey-types";
+import type { FileRecipientRole } from "@/lib/files/file-access";
+import { SURVEY_TYPES } from "@/lib/surveys/survey-types";
 
 function resolveSurveyType(workflowStep: {
   triggerType: string;

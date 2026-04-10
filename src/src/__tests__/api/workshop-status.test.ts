@@ -27,7 +27,7 @@ jest.mock("@/inngest/client", () => ({
   },
 }));
 
-jest.mock("@/lib/survey-automation", () => ({
+jest.mock("@/lib/surveys/survey-automation", () => ({
   createPostWorkshopSurveys: jest.fn().mockResolvedValue({
     created: 0,
     skipped: 0,
@@ -43,7 +43,7 @@ import { inngest } from "@/inngest/client";
 import {
   createPostWorkshopSurveys,
   sendSurveyEmail,
-} from "@/lib/survey-automation";
+} from "@/lib/surveys/survey-automation";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */

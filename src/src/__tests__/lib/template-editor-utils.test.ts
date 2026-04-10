@@ -5,8 +5,8 @@ import {
     THANKYOU_DEFAULTS,
     getInitialData,
     isDirtyCheck,
-} from "@/lib/template-editor-utils";
-import { TEMPLATE_PREVIEW_DATA } from "@/lib/template-preview";
+} from "@/lib/templates/template-editor-utils";
+import { TEMPLATE_PREVIEW_DATA } from "@/lib/templates/template-preview";
 
 // ---------------------------------------------------------------------------
 // TDD Cycle 1: safeJsonParse

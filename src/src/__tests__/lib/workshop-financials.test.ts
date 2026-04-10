@@ -1,7 +1,7 @@
 import {
   calculateWorkshopRevenueSplit,
   formatUsdFromCents,
-} from "@/lib/workshop-financials";
+} from "@/lib/workshops/workshop-financials";
 
 describe("workshop financial helpers", () => {
   it("returns a 25/75 split that sums back to gross revenue", () => {

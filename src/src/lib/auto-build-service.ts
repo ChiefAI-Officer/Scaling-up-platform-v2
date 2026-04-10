@@ -9,7 +9,7 @@
  */
 
 import { db } from "@/lib/db";
-import { buildWorkshopVariables, interpolateContent, templateHasPlaceholders, findRemainingPlaceholders } from "@/lib/template-interpolation";
+import { buildWorkshopVariables, interpolateContent, templateHasPlaceholders, findRemainingPlaceholders } from "@/lib/templates/template-interpolation";
 import { sendWorkshopBuiltEmail } from "@/services/notifications";
 import { inngest } from "@/inngest/client";
 

@@ -5,9 +5,9 @@
 
 import { Suspense } from "react";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/authorization";
+import { requireAdmin } from "@/lib/auth/authorization";
 import { FileManager } from "@/components/files/file-manager";
-import { mapFileForClient } from "@/lib/file-service";
+import { mapFileForClient } from "@/lib/files/file-service";
 
 async function FilesPageData() {
   await requireAdmin();

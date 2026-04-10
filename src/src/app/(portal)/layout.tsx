@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { requireCoach } from "@/lib/authorization";
+import { requireCoach } from "@/lib/auth/authorization";
 import { CoachMobileNav } from "@/components/layout/coach-mobile-nav";
 import { CoachNavLink } from "@/components/layout/coach-nav-link";
 import { ThemeToggle } from "@/components/ui/theme-toggle";

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/lib/auth/auth";
 import { redirect } from "next/navigation";
 import { AdminMobileNav } from "@/components/layout/admin-mobile-nav";
 import { AdminNavLinks } from "@/components/layout/admin-nav-links";

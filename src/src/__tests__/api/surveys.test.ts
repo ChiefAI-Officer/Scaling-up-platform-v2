@@ -13,13 +13,13 @@ jest.mock("@/lib/rate-limit", () => ({
   withRateLimit: jest.fn(),
 }));
 
-jest.mock("@/lib/survey-service", () => ({
+jest.mock("@/lib/surveys/survey-service", () => ({
   submitSurveyResponse: jest.fn(),
 }));
 
 import { POST } from "@/app/api/surveys/[id]/submit/route";
 import { withRateLimit } from "@/lib/rate-limit";
-import { submitSurveyResponse } from "@/lib/survey-service";
+import { submitSurveyResponse } from "@/lib/surveys/survey-service";
 
 // ---------------------------------------------------------------------------
 // Helpers

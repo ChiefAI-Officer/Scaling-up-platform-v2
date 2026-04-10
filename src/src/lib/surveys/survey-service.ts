@@ -5,7 +5,7 @@
  */
 
 import { db } from "@/lib/db";
-import type { QuestionType, SurveyType } from "@/lib/survey-types";
+import type { QuestionType, SurveyType } from "@/lib/surveys/survey-types";
 
 // ============================================
 // Types

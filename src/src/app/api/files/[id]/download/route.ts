@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { getApiActor } from "@/lib/authorization";
-import { getFile } from "@/lib/file-service";
-import { canRoleAccessAttachment, verifyFileAccessToken } from "@/lib/file-access";
+import { authOptions } from "@/lib/auth/auth";
+import { getApiActor } from "@/lib/auth/authorization";
+import { getFile } from "@/lib/files/file-service";
+import { canRoleAccessAttachment, verifyFileAccessToken } from "@/lib/files/file-access";
 import { db } from "@/lib/db";
 import { z } from "zod";
 

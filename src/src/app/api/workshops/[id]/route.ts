@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { updateWorkshopSchema } from "@/lib/validations";
-import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/authorization";
-import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/lead-time-validator";
+import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/workshops/lead-time-validator";
 import { chargeCancellationFee } from "@/services/stripe";
-import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/template-interpolation";
+import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/templates/template-interpolation";
 import { sendCustomPriceChangeEmail } from "@/services/notifications";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;

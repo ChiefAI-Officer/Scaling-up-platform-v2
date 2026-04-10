@@ -32,7 +32,7 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-jest.mock("@/lib/template-interpolation", () => ({
+jest.mock("@/lib/templates/template-interpolation", () => ({
   buildWorkshopVariables: jest.fn(),
   interpolateContent: jest.fn((content: string) => content), // pass-through
   templateHasPlaceholders: jest.fn(() => true),
@@ -53,7 +53,7 @@ jest.mock("@/inngest/client", () => ({
 
 import { runAutoBuild } from "@/lib/auto-build-service";
 import { db } from "@/lib/db";
-import { buildWorkshopVariables, templateHasPlaceholders } from "@/lib/template-interpolation";
+import { buildWorkshopVariables, templateHasPlaceholders } from "@/lib/templates/template-interpolation";
 import { sendWorkshopBuiltEmail } from "@/services/notifications";
 
 // --- Test Data ---

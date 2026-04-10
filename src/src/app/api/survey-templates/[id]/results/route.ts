@@ -5,8 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { getSurveyResults } from "@/lib/survey-service";
+import { authOptions } from "@/lib/auth/auth";
+import { getSurveyResults } from "@/lib/surveys/survey-service";
 import { z } from "zod";
 
 const surveyResultsParamsSchema = z.object({

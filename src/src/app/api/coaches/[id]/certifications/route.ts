@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 
 const AddCertificationSchema = z.object({
     workshopTypeId: z.string().min(1),

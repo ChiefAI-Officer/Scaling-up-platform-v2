@@ -6,8 +6,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { authOptions } from "@/lib/auth/auth";
+import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import {
   getFile,
@@ -15,7 +15,7 @@ import {
   linkFileToWorkflowStep,
   unlinkFileFromWorkflowStep,
   mapFileForClient,
-} from "@/lib/file-service";
+} from "@/lib/files/file-service";
 import { z } from "zod";
 
 const fileRouteParamsSchema = z.object({

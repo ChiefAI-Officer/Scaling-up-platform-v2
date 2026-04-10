@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { canManageCoachData, getApiActor } from "@/lib/auth/authorization";
 import { z } from "zod";
 
 const VALID_TEMPLATES = ["BIO_PAGE", "SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] as const;

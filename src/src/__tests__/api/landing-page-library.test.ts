@@ -38,7 +38,7 @@ jest.mock("@/lib/auth/authorization", () => ({
   canManageCoachData: jest.fn(),
 }));
 
-jest.mock("@/lib/template-interpolation", () => ({
+jest.mock("@/lib/templates/template-interpolation", () => ({
   rewriteIdentityFields: jest.fn((content: string) => content),
   buildWorkshopVariables: jest.fn().mockResolvedValue(null),
 }));

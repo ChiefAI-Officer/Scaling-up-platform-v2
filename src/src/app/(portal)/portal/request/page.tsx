@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireCoach } from "@/lib/authorization";
+import { requireCoach } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import { getCoachBioMissingFields } from "@/lib/validations";
 import { NewWorkshopForm } from "@/app/(dashboard)/workshops/new/page";

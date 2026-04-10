@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { resetPasswordSchema } from "@/lib/validations";
-import { verifyPasswordResetToken } from "@/lib/password-reset";
+import { verifyPasswordResetToken } from "@/lib/auth/password-reset";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 
 const INVALID_RESET_MESSAGE = "Reset link is invalid or has expired";

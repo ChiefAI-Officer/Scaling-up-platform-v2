@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { createCheckoutSession, StripeDiscountCodeError } from "@/services/stripe";
 import { z } from "zod";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
-import { parseStoredWorkshopCoupons } from "@/lib/workshop-coupons";
+import { parseStoredWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 
 const checkoutSchema = z.object({
   registrationId: z.string().min(1, "Registration ID is required"),

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { LandingPage } from "@prisma/client";
 import { db } from "@/lib/db";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 
 const UpdateSchema = z.object({
     isActiveTemplate: z.boolean().optional(),

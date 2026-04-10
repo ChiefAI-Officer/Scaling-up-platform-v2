@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { changePasswordSchema } from "@/lib/validations";

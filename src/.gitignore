@@ -42,3 +42,7 @@ next-env.d.ts
 
 /src/generated/prisma
 .env*.local
+
+# prisma local dev databases
+prisma/*.db
+prisma/*.db-journal

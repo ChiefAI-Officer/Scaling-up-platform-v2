@@ -8,6 +8,7 @@ import { RegistrationPageTemplate } from "@/components/templates/registration-pa
 import { BioPageTemplate, BioContent } from "@/components/templates/bio-page-template";
 import { SoloLandingPageTemplate, SoloContent } from "@/components/templates/solo-landing-page-template";
 import { DuoLandingPageTemplate, DuoContent } from "@/components/templates/duo-landing-page-template";
+import { stripPlaceholders } from "@/lib/templates/template-utils";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -33,14 +34,6 @@ interface WorkshopData {
   earlyBirdPriceCents: number | null;
 }
 
-/** Strip any unresolved {{variable}} placeholders — safety net with logging */
-function stripPlaceholders(text: string | undefined): string {
-  if (!text) return "";
-  if (/\{\{[^}]+\}\}/.test(text)) {
-    console.warn(`[landing-page] Unresolved placeholder in rendered content: ${text.substring(0, 80)}`);
-  }
-  return text.replace(/\{\{[^}]+\}\}/g, "").replace(/\s{2,}/g, " ").trim();
-}
 
 interface WorkshopFallbackData {
   id: string;

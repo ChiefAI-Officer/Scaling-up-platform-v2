@@ -2,7 +2,7 @@ import {
   canRoleAccessAttachment,
   createFileAccessToken,
   verifyFileAccessToken,
-} from "@/lib/file-access";
+} from "@/lib/files/file-access";
 
 describe("file-access", () => {
   it("creates and verifies a signed token", () => {

@@ -1,0 +1,39 @@
+[    7110ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/templates:0
+[    7640ms] [ERROR] %o
+
+%s PrismaClientKnownRequestError: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["db"].pageTemplate.findMany()` invocation in
+/Users/diushianstand/Scaling-up-platform-v2/src/.next/dev/server/chunks/ssr/[root-of-the-server]__e2106de5._.js:247:144
+
+  244     }
+  245 };
+  246 async function getPageTemplates() {
+→ 247     return __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["db"].pageTemplate.findMany(
+Can't reach database server at `ep-falling-sound-aiilz991-pooler.c-4.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-falling-sound-aiilz991-pooler.c-4.us-east-1.aws.neon.tech:5432`.
+    at Function.all (<anonymous>:1:21)
+    at TemplatesPage (about://React/Server/file:///Users/diushianstand/Scaling-up-platform-v2/src/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__e2106de5._.js?23:288:40)
+    at resolveErrorDev (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:1894:148)
+    at processFullStringRow (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2402:29)
+    at processFullBinaryRow (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2361:9)
+    at processBinaryChunk (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2470:221)
+    at progress (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2640:13) The above error occurred in the <TemplatesPage> component. It was handled by the <ErrorBoundaryHandler> error boundary. @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_client_17643121._.js:1342
+[    7648ms] [ERROR] Application error: PrismaClientKnownRequestError: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["db"].pageTemplate.findMany()` invocation in
+/Users/diushianstand/Scaling-up-platform-v2/src/.next/dev/server/chunks/ssr/[root-of-the-server]__e2106de5._.js:247:144
+
+  244     }
+  245 };
+  246 async function getPageTemplates() {
+→ 247     return __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$db$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["db"].pageTemplate.findMany(
+Can't reach database server at `ep-falling-sound-aiilz991-pooler.c-4.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-falling-sound-aiilz991-pooler.c-4.us-east-1.aws.neon.tech:5432`.
+    at Function.all (<anonymous>:1:21)
+    at TemplatesPage (about://React/Server/file:///Users/diushianstand/Scaling-up-platform-v2/src/.next/dev/server/chunks/ssr/%5Broot-of-the-server%5D__e2106de5._.js?23:288:40)
+    at resolveErrorDev (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:1894:148)
+    at processFullStringRow (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2402:29)
+    at processFullBinaryRow (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2361:9)
+    at processBinaryChunk (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2470:221)
+    at progress (http://localhost:3000/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_9212ccad._.js:2640:13) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:3127

@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { submitSurveyResponse } from "@/lib/survey-service";
+import { submitSurveyResponse } from "@/lib/surveys/survey-service";
 import { withRateLimit, RateLimits } from "@/lib/rate-limit";
 import { z } from "zod";
 

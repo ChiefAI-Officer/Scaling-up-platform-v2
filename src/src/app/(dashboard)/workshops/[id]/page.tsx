@@ -27,7 +27,7 @@ import { WorkshopActions } from "./workshop-actions";
 import { QuickActions } from "./quick-actions";
 import { RegistrationRemoveButton } from "./registration-remove-button";
 import { WorkshopInlineEditForm } from "@/components/workshops/WorkshopInlineEditForm";
-import { requireAuth } from "@/lib/authorization";
+import { requireAuth } from "@/lib/auth/authorization";
 
 function executionStatusVariant(status: string): "success" | "warning" | "destructive" | "secondary" {
   switch (status) {

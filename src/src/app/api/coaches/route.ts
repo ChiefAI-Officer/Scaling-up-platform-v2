@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createCoachSchema } from "@/lib/validations";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
-import { generatePasswordResetToken } from "@/lib/password-reset";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { generatePasswordResetToken } from "@/lib/auth/password-reset";
 import { sendCoachWelcomeEmail } from "@/services/notifications";
 
 export async function GET(request: NextRequest) {

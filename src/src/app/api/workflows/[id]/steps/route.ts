@@ -5,10 +5,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { addWorkflowStep, reorderWorkflowSteps } from "@/lib/workflow-service";
-import { STEP_TYPES, TRIGGER_TYPES } from "@/lib/workflow-types";
-import type { StepType, TriggerType } from "@/lib/workflow-types";
+import { authOptions } from "@/lib/auth/auth";
+import { addWorkflowStep, reorderWorkflowSteps } from "@/lib/workflows/workflow-service";
+import { STEP_TYPES, TRIGGER_TYPES } from "@/lib/workflows/workflow-types";
+import type { StepType, TriggerType } from "@/lib/workflows/workflow-types";
 import { z } from "zod";
 
 const workflowStepParamsSchema = z.object({

@@ -1,5 +1,5 @@
 import React from "react";
-import { requireCoach } from "@/lib/authorization";
+import { requireCoach } from "@/lib/auth/authorization";
 import { FileBox } from "lucide-react";
 
 export default async function TemplatesPage() {

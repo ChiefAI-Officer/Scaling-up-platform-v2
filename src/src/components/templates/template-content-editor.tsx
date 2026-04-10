@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { TEMPLATE_PREVIEW_DATA } from "@/lib/template-preview";
-import { interpolateContent } from "@/lib/template-interpolation-core";
+import { TEMPLATE_PREVIEW_DATA } from "@/lib/templates/template-preview";
+import { interpolateContent } from "@/lib/templates/template-interpolation-core";
 import {
     safeJsonParse,
     getInitialData,
@@ -14,13 +14,13 @@ import {
     SOLO_DEFAULTS,
     REGISTRATION_DEFAULTS,
     THANKYOU_DEFAULTS,
-} from "@/lib/template-editor-utils";
-import type { SoloLandingFields, RegistrationFields, ThankYouFields } from "@/lib/template-editor-utils";
+} from "@/lib/templates/template-editor-utils";
+import type { SoloLandingFields, RegistrationFields, ThankYouFields } from "@/lib/templates/template-editor-utils";
 import { ThankYouPageTemplate, SAMPLE_WORKSHOP } from "@/components/templates/thank-you-page-template";
 import { RegistrationPageTemplate, SAMPLE_WORKSHOP_REGISTRATION } from "@/components/templates/registration-page-template";
 import { SoloLandingPageTemplate, SAMPLE_WORKSHOP_SOLO } from "@/components/templates/solo-landing-page-template";
 
-// Types, defaults, and utilities imported from @/lib/template-editor-utils
+// Types, defaults, and utilities imported from @/lib/templates/template-editor-utils
 
 // ---------------------------------------------------------------------------
 // Helper: replace {{var}} in a single string with preview data

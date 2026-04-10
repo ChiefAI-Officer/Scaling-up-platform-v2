@@ -1,0 +1,2 @@
+[     661ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://scaling-up-platform-v2.vercel.app/_vercel/insights/script.js:0
+[     661ms] [ERROR] Refused to execute script from 'https://scaling-up-platform-v2.vercel.app/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled. @ https://scaling-up-platform-v2.vercel.app/login:0

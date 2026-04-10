@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
-import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { canManageCoachData, getApiActor } from "@/lib/auth/authorization";
 import { syncCoachFromCircle } from "@/services/circle-sync";
 
 // Request validation schema

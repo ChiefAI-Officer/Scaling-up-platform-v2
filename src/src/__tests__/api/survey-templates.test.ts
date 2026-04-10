@@ -16,7 +16,7 @@ jest.mock("@/lib/auth/auth", () => ({
   authOptions: {},
 }));
 
-jest.mock("@/lib/survey-service", () => ({
+jest.mock("@/lib/surveys/survey-service", () => ({
   createSurveyTemplate: jest.fn(),
   listSurveyTemplates: jest.fn(),
   getSurveyTemplate: jest.fn(),
@@ -37,7 +37,7 @@ import {
   getSurveyTemplate,
   updateSurveyTemplate,
   deleteSurveyTemplate,
-} from "@/lib/survey-service";
+} from "@/lib/surveys/survey-service";
 
 function authenticatedSession(role: "ADMIN" | "COACH" = "ADMIN") {
   return {

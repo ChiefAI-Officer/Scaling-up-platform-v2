@@ -5,10 +5,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { updateQuestion, deleteQuestion } from "@/lib/survey-service";
-import { QUESTION_TYPES } from "@/lib/survey-types";
-import type { QuestionType } from "@/lib/survey-types";
+import { authOptions } from "@/lib/auth/auth";
+import { updateQuestion, deleteQuestion } from "@/lib/surveys/survey-service";
+import { QUESTION_TYPES } from "@/lib/surveys/survey-types";
+import type { QuestionType } from "@/lib/surveys/survey-types";
 import { z } from "zod";
 
 const surveyQuestionParamsSchema = z.object({

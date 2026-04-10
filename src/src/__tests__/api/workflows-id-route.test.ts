@@ -16,7 +16,7 @@ jest.mock("@/lib/auth/auth", () => ({
   authOptions: {},
 }));
 
-jest.mock("@/lib/workflow-service", () => ({
+jest.mock("@/lib/workflows/workflow-service", () => ({
   getWorkflow: jest.fn(),
   updateWorkflow: jest.fn(),
   deleteWorkflow: jest.fn(),
@@ -24,7 +24,7 @@ jest.mock("@/lib/workflow-service", () => ({
 
 import { getServerSession } from "next-auth";
 import { GET, PATCH, DELETE } from "@/app/api/workflows/[id]/route";
-import { getWorkflow, updateWorkflow, deleteWorkflow } from "@/lib/workflow-service";
+import { getWorkflow, updateWorkflow, deleteWorkflow } from "@/lib/workflows/workflow-service";
 
 function authenticatedSession(role: "ADMIN" | "COACH" = "ADMIN") {
   return {

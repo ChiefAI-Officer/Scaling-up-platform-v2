@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { evaluateApproval, ApprovalType } from "@/lib/approval-engine";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { inngest } from "@/inngest/client";
 import { runAutoBuild } from "@/lib/auto-build-service";
-import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
+import { generateUniqueWorkshopCode } from "@/lib/workshops/workshop-code";
 import { generateSlug } from "@/lib/utils";
 import { sendEnrichedApprovalRequest } from "@/services/notifications";
 import { verifyCertification } from "@/services/circle";
 import { getCoachByEmail } from "@/services/hubspot";
-import { validateLeadTime } from "@/lib/lead-time-validator";
+import { validateLeadTime } from "@/lib/workshops/lead-time-validator";
 import { getCoachBioMissingFields } from "@/lib/validations";
 
 // Request schemas

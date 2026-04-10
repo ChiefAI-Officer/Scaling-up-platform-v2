@@ -15,8 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   STEP_TYPE_LABELS,
   TRIGGER_TYPES,
-} from "@/lib/workflow-types";
-import type { StepType } from "@/lib/workflow-types";
+} from "@/lib/workflows/workflow-types";
+import type { StepType } from "@/lib/workflows/workflow-types";
 
 interface TimelineStep {
   id: string;

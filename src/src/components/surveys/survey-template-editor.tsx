@@ -8,8 +8,8 @@ import {
   SURVEY_TYPE_LABELS,
   QUESTION_TYPES,
   QUESTION_TYPE_LABELS,
-} from "@/lib/survey-types";
-import type { SurveyType, QuestionType } from "@/lib/survey-types";
+} from "@/lib/surveys/survey-types";
+import type { SurveyType, QuestionType } from "@/lib/surveys/survey-types";
 
 // ============================================
 // Types

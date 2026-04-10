@@ -16,7 +16,7 @@ jest.mock("@/lib/auth/auth", () => ({
   authOptions: {},
 }));
 
-jest.mock("@/lib/file-service", () => ({
+jest.mock("@/lib/files/file-service", () => ({
   uploadFile: jest.fn(),
   getFile: jest.fn(),
   listFiles: jest.fn(),
@@ -60,7 +60,7 @@ import {
   unlinkFileFromWorkflowStep,
   validateFile,
   mapFileForClient,
-} from "@/lib/file-service";
+} from "@/lib/files/file-service";
 import { getApiActor, canManageCoachData } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireCoach } from "@/lib/authorization";
+import { requireCoach } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import { StatusPill } from "@/components/ui/status-pill";
 import { Badge } from "@/components/ui/badge";
@@ -11,12 +11,12 @@ import { ResubmitWorkshop } from "@/components/workshops/resubmit-workshop";
 import { CounterOfferCard } from "@/components/workshops/counter-offer-card";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { InlineEditDescription } from "@/components/workshops/inline-edit-description";
-import { getSessionDownloadPath } from "@/lib/file-download-path";
+import { getSessionDownloadPath } from "@/lib/files/file-download-path";
 import { getWorkshopStatusExplanation } from "@/lib/utils";
 import {
   calculateWorkshopRevenueSplit,
   formatUsdFromCents,
-} from "@/lib/workshop-financials";
+} from "@/lib/workshops/workshop-financials";
 
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 

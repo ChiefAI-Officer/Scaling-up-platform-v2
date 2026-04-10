@@ -1,0 +1,16 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - link "Skip to content" [ref=e8] [cursor=pointer]:
+        - /url: "#main"
+        - generic [ref=e9]:
+          - text: Skip to content
+          - img [ref=e10]
+      - generic [ref=e12]:
+        - banner [ref=e13]
+        - main [ref=e15]:
+          - group [ref=e18]
+    - status [ref=e28]
+    - alert [ref=e29]
+  - iframe [ref=e30]:
+    

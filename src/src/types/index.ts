@@ -15,6 +15,7 @@ export type WorkshopStatus =
   | "PRE_EVENT"
   | "POST_EVENT"
   | "COMPLETED"
+  | "DENIED"
   | "CANCELED";
 
 export type WorkshopFormat = "IN_PERSON" | "VIRTUAL" | "HYBRID";

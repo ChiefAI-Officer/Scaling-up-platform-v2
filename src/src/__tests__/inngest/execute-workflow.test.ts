@@ -34,12 +34,12 @@ jest.mock("@/inngest/client", () => ({
   },
 }));
 
-jest.mock("@/lib/workflow-service", () => ({
+jest.mock("@/lib/workflows/workflow-service", () => ({
   interpolateTemplate: jest.fn((input: string) => input),
   calculateSendDate: jest.fn(),
 }));
 
-jest.mock("@/lib/workflow-types", () => ({
+jest.mock("@/lib/workflows/workflow-types", () => ({
   STEP_TYPES: {
     EMAIL_ATTENDEES: "EMAIL_ATTENDEES",
     EMAIL_COACH: "EMAIL_COACH",
@@ -56,7 +56,7 @@ jest.mock("@/lib/workflow-types", () => ({
   },
 }));
 
-jest.mock("@/lib/survey-types", () => ({
+jest.mock("@/lib/surveys/survey-types", () => ({
   SURVEY_TYPES: {
     PRE_WORKSHOP: "PRE_WORKSHOP",
     POST_WORKSHOP: "POST_WORKSHOP",
@@ -67,7 +67,7 @@ jest.mock("@/lib/ics-generator", () => ({
   buildLocationString: jest.fn(() => "123 Main St, New York, NY"),
 }));
 
-jest.mock("@/lib/file-service", () => ({
+jest.mock("@/lib/files/file-service", () => ({
   getWorkflowStepFiles: jest.fn(async () => []),
   canDeliverWorkflowAttachments: jest.fn(() => true),
   buildProtectedEmailAttachments: jest.fn(() => []),
@@ -81,7 +81,7 @@ jest.mock("@/lib/delivery-telemetry", () => ({
   recordDeliveryTelemetry: jest.fn(async () => {}),
 }));
 
-jest.mock("@/lib/survey-automation", () => ({
+jest.mock("@/lib/surveys/survey-automation", () => ({
   getOrCreateSurveyLink: jest.fn(),
 }));
 
@@ -93,15 +93,15 @@ import { db } from "@/lib/db";
 import {
   interpolateTemplate,
   calculateSendDate,
-} from "@/lib/workflow-service";
+} from "@/lib/workflows/workflow-service";
 import { sendEmailViaSMTP } from "@/lib/smtp-transport";
 import {
   getWorkflowStepFiles,
   canDeliverWorkflowAttachments,
   buildProtectedEmailAttachments,
-} from "@/lib/file-service";
+} from "@/lib/files/file-service";
 import { recordDeliveryTelemetry } from "@/lib/delivery-telemetry";
-import { getOrCreateSurveyLink } from "@/lib/survey-automation";
+import { getOrCreateSurveyLink } from "@/lib/surveys/survey-automation";
 
 // Force the module to load so capturedHandler is assigned
 import "@/inngest/functions/execute-workflow";

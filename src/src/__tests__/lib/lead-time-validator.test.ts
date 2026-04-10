@@ -11,7 +11,7 @@ import {
     IN_PERSON_WORKSHOP_LEAD_TIME_DAYS,
     HYBRID_WORKSHOP_LEAD_TIME_DAYS,
     MINIMUM_LEAD_TIME_DAYS,
-} from "@/lib/lead-time-validator";
+} from "@/lib/workshops/lead-time-validator";
 
 describe("Lead Time Validator", () => {
     describe("validateLeadTime", () => {

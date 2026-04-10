@@ -12,13 +12,13 @@ import {
   getProtectedFileUrl,
   type FileRecipientRole,
   type WorkshopStatus,
-} from "@/lib/file-access";
-import { getSessionDownloadPath } from "@/lib/file-download-path";
+} from "@/lib/files/file-access";
+import { getSessionDownloadPath } from "@/lib/files/file-download-path";
 import {
   sanitizeFilename,
   validateFile,
-} from "@/lib/file-rules";
-export { validateFile } from "@/lib/file-rules";
+} from "@/lib/files/file-rules";
+export { validateFile } from "@/lib/files/file-rules";
 
 export interface UploadFileInput {
   file: File;

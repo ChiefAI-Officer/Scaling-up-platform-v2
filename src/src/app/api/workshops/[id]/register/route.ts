@@ -13,9 +13,9 @@ import {
   parseDurationHours,
   buildLocationString,
 } from "@/lib/ics-generator";
-import { createPreWorkshopSurvey, sendSurveyEmail } from "@/lib/survey-automation";
+import { createPreWorkshopSurvey, sendSurveyEmail } from "@/lib/surveys/survey-automation";
 import { z } from "zod";
-import { parseStoredWorkshopCoupons } from "@/lib/workshop-coupons";
+import { parseStoredWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 
 const workshopRegisterParamsSchema = z.object({
   id: z.string().min(1, "Workshop id is required"),

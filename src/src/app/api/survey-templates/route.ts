@@ -5,13 +5,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/lib/auth/auth";
 import {
   createSurveyTemplate,
   listSurveyTemplates,
-} from "@/lib/survey-service";
-import type { SurveyType } from "@/lib/survey-types";
-import { SURVEY_TYPES } from "@/lib/survey-types";
+} from "@/lib/surveys/survey-service";
+import type { SurveyType } from "@/lib/surveys/survey-types";
+import { SURVEY_TYPES } from "@/lib/surveys/survey-types";
 import { z } from "zod";
 
 const validSurveyTypes = Object.values(SURVEY_TYPES) as [SurveyType, ...SurveyType[]];

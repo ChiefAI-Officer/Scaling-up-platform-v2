@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import crypto from "crypto";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { sendWorkshopApprovedEmail, sendWorkshopDeniedEmail, sendApprovalInfoRequestEmail, sendCounterOfferEmail } from "@/services/notifications";
 import { inngest } from "@/inngest/client";
 import { runAutoBuild, type AutoBuildResult } from "@/lib/auto-build-service";

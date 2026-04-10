@@ -16,11 +16,6 @@ export function interpolateContent(contentJson: string, variables: Record<string
 }
 
 /**
- * Replace known identity fields in landing page content JSON.
- * Parses the JSON, overwrites structured fields (coachName, workshopTitle, etc.)
- * with target workshop values, then re-serializes.
- */
-/**
  * Returns true if the content string contains any {{...}} placeholders.
  */
 export function templateHasPlaceholders(contentJson: string): boolean {
@@ -35,6 +30,11 @@ export function findRemainingPlaceholders(contentJson: string): string[] {
     return matches ? matches.map(m => m.replace(/[{}]/g, '').trim()) : [];
 }
 
+/**
+ * Replace known identity fields in landing page content JSON.
+ * Parses the JSON, overwrites structured fields (coachName, workshopTitle, etc.)
+ * with target workshop values, then re-serializes.
+ */
 export function rewriteIdentityFields(
     contentJson: string,
     targetFields: Record<string, string>

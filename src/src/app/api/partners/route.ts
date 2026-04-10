@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 
 const PARTNER_PROFILE_DRAFT_KEY = "system:partners:profiles";
 const PARTNER_TOGGLE_DRAFT_KEY = "system:partners:toggles";

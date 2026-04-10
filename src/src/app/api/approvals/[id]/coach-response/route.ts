@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 import {
     sendApprovalCoachRespondedEmail,
     sendCounterOfferAcceptedEmail,

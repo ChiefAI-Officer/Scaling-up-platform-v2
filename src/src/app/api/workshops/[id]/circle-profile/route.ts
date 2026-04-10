@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { canManageCoachData, getApiActor } from "@/lib/auth/authorization";
 import { getCircleProfileByEmail } from "@/services/circle";
 import { z } from "zod";
 

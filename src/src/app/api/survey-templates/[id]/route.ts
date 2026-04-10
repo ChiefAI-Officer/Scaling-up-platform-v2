@@ -6,14 +6,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/lib/auth/auth";
 import {
   getSurveyTemplate,
   updateSurveyTemplate,
   deleteSurveyTemplate,
-} from "@/lib/survey-service";
-import { SURVEY_TYPES } from "@/lib/survey-types";
-import type { SurveyType } from "@/lib/survey-types";
+} from "@/lib/surveys/survey-service";
+import { SURVEY_TYPES } from "@/lib/surveys/survey-types";
+import type { SurveyType } from "@/lib/surveys/survey-types";
 import { z } from "zod";
 
 const surveyTemplateParamsSchema = z.object({

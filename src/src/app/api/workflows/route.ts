@@ -5,8 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { createWorkflow, listWorkflows, duplicateWorkflow } from "@/lib/workflow-service";
+import { authOptions } from "@/lib/auth/auth";
+import { createWorkflow, listWorkflows, duplicateWorkflow } from "@/lib/workflows/workflow-service";
 import { z } from "zod";
 
 const workflowsQuerySchema = z.object({

@@ -85,7 +85,7 @@ jest.mock("@/lib/ics-generator", () => ({
   buildLocationString: jest.fn().mockReturnValue("123 Main St"),
 }));
 
-jest.mock("@/lib/survey-automation", () => ({
+jest.mock("@/lib/surveys/survey-automation", () => ({
   createPreWorkshopSurvey: jest.fn().mockResolvedValue({
     surveyUrl: "https://example.com/survey/1",
   }),

@@ -28,11 +28,11 @@ jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
 }));
 
-jest.mock("@/lib/file-service", () => ({
+jest.mock("@/lib/files/file-service", () => ({
   getFile: jest.fn(),
 }));
 
-jest.mock("@/lib/file-access", () => ({
+jest.mock("@/lib/files/file-access", () => ({
   canRoleAccessAttachment: jest.fn(),
   verifyFileAccessToken: jest.fn(),
 }));
@@ -48,8 +48,8 @@ jest.mock("@/lib/db", () => ({
 import { GET } from "@/app/api/files/[id]/download/route";
 import { getServerSession } from "next-auth";
 import { getApiActor } from "@/lib/auth/authorization";
-import { getFile } from "@/lib/file-service";
-import { canRoleAccessAttachment, verifyFileAccessToken } from "@/lib/file-access";
+import { getFile } from "@/lib/files/file-service";
+import { canRoleAccessAttachment, verifyFileAccessToken } from "@/lib/files/file-access";
 
 function routeParams(id = "file-1") {
   return { params: Promise.resolve({ id }) };

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getAuthPosture } from "@/lib/auth-posture";
+import { getAuthPosture } from "@/lib/auth/auth-posture";
 
 /**
  * Health check endpoint for monitoring and load balancers

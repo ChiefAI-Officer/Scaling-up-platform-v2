@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/authorization";
-import { getSurveyResults } from "@/lib/survey-service";
-import { SURVEY_TYPE_LABELS } from "@/lib/survey-types";
-import type { SurveyType } from "@/lib/survey-types";
+import { requireAdmin } from "@/lib/auth/authorization";
+import { getSurveyResults } from "@/lib/surveys/survey-service";
+import { SURVEY_TYPE_LABELS } from "@/lib/surveys/survey-types";
+import type { SurveyType } from "@/lib/surveys/survey-types";
 import { FadeUp } from "@/components/ui/animated";
 
 interface PageProps {

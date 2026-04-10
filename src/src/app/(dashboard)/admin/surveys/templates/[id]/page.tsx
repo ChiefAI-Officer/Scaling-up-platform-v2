@@ -4,7 +4,7 @@
  */
 
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/authorization";
+import { requireAdmin } from "@/lib/auth/authorization";
 import { SurveyTemplateEditor } from "@/components/surveys/survey-template-editor";
 
 export default async function SurveyTemplateEditorPage({

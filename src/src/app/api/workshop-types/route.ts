@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createWorkshopTypeSchema } from "@/lib/validations";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 
 function parseJsonField<T>(raw: string | null): T | null {
   if (!raw) {

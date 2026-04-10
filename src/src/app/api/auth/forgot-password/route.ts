@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { db } from "@/lib/db";
 import { forgotPasswordSchema } from "@/lib/validations";
-import { generatePasswordResetToken } from "@/lib/password-reset";
+import { generatePasswordResetToken } from "@/lib/auth/password-reset";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 
 const GENERIC_SUCCESS_MESSAGE =

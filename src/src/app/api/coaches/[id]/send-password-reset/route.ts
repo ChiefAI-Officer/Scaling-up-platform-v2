@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
-import { generatePasswordResetToken } from "@/lib/password-reset";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { generatePasswordResetToken } from "@/lib/auth/password-reset";
 import { sendCoachWelcomeEmail } from "@/services/notifications";
 
 export async function POST(

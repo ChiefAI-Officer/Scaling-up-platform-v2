@@ -1,4 +1,4 @@
-import { requireCoach } from "@/lib/authorization";
+import { requireCoach } from "@/lib/auth/authorization";
 import { getCoachBioMissingFields } from "@/lib/validations";
 import ChangePasswordForm from "@/components/auth/change-password-form";
 import { CoachProfileForm } from "@/components/coach/coach-profile-form";

@@ -8,7 +8,7 @@
  */
 
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import type { Session } from "next-auth";
@@ -17,7 +17,7 @@ import {
     normalizeRole,
     canManageCoachData,
     isPrivilegedRole,
-} from "@/lib/access-control";
+} from "@/lib/auth/access-control";
 
 // Extend NextAuth session type to include user id and role
 export interface ExtendedSession extends Session {
@@ -293,6 +293,6 @@ export async function getApiActor(): Promise<ApiActor | null> {
     };
 }
 
-export type { ApiActor, ApiUserRole } from "@/lib/access-control";
+export type { ApiActor, ApiUserRole } from "@/lib/auth/access-control";
 export { canManageCoachData, isPrivilegedRole };
 

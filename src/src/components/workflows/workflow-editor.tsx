@@ -25,8 +25,8 @@ import {
   OFFSET_PRESETS,
   HOUR_OFFSET_PRESETS,
   WORKFLOW_VARIABLES,
-} from "@/lib/workflow-types";
-import type { StepType, TriggerType, OffsetMode } from "@/lib/workflow-types";
+} from "@/lib/workflows/workflow-types";
+import type { StepType, TriggerType, OffsetMode } from "@/lib/workflows/workflow-types";
 import {
   Tooltip,
   TooltipContent,

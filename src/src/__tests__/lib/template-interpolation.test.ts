@@ -1,4 +1,4 @@
-import { interpolateContent, rewriteIdentityFields, templateHasPlaceholders, findRemainingPlaceholders, formatVenueAddress, formatWorkshopDate, formatWorkshopDay, formatWorkshopDateNoWeekday } from "@/lib/template-interpolation";
+import { interpolateContent, rewriteIdentityFields, templateHasPlaceholders, findRemainingPlaceholders, formatVenueAddress, formatWorkshopDate, formatWorkshopDay, formatWorkshopDateNoWeekday } from "@/lib/templates/template-interpolation";
 
 describe("interpolateContent", () => {
   it("replaces {{variable}} placeholders with values", () => {

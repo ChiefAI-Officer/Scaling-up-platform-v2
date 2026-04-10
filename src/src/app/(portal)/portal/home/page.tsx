@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireCoach } from "@/lib/authorization";
+import { requireCoach } from "@/lib/auth/authorization";
 import Link from "next/link";
 import { StatusPill } from "@/components/ui/status-pill";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";

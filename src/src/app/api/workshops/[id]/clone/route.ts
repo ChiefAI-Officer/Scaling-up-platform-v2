@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireCoach, canAccessWorkshop } from "@/lib/authorization";
+import { requireCoach, canAccessWorkshop } from "@/lib/auth/authorization";
 import { generateSlug } from "@/lib/utils";
-import { generateUniqueWorkshopCode } from "@/lib/workshop-code";
+import { generateUniqueWorkshopCode } from "@/lib/workshops/workshop-code";
 import { z } from "zod";
 
 const cloneWorkshopParamsSchema = z.object({

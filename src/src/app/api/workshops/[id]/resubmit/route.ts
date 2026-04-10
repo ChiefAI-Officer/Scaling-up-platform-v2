@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getApiActor, canManageCoachData } from "@/lib/authorization";
+import { getApiActor, canManageCoachData } from "@/lib/auth/authorization";
 import { evaluateApproval } from "@/lib/approval-engine";
 import { runAutoBuild } from "@/lib/auto-build-service";
 

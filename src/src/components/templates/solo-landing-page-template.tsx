@@ -1,7 +1,7 @@
 "use client";
 
 import { formatCurrency } from "@/lib/utils";
-import { stripPlaceholders } from "@/lib/template-utils";
+import { stripPlaceholders } from "@/lib/templates/template-utils";
 
 export interface SoloContent {
   heroTitle?: string;

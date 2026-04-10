@@ -7,7 +7,7 @@
  * - hours offset with sendTimeOfDay set — sendTimeOfDay should be IGNORED (the fix)
  */
 
-import { calculateSendDate } from "@/lib/workflow-service";
+import { calculateSendDate } from "@/lib/workflows/workflow-service";
 
 describe("calculateSendDate", () => {
   // Fixed event date: 2026-06-15 at 14:00:00 UTC

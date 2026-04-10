@@ -1,7 +1,7 @@
 "use client";
 
 import { RegistrationForm } from "@/app/(public)/workshop/[slug]/registration-form";
-import { stripPlaceholders } from "@/lib/template-utils";
+import { stripPlaceholders } from "@/lib/templates/template-utils";
 
 export interface RegistrationContent {
   coachPhoto?: string;

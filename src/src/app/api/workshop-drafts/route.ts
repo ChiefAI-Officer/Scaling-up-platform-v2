@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireCoach } from "@/lib/authorization";
+import { requireCoach } from "@/lib/auth/authorization";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 

@@ -1,4 +1,4 @@
-import { stripPlaceholders } from "@/lib/template-utils";
+import { stripPlaceholders } from "@/lib/templates/template-utils";
 
 describe("stripPlaceholders", () => {
   it("returns empty string for undefined", () => {

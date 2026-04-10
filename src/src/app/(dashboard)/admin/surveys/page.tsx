@@ -6,9 +6,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { requireAdmin } from "@/lib/authorization";
-import { SURVEY_TYPE_LABELS } from "@/lib/survey-types";
-import type { SurveyType } from "@/lib/survey-types";
+import { requireAdmin } from "@/lib/auth/authorization";
+import { SURVEY_TYPE_LABELS } from "@/lib/surveys/survey-types";
+import type { SurveyType } from "@/lib/surveys/survey-types";
 import { DeleteSurveyTemplateButton } from "@/components/surveys/delete-survey-template-button";
 
 async function SurveyTemplatesList() {

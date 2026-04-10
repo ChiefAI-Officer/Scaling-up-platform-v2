@@ -9,8 +9,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
-import { STEP_TYPE_LABELS } from "@/lib/workflow-types";
-import type { StepType } from "@/lib/workflow-types";
+import { STEP_TYPE_LABELS } from "@/lib/workflows/workflow-types";
+import type { StepType } from "@/lib/workflows/workflow-types";
 
 interface Execution {
   id: string;

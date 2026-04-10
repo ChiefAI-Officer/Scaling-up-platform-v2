@@ -5,11 +5,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions } from "@/lib/auth/auth";
 import {
   assignWorkflowToWorkshop,
   unassignWorkflow,
-} from "@/lib/workflow-service";
+} from "@/lib/workflows/workflow-service";
 import { inngest } from "@/inngest/client";
 import { z } from "zod";
 

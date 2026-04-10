@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireCoach } from "@/lib/authorization";
+import { requireCoach } from "@/lib/auth/authorization";
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
 import { PortalWorkshopList } from "@/components/workshops/workshop-list-filters";

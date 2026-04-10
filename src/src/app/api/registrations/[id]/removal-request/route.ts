@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { canManageCoachData, getApiActor } from "@/lib/auth/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { sendApprovalRequest } from "@/services/notifications";
 

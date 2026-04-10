@@ -5,7 +5,7 @@
 
 import { db } from "@/lib/db";
 
-export { interpolateContent, rewriteIdentityFields, templateHasPlaceholders, findRemainingPlaceholders } from "@/lib/template-interpolation-core";
+export { interpolateContent, rewriteIdentityFields, templateHasPlaceholders, findRemainingPlaceholders } from "@/lib/templates/template-interpolation-core";
 
 /**
  * Format a venue address that may be stored as a JSON object or plain string.

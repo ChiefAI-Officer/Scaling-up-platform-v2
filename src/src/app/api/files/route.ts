@@ -5,8 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { uploadFile, listFiles, mapFileForClient, validateFile } from "@/lib/file-service";
+import { authOptions } from "@/lib/auth/auth";
+import { uploadFile, listFiles, mapFileForClient, validateFile } from "@/lib/files/file-service";
 import { z } from "zod";
 
 const filesQuerySchema = z.object({

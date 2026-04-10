@@ -184,7 +184,7 @@ model Workshop {
   coupons String @default("[]")
 
   // Status & Pipeline — JV-02: Jeff's 6 stages
-  // INFO_REQUESTED, AWAITING_APPROVAL, PRE_EVENT, POST_EVENT, COMPLETED, CANCELED
+  // INFO_REQUESTED, AWAITING_APPROVAL, PRE_EVENT, POST_EVENT, COMPLETED, DENIED, CANCELED
   status String @default("INFO_REQUESTED")
 
   // Generated Assets

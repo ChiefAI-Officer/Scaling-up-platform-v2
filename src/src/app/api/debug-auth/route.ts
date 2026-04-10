@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
-import { getAuthPosture } from "@/lib/auth-posture";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { getAuthPosture } from "@/lib/auth/auth-posture";
 
 export async function GET() {
     if (process.env.NODE_ENV === "production") {

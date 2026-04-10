@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 
 export async function GET(request: NextRequest) {

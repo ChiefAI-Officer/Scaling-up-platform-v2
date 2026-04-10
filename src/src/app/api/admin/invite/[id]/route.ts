@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 
 export async function DELETE(
   request: NextRequest,

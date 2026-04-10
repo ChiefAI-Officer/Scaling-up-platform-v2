@@ -1,0 +1,52 @@
+[    3264ms] [INFO] Resource Sentinel initialized... @ https://www.notion.so/3348c45dd829800f8ac8ee05ed9bd59d:0
+[    4726ms] [INFO] 2026-04-01T14:16:54.999Z [info] FeatureFlagTransactionQueue: preferIndexedDB {team: no-team-specified} @ https://www.notion.so/_assets/app-866745a86d9b65fc.js:71
+[    4773ms] [INFO] 2026-04-01T14:16:55.043Z [info] appHelpers: shouldShowError {data: Object} @ https://www.notion.so/_assets/app-866745a86d9b65fc.js:71
+[    4780ms] [INFO] 2026-04-01T14:16:55.056Z [info] appHelpers: shouldShowError {data: Object} @ https://www.notion.so/_assets/app-866745a86d9b65fc.js:71
+[    4796ms] [LOG] %c
+	nnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+	nnnn                         nnnn
+	nnnnnnn                          nnnn
+	nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+	nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn
+	nnnnnnnn                           nnn
+	nnnnnnnn    nnnnnnnn     nnnnnnn   nnn
+	nnnnnnnn      nnnnnnn      nnn     nnn
+	nnnnnnnn      nnnnnnnn     nnn     nnn
+	nnnnnnnn      nnnnnnnnnn   nnn     nnn
+	nnnnnnnn      nnn nnnnnnn  nnn     nnn
+	nnnnnnnn      nnn  nnnnnnnnnnn     nnn
+	nnnnnnnn      nnn   nnnnnnnnnn     nnn
+	nnnnnnnn      nnn     nnnnnnnn     nnn
+	nnnnnnnn      nnn      nnnnnnn     nnn
+	nnnnnnnn    nnnnnnnn    nnnnnn     nnn
+	  nnnnnn                           nnn
+		nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn		We're hiring!
+		  nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn		notion.so/careers
+
+	“yeah, I would probably eat a lemon for one hundred dollars” -- Ivan Zhao (2023-07-14)
+				  font-family: monospace @ https://www.notion.so/_assets/mainApp-aa6b1638c6d62ae5.js:0
+[    4951ms] [INFO] 2026-04-01T14:16:55.226Z [info] PageLoader: loserAborted {data: Object} @ https://www.notion.so/_assets/app-866745a86d9b65fc.js:71
+[    5148ms] [INFO] 2026-04-01T14:16:55.423Z [info] syncRecordValuesBatched: recordPointerMissingSpaceId {actor: Object, data: Object} @ https://www.notion.so/_assets/app-866745a86d9b65fc.js:71
+[    5204ms] [INFO] 2026-04-01T14:16:55.480Z [error] handleRestrictedStateForResponse: callApi {data: Object} @ https://www.notion.so/_assets/app-866745a86d9b65fc.js:71
+[    5262ms] [WARNING] Amplitude Logger [Warn]: Event not tracked, no destination plugins on the instance @ https://www.notion.so/_assets/transport-support-e7d414a1cfeb3949.js:1
+[    5262ms] [INFO] 2026-04-01T14:16:55.538Z [error] eventTrailApiHelpers: trackFailure {error: Object} @ https://www.notion.so/_assets/app-866745a86d9b65fc.js:71
+[    5633ms] [WARNING] Ignoring inability to install OPFS sqlite3_vfs: Cannot install OPFS: Missing SharedArrayBuffer and/or Atomics. The server must emit the COOP/COEP response headers to enable those. See https://sqlite.org/wasm/doc/trunk/persistence.md#coop-coep @ https://www.notion.so/_assets/wasm-sqlite-worker-f2a58d8eec8320f4.js:0
+[    5750ms] [INFO] 2026-04-01T14:16:56.025Z [info] appHelpers: shouldShowError {data: Object} @ https://www.notion.so/_assets/app-866745a86d9b65fc.js:71
+[    5817ms] [INFO] 2026-04-01T14:16:56.093Z [info] pageError: pageError {data: Object} @ https://www.notion.so/_assets/app-866745a86d9b65fc.js:71
+[    5819ms] [INFO] 2026-04-01T14:16:56.094Z [info] appHelpers: shouldShowError {data: Object} @ https://www.notion.so/_assets/app-866745a86d9b65fc.js:71
+[    5948ms] [INFO] 2026-04-01T14:16:56.224Z [info] sqliteSchemaHelpers: attemptFastForwardMigration {data: Object} @ https://www.notion.so/_assets/18763-66afc1806c4c9477.js:473
+[    6007ms] [INFO] 2026-04-01T14:16:56.282Z [info] sqliteSchemaHelpers: successfulFastForwardMigration {data: Object} @ https://www.notion.so/_assets/18763-66afc1806c4c9477.js:473
+[    6076ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://www.notion.so/api/v3/recordPageExit:0
+[    6124ms] [INFO] 2026-04-01T14:16:56.399Z [error] handleRestrictedStateForResponse: callApi {data: Object} @ https://www.notion.so/_assets/18763-66afc1806c4c9477.js:473
+[    6437ms] [ERROR] HttpRequestError: Received HTTP 401
+    at l (https://www.notion.so/_assets/ClientFramework-e1ef8e4bee178add.js:4:942)
+    at async h (https://www.notion.so/_assets/ClientFramework-e1ef8e4bee178add.js:4:3015)
+    at async r (https://www.notion.so/_assets/app-866745a86d9b65fc.js:2:389)
+    at async l (https://www.notion.so/_assets/41403-111c9437b575a42b.js:87:15431) @ https://www.notion.so/_assets/18763-66afc1806c4c9477.js:473
+[    6437ms] [INFO] 2026-04-01T14:16:56.713Z [error] api: httpTrigger401 {data: Object} @ https://www.notion.so/_assets/18763-66afc1806c4c9477.js:473
+[    6630ms] [WARNING] [GSI_LOGGER]: Your client application uses one of the Google One Tap prompt UI status methods that may stop functioning when FedCM becomes mandatory. Refer to the migration guide to update your code accordingly and opt-in to FedCM to test your changes. Learn more: https://developers.google.com/identity/gsi/web/guides/fedcm-migration?s=dc#display_moment and https://developers.google.com/identity/gsi/web/guides/fedcm-migration?s=dc#skipped_moment @ https://www.notion.so/_assets/18763-66afc1806c4c9477.js:473
+[    6634ms] [ERROR] Not signed in with the identity provider. @ https://www.notion.so/3348c45dd829800f8ac8ee05ed9bd59d:0
+[    7398ms] [INFO] 2026-04-01T14:16:57.674Z [error] handleRestrictedStateForResponse: callApi {data: Object} @ https://www.notion.so/_assets/18763-66afc1806c4c9477.js:473
+[    7548ms] [INFO] 2026-04-01T14:16:57.823Z [info] syncRecordValuesBatched: recordPointerMissingSpaceId {actor: Object, data: Object} @ https://www.notion.so/_assets/18763-66afc1806c4c9477.js:473
+[    8541ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://cdn.metadata.io/pixel/config/1127.json:0
+[   10138ms] [ERROR] [GSI_LOGGER]: FedCM get() rejects with NetworkError: Error retrieving a token. @ https://www.notion.so/_assets/18763-66afc1806c4c9477.js:473

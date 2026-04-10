@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { upload } from "@vercel/blob/client";
-import { sanitizeFilename, validateFile } from "@/lib/file-rules";
+import { sanitizeFilename, validateFile } from "@/lib/files/file-rules";
 
 interface FileRecord {
   id: string;

@@ -9,7 +9,7 @@
  */
 
 import { db } from "@/lib/db";
-import { SURVEY_TYPES } from "@/lib/survey-types";
+import { SURVEY_TYPES } from "@/lib/surveys/survey-types";
 
 /**
  * Find the best matching survey template for a workshop + survey type.

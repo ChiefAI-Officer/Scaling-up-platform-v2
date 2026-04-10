@@ -1,7 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { db } from "./db";
-import { enforceProductionSafeAuthPosture } from "./auth-posture";
+import { db } from "@/lib/db";
+import { enforceProductionSafeAuthPosture } from "@/lib/auth/auth-posture";
 
 // User roles for authorization
 export type UserRole = "ADMIN" | "STAFF" | "COACH";

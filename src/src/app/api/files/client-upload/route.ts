@@ -1,14 +1,14 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { canManageCoachData, getApiActor } from "@/lib/authorization";
+import { canManageCoachData, getApiActor } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import {
   ALLOWED_CONTENT_TYPES,
   MAX_FILE_SIZE,
   sanitizeFilename,
   validateFileDescriptor,
-} from "@/lib/file-rules";
+} from "@/lib/files/file-rules";
 
 class ClientUploadRouteError extends Error {
   constructor(public status: number, message: string) {

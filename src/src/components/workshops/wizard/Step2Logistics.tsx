@@ -9,7 +9,7 @@ import {
     getMinimumLeadTimeDate,
     getMinimumLeadTimeDays,
     normalizeLeadTimeFormat,
-} from "@/lib/lead-time-validator";
+} from "@/lib/workshops/lead-time-validator";
 
 function getMinDate(format: string): string {
     return getMinimumLeadTimeDate(format).toISOString().split("T")[0];

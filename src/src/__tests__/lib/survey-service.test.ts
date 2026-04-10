@@ -9,7 +9,7 @@ jest.mock("@/lib/db", () => ({
 }));
 
 import { db } from "@/lib/db";
-import { deleteSurveyTemplate } from "@/lib/survey-service";
+import { deleteSurveyTemplate } from "@/lib/surveys/survey-service";
 
 describe("survey-service deleteSurveyTemplate", () => {
   beforeEach(() => {

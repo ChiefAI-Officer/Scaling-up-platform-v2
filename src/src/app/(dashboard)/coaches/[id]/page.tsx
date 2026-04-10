@@ -11,7 +11,7 @@ import { AddCertificationModal } from "@/components/coaches/add-certification-mo
 import { RemoveCertificationButton } from "@/components/coaches/remove-certification-button";
 import { DeleteCoachButton } from "@/components/coaches/delete-coach-button";
 import { SendPasswordResetButton } from "@/components/coaches/send-password-reset-button";
-import { requireAuth } from "@/lib/authorization";
+import { requireAuth } from "@/lib/auth/authorization";
 
 interface CoachDetailPageProps {
   params: Promise<{ id: string }>;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { db } from "@/lib/db";
-import { getApiActor } from "@/lib/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
 import { inviteAdminSchema } from "@/lib/validations";
 import { sendAdminInviteEmail } from "@/services/notifications";
 

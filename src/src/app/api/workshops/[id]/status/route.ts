@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { inngest } from "@/inngest/client";
-import { getApiActor, isPrivilegedRole } from "@/lib/authorization";
-import { createPostWorkshopSurveys, sendSurveyEmail } from "@/lib/survey-automation";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { createPostWorkshopSurveys, sendSurveyEmail } from "@/lib/surveys/survey-automation";
 import { z } from "zod";
 
 // JV-02: Jeff Verdun's 6 workshop stages
