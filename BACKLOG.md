@@ -32,7 +32,7 @@ Legend: `[ ]` pending · `[x]` done · `bug` · `feature` · `question`
 | AP-01 | `[ ]` | feature | **Bio page → Coach record** — add button on bio edit page that navigates to that coach's record for certifications | — |
 | AP-02 | `[ ]` | bug | **Landing page save 400 error** — registration page: saves as draft but ignores edits (Master Class repro) | — |
 | AP-03 | `[ ]` | bug | **Thank you page save 400 error** — same as AP-02 | — |
-| AP-04 | `[ ]` | bug | **Landing page editor** — after Save & Publish opens in new tab but edit page stays open; needs "Return to Workshop" button | — |
+| AP-04 | `[x]` | bug | ~~Landing page editor — after Save & Publish opens in new tab but edit page stays open; needs "Return to Workshop" button~~ | warm-prancing-panda |
 | AP-05 | `[ ]` | bug | **Admin workshop edit** — much of the edit form has been removed; admin should be able to edit every field | — |
 | AP-06 | `[ ]` | feature | **Coupon codes** — admin should be able to add/edit coupon codes on any workshop at any time | — |
 | AP-07 | `[x]` | bug | ~~Admins restricted by lead-time — can't create workshop on any date~~ | ethereal-floating-parnas |
@@ -62,6 +62,8 @@ Legend: `[ ]` pending · `[x]` done · `bug` · `feature` · `question`
 
 | Date | Item |
 |------|------|
+| Apr 10 | AP-04 — Back to Workshop link on all 4 landing page editors (warm-prancing-panda) |
+| Apr 10 | AP-02/AP-03 — Phase 1 instrumentation: HTTP status surfaced in UI + server-side logging (warm-prancing-panda) |
 | Apr 10 | CP-02, CP-04, CP-05 — DENIED workshop status full stack (warm-prancing-panda) |
 | Apr 08 | Hour-interval scheduling for workflow editor |
 | Apr 08 | Stripe PENDING registration unification |

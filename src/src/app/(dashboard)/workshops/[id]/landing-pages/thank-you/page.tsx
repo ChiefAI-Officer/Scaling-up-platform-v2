@@ -80,7 +80,7 @@ export default function ThankYouPageEditor() {
 
       const data = await response.json();
       if (!response.ok || !data.success) {
-        console.error("[landing-page save] error details:", data.details);
+        if (data.details) console.error("[landing-page save] error details:", data.details);
         throw new Error(`[${response.status}] ${data.error || "Failed to save"}`);
       }
       
@@ -160,18 +160,18 @@ export default function ThankYouPageEditor() {
             </CardContent>
           </Card>
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 sticky bottom-0 bg-card py-3">
             <Button onClick={() => handleSave(false)} variant="outline" disabled={saving} className="flex-1">
               {saving ? "Saving..." : "Save Draft"}
             </Button>
             <Button onClick={() => handleSave(true)} disabled={saving} className="flex-1">
               {saving ? "Publishing..." : "Save & Publish"}
             </Button>
-          </div>
-          <div className="mt-2 text-center">
-            <Link href={`/workshops/${workshopId}`} className="text-sm text-muted-foreground hover:text-foreground">
-              ← Back to Workshop
-            </Link>
+            <div className="text-center">
+              <Link href={`/workshops/${workshopId}`} className="text-sm text-muted-foreground hover:text-foreground">
+                ← Back to Workshop
+              </Link>
+            </div>
           </div>
         </div>
 

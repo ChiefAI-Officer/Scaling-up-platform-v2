@@ -318,7 +318,7 @@ export default function DuoLandingEditor() {
 
       const data = await response.json();
       if (!response.ok || !data.success) {
-        console.error("[landing-page save] error details:", data.details);
+        if (data.details) console.error("[landing-page save] error details:", data.details);
         throw new Error(`[${response.status}] ${data.error || "Failed to save"}`);
       }
 
