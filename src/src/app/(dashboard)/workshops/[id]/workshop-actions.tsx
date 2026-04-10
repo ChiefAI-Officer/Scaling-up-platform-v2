@@ -13,6 +13,7 @@ type WorkshopStatus =
   | "PRE_EVENT"
   | "POST_EVENT"
   | "COMPLETED"
+  | "DENIED"
   | "CANCELED";
 
 interface WorkshopActionsProps {
@@ -28,6 +29,7 @@ const statusTransitions: Record<WorkshopStatus, WorkshopStatus[]> = {
   PRE_EVENT: ["POST_EVENT", "CANCELED"],
   POST_EVENT: ["COMPLETED"],
   COMPLETED: [],
+  DENIED: ["CANCELED"],
   CANCELED: ["INFO_REQUESTED"],
 };
 
@@ -37,6 +39,7 @@ const statusLabels: Record<WorkshopStatus, string> = {
   PRE_EVENT: "Pre-Event",
   POST_EVENT: "Post-Event",
   COMPLETED: "Completed",
+  DENIED: "Denied",
   CANCELED: "Canceled",
 };
 

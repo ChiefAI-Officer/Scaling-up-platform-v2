@@ -33,6 +33,7 @@ interface PortalWorkshopListProps {
 const STATUS_OPTIONS = [
     { value: "", label: "All Statuses" },
     { value: "INFO_REQUESTED", label: "Info Requested" },
+    { value: "DENIED", label: "Denied" },
     { value: "REQUESTED", label: "Approval Pending" },
     { value: "AWAITING_APPROVAL", label: "Approval Pending" },
     { value: "PRE_EVENT", label: "Pre-Event" },

@@ -2,6 +2,7 @@ import crypto from "crypto";
 
 export const WORKSHOP_STATUS_ORDER = [
   "INFO_REQUESTED",
+  "DENIED",
   "AWAITING_APPROVAL",
   "PRE_EVENT",
   "POST_EVENT",
