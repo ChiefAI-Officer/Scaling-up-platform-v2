@@ -131,24 +131,13 @@ export const executeWorkflow = inngest.createFunction(
           workshop.timezone
         );
 
-        // Only schedule if the send time is in the future
+        // Schedule for future; if already past, fire immediately (no sleep)
         if (sendAt > new Date()) {
           await step.sleepUntil(`wait-${stepName}`, sendAt);
         } else {
-          // Skip past steps
-          await step.run(`skip-${stepName}`, async () => {
-            await db.workflowStepExecution.create({
-              data: {
-                stepId: workflowStep.id,
-                workshopId: workshop.id,
-                status: "SKIPPED",
-                scheduledFor: sendAt,
-                executedAt: new Date(),
-                errorMessage: "Send time already passed",
-              },
-            });
-          });
-          continue;
+          console.warn(
+            `[execute-workflow] Step ${workflowStep.id} scheduled for past (${sendAt.toISOString()}). Firing immediately.`
+          );
         }
       }
 
@@ -176,17 +165,52 @@ export const executeWorkflow = inngest.createFunction(
           let recipientRole: FileRecipientRole = "CUSTOM";
 
           switch (workflowStep.stepType) {
-            case STEP_TYPES.EMAIL_COACH:
+            case STEP_TYPES.EMAIL_COACH: {
+              // Dedup guard — prevent double-send on Inngest retry
+              const existingExecution = await db.workflowStepExecution.findFirst({
+                where: { stepId: workflowStep.id, workshopId: workshop.id, status: "SENT" },
+              });
+              if (existingExecution) {
+                console.warn(
+                  `[execute-workflow] EMAIL_COACH step ${workflowStep.id} already sent for workshop ${workshop.id}. Skipping duplicate.`
+                );
+                stepsExecuted++;
+                return;
+              }
               recipientRole = "COACH";
               recipients.push(workshop.coach.email);
               break;
+            }
 
-            case STEP_TYPES.EMAIL_STAFF:
+            case STEP_TYPES.EMAIL_STAFF: {
+              // Dedup guard — prevent double-send on Inngest retry
+              const existingExecution = await db.workflowStepExecution.findFirst({
+                where: { stepId: workflowStep.id, workshopId: workshop.id, status: "SENT" },
+              });
+              if (existingExecution) {
+                console.warn(
+                  `[execute-workflow] EMAIL_STAFF step ${workflowStep.id} already sent for workshop ${workshop.id}. Skipping duplicate.`
+                );
+                stepsExecuted++;
+                return;
+              }
               recipientRole = "STAFF";
               recipients.push(process.env.ADMIN_EMAIL || "admin@scalingup.com");
               break;
+            }
 
-            case STEP_TYPES.EMAIL_CUSTOM:
+            case STEP_TYPES.EMAIL_CUSTOM: {
+              // Dedup guard — prevent double-send on Inngest retry
+              const existingExecution = await db.workflowStepExecution.findFirst({
+                where: { stepId: workflowStep.id, workshopId: workshop.id, status: "SENT" },
+              });
+              if (existingExecution) {
+                console.warn(
+                  `[execute-workflow] EMAIL_CUSTOM step ${workflowStep.id} already sent for workshop ${workshop.id}. Skipping duplicate.`
+                );
+                stepsExecuted++;
+                return;
+              }
               recipientRole = "CUSTOM";
               if (workflowStep.customRecipients) {
                 try {
@@ -200,6 +224,7 @@ export const executeWorkflow = inngest.createFunction(
                 }
               }
               break;
+            }
 
             case STEP_TYPES.EMAIL_ATTENDEES: {
               recipientRole = "ATTENDEE";

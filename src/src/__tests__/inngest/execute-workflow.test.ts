@@ -576,9 +576,9 @@ describe("execute-workflow Inngest function", () => {
   });
 
   // ------------------------------------------------------------------
-  // 12. RELATIVE_TO_EVENT: creates SKIPPED execution for past dates
+  // 12. RELATIVE_TO_EVENT: fires immediately (SENT) for past dates
   // ------------------------------------------------------------------
-  it("RELATIVE_TO_EVENT timing: creates SKIPPED execution for past dates", async () => {
+  it("RELATIVE_TO_EVENT timing: fires immediately (SENT) for past dates", async () => {
     const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000); // 1 day ago
     mockCalculateSendDate.mockReturnValue(pastDate);
 
@@ -598,22 +598,55 @@ describe("execute-workflow Inngest function", () => {
     const result = await invoke();
 
     expect(mockStep.sleepUntil).not.toHaveBeenCalled();
-    expect(mockSendEmail).not.toHaveBeenCalled();
-    expect(executionCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          stepId: "step-1",
-          status: "SKIPPED",
-          errorMessage: "Send time already passed",
-        }),
-      })
+    expect(mockSendEmail).toHaveBeenCalled();
+    const skippedCall = (executionCreate as jest.Mock).mock.calls.find(
+      ([data]: [{ data: { status: string } }]) => data?.data?.status === "SKIPPED"
     );
-    // The step is skipped via continue so stepsExecuted stays 0
+    expect(skippedCall).toBeUndefined();
+    // The step fires immediately so stepsExecuted = 1
     expect(result).toMatchObject({
       success: true,
-      stepsExecuted: 0,
+      stepsExecuted: 1,
       stepsFailed: 0,
       totalSteps: 1,
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // RELATIVE_TO_EVENT past-timestamp behavior
+  // ------------------------------------------------------------------
+  describe("RELATIVE_TO_EVENT past-timestamp behavior", () => {
+    it("fires immediately (SENT) when sendAt is in the past — does NOT create SKIPPED record", async () => {
+      const pastSendAt = new Date(Date.now() - 60 * 60 * 1000);
+      (calculateSendDate as jest.Mock).mockReturnValue(pastSendAt);
+      const mockCreate = db.workflowStepExecution.create as jest.Mock;
+      mockCreate.mockResolvedValue({});
+      const assignment = makeAssignment({
+        steps: [makeStep({ triggerType: "RELATIVE_TO_EVENT", stepType: "EMAIL_COACH", offsetDays: 0, offsetHours: -1 })],
+      });
+      (db.workflowAssignment.findUnique as jest.Mock).mockResolvedValue(assignment);
+
+      await capturedHandler({ event: buildEvent(), step: mockStep });
+
+      expect(mockStep.sleepUntil).not.toHaveBeenCalled();
+      expect(sendEmailViaSMTP).toHaveBeenCalled();
+      const skippedCall = mockCreate.mock.calls.find(
+        ([data]: [{ data: { status: string } }]) => data?.data?.status === "SKIPPED"
+      );
+      expect(skippedCall).toBeUndefined();
+    });
+
+    it("sleeps until sendAt when it is in the future", async () => {
+      const futureSendAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
+      (calculateSendDate as jest.Mock).mockReturnValue(futureSendAt);
+      const assignment = makeAssignment({
+        steps: [makeStep({ triggerType: "RELATIVE_TO_EVENT", stepType: "EMAIL_COACH", offsetDays: 0, offsetHours: -2 })],
+      });
+      (db.workflowAssignment.findUnique as jest.Mock).mockResolvedValue(assignment);
+
+      await capturedHandler({ event: buildEvent(), step: mockStep });
+
+      expect(mockStep.sleepUntil).toHaveBeenCalledWith(expect.stringContaining("wait-"), futureSendAt);
     });
   });
 
