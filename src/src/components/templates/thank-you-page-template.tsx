@@ -191,7 +191,7 @@ export function ThankYouPageTemplate({
 
             {/* Video embed */}
             {videoUrl && (
-              <div className="mt-8 w-full max-w-2xl">
+              <div className="mt-8 w-full max-w-2xl mx-auto">
                 <div className="rounded-xl overflow-hidden border border-border">
                   <iframe
                     src={videoUrl}

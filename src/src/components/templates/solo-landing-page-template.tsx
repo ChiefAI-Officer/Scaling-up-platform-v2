@@ -182,7 +182,7 @@ export function SoloLandingPageTemplate({
             )}
 
             {videoUrl && (
-              <div className="w-full max-w-2xl">
+              <div className="w-full max-w-2xl mx-auto">
                 <div className="rounded-2xl overflow-hidden shadow-xl border border-border">
                   <iframe
                     src={videoUrl}
