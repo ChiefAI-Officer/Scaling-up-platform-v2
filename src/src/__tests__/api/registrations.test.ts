@@ -23,6 +23,7 @@ jest.mock("@/lib/db", () => ({
 jest.mock("@/lib/auth/authorization", () => ({
   canManageCoachData: jest.fn(),
   getApiActor: jest.fn(),
+  isPrivilegedRole: jest.fn((role: string) => role === "ADMIN" || role === "STAFF"),
 }));
 
 jest.mock("@/lib/rate-limit", () => ({
