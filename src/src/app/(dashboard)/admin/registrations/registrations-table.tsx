@@ -85,7 +85,7 @@ export function RegistrationsTable({ registrations }: RegistrationsTableProps) {
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider text-xs hidden lg:table-cell">Phone</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider text-xs">Workshop</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider text-xs hidden xl:table-cell">Coach</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider text-xs hidden lg:table-cell">Event Date</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider text-xs hidden lg:table-cell">Registration Date</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground uppercase tracking-wider text-xs">Status</th>
                 </tr>
               </thead>
@@ -113,7 +113,7 @@ export function RegistrationsTable({ registrations }: RegistrationsTableProps) {
                         : <span className="text-muted-foreground/50">—</span>}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell whitespace-nowrap">
-                      {reg.workshop?.eventDate ? formatDate(new Date(reg.workshop.eventDate)) : <span className="text-muted-foreground/50">—</span>}
+                      {reg.createdAt ? formatDate(new Date(reg.createdAt)) : <span className="text-muted-foreground/50">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       {paymentStatusBadge(reg.paymentStatus)}
