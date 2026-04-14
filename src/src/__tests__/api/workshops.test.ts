@@ -222,7 +222,7 @@ describe("Workshops API", () => {
       expect(db.workshop.create).toHaveBeenCalled();
     });
 
-    it("admin cannot create a workshop with yesterday's date (past dates still blocked)", async () => {
+    it("admin CAN create a workshop with yesterday's date (retroactive import)", async () => {
       (getApiActor as jest.Mock).mockResolvedValue({
         userId: "admin-1",
         email: "admin@example.com",
@@ -242,10 +242,9 @@ describe("Workshops API", () => {
           })
         )
       );
-      const body = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(body.success).toBe(false);
+      // Admins bypass past-date restrictions; creation should succeed
+      expect([200, 201]).toContain(response.status);
     });
 
     it("creates workshop when in-person lead time and certification checks pass", async () => {

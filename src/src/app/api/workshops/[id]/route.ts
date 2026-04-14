@@ -285,8 +285,8 @@ export async function PATCH(
     }
 
     if (data.eventDate) {
-      // Past dates are always rejected, even for admins
-      if (new Date(data.eventDate) < new Date()) {
+      // Admins can set past dates (retroactive imports); coaches/staff cannot.
+      if (!isPrivileged && new Date(data.eventDate) < new Date()) {
         return NextResponse.json(
           { success: false, error: "Event date cannot be in the past" },
           { status: 400 }
