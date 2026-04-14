@@ -65,6 +65,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Non-admin actors must have a coach profile
+    if (!isAdmin && !actor.coachId) {
+      return NextResponse.json(
+        { success: false, error: "Coach profile not found" },
+        { status: 403 }
+      );
+    }
+
     // For coach with a workshopId, verify they own the workshop
     if (workshopId && !isAdmin) {
       const workshop = await db.workshop.findUnique({
@@ -90,7 +98,7 @@ export async function GET(request: NextRequest) {
 
     const where = {
       ...(workshopId ? { workshopId } : {}),
-      ...(!isAdmin ? { workshop: { coachId: actor.coachId! } } : {}),
+      ...(!isAdmin ? { workshop: { coachId: actor.coachId } } : {}),
       paymentStatus: { not: "PENDING" as const },
     };
 

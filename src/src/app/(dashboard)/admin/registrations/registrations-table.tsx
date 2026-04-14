@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 
 interface Registration {
   id: string;
@@ -30,7 +30,7 @@ interface RegistrationsTableProps {
 function paymentStatusBadge(status: string) {
   const map: Record<string, string> = {
     PAID: "bg-success/10 text-success border border-success/20",
-    FREE: "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800",
+    FREE: "bg-info/10 text-info border border-info/20",
     REFUNDED: "bg-warning/10 text-warning border border-warning/20",
     CANCELLED: "bg-destructive/10 text-destructive border border-destructive/20",
   };
@@ -124,6 +124,11 @@ export function RegistrationsTable({ registrations }: RegistrationsTableProps) {
             </table>
           </div>
         </div>
+      )}
+      {registrations.length >= 200 && (
+        <p className="text-sm text-muted-foreground mt-3 text-center">
+          Showing the 200 most recent registrations. Use filters to narrow results.
+        </p>
       )}
     </div>
   );
