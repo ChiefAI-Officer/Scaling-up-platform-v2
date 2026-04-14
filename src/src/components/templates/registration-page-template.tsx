@@ -20,6 +20,7 @@ export interface RegistrationContent {
   privacyText?: string;
   venueName?: string | null;
   venueAddress?: string | null;
+  format?: string | null;
 }
 
 export interface RegistrationWorkshopData {
