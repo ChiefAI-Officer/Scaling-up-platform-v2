@@ -39,6 +39,11 @@ export function Step2Logistics() {
     const { formData, updateField, nextStep, prevStep } = useWizard();
     const minDate = getMinDate(formData.format);
 
+    // Parse existing eventTime into start/end components
+    const timeParts = (formData.eventTime ?? "").split(/\s*-\s*/);
+    const [eventTimeStart, setEventTimeStart] = React.useState(timeParts.length === 2 ? timeParts[0] : "");
+    const [eventTimeEnd, setEventTimeEnd] = React.useState(timeParts.length === 2 ? timeParts[1] : "");
+
     const dateIsTooSoon = formData.eventDate && formData.eventDate < minDate;
     const virtualLinkInvalid = formData.virtualLink && !isValidUrl(formData.virtualLink);
 
@@ -114,15 +119,33 @@ export function Step2Logistics() {
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="eventTime">Event Time</Label>
-                    <Input
-                        type="text"
-                        id="eventTime"
-                        value={formData.eventTime}
-                        onChange={(e) => updateField("eventTime", e.target.value)}
-                        placeholder="e.g., 09:00 - 17:00"
-                    />
-                    <p className="text-xs text-muted-foreground">Enter start and end time (e.g., 09:00 - 12:00)</p>
+                    <Label>Event Time</Label>
+                    <div className="flex items-center gap-3">
+                        <div className="flex-1 space-y-1">
+                            <label className="text-xs text-muted-foreground">Start time</label>
+                            <Input
+                                type="time"
+                                value={eventTimeStart}
+                                onChange={(e) => {
+                                    setEventTimeStart(e.target.value);
+                                    updateField("eventTime", `${e.target.value} - ${eventTimeEnd}`);
+                                }}
+                            />
+                        </div>
+                        <span className="text-muted-foreground pt-4">to</span>
+                        <div className="flex-1 space-y-1">
+                            <label className="text-xs text-muted-foreground">End time</label>
+                            <Input
+                                type="time"
+                                value={eventTimeEnd}
+                                onChange={(e) => {
+                                    setEventTimeEnd(e.target.value);
+                                    updateField("eventTime", `${eventTimeStart} - ${e.target.value}`);
+                                }}
+                            />
+                        </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Enter start and end time (e.g., 09:00 - 17:00)</p>
                 </div>
             </div>
 
