@@ -28,6 +28,7 @@ interface Workshop {
     lastName: string;
     bio: string | null;
     profileImage: string | null;
+    bookCallUrl: string | null;
   };
 }
 
@@ -63,7 +64,7 @@ export default function BioPageEditor() {
         const workshopData = await workshopRes.json();
         if (workshopData.success) {
           setWorkshop(workshopData.data);
-          
+
           // Pre-fill from coach data
           const coach = workshopData.data.coach;
           setFormData((prev) => ({
@@ -72,14 +73,20 @@ export default function BioPageEditor() {
             biography: coach.bio || "",
             profileImageUrl: coach.profileImage || "",
             ctaButtonText: `Book a Free Call with ${coach.firstName}`,
+            ctaButtonUrl: coach.bookCallUrl || "",
           }));
         }
 
         const pageData = await pageRes.json();
         if (pageData.success && pageData.data) {
-          // Override with saved landing page data
+          // Override with saved landing page data; fall back to coach.bookCallUrl if not explicitly set
           const content = JSON.parse(pageData.data.content);
-          setFormData((prev) => ({ ...prev, ...content }));
+          const coachBookCallUrl = workshopData.success ? workshopData.data.coach?.bookCallUrl : null;
+          setFormData((prev) => ({
+            ...prev,
+            ...content,
+            ctaButtonUrl: content.ctaButtonUrl || coachBookCallUrl || prev.ctaButtonUrl || "",
+          }));
         }
       } catch {
         setError("Failed to load data");

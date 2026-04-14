@@ -100,6 +100,7 @@ export async function PATCH(
         ...(data.profileImage !== undefined && { profileImage: data.profileImage }),
         ...(data.linkedinUrl !== undefined && { linkedinUrl: data.linkedinUrl }),
         ...(data.showBookCallCta !== undefined && { showBookCallCta: data.showBookCallCta }),
+        ...(data.bookCallUrl !== undefined && { bookCallUrl: data.bookCallUrl }),
         ...(data.hubspotId !== undefined && { hubspotId: data.hubspotId }),
         ...(data.circleId !== undefined && { circleId: data.circleId }),
         ...(data.territory !== undefined && { territory: data.territory }),

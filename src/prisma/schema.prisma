@@ -80,6 +80,7 @@ model Coach {
   profileImage        String?
   linkedinUrl         String?
   showBookCallCta     Boolean   @default(true)
+  bookCallUrl         String?
   certificationStatus String    @default("PENDING")
   certificationExpiry DateTime?
   paymentStatus       String    @default("PENDING")

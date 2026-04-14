@@ -13,6 +13,14 @@ const updatePortalProfileSchema = z
     company: z.string().nullable().optional(), // MR-26: Title / Credentials / business entity
     linkedinUrl: z.string().url().nullable().optional(),
     showBookCallCta: z.boolean().optional(),
+    bookCallUrl: z
+      .string()
+      .nullable()
+      .optional()
+      .refine(
+        (val) => !val || val.startsWith("https://") || val.startsWith("http://"),
+        { message: "Book a Call URL must start with http:// or https://" }
+      ),
   })
   .refine((value) => Object.values(value).some((entry) => entry !== undefined), {
     message: "At least one field must be provided",
@@ -41,7 +49,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { firstName, lastName, bio, title, company, linkedinUrl, showBookCallCta } = bodyValidation.data;
+    const { firstName, lastName, bio, title, company, linkedinUrl, showBookCallCta, bookCallUrl } = bodyValidation.data;
 
     const updated = await db.coach.update({
       where: { id: coach.id },
@@ -53,6 +61,7 @@ export async function PATCH(request: NextRequest) {
         ...(company !== undefined && { company: company?.trim() || null }),
         ...(linkedinUrl !== undefined && { linkedinUrl }),
         ...(typeof showBookCallCta === "boolean" && { showBookCallCta }),
+        ...(bookCallUrl !== undefined && { bookCallUrl }),
       },
     });
 
