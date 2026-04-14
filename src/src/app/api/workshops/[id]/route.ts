@@ -285,7 +285,7 @@ export async function PATCH(
     }
 
     if (data.eventDate) {
-      // Admins can set past dates (retroactive imports); coaches/staff cannot.
+      // Privileged roles (ADMIN + STAFF) can set past dates (retroactive imports); coaches cannot.
       if (!isPrivileged && new Date(data.eventDate) < new Date()) {
         return NextResponse.json(
           { success: false, error: "Event date cannot be in the past" },
