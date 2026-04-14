@@ -378,7 +378,7 @@ export default function ApprovalsPage() {
                     <p className="text-sm text-foreground whitespace-pre-wrap">{approval.coachResponse}</p>
                   </div>
                 )}
-                <ApprovalThread messages={approval.messages ?? []} />
+                <ApprovalThread messages={approval.messages ?? []} perspective="admin" />
                 <div className="flex gap-4 text-sm text-muted-foreground mt-1">
                   <span>
                     Requested: {new Date(approval.requestedAt).toLocaleDateString()}

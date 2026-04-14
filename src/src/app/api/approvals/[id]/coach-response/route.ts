@@ -103,14 +103,13 @@ export async function POST(
                 await tx.approvalMessage.create({
                     data: { approvalId: id, from: "COACH", text: coachResponseText },
                 });
+                if (approval.workshopId) {
+                    await tx.workshop.update({
+                        where: { id: approval.workshopId },
+                        data: { status: "AWAITING_APPROVAL" },
+                    });
+                }
             });
-
-            if (approval.workshopId) {
-                await db.workshop.update({
-                    where: { id: approval.workshopId },
-                    data: { status: "AWAITING_APPROVAL" },
-                });
-            }
 
             {
                 const coach = await db.coach.findUnique({

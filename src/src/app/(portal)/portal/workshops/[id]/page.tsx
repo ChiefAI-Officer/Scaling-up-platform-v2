@@ -339,28 +339,26 @@ export default async function WorkshopDetailsPage({
               createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : m.createdAt,
             }))}
           />
+          <ResubmitWorkshop
+            variant="info_requested"
+            workshopId={workshop.id}
+            approvalId={infoRequestedApproval.id}
+            adminMessage={infoRequestedApproval.notes ?? null}
+            title={workshop.title}
+            description={workshop.description}
+            eventDate={workshop.eventDate.toISOString()}
+            eventTime={workshop.eventTime}
+            timezone={workshop.timezone}
+            venueName={workshop.venueName}
+            venueAddress={workshop.venueAddress}
+            virtualLink={workshop.virtualLink}
+            categoryId={workshop.categoryId}
+            format={workshop.format}
+            priceCents={workshop.priceCents}
+            isFree={workshop.isFree}
+            pricingTierId={workshop.pricingTierId}
+          />
         </>
-      )}
-      {workshop.status === "INFO_REQUESTED" && infoRequestedApproval && !latestDenial && (
-        <ResubmitWorkshop
-          variant="info_requested"
-          workshopId={workshop.id}
-          approvalId={infoRequestedApproval.id}
-          adminMessage={infoRequestedApproval.notes ?? null}
-          title={workshop.title}
-          description={workshop.description}
-          eventDate={workshop.eventDate.toISOString()}
-          eventTime={workshop.eventTime}
-          timezone={workshop.timezone}
-          venueName={workshop.venueName}
-          venueAddress={workshop.venueAddress}
-          virtualLink={workshop.virtualLink}
-          categoryId={workshop.categoryId}
-          format={workshop.format}
-          priceCents={workshop.priceCents}
-          isFree={workshop.isFree}
-          pricingTierId={workshop.pricingTierId}
-        />
       )}
 
       {/* MR-29: Workshop files for download */}

@@ -5,7 +5,13 @@ interface ApprovalMessage {
   createdAt: string;
 }
 
-export function ApprovalThread({ messages }: { messages: ApprovalMessage[] }) {
+export function ApprovalThread({
+  messages,
+  perspective = "coach",
+}: {
+  messages: ApprovalMessage[];
+  perspective?: "admin" | "coach";
+}) {
   if (!messages.length) return null;
   return (
     <div className="space-y-3 mt-4">
@@ -18,7 +24,10 @@ export function ApprovalThread({ messages }: { messages: ApprovalMessage[] }) {
               : "bg-primary/10 text-primary border-primary/20"
           }`}>
             <div className="text-xs text-muted-foreground mb-1 font-medium">
-              {m.from === "ADMIN" ? "Admin" : "You"} · {new Date(m.createdAt).toLocaleDateString()}
+              {m.from === "ADMIN"
+                ? perspective === "admin" ? "You (Admin)" : "Admin"
+                : perspective === "admin" ? "Coach" : "You"}
+              · {new Date(m.createdAt).toLocaleDateString()}
             </div>
             <p className="whitespace-pre-wrap">{m.text}</p>
           </div>
