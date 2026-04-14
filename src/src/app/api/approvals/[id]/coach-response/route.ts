@@ -92,9 +92,17 @@ export async function POST(
                 );
             }
 
-            await db.approvalQueue.update({
-                where: { id },
-                data: { coachResponse: parsed.response, status: "PENDING" },
+            const coachResponseText = parsed.response;
+
+            await db.$transaction(async (tx) => {
+                await tx.approvalQueue.update({
+                    where: { id },
+                    data: { coachResponse: coachResponseText, status: "PENDING" },
+                });
+                // Append coach message to the thread
+                await tx.approvalMessage.create({
+                    data: { approvalId: id, from: "COACH", text: coachResponseText },
+                });
             });
 
             if (approval.workshopId) {

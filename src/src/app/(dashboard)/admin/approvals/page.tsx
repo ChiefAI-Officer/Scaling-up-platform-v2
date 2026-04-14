@@ -3,9 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { ApprovalThread } from "@/components/approvals/approval-thread";
 
 type ApprovalStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" | "INFO_REQUESTED" | "COUNTER_OFFERED";
 type FilterStatus = ApprovalStatus | "ALL";
+
+interface ApprovalMessage {
+  id: string;
+  from: string;
+  text: string;
+  createdAt: string;
+}
 
 interface Approval {
   id: string;
@@ -22,6 +30,7 @@ interface Approval {
   counterOfferNote?: string | null;
   notes?: string | null;
   requestData?: Record<string, unknown> | null;
+  messages?: ApprovalMessage[];
 }
 
 interface ApprovalsApiResponse {
@@ -369,6 +378,7 @@ export default function ApprovalsPage() {
                     <p className="text-sm text-foreground whitespace-pre-wrap">{approval.coachResponse}</p>
                   </div>
                 )}
+                <ApprovalThread messages={approval.messages ?? []} />
                 <div className="flex gap-4 text-sm text-muted-foreground mt-1">
                   <span>
                     Requested: {new Date(approval.requestedAt).toLocaleDateString()}

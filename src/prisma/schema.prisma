@@ -483,12 +483,25 @@ model ApprovalQueue {
   counterOfferCents Int?
   counterOfferNote  String?
 
-  workshop Workshop? @relation(fields: [workshopId], references: [id], onDelete: Cascade)
-  coach    Coach     @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  workshop Workshop?         @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  coach    Coach              @relation(fields: [coachId], references: [id], onDelete: Cascade)
+  messages ApprovalMessage[]
 
   @@index([status])
   @@index([coachId])
   @@map("approval_queue")
+}
+
+model ApprovalMessage {
+  id         String        @id @default(cuid())
+  approvalId String
+  approval   ApprovalQueue @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  from       String        // "ADMIN" | "COACH"
+  text       String
+  createdAt  DateTime      @default(now())
+
+  @@index([approvalId])
+  @@map("approval_messages")
 }
 
 // ============================================

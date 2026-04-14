@@ -166,6 +166,9 @@ export async function GET(request: NextRequest) {
                         workshopCode: true,
                     },
                 },
+                messages: {
+                    orderBy: { createdAt: "asc" },
+                },
             },
         });
 
@@ -198,6 +201,12 @@ export async function GET(request: NextRequest) {
                     counterOfferCents: a.counterOfferCents ?? null,
                     counterOfferNote: a.counterOfferNote ?? null,
                     notes: a.notes,
+                    messages: (a.messages ?? []).map((m) => ({
+                        id: m.id,
+                        from: m.from,
+                        text: m.text,
+                        createdAt: m.createdAt.toISOString(),
+                    })),
                 };
             }),
             total: approvals.length,

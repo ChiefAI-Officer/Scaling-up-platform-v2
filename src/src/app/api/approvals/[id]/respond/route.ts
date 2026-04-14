@@ -318,6 +318,10 @@ export async function POST(
                         data: { status: "INFO_REQUESTED" },
                     });
                 }
+                // Append admin message to the thread
+                await tx.approvalMessage.create({
+                    data: { approvalId: id, from: "ADMIN", text: reason || "" },
+                });
             });
             // Notify coach (non-blocking)
             {
