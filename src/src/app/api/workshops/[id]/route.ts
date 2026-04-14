@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "@/lib/db";
 import { updateWorkshopSchema } from "@/lib/validations";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
@@ -7,6 +6,7 @@ import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/workshops/lead
 import { chargeCancellationFee } from "@/services/stripe";
 import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/templates/template-interpolation";
 import { sendCustomPriceChangeEmail } from "@/services/notifications";
+import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;
 
@@ -143,19 +143,13 @@ export async function PATCH(
     const body = await request.json() as any;
 
     // Extract and validate coupons before Zod parse (Zod schema would strip them)
-    const couponSchema = z.object({
-      code: z.string().min(1),
-      discountPercent: z.number().min(1).max(100),
-      singleUse: z.boolean().default(false),
-    });
-
-    let parsedCoupons: z.infer<typeof couponSchema>[] | undefined;
+    let parsedCoupons: ReturnType<typeof parseWorkshopCouponsInput> | undefined;
     if (body.coupons !== undefined && isPrivilegedRole(actor.role)) {
-      const couponsParsed = z.array(couponSchema).safeParse(body.coupons);
-      if (!couponsParsed.success) {
+      try {
+        parsedCoupons = parseWorkshopCouponsInput(body.coupons);
+      } catch {
         return NextResponse.json({ success: false, error: "Invalid coupon data" }, { status: 400 });
       }
-      parsedCoupons = couponsParsed.data;
     }
 
     // Normalize null → undefined before Zod validation: the schema uses .optional()
@@ -355,7 +349,7 @@ export async function PATCH(
         ...(!isCoach && data.priceCents !== undefined && { priceCents: data.priceCents }),
         ...(!isCoach && data.maxAttendees !== undefined && { maxAttendees: data.maxAttendees }),
         // Coupon codes (admin/staff only, validated above)
-        ...(parsedCoupons !== undefined && { coupons: JSON.stringify(parsedCoupons) }),
+        ...(parsedCoupons !== undefined && { coupons: serializeWorkshopCoupons(parsedCoupons) }),
       },
       include: {
         coach: true,

@@ -118,12 +118,6 @@ describe("PATCH /api/workshops/[id] — coupon editing", () => {
     });
 
     // Coach sending "coupons" (not in COACH_EDITABLE_FIELDS) → 403
-    // OR if somehow 200, coupons must not be in the update payload
-    if (res.status === 200) {
-      const updateCall = (db.workshop.update as jest.Mock).mock.calls[0][0];
-      expect(updateCall.data).not.toHaveProperty("coupons");
-    } else {
-      expect([400, 403]).toContain(res.status);
-    }
+    expect(res.status).toBe(403);
   });
 });

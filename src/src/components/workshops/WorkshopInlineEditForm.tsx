@@ -305,7 +305,7 @@ export function WorkshopInlineEditForm({
             </button>
           </div>
           {coupons.map((coupon, i) => (
-            <div key={i} className="flex gap-2 items-center">
+            <div key={coupon.code || String(i)} className="flex gap-2 items-center">
               <Input
                 placeholder="Code (e.g. SAVE20)"
                 value={coupon.code}
@@ -315,6 +315,7 @@ export function WorkshopInlineEditForm({
                   setCoupons(c);
                 }}
                 className="flex-1 text-sm"
+                maxLength={64}
               />
               <Input
                 type="number"
@@ -328,6 +329,7 @@ export function WorkshopInlineEditForm({
                 className="w-20 text-sm"
                 min={1}
                 max={100}
+                step="1"
               />
               <label className="flex items-center gap-1 text-xs whitespace-nowrap text-foreground">
                 <input
