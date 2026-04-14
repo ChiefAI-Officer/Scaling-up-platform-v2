@@ -85,7 +85,7 @@ export default function BioPageEditor() {
           setFormData((prev) => ({
             ...prev,
             ...content,
-            ctaButtonUrl: content.ctaButtonUrl || coachBookCallUrl || prev.ctaButtonUrl || "",
+            ctaButtonUrl: content.ctaButtonUrl || coachBookCallUrl || "",
           }));
         }
       } catch {
