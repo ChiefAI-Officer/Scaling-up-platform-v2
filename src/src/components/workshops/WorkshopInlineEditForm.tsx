@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,8 @@ interface WorkshopInlineEditFormProps {
   format: string;
   // Pricing — read-only in this sprint; editable in FIG-007
   pricingTier: PricingTierDisplay | null;
+  // Coupon codes (JSON string from DB)
+  coupons?: string | null;
   // Logistics fields
   eventDate: string; // ISO string
   eventTime: string | null;
@@ -79,6 +81,7 @@ export function WorkshopInlineEditForm({
   categoryId,
   format,
   pricingTier,
+  coupons: couponsProp,
   eventDate,
   eventTime,
   timezone,
@@ -92,6 +95,16 @@ export function WorkshopInlineEditForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const [coupons, setCoupons] = React.useState<Array<{ code: string; discountPercent: number; singleUse: boolean }>>(
+    () => {
+      try {
+        return JSON.parse(couponsProp ?? "[]");
+      } catch {
+        return [];
+      }
+    }
+  );
 
   const parsedVenue = parseVenueAddress(venueAddress);
 
@@ -139,6 +152,7 @@ export function WorkshopInlineEditForm({
                 zip: form.venueZip,
               })
             : null,
+          coupons,
         }),
       });
 
@@ -276,6 +290,69 @@ export function WorkshopInlineEditForm({
             )}
             <p className="text-xs text-muted-foreground mt-1">Pricing changes will be available in a future update.</p>
           </div>
+        </div>
+
+        {/* Section: Coupon Codes */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Coupon Codes</p>
+            <button
+              type="button"
+              onClick={() => setCoupons([...coupons, { code: "", discountPercent: 10, singleUse: false }])}
+              className="text-xs text-primary hover:underline"
+            >
+              + Add Coupon
+            </button>
+          </div>
+          {coupons.map((coupon, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <Input
+                placeholder="Code (e.g. SAVE20)"
+                value={coupon.code}
+                onChange={(e) => {
+                  const c = [...coupons];
+                  c[i] = { ...c[i], code: e.target.value };
+                  setCoupons(c);
+                }}
+                className="flex-1 text-sm"
+              />
+              <Input
+                type="number"
+                placeholder="%"
+                value={coupon.discountPercent}
+                onChange={(e) => {
+                  const c = [...coupons];
+                  c[i] = { ...c[i], discountPercent: Number(e.target.value) };
+                  setCoupons(c);
+                }}
+                className="w-20 text-sm"
+                min={1}
+                max={100}
+              />
+              <label className="flex items-center gap-1 text-xs whitespace-nowrap text-foreground">
+                <input
+                  type="checkbox"
+                  checked={coupon.singleUse}
+                  onChange={(e) => {
+                    const c = [...coupons];
+                    c[i] = { ...c[i], singleUse: e.target.checked };
+                    setCoupons(c);
+                  }}
+                />
+                Single use
+              </label>
+              <button
+                type="button"
+                onClick={() => setCoupons(coupons.filter((_, j) => j !== i))}
+                className="text-destructive text-xs hover:underline whitespace-nowrap"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          {coupons.length === 0 && (
+            <p className="text-xs text-muted-foreground">No coupon codes configured.</p>
+          )}
         </div>
 
         {/* Section: Schedule & Location */}

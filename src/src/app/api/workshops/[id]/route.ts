@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import { updateWorkshopSchema } from "@/lib/validations";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
@@ -140,6 +141,23 @@ export async function PATCH(
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = await request.json() as any;
+
+    // Extract and validate coupons before Zod parse (Zod schema would strip them)
+    const couponSchema = z.object({
+      code: z.string().min(1),
+      discountPercent: z.number().min(1).max(100),
+      singleUse: z.boolean().default(false),
+    });
+
+    let parsedCoupons: z.infer<typeof couponSchema>[] | undefined;
+    if (body.coupons !== undefined && isPrivilegedRole(actor.role)) {
+      const couponsParsed = z.array(couponSchema).safeParse(body.coupons);
+      if (!couponsParsed.success) {
+        return NextResponse.json({ success: false, error: "Invalid coupon data" }, { status: 400 });
+      }
+      parsedCoupons = couponsParsed.data;
+    }
+
     // Normalize null → undefined before Zod validation: the schema uses .optional()
     // which accepts undefined but not null. Null values in PATCH payloads (sent by
     // the frontend to represent "empty optional field") would fail with a type error.
@@ -336,6 +354,8 @@ export async function PATCH(
         ...(!isCoach && data.isFree !== undefined && { isFree: data.isFree }),
         ...(!isCoach && data.priceCents !== undefined && { priceCents: data.priceCents }),
         ...(!isCoach && data.maxAttendees !== undefined && { maxAttendees: data.maxAttendees }),
+        // Coupon codes (admin/staff only, validated above)
+        ...(parsedCoupons !== undefined && { coupons: JSON.stringify(parsedCoupons) }),
       },
       include: {
         coach: true,
