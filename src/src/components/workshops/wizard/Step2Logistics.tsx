@@ -44,6 +44,15 @@ export function Step2Logistics() {
     const [eventTimeStart, setEventTimeStart] = React.useState(timeParts.length === 2 ? timeParts[0] : "");
     const [eventTimeEnd, setEventTimeEnd] = React.useState(timeParts.length === 2 ? timeParts[1] : "");
 
+    // Sync local time state when formData.eventTime changes (e.g., draft loaded, parent updates state)
+    React.useEffect(() => {
+        const parts = (formData.eventTime ?? "").split(/\s*-\s*/);
+        if (parts.length === 2) {
+            setEventTimeStart(parts[0]);
+            setEventTimeEnd(parts[1]);
+        }
+    }, [formData.eventTime]);
+
     const dateIsTooSoon = formData.eventDate && formData.eventDate < minDate;
     const virtualLinkInvalid = formData.virtualLink && !isValidUrl(formData.virtualLink);
 
