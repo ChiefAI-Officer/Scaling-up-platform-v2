@@ -160,12 +160,6 @@ export function SoloLandingPageTemplate({
               </p>
             </section>
 
-            {videoUrl && (
-              <div className="rounded-2xl overflow-hidden shadow-xl border border-border">
-                <iframe src={videoUrl} className="w-full aspect-video" allowFullScreen />
-              </div>
-            )}
-
             {benefits.length > 0 && (
               <section>
                 <h3 className="text-xl font-bold text-foreground mb-6">
@@ -185,6 +179,20 @@ export function SoloLandingPageTemplate({
                   ))}
                 </div>
               </section>
+            )}
+
+            {videoUrl && (
+              <div className="w-full max-w-2xl">
+                <div className="rounded-2xl overflow-hidden shadow-xl border border-border">
+                  <iframe
+                    src={videoUrl}
+                    className="w-full aspect-video"
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allowFullScreen
+                    loading="lazy"
+                  />
+                </div>
+              </div>
             )}
           </div>
 
