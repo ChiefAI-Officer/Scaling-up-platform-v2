@@ -19,7 +19,7 @@ const CoachResponseSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("DECLINE_COUNTER"), newPriceCents: z.number().int().min(1).max(10_000_000).optional(), counterNote: z.string().max(1000).optional() }),
 ]);
 
-const PRE_BUILD_STATUSES = ["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED"];
+const PRE_BUILD_STATUSES = ["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED", "DENIED"];
 
 /**
  * POST /api/approvals/[id]/coach-response

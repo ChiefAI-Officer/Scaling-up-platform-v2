@@ -449,7 +449,7 @@ export default function SoloLandingEditor() {
             </CardContent>
           </Card>
 
-          <div className="flex gap-3">
+          <div className="sticky bottom-0 bg-card border-t border-border py-3 px-4 flex gap-3 items-center">
             <Button
               onClick={() => handleSave(false)}
               variant="outline"
