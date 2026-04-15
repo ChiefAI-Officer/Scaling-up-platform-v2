@@ -95,6 +95,7 @@ export function WorkshopInlineEditForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [stripeWarning, setStripeWarning] = useState<string | null>(null);
 
   const [coupons, setCoupons] = React.useState<Array<{ code: string; discountPercent: number; singleUse: boolean }>>(
     () => {
@@ -129,6 +130,7 @@ export function WorkshopInlineEditForm({
     setSaving(true);
     setError(null);
     setSuccess(false);
+    setStripeWarning(null);
 
     try {
       const res = await fetch(`/api/workshops/${workshopId}`, {
@@ -156,7 +158,7 @@ export function WorkshopInlineEditForm({
         }),
       });
 
-      const data = await res.json() as { success: boolean; error?: string | { message: string }[] };
+      const data = await res.json() as { success: boolean; error?: string | { message: string }[]; stripeErrors?: string[] };
 
       if (!data.success) {
         const errMsg =
@@ -170,6 +172,11 @@ export function WorkshopInlineEditForm({
       }
 
       setSuccess(true);
+      if (data.stripeErrors && data.stripeErrors.length > 0) {
+        setStripeWarning(`Workshop saved — Stripe sync warning: ${data.stripeErrors.join("; ")}`);
+      } else {
+        setStripeWarning(null);
+      }
       router.refresh();
     } catch {
       setError("Failed to update workshop. Please try again.");
@@ -197,7 +204,7 @@ export function WorkshopInlineEditForm({
         <h3 className="text-sm font-semibold text-foreground">Edit Workshop Details</h3>
         <button
           type="button"
-          onClick={() => { setOpen(false); setError(null); setSuccess(false); }}
+          onClick={() => { setOpen(false); setError(null); setSuccess(false); setStripeWarning(null); }}
           className="text-muted-foreground hover:text-foreground text-sm cursor-pointer"
         >
           Cancel
@@ -473,6 +480,9 @@ export function WorkshopInlineEditForm({
         {success && (
           <p className="text-sm text-success">Details updated successfully.</p>
         )}
+        {stripeWarning && (
+          <p className="text-sm text-amber-700">{stripeWarning}</p>
+        )}
 
         <div className="flex gap-2 pt-1">
           <Button type="submit" size="sm" disabled={saving}>
@@ -482,7 +492,7 @@ export function WorkshopInlineEditForm({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => { setOpen(false); setError(null); setSuccess(false); }}
+            onClick={() => { setOpen(false); setError(null); setSuccess(false); setStripeWarning(null); }}
           >
             Cancel
           </Button>

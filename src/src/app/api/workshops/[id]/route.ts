@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { updateWorkshopSchema } from "@/lib/validations";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/workshops/lead-time-validator";
-import { chargeCancellationFee } from "@/services/stripe";
+import { chargeCancellationFee, createWorkshopPromotionCode } from "@/services/stripe";
 import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/templates/template-interpolation";
 import { sendCustomPriceChangeEmail } from "@/services/notifications";
 import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
@@ -379,11 +379,35 @@ export async function PATCH(
       }
     }
 
+    // Sync coupons to Stripe (non-blocking — DB save already succeeded)
+    const stripeErrors: string[] = [];
+    if (parsedCoupons !== undefined && parsedCoupons.length > 0) {
+      const results = await Promise.allSettled(
+        parsedCoupons.map((coupon) =>
+          createWorkshopPromotionCode({
+            workshopCode: existing.workshopCode ?? "",
+            workshopTitle: existing.title,
+            code: coupon.code,
+            discountPercent: coupon.discountPercent,
+            singleUse: coupon.singleUse,
+          })
+        )
+      );
+      results.forEach((result, i) => {
+        if (result.status === "rejected") {
+          const msg = `Coupon "${parsedCoupons![i].code}" failed to sync to Stripe: ${(result.reason as Error)?.message ?? "unknown error"}`;
+          console.error("[coupon-sync]", msg);
+          stripeErrors.push(msg);
+        }
+      });
+    }
+
     return NextResponse.json({
       success: true,
       data: workshop,
       message: "Workshop updated successfully",
       ...(landingPageSyncWarning ? { warning: landingPageSyncWarning } : {}),
+      ...(stripeErrors.length > 0 && { stripeErrors }),
     });
   } catch (error) {
     console.error("Error updating workshop:", error);
