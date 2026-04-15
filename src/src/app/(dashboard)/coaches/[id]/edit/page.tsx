@@ -1,11 +1,10 @@
 export const dynamic = "force-dynamic";
 
 import { notFound, redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
-import { isPrivilegedRole } from "@/lib/auth/authorization";
+import { requireAuth, isPrivilegedRole } from "@/lib/auth/authorization";
 import { CoachProfileForm } from "@/components/coach/coach-profile-form";
+import { FadeUp } from "@/components/ui/animated";
 import Link from "next/link";
 
 interface Props {
@@ -14,8 +13,8 @@ interface Props {
 
 export default async function EditCoachPage({ params }: Props) {
   const { id } = await params;
-  const session = await getServerSession(authOptions);
-  if (!session?.user || !isPrivilegedRole(session.user.role)) redirect("/login");
+  const session = await requireAuth();
+  if (!isPrivilegedRole(session.user.role)) redirect("/login");
 
   const coach = await db.coach.findUnique({
     where: { id },
@@ -24,6 +23,7 @@ export default async function EditCoachPage({ params }: Props) {
   if (!coach) notFound();
 
   return (
+    <FadeUp>
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -34,7 +34,7 @@ export default async function EditCoachPage({ params }: Props) {
           href={`/coaches/${id}`}
           className="text-sm text-muted-foreground hover:text-foreground"
         >
-          ← Back to Coach
+          &larr; Back to Coach
         </Link>
       </div>
       <CoachProfileForm
@@ -42,7 +42,7 @@ export default async function EditCoachPage({ params }: Props) {
         initialData={{
           firstName: coach.firstName,
           lastName: coach.lastName,
-          email: coach.user.email,
+          email: coach.user?.email ?? "",
           bio: coach.bio ?? "",
           title: coach.title,
           titleCredentials: coach.titleCredentials,
@@ -53,5 +53,6 @@ export default async function EditCoachPage({ params }: Props) {
         }}
       />
     </div>
+    </FadeUp>
   );
 }
