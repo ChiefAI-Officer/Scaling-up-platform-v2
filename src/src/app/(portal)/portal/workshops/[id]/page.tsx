@@ -18,6 +18,7 @@ import {
   formatUsdFromCents,
 } from "@/lib/workshops/workshop-financials";
 import { ApprovalThread } from "@/components/approvals/approval-thread";
+import { CoachReplyForm } from "@/components/approvals/coach-reply-form";
 
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
@@ -339,6 +340,7 @@ export default async function WorkshopDetailsPage({
               createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : m.createdAt,
             }))}
           />
+          <CoachReplyForm approvalId={infoRequestedApproval.id} />
           <ResubmitWorkshop
             variant="info_requested"
             workshopId={workshop.id}
