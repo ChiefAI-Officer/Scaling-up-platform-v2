@@ -9,6 +9,7 @@ import { BioPageTemplate, BioContent } from "@/components/templates/bio-page-tem
 import { SoloLandingPageTemplate, SoloContent } from "@/components/templates/solo-landing-page-template";
 import { DuoLandingPageTemplate, DuoContent } from "@/components/templates/duo-landing-page-template";
 import { stripPlaceholders } from "@/lib/templates/template-utils";
+import { formatVenueAddress, normalizeVideoUrl } from "@/lib/templates/landing-page-overlay";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -127,17 +128,28 @@ export default async function LandingPageView({ params }: PageProps) {
     const content = JSON.parse(landingPage.content);
     const workshop = landingPage.workshop;
 
+    // Overlay live Workshop fields onto the frozen content snapshot so that
+    // venue changes and Vimeo URLs are always current at render time.
+    const mergedContent = {
+      ...content,
+      format: workshop.format ?? content.format ?? null,
+      venueName: workshop.venueName ?? content.venueName ?? null,
+      venueAddress:
+        formatVenueAddress(workshop.venueAddress) || content.venueAddress || null,
+      videoUrl: normalizeVideoUrl(content.videoUrl),
+    };
+
     switch (landingPage.template) {
       case "BIO_PAGE":
         return <BioPageTemplate content={content as BioContent} isPreview={false} />;
       case "SOLO_LANDING":
-        return <SoloLandingPageTemplate content={content as SoloContent} workshop={workshop} isPreview={false} />;
+        return <SoloLandingPageTemplate content={mergedContent as SoloContent} workshop={workshop} isPreview={false} />;
       case "DUO_LANDING":
-        return <DuoLandingPageTemplate content={content as DuoContent} workshop={workshop} isPreview={false} />;
+        return <DuoLandingPageTemplate content={mergedContent as DuoContent} workshop={workshop} isPreview={false} />;
       case "REGISTRATION":
-        return <RegistrationPageTemplate content={content} workshop={workshop} isPreview={false} />;
+        return <RegistrationPageTemplate content={mergedContent} workshop={workshop} isPreview={false} />;
       case "THANK_YOU":
-        return <ThankYouPageTemplate content={content} workshop={workshop} isPreview={false} />;
+        return <ThankYouPageTemplate content={mergedContent} workshop={workshop} isPreview={false} />;
       default:
         notFound();
     }
