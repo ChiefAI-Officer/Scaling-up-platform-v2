@@ -50,4 +50,10 @@ describe("normalizeVideoUrl", () => {
       "https://www.youtube.com/embed/abc123"
     );
   });
+
+  it("converts private vimeo.com/ID/hash URL to player.vimeo.com format", () => {
+    expect(normalizeVideoUrl("https://vimeo.com/123456789/abc123def456")).toBe(
+      "https://player.vimeo.com/video/123456789/abc123def456"
+    );
+  });
 });
