@@ -381,7 +381,9 @@ export async function PATCH(
 
     // Sync coupons to Stripe (non-blocking — DB save already succeeded)
     const stripeErrors: string[] = [];
-    if (parsedCoupons !== undefined && parsedCoupons.length > 0) {
+    if (!existing.workshopCode) {
+      stripeErrors.push("Workshop code is missing — coupons saved to DB but not synced to Stripe.");
+    } else if (parsedCoupons !== undefined && parsedCoupons.length > 0) {
       const results = await Promise.allSettled(
         parsedCoupons.map((coupon) =>
           createWorkshopPromotionCode({
@@ -395,7 +397,7 @@ export async function PATCH(
       );
       results.forEach((result, i) => {
         if (result.status === "rejected") {
-          const msg = `Coupon "${parsedCoupons![i].code}" failed to sync to Stripe: ${(result.reason as Error)?.message ?? "unknown error"}`;
+          const msg = `Coupon "${parsedCoupons[i].code}" failed to sync to Stripe: ${(result.reason as Error)?.message ?? "unknown error"}`;
           console.error("[coupon-sync]", msg);
           stripeErrors.push(msg);
         }

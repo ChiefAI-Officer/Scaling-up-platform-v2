@@ -481,7 +481,7 @@ export function WorkshopInlineEditForm({
           <p className="text-sm text-success">Details updated successfully.</p>
         )}
         {stripeWarning && (
-          <p className="text-sm text-amber-700">{stripeWarning}</p>
+          <p className="text-sm text-warning">{stripeWarning}</p>
         )}
 
         <div className="flex gap-2 pt-1">
