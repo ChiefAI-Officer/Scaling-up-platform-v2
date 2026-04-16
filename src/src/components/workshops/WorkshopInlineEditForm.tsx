@@ -97,10 +97,11 @@ export function WorkshopInlineEditForm({
   const [success, setSuccess] = useState(false);
   const [stripeWarning, setStripeWarning] = useState<string | null>(null);
 
-  const [coupons, setCoupons] = React.useState<Array<{ code: string; discountPercent: number; singleUse: boolean }>>(
+  const [coupons, setCoupons] = React.useState<Array<{ id: string; code: string; discountPercent: number; singleUse: boolean }>>(
     () => {
       try {
-        return JSON.parse(couponsProp ?? "[]");
+        const parsed = JSON.parse(couponsProp ?? "[]") as Array<{ code: string; discountPercent: number; singleUse: boolean }>;
+        return parsed.map((c) => ({ id: crypto.randomUUID(), ...c }));
       } catch {
         return [];
       }
@@ -154,7 +155,7 @@ export function WorkshopInlineEditForm({
                 zip: form.venueZip,
               })
             : null,
-          coupons,
+          coupons: coupons.map(({ id: _id, ...rest }) => rest),
         }),
       });
 
@@ -305,14 +306,14 @@ export function WorkshopInlineEditForm({
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Coupon Codes</p>
             <button
               type="button"
-              onClick={() => setCoupons([...coupons, { code: "", discountPercent: 10, singleUse: false }])}
+              onClick={() => setCoupons([...coupons, { id: crypto.randomUUID(), code: "", discountPercent: 10, singleUse: false }])}
               className="text-xs text-primary hover:underline"
             >
               + Add Coupon
             </button>
           </div>
           {coupons.map((coupon, i) => (
-            <div key={coupon.code || String(i)} className="flex gap-2 items-center">
+            <div key={coupon.id} className="flex gap-2 items-center">
               <Input
                 placeholder="Code (e.g. SAVE20)"
                 value={coupon.code}

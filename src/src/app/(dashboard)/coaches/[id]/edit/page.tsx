@@ -14,7 +14,7 @@ interface Props {
 export default async function EditCoachPage({ params }: Props) {
   const { id } = await params;
   const session = await requireAuth();
-  if (!isPrivilegedRole(session.user.role)) redirect("/login");
+  if (!isPrivilegedRole(session.user.role)) redirect("/unauthorized");
 
   const coach = await db.coach.findUnique({
     where: { id },

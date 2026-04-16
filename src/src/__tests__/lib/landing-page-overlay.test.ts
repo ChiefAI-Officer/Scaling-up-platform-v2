@@ -56,4 +56,22 @@ describe("normalizeVideoUrl", () => {
       "https://player.vimeo.com/video/123456789/abc123def456"
     );
   });
+
+  it("normalizes YouTube watch URL", () => {
+    expect(normalizeVideoUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe(
+      "https://www.youtube.com/embed/dQw4w9WgXcQ"
+    );
+  });
+
+  it("normalizes YouTube short URL (youtu.be)", () => {
+    expect(normalizeVideoUrl("https://youtu.be/dQw4w9WgXcQ")).toBe(
+      "https://www.youtube.com/embed/dQw4w9WgXcQ"
+    );
+  });
+
+  it("normalizes already-embedded YouTube URL", () => {
+    expect(normalizeVideoUrl("https://www.youtube.com/embed/dQw4w9WgXcQ")).toBe(
+      "https://www.youtube.com/embed/dQw4w9WgXcQ"
+    );
+  });
 });
