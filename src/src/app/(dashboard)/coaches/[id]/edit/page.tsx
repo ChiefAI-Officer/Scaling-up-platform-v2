@@ -45,7 +45,7 @@ export default async function EditCoachPage({ params }: Props) {
           email: coach.user?.email ?? "",
           bio: coach.bio ?? "",
           title: coach.title,
-          titleCredentials: coach.titleCredentials,
+          titleCredentials: coach.company,
           profileImage: coach.profileImage,
           linkedinUrl: coach.linkedinUrl,
           showBookCallCta: coach.showBookCallCta,

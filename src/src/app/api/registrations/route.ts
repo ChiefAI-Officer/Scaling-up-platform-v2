@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
 
     const where = {
       ...(workshopId ? { workshopId } : {}),
-      ...(!isAdmin ? { workshop: { coachId: actor.coachId } } : {}),
+      ...(!isAdmin && actor.coachId ? { workshop: { coachId: actor.coachId } } : {}),
       paymentStatus: { not: "PENDING" as const },
     };
 
