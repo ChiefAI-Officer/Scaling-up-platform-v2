@@ -126,7 +126,9 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Workshop</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Registrations</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Validated</th>
+                            {isAdmin && (
+                              <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Validated</th>
+                            )}
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">Approved</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pricing</th>
                             <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Landing Page</th>
@@ -137,7 +139,7 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                     <tbody className="divide-y divide-border">
                         {filtered.length === 0 ? (
                             <tr>
-                                <td colSpan={9} className="px-6 py-12 text-center text-muted-foreground">
+                                <td colSpan={isAdmin ? 9 : 8} className="px-6 py-12 text-center text-muted-foreground">
                                     {hasActiveFilters
                                         ? "No workshops match your search."
                                         : "No workshops found. Request your first one above!"}
@@ -169,13 +171,15 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                                             <div className="font-medium">{workshop._count.registrations}</div>
                                             <div className="text-xs text-muted-foreground">of {workshop.maxAttendees} max</div>
                                         </td>
-                                        <td className="px-6 py-4 text-center">
+                                        {isAdmin && (
+                                          <td className="px-6 py-4 text-center">
                                             {isValidated ? (
                                                 <CheckCircle2 className="w-5 h-5 text-success mx-auto" />
                                             ) : (
                                                 <Circle className="w-5 h-5 text-muted-foreground mx-auto" />
                                             )}
-                                        </td>
+                                          </td>
+                                        )}
                                         <td className="px-6 py-4 text-center">
                                             {isApproved ? (
                                                 <CheckCircle2 className="w-5 h-5 text-success mx-auto" />

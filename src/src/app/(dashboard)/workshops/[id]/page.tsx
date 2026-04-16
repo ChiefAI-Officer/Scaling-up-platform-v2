@@ -308,6 +308,7 @@ export default async function WorkshopDetailPage({
                   virtualLink={workshop.virtualLink}
                   venueName={workshop.venueName}
                   venueAddress={workshop.venueAddress}
+                  coupons={workshop.coupons}
                   categories={categories}
                 />
               )}

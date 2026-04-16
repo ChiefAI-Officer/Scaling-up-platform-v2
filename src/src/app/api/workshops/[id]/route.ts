@@ -3,9 +3,10 @@ import { db } from "@/lib/db";
 import { updateWorkshopSchema } from "@/lib/validations";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/workshops/lead-time-validator";
-import { chargeCancellationFee } from "@/services/stripe";
+import { chargeCancellationFee, createWorkshopPromotionCode } from "@/services/stripe";
 import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/templates/template-interpolation";
 import { sendCustomPriceChangeEmail } from "@/services/notifications";
+import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;
 
@@ -140,6 +141,17 @@ export async function PATCH(
     const { id } = await params;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const body = await request.json() as any;
+
+    // Extract and validate coupons before Zod parse (Zod schema would strip them)
+    let parsedCoupons: ReturnType<typeof parseWorkshopCouponsInput> | undefined;
+    if (body.coupons !== undefined && isPrivilegedRole(actor.role)) {
+      try {
+        parsedCoupons = parseWorkshopCouponsInput(body.coupons);
+      } catch {
+        return NextResponse.json({ success: false, error: "Invalid coupon data" }, { status: 400 });
+      }
+    }
+
     // Normalize null → undefined before Zod validation: the schema uses .optional()
     // which accepts undefined but not null. Null values in PATCH payloads (sent by
     // the frontend to represent "empty optional field") would fail with a type error.
@@ -273,8 +285,8 @@ export async function PATCH(
     }
 
     if (data.eventDate) {
-      // Past dates are always rejected, even for admins
-      if (new Date(data.eventDate) < new Date()) {
+      // Privileged roles (ADMIN + STAFF) can set past dates (retroactive imports); coaches cannot.
+      if (!isPrivileged && new Date(data.eventDate) < new Date()) {
         return NextResponse.json(
           { success: false, error: "Event date cannot be in the past" },
           { status: 400 }
@@ -336,6 +348,8 @@ export async function PATCH(
         ...(!isCoach && data.isFree !== undefined && { isFree: data.isFree }),
         ...(!isCoach && data.priceCents !== undefined && { priceCents: data.priceCents }),
         ...(!isCoach && data.maxAttendees !== undefined && { maxAttendees: data.maxAttendees }),
+        // Coupon codes (admin/staff only, validated above)
+        ...(parsedCoupons !== undefined && { coupons: serializeWorkshopCoupons(parsedCoupons) }),
       },
       include: {
         coach: true,
@@ -365,11 +379,37 @@ export async function PATCH(
       }
     }
 
+    // Sync coupons to Stripe (non-blocking — DB save already succeeded)
+    const stripeErrors: string[] = [];
+    if (!existing.workshopCode) {
+      stripeErrors.push("Workshop code is missing — coupons saved to DB but not synced to Stripe.");
+    } else if (parsedCoupons !== undefined && parsedCoupons.length > 0) {
+      const results = await Promise.allSettled(
+        parsedCoupons.map((coupon) =>
+          createWorkshopPromotionCode({
+            workshopCode: existing.workshopCode ?? "",
+            workshopTitle: existing.title,
+            code: coupon.code,
+            discountPercent: coupon.discountPercent,
+            singleUse: coupon.singleUse,
+          })
+        )
+      );
+      results.forEach((result, i) => {
+        if (result.status === "rejected") {
+          const msg = `Coupon "${parsedCoupons[i].code}" failed to sync to Stripe: ${(result.reason as Error)?.message ?? "unknown error"}`;
+          console.error("[coupon-sync]", msg);
+          stripeErrors.push(msg);
+        }
+      });
+    }
+
     return NextResponse.json({
       success: true,
       data: workshop,
       message: "Workshop updated successfully",
       ...(landingPageSyncWarning ? { warning: landingPageSyncWarning } : {}),
+      ...(stripeErrors.length > 0 && { stripeErrors }),
     });
   } catch (error) {
     console.error("Error updating workshop:", error);

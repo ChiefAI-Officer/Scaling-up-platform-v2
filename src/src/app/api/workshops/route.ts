@@ -178,8 +178,9 @@ export async function POST(request: NextRequest) {
       new Date(data.eventDate),
       data.format
     );
-    // Admins bypass the minimum lead-time threshold but are still blocked from past dates
-    if (!leadTimeValidation.valid && (!isPrivilegedRole(actor.role) || leadTimeValidation.leadTimeDays < 0)) {
+    // Admins bypass all lead-time and past-date restrictions (for retroactive imports).
+    // Coaches and staff are still subject to both the past-date and minimum lead-time checks.
+    if (!leadTimeValidation.valid && !isPrivilegedRole(actor.role)) {
       return NextResponse.json(
         {
           success: false,

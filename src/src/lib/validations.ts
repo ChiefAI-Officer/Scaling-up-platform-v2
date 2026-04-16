@@ -175,6 +175,14 @@ export const createCoachSchema = z.object({
     circleId: z.string().optional(),
     linkedinUrl: z.string().url().nullable().optional(),
     showBookCallCta: z.boolean().optional(),
+    bookCallUrl: z
+        .string()
+        .nullable()
+        .optional()
+        .refine(
+            (val) => !val || val.startsWith("https://") || val.startsWith("http://"),
+            { message: "Book a Call URL must start with http:// or https://" }
+        ),
 });
 
 export const updateCoachSchema = createCoachSchema.partial();

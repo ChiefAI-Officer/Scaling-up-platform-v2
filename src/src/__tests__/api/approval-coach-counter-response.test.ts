@@ -15,6 +15,9 @@ jest.mock("@/lib/db", () => ({
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    approvalMessage: {
+      create: jest.fn().mockResolvedValue({ id: "msg-1", from: "COACH", text: "", createdAt: new Date() }),
+    },
     coach: {
       findUnique: jest.fn().mockResolvedValue(null),
     },

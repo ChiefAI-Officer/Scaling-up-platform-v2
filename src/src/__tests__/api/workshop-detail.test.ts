@@ -135,7 +135,7 @@ describe("Workshop detail API", () => {
       expect(db.workshop.update).toHaveBeenCalled();
     });
 
-    it("admin cannot PATCH a workshop date to yesterday (past-date guard still enforced)", async () => {
+    it("admin CAN PATCH a workshop date to yesterday (retroactive import allowed)", async () => {
       // Default actor is ADMIN (set in beforeEach)
       (db.workshop.findUnique as jest.Mock).mockResolvedValue({
         id: "ws-1",
@@ -143,6 +143,13 @@ describe("Workshop detail API", () => {
         status: "AWAITING_APPROVAL",
         coachId: "coach-1",
         eventDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      });
+      (db.workshop.update as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        format: "IN_PERSON",
+        status: "AWAITING_APPROVAL",
+        coachId: "coach-1",
+        eventDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
       });
 
       const yesterday = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
@@ -157,11 +164,10 @@ describe("Workshop detail API", () => {
         ),
         routeParams("ws-1")
       );
-      const body = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(body.success).toBe(false);
-      expect(db.workshop.update).not.toHaveBeenCalled();
+      // Admins bypass past-date restrictions; update should succeed
+      expect(response.status).toBe(200);
+      expect(db.workshop.update).toHaveBeenCalled();
     });
 
     it("admin can PATCH a workshop date to tomorrow (bypasses lead-time threshold)", async () => {

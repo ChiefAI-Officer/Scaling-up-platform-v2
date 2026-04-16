@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createRegistrationSchema } from "@/lib/validations";
-import { canManageCoachData, getApiActor } from "@/lib/auth/authorization";
+import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { inngest } from "@/inngest/client";
 import {
@@ -55,34 +55,52 @@ export async function GET(request: NextRequest) {
         ? Math.min(100, parsedPageSize)
         : 50;
 
-    if (!workshopId) {
+    const isAdmin = isPrivilegedRole(actor.role);
+
+    // Admin can omit workshopId (gets all); coach requires it
+    if (!isAdmin && !workshopId) {
       return NextResponse.json(
         { success: false, error: "workshopId is required" },
         { status: 400 }
       );
     }
 
-    const workshop = await db.workshop.findUnique({
-      where: { id: workshopId },
-      select: { id: true, coachId: true },
-    });
-
-    if (!workshop) {
+    // Non-admin actors must have a coach profile
+    if (!isAdmin && !actor.coachId) {
       return NextResponse.json(
-        { success: false, error: "Workshop not found" },
-        { status: 404 }
+        { success: false, error: "Coach profile not found" },
+        { status: 403 }
       );
     }
 
-    if (!canManageCoachData(actor, workshop.coachId)) {
-      // Hide existence if user is not allowed.
-      return NextResponse.json(
-        { success: false, error: "Workshop not found" },
-        { status: 404 }
-      );
+    // For coach with a workshopId, verify they own the workshop
+    if (workshopId && !isAdmin) {
+      const workshop = await db.workshop.findUnique({
+        where: { id: workshopId },
+        select: { id: true, coachId: true },
+      });
+
+      if (!workshop) {
+        return NextResponse.json(
+          { success: false, error: "Workshop not found" },
+          { status: 404 }
+        );
+      }
+
+      if (!canManageCoachData(actor, workshop.coachId)) {
+        // Hide existence if user is not allowed.
+        return NextResponse.json(
+          { success: false, error: "Workshop not found" },
+          { status: 404 }
+        );
+      }
     }
 
-    const where = { workshopId, paymentStatus: { not: "PENDING" as const } };
+    const where = {
+      ...(workshopId ? { workshopId } : {}),
+      ...(!isAdmin && actor.coachId ? { workshop: { coachId: actor.coachId } } : {}),
+      paymentStatus: { not: "PENDING" as const },
+    };
 
     const [registrations, total] = await Promise.all([
       db.registration.findMany({
@@ -101,6 +119,21 @@ export async function GET(request: NextRequest) {
       }),
       db.registration.count({ where }),
     ]);
+
+    // Admin all-registrations view uses a flat `registrations` key;
+    // existing workshopId-scoped callers get `data` for backwards compat.
+    if (isAdmin && !workshopId) {
+      return NextResponse.json({
+        success: true,
+        registrations,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

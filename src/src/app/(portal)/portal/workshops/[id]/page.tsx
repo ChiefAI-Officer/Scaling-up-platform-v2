@@ -17,6 +17,8 @@ import {
   calculateWorkshopRevenueSplit,
   formatUsdFromCents,
 } from "@/lib/workshops/workshop-financials";
+import { ApprovalThread } from "@/components/approvals/approval-thread";
+import { CoachReplyForm } from "@/components/approvals/coach-reply-form";
 
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
@@ -118,11 +120,16 @@ export default async function WorkshopDetailsPage({
       where: { workshopId: id, paymentStatus: "COMPLETED" },
       select: { amountPaidCents: true },
     }),
-    // MR-33: INFO_REQUESTED approval for coach response form
+    // MR-33: INFO_REQUESTED approval for coach response form + thread
     db.approvalQueue.findFirst({
       where: { workshopId: id, status: "INFO_REQUESTED" },
       orderBy: { requestedAt: "desc" },
-      select: { id: true, notes: true, coachResponse: true },
+      select: {
+        id: true,
+        notes: true,
+        coachResponse: true,
+        messages: { orderBy: { createdAt: "asc" } },
+      },
     }),
     // Sprint 3: Fallback landing page URL in case landingPageSlug not yet set on workshop
     db.landingPage.findFirst({
@@ -324,27 +331,36 @@ export default async function WorkshopDetailsPage({
         </div>
       )}
 
-      {/* FIG-009: Full edit form for INFO_REQUESTED status */}
+      {/* FIG-009: Full edit form for INFO_REQUESTED status — includes conversation thread */}
       {workshop.status === "INFO_REQUESTED" && infoRequestedApproval && !latestDenial && (
-        <ResubmitWorkshop
-          variant="info_requested"
-          workshopId={workshop.id}
-          approvalId={infoRequestedApproval.id}
-          adminMessage={infoRequestedApproval.notes ?? null}
-          title={workshop.title}
-          description={workshop.description}
-          eventDate={workshop.eventDate.toISOString()}
-          eventTime={workshop.eventTime}
-          timezone={workshop.timezone}
-          venueName={workshop.venueName}
-          venueAddress={workshop.venueAddress}
-          virtualLink={workshop.virtualLink}
-          categoryId={workshop.categoryId}
-          format={workshop.format}
-          priceCents={workshop.priceCents}
-          isFree={workshop.isFree}
-          pricingTierId={workshop.pricingTierId}
-        />
+        <>
+          <ApprovalThread
+            messages={(infoRequestedApproval.messages ?? []).map((m) => ({
+              ...m,
+              createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : m.createdAt,
+            }))}
+          />
+          <CoachReplyForm approvalId={infoRequestedApproval.id} />
+          <ResubmitWorkshop
+            variant="info_requested"
+            workshopId={workshop.id}
+            approvalId={infoRequestedApproval.id}
+            adminMessage={infoRequestedApproval.notes ?? null}
+            title={workshop.title}
+            description={workshop.description}
+            eventDate={workshop.eventDate.toISOString()}
+            eventTime={workshop.eventTime}
+            timezone={workshop.timezone}
+            venueName={workshop.venueName}
+            venueAddress={workshop.venueAddress}
+            virtualLink={workshop.virtualLink}
+            categoryId={workshop.categoryId}
+            format={workshop.format}
+            priceCents={workshop.priceCents}
+            isFree={workshop.isFree}
+            pricingTierId={workshop.pricingTierId}
+          />
+        </>
       )}
 
       {/* MR-29: Workshop files for download */}

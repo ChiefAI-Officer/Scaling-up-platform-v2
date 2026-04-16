@@ -22,6 +22,9 @@ export interface SoloContent {
   videoUrl?: string;
   benefits?: string[];
   registrationUrl?: string;
+  venueName?: string | null;
+  venueAddress?: string | null;
+  format?: string | null;
 }
 
 export interface SoloWorkshopData {
@@ -160,12 +163,6 @@ export function SoloLandingPageTemplate({
               </p>
             </section>
 
-            {videoUrl && (
-              <div className="rounded-2xl overflow-hidden shadow-xl border border-border">
-                <iframe src={videoUrl} className="w-full aspect-video" allowFullScreen />
-              </div>
-            )}
-
             {benefits.length > 0 && (
               <section>
                 <h3 className="text-xl font-bold text-foreground mb-6">
@@ -185,6 +182,45 @@ export function SoloLandingPageTemplate({
                   ))}
                 </div>
               </section>
+            )}
+
+            {videoUrl && (
+              <div className="w-full max-w-2xl mx-auto">
+                <div className="rounded-2xl overflow-hidden shadow-xl border border-border">
+                  <iframe
+                    src={videoUrl}
+                    className="w-full aspect-video"
+                    allow="autoplay; encrypted-media; picture-in-picture"
+                    allowFullScreen
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            )}
+
+            {content.format === "IN_PERSON" && content.venueName && (
+              <div className="flex items-start gap-3 bg-muted rounded-lg p-4">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-primary mt-0.5 flex-shrink-0"
+                >
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                <div>
+                  <div className="font-semibold text-foreground">{content.venueName}</div>
+                  {content.venueAddress && (
+                    <div className="text-sm text-muted-foreground">{content.venueAddress}</div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
 

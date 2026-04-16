@@ -18,6 +18,9 @@ export interface RegistrationContent {
   companyPlaceholder?: string;
   submitButtonText?: string;
   privacyText?: string;
+  venueName?: string | null;
+  venueAddress?: string | null;
+  format?: string | null;
 }
 
 export interface RegistrationWorkshopData {
@@ -118,6 +121,21 @@ export function RegistrationPageTemplate({
                     </svg>
                   </div>
                   <span className="text-sm">{eventTime}</span>
+                </div>
+              )}
+              {workshop.format === "IN_PERSON" && content.venueName && (
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+                    </svg>
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium">{content.venueName}</span>
+                    {content.venueAddress && (
+                      <span className="block text-xs text-white/60">{content.venueAddress}</span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -272,9 +272,18 @@ export async function POST(
                     { status: 400 }
                 );
             }
-            await db.approvalQueue.update({
-                where: { id },
-                data: { status: "PENDING", respondedBy: null, respondedAt: null, responseReason: null },
+            await db.$transaction(async (tx) => {
+                await tx.approvalQueue.update({
+                    where: { id },
+                    data: { status: "PENDING", respondedBy: null, respondedAt: null, responseReason: null },
+                });
+                // Reset workshop status so it no longer shows "Denied" after admin resets to pending
+                if (approval.workshopId && approval.type !== "CUSTOM_PRICING") {
+                    await tx.workshop.update({
+                        where: { id: approval.workshopId },
+                        data: { status: "AWAITING_APPROVAL" },
+                    });
+                }
             });
             await logAudit({
                 entityType: "ApprovalQueue",
@@ -309,6 +318,10 @@ export async function POST(
                         data: { status: "INFO_REQUESTED" },
                     });
                 }
+                // Append admin message to the thread
+                await tx.approvalMessage.create({
+                    data: { approvalId: id, from: "ADMIN", text: reason || "" },
+                });
             });
             // Notify coach (non-blocking)
             {

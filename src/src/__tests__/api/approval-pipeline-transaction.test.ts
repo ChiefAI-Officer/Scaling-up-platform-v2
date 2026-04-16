@@ -228,6 +228,9 @@ describe("Approval pipeline transaction safety", () => {
           status: "INFO_REQUESTED",
         }),
       },
+      approvalMessage: {
+        create: jest.fn().mockResolvedValue({ id: "msg-1", from: "ADMIN", text: "Need more details", createdAt: new Date() }),
+      },
     };
     (db.$transaction as jest.Mock).mockImplementation(
       async (fn: (...args: unknown[]) => unknown) => fn(txMocks)

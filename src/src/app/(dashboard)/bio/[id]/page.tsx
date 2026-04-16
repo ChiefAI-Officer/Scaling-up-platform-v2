@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -197,8 +198,18 @@ export default function CoachBioEditorPage() {
           <span>/</span>
           <span className="text-foreground">{coachFullName || "Coach"}</span>
         </div>
-        <h1 className="text-2xl font-bold text-foreground">Bio Page Editor</h1>
-        <p className="text-muted-foreground">Edit coach bio details and profile picture.</p>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Bio Page Editor</h1>
+            <p className="text-muted-foreground">Edit coach bio details and profile picture.</p>
+          </div>
+          <Link
+            href={`/coaches/${coachId}`}
+            className="inline-flex items-center gap-1.5 text-sm text-primary border border-primary/30 rounded-md px-3 py-1.5 hover:bg-primary/5 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" /> View Coach Record
+          </Link>
+        </div>
       </div>
 
       {error && (

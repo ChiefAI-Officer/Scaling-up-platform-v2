@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,8 @@ interface WorkshopInlineEditFormProps {
   format: string;
   // Pricing — read-only in this sprint; editable in FIG-007
   pricingTier: PricingTierDisplay | null;
+  // Coupon codes (JSON string from DB)
+  coupons?: string | null;
   // Logistics fields
   eventDate: string; // ISO string
   eventTime: string | null;
@@ -79,6 +81,7 @@ export function WorkshopInlineEditForm({
   categoryId,
   format,
   pricingTier,
+  coupons: couponsProp,
   eventDate,
   eventTime,
   timezone,
@@ -92,6 +95,18 @@ export function WorkshopInlineEditForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [stripeWarning, setStripeWarning] = useState<string | null>(null);
+
+  const [coupons, setCoupons] = React.useState<Array<{ id: string; code: string; discountPercent: number; singleUse: boolean }>>(
+    () => {
+      try {
+        const parsed = JSON.parse(couponsProp ?? "[]") as Array<{ code: string; discountPercent: number; singleUse: boolean }>;
+        return parsed.map((c) => ({ id: crypto.randomUUID(), ...c }));
+      } catch {
+        return [];
+      }
+    }
+  );
 
   const parsedVenue = parseVenueAddress(venueAddress);
 
@@ -116,6 +131,7 @@ export function WorkshopInlineEditForm({
     setSaving(true);
     setError(null);
     setSuccess(false);
+    setStripeWarning(null);
 
     try {
       const res = await fetch(`/api/workshops/${workshopId}`, {
@@ -139,10 +155,11 @@ export function WorkshopInlineEditForm({
                 zip: form.venueZip,
               })
             : null,
+          coupons: coupons.map(({ id: _id, ...rest }) => rest),
         }),
       });
 
-      const data = await res.json() as { success: boolean; error?: string | { message: string }[] };
+      const data = await res.json() as { success: boolean; error?: string | { message: string }[]; stripeErrors?: string[] };
 
       if (!data.success) {
         const errMsg =
@@ -156,6 +173,11 @@ export function WorkshopInlineEditForm({
       }
 
       setSuccess(true);
+      if (data.stripeErrors && data.stripeErrors.length > 0) {
+        setStripeWarning(`Workshop saved — Stripe sync warning: ${data.stripeErrors.join("; ")}`);
+      } else {
+        setStripeWarning(null);
+      }
       router.refresh();
     } catch {
       setError("Failed to update workshop. Please try again.");
@@ -183,7 +205,7 @@ export function WorkshopInlineEditForm({
         <h3 className="text-sm font-semibold text-foreground">Edit Workshop Details</h3>
         <button
           type="button"
-          onClick={() => { setOpen(false); setError(null); setSuccess(false); }}
+          onClick={() => { setOpen(false); setError(null); setSuccess(false); setStripeWarning(null); }}
           className="text-muted-foreground hover:text-foreground text-sm cursor-pointer"
         >
           Cancel
@@ -278,6 +300,71 @@ export function WorkshopInlineEditForm({
           </div>
         </div>
 
+        {/* Section: Coupon Codes */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Coupon Codes</p>
+            <button
+              type="button"
+              onClick={() => setCoupons([...coupons, { id: crypto.randomUUID(), code: "", discountPercent: 10, singleUse: false }])}
+              className="text-xs text-primary hover:underline"
+            >
+              + Add Coupon
+            </button>
+          </div>
+          {coupons.map((coupon, i) => (
+            <div key={coupon.id} className="flex gap-2 items-center">
+              <Input
+                placeholder="Code (e.g. SAVE20)"
+                value={coupon.code}
+                onChange={(e) => {
+                  const c = [...coupons];
+                  c[i] = { ...c[i], code: e.target.value };
+                  setCoupons(c);
+                }}
+                className="flex-1 text-sm"
+                maxLength={64}
+              />
+              <Input
+                type="number"
+                placeholder="%"
+                value={coupon.discountPercent}
+                onChange={(e) => {
+                  const c = [...coupons];
+                  c[i] = { ...c[i], discountPercent: Number(e.target.value) };
+                  setCoupons(c);
+                }}
+                className="w-20 text-sm"
+                min={1}
+                max={100}
+                step="1"
+              />
+              <label className="flex items-center gap-1 text-xs whitespace-nowrap text-foreground">
+                <input
+                  type="checkbox"
+                  checked={coupon.singleUse}
+                  onChange={(e) => {
+                    const c = [...coupons];
+                    c[i] = { ...c[i], singleUse: e.target.checked };
+                    setCoupons(c);
+                  }}
+                />
+                Single use
+              </label>
+              <button
+                type="button"
+                onClick={() => setCoupons(coupons.filter((_, j) => j !== i))}
+                className="text-destructive text-xs hover:underline whitespace-nowrap"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          {coupons.length === 0 && (
+            <p className="text-xs text-muted-foreground">No coupon codes configured.</p>
+          )}
+        </div>
+
         {/* Section: Schedule & Location */}
         <div className="space-y-3">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Schedule &amp; Location</p>
@@ -294,15 +381,35 @@ export function WorkshopInlineEditForm({
               />
             </div>
             <div>
-              <Label htmlFor="ie-eventTime" className="text-xs">Event Time</Label>
-              <Input
-                id="ie-eventTime"
-                type="text"
-                value={form.eventTime}
-                onChange={(e) => setForm((p) => ({ ...p, eventTime: e.target.value }))}
-                placeholder="e.g., 09:00 - 17:00"
-                className="mt-1 text-sm"
-              />
+              <Label className="text-xs">Event Time</Label>
+              <div className="mt-1 grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="ie-eventTime-start" className="text-xs text-muted-foreground">Start Time</Label>
+                  <Input
+                    id="ie-eventTime-start"
+                    type="time"
+                    value={form.eventTime.split(/\s*-\s*/)[0] || ""}
+                    onChange={(e) => {
+                      const end = form.eventTime.split(/\s*-\s*/)[1] || "";
+                      setForm((p) => ({ ...p, eventTime: `${e.target.value} - ${end}` }));
+                    }}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ie-eventTime-end" className="text-xs text-muted-foreground">End Time</Label>
+                  <Input
+                    id="ie-eventTime-end"
+                    type="time"
+                    value={form.eventTime.split(/\s*-\s*/)[1] || ""}
+                    onChange={(e) => {
+                      const start = form.eventTime.split(/\s*-\s*/)[0] || "";
+                      setForm((p) => ({ ...p, eventTime: `${start} - ${e.target.value}` }));
+                    }}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
             </div>
             <div>
               <Label htmlFor="ie-timezone" className="text-xs">Timezone</Label>
@@ -394,6 +501,9 @@ export function WorkshopInlineEditForm({
         {success && (
           <p className="text-sm text-success">Details updated successfully.</p>
         )}
+        {stripeWarning && (
+          <p className="text-sm text-warning">{stripeWarning}</p>
+        )}
 
         <div className="flex gap-2 pt-1">
           <Button type="submit" size="sm" disabled={saving}>
@@ -403,7 +513,7 @@ export function WorkshopInlineEditForm({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => { setOpen(false); setError(null); setSuccess(false); }}
+            onClick={() => { setOpen(false); setError(null); setSuccess(false); setStripeWarning(null); }}
           >
             Cancel
           </Button>

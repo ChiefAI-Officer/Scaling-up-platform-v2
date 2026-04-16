@@ -19,6 +19,7 @@ interface CoachProfileFormProps {
         profileImage?: string | null;
         linkedinUrl?: string | null;
         showBookCallCta?: boolean;
+        bookCallUrl?: string | null;
     };
 }
 
@@ -31,6 +32,7 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
     const [titleCredentials, setTitleCredentials] = useState(initialData.titleCredentials || "");
     const [linkedinUrl, setLinkedinUrl] = useState(initialData.linkedinUrl || "");
     const [showBookCallCta, setShowBookCallCta] = useState(initialData.showBookCallCta ?? true);
+    const [bookCallUrl, setBookCallUrl] = useState(initialData.bookCallUrl ?? "");
     const [profileImage, setProfileImage] = useState(initialData.profileImage || "");
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -76,7 +78,7 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
             const res = await fetch(`/api/portal/profile`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ firstName, lastName, bio, title: title || null, company: titleCredentials || null, linkedinUrl: linkedinUrl || null, showBookCallCta }),
+                body: JSON.stringify({ firstName, lastName, bio, title: title || null, company: titleCredentials || null, linkedinUrl: linkedinUrl || null, showBookCallCta, bookCallUrl: bookCallUrl || null }),
             });
 
             const data = await res.json();
@@ -218,6 +220,20 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
                     Show &ldquo;Book a Call&rdquo; button on my bio page
                 </Label>
             </div>
+
+            {showBookCallCta && (
+                <div className="space-y-1">
+                    <Label htmlFor="bookCallUrl">Book a Call URL</Label>
+                    <Input
+                        id="bookCallUrl"
+                        type="url"
+                        placeholder="https://calendly.com/yourname"
+                        value={bookCallUrl}
+                        onChange={(e) => setBookCallUrl(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Link for the button on your public bio page</p>
+                </div>
+            )}
 
             <div className="pt-4 border-t border-border flex justify-end">
                 <Button onClick={handleSave} disabled={saving}>

@@ -19,7 +19,7 @@ const CoachResponseSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("DECLINE_COUNTER"), newPriceCents: z.number().int().min(1).max(10_000_000).optional(), counterNote: z.string().max(1000).optional() }),
 ]);
 
-const PRE_BUILD_STATUSES = ["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED"];
+const PRE_BUILD_STATUSES = ["REQUESTED", "AWAITING_APPROVAL", "INFO_REQUESTED", "DENIED"];
 
 /**
  * POST /api/approvals/[id]/coach-response
@@ -92,17 +92,24 @@ export async function POST(
                 );
             }
 
-            await db.approvalQueue.update({
-                where: { id },
-                data: { coachResponse: parsed.response, status: "PENDING" },
-            });
+            const coachResponseText = parsed.response;
 
-            if (approval.workshopId) {
-                await db.workshop.update({
-                    where: { id: approval.workshopId },
-                    data: { status: "AWAITING_APPROVAL" },
+            await db.$transaction(async (tx) => {
+                await tx.approvalQueue.update({
+                    where: { id },
+                    data: { coachResponse: coachResponseText, status: "PENDING" },
                 });
-            }
+                // Append coach message to the thread
+                await tx.approvalMessage.create({
+                    data: { approvalId: id, from: "COACH", text: coachResponseText },
+                });
+                if (approval.workshopId) {
+                    await tx.workshop.update({
+                        where: { id: approval.workshopId },
+                        data: { status: "AWAITING_APPROVAL" },
+                    });
+                }
+            });
 
             {
                 const coach = await db.coach.findUnique({
