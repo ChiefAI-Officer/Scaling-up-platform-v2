@@ -380,15 +380,35 @@ export function WorkshopInlineEditForm({
               />
             </div>
             <div>
-              <Label htmlFor="ie-eventTime" className="text-xs">Event Time</Label>
-              <Input
-                id="ie-eventTime"
-                type="text"
-                value={form.eventTime}
-                onChange={(e) => setForm((p) => ({ ...p, eventTime: e.target.value }))}
-                placeholder="e.g., 09:00 - 17:00"
-                className="mt-1 text-sm"
-              />
+              <Label className="text-xs">Event Time</Label>
+              <div className="mt-1 grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="ie-eventTime-start" className="text-xs text-muted-foreground">Start Time</Label>
+                  <Input
+                    id="ie-eventTime-start"
+                    type="time"
+                    value={form.eventTime.split(/\s*-\s*/)[0] || ""}
+                    onChange={(e) => {
+                      const end = form.eventTime.split(/\s*-\s*/)[1] || "";
+                      setForm((p) => ({ ...p, eventTime: `${e.target.value} - ${end}` }));
+                    }}
+                    className="text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ie-eventTime-end" className="text-xs text-muted-foreground">End Time</Label>
+                  <Input
+                    id="ie-eventTime-end"
+                    type="time"
+                    value={form.eventTime.split(/\s*-\s*/)[1] || ""}
+                    onChange={(e) => {
+                      const start = form.eventTime.split(/\s*-\s*/)[0] || "";
+                      setForm((p) => ({ ...p, eventTime: `${start} - ${e.target.value}` }));
+                    }}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
             </div>
             <div>
               <Label htmlFor="ie-timezone" className="text-xs">Timezone</Label>
