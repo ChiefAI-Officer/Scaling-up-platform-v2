@@ -63,6 +63,7 @@ jest.mock("@/lib/workshops/workshop-code", () => ({
 jest.mock("@/services/notifications", () => ({
   sendWorkshopRequestedEmail: jest.fn().mockResolvedValue(undefined),
   sendCustomPriceChangeEmail: jest.fn().mockResolvedValue(undefined),
+  sendWorkshopDateChangeEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/services/stripe", () => ({

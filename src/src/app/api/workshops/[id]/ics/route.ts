@@ -70,7 +70,7 @@ export async function GET(
       : undefined;
 
     const icsContent = generateIcsContent({
-      uid: workshop.id,
+      uid: `workshop-${workshop.id}@scaling-up-platform.com`,
       title: workshop.title,
       description: workshop.description,
       eventDate: workshop.eventDate,

@@ -287,6 +287,25 @@ describe("POST /api/workshops/[id]/register", () => {
       expect(createCheckoutSession).not.toHaveBeenCalled();
     });
 
+    it("passes deterministic UID to generateIcsContent with domain suffix", async () => {
+      const workshop = makeFreeWorkshop(); // id = "ws-1"
+      const registration = makeRegistration();
+
+      (createWorkshopRegistration as jest.Mock).mockResolvedValue({
+        registration,
+        workshop,
+      });
+
+      await POST(buildJsonRequest(validPayload), routeParams("ws-1"));
+
+      const { generateIcsContent } = jest.requireMock("@/lib/ics-generator");
+      expect(generateIcsContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uid: "workshop-ws-1@scaling-up-platform.com",
+        })
+      );
+    });
+
     // Note: The redirect (303) path for non-JSON requests cannot be tested in jsdom
     // because Request.formData() is not available. The redirect logic is covered by
     // the wantsJsonResponse check — when content-type is NOT application/json,

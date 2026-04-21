@@ -5,7 +5,8 @@ import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/au
 import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/workshops/lead-time-validator";
 import { chargeCancellationFee, createWorkshopPromotionCode } from "@/services/stripe";
 import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/templates/template-interpolation";
-import { sendCustomPriceChangeEmail } from "@/services/notifications";
+import { sendCustomPriceChangeEmail, sendWorkshopDateChangeEmail } from "@/services/notifications";
+import { parseDurationHours } from "@/lib/ics-generator";
 import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;
@@ -194,6 +195,12 @@ export async function PATCH(
 
     const data = validation.data;
 
+    // Detect date/time change before update (compare against existing values)
+    const dateChanged =
+      (data.eventDate !== undefined &&
+        data.eventDate?.toISOString() !== existing.eventDate?.toISOString()) ||
+      (data.eventTime !== undefined && data.eventTime !== existing.eventTime);
+
     // Coaches cannot edit fields outside their allowed set
     if (isCoach) {
       // Check raw body keys (not Zod-transformed data) — Zod defaults would
@@ -377,6 +384,31 @@ export async function PATCH(
         console.error("[R4B] Landing page sync failed (non-blocking):", syncError);
         landingPageSyncWarning = "Landing page content sync failed — please refresh landing pages manually.";
       }
+    }
+
+    // Fire-and-forget ICS reschedule notification to all confirmed registrants
+    if (dateChanged && workshop.coach) {
+      const appUrl = process.env.APP_URL ?? "https://scaling-up-platform-v2.vercel.app";
+      sendWorkshopDateChangeEmail({
+        workshopId: workshop.id,
+        workshopTitle: workshop.title,
+        workshopCode: workshop.workshopCode ?? "",
+        coachName: `${workshop.coach.firstName} ${workshop.coach.lastName}`,
+        coachEmail: workshop.coach.email,
+        eventDate: workshop.eventDate!,
+        eventTime: workshop.eventTime,
+        timezone: workshop.timezone,
+        virtualLink: workshop.virtualLink,
+        venueName: workshop.venueName,
+        venueAddress: workshop.venueAddress,
+        workshopFormat: workshop.format,
+        durationHours: parseDurationHours(workshop.duration),
+        landingPageUrl: workshop.landingPageSlug
+          ? `${appUrl}/workshop/${workshop.landingPageSlug}`
+          : undefined,
+      }).catch((err) =>
+        console.error("[PATCH /workshops] Failed to send date-change ICS emails:", err)
+      );
     }
 
     // Sync coupons to Stripe (non-blocking — DB save already succeeded)
