@@ -128,7 +128,7 @@ export function generateIcsContent(event: IcsEventData): string {
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
-    `UID:${event.uid}@scalingup.com`,
+    `UID:${event.uid}`,
     `DTSTAMP:${formatIcsUtcNow()}`,
     `DTSTART;TZID=${event.timezone}:${formatIcsDate(start)}`,
     `DTEND;TZID=${event.timezone}:${formatIcsDate(end)}`,
