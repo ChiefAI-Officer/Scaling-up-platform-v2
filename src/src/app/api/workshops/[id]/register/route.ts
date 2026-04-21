@@ -202,7 +202,7 @@ export async function POST(
           if (workshop.isFree) {
             // JV-18: Generate ICS calendar file for the registrant
             const icsContent = generateIcsContent({
-              uid: workshop.id,
+              uid: `workshop-${workshop.id}@scaling-up-platform.com`,
               title: workshop.title,
               description: workshop.description,
               eventDate: workshop.eventDate,

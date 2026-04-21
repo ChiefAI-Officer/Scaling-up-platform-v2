@@ -222,7 +222,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       const workshop = registration.workshop;
       const coach = workshop.coach;
       const icsContent = generateIcsContent({
-        uid: workshop.id,
+        uid: `workshop-${workshop.id}@scaling-up-platform.com`,
         title: workshop.title,
         description: workshop.description,
         eventDate: workshop.eventDate,
@@ -331,7 +331,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       const workshop = registration.workshop;
       const coach = workshop.coach;
       const icsContent = generateIcsContent({
-        uid: workshop.id,
+        uid: `workshop-${workshop.id}@scaling-up-platform.com`,
         title: workshop.title,
         description: workshop.description,
         eventDate: workshop.eventDate,
