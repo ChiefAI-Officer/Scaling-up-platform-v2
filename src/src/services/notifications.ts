@@ -5,6 +5,9 @@
  */
 
 import { sendEmailViaSMTP, type SmtpAttachment } from "@/lib/smtp-transport";
+import { db } from "@/lib/db";
+import { generateIcsContent, buildLocationString } from "@/lib/ics-generator";
+import { formatDate } from "@/lib/utils";
 
 // ============================================
 // Types
@@ -646,6 +649,110 @@ export async function sendCustomPriceChangeEmail(params: {
             metadata: { type: "custom_pricing_request" },
         },
     });
+}
+
+// ============================================
+// Workshop Date Change — ICS Reschedule Notification
+// ============================================
+
+/**
+ * Send updated ICS calendar files to all confirmed registrants when a
+ * workshop's date or time changes. Uses METHOD:REQUEST so calendar clients
+ * update the existing event rather than creating a duplicate.
+ */
+export async function sendWorkshopDateChangeEmail({
+  workshopId,
+  workshopTitle,
+  workshopCode,
+  coachName,
+  coachEmail,
+  eventDate,
+  eventTime,
+  timezone,
+  virtualLink,
+  venueName,
+  venueAddress,
+  workshopFormat,
+  durationHours,
+  landingPageUrl,
+}: {
+  workshopId: string;
+  workshopTitle: string;
+  workshopCode: string;
+  coachName: string;
+  coachEmail: string;
+  eventDate: Date;
+  eventTime?: string | null;
+  timezone?: string | null;
+  virtualLink?: string | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
+  workshopFormat?: string | null;
+  durationHours?: number;
+  landingPageUrl?: string;
+}): Promise<void> {
+  const registrants = await db.registration.findMany({
+    where: {
+      workshopId,
+      paymentStatus: { in: ["FREE", "COMPLETED"] },
+    },
+    select: { email: true, firstName: true, lastName: true },
+  });
+
+  if (registrants.length === 0) return;
+
+  // buildLocationString expects `format` — map workshopFormat → format
+  const location = buildLocationString({
+    format: workshopFormat ?? "IN_PERSON",
+    virtualLink: virtualLink ?? null,
+    venueName: venueName ?? null,
+    venueAddress: venueAddress ?? null,
+  });
+
+  const icsContent = generateIcsContent({
+    uid: `workshop-${workshopId}@scaling-up-platform.com`,
+    title: workshopTitle,
+    eventDate,
+    eventTime: eventTime ?? null,
+    timezone: timezone ?? "UTC",
+    durationHours: durationHours ?? 8,
+    location,
+    url: landingPageUrl,
+    organizer: { name: coachName, email: coachEmail },
+    method: "REQUEST",
+  });
+
+  const icsAttachment: SmtpAttachment = {
+    filename: `${workshopCode}-updated.ics`,
+    content: icsContent,
+    contentType: "text/calendar",
+  };
+
+  const formattedDate = formatDate(eventDate);
+
+  // Sequential send — avoids SMTP rate limiting.
+  for (const registrant of registrants) {
+    await sendNotificationEmail({
+      to: registrant.email,
+      subject: `Workshop date updated: ${workshopTitle}`,
+      html: `
+        <p>Hi ${registrant.firstName},</p>
+        <p>The date or time for <strong>${workshopTitle}</strong> (${workshopCode}) has been updated.</p>
+        <p><strong>New date:</strong> ${formattedDate}${eventTime ? ` at ${eventTime}` : ""}</p>
+        <p>We've attached an updated calendar invite. Open it to update the event in your calendar.</p>
+        ${landingPageUrl ? `<p><a href="${landingPageUrl}">View workshop details</a></p>` : ""}
+        <p>Questions? Reply to this email or contact your workshop organizer.</p>
+      `,
+      attachments: [icsAttachment],
+      telemetry: {
+        workshopId,
+        workshopCode,
+        recipientRole: "ATTENDEE" as const,
+      },
+    }).catch((err) =>
+      console.error(`[sendWorkshopDateChangeEmail] Failed to send to ${registrant.email}:`, err)
+    );
+  }
 }
 
 // ============================================
