@@ -109,7 +109,7 @@ describe("sendWorkshopDateChangeEmail", () => {
     expect(firstCall.subject).toBe("Workshop date updated: Scaling Up Workshop");
     expect(firstCall.attachments).toHaveLength(1);
     expect(firstCall.attachments[0].filename).toBe("WS-2026-AB12-updated.ics");
-    expect(firstCall.attachments[0].contentType).toBe("text/calendar");
+    expect(firstCall.attachments[0].contentType).toBe("text/calendar; method=REQUEST");
 
     const secondCall = mockSendEmailViaSMTP.mock.calls[1][0];
     expect(secondCall.to).toBe("bob@example.com");

@@ -725,7 +725,7 @@ export async function sendWorkshopDateChangeEmail({
   const icsAttachment: SmtpAttachment = {
     filename: `${workshopCode}-updated.ics`,
     content: icsContent,
-    contentType: "text/calendar",
+    contentType: "text/calendar; method=REQUEST",
   };
 
   const formattedDate = formatDate(eventDate);
@@ -736,7 +736,7 @@ export async function sendWorkshopDateChangeEmail({
       to: registrant.email,
       subject: `Workshop date updated: ${workshopTitle}`,
       html: `
-        <p>Hi ${registrant.firstName},</p>
+        <p>Hi ${escapeHtml(registrant.firstName ?? "")},</p>
         <p>The date or time for <strong>${workshopTitle}</strong> (${workshopCode}) has been updated.</p>
         <p><strong>New date:</strong> ${formattedDate}${eventTime ? ` at ${eventTime}` : ""}</p>
         <p>We've attached an updated calendar invite. Open it to update the event in your calendar.</p>

@@ -6,6 +6,7 @@ import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/workshops/lead
 import { chargeCancellationFee } from "@/services/stripe";
 import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/templates/template-interpolation";
 import { sendCustomPriceChangeEmail, sendWorkshopDateChangeEmail } from "@/services/notifications";
+import { parseDurationHours } from "@/lib/ics-generator";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;
 
@@ -387,6 +388,7 @@ export async function PATCH(
         venueName: workshop.venueName,
         venueAddress: workshop.venueAddress,
         workshopFormat: workshop.format,
+        durationHours: parseDurationHours(workshop.duration),
         landingPageUrl: workshop.landingPageSlug
           ? `${appUrl}/workshop/${workshop.landingPageSlug}`
           : undefined,
