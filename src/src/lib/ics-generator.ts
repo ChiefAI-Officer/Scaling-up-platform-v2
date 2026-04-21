@@ -15,6 +15,7 @@ export interface IcsEventData {
   location?: string | null;
   url?: string | null;
   organizer?: { name: string; email: string } | null;
+  method?: "PUBLISH" | "REQUEST";
 }
 
 /**
@@ -126,10 +127,11 @@ export function generateIcsContent(event: IcsEventData): string {
     "VERSION:2.0",
     "PRODID:-//Scaling Up//Workshop Platform//EN",
     "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
+    `METHOD:${event.method ?? "PUBLISH"}`,
     "BEGIN:VEVENT",
     `UID:${event.uid}`,
     `DTSTAMP:${formatIcsUtcNow()}`,
+    "SEQUENCE:0",
     `DTSTART;TZID=${event.timezone}:${formatIcsDate(start)}`,
     `DTEND;TZID=${event.timezone}:${formatIcsDate(end)}`,
     `SUMMARY:${escapeIcsText(event.title)}`,
