@@ -387,7 +387,7 @@ export async function PATCH(
     }
 
     // Fire-and-forget ICS reschedule notification to all confirmed registrants
-    if (dateChanged && workshop.coach) {
+    if (dateChanged && !isCoach && workshop.coach) {
       const appUrl = process.env.APP_URL ?? "https://scaling-up-platform-v2.vercel.app";
       sendWorkshopDateChangeEmail({
         workshopId: workshop.id,
