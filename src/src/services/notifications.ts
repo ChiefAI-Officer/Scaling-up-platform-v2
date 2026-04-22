@@ -731,11 +731,13 @@ export async function sendWorkshopDateChangeEmail({
   const formattedDate = formatDate(eventDate);
 
   // Sequential send — avoids SMTP rate limiting.
+  const failures: Array<{ email: string; error: unknown }> = [];
   for (const registrant of registrants) {
-    await sendNotificationEmail({
-      to: registrant.email,
-      subject: `Workshop date updated: ${workshopTitle}`,
-      html: `
+    try {
+      await sendNotificationEmail({
+        to: registrant.email,
+        subject: `Workshop date updated: ${workshopTitle}`,
+        html: `
         <p>Hi ${escapeHtml(registrant.firstName ?? "")},</p>
         <p>The date or time for <strong>${workshopTitle}</strong> (${workshopCode}) has been updated.</p>
         <p><strong>New date:</strong> ${formattedDate}${eventTime ? ` at ${eventTime}` : ""}</p>
@@ -743,14 +745,23 @@ export async function sendWorkshopDateChangeEmail({
         ${landingPageUrl ? `<p><a href="${landingPageUrl}">View workshop details</a></p>` : ""}
         <p>Questions? Reply to this email or contact your workshop organizer.</p>
       `,
-      attachments: [icsAttachment],
-      telemetry: {
-        workshopId,
-        workshopCode,
-        recipientRole: "ATTENDEE" as const,
-      },
-    }).catch((err) =>
-      console.error(`[sendWorkshopDateChangeEmail] Failed to send to ${registrant.email}:`, err)
+        attachments: [icsAttachment],
+        telemetry: {
+          workshopId,
+          workshopCode,
+          recipientRole: "ATTENDEE" as const,
+        },
+      });
+    } catch (err) {
+      console.error(`[sendWorkshopDateChangeEmail] Failed to send to ${registrant.email}:`, err);
+      failures.push({ email: registrant.email, error: err });
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(
+      `sendWorkshopDateChangeEmail: ${failures.length}/${registrants.length} recipient(s) failed. ` +
+        `First error: ${(failures[0].error as Error)?.message ?? failures[0].error}`
     );
   }
 }

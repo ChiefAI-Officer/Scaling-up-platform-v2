@@ -5,9 +5,9 @@ import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/au
 import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/workshops/lead-time-validator";
 import { chargeCancellationFee, createWorkshopPromotionCode } from "@/services/stripe";
 import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/templates/template-interpolation";
-import { sendCustomPriceChangeEmail, sendWorkshopDateChangeEmail } from "@/services/notifications";
-import { parseDurationHours } from "@/lib/ics-generator";
+import { sendCustomPriceChangeEmail } from "@/services/notifications";
 import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
+import { inngest } from "@/inngest/client";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;
 
@@ -386,29 +386,19 @@ export async function PATCH(
       }
     }
 
-    // Fire-and-forget ICS reschedule notification to all confirmed registrants
+    // Emit Inngest event — awaited so the HTTP call to Inngest completes
+    // before the serverless function shuts down. The Inngest function then
+    // runs asynchronously in its own invocation with retries.
     if (dateChanged && !isCoach && workshop.coach) {
-      const appUrl = process.env.APP_URL ?? "https://scaling-up-platform-v2.vercel.app";
-      sendWorkshopDateChangeEmail({
-        workshopId: workshop.id,
-        workshopTitle: workshop.title,
-        workshopCode: workshop.workshopCode ?? "",
-        coachName: `${workshop.coach.firstName} ${workshop.coach.lastName}`,
-        coachEmail: workshop.coach.email,
-        eventDate: workshop.eventDate!,
-        eventTime: workshop.eventTime,
-        timezone: workshop.timezone,
-        virtualLink: workshop.virtualLink,
-        venueName: workshop.venueName,
-        venueAddress: workshop.venueAddress,
-        workshopFormat: workshop.format,
-        durationHours: parseDurationHours(workshop.duration),
-        landingPageUrl: workshop.landingPageSlug
-          ? `${appUrl}/workshop/${workshop.landingPageSlug}`
-          : undefined,
-      }).catch((err) =>
-        console.error("[PATCH /workshops] Failed to send date-change ICS emails:", err)
-      );
+      try {
+        await inngest.send({
+          name: "workshop/date-changed",
+          data: { workshopId: workshop.id },
+        });
+      } catch (err) {
+        console.error("[PATCH /workshops] Failed to emit workshop/date-changed:", err);
+        // Non-blocking: workshop update still succeeds.
+      }
     }
 
     // Sync coupons to Stripe (non-blocking — DB save already succeeded)

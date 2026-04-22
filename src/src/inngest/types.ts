@@ -58,10 +58,17 @@ type WorkshopCompleted = {
     };
 };
 
+type WorkshopDateChanged = {
+    data: {
+        workshopId: string;
+    };
+};
+
 type Events = {
     "workshop/created": WorkshopCreated;
     "workshop/approved": WorkshopApproved;
     "workshop/completed": WorkshopCompleted;
+    "workshop/date-changed": WorkshopDateChanged;
     "registration/created": RegistrationCreated;
     "approval/requested": ApprovalRequested;
     "workflow/schedule": WorkflowSchedule;
