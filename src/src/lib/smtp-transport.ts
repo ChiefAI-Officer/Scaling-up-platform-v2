@@ -23,6 +23,7 @@ export interface SendEmailOptions {
 }
 
 let _transporter: nodemailer.Transporter | null = null;
+let _verified = false;
 
 function getTransporter(): nodemailer.Transporter {
   if (!_transporter) {
@@ -30,6 +31,8 @@ function getTransporter(): nodemailer.Transporter {
       host: process.env.SMTP_HOST || "smtp.example.com",
       port: parseInt(process.env.SMTP_PORT || "587"),
       secure: false,
+      requireTLS: true,
+      tls: { minVersion: "TLSv1.2" },
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
@@ -64,7 +67,17 @@ export async function sendEmailViaSMTP(options: SendEmailOptions): Promise<void>
   }
 
   try {
-    await getTransporter().sendMail({
+    const transporter = getTransporter();
+    if (!_verified) {
+      try {
+        await transporter.verify();
+        console.log("[smtp-transport] SMTP verify() succeeded: host=" + process.env.SMTP_HOST);
+      } catch (verifyErr) {
+        console.error("[smtp-transport] SMTP verify() FAILED:", verifyErr);
+      }
+      _verified = true;
+    }
+    await transporter.sendMail({
       from: process.env.SMTP_FROM || '"Scaling Up Platform" <noreply@scalingup.com>',
       to: options.to,
       subject: options.subject,
