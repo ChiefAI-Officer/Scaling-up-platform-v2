@@ -10,6 +10,7 @@
 
 import { db } from "@/lib/db";
 import { SURVEY_TYPES } from "@/lib/surveys/survey-types";
+import { sendEmailViaSMTP } from "@/lib/smtp-transport";
 
 /**
  * Find the best matching survey template for a workshop + survey type.
@@ -227,20 +228,6 @@ export async function sendSurveyEmail(input: {
   surveyUrl: string;
   surveyType: string;
 }): Promise<void> {
-  const nodemailer = await import("nodemailer");
-
-  if (!process.env.SMTP_HOST) {
-    console.log(`[Survey Mock Email] To: ${input.to}, Survey: ${input.surveyUrl}`);
-    return;
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: false,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
-  });
-
   const isPre = input.surveyType === SURVEY_TYPES.PRE_WORKSHOP;
   const subject = isPre
     ? `Pre-Workshop Survey: ${input.workshopTitle}`
@@ -263,8 +250,7 @@ export async function sendSurveyEmail(input: {
     <p>— The Scaling Up Team</p>
   `;
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || '"Scaling Up Platform" <noreply@scalingup.com>',
+  await sendEmailViaSMTP({
     to: input.to,
     subject,
     html,

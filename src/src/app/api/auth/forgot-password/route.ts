@@ -1,32 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 import { db } from "@/lib/db";
 import { forgotPasswordSchema } from "@/lib/validations";
 import { generatePasswordResetToken } from "@/lib/auth/password-reset";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { sendEmailViaSMTP } from "@/lib/smtp-transport";
 
 const GENERIC_SUCCESS_MESSAGE =
   "If an account exists for this email, password reset instructions have been sent.";
 
 async function sendPasswordResetEmail(email: string, resetUrl: string) {
-  const smtpHost = process.env.SMTP_HOST;
-  if (!smtpHost || process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV === "development") {
     console.log(`[PASSWORD RESET] ${email} -> ${resetUrl}`);
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: parseInt(process.env.SMTP_PORT || "587", 10),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
-
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || '"Scaling Up" <noreply@scalingup.com>',
+  await sendEmailViaSMTP({
     to: email,
     subject: "Reset your Scaling Up password",
     html: `
