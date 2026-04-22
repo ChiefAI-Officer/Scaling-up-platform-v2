@@ -146,6 +146,26 @@ describe("sendWorkshopDateChangeEmail", () => {
     expect(callArgs.attachments[0].content).toBe("BEGIN:VCALENDAR\nEND:VCALENDAR");
   });
 
+  it("dispatches ICS attachment with METHOD:REQUEST content-type to each registrant", async () => {
+    mockFindMany.mockResolvedValue([
+      { email: "a@example.com", firstName: "Alice", lastName: "A" },
+    ]);
+    mockGenerateIcsContent.mockReturnValue(
+      "BEGIN:VCALENDAR\r\nMETHOD:REQUEST\r\nEND:VCALENDAR"
+    );
+
+    await sendWorkshopDateChangeEmail(baseParams);
+
+    expect(mockSendEmailViaSMTP).toHaveBeenCalledTimes(1);
+    const call = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(call.attachments).toHaveLength(1);
+    expect(call.attachments[0]).toMatchObject({
+      filename: expect.stringMatching(/\.ics$/),
+      content: expect.stringContaining("METHOD:REQUEST"),
+      contentType: "text/calendar; method=REQUEST",
+    });
+  });
+
   it("uses IN_PERSON as default format when workshopFormat is null", async () => {
     mockFindMany.mockResolvedValue([
       { email: "dave@example.com", firstName: "Dave", lastName: "Lee" },
