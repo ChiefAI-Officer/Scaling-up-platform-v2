@@ -731,10 +731,13 @@ export async function sendWorkshopDateChangeEmail({
   const formattedDate = formatDate(eventDate);
 
   // Sequential send — avoids SMTP rate limiting.
+  // NOTE: calls sendEmailViaSMTP directly (not sendNotificationEmail) because
+  // sendNotificationEmail swallows SMTP errors with .catch — which would
+  // defeat Inngest retries that depend on this function throwing on failure.
   const failures: Array<{ email: string; error: unknown }> = [];
   for (const registrant of registrants) {
     try {
-      await sendNotificationEmail({
+      await sendEmailViaSMTP({
         to: registrant.email,
         subject: `Workshop date updated: ${workshopTitle}`,
         html: `
@@ -750,6 +753,7 @@ export async function sendWorkshopDateChangeEmail({
           workshopId,
           workshopCode,
           recipientRole: "ATTENDEE" as const,
+          metadata: { attachmentCount: 1 },
         },
       });
     } catch (err) {
