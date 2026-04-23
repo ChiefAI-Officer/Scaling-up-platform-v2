@@ -734,8 +734,12 @@ export async function sendWorkshopDateChangeEmail({
   // NOTE: calls sendEmailViaSMTP directly (not sendNotificationEmail) because
   // sendNotificationEmail swallows SMTP errors with .catch — which would
   // defeat Inngest retries that depend on this function throwing on failure.
+  console.log(
+    `[sendWorkshopDateChangeEmail] starting: workshopId=${workshopId} registrants=${registrants.length}`
+  );
   const failures: Array<{ email: string; error: unknown }> = [];
   for (const registrant of registrants) {
+    console.log(`[sendWorkshopDateChangeEmail] sending to ${registrant.email}`);
     try {
       await sendEmailViaSMTP({
         to: registrant.email,
@@ -761,6 +765,10 @@ export async function sendWorkshopDateChangeEmail({
       failures.push({ email: registrant.email, error: err });
     }
   }
+
+  console.log(
+    `[sendWorkshopDateChangeEmail] done: sent=${registrants.length - failures.length}/${registrants.length} failed=${failures.length}`
+  );
 
   if (failures.length > 0) {
     throw new Error(

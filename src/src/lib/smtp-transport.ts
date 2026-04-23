@@ -33,6 +33,12 @@ function getTransporter(): nodemailer.Transporter {
       secure: false,
       requireTLS: true,
       tls: { minVersion: "TLSv1.2" },
+      // Fail fast instead of hanging on an unresponsive SMTP server.
+      // Defaults (2min/30s) can exceed Vercel serverless function budget
+      // and kill the process silently mid-loop when sending to many recipients.
+      connectionTimeout: 10_000, // 10s to open TCP socket
+      greetingTimeout: 10_000,   // 10s to receive SMTP banner
+      socketTimeout: 20_000,     // 20s max per-connection inactivity
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD,
