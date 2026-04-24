@@ -519,6 +519,7 @@ export const triggerWorkflowStep = inngest.createFunction(
                             stepId: workflowStep.id,
                             workshopId: workshop.id,
                             status: "SENT",
+                            scheduledFor: new Date(),
                             executedAt: new Date(),
                         },
                     });
