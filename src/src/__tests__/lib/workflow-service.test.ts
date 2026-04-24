@@ -7,7 +7,8 @@
  * - hours offset with sendTimeOfDay set — sendTimeOfDay should be IGNORED (the fix)
  */
 
-import { calculateSendDate } from "@/lib/workflows/workflow-service";
+import { calculateSendDate, interpolateTemplate } from "@/lib/workflows/workflow-service";
+import type { WorkflowContext } from "@/lib/workflows/workflow-service";
 
 describe("calculateSendDate", () => {
   // Fixed event date: 2026-06-15 at 14:00:00 UTC
@@ -103,5 +104,81 @@ describe("calculateSendDate", () => {
     expected.setDate(expected.getDate() + 1);
     expected.setHours(10, 30, 0, 0);
     expect(result.getTime()).toBe(expected.getTime());
+  });
+});
+
+// ============================================================
+// interpolateTemplate — null/undefined coalescing tests (BUG-08)
+// ============================================================
+
+const baseContext: WorkflowContext = {
+  workshopTitle: "Leadership Essentials",
+  workshopCode: "WS-2026-AB12",
+  workshopDate: "June 15, 2026",
+  workshopTime: "10:00 AM",
+  workshopLocation: "New York, NY",
+  workshopUrl: "https://example.com/workshop/leadership",
+  workshopFormat: "IN_PERSON",
+  coachName: "Jane Coach",
+  coachEmail: "jane@example.com",
+};
+
+describe("interpolateTemplate — null/undefined guard (BUG-08)", () => {
+  it("workshopFormat null → output does NOT contain the string 'undefined'", () => {
+    const ctx: WorkflowContext = { ...baseContext, workshopFormat: null };
+    const result = interpolateTemplate("Format: {{workshopFormat}}", ctx);
+    expect(result).not.toContain("undefined");
+  });
+
+  it("workshopFormat null → placeholder replaced with empty string", () => {
+    const ctx: WorkflowContext = { ...baseContext, workshopFormat: null };
+    const result = interpolateTemplate("Format: {{workshopFormat}}", ctx);
+    expect(result).toBe("Format: ");
+  });
+
+  it("snake_case workshop_format null → output does NOT contain 'undefined'", () => {
+    const ctx: WorkflowContext = { ...baseContext, workshopFormat: null };
+    const result = interpolateTemplate("Format: {{workshop_format}}", ctx);
+    expect(result).not.toContain("undefined");
+  });
+
+  it("snake_case workshop_format null → placeholder replaced with empty string", () => {
+    const ctx: WorkflowContext = { ...baseContext, workshopFormat: null };
+    const result = interpolateTemplate("Format: {{workshop_format}}", ctx);
+    expect(result).toBe("Format: ");
+  });
+
+  it("registrantName undefined → output does NOT contain 'undefined'", () => {
+    const ctx: WorkflowContext = { ...baseContext, registrantName: undefined };
+    const result = interpolateTemplate("Hi {{registrantName}}!", ctx);
+    expect(result).not.toContain("undefined");
+  });
+
+  it("registrantName undefined → placeholder replaced with empty string", () => {
+    const ctx: WorkflowContext = { ...baseContext, registrantName: undefined };
+    const result = interpolateTemplate("Hi {{registrantName}}!", ctx);
+    expect(result).toBe("Hi !");
+  });
+
+  it("surveyUrl undefined → output does NOT contain 'undefined'", () => {
+    const ctx: WorkflowContext = { ...baseContext, surveyUrl: undefined };
+    const result = interpolateTemplate("Survey: {{surveyUrl}}", ctx);
+    expect(result).not.toContain("undefined");
+  });
+
+  it("normal context with all fields populated → all placeholders replaced correctly", () => {
+    const result = interpolateTemplate(
+      "{{workshopTitle}} ({{workshopFormat}}) — {{coachName}}",
+      baseContext
+    );
+    expect(result).toBe("Leadership Essentials (IN_PERSON) — Jane Coach");
+  });
+
+  it("snake_case aliases work for populated fields", () => {
+    const result = interpolateTemplate(
+      "{{workshop_title}} by {{coach_name}}",
+      baseContext
+    );
+    expect(result).toBe("Leadership Essentials by Jane Coach");
   });
 });

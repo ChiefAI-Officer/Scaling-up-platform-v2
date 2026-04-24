@@ -109,7 +109,7 @@ export const executeWorkflow = inngest.createFunction(
       workshopUrl: workshop.landingPageSlug
         ? `${appUrl}/workshop/${workshop.landingPageSlug}`
         : appUrl,
-      workshopFormat: workshop.format,
+      workshopFormat: workshop.format ?? "",
       coachName: `${workshop.coach.firstName} ${workshop.coach.lastName}`,
       coachEmail: workshop.coach.email,
     };
