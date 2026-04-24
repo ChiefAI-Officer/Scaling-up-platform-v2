@@ -10,6 +10,18 @@ const securityHeaders = [
     key: "Strict-Transport-Security",
     value: "max-age=31536000; includeSubDomains; preload",
   },
+  {
+    key: "Content-Security-Policy-Report-Only",
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https://*.vercel-storage.com",
+      "connect-src 'self' https://*.stripe.com https://api.hubspot.com",
+      "frame-src https://js.stripe.com",
+      "font-src 'self' data:",
+    ].join("; "),
+  },
 ];
 
 const nextConfig: NextConfig = {
