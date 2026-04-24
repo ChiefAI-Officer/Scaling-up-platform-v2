@@ -41,11 +41,12 @@ export async function PATCH(
     } catch {
         return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
-    const { name, content, categoryId, isActive } = body as {
+    const { name, content, categoryId, isActive, customCode } = body as {
         name?: string;
         content?: string;
         categoryId?: string | null;
         isActive?: boolean;
+        customCode?: string | null;
     };
 
     // Validate template content has {{placeholders}} — prevent corruption
@@ -89,6 +90,7 @@ export async function PATCH(
                     ...(name !== undefined ? { name } : {}),
                     ...(content !== undefined ? { content } : {}),
                     ...(categoryId !== undefined ? { categoryId } : {}),
+                    ...(customCode !== undefined ? { customCode } : {}),
                 },
             });
         });
@@ -101,6 +103,7 @@ export async function PATCH(
                 ...(content !== undefined ? { content } : {}),
                 ...(categoryId !== undefined ? { categoryId } : {}),
                 ...(isActive !== undefined ? { isActive } : {}),
+                ...(customCode !== undefined ? { customCode } : {}),
             },
         });
     }
@@ -120,6 +123,7 @@ export async function PATCH(
             ...(isActive !== undefined ? { isActive } : {}),
             ...(categoryId !== undefined ? { categoryId } : {}),
             ...(content !== undefined ? { contentUpdated: true } : {}),
+            ...(customCode !== undefined ? { customCode } : {}),
         },
     });
 

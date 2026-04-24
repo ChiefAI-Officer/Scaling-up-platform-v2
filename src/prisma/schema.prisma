@@ -582,6 +582,7 @@ model PageTemplate {
   templateType LandingPageTemplate // BIO_PAGE, SOLO_LANDING, DUO_LANDING, REGISTRATION, THANK_YOU
   categoryId   String?             // null = global template (applies to all categories)
   content      String              // JSON string with {{variable}} placeholders (TEXT column)
+  customCode   String?             // ENH-06: affiliate / tracking code (stored only, not rendered)
   isActive     Boolean             @default(false)
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt

@@ -38,6 +38,7 @@ export default async function TemplateEditorPage({ params }: PageProps) {
                 categoryName={template.category?.name || "All Categories"}
                 isActive={template.isActive}
                 initialContent={template.content}
+                initialCustomCode={template.customCode}
             />
         </div>
     );

@@ -41,6 +41,7 @@ interface Props {
     categoryName: string;
     isActive: boolean;
     initialContent: string;
+    initialCustomCode?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,7 @@ export function TemplateContentEditor({
     categoryName,
     isActive,
     initialContent,
+    initialCustomCode,
 }: Props) {
     // Parse initial content, merging over defaults for the active type only (I-1 fix)
     const parsed = safeJsonParse(initialContent);
@@ -76,6 +78,7 @@ export function TemplateContentEditor({
             ? { ...THANKYOU_DEFAULTS, ...parsed }
             : THANKYOU_DEFAULTS
     );
+    const [customCode, setCustomCode] = useState<string | null>(initialCustomCode ?? null);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
 
@@ -115,7 +118,7 @@ export function TemplateContentEditor({
             const res = await fetch(`/api/page-templates/${templateId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ content }),
+                body: JSON.stringify({ content, customCode }),
             });
             if (!res.ok) {
                 setMessage(`Error: Server returned ${res.status}`);
@@ -183,6 +186,32 @@ export function TemplateContentEditor({
                             <ThankYouForm data={tyData} onChange={setTyData} />
                         )}
 
+                        {/* Affiliate / Tracking Code */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Affiliate / Tracking Code</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <div>
+                                    <Label htmlFor="customCode" className="block text-sm font-medium text-foreground mb-1">
+                                        Affiliate / Tracking Code
+                                        <span className="ml-1 text-xs text-muted-foreground">(optional)</span>
+                                    </Label>
+                                    <input
+                                        id="customCode"
+                                        type="text"
+                                        value={customCode ?? ""}
+                                        onChange={(e) => setCustomCode(e.target.value || null)}
+                                        placeholder="e.g. partner123"
+                                        className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                                    />
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Stored but not rendered until use case is confirmed.
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+
                         {/* Save button */}
                         <div className="flex items-center gap-3">
                             <Button onClick={handleSave} disabled={saving}>
@@ -229,6 +258,8 @@ export function TemplateContentEditor({
                 <FallbackJsonEditor
                     templateId={templateId}
                     initialContent={initialContent}
+                    customCode={customCode}
+                    onCustomCodeChange={setCustomCode}
                 />
             )}
         </div>
@@ -753,9 +784,13 @@ function ThankYouPreview({ data }: { data: ThankYouFields }) {
 function FallbackJsonEditor({
     templateId,
     initialContent,
+    customCode,
+    onCustomCodeChange,
 }: {
     templateId: string;
     initialContent: string;
+    customCode: string | null;
+    onCustomCodeChange: (val: string | null) => void;
 }) {
     const [content, setContent] = useState(initialContent);
     const [saving, setSaving] = useState(false);
@@ -777,7 +812,7 @@ function FallbackJsonEditor({
             const res = await fetch(`/api/page-templates/${templateId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ content }),
+                body: JSON.stringify({ content, customCode }),
             });
             if (!res.ok) {
                 setMessage(`Error: Server returned ${res.status}`);
@@ -807,6 +842,22 @@ function FallbackJsonEditor({
                 className="w-full h-[500px] font-mono text-xs bg-background border border-border rounded-lg p-3 resize-y"
                 spellCheck={false}
             />
+            <div>
+                <label className="block text-sm font-medium text-foreground mb-1">
+                    Affiliate / Tracking Code
+                    <span className="ml-1 text-xs text-muted-foreground">(optional)</span>
+                </label>
+                <input
+                    type="text"
+                    value={customCode ?? ""}
+                    onChange={(e) => onCustomCodeChange(e.target.value || null)}
+                    placeholder="e.g. partner123"
+                    className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                    Stored but not rendered until use case is confirmed.
+                </p>
+            </div>
             <div className="flex items-center gap-3">
                 <Button onClick={handleSave} disabled={saving}>
                     {saving ? "Saving..." : "Save Template"}
