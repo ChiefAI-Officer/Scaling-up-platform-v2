@@ -205,10 +205,12 @@ export default async function WorkshopDetailsPage({
               <span className="font-medium">Price:</span>{" "}
               {workshop.isFree
                 ? "Free"
-                : workshop.pricingTier
-                  ? `${formatUsdFromCents(workshop.pricingTier.amountCents)} — ${workshop.pricingTier.name}`
-                  : workshop.priceCents
-                    ? formatUsdFromCents(workshop.priceCents)
+                : workshop.priceCents !== null && workshop.priceCents !== undefined
+                  ? workshop.pricingTier
+                    ? `${formatUsdFromCents(workshop.priceCents)} — ${workshop.pricingTier.name}`
+                    : formatUsdFromCents(workshop.priceCents)
+                  : workshop.pricingTier
+                    ? workshop.pricingTier.name
                     : "TBD"}
             </p>
             {workshop.format !== "VIRTUAL" && (
