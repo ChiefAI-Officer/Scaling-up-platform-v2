@@ -302,9 +302,11 @@ describe("POST /api/approvals/[id]/coach-response — counter-offer actions", ()
       expect(body.success).not.toBe(true);
     });
 
-    it("sets status to DENIED and clears counter fields when no newPriceCents", async () => {
+    it("sets status to DENIED and cancels workshop atomically in transaction when no newPriceCents", async () => {
       (db.approvalQueue.findUnique as jest.Mock).mockResolvedValue(counterOfferedApproval);
       (db.approvalQueue.update as jest.Mock).mockResolvedValue({ id: "apr-1", status: "DENIED" });
+      (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1", status: "CANCELED" });
+      (db.$transaction as jest.Mock).mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => fn(db));
 
       await POST(requestWithJson({ action: "DECLINE_COUNTER" }), routeParams());
 
@@ -315,6 +317,13 @@ describe("POST /api/approvals/[id]/coach-response — counter-offer actions", ()
             counterOfferCents: null,
             counterOfferNote: null,
           }),
+        })
+      );
+      // Transaction atomicity: workshop must also be canceled in the same call
+      expect(db.workshop.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "ws-1" },
+          data: { status: "CANCELED" },
         })
       );
     });

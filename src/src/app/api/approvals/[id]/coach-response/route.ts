@@ -322,15 +322,23 @@ export async function POST(
             } else {
                 // No new price — final decline, end negotiation
                 // DB-level race guard on final decline + record coach as respondent
-                await db.approvalQueue.update({
-                    where: { id, status: "COUNTER_OFFERED" },
-                    data: {
-                        status: "DENIED",
-                        counterOfferCents: null,
-                        counterOfferNote: null,
-                        respondedBy: actor.email,
-                        respondedAt: new Date(),
-                    },
+                await db.$transaction(async (tx) => {
+                    await tx.approvalQueue.update({
+                        where: { id, status: "COUNTER_OFFERED" },
+                        data: {
+                            status: "DENIED",
+                            counterOfferCents: null,
+                            counterOfferNote: null,
+                            respondedBy: actor.email,
+                            respondedAt: new Date(),
+                        },
+                    });
+                    if (approval.workshopId) {
+                        await tx.workshop.update({
+                            where: { id: approval.workshopId },
+                            data: { status: "CANCELED" },
+                        });
+                    }
                 });
 
                 // Notify admin (non-blocking)
