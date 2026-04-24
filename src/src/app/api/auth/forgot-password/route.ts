@@ -9,8 +9,8 @@ const GENERIC_SUCCESS_MESSAGE =
   "If an account exists for this email, password reset instructions have been sent.";
 
 async function sendPasswordResetEmail(email: string, resetUrl: string) {
-  if (process.env.NODE_ENV === "development") {
-    console.log(`[PASSWORD RESET] ${email} -> ${resetUrl}`);
+  const smtpHost = process.env.SMTP_HOST;
+  if (!smtpHost || process.env.NODE_ENV === "development") {
     return;
   }
 
