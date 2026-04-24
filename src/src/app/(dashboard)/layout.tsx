@@ -11,7 +11,6 @@ import { SignOutButton } from "@/components/layout/sign-out-button";
 const navLinks = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/workshops", label: "All Workshops" },
-  { href: "/bio", label: "Bio" },
   { href: "/templates", label: "Templates" },
   { href: "/admin/workflows", label: "Workflows" },
   { href: "/admin/surveys", label: "Surveys" },
