@@ -78,7 +78,10 @@ export default withAuth(
         pathname.startsWith("/api/inngest") ||
         pathname.startsWith("/api/health") ||
         pathname.startsWith("/api/docs") ||
-        pathname.match(/^\/api\/workshops\/[^/]+\/register$/)
+        pathname.match(/^\/api\/workshops\/[^/]+\/register$/) ||
+        // Survey fetch and submit are public (survey links in workflow emails must work unauthenticated)
+        // Negative lookahead excludes /api/surveys/assign and /api/surveys/workflows (stay protected)
+        pathname.match(/^\/api\/surveys\/(?!assign|workflows)[^/]+(\/submit)?$/)
       ) {
         return withRateLimitHeaders(NextResponse.next(), rateLimitHeaders);
       }
@@ -120,6 +123,8 @@ export default withAuth(
           pathname.startsWith("/api/registrations") ||
           pathname.startsWith("/api/checkout") ||
           pathname.match(/^\/api\/workshops\/[^/]+\/register$/) ||
+          pathname.startsWith("/survey/") ||
+          pathname.match(/^\/api\/surveys\/(?!assign|workflows)[^/]+(\/submit)?$/) ||
           pathname.startsWith("/_next") ||
           pathname.includes(".")
         ) {
