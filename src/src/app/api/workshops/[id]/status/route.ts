@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { inngest } from "@/inngest/client";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { createPostWorkshopSurveys, sendSurveyEmail } from "@/lib/surveys/survey-automation";
+import { cancelWorkflowExecutions } from "@/lib/workflows/workflow-service";
 import { z } from "zod";
 
 // JV-02: Jeff Verdun's 6 workshop stages
@@ -92,25 +93,33 @@ export async function PATCH(
       );
     }
 
-    // Update workshop status
-    const updated = await db.workshop.update({
-      where: { id },
-      data: { status: newStatus },
-      include: {
-        coach: true,
-        workshopType: true,
-      },
-    });
+    // Update workshop status (and cancel workflow executions if canceling)
+    const updated = await db.$transaction(async (tx) => {
+      const result = await tx.workshop.update({
+        where: { id },
+        data: { status: newStatus },
+        include: {
+          coach: true,
+          workshopType: true,
+        },
+      });
 
-    // Create automation task for tracking
-    await db.automationTask.create({
-      data: {
-        workshopId: id,
-        taskType: `status_change_to_${newStatus}`,
-        status: "COMPLETED",
-        inputData: JSON.stringify({ previousStatus: workshop.status, newStatus }),
-        completedAt: new Date(),
-      },
+      // Create automation task for tracking
+      await tx.automationTask.create({
+        data: {
+          workshopId: id,
+          taskType: `status_change_to_${newStatus}`,
+          status: "COMPLETED",
+          inputData: JSON.stringify({ previousStatus: workshop.status, newStatus }),
+          completedAt: new Date(),
+        },
+      });
+
+      if (newStatus === "CANCELED") {
+        await cancelWorkflowExecutions(id, tx);
+      }
+
+      return result;
     });
 
     // Emit workshop/completed event for summary email

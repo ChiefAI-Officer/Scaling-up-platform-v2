@@ -8,13 +8,29 @@ jest.mock("next/server", () => ({
   },
 }));
 
-jest.mock("@/lib/db", () => ({
-  db: {
-    workshop: { findUnique: jest.fn(), update: jest.fn() },
-    automationTask: { create: jest.fn() },
+jest.mock("@/lib/db", () => {
+  const workshopUpdate = jest.fn();
+  const automationTaskCreate = jest.fn();
+  const workflowStepExecutionUpdateMany = jest.fn();
+  const workflowAssignmentUpdateMany = jest.fn();
+  const dbMock = {
+    workshop: { findUnique: jest.fn(), update: workshopUpdate },
+    automationTask: { create: automationTaskCreate },
     registration: { findMany: jest.fn() },
-  },
-}));
+    workflowStepExecution: { updateMany: workflowStepExecutionUpdateMany },
+    workflowAssignment: { updateMany: workflowAssignmentUpdateMany },
+    $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        workshop: { update: workshopUpdate },
+        automationTask: { create: automationTaskCreate },
+        workflowStepExecution: { updateMany: workflowStepExecutionUpdateMany },
+        workflowAssignment: { updateMany: workflowAssignmentUpdateMany },
+      };
+      return fn(tx);
+    }),
+  };
+  return { db: dbMock };
+});
 
 jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
@@ -464,5 +480,47 @@ describe("Workshop status API – PATCH /api/workshops/[id]/status", () => {
     await flushPromises();
 
     expect(createPostWorkshopSurveys).not.toHaveBeenCalled();
+  });
+
+  it("cancels pending workflow executions and marks assignments inactive when transitioning to CANCELED", async () => {
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue(
+      mockWorkshop("PRE_EVENT")
+    );
+    mockUpdateReturns("CANCELED");
+    (db.workflowStepExecution.updateMany as jest.Mock).mockResolvedValue({ count: 2 });
+    (db.workflowAssignment.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+    const response = await PATCH(
+      buildPatchRequest({ status: "CANCELED" }),
+      routeParams()
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+
+    expect(db.workflowStepExecution.updateMany).toHaveBeenCalledWith({
+      where: { workshopId: "ws-1", status: "PENDING" },
+      data: { status: "CANCELED" },
+    });
+    expect(db.workflowAssignment.updateMany).toHaveBeenCalledWith({
+      where: { workshopId: "ws-1" },
+      data: { isActive: false },
+    });
+  });
+
+  it("does not cancel workflow executions for non-CANCELED transitions", async () => {
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue(
+      mockWorkshop("REQUESTED")
+    );
+    mockUpdateReturns("AWAITING_APPROVAL");
+
+    await PATCH(
+      buildPatchRequest({ status: "AWAITING_APPROVAL" }),
+      routeParams()
+    );
+
+    expect(db.workflowStepExecution.updateMany).not.toHaveBeenCalled();
+    expect(db.workflowAssignment.updateMany).not.toHaveBeenCalled();
   });
 });

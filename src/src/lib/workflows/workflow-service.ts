@@ -6,6 +6,7 @@
  */
 
 import { db } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import type { StepType, TriggerType } from "@/lib/workflows/workflow-types";
 
 // ============================================
@@ -313,4 +314,30 @@ export function calculateSendDate(
   }
 
   return sendDate;
+}
+
+// ============================================
+// Cancellation
+// ============================================
+
+/**
+ * Cancel pending workflow executions and mark assignments inactive when a workshop is canceled.
+ * Called from (1) status/route.ts CANCELED transition and (2) route.ts DELETE path — both call
+ * sites must stay in sync.
+ *
+ * Known limitation: jobs already sleeping via step.sleepUntil() will still fire because Inngest
+ * caches step.run() results and ignores isActive=false. Future fix: emit a workflow/cancel event.
+ */
+export async function cancelWorkflowExecutions(
+  workshopId: string,
+  tx: Prisma.TransactionClient
+): Promise<void> {
+  await tx.workflowStepExecution.updateMany({
+    where: { workshopId, status: "PENDING" },
+    data: { status: "CANCELED" },
+  });
+  await tx.workflowAssignment.updateMany({
+    where: { workshopId },
+    data: { isActive: false },
+  });
 }

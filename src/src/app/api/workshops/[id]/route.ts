@@ -8,6 +8,8 @@ import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } fro
 import { sendCustomPriceChangeEmail } from "@/services/notifications";
 import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 import { inngest } from "@/inngest/client";
+import { parseDurationHours } from "@/lib/ics-generator";
+import { cancelWorkflowExecutions } from "@/lib/workflows/workflow-service";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;
 
@@ -572,10 +574,13 @@ export async function DELETE(
       }
     }
 
-    // Soft delete by setting status to CANCELED
-    await db.workshop.update({
-      where: { id },
-      data: { status: "CANCELED" },
+    // Soft delete by setting status to CANCELED and canceling pending workflow executions
+    await db.$transaction(async (tx) => {
+      await tx.workshop.update({
+        where: { id },
+        data: { status: "CANCELED" },
+      });
+      await cancelWorkflowExecutions(id, tx);
     });
 
     return NextResponse.json({
