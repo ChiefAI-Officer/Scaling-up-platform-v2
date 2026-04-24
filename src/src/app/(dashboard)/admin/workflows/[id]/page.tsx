@@ -101,7 +101,7 @@ export default async function WorkflowEditorPage({ params, searchParams }: Workf
           assignedAt: a.assignedAt.toISOString(),
           workshop: {
             ...a.workshop,
-            eventDate: a.workshop.eventDate.toISOString(),
+            eventDate: a.workshop.eventDate?.toISOString() ?? "",
           },
         })),
       }
@@ -109,7 +109,7 @@ export default async function WorkflowEditorPage({ params, searchParams }: Workf
 
   const serializedWorkshops = workshops.map((w) => ({
     ...w,
-    eventDate: w.eventDate.toISOString(),
+    eventDate: w.eventDate?.toISOString() ?? "",
   }));
 
   return (

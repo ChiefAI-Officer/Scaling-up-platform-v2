@@ -667,7 +667,7 @@ export function WorkflowEditor({
                     .map((w) => (
                       <option key={w.id} value={w.id}>
                         [{w.workshopCode}] {w.title} —{" "}
-                        {new Date(w.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}
+                        {w.eventDate ? new Date(w.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" }) : "TBD"}
                       </option>
                     ))}
                 </select>
@@ -698,7 +698,7 @@ export function WorkflowEditor({
                       [{assignment.workshopCode}]
                     </span>
                     <span className="ml-2 text-sm text-muted-foreground">
-                      {new Date(assignment.workshop.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}
+                      {assignment.workshop.eventDate ? new Date(assignment.workshop.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" }) : "TBD"}
                     </span>
                     <Badge variant="secondary" className="ml-2">
                       {assignment.workshop.status}

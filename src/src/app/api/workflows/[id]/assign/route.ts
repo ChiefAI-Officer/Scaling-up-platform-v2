@@ -69,7 +69,16 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({ success: true, data: assignment }, { status: 201 });
+    // Serialize Date objects so the client component can use them directly
+    const serialized = {
+      ...assignment,
+      assignedAt: assignment.assignedAt.toISOString(),
+      workshop: {
+        ...assignment.workshop,
+        eventDate: assignment.workshop.eventDate?.toISOString() ?? "",
+      },
+    };
+    return NextResponse.json({ success: true, data: serialized }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "Workshop not found") {
       return NextResponse.json({ error: "Workshop not found" }, { status: 404 });

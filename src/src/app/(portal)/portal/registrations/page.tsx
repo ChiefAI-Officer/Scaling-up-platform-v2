@@ -55,7 +55,7 @@ export default async function RegistrationsPage({
     id: registration.id,
     workshopId: registration.workshop.id,
     workshopTitle: registration.workshop.title,
-    workshopDate: registration.workshop.eventDate.toISOString(),
+    workshopDate: registration.workshop.eventDate?.toISOString() ?? "",
     firstName: registration.firstName,
     lastName: registration.lastName,
     email: registration.email,

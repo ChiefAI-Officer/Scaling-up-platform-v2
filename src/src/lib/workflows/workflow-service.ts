@@ -209,7 +209,7 @@ export async function assignWorkflowToWorkshop(input: AssignWorkflowInput) {
     },
     include: {
       workflow: { include: { steps: { orderBy: { sortOrder: "asc" } } } },
-      workshop: { select: { id: true, title: true, workshopCode: true } },
+      workshop: { select: { id: true, title: true, workshopCode: true, eventDate: true, status: true } },
     },
   });
 }
