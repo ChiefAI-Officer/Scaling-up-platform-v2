@@ -295,12 +295,14 @@ export function calculateSendDate(
 ): Date {
   const sendDate = new Date(eventDate);
 
-  // Apply day offset
-  sendDate.setDate(sendDate.getDate() + offsetDays);
-
-  // Apply hour offset if specified
+  // Hours-mode wins when both are set: offsetDays is ignored if offsetHours is non-zero.
+  // This prevents a step with offsetDays=-1, offsetHours=-12 from compounding to -36 hours.
   if (offsetHours) {
+    // Apply hour offset only (ignore offsetDays)
     sendDate.setHours(sendDate.getHours() + offsetHours);
+  } else if (offsetDays !== 0) {
+    // Apply day offset only (offsetHours is 0, null, or undefined)
+    sendDate.setDate(sendDate.getDate() + offsetDays);
   }
 
   // Override time-of-day if specified (e.g., "09:00")

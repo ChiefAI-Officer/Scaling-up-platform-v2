@@ -105,6 +105,15 @@ describe("calculateSendDate", () => {
     expected.setHours(10, 30, 0, 0);
     expect(result.getTime()).toBe(expected.getTime());
   });
+
+  it("stale-DB case: offsetDays=-1,offsetHours=-12 same result as offsetDays=0,offsetHours=-12 (hours-mode wins)", () => {
+    // A step stored with both offsetDays=-1 and offsetHours=-12 (legacy/stale DB row) must
+    // produce the same send date as a clean hours-only step (offsetDays=0, offsetHours=-12).
+    // Without the fix this would compound to -36 hours instead of -12.
+    const withStaleDay = calculateSendDate(eventDate, -1, -12, null);
+    const hoursOnly = calculateSendDate(eventDate, 0, -12, null);
+    expect(withStaleDay.getTime()).toBe(hoursOnly.getTime());
+  });
 });
 
 // ============================================================
