@@ -293,7 +293,17 @@ export default async function WorkshopDetailPage({
                 return copySlug ? (
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Landing Page</p>
-                    <CopyUrlButton url={`${APP_URL}/workshop/${copySlug}`} />
+                    <div className="flex items-center gap-2">
+                      <CopyUrlButton url={`${APP_URL}/workshop/${copySlug}`} />
+                      <a
+                        href={`${APP_URL}/workshop/${copySlug}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                      >
+                        Open ↗
+                      </a>
+                    </div>
                   </div>
                 ) : null;
               })()}
@@ -514,12 +524,18 @@ export default async function WorkshopDetailPage({
                           {assignment.workflow.steps.map((step, index) => {
                             const execution = step.executions[0];
                             const status = execution?.status ?? "PENDING";
+                            const isCompleted = ["SENT", "SKIPPED", "FAILED"].includes(status);
                             return (
-                              <div key={step.id} className="flex items-center justify-between text-sm">
+                              <div key={step.id} className="flex items-center justify-between text-sm gap-2">
                                 <span className="text-muted-foreground mr-2">{index + 1}.</span>
                                 <span className="flex-1 text-foreground truncate">
                                   {step.subject || step.stepType}
                                 </span>
+                                {isCompleted && execution?.scheduledFor && (
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                    Last Executed: {formatDate(execution.scheduledFor)}
+                                  </span>
+                                )}
                                 <Badge variant={executionStatusVariant(status)}>
                                   {status}
                                 </Badge>
