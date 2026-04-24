@@ -27,6 +27,7 @@ import { WorkshopActions } from "./workshop-actions";
 import { QuickActions } from "./quick-actions";
 import { RegistrationRemoveButton } from "./registration-remove-button";
 import { WorkshopInlineEditForm } from "@/components/workshops/WorkshopInlineEditForm";
+import { TriggerNowButton } from "@/components/workflows/trigger-now-button";
 import { requireAuth } from "@/lib/auth/authorization";
 
 function executionStatusVariant(status: string): "success" | "warning" | "destructive" | "secondary" {
@@ -539,6 +540,10 @@ export default async function WorkshopDetailPage({
                                 <Badge variant={executionStatusVariant(status)}>
                                   {status}
                                 </Badge>
+                                <TriggerNowButton
+                                  stepId={step.id}
+                                  workshopId={workshop.id}
+                                />
                               </div>
                             );
                           })}

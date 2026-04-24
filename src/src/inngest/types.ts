@@ -64,6 +64,13 @@ type WorkshopDateChanged = {
     };
 };
 
+type WorkflowStepTrigger = {
+    data: {
+        stepId: string;
+        workshopId: string;
+    };
+};
+
 type Events = {
     "workshop/created": WorkshopCreated;
     "workshop/approved": WorkshopApproved;
@@ -73,6 +80,7 @@ type Events = {
     "approval/requested": ApprovalRequested;
     "workflow/schedule": WorkflowSchedule;
     "workflow/step.execute": WorkflowStepExecute;
+    "workflow/step.trigger": WorkflowStepTrigger;
 };
 
 export const schemas = new EventSchemas().fromRecord<Events>();
