@@ -55,6 +55,19 @@ export async function GET(request: NextRequest) {
         ? Math.min(100, parsedPageSize)
         : 50;
 
+    // Sort param — strict allowlist, 400 on invalid
+    const SORT_ALLOWLIST = ["createdAt", "firstName", "lastName", "amountPaidCents"] as const;
+    type SortField = (typeof SORT_ALLOWLIST)[number];
+    const rawSort = searchParams.get("sort");
+    if (rawSort !== null && !SORT_ALLOWLIST.includes(rawSort as SortField)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid sort field. Allowed: ${SORT_ALLOWLIST.join(", ")}` },
+        { status: 400 }
+      );
+    }
+    const sortField: SortField = (rawSort as SortField) ?? "createdAt";
+    const sortDir = sortField === "createdAt" ? "desc" : "asc";
+
     const isAdmin = isPrivilegedRole(actor.role);
 
     // Admin can omit workshopId (gets all); coach requires it
@@ -113,7 +126,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: { [sortField]: sortDir },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),

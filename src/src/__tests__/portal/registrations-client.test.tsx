@@ -11,6 +11,7 @@ const baseRegistration: CoachRegistrationView = {
   email: "alex@example.com",
   company: "Acme",
   paymentStatus: "COMPLETED",
+  amountPaidCents: 0,
   status: "REGISTERED",
   attended: false,
   registeredAt: "2026-03-08T00:00:00.000Z",

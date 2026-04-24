@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatCurrency } from "@/lib/utils";
+
+// Exported so the server page can use the same allowlist without duplication
+export const SORT_ALLOWLIST = ["createdAt", "firstName", "lastName", "amountPaidCents"] as const;
+export type SortField = (typeof SORT_ALLOWLIST)[number];
 
 export interface CoachRegistrationView {
   id: string;
@@ -22,6 +29,7 @@ export interface CoachRegistrationView {
   email: string;
   company: string | null;
   paymentStatus: string;
+  amountPaidCents: number;
   status: string;
   attended: boolean;
   registeredAt: string;
@@ -29,6 +37,7 @@ export interface CoachRegistrationView {
 
 interface RegistrationsClientProps {
   registrations: CoachRegistrationView[];
+  currentSort?: SortField;
 }
 
 function toCsvCell(value: string): string {
@@ -62,7 +71,8 @@ function paymentBadgeVariant(
 
 const PAGE_SIZE = 25;
 
-export function RegistrationsClient({ registrations: initialRegistrations }: RegistrationsClientProps) {
+export function RegistrationsClient({ registrations: initialRegistrations, currentSort = "createdAt" }: RegistrationsClientProps) {
+  const router = useRouter();
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [selectedWorkshopId, setSelectedWorkshopId] = useState("all");
   const [submittingForId, setSubmittingForId] = useState<string | null>(null);
@@ -73,10 +83,18 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
   } | null>(null);
   // MR-31: pagination + sort
   const [page, setPage] = useState(0);
-  const [sortField, setSortField] = useState<"attendee" | "registeredAt" | null>(null);
+  // Legacy client-side sort state (kept for backward compat with attendee sort)
+  const [sortField, setSortField] = useState<"attendee" | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  function toggleSort(field: "attendee" | "registeredAt") {
+  // Server-side sort: navigate to ?sort=field for DB-level sorting
+  function navigateSort(field: SortField) {
+    router.push(`?sort=${field}`);
+    setPage(0);
+  }
+
+  // Client-side attendee sort (first+last name combined — can't do in DB as single field)
+  function toggleSort(field: "attendee") {
     if (sortField === field) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
@@ -84,6 +102,16 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
       setSortDir("asc");
     }
     setPage(0);
+  }
+
+  // Sort indicator helpers
+  function sortIndicator(field: SortField) {
+    if (currentSort === field) return currentSort === "createdAt" ? " ↓" : " ↑";
+    return "";
+  }
+  function attendeeSortIndicator() {
+    if (sortField === "attendee") return sortDir === "asc" ? " ↑" : " ↓";
+    return "";
   }
 
   const workshops = useMemo(() => {
@@ -108,14 +136,11 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
       ? registrations
       : registrations.filter((r) => r.workshopId === selectedWorkshopId);
 
-    if (sortField) {
+    // Client-side sort only applies to "attendee" (combined first+last name)
+    // All other sorts are server-side via URL param
+    if (sortField === "attendee") {
       result = [...result].sort((a, b) => {
-        let cmp = 0;
-        if (sortField === "attendee") {
-          cmp = `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`);
-        } else {
-          cmp = new Date(a.registeredAt).getTime() - new Date(b.registeredAt).getTime();
-        }
+        const cmp = `${a.lastName}${a.firstName}`.localeCompare(`${b.lastName}${b.firstName}`);
         return sortDir === "asc" ? cmp : -cmp;
       });
     }
@@ -134,6 +159,7 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
       "Email",
       "Company",
       "Payment Status",
+      "Price Paid",
       "Registration Status",
       "Attended",
       "Registered At",
@@ -147,6 +173,7 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
       registration.email,
       registration.company || "",
       registration.paymentStatus,
+      registration.amountPaidCents === 0 ? "Free" : formatCurrency(registration.amountPaidCents),
       registration.status,
       registration.attended ? "Yes" : "No",
       formatDate(registration.registeredAt),
@@ -351,16 +378,27 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
                 className="cursor-pointer select-none hover:text-foreground"
                 onClick={() => toggleSort("attendee")}
               >
-                Attendee {sortField === "attendee" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+                Attendee{attendeeSortIndicator()}
               </TableHead>
-              <TableHead>Workshop</TableHead>
               <TableHead
                 className="cursor-pointer select-none hover:text-foreground"
-                onClick={() => toggleSort("registeredAt")}
+                onClick={() => navigateSort("createdAt")}
               >
-                Registered {sortField === "registeredAt" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+                Workshop{sortIndicator("createdAt")}
+              </TableHead>
+              <TableHead
+                className="cursor-pointer select-none hover:text-foreground"
+                onClick={() => navigateSort("createdAt")}
+              >
+                Registered{sortIndicator("createdAt")}
               </TableHead>
               <TableHead>Payment</TableHead>
+              <TableHead
+                className="cursor-pointer select-none hover:text-foreground"
+                onClick={() => navigateSort("amountPaidCents")}
+              >
+                Price Paid{sortIndicator("amountPaidCents")}
+              </TableHead>
               <TableHead>Attended</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -368,7 +406,7 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
           <TableBody>
             {filteredRegistrations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   No registrations found for this filter.
                 </TableCell>
               </TableRow>
@@ -385,9 +423,12 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="font-medium text-foreground">
+                    <Link
+                      href={`/portal/workshops/${registration.workshopId}`}
+                      className="font-medium text-foreground hover:text-primary hover:underline"
+                    >
                       {registration.workshopTitle}
-                    </div>
+                    </Link>
                     <div className="text-sm text-muted-foreground">
                       {formatDate(registration.workshopDate)}
                     </div>
@@ -397,6 +438,11 @@ export function RegistrationsClient({ registrations: initialRegistrations }: Reg
                     <Badge variant={paymentBadgeVariant(registration.paymentStatus)}>
                       {registration.paymentStatus}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {registration.amountPaidCents === 0
+                      ? <span className="text-muted-foreground">Free</span>
+                      : formatCurrency(registration.amountPaidCents)}
                   </TableCell>
                   <TableCell>
                     {registration.status !== "CANCELLED" &&

@@ -20,6 +20,7 @@ jest.mock(
   "@/app/(portal)/portal/registrations/registrations-client",
   () => ({
     RegistrationsClient: () => null,
+    SORT_ALLOWLIST: ["createdAt", "firstName", "lastName", "amountPaidCents"],
   })
 );
 
@@ -36,8 +37,10 @@ describe("Portal registrations page", () => {
     (db.registration.findMany as jest.Mock).mockResolvedValue([]);
   });
 
+  const defaultProps = { searchParams: Promise.resolve({}) };
+
   it("excludes PENDING registrations from the coach registrations list", async () => {
-    await RegistrationsPage();
+    await RegistrationsPage(defaultProps);
 
     const call = (db.registration.findMany as jest.Mock).mock.calls[0][0];
     expect(call.where).toEqual(
@@ -48,7 +51,7 @@ describe("Portal registrations page", () => {
   });
 
   it("still queries by the coach's workshops", async () => {
-    await RegistrationsPage();
+    await RegistrationsPage(defaultProps);
 
     const call = (db.registration.findMany as jest.Mock).mock.calls[0][0];
     expect(call.where).toEqual(
