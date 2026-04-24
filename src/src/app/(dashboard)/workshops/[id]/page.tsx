@@ -74,6 +74,10 @@ export default async function WorkshopDetailPage({
             template: true,
           },
         },
+        approvals: {
+          where: { type: { in: ["WORKSHOP_REQUEST", "CUSTOM_PRICING"] } },
+          orderBy: { requestedAt: "asc" },
+        },
       },
     }),
     db.category.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -402,6 +406,52 @@ export default async function WorkshopDetailPage({
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          {/* Conversation History */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Conversation History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {workshop.approvals.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  No prior admin/coach messages for this workshop.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {workshop.approvals.map((record) => (
+                    <div key={record.id} className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(record.requestedAt)}
+                        {record.type === "CUSTOM_PRICING" && (
+                          <span className="ml-2 font-medium">(Custom Pricing Request)</span>
+                        )}
+                      </p>
+                      {record.notes && (
+                        <div className="ml-2 pl-3 border-l-2 border-border">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                            Admin
+                          </p>
+                          <p className="text-sm text-foreground whitespace-pre-wrap">
+                            {record.notes}
+                          </p>
+                        </div>
+                      )}
+                      {record.coachResponse && (
+                        <div className="ml-2 pl-3 border-l-2 border-primary/40">
+                          <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">
+                            Coach
+                          </p>
+                          <p className="text-sm text-foreground whitespace-pre-wrap">
+                            {record.coachResponse}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>

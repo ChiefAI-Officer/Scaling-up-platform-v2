@@ -12,7 +12,7 @@ import { CounterOfferCard } from "@/components/workshops/counter-offer-card";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { InlineEditDescription } from "@/components/workshops/inline-edit-description";
 import { getSessionDownloadPath } from "@/lib/files/file-download-path";
-import { getWorkshopStatusExplanation } from "@/lib/utils";
+import { getWorkshopStatusExplanation, formatDate } from "@/lib/utils";
 import {
   calculateWorkshopRevenueSplit,
   formatUsdFromCents,
