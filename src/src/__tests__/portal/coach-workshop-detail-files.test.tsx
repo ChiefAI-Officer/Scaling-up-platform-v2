@@ -33,6 +33,7 @@ jest.mock("@/lib/db", () => ({
     },
     approvalQueue: {
       findFirst: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     fileAttachment: {
       findMany: jest.fn(),

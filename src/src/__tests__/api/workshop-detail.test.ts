@@ -8,14 +8,33 @@ jest.mock("next/server", () => ({
   },
 }));
 
-jest.mock("@/lib/db", () => ({
-  db: {
-    workshop: {
-      findUnique: jest.fn(),
-      update: jest.fn(),
+jest.mock("@/lib/db", () => {
+  const workshopUpdate = jest.fn();
+  const workflowStepExecutionUpdateMany = jest.fn().mockResolvedValue({ count: 0 });
+  const workflowAssignmentUpdateMany = jest.fn().mockResolvedValue({ count: 0 });
+  return {
+    db: {
+      workshop: {
+        findUnique: jest.fn(),
+        update: workshopUpdate,
+      },
+      workflowStepExecution: {
+        updateMany: workflowStepExecutionUpdateMany,
+      },
+      workflowAssignment: {
+        updateMany: workflowAssignmentUpdateMany,
+      },
+      $transaction: jest.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+        const tx = {
+          workshop: { update: workshopUpdate },
+          workflowStepExecution: { updateMany: workflowStepExecutionUpdateMany },
+          workflowAssignment: { updateMany: workflowAssignmentUpdateMany },
+        };
+        return fn(tx);
+      }),
     },
-  },
-}));
+  };
+});
 
 jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
