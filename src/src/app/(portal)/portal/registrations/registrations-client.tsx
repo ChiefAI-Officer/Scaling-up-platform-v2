@@ -380,12 +380,7 @@ export function RegistrationsClient({ registrations: initialRegistrations, curre
               >
                 Attendee{attendeeSortIndicator()}
               </TableHead>
-              <TableHead
-                className="cursor-pointer select-none hover:text-foreground"
-                onClick={() => navigateSort("createdAt")}
-              >
-                Workshop{sortIndicator("createdAt")}
-              </TableHead>
+              <TableHead>Workshop</TableHead>
               <TableHead
                 className="cursor-pointer select-none hover:text-foreground"
                 onClick={() => navigateSort("createdAt")}

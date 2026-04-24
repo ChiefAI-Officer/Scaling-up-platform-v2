@@ -9,6 +9,9 @@ import {
   RegistrationServiceError,
 } from "@/lib/registration-service";
 
+const SORT_ALLOWLIST = ["createdAt", "firstName", "lastName", "amountPaidCents"] as const;
+type SortField = (typeof SORT_ALLOWLIST)[number];
+
 async function publishRegistrationCreatedEvent(registration: {
   id: string;
   workshopId: string;
@@ -56,8 +59,6 @@ export async function GET(request: NextRequest) {
         : 50;
 
     // Sort param — strict allowlist, 400 on invalid
-    const SORT_ALLOWLIST = ["createdAt", "firstName", "lastName", "amountPaidCents"] as const;
-    type SortField = (typeof SORT_ALLOWLIST)[number];
     const rawSort = searchParams.get("sort");
     if (rawSort !== null && !SORT_ALLOWLIST.includes(rawSort as SortField)) {
       return NextResponse.json(
