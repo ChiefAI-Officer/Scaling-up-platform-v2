@@ -33,6 +33,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useToast } from "@/components/ui/use-toast";
 
 // ============================================
 // Types (serialized from server)
@@ -746,6 +747,7 @@ function StepCard({
   onSave: (data: Record<string, unknown>) => void;
   onDelete: () => void;
 }) {
+  const { toast } = useToast();
   const [stepType, setStepType] = useState(step.stepType);
   const [triggerType, setTriggerType] = useState(step.triggerType);
   const [offsetDays, setOffsetDays] = useState<number>(step.offsetDays ?? 0);
@@ -770,6 +772,7 @@ function StepCard({
       fetch("/api/survey-templates")
         .then((r) => r.json())
         .then((data) => setSurveyTemplates(data.data ?? []))
+        .catch(() => setSurveyTemplates([]))
         .finally(() => setSurveyTemplatesLoading(false));
     }
   }, [stepType, isEditing]);
@@ -901,7 +904,11 @@ function StepCard({
           <label className="block text-sm font-medium text-foreground">Step Type</label>
           <select
             value={stepType}
-            onChange={(e) => setStepType(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next !== STEP_TYPES.SEND_SURVEY_LINK) setSurveyTemplateId(null);
+              setStepType(next);
+            }}
             className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
           >
             {Object.entries(STEP_TYPE_LABELS).map(([value, label]) => (
@@ -1009,7 +1016,7 @@ function StepCard({
       {stepType === STEP_TYPES.SEND_SURVEY_LINK && (
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">
-            Survey Template <span className="text-destructive">*</span>
+            Survey Template <span className="text-muted-foreground font-normal">(optional)</span>
           </label>
           {surveyTemplatesLoading ? (
             <div className="h-9 bg-muted animate-pulse rounded-md" />
@@ -1140,8 +1147,7 @@ function StepCard({
         <button
           onClick={() => {
             if (stepType === STEP_TYPES.SEND_SURVEY_LINK && !surveyTemplateId) {
-              // Warn but don't block — executor falls back to category-based auto-matching
-              console.warn("[workflow-editor] SEND_SURVEY_LINK step saved without a pinned survey template — executor will fall back to category-based auto-matching.");
+              toast({ title: "No survey template selected", description: "This step will fall back to auto-matching by category. Select a template for reliable delivery.", variant: "default" });
             }
             onSave({
               stepType,
@@ -1195,6 +1201,7 @@ function NewStepForm({
   onCancel: () => void;
   saving: boolean;
 }) {
+  const { toast } = useToast();
   const [stepType, setStepType] = useState<StepType>(STEP_TYPES.EMAIL_ATTENDEES);
   const [triggerType, setTriggerType] = useState<TriggerType>(TRIGGER_TYPES.RELATIVE_TO_EVENT);
   const [offsetDays, setOffsetDays] = useState(-1);
@@ -1215,6 +1222,7 @@ function NewStepForm({
       fetch("/api/survey-templates")
         .then((r) => r.json())
         .then((data) => setSurveyTemplates(data.data ?? []))
+        .catch(() => setSurveyTemplates([]))
         .finally(() => setSurveyTemplatesLoading(false));
     }
   }, [stepType]);
@@ -1348,7 +1356,7 @@ function NewStepForm({
       {stepType === STEP_TYPES.SEND_SURVEY_LINK && (
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">
-            Survey Template <span className="text-destructive">*</span>
+            Survey Template <span className="text-muted-foreground font-normal">(optional)</span>
           </label>
           {surveyTemplatesLoading ? (
             <div className="h-9 bg-muted animate-pulse rounded-md" />
@@ -1426,8 +1434,7 @@ function NewStepForm({
         <button
           onClick={() => {
             if (stepType === STEP_TYPES.SEND_SURVEY_LINK && !surveyTemplateId) {
-              // Warn but don't block — admin may be setting up a draft step
-              console.warn("[workflow-editor] SEND_SURVEY_LINK step added without a pinned survey template — executor will fall back to category-based auto-matching.");
+              toast({ title: "No survey template selected", description: "This step will fall back to auto-matching by category. Select a template for reliable delivery.", variant: "default" });
             }
             onAdd({
               stepType,

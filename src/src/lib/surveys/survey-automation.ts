@@ -67,6 +67,9 @@ export async function getOrCreateSurveyLink(input: {
       where: { id: input.templateId, isActive: true },
       select: { id: true },
     });
+    if (!pinned) {
+      console.warn(`[survey-automation] Pinned surveyTemplateId ${input.templateId} not found or inactive for workshopId ${input.workshopId} — falling back to category lookup`);
+    }
     templateId = pinned?.id ?? null;
   } else {
     templateId = await findTemplateForWorkshop(input.workshopId, input.surveyType);
