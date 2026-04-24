@@ -104,23 +104,23 @@ export async function PATCH(
         },
       });
 
-      // Create automation task for tracking
-      await tx.automationTask.create({
-        data: {
-          workshopId: id,
-          taskType: `status_change_to_${newStatus}`,
-          status: "COMPLETED",
-          inputData: JSON.stringify({ previousStatus: workshop.status, newStatus }),
-          completedAt: new Date(),
-        },
-      });
-
       if (newStatus === "CANCELED") {
         await cancelWorkflowExecutions(id, tx);
       }
 
       return result;
     });
+
+    // Audit task — fire-and-forget, does not need to be in the status transaction
+    db.automationTask.create({
+      data: {
+        workshopId: id,
+        taskType: `status_change_to_${newStatus}`,
+        status: "COMPLETED",
+        inputData: JSON.stringify({ previousStatus: workshop.status, newStatus }),
+        completedAt: new Date(),
+      },
+    }).catch((err) => console.error("Failed to create automation task:", err));
 
     // Emit workshop/completed event for summary email
     if (newStatus === "COMPLETED") {
