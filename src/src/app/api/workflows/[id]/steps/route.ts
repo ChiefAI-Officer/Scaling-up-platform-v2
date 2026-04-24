@@ -26,6 +26,7 @@ const createWorkflowStepSchema = z.object({
   offsetDays: z.coerce.number().int().optional(),
   offsetHours: z.coerce.number().int().optional(),
   sendTimeOfDay: z.string().optional().nullable(),
+  surveyTemplateId: z.string().optional().nullable(), // BUG-06
 });
 
 const reorderWorkflowStepsSchema = z.object({
@@ -69,6 +70,7 @@ export async function POST(
     offsetDays,
     offsetHours,
     sendTimeOfDay,
+    surveyTemplateId,
   } = bodyValidation.data;
 
   if (!stepType || !Object.values(STEP_TYPES).includes(stepType as StepType)) {
@@ -91,6 +93,7 @@ export async function POST(
     offsetDays,
     offsetHours,
     sendTimeOfDay: sendTimeOfDay ?? undefined,
+    surveyTemplateId: surveyTemplateId ?? null, // BUG-06
   });
 
   return NextResponse.json({ success: true, data: step }, { status: 201 });

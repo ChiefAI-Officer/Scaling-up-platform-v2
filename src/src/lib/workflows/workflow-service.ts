@@ -35,6 +35,8 @@ export interface CreateWorkflowStepInput {
   offsetDays?: number;
   offsetHours?: number;
   sendTimeOfDay?: string;
+  /** BUG-06: Pinned survey template for SEND_SURVEY_LINK steps */
+  surveyTemplateId?: string | null;
 }
 
 export interface AssignWorkflowInput {
@@ -131,6 +133,7 @@ export async function duplicateWorkflow(id: string, createdBy: string, newName?:
           offsetHours: step.offsetHours,
           sendTimeOfDay: step.sendTimeOfDay,
           attachments: step.attachments,
+          surveyTemplateId: step.surveyTemplateId, // BUG-06: copy pinned survey template
         })),
       },
     },
@@ -156,6 +159,7 @@ export async function addWorkflowStep(input: CreateWorkflowStepInput) {
       offsetDays: input.offsetDays,
       offsetHours: input.offsetHours,
       sendTimeOfDay: input.sendTimeOfDay,
+      surveyTemplateId: input.surveyTemplateId ?? null, // BUG-06
     },
   });
 }

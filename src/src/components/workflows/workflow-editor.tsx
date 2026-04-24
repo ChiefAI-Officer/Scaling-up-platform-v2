@@ -56,6 +56,7 @@ interface SerializedStep {
   createdAt: string;
   updatedAt: string;
   emailTemplate: { id: string; name: string; subject: string } | null;
+  surveyTemplateId: string | null; // BUG-06
 }
 
 interface SerializedAssignment {
@@ -232,6 +233,7 @@ export function WorkflowEditor({
       offsetHours?: number;
       sendTimeOfDay?: string | null;
       customRecipients?: string[];
+      surveyTemplateId?: string | null; // BUG-06
     }) => {
       if (!workflowId) return;
 
@@ -757,6 +759,20 @@ function StepCard({
   const [subject, setSubject] = useState(step.subject ?? "");
   const [body, setBody] = useState(step.body ?? "");
   const [templateId, setTemplateId] = useState(step.emailTemplateId ?? "");
+  // BUG-06: survey template picker state
+  const [surveyTemplateId, setSurveyTemplateId] = useState<string | null>(step.surveyTemplateId ?? null);
+  const [surveyTemplates, setSurveyTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [surveyTemplatesLoading, setSurveyTemplatesLoading] = useState(false);
+
+  useEffect(() => {
+    if (stepType === STEP_TYPES.SEND_SURVEY_LINK && isEditing) {
+      setSurveyTemplatesLoading(true);
+      fetch("/api/survey-templates")
+        .then((r) => r.json())
+        .then((data) => setSurveyTemplates(data.data ?? []))
+        .finally(() => setSurveyTemplatesLoading(false));
+    }
+  }, [stepType, isEditing]);
 
   // JV-12: File attachments for this step
   const [stepFiles, setStepFiles] = useState<{ id: string; filename: string; blobUrl?: string; contentType: string }[]>([]);
@@ -989,24 +1005,59 @@ function StepCard({
         </div>
       )}
 
-      {/* Email content */}
-      <div>
-        <label className="block text-sm font-medium text-foreground">
-          Email Template (optional)
-        </label>
-        <select
-          value={templateId}
-          onChange={(e) => setTemplateId(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
-        >
-          <option value="">Custom content (no template)</option>
-          {emailTemplates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} — {t.subject}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* BUG-06: Survey template picker — only for SEND_SURVEY_LINK steps */}
+      {stepType === STEP_TYPES.SEND_SURVEY_LINK && (
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Survey Template <span className="text-destructive">*</span>
+          </label>
+          {surveyTemplatesLoading ? (
+            <div className="h-9 bg-muted animate-pulse rounded-md" />
+          ) : surveyTemplates.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No active survey templates.{" "}
+              <a href="/admin/surveys" className="underline text-primary">
+                Create one
+              </a>
+              .
+            </p>
+          ) : (
+            <select
+              className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+              value={surveyTemplateId ?? ""}
+              onChange={(e) => setSurveyTemplateId(e.target.value || null)}
+            >
+              <option value="">Select a survey template...</option>
+              {surveyTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      {/* Email content — hidden for SEND_SURVEY_LINK steps */}
+      {stepType !== STEP_TYPES.SEND_SURVEY_LINK && (
+        <div>
+          <label className="block text-sm font-medium text-foreground">
+            Email Template (optional)
+          </label>
+          <select
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+          >
+            <option value="">Custom content (no template)</option>
+            {emailTemplates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} — {t.subject}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {!templateId && (
         <>
@@ -1087,7 +1138,11 @@ function StepCard({
 
       <div className="flex gap-2 pt-2">
         <button
-          onClick={() =>
+          onClick={() => {
+            if (stepType === STEP_TYPES.SEND_SURVEY_LINK && !surveyTemplateId) {
+              // Warn but don't block — executor falls back to category-based auto-matching
+              console.warn("[workflow-editor] SEND_SURVEY_LINK step saved without a pinned survey template — executor will fall back to category-based auto-matching.");
+            }
             onSave({
               stepType,
               triggerType,
@@ -1097,8 +1152,9 @@ function StepCard({
               subject: subject || null,
               body: body || null,
               emailTemplateId: templateId || null,
-            })
-          }
+              surveyTemplateId: stepType === STEP_TYPES.SEND_SURVEY_LINK ? (surveyTemplateId ?? null) : null, // BUG-06
+            });
+          }}
           className="inline-flex rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           Save Changes
@@ -1134,6 +1190,7 @@ function NewStepForm({
     offsetDays?: number;
     offsetHours?: number;
     sendTimeOfDay?: string | null;
+    surveyTemplateId?: string | null; // BUG-06
   }) => void;
   onCancel: () => void;
   saving: boolean;
@@ -1147,6 +1204,20 @@ function NewStepForm({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [templateId, setTemplateId] = useState("");
+  // BUG-06: survey template picker state
+  const [surveyTemplateId, setSurveyTemplateId] = useState<string | null>(null);
+  const [surveyTemplates, setSurveyTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [surveyTemplatesLoading, setSurveyTemplatesLoading] = useState(false);
+
+  useEffect(() => {
+    if (stepType === STEP_TYPES.SEND_SURVEY_LINK) {
+      setSurveyTemplatesLoading(true);
+      fetch("/api/survey-templates")
+        .then((r) => r.json())
+        .then((data) => setSurveyTemplates(data.data ?? []))
+        .finally(() => setSurveyTemplatesLoading(false));
+    }
+  }, [stepType]);
 
   const handleModeSwitch = (mode: OffsetMode) => {
     setOffsetMode(mode);
@@ -1273,23 +1344,58 @@ function NewStepForm({
         </div>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-foreground">
-          Email Template (optional)
-        </label>
-        <select
-          value={templateId}
-          onChange={(e) => setTemplateId(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
-        >
-          <option value="">Write custom content</option>
-          {emailTemplates.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} — {t.subject}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* BUG-06: Survey template picker — only for SEND_SURVEY_LINK steps */}
+      {stepType === STEP_TYPES.SEND_SURVEY_LINK && (
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-1">
+            Survey Template <span className="text-destructive">*</span>
+          </label>
+          {surveyTemplatesLoading ? (
+            <div className="h-9 bg-muted animate-pulse rounded-md" />
+          ) : surveyTemplates.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No active survey templates.{" "}
+              <a href="/admin/surveys" className="underline text-primary">
+                Create one
+              </a>
+              .
+            </p>
+          ) : (
+            <select
+              className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+              value={surveyTemplateId ?? ""}
+              onChange={(e) => setSurveyTemplateId(e.target.value || null)}
+            >
+              <option value="">Select a survey template...</option>
+              {surveyTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      {stepType !== STEP_TYPES.SEND_SURVEY_LINK && (
+        <div>
+          <label className="block text-sm font-medium text-foreground">
+            Email Template (optional)
+          </label>
+          <select
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
+          >
+            <option value="">Write custom content</option>
+            {emailTemplates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} — {t.subject}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {!templateId && (
         <>
@@ -1318,7 +1424,11 @@ function NewStepForm({
 
       <div className="flex gap-2 pt-2">
         <button
-          onClick={() =>
+          onClick={() => {
+            if (stepType === STEP_TYPES.SEND_SURVEY_LINK && !surveyTemplateId) {
+              // Warn but don't block — admin may be setting up a draft step
+              console.warn("[workflow-editor] SEND_SURVEY_LINK step added without a pinned survey template — executor will fall back to category-based auto-matching.");
+            }
             onAdd({
               stepType,
               triggerType,
@@ -1328,8 +1438,9 @@ function NewStepForm({
               offsetDays: offsetMode === "hours" ? 0 : offsetDays,
               offsetHours: offsetMode === "days" ? 0 : offsetHours,
               sendTimeOfDay: offsetMode === "hours" ? null : (sendTime || "09:00"),
-            })
-          }
+              surveyTemplateId: stepType === STEP_TYPES.SEND_SURVEY_LINK ? (surveyTemplateId ?? null) : null,
+            });
+          }}
           disabled={saving}
           className="inline-flex rounded-md bg-success px-3 py-1.5 text-sm font-medium text-success-foreground hover:bg-success/90 disabled:opacity-50"
         >

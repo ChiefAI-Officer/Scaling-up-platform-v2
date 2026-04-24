@@ -352,9 +352,10 @@ model SurveyTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  category  Category?        @relation(fields: [categoryId], references: [id])
-  questions SurveyQuestion[]
-  surveys   Survey[]
+  category      Category?        @relation(fields: [categoryId], references: [id])
+  questions     SurveyQuestion[]
+  surveys       Survey[]
+  workflowSteps WorkflowStep[]   // BUG-06: Steps that pin this survey template
 
   @@index([categoryId])
   @@index([surveyType])
@@ -814,12 +815,16 @@ model WorkflowStep {
   // JV-12: File attachments placeholder (future Track B)
   attachments String? // JSON array of { filename, storageKey, contentType }
 
+  // BUG-06: Pinned survey template for SEND_SURVEY_LINK steps
+  surveyTemplateId String? // Optional FK to SurveyTemplate; overrides category-based auto-matching
+
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   workflow        Workflow         @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   emailTemplate   EmailTemplate?   @relation(fields: [emailTemplateId], references: [id])
+  surveyTemplate  SurveyTemplate?  @relation(fields: [surveyTemplateId], references: [id], onDelete: SetNull)
   executions      WorkflowStepExecution[]
   fileAttachments FileAttachment[] // JV-12: Files attached to this step
 

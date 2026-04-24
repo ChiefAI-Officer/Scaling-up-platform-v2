@@ -28,6 +28,7 @@ const updateWorkflowStepSchema = z.object({
   sendTimeOfDay: z.string().optional().nullable(),
   sortOrder: z.coerce.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
+  surveyTemplateId: z.string().optional().nullable(), // BUG-06
 });
 
 export async function PATCH(
@@ -83,6 +84,7 @@ export async function PATCH(
   if (body.sendTimeOfDay !== undefined) updateData.sendTimeOfDay = body.sendTimeOfDay;
   if (body.sortOrder !== undefined) updateData.sortOrder = body.sortOrder;
   if (body.isActive !== undefined) updateData.isActive = body.isActive;
+  if (body.surveyTemplateId !== undefined) updateData.surveyTemplateId = body.surveyTemplateId ?? null; // BUG-06
 
   const step = await updateWorkflowStep(stepId, updateData);
 

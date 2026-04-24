@@ -57,8 +57,20 @@ export async function getOrCreateSurveyLink(input: {
   workshopId: string;
   registrationId: string;
   surveyType: string;
+  /** BUG-06: Optional pinned template ID — bypasses category-based auto-matching when provided. */
+  templateId?: string;
 }): Promise<{ surveyId: string; surveyUrl: string; surveyType: string } | null> {
-  const templateId = await findTemplateForWorkshop(input.workshopId, input.surveyType);
+  // BUG-06: If a specific templateId is provided, verify it exists and is active; skip category lookup.
+  let templateId: string | null;
+  if (input.templateId) {
+    const pinned = await db.surveyTemplate.findFirst({
+      where: { id: input.templateId, isActive: true },
+      select: { id: true },
+    });
+    templateId = pinned?.id ?? null;
+  } else {
+    templateId = await findTemplateForWorkshop(input.workshopId, input.surveyType);
+  }
 
   if (!templateId) {
     return null;

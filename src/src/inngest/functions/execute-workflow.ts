@@ -371,6 +371,7 @@ export const executeWorkflow = inngest.createFunction(
                   workshopId: workshop.id,
                   registrationId: reg.id,
                   surveyType,
+                  templateId: workflowStep.surveyTemplateId ?? undefined, // BUG-06: use pinned template if set
                 });
 
                 if (!surveyLink) {
