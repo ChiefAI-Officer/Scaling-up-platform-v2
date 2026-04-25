@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { inngest } from "@/inngest/client";
+import { db } from "@/lib/db";
 
 /**
  * POST /api/workflow-steps/[stepId]/trigger-now
@@ -63,9 +64,32 @@ export async function POST(
         );
     }
 
+    const cleanWorkshopId = workshopId.trim();
+
+    const step = await db.workflowStep.findUnique({
+        where: { id: stepId },
+        select: { id: true },
+    });
+    if (!step) {
+        return NextResponse.json(
+            { error: "Workflow step not found" },
+            { status: 404, headers: rateLimit.headers }
+        );
+    }
+
+    const existing = await db.workflowStepExecution.findFirst({
+        where: { stepId, workshopId: cleanWorkshopId, status: "SENT" },
+    });
+    if (existing) {
+        return NextResponse.json(
+            { error: "This step has already been sent", alreadySent: true },
+            { status: 409, headers: rateLimit.headers }
+        );
+    }
+
     await inngest.send({
         name: "workflow/step.trigger",
-        data: { stepId, workshopId },
+        data: { stepId, workshopId: cleanWorkshopId },
     });
 
     return NextResponse.json({ success: true }, { headers: rateLimit.headers });

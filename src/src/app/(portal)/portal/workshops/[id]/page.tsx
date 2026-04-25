@@ -46,7 +46,7 @@ export default async function WorkshopDetailsPage({
   const { id } = await params;
   const { coach } = await requireCoach();
 
-  const [workshop, workflowAssignments, surveyCount, latestDenial, workshopFiles, registrationFinancials, infoRequestedApproval, fallbackLandingPage, pendingPriceChange] = await Promise.all([
+  const [workshop, workflowAssignments, surveyCount, latestDenial, workshopFiles, registrationFinancials, infoRequestedApproval, fallbackLandingPage, pendingPriceChange, approvalHistory] = await Promise.all([
     db.workshop.findFirst({
       where: { id, coachId: coach.id },
       select: {
@@ -142,6 +142,18 @@ export default async function WorkshopDetailsPage({
       where: { workshopId: id, type: "CUSTOM_PRICING", status: { in: ["PENDING", "COUNTER_OFFERED"] } },
       select: { id: true, requestData: true, requestedAt: true, status: true, counterOfferCents: true, counterOfferNote: true },
       orderBy: { requestedAt: "desc" },
+    }),
+    // BUG-05: Full approval conversation history for coach view
+    db.approvalQueue.findMany({
+      where: {
+        workshopId: id,
+        type: { in: ["WORKSHOP_REQUEST", "CUSTOM_PRICING"] },
+        status: { not: "INFO_REQUESTED" },
+      },
+      include: {
+        messages: { orderBy: { createdAt: "asc" } },
+      },
+      orderBy: { requestedAt: "asc" },
     }),
   ]);
 
@@ -330,6 +342,39 @@ export default async function WorkshopDetailsPage({
             </p>
           </div>
           <Badge variant="warning">Pending</Badge>
+        </div>
+      )}
+
+      {/* BUG-05: Full conversation history */}
+      {approvalHistory.some((r) => r.messages.length > 0) && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Conversation History
+          </h2>
+          <div className="space-y-6">
+            {approvalHistory.map((record) => {
+              const msgs = record.messages.map((m) => ({
+                ...m,
+                createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : m.createdAt,
+              }));
+              if (!msgs.length) return null;
+              return (
+                <div key={record.id}>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {record.requestedAt.toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                    {record.type === "CUSTOM_PRICING" && (
+                      <span className="ml-2 font-medium">(Custom Pricing Request)</span>
+                    )}
+                  </p>
+                  <ApprovalThread messages={msgs} perspective="coach" />
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
