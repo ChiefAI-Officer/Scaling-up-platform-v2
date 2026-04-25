@@ -46,6 +46,7 @@ function toCsvCell(value: string): string {
 }
 
 function formatDate(value: string): string {
+  if (!value) return "TBD";
   return new Date(value).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

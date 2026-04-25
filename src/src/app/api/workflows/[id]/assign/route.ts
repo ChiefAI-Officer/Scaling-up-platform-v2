@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/auth";
+import { isPrivilegedRole } from "@/lib/auth/authorization";
 import {
   assignWorkflowToWorkshop,
   unassignWorkflow,
@@ -32,6 +33,9 @@ export async function POST(
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isPrivilegedRole(session.user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const paramsValidation = workflowAssignParamsSchema.safeParse(await params);
@@ -106,6 +110,9 @@ export async function DELETE(
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isPrivilegedRole(session.user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const paramsValidation = workflowAssignParamsSchema.safeParse(await params);
