@@ -52,23 +52,29 @@ export default async function RegistrationsPage({
     console.error("[RegistrationsPage] db.registration.findMany failed:", err);
   }
 
-  const rows: CoachRegistrationView[] = registrations
-    .filter((reg) => reg.workshop != null)
-    .map((registration) => ({
-      id: registration.id,
-      workshopId: registration.workshop!.id,
-      workshopTitle: registration.workshop!.title,
-      workshopDate: registration.workshop!.eventDate?.toISOString() ?? "",
-      firstName: registration.firstName,
-      lastName: registration.lastName,
-      email: registration.email,
-      company: registration.company,
-      paymentStatus: registration.paymentStatus,
-      amountPaidCents: registration.amountPaidCents ?? 0,
-      status: registration.status,
-      attended: registration.attended ?? false,
-      registeredAt: registration.createdAt?.toISOString() ?? "",
-    }));
+  let rows: CoachRegistrationView[] = [];
+  try {
+    rows = registrations
+      .filter((reg) => reg.workshop != null)
+      .map((registration) => ({
+        id: registration.id,
+        workshopId: registration.workshop!.id,
+        workshopTitle: registration.workshop!.title,
+        workshopDate: registration.workshop!.eventDate?.toISOString() ?? "",
+        firstName: registration.firstName,
+        lastName: registration.lastName,
+        email: registration.email,
+        company: registration.company,
+        paymentStatus: registration.paymentStatus,
+        amountPaidCents: registration.amountPaidCents ?? 0,
+        status: registration.status,
+        attended: registration.attended ?? false,
+        registeredAt: registration.createdAt?.toISOString() ?? "",
+      }));
+  } catch (err) {
+    console.error("[RegistrationsPage] registration transform failed:", err);
+    // rows stays [] — page renders empty rather than crashing
+  }
 
   return <FadeUp><RegistrationsClient registrations={rows} currentSort={sortField} /></FadeUp>;
 }
