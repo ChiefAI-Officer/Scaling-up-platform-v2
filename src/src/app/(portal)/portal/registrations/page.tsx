@@ -76,5 +76,16 @@ export default async function RegistrationsPage({
     // rows stays [] — page renders empty rather than crashing
   }
 
-  return <FadeUp><RegistrationsClient registrations={rows} currentSort={sortField} /></FadeUp>;
+  try {
+    return <FadeUp><RegistrationsClient registrations={rows} currentSort={sortField} /></FadeUp>;
+  } catch (err) {
+    console.error("[RegistrationsPage] render failed:", err);
+    return (
+      <FadeUp>
+        <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
+          <p className="text-sm">Unable to display registrations. Please refresh the page.</p>
+        </div>
+      </FadeUp>
+    );
+  }
 }

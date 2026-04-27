@@ -36,7 +36,7 @@ export function TriggerNowButton({ stepId, workshopId }: TriggerNowButtonProps) 
                 } else {
                     toast({
                         title: "Step triggered",
-                        description: "The workflow step will execute shortly.",
+                        description: "Email queued. If nothing arrives in 5 minutes, check SMTP credentials in Vercel Environment Variables (SMTP_HOST, SMTP_USER, SMTP_PASSWORD).",
                     });
                 }
             } else if (res.status === 409) {
