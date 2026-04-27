@@ -86,7 +86,15 @@
       "Edit(~/.claude/skills/co-validate/**)",
       "Edit(~/.claude/skills/project-file-map/**)",
       "Skill(model-chat-skill)",
-      "Skill(model-chat-skill:*)"
+      "Skill(model-chat-skill:*)",
+      "Skill(review)",
+      "Skill(review:*)",
+      "mcp__plugin_claude-mem_mcp-search__smart_outline",
+      "mcp__plugin_claude-mem_mcp-search__get_observations",
+      "mcp__plugin_claude-mem_mcp-search__smart_unfold",
+      "mcp__plugin_claude-mem_mcp-search__smart_search",
+      "Skill(codex)",
+      "Skill(codex:*)"
     ],
     "additionalDirectories": [
       "/Users/diushianstand/.claude/worklogs",
