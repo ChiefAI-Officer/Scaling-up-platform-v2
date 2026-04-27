@@ -30,26 +30,27 @@ export default async function RegistrationsPage({
     "createdAt";
   const sortDir = sortField === "createdAt" ? "desc" : "asc";
 
-  const registrations = await db.registration.findMany({
+  const queryArgs = {
     where: {
-      workshop: {
-        coachId: coach.id,
-      },
-      paymentStatus: { not: "PENDING" },
+      workshop: { coachId: coach.id },
+      paymentStatus: { not: "PENDING" as const },
     },
-    orderBy: {
-      [orderByField]: sortDir,
-    },
+    orderBy: { [orderByField]: sortDir } as Record<string, string>,
     include: {
       workshop: {
-        select: {
-          id: true,
-          title: true,
-          eventDate: true,
-        },
+        select: { id: true, title: true, eventDate: true },
       },
     },
-  });
+  } as const;
+
+  type RegistrationRow = Awaited<ReturnType<typeof db.registration.findMany<typeof queryArgs>>>[number];
+
+  let registrations: RegistrationRow[] = [];
+  try {
+    registrations = await db.registration.findMany(queryArgs);
+  } catch (err) {
+    console.error("[RegistrationsPage] db.registration.findMany failed:", err);
+  }
 
   const rows: CoachRegistrationView[] = registrations.map((registration) => ({
     id: registration.id,
@@ -63,8 +64,8 @@ export default async function RegistrationsPage({
     paymentStatus: registration.paymentStatus,
     amountPaidCents: registration.amountPaidCents ?? 0,
     status: registration.status,
-    attended: registration.attended,
-    registeredAt: registration.createdAt.toISOString(),
+    attended: registration.attended ?? false,
+    registeredAt: registration.createdAt?.toISOString() ?? "",
   }));
 
   return <FadeUp><RegistrationsClient registrations={rows} currentSort={sortField} /></FadeUp>;
