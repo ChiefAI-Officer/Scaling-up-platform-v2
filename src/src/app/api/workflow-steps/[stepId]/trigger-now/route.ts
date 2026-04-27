@@ -96,23 +96,36 @@ export async function POST(
         );
     }
 
-    // Check for a recent failure so the UI can warn the operator before firing again.
-    const recentFailure = await db.workflowStepExecution.findFirst({
-        where: { stepId, workshopId: cleanWorkshopId, status: "FAILED" },
-        orderBy: { executedAt: "desc" },
-        select: { status: true, executedAt: true },
-    });
-
     await inngest.send({
         name: "workflow/step.trigger",
         data: { stepId, workshopId: cleanWorkshopId },
     });
 
+    // After firing — check for a recent SMTP failure so the UI can show actionable context.
+    // 24h window prevents stale errors from surfacing as false-positive warnings.
+    let recentFailure: { errorMessage: string | null } | null = null;
+    try {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        recentFailure = await db.workflowStepExecution.findFirst({
+            where: {
+                stepId,
+                workshopId: cleanWorkshopId,
+                status: "FAILED",
+                executedAt: { gte: cutoff },
+            },
+            orderBy: { executedAt: "desc" },
+            select: { errorMessage: true },
+        });
+    } catch {
+        // Non-fatal — Inngest event already sent
+        console.error("[trigger-now] Failed to query recent executions for failure context");
+    }
+
     return NextResponse.json(
         {
             success: true,
             previousFailure: recentFailure
-                ? { status: recentFailure.status, executedAt: recentFailure.executedAt }
+                ? { errorMessage: recentFailure.errorMessage }
                 : null,
         },
         { headers: rateLimit.headers }
