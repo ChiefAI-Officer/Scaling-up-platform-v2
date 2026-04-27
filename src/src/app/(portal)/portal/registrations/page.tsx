@@ -1,12 +1,27 @@
 import { db } from "@/lib/db";
 import { requireCoach } from "@/lib/auth/authorization";
-import {
-  CoachRegistrationView,
-  RegistrationsClient,
-  SORT_ALLOWLIST,
-} from "./registrations-client";
+import type { CoachRegistrationView, SortField } from "./registrations-client";
+import { SORT_ALLOWLIST } from "./registrations-client";
 import { RegistrationsErrorBoundary } from "./registrations-error-boundary";
-import { FadeUp } from "@/components/ui/animated";
+import dynamic from "next/dynamic";
+
+// ssr: false bypasses SSR for this client component — the Error Boundary catches
+// any client-side crashes. SSR of this component was causing deterministic crashes
+// (digest changed but error persisted after multiple server-side try-catch fixes).
+const RegistrationsClientDynamic = dynamic<{
+  registrations: CoachRegistrationView[];
+  currentSort?: SortField;
+}>(
+  () => import("./registrations-client").then((m) => ({ default: m.RegistrationsClient })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
+        Loading registrations…
+      </div>
+    ),
+  }
+);
 
 export default async function RegistrationsPage({
   searchParams,
@@ -80,10 +95,8 @@ export default async function RegistrationsPage({
   }
 
   return (
-    <FadeUp>
-      <RegistrationsErrorBoundary>
-        <RegistrationsClient registrations={rows} currentSort={sortField} />
-      </RegistrationsErrorBoundary>
-    </FadeUp>
+    <RegistrationsErrorBoundary>
+      <RegistrationsClientDynamic registrations={rows} currentSort={sortField} />
+    </RegistrationsErrorBoundary>
   );
 }
