@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { CoachRegistrationView, SortField } from "./registrations-client";
+import type { CoachRegistrationView, SortField } from "./registrations-types";
 
 // dynamic({ ssr: false }) must live inside a Client Component (Server Components disallow it).
 // This wrapper ensures RegistrationsClient is never server-rendered, so SSR crashes are

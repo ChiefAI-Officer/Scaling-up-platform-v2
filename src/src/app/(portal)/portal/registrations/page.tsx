@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { requireCoach } from "@/lib/auth/authorization";
-import type { CoachRegistrationView } from "./registrations-client";
-import { SORT_ALLOWLIST } from "./registrations-client";
+import type { CoachRegistrationView } from "./registrations-types";
+import { SORT_ALLOWLIST } from "./registrations-types";
 import { RegistrationsErrorBoundary } from "./registrations-error-boundary";
 import { RegistrationsLoader } from "./registrations-loader";
 
