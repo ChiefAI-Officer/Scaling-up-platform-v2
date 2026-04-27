@@ -96,10 +96,25 @@ export async function POST(
         );
     }
 
+    // Check for a recent failure so the UI can warn the operator before firing again.
+    const recentFailure = await db.workflowStepExecution.findFirst({
+        where: { stepId, workshopId: cleanWorkshopId, status: "FAILED" },
+        orderBy: { executedAt: "desc" },
+        select: { status: true, executedAt: true },
+    });
+
     await inngest.send({
         name: "workflow/step.trigger",
         data: { stepId, workshopId: cleanWorkshopId },
     });
 
-    return NextResponse.json({ success: true }, { headers: rateLimit.headers });
+    return NextResponse.json(
+        {
+            success: true,
+            previousFailure: recentFailure
+                ? { status: recentFailure.status, executedAt: recentFailure.executedAt }
+                : null,
+        },
+        { headers: rateLimit.headers }
+    );
 }
