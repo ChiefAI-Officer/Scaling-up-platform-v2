@@ -116,9 +116,9 @@ export async function POST(
             orderBy: { executedAt: "desc" },
             select: { errorMessage: true },
         });
-    } catch {
+    } catch (err) {
         // Non-fatal — Inngest event already sent
-        console.error("[trigger-now] Failed to query recent executions for failure context");
+        console.error("[trigger-now] Failed to query recent executions for failure context:", err);
     }
 
     return NextResponse.json(
