@@ -28,9 +28,10 @@ export function TriggerNowButton({ stepId, workshopId }: TriggerNowButtonProps) 
                     description: "The workflow step will execute shortly.",
                 });
             } else if (res.status === 409) {
+                const data = await res.json().catch(() => ({}));
                 toast({
-                    title: "Already sent",
-                    description: "This step was already executed. Check the workflow status card.",
+                    title: "Cannot trigger step",
+                    description: (data as { error?: string }).error ?? "This step has already been executed or is in progress.",
                 });
             } else {
                 const data = await res.json().catch(() => ({}));

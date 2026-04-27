@@ -77,12 +77,23 @@ export async function POST(
         );
     }
 
+    // Block if already sent, currently in-flight (PENDING), or already queued (SCHEDULED)
+    // — prevents double-send and duplicate Inngest events on sleeping steps
     const existing = await db.workflowStepExecution.findFirst({
-        where: { stepId, workshopId: cleanWorkshopId, status: "SENT" },
+        where: { stepId, workshopId: cleanWorkshopId, status: { in: ["SENT", "SCHEDULED", "PENDING"] } },
     });
     if (existing) {
+        const alreadySent = existing.status === "SENT";
+        const alreadyScheduled = existing.status === "SCHEDULED";
         return NextResponse.json(
-            { error: "This step has already been sent", alreadySent: true },
+            {
+                error: alreadySent
+                    ? "This step has already been sent"
+                    : alreadyScheduled
+                    ? "This step is already scheduled to send"
+                    : "This step is currently being processed",
+                alreadySent,
+            },
             { status: 409, headers: rateLimit.headers }
         );
     }

@@ -256,26 +256,48 @@ export const triggerWorkflowStep = inngest.createFunction(
                             personalContext
                         );
 
-                        await sendEmailViaSMTP({
-                            to: reg.email,
-                            subject: personalSubject,
-                            html: personalBody,
-                            attachments: attendeeAttachments,
-                            telemetry: {
-                                workshopId: workshop.id,
-                                workshopCode: workshop.workshopCode,
-                                workflowId: workflowStep.workflow.id,
-                                workflowStepId: workflowStep.id,
-                                recipientRole,
-                                registrationId: reg.id,
-                                metadata: {
-                                    attemptedAttachmentCount: stepFiles.length,
-                                    attachedCount: attendeeAttachments.length,
-                                    attachmentPolicyAllowed: canAttach,
-                                    triggeredManually: true,
+                        try {
+                            await sendEmailViaSMTP({
+                                to: reg.email,
+                                subject: personalSubject,
+                                html: personalBody,
+                                attachments: attendeeAttachments,
+                                telemetry: {
+                                    workshopId: workshop.id,
+                                    workshopCode: workshop.workshopCode,
+                                    workflowId: workflowStep.workflow.id,
+                                    workflowStepId: workflowStep.id,
+                                    recipientRole,
+                                    registrationId: reg.id,
+                                    metadata: {
+                                        attemptedAttachmentCount: stepFiles.length,
+                                        attachedCount: attendeeAttachments.length,
+                                        attachmentPolicyAllowed: canAttach,
+                                        triggeredManually: true,
+                                    },
                                 },
-                            },
-                        });
+                            });
+                        } catch (smtpErr) {
+                            const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
+                            const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
+                            console.error(`[trigger-workflow-step] EMAIL_ATTENDEES sendEmailViaSMTP failed for ${reg.email}:`, smtpErr);
+                            if (!isTerminalAuthError) {
+                                // Transient error — let Inngest retry
+                                throw smtpErr;
+                            }
+                            // Terminal auth error — record FAILED and stop retrying
+                            await db.workflowStepExecution.create({
+                                data: {
+                                    stepId: workflowStep.id,
+                                    workshopId: workshop.id,
+                                    status: "FAILED",
+                                    scheduledFor: new Date(),
+                                    executedAt: new Date(),
+                                    errorMessage: msg || "SMTP send failed",
+                                },
+                            });
+                            return; // Note: if partial-send occurred, prior attendees already received the email
+                        }
                     }
 
                     await db.workflowStepExecution.create({
@@ -344,25 +366,47 @@ export const triggerWorkflowStep = inngest.createFunction(
                             personalContext
                         );
 
-                        await sendEmailViaSMTP({
-                            to: reg.email,
-                            subject: personalSubject,
-                            html: personalBody,
-                            telemetry: {
-                                workshopId: workshop.id,
-                                workshopCode: workshop.workshopCode,
-                                workflowId: workflowStep.workflow.id,
-                                workflowStepId: workflowStep.id,
-                                recipientRole,
-                                registrationId: reg.id,
-                                metadata: {
-                                    surveyType,
-                                    surveyId: surveyLink.surveyId,
-                                    triggeredManually: true,
+                        try {
+                            await sendEmailViaSMTP({
+                                to: reg.email,
+                                subject: personalSubject,
+                                html: personalBody,
+                                telemetry: {
+                                    workshopId: workshop.id,
+                                    workshopCode: workshop.workshopCode,
+                                    workflowId: workflowStep.workflow.id,
+                                    workflowStepId: workflowStep.id,
+                                    recipientRole,
+                                    registrationId: reg.id,
+                                    metadata: {
+                                        surveyType,
+                                        surveyId: surveyLink.surveyId,
+                                        triggeredManually: true,
+                                    },
                                 },
-                            },
-                        });
-                        sentCount++;
+                            });
+                            sentCount++;
+                        } catch (smtpErr) {
+                            const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
+                            const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
+                            console.error(`[trigger-workflow-step] SEND_SURVEY_LINK sendEmailViaSMTP failed for ${reg.email}:`, smtpErr);
+                            if (!isTerminalAuthError) {
+                                // Transient error — let Inngest retry
+                                throw smtpErr;
+                            }
+                            // Terminal auth error — record FAILED and stop retrying
+                            await db.workflowStepExecution.create({
+                                data: {
+                                    stepId: workflowStep.id,
+                                    workshopId: workshop.id,
+                                    status: "FAILED",
+                                    scheduledFor: new Date(),
+                                    executedAt: new Date(),
+                                    errorMessage: msg || "SMTP send failed",
+                                },
+                            });
+                            return; // Note: if partial-send occurred, prior attendees already received the email
+                        }
                     }
 
                     await db.workflowStepExecution.create({
@@ -479,23 +523,45 @@ export const triggerWorkflowStep = inngest.createFunction(
                             personalContext
                         );
 
-                        await sendEmailViaSMTP({
-                            to: reg.email,
-                            subject: personalSubject,
-                            html: personalBody,
-                            telemetry: {
-                                workshopId: workshop.id,
-                                workshopCode: workshop.workshopCode,
-                                workflowId: workflowStep.workflow.id,
-                                workflowStepId: workflowStep.id,
-                                recipientRole,
-                                registrationId: reg.id,
-                                metadata: {
-                                    fileLinkCount: protectedLinks.length,
-                                    triggeredManually: true,
+                        try {
+                            await sendEmailViaSMTP({
+                                to: reg.email,
+                                subject: personalSubject,
+                                html: personalBody,
+                                telemetry: {
+                                    workshopId: workshop.id,
+                                    workshopCode: workshop.workshopCode,
+                                    workflowId: workflowStep.workflow.id,
+                                    workflowStepId: workflowStep.id,
+                                    recipientRole,
+                                    registrationId: reg.id,
+                                    metadata: {
+                                        fileLinkCount: protectedLinks.length,
+                                        triggeredManually: true,
+                                    },
                                 },
-                            },
-                        });
+                            });
+                        } catch (smtpErr) {
+                            const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
+                            const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
+                            console.error(`[trigger-workflow-step] SEND_FILE_LINK sendEmailViaSMTP failed for ${reg.email}:`, smtpErr);
+                            if (!isTerminalAuthError) {
+                                // Transient error — let Inngest retry
+                                throw smtpErr;
+                            }
+                            // Terminal auth error — record FAILED and stop retrying
+                            await db.workflowStepExecution.create({
+                                data: {
+                                    stepId: workflowStep.id,
+                                    workshopId: workshop.id,
+                                    status: "FAILED",
+                                    scheduledFor: new Date(),
+                                    executedAt: new Date(),
+                                    errorMessage: msg || "SMTP send failed",
+                                },
+                            });
+                            return; // Note: if partial-send occurred, prior attendees already received the email
+                        }
                     }
 
                     await db.workflowStepExecution.create({
@@ -562,25 +628,47 @@ export const triggerWorkflowStep = inngest.createFunction(
                 : [];
 
             for (const recipient of recipients) {
-                await sendEmailViaSMTP({
-                    to: recipient,
-                    subject,
-                    html: body,
-                    attachments: protectedAttachments,
-                    telemetry: {
-                        workshopId: workshop.id,
-                        workshopCode: workshop.workshopCode,
-                        workflowId: workflowStep.workflow.id,
-                        workflowStepId: workflowStep.id,
-                        recipientRole,
-                        metadata: {
-                            attemptedAttachmentCount: stepFiles.length,
-                            attachedCount: protectedAttachments.length,
-                            attachmentPolicyAllowed: canAttach,
-                            triggeredManually: true,
+                try {
+                    await sendEmailViaSMTP({
+                        to: recipient,
+                        subject,
+                        html: body,
+                        attachments: protectedAttachments,
+                        telemetry: {
+                            workshopId: workshop.id,
+                            workshopCode: workshop.workshopCode,
+                            workflowId: workflowStep.workflow.id,
+                            workflowStepId: workflowStep.id,
+                            recipientRole,
+                            metadata: {
+                                attemptedAttachmentCount: stepFiles.length,
+                                attachedCount: protectedAttachments.length,
+                                attachmentPolicyAllowed: canAttach,
+                                triggeredManually: true,
+                            },
                         },
-                    },
-                });
+                    });
+                } catch (smtpErr) {
+                    const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
+                    const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
+                    console.error(`[trigger-workflow-step] sendEmailViaSMTP failed for ${recipient}:`, smtpErr);
+                    if (!isTerminalAuthError) {
+                        // Transient error — let Inngest retry
+                        throw smtpErr;
+                    }
+                    // Terminal auth error — record FAILED and stop retrying
+                    await db.workflowStepExecution.create({
+                        data: {
+                            stepId: workflowStep.id,
+                            workshopId: workshop.id,
+                            status: "FAILED",
+                            scheduledFor: new Date(),
+                            executedAt: new Date(),
+                            errorMessage: msg || "SMTP send failed",
+                        },
+                    });
+                    return; // Do not re-throw — stops Inngest retry loop for auth errors
+                }
             }
 
             await db.workflowStepExecution.create({
