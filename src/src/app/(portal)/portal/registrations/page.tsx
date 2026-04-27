@@ -5,6 +5,7 @@ import {
   RegistrationsClient,
   SORT_ALLOWLIST,
 } from "./registrations-client";
+import { RegistrationsErrorBoundary } from "./registrations-error-boundary";
 import { FadeUp } from "@/components/ui/animated";
 
 export default async function RegistrationsPage({
@@ -12,7 +13,9 @@ export default async function RegistrationsPage({
 }: {
   searchParams: Promise<{ sort?: string }>;
 }) {
+  console.log("[RegistrationsPage] page function entered");
   const { coach } = await requireCoach();
+  console.log("[RegistrationsPage] requireCoach passed, coachId:", coach?.id);
   const params = await searchParams;
 
   // Strict allowlist — fall back to default on invalid values
@@ -76,16 +79,11 @@ export default async function RegistrationsPage({
     // rows stays [] — page renders empty rather than crashing
   }
 
-  try {
-    return <FadeUp><RegistrationsClient registrations={rows} currentSort={sortField} /></FadeUp>;
-  } catch (err) {
-    console.error("[RegistrationsPage] render failed:", err);
-    return (
-      <FadeUp>
-        <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
-          <p className="text-sm">Unable to display registrations. Please refresh the page.</p>
-        </div>
-      </FadeUp>
-    );
-  }
+  return (
+    <FadeUp>
+      <RegistrationsErrorBoundary>
+        <RegistrationsClient registrations={rows} currentSort={sortField} />
+      </RegistrationsErrorBoundary>
+    </FadeUp>
+  );
 }
