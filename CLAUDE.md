@@ -652,6 +652,16 @@ Secrets are in local `.env` (gitignored) and Vercel dashboard. Key variables:
 
 **Why this matters:** Local `npx next build` does NOT match the Vercel build pipeline. The Vercel build also runs `prisma generate` + `prisma db push` (database migration), and runs in a Linux/Node 20 environment. A passing local build does NOT guarantee a passing Vercel build.
 
+## Standing Security Practice
+
+Security improvements ship with every sprint — no separate security sprint needed. Jeff is already aware of the security posture. On every sprint:
+- Validate input at all new API boundaries (Zod)
+- Rate-limit any new POST/mutation endpoints (`withRateLimit`)
+- Auth check first (`getApiActor()` → 401 if null)
+- No raw HTML injection in JSX (escape user-controlled fields)
+- Audit log on sensitive mutations (`logAudit()`)
+- No secrets or tokens in console.log
+
 ## Continuous Update Protocol
 
 **After every sprint or significant change, update this file:**
