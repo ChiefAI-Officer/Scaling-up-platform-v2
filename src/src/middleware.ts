@@ -72,7 +72,7 @@ export default withAuth(
     if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth") && !pathname.startsWith("/api/public")) {
       // Allow public API endpoints without auth
       if (
-        pathname.startsWith("/api/registrations") ||
+        (pathname.startsWith("/api/registrations") && !pathname.startsWith("/api/registrations/export")) ||
         pathname.startsWith("/api/checkout") ||
         pathname.startsWith("/api/webhooks") ||
         pathname.startsWith("/api/inngest") ||
@@ -120,7 +120,7 @@ export default withAuth(
           pathname.startsWith("/api/inngest") ||
           pathname.startsWith("/api/health") ||
           pathname.startsWith("/api/docs") ||
-          pathname.startsWith("/api/registrations") ||
+          (pathname.startsWith("/api/registrations") && !pathname.startsWith("/api/registrations/export")) ||
           pathname.startsWith("/api/checkout") ||
           pathname.match(/^\/api\/workshops\/[^/]+\/register$/) ||
           pathname.startsWith("/survey/") ||

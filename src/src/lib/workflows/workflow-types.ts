@@ -31,6 +31,14 @@ export const STEP_TYPE_LABELS: Record<StepType, string> = {
   SEND_FILE_LINK: "Send File Access Link",
 };
 
+export function formatStepLabel(step: { subject?: string | null; stepType: string }): string {
+  if (step.subject) {
+    const stripped = step.subject.replace(/\{\{[^}]+\}\}/g, "").replace(/\s{2,}/g, " ").trim();
+    if (stripped) return stripped;
+  }
+  return STEP_TYPE_LABELS[step.stepType as StepType] || step.stepType;
+}
+
 // ============================================
 // Trigger Types — when the step fires
 // ============================================

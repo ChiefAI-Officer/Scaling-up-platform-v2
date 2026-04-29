@@ -1,18 +1,18 @@
 import { db } from "@/lib/db";
 import { requireCoach } from "@/lib/auth/authorization";
-import {
-  CoachRegistrationView,
-  RegistrationsClient,
-  SORT_ALLOWLIST,
-} from "./registrations-client";
-import { FadeUp } from "@/components/ui/animated";
+import type { CoachRegistrationView } from "./registrations-types";
+import { SORT_ALLOWLIST } from "./registrations-types";
+import { RegistrationsErrorBoundary } from "./registrations-error-boundary";
+import { RegistrationsLoader } from "./registrations-loader";
 
 export default async function RegistrationsPage({
   searchParams,
 }: {
   searchParams: Promise<{ sort?: string }>;
 }) {
+  console.log("[RegistrationsPage] page function entered");
   const { coach } = await requireCoach();
+  console.log("[RegistrationsPage] requireCoach passed, coachId:", coach?.id);
   const params = await searchParams;
 
   // Strict allowlist — fall back to default on invalid values
@@ -52,21 +52,33 @@ export default async function RegistrationsPage({
     console.error("[RegistrationsPage] db.registration.findMany failed:", err);
   }
 
-  const rows: CoachRegistrationView[] = registrations.map((registration) => ({
-    id: registration.id,
-    workshopId: registration.workshop.id,
-    workshopTitle: registration.workshop.title,
-    workshopDate: registration.workshop.eventDate?.toISOString() ?? "",
-    firstName: registration.firstName,
-    lastName: registration.lastName,
-    email: registration.email,
-    company: registration.company,
-    paymentStatus: registration.paymentStatus,
-    amountPaidCents: registration.amountPaidCents ?? 0,
-    status: registration.status,
-    attended: registration.attended ?? false,
-    registeredAt: registration.createdAt?.toISOString() ?? "",
-  }));
+  let rows: CoachRegistrationView[] = [];
+  try {
+    rows = registrations
+      .filter((reg) => reg.workshop != null)
+      .map((registration) => ({
+        id: registration.id,
+        workshopId: registration.workshop!.id,
+        workshopTitle: registration.workshop!.title,
+        workshopDate: registration.workshop!.eventDate?.toISOString() ?? "",
+        firstName: registration.firstName,
+        lastName: registration.lastName,
+        email: registration.email,
+        company: registration.company,
+        paymentStatus: registration.paymentStatus,
+        amountPaidCents: registration.amountPaidCents ?? 0,
+        status: registration.status,
+        attended: registration.attended ?? false,
+        registeredAt: registration.createdAt?.toISOString() ?? "",
+      }));
+  } catch (err) {
+    console.error("[RegistrationsPage] registration transform failed:", err);
+    // rows stays [] — page renders empty rather than crashing
+  }
 
-  return <FadeUp><RegistrationsClient registrations={rows} currentSort={sortField} /></FadeUp>;
+  return (
+    <RegistrationsErrorBoundary>
+      <RegistrationsLoader registrations={rows} currentSort={sortField} />
+    </RegistrationsErrorBoundary>
+  );
 }

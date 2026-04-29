@@ -77,20 +77,18 @@ export async function POST(
         );
     }
 
-    // Block if already sent, currently in-flight (PENDING), or already queued (SCHEDULED)
-    // — prevents double-send and duplicate Inngest events on sleeping steps
+    // Block only if already sent or currently in-flight (PENDING).
+    // SCHEDULED is intentionally not blocked — Trigger Now is meant to override a scheduled step.
+    // The executeWorkflow idempotency guard (checks for SENT before sending) prevents double-send.
     const existing = await db.workflowStepExecution.findFirst({
-        where: { stepId, workshopId: cleanWorkshopId, status: { in: ["SENT", "SCHEDULED", "PENDING"] } },
+        where: { stepId, workshopId: cleanWorkshopId, status: { in: ["SENT", "PENDING"] } },
     });
     if (existing) {
         const alreadySent = existing.status === "SENT";
-        const alreadyScheduled = existing.status === "SCHEDULED";
         return NextResponse.json(
             {
                 error: alreadySent
                     ? "This step has already been sent"
-                    : alreadyScheduled
-                    ? "This step is already scheduled to send"
                     : "This step is currently being processed",
                 alreadySent,
             },
@@ -103,5 +101,33 @@ export async function POST(
         data: { stepId, workshopId: cleanWorkshopId },
     });
 
-    return NextResponse.json({ success: true }, { headers: rateLimit.headers });
+    // After firing — check for a recent SMTP failure so the UI can show actionable context.
+    // 24h window prevents stale errors from surfacing as false-positive warnings.
+    let recentFailure: { errorMessage: string | null } | null = null;
+    try {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        recentFailure = await db.workflowStepExecution.findFirst({
+            where: {
+                stepId,
+                workshopId: cleanWorkshopId,
+                status: "FAILED",
+                executedAt: { gte: cutoff },
+            },
+            orderBy: { executedAt: "desc" },
+            select: { errorMessage: true },
+        });
+    } catch (err) {
+        // Non-fatal — Inngest event already sent
+        console.error("[trigger-now] Failed to query recent executions for failure context:", err);
+    }
+
+    return NextResponse.json(
+        {
+            success: true,
+            previousFailure: recentFailure
+                ? { errorMessage: recentFailure.errorMessage }
+                : null,
+        },
+        { headers: rateLimit.headers }
+    );
 }

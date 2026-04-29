@@ -28,6 +28,7 @@ import { QuickActions } from "./quick-actions";
 import { RegistrationRemoveButton } from "./registration-remove-button";
 import { WorkshopInlineEditForm } from "@/components/workshops/WorkshopInlineEditForm";
 import { TriggerNowButton } from "@/components/workflows/trigger-now-button";
+import { formatStepLabel } from "@/lib/workflows/workflow-types";
 import { requireAuth } from "@/lib/auth/authorization";
 
 function executionStatusVariant(status: string): "success" | "warning" | "destructive" | "secondary" {
@@ -530,7 +531,7 @@ export default async function WorkshopDetailPage({
                               <div key={step.id} className="flex items-center justify-between text-sm gap-2">
                                 <span className="text-muted-foreground mr-2">{index + 1}.</span>
                                 <span className="flex-1 text-foreground truncate">
-                                  {step.subject || step.stepType}
+                                  {formatStepLabel(step)}
                                 </span>
                                 {isCompleted && execution?.scheduledFor && (
                                   <span className="text-xs text-muted-foreground whitespace-nowrap">

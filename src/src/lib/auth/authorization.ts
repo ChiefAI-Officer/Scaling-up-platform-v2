@@ -66,21 +66,29 @@ export async function getCoachForSession() {
     }
 
     // First try to find coach linked via userId
-    const user = await db.user.findUnique({
-        where: { email: session.user.email },
-        include: { coachProfile: true },
-    });
-
-    if (user?.coachProfile) {
-        return user.coachProfile;
+    try {
+        const user = await db.user.findUnique({
+            where: { email: session.user.email },
+            include: { coachProfile: true },
+        });
+        if (user?.coachProfile) {
+            return user.coachProfile;
+        }
+    } catch (err) {
+        console.error("[getCoachForSession] db.user.findUnique failed:", err);
+        return null;
     }
 
     // Fallback: Find coach by matching email (for backwards compatibility)
-    const coachByEmail = await db.coach.findUnique({
-        where: { email: session.user.email },
-    });
-
-    return coachByEmail;
+    try {
+        const coachByEmail = await db.coach.findUnique({
+            where: { email: session.user.email },
+        });
+        return coachByEmail;
+    } catch (err) {
+        console.error("[getCoachForSession] db.coach.findUnique failed:", err);
+        return null;
+    }
 }
 
 /**

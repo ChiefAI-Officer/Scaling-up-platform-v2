@@ -23,10 +23,22 @@ export function TriggerNowButton({ stepId, workshopId }: TriggerNowButtonProps) 
             });
 
             if (res.ok) {
-                toast({
-                    title: "Step triggered",
-                    description: "The workflow step will execute shortly.",
-                });
+                interface TriggerNowResponse {
+                    success: boolean;
+                    previousFailure: { errorMessage: string | null } | null;
+                }
+                const data = await res.json() as TriggerNowResponse;
+                if (data.previousFailure?.errorMessage) {
+                    toast({
+                        title: "Step triggered",
+                        description: `Note: last attempt failed — ${data.previousFailure.errorMessage ?? "unknown error"}. If this persists, check SMTP credentials in Vercel.`,
+                    });
+                } else {
+                    toast({
+                        title: "Step triggered",
+                        description: "Email queued. If nothing arrives in 5 minutes, check SMTP credentials in Vercel Environment Variables (SMTP_HOST, SMTP_USER, SMTP_PASSWORD).",
+                    });
+                }
             } else if (res.status === 409) {
                 const data = await res.json().catch(() => ({}));
                 toast({
