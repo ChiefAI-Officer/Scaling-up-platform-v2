@@ -17,10 +17,19 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | March 17, 2026 — Figma board ingested (11 revisions, 4 sprints planned) |
+| **Last Updated** | April 29, 2026 — Jeff Apr 28 sprint complete; Trigger Now + CSV export + workflow display fixes shipped |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
+
+**Jeff Apr 28 Sprint** — Complete (commit 229faee on main, Apr 29 2026):
+- `formatStepLabel()` helper strips `{{tokens}}`, falls back to STEP_TYPE_LABELS
+- Workflow Status card: step names now visible (flex min-w-0 layout fix)
+- Trigger Now: auto-refreshes page after fire; SENT steps re-triggerable via `forceResend=true` flag
+- `SEND_SURVEY_LINK` step now fires: passes `surveyTemplateId` to `getOrCreateSurveyLink`; PRE_WORKSHOP template seeded to prod
+- CSV export `GET /api/registrations/export` (RFC 4180, injection-safe, confirmed-only)
+- Contacts page: h1 → "Contacts", Export All button
+- 861 tests passing (up from 847)
 
 **Sprint 0** (Schema Foundation) — Complete
 **Sprint 1** (Security + Auth + Critical Bug Fixes) — Complete
@@ -651,3 +660,17 @@ Secrets are in local `.env` (gitignored) and Vercel dashboard. Key variables:
 3. Update "Last Updated" date
 4. Add any new API routes, models, or components to the relevant sections
 5. Document new gotchas or quirks discovered during development
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub Issues on `jcbdelo26/Scaling-up-platform-v2`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five state labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) plus category labels (`bug`, `enhancement`, `security`, `documentation`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo. `CLAUDE.md` is the primary reference; `CONTEXT.md` and `docs/adr/` are created lazily by `/grill-with-docs`. See `docs/agents/domain.md`.
