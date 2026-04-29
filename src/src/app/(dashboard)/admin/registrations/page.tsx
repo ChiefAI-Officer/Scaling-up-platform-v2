@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { RegistrationsTable } from "./registrations-table";
+import { Button } from "@/components/ui/button";
 
 export default async function AdminRegistrationsPage() {
   const session = await getServerSession(authOptions);
@@ -35,11 +36,16 @@ export default async function AdminRegistrationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">All Registrations</h1>
-        <p className="text-muted-foreground mt-1">
-          All confirmed registrations across all workshops.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Contacts</h1>
+          <p className="text-muted-foreground mt-1">
+            All confirmed registrations across all workshops.
+          </p>
+        </div>
+        <Button asChild variant="outline">
+          <a href="/api/registrations/export">Export All</a>
+        </Button>
       </div>
       <RegistrationsTable registrations={registrations} />
     </div>
