@@ -13,6 +13,7 @@ import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { InlineEditDescription } from "@/components/workshops/inline-edit-description";
 import { getSessionDownloadPath } from "@/lib/files/file-download-path";
 import { getWorkshopStatusExplanation, formatDate } from "@/lib/utils";
+import { formatStepLabel } from "@/lib/workflows/workflow-types";
 import {
   calculateWorkshopRevenueSplit,
   formatUsdFromCents,
@@ -487,7 +488,7 @@ export default async function WorkshopDetailsPage({
                             {index + 1}.
                           </span>
                           <span className="flex-1 text-foreground">
-                            {step.subject || step.stepType}
+                            {formatStepLabel(step)}
                           </span>
                           <Badge variant={executionStatusColor(status)}>
                             {status}
