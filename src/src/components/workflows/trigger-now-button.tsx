@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -12,6 +13,7 @@ interface TriggerNowButtonProps {
 export function TriggerNowButton({ stepId, workshopId }: TriggerNowButtonProps) {
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
+    const router = useRouter();
 
     async function handleTrigger() {
         setLoading(true);
@@ -36,9 +38,10 @@ export function TriggerNowButton({ stepId, workshopId }: TriggerNowButtonProps) 
                 } else {
                     toast({
                         title: "Step triggered",
-                        description: "Email queued. If nothing arrives in 5 minutes, check SMTP credentials in Vercel Environment Variables (SMTP_HOST, SMTP_USER, SMTP_PASSWORD).",
+                        description: "Step queued. Refresh the page in a moment to see the updated status.",
                     });
                 }
+                router.refresh();
             } else if (res.status === 409) {
                 const data = await res.json().catch(() => ({}));
                 toast({

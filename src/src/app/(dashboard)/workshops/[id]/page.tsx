@@ -528,23 +528,27 @@ export default async function WorkshopDetailPage({
                             const status = execution?.status ?? "PENDING";
                             const isCompleted = ["SENT", "SKIPPED", "FAILED"].includes(status);
                             return (
-                              <div key={step.id} className="flex items-center justify-between text-sm gap-2">
-                                <span className="text-muted-foreground mr-2">{index + 1}.</span>
-                                <span className="flex-1 text-foreground truncate">
-                                  {formatStepLabel(step)}
-                                </span>
-                                {isCompleted && execution?.scheduledFor && (
-                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                    Last Executed: {formatDate(execution.scheduledFor)}
+                              <div key={step.id} className="flex items-center text-sm gap-2">
+                                <span className="text-muted-foreground shrink-0">{index + 1}.</span>
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-foreground truncate block">
+                                    {formatStepLabel(step)}
                                   </span>
-                                )}
-                                <Badge variant={executionStatusVariant(status)}>
-                                  {status}
-                                </Badge>
-                                <TriggerNowButton
-                                  stepId={step.id}
-                                  workshopId={workshop.id}
-                                />
+                                  {isCompleted && execution?.scheduledFor && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatDate(execution.scheduledFor)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Badge variant={executionStatusVariant(status)}>
+                                    {status}
+                                  </Badge>
+                                  <TriggerNowButton
+                                    stepId={step.id}
+                                    workshopId={workshop.id}
+                                  />
+                                </div>
                               </div>
                             );
                           })}
