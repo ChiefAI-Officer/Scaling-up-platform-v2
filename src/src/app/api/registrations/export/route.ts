@@ -15,14 +15,15 @@ export async function GET() {
 
   const escape = (v: string | null | undefined): string => {
     const s = v ?? "";
-    // CSV injection protection: prefix formula-starting chars with tab
-    const safe = /^[=+\-@]/.test(s) ? `\t${s}` : s;
-    return safe.includes(",") || safe.includes('"') || safe.includes("\n") || safe.includes("\r")
+    // CSV injection protection: prefix formula-starting chars with tab; always quote so the tab stays intact
+    const needsInjectionGuard = /^[=+\-@]/.test(s);
+    const safe = needsInjectionGuard ? `\t${s}` : s;
+    return needsInjectionGuard || safe.includes(",") || safe.includes('"') || safe.includes("\n") || safe.includes("\r")
       ? `"${safe.replace(/"/g, '""')}"` : safe;
   };
 
   const header =
-    "First Name,Last Name,Email,Company,Job Title,Phone,Workshop,Event Date,Registration Date,Payment Status,Amount Paid (cents),Marketing Opt-In";
+    "First Name,Last Name,Email,Company,Job Title,Phone,Workshop,Event Date,Registration Date,Payment Status,Amount Paid,Marketing Opt-In";
   const rows = registrations.map((r) =>
     [
       r.firstName,
@@ -35,14 +36,14 @@ export async function GET() {
       r.workshop.eventDate ? r.workshop.eventDate.toISOString().split("T")[0] : "",
       r.createdAt.toISOString().split("T")[0],
       r.paymentStatus,
-      String(r.amountPaidCents ?? 0),
+      ((r.amountPaidCents ?? 0) / 100).toFixed(2),
       r.marketingOptIn ? "Yes" : "No",
     ]
       .map(escape)
       .join(",")
   );
 
-  const csv = [header, ...rows].join("\n");
+  const csv = [header, ...rows].join("\r\n");
   const date = new Date().toISOString().split("T")[0];
 
   return new Response(csv, {
