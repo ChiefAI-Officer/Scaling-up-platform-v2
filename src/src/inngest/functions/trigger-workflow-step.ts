@@ -59,7 +59,7 @@ export const triggerWorkflowStep = inngest.createFunction(
     async ({ event, step }) => {
         const { stepId, workshopId } = event.data;
 
-        // Idempotency guard: if already SENT, return early
+        // Idempotency guard: skip if already SENT, unless forceResend is set (manual re-trigger)
         const existingSent = await step.run("check-idempotency", async () => {
             return db.workflowStepExecution.findFirst({
                 where: { stepId, workshopId, status: "SENT" },
@@ -67,7 +67,7 @@ export const triggerWorkflowStep = inngest.createFunction(
             });
         });
 
-        if (existingSent) {
+        if (existingSent && !event.data.forceResend) {
             console.warn(
                 `[trigger-workflow-step] Step ${stepId} already SENT for workshop ${workshopId}. Skipping.`
             );
@@ -82,6 +82,7 @@ export const triggerWorkflowStep = inngest.createFunction(
                     emailTemplate: true,
                     workflow: true,
                 },
+                // surveyTemplateId is a scalar — included automatically (not a relation)
             });
         });
 
@@ -336,6 +337,7 @@ export const triggerWorkflowStep = inngest.createFunction(
                             workshopId: workshop.id,
                             registrationId: reg.id,
                             surveyType,
+                            templateId: workflowStep.surveyTemplateId ?? undefined,
                         });
 
                         if (!surveyLink) continue;

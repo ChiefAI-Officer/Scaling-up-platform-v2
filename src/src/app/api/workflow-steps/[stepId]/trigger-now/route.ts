@@ -77,28 +77,22 @@ export async function POST(
         );
     }
 
-    // Block only if already sent or currently in-flight (PENDING).
-    // SCHEDULED is intentionally not blocked — Trigger Now is meant to override a scheduled step.
-    // The executeWorkflow idempotency guard (checks for SENT before sending) prevents double-send.
-    const existing = await db.workflowStepExecution.findFirst({
-        where: { stepId, workshopId: cleanWorkshopId, status: { in: ["SENT", "PENDING"] } },
+    // Block only if currently in-flight (PENDING). SENT steps are allowed to re-trigger
+    // so admins can test workflows repeatedly. The Inngest function's idempotency guard
+    // skips re-sends for scheduled runs but respects forceResend=true for manual triggers.
+    const inFlight = await db.workflowStepExecution.findFirst({
+        where: { stepId, workshopId: cleanWorkshopId, status: "PENDING" },
     });
-    if (existing) {
-        const alreadySent = existing.status === "SENT";
+    if (inFlight) {
         return NextResponse.json(
-            {
-                error: alreadySent
-                    ? "This step has already been sent"
-                    : "This step is currently being processed",
-                alreadySent,
-            },
+            { error: "This step is currently being processed" },
             { status: 409, headers: rateLimit.headers }
         );
     }
 
     await inngest.send({
         name: "workflow/step.trigger",
-        data: { stepId, workshopId: cleanWorkshopId },
+        data: { stepId, workshopId: cleanWorkshopId, forceResend: true },
     });
 
     // After firing — check for a recent SMTP failure so the UI can show actionable context.
