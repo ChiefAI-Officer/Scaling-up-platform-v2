@@ -68,6 +68,7 @@ type WorkflowStepTrigger = {
     data: {
         stepId: string;
         workshopId: string;
+        forceResend?: boolean;
     };
 };
 

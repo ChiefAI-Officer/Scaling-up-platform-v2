@@ -127,6 +127,7 @@ function makeWorkflowStep(overrides: Record<string, unknown> = {}): any {
         body: "<p>Hello</p>",
         emailTemplate: null,
         customRecipients: null,
+        surveyTemplateId: null,
         workflow: { id: "wf-1", name: "Test Workflow" },
         ...overrides,
     };
@@ -175,21 +176,34 @@ describe("triggerWorkflowStep Inngest function", () => {
     // ------------------------------------------
 
     describe("idempotency guard", () => {
-        it("skips execution if a SENT execution already exists for stepId+workshopId", async () => {
+        it("skips execution when SENT execution exists and forceResend is not set", async () => {
             (db.workflowStepExecution.findFirst as jest.Mock).mockResolvedValueOnce({
                 id: "existing-exec",
             });
 
             const result = await capturedHandler({
-                event: buildEvent(),
+                event: buildEvent(), // no forceResend
                 step: mockStep,
             });
 
             expect(result).toEqual({ skipped: true, reason: "already_sent" });
-            // Must NOT create another execution record
             expect(db.workflowStepExecution.create).not.toHaveBeenCalled();
-            // Must NOT send any email
             expect(sendEmailViaSMTP).not.toHaveBeenCalled();
+        });
+
+        it("proceeds with execution when forceResend=true even if SENT execution exists", async () => {
+            (db.workflowStepExecution.findFirst as jest.Mock).mockResolvedValueOnce({
+                id: "existing-exec",
+            });
+
+            const result = await capturedHandler({
+                event: buildEvent({ forceResend: true }),
+                step: mockStep,
+            });
+
+            expect(result).toEqual({ success: true, stepId: "step-1", workshopId: "ws-1" });
+            expect(sendEmailViaSMTP).toHaveBeenCalledTimes(1);
+            expect(db.workflowStepExecution.create).toHaveBeenCalledTimes(1);
         });
 
         it("proceeds normally when no SENT execution exists", async () => {
@@ -398,6 +412,92 @@ describe("triggerWorkflowStep Inngest function", () => {
                 })
             );
             expect(result).toEqual({ success: true, stepId: "step-1", workshopId: "ws-1" });
+        });
+    });
+
+    // ------------------------------------------
+    // SEND_SURVEY_LINK step
+    // ------------------------------------------
+
+    describe("SEND_SURVEY_LINK step", () => {
+        const { getOrCreateSurveyLink } = jest.requireMock("@/lib/surveys/survey-automation");
+
+        it("passes surveyTemplateId from step to getOrCreateSurveyLink when pinned template is set", async () => {
+            (db.workflowStep.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkflowStep({
+                    stepType: "SEND_SURVEY_LINK",
+                    triggerType: "RELATIVE_TO_EVENT",
+                    offsetDays: -7,
+                    surveyTemplateId: "tpl-pinned",
+                })
+            );
+            (db.registration.findMany as jest.Mock).mockResolvedValue([
+                { id: "reg-1", email: "alice@example.com", firstName: "Alice", lastName: "A", company: "Acme" },
+            ]);
+            (getOrCreateSurveyLink as jest.Mock).mockResolvedValue({
+                surveyId: "srv-1",
+                surveyUrl: "https://example.com/survey/1",
+                surveyType: "PRE_WORKSHOP",
+            });
+
+            await capturedHandler({ event: buildEvent(), step: mockStep });
+
+            expect(getOrCreateSurveyLink).toHaveBeenCalledWith(
+                expect.objectContaining({ templateId: "tpl-pinned" })
+            );
+        });
+
+        it("records SKIPPED when getOrCreateSurveyLink returns null for all registrations", async () => {
+            (db.workflowStep.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkflowStep({
+                    stepType: "SEND_SURVEY_LINK",
+                    triggerType: "RELATIVE_TO_EVENT",
+                    offsetDays: -7,
+                    surveyTemplateId: null,
+                })
+            );
+            (db.registration.findMany as jest.Mock).mockResolvedValue([
+                { id: "reg-1", email: "alice@example.com", firstName: "Alice", lastName: "A", company: "Acme" },
+            ]);
+            (getOrCreateSurveyLink as jest.Mock).mockResolvedValue(null);
+
+            await capturedHandler({ event: buildEvent(), step: mockStep });
+
+            expect(db.workflowStepExecution.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({ status: "SKIPPED" }),
+                })
+            );
+            expect(sendEmailViaSMTP).not.toHaveBeenCalled();
+        });
+
+        it("sends survey link emails and records SENT when links are available", async () => {
+            (db.workflowStep.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkflowStep({
+                    stepType: "SEND_SURVEY_LINK",
+                    triggerType: "RELATIVE_TO_EVENT",
+                    offsetDays: -7,
+                    surveyTemplateId: "tpl-1",
+                })
+            );
+            (db.registration.findMany as jest.Mock).mockResolvedValue([
+                { id: "reg-1", email: "alice@example.com", firstName: "Alice", lastName: "A", company: "Acme" },
+                { id: "reg-2", email: "bob@example.com", firstName: "Bob", lastName: "B", company: "Beta" },
+            ]);
+            (getOrCreateSurveyLink as jest.Mock).mockResolvedValue({
+                surveyId: "srv-1",
+                surveyUrl: "https://example.com/survey/1",
+                surveyType: "PRE_WORKSHOP",
+            });
+
+            await capturedHandler({ event: buildEvent(), step: mockStep });
+
+            expect(sendEmailViaSMTP).toHaveBeenCalledTimes(2);
+            expect(db.workflowStepExecution.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({ status: "SENT" }),
+                })
+            );
         });
     });
 });
