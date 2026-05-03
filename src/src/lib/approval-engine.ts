@@ -45,7 +45,9 @@ export interface ApprovalEvaluationResult {
 }
 
 // Thresholds
-const CERTIFICATION_CONFIDENCE_THRESHOLD = 85;
+// CHG-02 (Jeff Apr 30 2026, "101 please"): set to 101 to effectively disable auto-approve
+// (Circle's confidence score never exceeds 100). Code path preserved for re-enable — drop the number.
+const CERTIFICATION_CONFIDENCE_THRESHOLD = 101;
 const REFUND_AUTO_LIMIT_CENTS = 25000; // $250
 
 /**
