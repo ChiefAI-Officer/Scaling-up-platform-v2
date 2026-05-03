@@ -951,7 +951,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
             {!formData.isFree && (
               <>
                 <div>
-                  <Label htmlFor="pricingTierId">Workshop Price *</Label>
+                  <Label htmlFor="pricingTierId">Workshop Type *</Label>
                   {selectedCategory?.pricingTiers && selectedCategory.pricingTiers.length > 0 ? (
                     <Select
                       value={formData.pricingTierId}
