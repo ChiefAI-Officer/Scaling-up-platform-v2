@@ -249,7 +249,17 @@ export default async function WorkshopDetailsPage({
           {(workshop.landingPageSlug || fallbackLandingPage?.slug) && (
             <div className="mt-3 pt-3 border-t border-border">
               <p className="text-xs font-medium text-muted-foreground mb-1">Landing Page URL</p>
-              <CopyUrlButton url={`${APP_URL}/workshop/${workshop.landingPageSlug ?? fallbackLandingPage!.slug}`} />
+              <div className="flex items-center gap-2">
+                <CopyUrlButton url={`${APP_URL}/workshop/${workshop.landingPageSlug ?? fallbackLandingPage!.slug}`} />
+                <a
+                  href={`${APP_URL}/workshop/${workshop.landingPageSlug ?? fallbackLandingPage!.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:text-primary/80 underline"
+                >
+                  Open ↗
+                </a>
+              </div>
             </div>
           )}
         </div>
@@ -516,12 +526,14 @@ export default async function WorkshopDetailsPage({
         >
           Back to Workshops
         </Link>
-        <Link
-          href="/portal/registrations"
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          View Registrations
-        </Link>
+        {["PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(workshop.status) && (
+          <Link
+            href="/portal/registrations"
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            View Registrations
+          </Link>
+        )}
         {surveyCount > 0 && (
           <Link
             href={`/portal/workshops/${workshop.id}/surveys`}

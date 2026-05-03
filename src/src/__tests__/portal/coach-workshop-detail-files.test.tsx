@@ -14,6 +14,13 @@ jest.mock("next/navigation", () => ({
   notFound: jest.fn(() => {
     throw new Error("NOT_FOUND");
   }),
+  useRouter: () => ({
+    push: jest.fn(),
+    refresh: jest.fn(),
+    back: jest.fn(),
+  }),
+  usePathname: () => "/portal/workshops/ws-1",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 jest.mock("@/lib/auth/authorization", () => ({
@@ -130,5 +137,52 @@ describe("Coach workshop detail file links", () => {
     expect(markup).toContain("[AGENDA]");
     expect(markup).toContain("1.0 KB");
     expect(markup).not.toContain("https://blob.example.com/private/agenda.pdf");
+  });
+
+  it("BUG-03: renders Open landing page link next to copy-URL button (target=_blank, rel=noopener)", async () => {
+    const element = await WorkshopDetailsPage({
+      params: Promise.resolve({ id: "ws-1" }),
+    });
+
+    const markup = renderToStaticMarkup(element);
+
+    // The page renders a CopyUrlButton (mocked as span containing the URL) for the landing page.
+    // BUG-03 adds a sibling Open anchor pointing at the same URL with target="_blank".
+    expect(markup).toMatch(/<a[^>]+href="[^"]*\/workshop\/protected-files-workshop"[^>]*target="_blank"[^>]*>[^<]*Open/);
+    expect(markup).toMatch(/rel="[^"]*noopener[^"]*"/);
+  });
+
+  it("BUG-04: View Registrations link IS visible when workshop status is PRE_EVENT", async () => {
+    // Default beforeEach already sets status: PRE_EVENT
+    const element = await WorkshopDetailsPage({
+      params: Promise.resolve({ id: "ws-1" }),
+    });
+    const markup = renderToStaticMarkup(element);
+    expect(markup).toContain("View Registrations");
+  });
+
+  it("BUG-04: View Registrations link is HIDDEN when workshop status is REQUESTED", async () => {
+    // Override the workshop status to REQUESTED (no registrations possible — landing page not live)
+    (db.workshop.findFirst as jest.Mock).mockResolvedValueOnce({
+      id: "ws-1",
+      title: "Pending Workshop",
+      description: "Not yet approved",
+      status: "REQUESTED",
+      format: "VIRTUAL",
+      eventDate: new Date("2026-04-10T00:00:00.000Z"),
+      eventTime: "09:00",
+      venueName: null,
+      virtualLink: "https://meet.example.com/room",
+      landingPageSlug: "pending-workshop",
+      maxAttendees: 25,
+      isFree: false,
+      workshopType: { name: "AI Workshop" },
+      _count: { registrations: 0 },
+    });
+    const element = await WorkshopDetailsPage({
+      params: Promise.resolve({ id: "ws-1" }),
+    });
+    const markup = renderToStaticMarkup(element);
+    expect(markup).not.toContain("View Registrations");
   });
 });

@@ -127,6 +127,8 @@ export const WORKFLOW_VARIABLES = {
   "{{registrantName}}": "Registrant full name",
   "{{registrantEmail}}": "Registrant email",
   "{{registrantCompany}}": "Registrant company",
+  "{{surveyUrl}}": "Survey URL (only populates inside SEND_SURVEY_LINK step bodies)",
+  "{{fileLinks}}": "Bullet list of file attachment links (populates when files are attached to the step)",
 } as const;
 
 export type WorkflowVariable = keyof typeof WORKFLOW_VARIABLES;
