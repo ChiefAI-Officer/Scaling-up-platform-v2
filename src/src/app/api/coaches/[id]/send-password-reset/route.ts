@@ -31,7 +31,7 @@ export async function POST(
     const passwordHash = coach.user?.passwordHash ?? null;
     const token = generatePasswordResetToken(coach.email, passwordHash, 24 * 60 * 60);
     const baseUrl = process.env.NEXTAUTH_URL || "https://scaling-up-platform-v2.vercel.app";
-    const passwordSetUrl = `${baseUrl}/auth/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(coach.email)}`;
+    const passwordSetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(coach.email)}`;
 
     await sendCoachWelcomeEmail({
       coachEmail: coach.email,
