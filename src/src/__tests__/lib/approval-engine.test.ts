@@ -44,7 +44,7 @@ describe("Approval Engine", () => {
     };
 
     describe("WORKSHOP_REQUEST type", () => {
-      it("should auto-approve when certification confidence >= 85%", async () => {
+      it("should route to manual approval even at high certification confidence (CHG-02: threshold raised to 101 / effective-off)", async () => {
         (verifyCertification as jest.Mock).mockResolvedValue({
           verified: true,
           confidence: 90,
@@ -57,9 +57,25 @@ describe("Approval Engine", () => {
           workshopTypeSlug: "scaling-up",
         });
 
-        expect(result.autoApproved).toBe(true);
-        expect(result.reason).toContain("Auto-approved");
-        expect(result.reason).toContain("90%");
+        expect(result.autoApproved).toBe(false);
+        expect(result.approvalId).toBe("test-approval-id");
+      });
+
+      it("CHG-02 regression: 100% confidence still routes to manual (Circle's max is 100; threshold 101 means always-manual)", async () => {
+        (verifyCertification as jest.Mock).mockResolvedValue({
+          verified: true,
+          confidence: 100,
+          issues: [],
+        });
+
+        const result = await evaluateApproval({
+          ...baseInput,
+          type: "WORKSHOP_REQUEST" as ApprovalType,
+          workshopTypeSlug: "scaling-up",
+        });
+
+        expect(result.autoApproved).toBe(false);
+        expect(result.approvalId).toBe("test-approval-id");
       });
 
       it("should route to manual approval when certification confidence < 85%", async () => {
