@@ -86,4 +86,14 @@ describe("NewWorkshopForm — coach portal pricing visibility", () => {
     expect(btn).toHaveAttribute("aria-expanded", "false");
     expect(btn).toHaveAttribute("aria-controls", "custom-pricing-section");
   });
+
+  it('ENH-02: pricing tier select uses "Workshop Type *" label (not "Workshop Price *")', async () => {
+    render(<NewWorkshopForm isCoachPortal={false} />);
+    await waitFor(() => expect(screen.getByText("AI Workshop")).toBeInTheDocument());
+    // Selecting the category surfaces the pricing-tier dropdown that owns this label.
+    fireEvent.click(screen.getByText("AI Workshop"));
+
+    expect(screen.getByText("Workshop Type *")).toBeInTheDocument();
+    expect(screen.queryByText("Workshop Price *")).not.toBeInTheDocument();
+  });
 });
