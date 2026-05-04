@@ -336,8 +336,12 @@ export async function cancelWorkflowExecutions(
   workshopId: string,
   tx: Prisma.TransactionClient
 ): Promise<void> {
+  // BUG-09: SCHEDULED rows (created pre-sleep so the Workflow Status card
+  // shows future scheduledFor) must also be cleaned up on cancel — otherwise
+  // the card keeps showing stale scheduled work after the workshop is
+  // canceled.
   await tx.workflowStepExecution.updateMany({
-    where: { workshopId, status: "PENDING" },
+    where: { workshopId, status: { in: ["PENDING", "SCHEDULED"] } },
     data: { status: "CANCELED" },
   });
   await tx.workflowAssignment.updateMany({
