@@ -277,6 +277,10 @@ model Registration {
 
   @@index([workshopId])
   @@index([email])
+  // CHG-03: paid thank-you pages look up the registration by stripeSessionId
+  // to scope it to the workshop. Without this index, every paid thank-you
+  // hit does a sequential scan against the registrations table.
+  @@index([stripeSessionId])
   @@map("registrations")
 }
 
@@ -566,6 +570,10 @@ model LandingPage {
   isActiveTemplate Boolean             @default(false) // Feb25 Sprint 5: marks this page as the active template for auto-build
   categoryId       String?             // FIG-005: FK to Category — null = global template (applies to all)
   sourceTemplateId String?             // Tracks which PageTemplate this page was cloned from (informational, no FK)
+  // CHG-03 (May 4 2026): customCode rendered on THANK_YOU pages for iDev
+  // affiliate tracking. Copied at build time from the source PageTemplate;
+  // never accepted from request bodies on coach-accessible routes.
+  customCode       String?
   publishedAt      DateTime?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt

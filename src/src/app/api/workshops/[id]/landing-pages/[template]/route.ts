@@ -142,9 +142,11 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const { content, status } = bodyValidation.data;
 
     // Check if workshop exists
+    // CHG-03: include categoryId so we can match a per-category PageTemplate
+    // for customCode copy-through using the same precedence as auto-build.
     const workshop = await db.workshop.findUnique({
       where: { id },
-      select: { id: true, title: true, coachId: true },
+      select: { id: true, title: true, coachId: true, categoryId: true },
     });
 
     if (!workshop || !canManageCoachData(actor, workshop.coachId)) {
@@ -181,7 +183,30 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     } else {
       // Create new
       const slug = generateSlug(id, normalizedTemplate, workshop.title);
-      
+
+      // CHG-03: copy customCode from the matching admin-blessed PageTemplate
+      // (category-scoped wins over global; falls back to all-active when
+      // category match is empty — same precedence as auto-build).
+      const candidateTemplates = await db.pageTemplate.findMany({
+        where: {
+          templateType: normalizedTemplate,
+          isActive: true,
+          OR: [
+            { categoryId: workshop.categoryId },
+            { categoryId: null },
+          ],
+        },
+        select: { customCode: true, categoryId: true },
+      });
+      let chosenTemplate = candidateTemplates.find((t) => t.categoryId !== null) ?? candidateTemplates[0] ?? null;
+      if (!chosenTemplate && workshop.categoryId) {
+        const fallback = await db.pageTemplate.findFirst({
+          where: { templateType: normalizedTemplate, isActive: true },
+          select: { customCode: true },
+        });
+        if (fallback) chosenTemplate = { customCode: fallback.customCode, categoryId: null };
+      }
+
       landingPage = await db.landingPage.create({
         data: {
           workshopId: id,
@@ -190,6 +215,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           content: JSON.stringify(content),
           status: status || "DRAFT",
           publishedAt: status === "PUBLISHED" ? new Date() : null,
+          customCode: chosenTemplate?.customCode ?? null,
         },
       });
     }

@@ -88,8 +88,13 @@ export async function POST(request: NextRequest) {
       where: { workshopId: registration.workshop.id, template: "THANK_YOU", status: "PUBLISHED" },
       select: { slug: true },
     });
+    // CHG-03: thread the Stripe session id through to BOTH redirect targets
+    // so the iDev pixel can fire at whichever page actually loads. The
+    // THANK_YOU LandingPage path is the normal post-launch destination;
+    // the registration/success fallback only handles workshops without a
+    // published THANK_YOU page.
     const successRedirect = thankYouPage
-      ? `${appUrl}/workshop/${thankYouPage.slug}`
+      ? `${appUrl}/workshop/${thankYouPage.slug}?session_id={CHECKOUT_SESSION_ID}`
       : `${appUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`;
 
     const session = await createCheckoutSession({

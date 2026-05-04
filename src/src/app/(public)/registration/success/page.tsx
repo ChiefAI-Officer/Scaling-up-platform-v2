@@ -3,12 +3,15 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatEventDateUTC, parseJsonField, VenueAddress } from "@/lib/utils";
 import { retrieveCheckoutSession } from "@/services/stripe";
-import { IdevTracking } from "@/components/affiliate/idev-tracking";
 import {
   buildGoogleCalendarUrl,
   parseDurationHours,
   buildLocationString,
 } from "@/lib/ics-generator";
+import { resolveCustomCodeRenderer } from "@/lib/templates/resolve-custom-code-renderer";
+
+// CHG-03: paid thank-you path needs fresh data on every request.
+export const dynamic = "force-dynamic";
 
 interface SuccessPageProps {
   searchParams: Promise<{ id?: string; session_id?: string }>;
@@ -120,40 +123,23 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
     );
   }
 
-  const idevScriptUrl = process.env.IDEV_SCRIPT_URL?.trim();
-  const isPaidWorkshop = !registration.workshop.isFree;
-  const paidAmountCents =
-    registration.amountPaidCents ??
-    checkoutAmountCents ??
-    registration.workshop.priceCents ??
-    0;
+  // CHG-03: iDev affiliate tracking is now driven by LandingPage.customCode
+  // via <CustomCodeRenderer>, not the IDEV_SCRIPT_URL env var.
+  const thankYouLandingPage = await db.landingPage.findFirst({
+    where: { workshopId: registration.workshop.id, template: "THANK_YOU" },
+    select: { customCode: true },
+  });
 
-  const shouldTrackAffiliate =
-    Boolean(idevScriptUrl) &&
-    /^https?:\/\//i.test(idevScriptUrl || "") &&
-    isPaidWorkshop &&
-    paidAmountCents > 0;
-
-  const affiliateProductCode =
-    registration.workshop.workshopType?.slug || registration.workshop.workshopType?.name || "";
-  const affiliateOrderNumber =
-    registration.stripePaymentId ||
-    registration.stripeSessionId ||
-    session_id ||
-    registration.id;
+  const customCodeRenderer = await resolveCustomCodeRenderer({
+    sessionId: registration.stripeSessionId ?? session_id,
+    workshopId: registration.workshop.id,
+    isFree: registration.workshop.isFree ?? false,
+    customCode: thankYouLandingPage?.customCode ?? null,
+  });
 
   return (
     <div className="min-h-screen bg-muted py-12">
-      {shouldTrackAffiliate && idevScriptUrl && (
-        <IdevTracking
-          scriptUrl={idevScriptUrl}
-          saleAmount={(paidAmountCents / 100).toFixed(2)}
-          orderNumber={affiliateOrderNumber}
-          productCode={affiliateProductCode}
-          customerEmail={registration.email}
-          currency={checkoutCurrency}
-        />
-      )}
+      {customCodeRenderer}
       <div className="max-w-2xl mx-auto px-4">
         <div className="bg-card rounded-xl shadow-lg overflow-hidden">
           {/* Success Header */}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
+import { validateCustomCode } from "@/lib/templates/interpolate-custom-code";
 
 export async function GET(
     _request: NextRequest,
@@ -57,6 +58,16 @@ export async function PATCH(
                 { error: "Template content has no {{placeholders}}. Auto-build requires placeholders to interpolate workshop data." },
                 { status: 400 }
             );
+        }
+    }
+
+    // CHG-03: validate customCode at save time so the admin sees inline 400
+    // before the value is ever rendered. Allow empty string / null to clear
+    // the field; only validate non-empty input.
+    if (customCode !== undefined && customCode !== null && customCode.trim().length > 0) {
+        const result = validateCustomCode(customCode);
+        if (!result.valid) {
+            return NextResponse.json({ error: result.error }, { status: 400 });
         }
     }
 

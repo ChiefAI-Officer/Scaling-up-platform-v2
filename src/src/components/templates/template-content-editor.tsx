@@ -120,12 +120,18 @@ export function TemplateContentEditor({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ content, customCode }),
             });
+            // CHG-03: surface validation errors (e.g. customCode rejected) inline
+            // instead of the generic "Server returned 400".
+            const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                setMessage(`Error: Server returned ${res.status}`);
+                setMessage(
+                    typeof data?.error === "string"
+                        ? `Error: ${data.error}`
+                        : `Error: Server returned ${res.status}`
+                );
                 setSaving(false);
                 return;
             }
-            const data = await res.json();
             if (data.success) {
                 setSavedSnapshot(currentData); // Reset dirty state
                 setMessage("Saved successfully");
@@ -197,16 +203,19 @@ export function TemplateContentEditor({
                                         Affiliate / Tracking Code
                                         <span className="ml-1 text-xs text-muted-foreground">(optional)</span>
                                     </Label>
-                                    <input
+                                    <textarea
                                         id="customCode"
-                                        type="text"
+                                        rows={6}
                                         value={customCode ?? ""}
                                         onChange={(e) => setCustomCode(e.target.value || null)}
-                                        placeholder="e.g. partner123"
-                                        className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                                        placeholder={`<img src="https://scalingup.idevaffiliate.com/sale.php?profile=72198&idev_saleamt={{saleAmount}}&idev_ordernum={{orderNumber}}">`}
+                                        className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background font-mono"
                                     />
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Stored but not rendered until use case is confirmed.
+                                        Pasted code renders on THANK_YOU page after paid registration. Tokens:{" "}
+                                        <code>{"{{saleAmount}}"}</code>, <code>{"{{orderNumber}}"}</code>,{" "}
+                                        <code>{"{{email}}"}</code>, <code>{"{{currency}}"}</code>.{" "}
+                                        <code>&lt;img&gt;</code> pixel only — <code>&lt;script&gt;</code> rejected.
                                     </p>
                                 </div>
                             </CardContent>
@@ -814,12 +823,17 @@ function FallbackJsonEditor({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ content, customCode }),
             });
+            // CHG-03: surface validation errors (e.g. customCode rejected) inline.
+            const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                setMessage(`Error: Server returned ${res.status}`);
+                setMessage(
+                    typeof data?.error === "string"
+                        ? `Error: ${data.error}`
+                        : `Error: Server returned ${res.status}`
+                );
                 setSaving(false);
                 return;
             }
-            const data = await res.json();
             if (data.success) {
                 setMessage("Saved successfully");
             } else {
@@ -847,15 +861,18 @@ function FallbackJsonEditor({
                     Affiliate / Tracking Code
                     <span className="ml-1 text-xs text-muted-foreground">(optional)</span>
                 </label>
-                <input
-                    type="text"
+                <textarea
+                    rows={6}
                     value={customCode ?? ""}
                     onChange={(e) => onCustomCodeChange(e.target.value || null)}
-                    placeholder="e.g. partner123"
-                    className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background"
+                    placeholder={`<img src="https://scalingup.idevaffiliate.com/sale.php?profile=72198&idev_saleamt={{saleAmount}}&idev_ordernum={{orderNumber}}">`}
+                    className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background font-mono"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                    Stored but not rendered until use case is confirmed.
+                    Pasted code renders on THANK_YOU page after paid registration. Tokens:{" "}
+                    <code>{"{{saleAmount}}"}</code>, <code>{"{{orderNumber}}"}</code>,{" "}
+                    <code>{"{{email}}"}</code>, <code>{"{{currency}}"}</code>.{" "}
+                    <code>&lt;img&gt;</code> pixel only — <code>&lt;script&gt;</code> rejected.
                 </p>
             </div>
             <div className="flex items-center gap-3">
