@@ -364,16 +364,18 @@ export async function sendWorkshopDeniedEmail(data: {
     reason: string;
     workshopId?: string;
 }): Promise<void> {
-    const portalUrl = `${process.env.APP_URL}/portal/workshops`;
+    // CHG-01: resubmit removed. Coaches submit a fresh request instead so the
+    // original workshop's history stays intact for audit.
+    const portalUrl = `${process.env.APP_URL}/portal/request`;
 
     const html = `
     <h2>Workshop Denied</h2>
     <p>Hi ${data.coachName},</p>
     <p>Your workshop <strong>${data.workshopTitle}</strong> has been denied.</p>
     <p><strong>Reason:</strong> ${data.reason}</p>
-    <p>Please review the feedback, make any necessary edits, and resubmit your workshop from the portal.</p>
+    <p>To run a similar event, please submit a new workshop request from the portal.</p>
     <br/>
-    <a href="${portalUrl}" style="background-color: #1D4ED8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Edit &amp; Resubmit</a>
+    <a href="${portalUrl}" style="background-color: #1D4ED8; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Submit a new request</a>
     <p>— The Scaling Up Team</p>
     `;
 

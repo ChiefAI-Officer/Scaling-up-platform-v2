@@ -31,7 +31,7 @@ describe("getWorkshopStatusExplanation", () => {
       "Workshop canceled"
     );
     expect(getWorkshopStatusExplanation("DENIED")).toBe(
-      "Your workshop was denied — edit and resubmit below"
+      "Your workshop was denied — submit a new request to run a similar event"
     );
   });
 
