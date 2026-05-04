@@ -12,6 +12,7 @@ import {
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { runAutoBuild } from "@/lib/auto-build-service";
 import { inngest } from "@/inngest/client";
+import { formatApprovalMessage, appendApprovalMessage } from "@/lib/approvals/approval-thread";
 
 const CoachResponseSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("INFO_RESPONSE"), response: z.string().min(1, "Response cannot be empty").max(2000) }),
@@ -189,6 +190,15 @@ export async function POST(
                         respondedBy: actor.email,
                     },
                 });
+                // BUG-06–08: append coach acceptance message inside the same tx.
+                await appendApprovalMessage(tx, {
+                    approvalId: id,
+                    from: "COACH",
+                    text: formatApprovalMessage({
+                        type: "COUNTER_ACCEPT",
+                        amountCents: counterCents,
+                    }),
+                });
             });
 
             // Auto-build trigger if workshop hadn't been built yet (status captured inside transaction)
@@ -274,17 +284,32 @@ export async function POST(
                     reqData.counterNote = parsed.counterNote;
                 }
 
-                // DB-level race guard on decline-with-new-price
-                await db.approvalQueue.update({
-                    where: { id, status: "COUNTER_OFFERED" },
-                    data: {
-                        requestData: JSON.stringify(reqData),
-                        status: "PENDING",
-                        counterOfferCents: null,
-                        counterOfferNote: null,
-                        respondedBy: null,
-                        respondedAt: null,
-                    },
+                // BUG-06–08: wrap status-flip + message-append in a single tx
+                // so the new coach counter is atomic with the status update.
+                // Email send stays OUTSIDE the tx; smtp-transport telemetry
+                // already records EMAIL_DELIVERY failures for audit.
+                await db.$transaction(async (tx) => {
+                    // DB-level race guard on decline-with-new-price
+                    await tx.approvalQueue.update({
+                        where: { id, status: "COUNTER_OFFERED" },
+                        data: {
+                            requestData: JSON.stringify(reqData),
+                            status: "PENDING",
+                            counterOfferCents: null,
+                            counterOfferNote: null,
+                            respondedBy: null,
+                            respondedAt: null,
+                        },
+                    });
+                    await appendApprovalMessage(tx, {
+                        approvalId: id,
+                        from: "COACH",
+                        text: formatApprovalMessage({
+                            type: "COUNTER_COUNTER",
+                            amountCents: parsed.newPriceCents,
+                            note: parsed.counterNote ?? undefined,
+                        }),
+                    });
                 });
 
                 // Notify admin (non-blocking)
@@ -339,6 +364,15 @@ export async function POST(
                             data: { status: "CANCELED" },
                         });
                     }
+                    // BUG-06–08: append coach decline message inside the same tx.
+                    await appendApprovalMessage(tx, {
+                        approvalId: id,
+                        from: "COACH",
+                        text: formatApprovalMessage({
+                            type: "COUNTER_DECLINE",
+                            note: parsed.counterNote ?? undefined,
+                        }),
+                    });
                 });
 
                 // Notify admin (non-blocking)

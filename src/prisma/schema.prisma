@@ -499,9 +499,15 @@ model ApprovalMessage {
   approval   ApprovalQueue @relation(fields: [approvalId], references: [id], onDelete: Cascade)
   from       String        // "ADMIN" | "COACH"
   text       String
+  // BUG-06–08 (May 4 2026): true for rows created by the one-time backfill
+  // script (scripts/backfill-approval-messages.ts). Live writers leave the
+  // default false. Used both as a clean rollback key
+  // (`DELETE WHERE synthetic = true`) and to disambiguate dup checks.
+  synthetic  Boolean       @default(false)
   createdAt  DateTime      @default(now())
 
   @@index([approvalId])
+  @@index([approvalId, synthetic])
   @@map("approval_messages")
 }
 
