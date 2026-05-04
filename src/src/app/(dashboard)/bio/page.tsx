@@ -19,7 +19,7 @@ async function getCoaches() {
   });
 }
 
-function formatDate(value: Date): string {
+function formatTimestamp(value: Date): string {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -92,7 +92,7 @@ export default async function BioPageIndex() {
                         {coach.company || "Not set"}
                       </td>
                       <td className="px-4 py-3 text-sm text-foreground">
-                        {formatDate(coach.updatedAt)}
+                        {formatTimestamp(coach.updatedAt)}
                       </td>
                       <td className="px-4 py-3">
                         <Link

@@ -17,7 +17,13 @@ export function formatCurrency(cents: number): string {
   }).format(cents / 100);
 }
 
-export function formatDate(date: Date | string): string {
+/**
+ * BUG-05 (May 4 2026): renamed from `formatDate` to `formatTimestamp` to make the
+ * UTC-vs-zoned semantic visible at every call site. Use this for createdAt /
+ * respondedAt / scheduledFor — anything where the user's local timezone is correct.
+ * For event dates (workshop scheduling), use `formatEventDateUTC` instead.
+ */
+export function formatTimestamp(date: Date | string): string {
   try {
     const d = new Date(date);
     if (isNaN(d.getTime())) {
@@ -31,8 +37,11 @@ export function formatDate(date: Date | string): string {
   }
 }
 
-/** Format a calendar date (eventDate) using UTC to prevent timezone off-by-one */
-export function formatEventDate(date: Date | string): string {
+/**
+ * BUG-05 (May 4 2026): renamed from `formatEventDate`. Use UTC so a workshop
+ * scheduled "Oct 1, 2026" reads identically across timezones (no off-by-one).
+ */
+export function formatEventDateUTC(date: Date | string): string {
   try {
     const d = new Date(date);
     if (isNaN(d.getTime())) return "Invalid Date";
@@ -45,7 +54,8 @@ export function formatEventDate(date: Date | string): string {
   }
 }
 
-export function formatDateTime(date: Date | string): string {
+/** BUG-05 (May 4 2026): renamed from `formatDateTime`. Zoned (local) — for timestamps with time. */
+export function formatTimestampDateTime(date: Date | string): string {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",

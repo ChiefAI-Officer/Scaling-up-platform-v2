@@ -50,7 +50,7 @@ interface SurveysPayload {
   responses: SurveyResponseItem[];
 }
 
-function formatDate(value: string | null): string {
+function formatTimestamp(value: string | null): string {
   if (!value) {
     return "—";
   }
@@ -293,7 +293,7 @@ export default function SurveysPage() {
               </Button>
               {selectedWorkflow && (
                 <span className="text-sm text-muted-foreground">
-                  Last updated {formatDate(selectedWorkflow.updatedAt)}
+                  Last updated {formatTimestamp(selectedWorkflow.updatedAt)}
                 </span>
               )}
             </div>
@@ -337,7 +337,7 @@ export default function SurveysPage() {
                   {data.workflowConfigs.map((config) => (
                     <tr key={config.workshopId}>
                       <td className="px-4 py-3 text-sm text-foreground">{config.workshopTitle}</td>
-                      <td className="px-4 py-3 text-sm text-foreground">{formatDate(config.eventDate)}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{formatTimestamp(config.eventDate)}</td>
                       <td className="px-4 py-3 text-sm text-foreground">{config.preSurveyFormId || "—"}</td>
                       <td className="px-4 py-3 text-sm text-foreground">{config.postSurveyFormId || "—"}</td>
                       <td className="px-4 py-3 text-sm text-foreground">{config.npsSurveyFormId || "—"}</td>
@@ -385,7 +385,7 @@ export default function SurveysPage() {
                 {data.trends.map((trend) => (
                   <tr key={trend.workshopId}>
                     <td className="px-4 py-3 text-sm text-foreground">{trend.workshopTitle}</td>
-                    <td className="px-4 py-3 text-sm text-foreground">{formatDate(trend.eventDate)}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{formatTimestamp(trend.eventDate)}</td>
                     <td className="px-4 py-3 text-sm text-foreground">{trend.responses}</td>
                     <td className="px-4 py-3 text-sm text-foreground">{trend.completed}</td>
                     <td className="px-4 py-3 text-sm text-foreground">
@@ -435,9 +435,9 @@ export default function SurveysPage() {
                         <Badge variant="outline">{surveyTypeLabel(response.surveyType)}</Badge>
                       </td>
                       <td className="px-4 py-3 text-sm text-foreground">{response.workshopTitle}</td>
-                      <td className="px-4 py-3 text-sm text-foreground">{formatDate(response.sentAt)}</td>
+                      <td className="px-4 py-3 text-sm text-foreground">{formatTimestamp(response.sentAt)}</td>
                       <td className="px-4 py-3 text-sm text-foreground">
-                        {response.completedAt ? formatDate(response.completedAt) : "Pending"}
+                        {response.completedAt ? formatTimestamp(response.completedAt) : "Pending"}
                       </td>
                       <td className="px-4 py-3 text-sm text-foreground">
                         {typeof response.npsScore === "number" ? response.npsScore : "—"}

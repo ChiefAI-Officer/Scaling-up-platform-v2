@@ -4,8 +4,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import {
-  formatDate,
-  formatEventDate,
+  formatTimestamp,
+  formatEventDateUTC,
   formatCurrency,
   getWorkshopStatusColor,
   getWorkshopStatusLabel,
@@ -178,7 +178,7 @@ export default async function WorkshopDetailPage({
           <Card>
             <CardContent className="pt-6">
               <p className="text-sm text-muted-foreground">Event Date</p>
-              <p className="text-xl font-semibold">{formatEventDate(workshop.eventDate)}</p>
+              <p className="text-xl font-semibold">{formatEventDateUTC(workshop.eventDate)}</p>
               {workshop.eventTime && (
                 <p className="text-muted-foreground">{workshop.eventTime}</p>
               )}
@@ -267,7 +267,7 @@ export default async function WorkshopDetailPage({
                   {workshop.earlyBirdPriceCents && workshop.earlyBirdDeadline && (
                     <p className="text-sm text-muted-foreground">
                       Early bird: {formatCurrency(workshop.earlyBirdPriceCents)}{" "}
-                      until {formatDate(workshop.earlyBirdDeadline)}
+                      until {formatTimestamp(workshop.earlyBirdDeadline)}
                     </p>
                   )}
                 </div>
@@ -400,7 +400,7 @@ export default async function WorkshopDetailPage({
                             </Badge>
                           </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground">
-                            {formatDate(reg.createdAt)}
+                            {formatTimestamp(reg.createdAt)}
                           </td>
                           {session.user.role === "ADMIN" && (
                             <td className="px-4 py-3">
@@ -437,7 +437,7 @@ export default async function WorkshopDetailPage({
                   {workshop.approvals.map((record) => (
                     <div key={record.id} className="space-y-2">
                       <p className="text-xs text-muted-foreground">
-                        {formatDate(record.requestedAt)}
+                        {formatTimestamp(record.requestedAt)}
                         {record.type === "CUSTOM_PRICING" && (
                           <span className="ml-2 font-medium">(Custom Pricing Request)</span>
                         )}
@@ -536,7 +536,7 @@ export default async function WorkshopDetailPage({
                                   </span>
                                   {isCompleted && execution?.scheduledFor && (
                                     <span className="text-xs text-muted-foreground">
-                                      {formatDate(execution.scheduledFor)}
+                                      {formatTimestamp(execution.scheduledFor)}
                                     </span>
                                   )}
                                 </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { formatDate } from "@/lib/utils";
+import { formatTimestamp } from "@/lib/utils";
 
 interface Registration {
   id: string;
@@ -113,7 +113,7 @@ export function RegistrationsTable({ registrations }: RegistrationsTableProps) {
                         : <span className="text-muted-foreground/50">—</span>}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell whitespace-nowrap">
-                      {reg.createdAt ? formatDate(new Date(reg.createdAt)) : <span className="text-muted-foreground/50">—</span>}
+                      {reg.createdAt ? formatTimestamp(new Date(reg.createdAt)) : <span className="text-muted-foreground/50">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       {paymentStatusBadge(reg.paymentStatus)}

@@ -183,7 +183,7 @@ export default function WorkshopEditorPage() {
         }
     }
 
-    const formatDate = (value: string) =>
+    const formatTimestamp = (value: string) =>
         new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
     if (loading) {
@@ -387,7 +387,7 @@ export default function WorkshopEditorPage() {
                                     <option value="">Select a page to copy from...</option>
                                     {libraryItems.map((item) => (
                                         <option key={item.id} value={item.id}>
-                                            {item.workshopTitle} ({formatDate(item.createdAt)})
+                                            {item.workshopTitle} ({formatTimestamp(item.createdAt)})
                                         </option>
                                     ))}
                                 </select>

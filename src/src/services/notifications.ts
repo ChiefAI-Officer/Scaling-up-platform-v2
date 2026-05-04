@@ -7,7 +7,7 @@
 import { sendEmailViaSMTP, type SmtpAttachment } from "@/lib/smtp-transport";
 import { db } from "@/lib/db";
 import { generateIcsContent, buildLocationString } from "@/lib/ics-generator";
-import { formatDate } from "@/lib/utils";
+import { formatEventDateUTC } from "@/lib/utils";
 
 // ============================================
 // Types
@@ -728,7 +728,7 @@ export async function sendWorkshopDateChangeEmail({
     contentType: "text/calendar; method=REQUEST",
   };
 
-  const formattedDate = formatDate(eventDate);
+  const formattedDate = formatEventDateUTC(eventDate);
 
   // Sequential send — avoids SMTP rate limiting.
   // NOTE: calls sendEmailViaSMTP directly (not sendNotificationEmail) because

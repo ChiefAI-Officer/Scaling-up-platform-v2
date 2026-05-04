@@ -36,7 +36,7 @@ interface PartnersPayload {
   workshops: WorkshopOption[];
 }
 
-function formatDate(value: string): string {
+function formatTimestamp(value: string): string {
   return new Date(value).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -467,7 +467,7 @@ export default function PartnersPage() {
                           Delete
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground">Updated {formatDate(partner.updatedAt)}</p>
+                      <p className="text-xs text-muted-foreground">Updated {formatTimestamp(partner.updatedAt)}</p>
                     </div>
                   </div>
                 </div>
@@ -514,7 +514,7 @@ export default function PartnersPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-sm text-foreground">
-                        {formatDate(toggle.updatedAt)}
+                        {formatTimestamp(toggle.updatedAt)}
                       </td>
                     </tr>
                   ))}

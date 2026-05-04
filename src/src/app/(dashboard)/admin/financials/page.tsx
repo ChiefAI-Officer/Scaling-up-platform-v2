@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { Suspense } from "react";
 import { db } from "@/lib/db";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatEventDateUTC } from "@/lib/utils";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
 import { FinancialFilters } from "@/components/financials/financial-filters";
 
@@ -319,7 +319,7 @@ export default async function FinancialDashboardPage({ searchParams }: PageProps
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-sm text-foreground">{w.coachName}</td>
-                    <td className="px-4 py-3 text-sm text-foreground">{formatDate(w.eventDate)}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{formatEventDateUTC(w.eventDate)}</td>
                     <td className="px-4 py-3 text-sm text-foreground text-right">{w.totalRegistrations}</td>
                     <td className="px-4 py-3 text-sm font-semibold text-success text-right">
                       {formatCurrency(w.revenue)}

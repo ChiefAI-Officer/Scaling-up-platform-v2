@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { formatDate, parseJsonField, VenueAddress } from "@/lib/utils";
+import { formatEventDateUTC, parseJsonField, VenueAddress } from "@/lib/utils";
 import { retrieveCheckoutSession } from "@/services/stripe";
 import { IdevTracking } from "@/components/affiliate/idev-tracking";
 import {
@@ -194,7 +194,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Date</p>
                 <p className="text-foreground">
-                  {formatDate(registration.workshop.eventDate)}
+                  {formatEventDateUTC(registration.workshop.eventDate)}
                 </p>
               </div>
               {registration.workshop.eventTime && (
