@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatTimestamp } from "@/lib/utils";
 
 type TemplateValue = "SOLO_LANDING" | "DUO_LANDING" | "REGISTRATION" | "THANK_YOU";
 
@@ -215,7 +216,7 @@ export function ActivateTemplateModal({
                         {page.status}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {new Date(page.updatedAt).toLocaleDateString()}
+                        {formatTimestamp(page.updatedAt)}
                       </span>
                     </div>
 

@@ -1,3 +1,5 @@
+import { formatTimestamp } from "@/lib/utils";
+
 interface ApprovalMessage {
   id: string;
   from: string;
@@ -27,7 +29,7 @@ export function ApprovalThread({
               {m.from === "ADMIN"
                 ? perspective === "admin" ? "You (Admin)" : "Admin"
                 : perspective === "admin" ? "Coach" : "You"}
-              · {new Date(m.createdAt).toLocaleDateString()}
+              · {formatTimestamp(m.createdAt)}
             </div>
             <p className="whitespace-pre-wrap">{m.text}</p>
           </div>

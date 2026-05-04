@@ -6,6 +6,7 @@ import { Search, SlidersHorizontal, X } from "lucide-react";
 import { StatusPill } from "@/components/ui/status-pill";
 import { CheckCircle2, Circle } from "lucide-react";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
+import { formatEventDateUTC } from "@/lib/utils";
 
 interface WorkshopItem {
     id: string;
@@ -166,7 +167,7 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-muted-foreground">
-                                            {new Date(workshop.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}
+                                            {formatEventDateUTC(workshop.eventDate)}
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="font-medium">{workshop._count.registrations}</div>

@@ -12,7 +12,7 @@ import { CounterOfferCard } from "@/components/workshops/counter-offer-card";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { InlineEditDescription } from "@/components/workshops/inline-edit-description";
 import { getSessionDownloadPath } from "@/lib/files/file-download-path";
-import { getWorkshopStatusExplanation, formatTimestamp } from "@/lib/utils";
+import { getWorkshopStatusExplanation, formatTimestamp, formatEventDateUTC } from "@/lib/utils";
 import { formatStepLabel } from "@/lib/workflows/workflow-types";
 import {
   calculateWorkshopRevenueSplit,
@@ -210,7 +210,7 @@ export default async function WorkshopDetailsPage({
           <div className="space-y-2 text-sm text-foreground">
             <p>
               <span className="font-medium">Date:</span>{" "}
-              {new Date(workshop.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}
+              {formatEventDateUTC(workshop.eventDate)}
             </p>
             <p>
               <span className="font-medium">Time:</span> {workshop.eventTime || "TBD"}
@@ -526,7 +526,7 @@ export default async function WorkshopDetailsPage({
                           </Badge>
                           {execution?.scheduledFor && status === "SCHEDULED" && (
                             <span className="text-xs text-muted-foreground">
-                              {new Date(execution.scheduledFor).toLocaleDateString()}
+                              {formatTimestamp(execution.scheduledFor)}
                             </span>
                           )}
                         </div>

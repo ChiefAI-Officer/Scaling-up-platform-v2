@@ -10,6 +10,7 @@ import {
     getMinimumLeadTimeDays,
     normalizeLeadTimeFormat,
 } from "@/lib/workshops/lead-time-validator";
+import { formatTimestamp } from "@/lib/utils";
 
 function getMinDate(format: string): string {
     return getMinimumLeadTimeDate(format).toISOString().split("T")[0];
@@ -122,7 +123,7 @@ export function Step2Logistics() {
                     />
                     {dateIsTooSoon && (
                         <p className="text-xs text-warning">
-                            {getLeadTimeMessage(formData.format)} Earliest: {new Date(minDate).toLocaleDateString()}
+                            {getLeadTimeMessage(formData.format)} Earliest: {formatTimestamp(minDate)}
                         </p>
                     )}
                 </div>

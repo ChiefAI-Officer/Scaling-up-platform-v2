@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { WorkflowTimeline } from "@/components/workflows/workflow-timeline";
+import { formatEventDateUTC } from "@/lib/utils";
 import { WorkflowExecutions } from "@/components/workflows/workflow-executions";
 import {
   STEP_TYPES,
@@ -667,7 +668,7 @@ export function WorkflowEditor({
                     .map((w) => (
                       <option key={w.id} value={w.id}>
                         [{w.workshopCode}] {w.title} —{" "}
-                        {w.eventDate ? new Date(w.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" }) : "TBD"}
+                        {w.eventDate ? formatEventDateUTC(w.eventDate) : "TBD"}
                       </option>
                     ))}
                 </select>
@@ -698,7 +699,7 @@ export function WorkflowEditor({
                       [{assignment.workshopCode}]
                     </span>
                     <span className="ml-2 text-sm text-muted-foreground">
-                      {assignment.workshop.eventDate ? new Date(assignment.workshop.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" }) : "TBD"}
+                      {assignment.workshop.eventDate ? formatEventDateUTC(assignment.workshop.eventDate) : "TBD"}
                     </span>
                     <Badge variant="secondary" className="ml-2">
                       {assignment.workshop.status}
