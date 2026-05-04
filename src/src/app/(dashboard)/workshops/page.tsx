@@ -71,6 +71,9 @@ async function getWorkshops(
       include: {
         coach: true,
         workshopType: true,
+        // BUG-02-admin-followup: include pricingTier so the Workshop Type column
+        // can render the half-day/full-day/virtual label Jeff asked for at 1:13.
+        pricingTier: true,
         approvals: {
           where: { status: "PENDING" },
           select: { id: true },
@@ -250,6 +253,9 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                   Start Time
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Workshop Type
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Cost
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -308,6 +314,9 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground">
                       {formatStartTime(workshop.eventTime)}
+                    </td>
+                    <td className="px-4 py-4 text-sm text-foreground">
+                      {workshop.pricingTier?.name ?? <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground">
                       {costLabel(workshop)}
