@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { Mail, Trash2, UserPlus, RefreshCw } from "lucide-react";
+import { formatTimestamp } from "@/lib/utils";
 
 interface AdminInvite {
   id: string;
@@ -210,12 +211,12 @@ export function InviteAdminSection() {
                       )}
                       <p className="text-xs text-muted-foreground">
                         Invited{" "}
-                        {new Date(invite.createdAt).toLocaleDateString()}
+                        {formatTimestamp(invite.createdAt)}
                         {status === "pending" &&
-                          ` · Expires ${new Date(invite.expiresAt).toLocaleDateString()}`}
+                          ` · Expires ${formatTimestamp(invite.expiresAt)}`}
                         {status === "active" &&
                           invite.acceptedAt &&
-                          ` · Accepted ${new Date(invite.acceptedAt).toLocaleDateString()}`}
+                          ` · Accepted ${formatTimestamp(invite.acceptedAt)}`}
                       </p>
                     </div>
                     {status === "pending" && (

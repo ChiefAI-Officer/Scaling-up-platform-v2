@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { upload } from "@vercel/blob/client";
 import { sanitizeFilename, validateFile } from "@/lib/files/file-rules";
+import { formatTimestamp } from "@/lib/utils";
 
 interface FileRecord {
   id: string;
@@ -408,7 +409,7 @@ export function FileManager({ initialFiles, workshops }: Props) {
                       {formatFileSize(file.sizeBytes)}
                     </td>
                     <td className="px-6 py-4 text-sm text-muted-foreground">
-                      {new Date(file.createdAt).toLocaleDateString()}
+                      {formatTimestamp(file.createdAt)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">

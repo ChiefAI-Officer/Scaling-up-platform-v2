@@ -6,7 +6,7 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { inngest } from "@/inngest/client";
 import { runAutoBuild } from "@/lib/auto-build-service";
 import { generateUniqueWorkshopCode } from "@/lib/workshops/workshop-code";
-import { generateSlug } from "@/lib/utils";
+import { generateSlug, formatEventDateUTC } from "@/lib/utils";
 import { sendEnrichedApprovalRequest } from "@/services/notifications";
 import { verifyCertification } from "@/services/circle";
 import { getCoachByEmail } from "@/services/hubspot";
@@ -58,7 +58,7 @@ function normalizeRequestData(raw: unknown): ApprovalRequestData {
         details = data.details;
     } else if (typeof data.workshopTitle === "string" && data.workshopTitle) {
         const datePart = typeof data.workshopEventDate === "string"
-            ? ` on ${new Date(data.workshopEventDate).toLocaleDateString("en-US", { year: "numeric", month: "numeric", day: "numeric", timeZone: "UTC" })}`
+            ? ` on ${formatEventDateUTC(data.workshopEventDate)}`
             : "";
         details = `Workshop: ${data.workshopTitle}${datePart}`;
     }
@@ -188,7 +188,7 @@ export async function GET(request: NextRequest) {
                     coachName,
                     details: normalized.details
                         || (a.workshop?.title
-                            ? `Workshop: ${a.workshop.title}${a.workshop.eventDate ? ` on ${new Date(a.workshop.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}` : ""}`
+                            ? `Workshop: ${a.workshop.title}${a.workshop.eventDate ? ` on ${formatEventDateUTC(a.workshop.eventDate)}` : ""}`
                             : "Approval request submitted from coach portal"),
                     coachId: a.coachId,
                     workshopId: a.workshopId,

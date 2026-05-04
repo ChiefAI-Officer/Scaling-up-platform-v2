@@ -10,6 +10,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { DeleteWorkflowButton } from "@/components/workflows/delete-workflow-button";
+import { formatTimestamp } from "@/lib/utils";
 
 async function WorkflowsContent() {
   const workflows = await db.workflow.findMany({
@@ -132,7 +133,7 @@ async function WorkflowsContent() {
                   )}
                 </td>
                 <td className="px-4 py-4 text-sm text-muted-foreground">
-                  {workflow.updatedAt.toLocaleDateString()}
+                  {formatTimestamp(workflow.updatedAt)}
                 </td>
                 <td className="px-4 py-4 text-right">
                   <div className="flex items-center justify-end gap-3">

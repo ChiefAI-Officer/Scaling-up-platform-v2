@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ApprovalThread } from "@/components/approvals/approval-thread";
+import { formatTimestamp } from "@/lib/utils";
 
 type ApprovalStatus = "PENDING" | "APPROVED" | "DENIED" | "EXPIRED" | "INFO_REQUESTED" | "COUNTER_OFFERED";
 type FilterStatus = ApprovalStatus | "ALL";
@@ -381,7 +382,7 @@ export default function ApprovalsPage() {
                 <ApprovalThread messages={approval.messages ?? []} perspective="admin" />
                 <div className="flex gap-4 text-sm text-muted-foreground mt-1">
                   <span>
-                    Requested: {new Date(approval.requestedAt).toLocaleDateString()}
+                    Requested: {formatTimestamp(approval.requestedAt)}
                   </span>
                   {approval.workshopCode && (
                     <span className="font-mono">{approval.workshopCode}</span>

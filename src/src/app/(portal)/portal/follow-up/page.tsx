@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatEventDateUTC } from "@/lib/utils";
 
 interface Workshop {
     id: string;
@@ -173,7 +174,7 @@ export default function FollowUpPage() {
                                 <option value="">Choose a workshop...</option>
                                 {availableWorkshops.map((ws) => (
                                     <option key={ws.id} value={ws.id}>
-                                        {ws.title} {ws.workshopCode ? `(${ws.workshopCode})` : ""} — {new Date(ws.eventDate).toLocaleDateString("en-US", { timeZone: "UTC" })}
+                                        {ws.title} {ws.workshopCode ? `(${ws.workshopCode})` : ""} — {formatEventDateUTC(ws.eventDate)}
                                     </option>
                                 ))}
                             </select>
