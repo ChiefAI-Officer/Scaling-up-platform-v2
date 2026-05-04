@@ -14,6 +14,10 @@ import {
   type WorkflowContext,
 } from "@/lib/workflows/workflow-service";
 import { TRIGGER_TYPES, STEP_TYPES } from "@/lib/workflows/workflow-types";
+import {
+  scheduleWorkflowExecution,
+  recordWorkflowExecution,
+} from "@/lib/workflows/record-workflow-execution";
 import { buildLocationString } from "@/lib/ics-generator";
 import {
   buildProtectedEmailAttachments,
@@ -121,6 +125,12 @@ export const executeWorkflow = inngest.createFunction(
     for (const workflowStep of workflow.steps) {
       const stepName = `step-${workflowStep.sortOrder}-${workflowStep.stepType}`;
 
+      // BUG-09: track scheduledFor + the SCHEDULED row id (if any) so the
+      // terminal write can preserve the originally-computed time and the
+      // portal renderer shows future-scheduled work immediately.
+      let effectiveScheduledFor: Date = new Date();
+      let executionId: string | undefined;
+
       // Determine timing
       if (workflowStep.triggerType === TRIGGER_TYPES.RELATIVE_TO_EVENT) {
         const sendAt = calculateSendDate(
@@ -130,9 +140,22 @@ export const executeWorkflow = inngest.createFunction(
           workflowStep.sendTimeOfDay,
           workshop.timezone
         );
+        effectiveScheduledFor = sendAt;
 
         // Schedule for future; if already past, fire immediately (no sleep)
         if (sendAt > new Date()) {
+          // BUG-09: persist a SCHEDULED row pre-sleep so the Workflow Status
+          // card shows "scheduled for tomorrow 8:00 AM" before the step
+          // fires. step.run keys this on stepName so retries/replays don't
+          // duplicate the row.
+          const scheduled = await step.run(`schedule-execution-${stepName}`, async () => {
+            return scheduleWorkflowExecution(db, {
+              stepId: workflowStep.id,
+              workshopId: workshop.id,
+              scheduledFor: sendAt,
+            });
+          });
+          executionId = scheduled.id;
           await step.sleepUntil(`wait-${stepName}`, sendAt);
         } else {
           console.warn(
@@ -326,15 +349,14 @@ export const executeWorkflow = inngest.createFunction(
                 });
               }
 
-              // Record execution
-              await db.workflowStepExecution.create({
-                data: {
-                  stepId: workflowStep.id,
-                  workshopId: workshop.id,
-                  status: "SENT",
-                  scheduledFor: new Date(),
-                  executedAt: new Date(),
-                },
+              // Record execution (BUG-09: preserve scheduledFor + transition SCHEDULED row)
+              await recordWorkflowExecution(db, {
+                executionId,
+                stepId: workflowStep.id,
+                workshopId: workshop.id,
+                status: "SENT",
+                scheduledFor: effectiveScheduledFor,
+                executedAt: new Date(),
               });
 
               stepsExecuted++;
@@ -424,15 +446,14 @@ export const executeWorkflow = inngest.createFunction(
                 sentCount++;
               }
 
-              await db.workflowStepExecution.create({
-                data: {
-                  stepId: workflowStep.id,
-                  workshopId: workshop.id,
-                  status: sentCount > 0 ? "SENT" : "SKIPPED",
-                  scheduledFor: new Date(),
-                  executedAt: new Date(),
-                  ...(sentCount === 0 ? { errorMessage: "No survey link could be generated" } : {}),
-                },
+              await recordWorkflowExecution(db, {
+                executionId,
+                stepId: workflowStep.id,
+                workshopId: workshop.id,
+                status: sentCount > 0 ? "SENT" : "SKIPPED",
+                scheduledFor: effectiveScheduledFor,
+                executedAt: new Date(),
+                ...(sentCount === 0 ? { error: "No survey link could be generated" } : {}),
               });
 
               if (sentCount > 0) {
@@ -460,15 +481,14 @@ export const executeWorkflow = inngest.createFunction(
               }
 
               if (stepFiles.length === 0) {
-                await db.workflowStepExecution.create({
-                  data: {
-                    stepId: workflowStep.id,
-                    workshopId: workshop.id,
-                    status: "SKIPPED",
-                    scheduledFor: new Date(),
-                    executedAt: new Date(),
-                    errorMessage: "No files attached to step",
-                  },
+                await recordWorkflowExecution(db, {
+                  executionId,
+                  stepId: workflowStep.id,
+                  workshopId: workshop.id,
+                  status: "SKIPPED",
+                  scheduledFor: effectiveScheduledFor,
+                  executedAt: new Date(),
+                  error: "No files attached to step",
                 });
                 return;
               }
@@ -495,15 +515,14 @@ export const executeWorkflow = inngest.createFunction(
                     attemptedAttachmentCount: stepFiles.length,
                   },
                 });
-                await db.workflowStepExecution.create({
-                  data: {
-                    stepId: workflowStep.id,
-                    workshopId: workshop.id,
-                    status: "SKIPPED",
-                    scheduledFor: new Date(),
-                    executedAt: new Date(),
-                    errorMessage: "Attachment policy blocked file-link delivery",
-                  },
+                await recordWorkflowExecution(db, {
+                  executionId,
+                  stepId: workflowStep.id,
+                  workshopId: workshop.id,
+                  status: "SKIPPED",
+                  scheduledFor: effectiveScheduledFor,
+                  executedAt: new Date(),
+                  error: "Attachment policy blocked file-link delivery",
                 });
                 return;
               }
@@ -556,14 +575,13 @@ export const executeWorkflow = inngest.createFunction(
                 });
               }
 
-              await db.workflowStepExecution.create({
-                data: {
-                  stepId: workflowStep.id,
-                  workshopId: workshop.id,
-                  status: "SENT",
-                  scheduledFor: new Date(),
-                  executedAt: new Date(),
-                },
+              await recordWorkflowExecution(db, {
+                executionId,
+                stepId: workflowStep.id,
+                workshopId: workshop.id,
+                status: "SENT",
+                scheduledFor: effectiveScheduledFor,
+                executedAt: new Date(),
               });
 
               stepsExecuted++;
@@ -573,13 +591,13 @@ export const executeWorkflow = inngest.createFunction(
             case STEP_TYPES.NOTIFICATION:
               // Teams notification or system log
               console.log(`[Workflow Notification] ${subject}: ${body}`);
-              await db.workflowStepExecution.create({
-                data: {
-                  stepId: workflowStep.id,
-                  workshopId: workshop.id,
-                  status: "SENT",
-                  executedAt: new Date(),
-                },
+              await recordWorkflowExecution(db, {
+                executionId,
+                stepId: workflowStep.id,
+                workshopId: workshop.id,
+                status: "SENT",
+                scheduledFor: effectiveScheduledFor,
+                executedAt: new Date(),
               });
               stepsExecuted++;
               return;
@@ -639,14 +657,13 @@ export const executeWorkflow = inngest.createFunction(
           }
 
           // Record execution
-          await db.workflowStepExecution.create({
-            data: {
-              stepId: workflowStep.id,
-              workshopId: workshop.id,
-              status: "SENT",
-              scheduledFor: new Date(),
-              executedAt: new Date(),
-            },
+          await recordWorkflowExecution(db, {
+            executionId,
+            stepId: workflowStep.id,
+            workshopId: workshop.id,
+            status: "SENT",
+            scheduledFor: effectiveScheduledFor,
+            executedAt: new Date(),
           });
 
           stepsExecuted++;
@@ -654,17 +671,17 @@ export const executeWorkflow = inngest.createFunction(
       } catch (err) {
         stepsFailed++;
 
-        // Record failure
+        // Record failure (BUG-09: preserve scheduledFor + transition SCHEDULED row if any)
         await step.run(`record-failure-${stepName}`, async () => {
-          await db.workflowStepExecution.create({
-            data: {
-              stepId: workflowStep.id,
-              workshopId: workshop.id,
-              status: "FAILED",
-              executedAt: new Date(),
-              errorMessage: err instanceof Error ? err.message : "Unknown error",
-              attempts: 1,
-            },
+          await recordWorkflowExecution(db, {
+            executionId,
+            stepId: workflowStep.id,
+            workshopId: workshop.id,
+            status: "FAILED",
+            scheduledFor: effectiveScheduledFor,
+            executedAt: new Date(),
+            error: err instanceof Error ? err.message : "Unknown error",
+            attempts: 1,
           });
         });
       }

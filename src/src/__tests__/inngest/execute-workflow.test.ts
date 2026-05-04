@@ -15,7 +15,11 @@
 jest.mock("@/lib/db", () => ({
   db: {
     workflowAssignment: { findUnique: jest.fn() },
-    workflowStepExecution: { create: jest.fn(), findFirst: jest.fn() },
+    workflowStepExecution: {
+      create: jest.fn(async () => ({ id: "exec-new" })),
+      update: jest.fn(async () => ({ id: "exec-new" })),
+      findFirst: jest.fn(),
+    },
     registration: { findMany: jest.fn() },
   },
 }));
@@ -1294,6 +1298,95 @@ describe("execute-workflow Inngest function", () => {
       success: true,
       workshopId: "ws-1",
       workflowId: "wf-1",
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // BUG-09: scheduledFor preservation
+  // ------------------------------------------------------------------
+  describe("BUG-09 scheduledFor preservation", () => {
+    it("RELATIVE_TO_EVENT future: creates SCHEDULED row pre-sleep, then transitions to SENT preserving scheduledFor", async () => {
+      const futureSendAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      mockCalculateSendDate.mockReturnValue(futureSendAt);
+
+      const executionUpdate = db.workflowStepExecution.update as jest.Mock;
+      executionCreate.mockClear();
+      executionUpdate.mockClear();
+      executionCreate.mockResolvedValueOnce({ id: "exec-sched-1" });
+
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({
+            triggerType: "RELATIVE_TO_EVENT",
+            stepType: "EMAIL_COACH",
+            offsetDays: -7,
+            subject: "Reminder",
+            body: "Coming soon",
+          }),
+        ],
+      });
+      findUnique.mockResolvedValue(assignment);
+
+      await invoke();
+
+      // Pre-sleep: SCHEDULED row created with futureSendAt
+      const scheduleCall = executionCreate.mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SCHEDULED"
+      );
+      expect(scheduleCall).toBeDefined();
+      expect(scheduleCall![0].data).toMatchObject({
+        status: "SCHEDULED",
+        scheduledFor: futureSendAt,
+      });
+
+      // Post-sleep: terminal transition via update, preserving scheduledFor
+      expect(executionUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "exec-sched-1" },
+          data: expect.objectContaining({
+            status: "SENT",
+            scheduledFor: futureSendAt,
+          }),
+        })
+      );
+    });
+
+    it("RELATIVE_TO_EVENT past: no SCHEDULED row; fresh terminal row carries the past sendAt", async () => {
+      const pastSendAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      mockCalculateSendDate.mockReturnValue(pastSendAt);
+
+      const executionUpdate = db.workflowStepExecution.update as jest.Mock;
+      executionCreate.mockClear();
+      executionUpdate.mockClear();
+
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({
+            triggerType: "RELATIVE_TO_EVENT",
+            stepType: "EMAIL_COACH",
+            offsetDays: -30,
+          }),
+        ],
+      });
+      findUnique.mockResolvedValue(assignment);
+
+      await invoke();
+
+      // No SCHEDULED row when sendAt is in the past
+      const scheduleCall = executionCreate.mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SCHEDULED"
+      );
+      expect(scheduleCall).toBeUndefined();
+
+      // Terminal create carries the past sendAt (not new Date() / "now")
+      const sentCall = executionCreate.mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SENT"
+      );
+      expect(sentCall).toBeDefined();
+      expect(sentCall![0].data.scheduledFor).toBe(pastSendAt);
+
+      // No update call (no SCHEDULED row to transition)
+      expect(executionUpdate).not.toHaveBeenCalled();
     });
   });
 });

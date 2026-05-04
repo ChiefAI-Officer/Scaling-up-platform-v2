@@ -500,7 +500,7 @@ describe("Workshop status API – PATCH /api/workshops/[id]/status", () => {
     expect(body.success).toBe(true);
 
     expect(db.workflowStepExecution.updateMany).toHaveBeenCalledWith({
-      where: { workshopId: "ws-1", status: "PENDING" },
+      where: { workshopId: "ws-1", status: { in: ["PENDING", "SCHEDULED"] } },
       data: { status: "CANCELED" },
     });
     expect(db.workflowAssignment.updateMany).toHaveBeenCalledWith({
