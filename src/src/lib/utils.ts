@@ -107,7 +107,7 @@ export function getWorkshopStatusExplanation(status: string): string {
     PRE_EVENT: "Approved — workshop pages are live",
     POST_EVENT: "Event concluded — collecting feedback",
     COMPLETED: "All follow-up complete",
-    DENIED: "Your workshop was denied — edit and resubmit below",
+    DENIED: "Your workshop was denied — submit a new request to run a similar event",
     CANCELED: "Workshop canceled",
   };
   return explanations[status] || "";
