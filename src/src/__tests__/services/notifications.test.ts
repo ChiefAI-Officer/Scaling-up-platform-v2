@@ -30,7 +30,8 @@ jest.mock("@/lib/ics-generator", () => ({
 }));
 
 jest.mock("@/lib/utils", () => ({
-  formatDate: jest.fn().mockReturnValue("May 1, 2026"),
+  formatTimestamp: jest.fn().mockReturnValue("May 1, 2026"),
+  formatEventDateUTC: jest.fn().mockReturnValue("Oct 1, 2026"),
   formatCurrency: jest.fn(),
   generateSlug: jest.fn(),
   getWorkshopStatusLabel: jest.fn(),

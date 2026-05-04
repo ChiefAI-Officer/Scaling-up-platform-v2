@@ -5,7 +5,8 @@ import { Suspense } from "react";
 import { db } from "@/lib/db";
 import {
   formatCurrency,
-  formatDate,
+  formatTimestamp,
+  formatEventDateUTC,
   getWorkshopStatusColor,
   getWorkshopStatusLabel,
 } from "@/lib/utils";
@@ -300,10 +301,10 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                       {workshop.coach.firstName} {workshop.coach.lastName}
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground">
-                      {formatDate(workshop.createdAt)}
+                      {formatTimestamp(workshop.createdAt)}
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground">
-                      {formatDate(workshop.eventDate)}
+                      {formatEventDateUTC(workshop.eventDate)}
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground">
                       {formatStartTime(workshop.eventTime)}

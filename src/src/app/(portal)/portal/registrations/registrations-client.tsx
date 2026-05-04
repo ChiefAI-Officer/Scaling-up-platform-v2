@@ -30,7 +30,7 @@ function toCsvCell(value: string): string {
   return `"${escaped}"`;
 }
 
-function formatDate(value: string): string {
+function formatTimestamp(value: string): string {
   if (!value) return "TBD";
   return new Date(value).toLocaleDateString("en-US", {
     month: "short",
@@ -153,7 +153,7 @@ export function RegistrationsClient({ registrations: initialRegistrations, curre
 
     const rows = filteredSorted.map((registration) => [
       registration.workshopTitle,
-      formatDate(registration.workshopDate),
+      formatTimestamp(registration.workshopDate),
       registration.firstName,
       registration.lastName,
       registration.email,
@@ -162,7 +162,7 @@ export function RegistrationsClient({ registrations: initialRegistrations, curre
       registration.amountPaidCents === 0 ? "Free" : formatCurrency(registration.amountPaidCents),
       registration.status,
       registration.attended ? "Yes" : "No",
-      formatDate(registration.registeredAt),
+      formatTimestamp(registration.registeredAt),
     ]);
 
     const csvBody = [headers, ...rows]
@@ -411,10 +411,10 @@ export function RegistrationsClient({ registrations: initialRegistrations, curre
                       {registration.workshopTitle}
                     </Link>
                     <div className="text-sm text-muted-foreground">
-                      {formatDate(registration.workshopDate)}
+                      {formatTimestamp(registration.workshopDate)}
                     </div>
                   </TableCell>
-                  <TableCell>{formatDate(registration.registeredAt)}</TableCell>
+                  <TableCell>{formatTimestamp(registration.registeredAt)}</TableCell>
                   <TableCell>
                     <Badge variant={paymentBadgeVariant(registration.paymentStatus)}>
                       {registration.paymentStatus}

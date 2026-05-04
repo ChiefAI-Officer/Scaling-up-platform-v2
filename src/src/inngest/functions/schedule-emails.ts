@@ -38,7 +38,7 @@ export const scheduleEmailSequence = inngest.createFunction(
                 variables: {
                     first_name: firstName,
                     workshop_name: workshop.title,
-                    event_date: formatDate(eventDate),
+                    event_date: formatTimestamp(eventDate),
                     event_time: workshop.eventTime || "TBD",
                     venue_name: workshop.venueName || "TBD",
                     coach_name: `${workshop.coach.firstName} ${workshop.coach.lastName}`,
@@ -57,7 +57,7 @@ export const scheduleEmailSequence = inngest.createFunction(
                     variables: {
                         first_name: firstName,
                         workshop_name: workshop.title,
-                        event_date: formatDate(eventDate),
+                        event_date: formatTimestamp(eventDate),
                         days_until: "5",
                     }
                 });
@@ -125,7 +125,7 @@ export const scheduleEmailSequence = inngest.createFunction(
     }
 );
 
-function formatDate(date: Date): string {
+function formatTimestamp(date: Date): string {
     return date.toLocaleDateString('en-US', {
         weekday: 'long',
         year: 'numeric',

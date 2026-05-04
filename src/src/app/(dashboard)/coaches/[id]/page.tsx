@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { formatDate } from "@/lib/utils";
+import { formatTimestamp, formatEventDateUTC } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
@@ -241,7 +241,7 @@ export default async function CoachDetailPage({
 
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Member Since</p>
-                  <p className="text-foreground">{formatDate(coach.createdAt)}</p>
+                  <p className="text-foreground">{formatTimestamp(coach.createdAt)}</p>
                 </div>
               </div>
 
@@ -271,7 +271,7 @@ export default async function CoachDetailPage({
                     {coach.syncedAt && (
                       <div>
                         <p className="text-xs text-muted-foreground">Last Circle Sync</p>
-                        <p className="text-sm text-muted-foreground">{formatDate(coach.syncedAt)}</p>
+                        <p className="text-sm text-muted-foreground">{formatTimestamp(coach.syncedAt)}</p>
                       </div>
                     )}
                   </div>
@@ -334,7 +334,7 @@ export default async function CoachDetailPage({
                             <p className="text-sm text-muted-foreground">{workshop.workshopType?.name}</p>
                           </td>
                           <td className="px-4 py-3 text-sm text-muted-foreground">
-                            {formatDate(workshop.eventDate)}
+                            {formatEventDateUTC(workshop.eventDate)}
                           </td>
                           <td className="px-4 py-3">
                             <Badge
@@ -393,9 +393,9 @@ export default async function CoachDetailPage({
                         </div>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        <p>Certified: {formatDate(cert.certifiedAt)}</p>
+                        <p>Certified: {formatTimestamp(cert.certifiedAt)}</p>
                         {cert.expiresAt && (
-                          <p>Expires: {formatDate(cert.expiresAt)}</p>
+                          <p>Expires: {formatTimestamp(cert.expiresAt)}</p>
                         )}
                       </div>
                     </div>
