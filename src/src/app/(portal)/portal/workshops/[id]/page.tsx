@@ -144,12 +144,16 @@ export default async function WorkshopDetailsPage({
       select: { id: true, requestData: true, requestedAt: true, status: true, counterOfferCents: true, counterOfferNote: true },
       orderBy: { requestedAt: "desc" },
     }),
-    // BUG-05: Full approval conversation history for coach view
+    // BUG-06–08: Full approval conversation history for coach view. The
+    // earlier `status !== INFO_REQUESTED` filter de-duplicated against the
+    // active info_requested view above, but it also dropped the message
+    // thread for any approval still in INFO_REQUESTED. The helper-driven
+    // wire-ups now seed messages into every approval, so de-dupe by the
+    // active row's id instead.
     db.approvalQueue.findMany({
       where: {
         workshopId: id,
         type: { in: ["WORKSHOP_REQUEST", "CUSTOM_PRICING"] },
-        status: { not: "INFO_REQUESTED" },
       },
       include: {
         messages: { orderBy: { createdAt: "asc" } },
@@ -356,14 +360,19 @@ export default async function WorkshopDetailsPage({
         </div>
       )}
 
-      {/* BUG-05: Full conversation history */}
-      {approvalHistory.some((r) => r.messages.length > 0) && (
+      {/* BUG-06–08: Full conversation history. De-dupe against the active
+          info_requested approval (rendered separately above) by id. */}
+      {approvalHistory.some(
+        (r) => r.messages.length > 0 && r.id !== infoRequestedApproval?.id
+      ) && (
         <div className="rounded-xl border border-border bg-card p-5">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Conversation History
           </h2>
           <div className="space-y-6">
-            {approvalHistory.map((record) => {
+            {approvalHistory
+              .filter((record) => record.id !== infoRequestedApproval?.id)
+              .map((record) => {
               const msgs = record.messages.map((m) => ({
                 ...m,
                 createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : m.createdAt,

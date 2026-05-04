@@ -25,6 +25,9 @@ jest.mock("@/lib/db", () => ({
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    approvalMessage: {
+      create: jest.fn().mockResolvedValue({ id: "msg-1" }),
+    },
     coach: {
       findUnique: jest.fn().mockResolvedValue(null),
     },
@@ -98,6 +101,7 @@ function setupApprovalScenario() {
   (db.$transaction as jest.Mock).mockImplementation(async (fn: (...args: unknown[]) => unknown) => {
     const tx = {
       approvalQueue: db.approvalQueue,
+      approvalMessage: db.approvalMessage,
       workshop: db.workshop,
       coach: db.coach,
     };
@@ -156,6 +160,7 @@ describe("Approval inline auto-build", () => {
     (db.$transaction as jest.Mock).mockImplementation(async (fn: (...args: unknown[]) => unknown) => {
       const tx = {
         approvalQueue: db.approvalQueue,
+        approvalMessage: db.approvalMessage,
         workshop: db.workshop,
         coach: db.coach,
       };

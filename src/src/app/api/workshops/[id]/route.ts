@@ -6,6 +6,7 @@ import { validateDateChange, MINIMUM_LEAD_TIME_DAYS } from "@/lib/workshops/lead
 import { chargeCancellationFee, createWorkshopPromotionCode } from "@/services/stripe";
 import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/templates/template-interpolation";
 import { sendCustomPriceChangeEmail } from "@/services/notifications";
+import { formatApprovalMessage } from "@/lib/approvals/approval-thread";
 import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 import { inngest } from "@/inngest/client";
 import { parseDurationHours } from "@/lib/ics-generator";
@@ -251,6 +252,8 @@ export async function PATCH(
           : actor.email;
 
         // Create CUSTOM_PRICING approval queue entry
+        // BUG-06–08: seed the coach's initial message via Prisma nested write
+        // so the approval thread is complete from creation.
         await db.approvalQueue.create({
           data: {
             type: "CUSTOM_PRICING",
@@ -267,6 +270,18 @@ export async function PATCH(
               requestedBy: actor.email,
             }),
             notes: notes ?? null,
+            messages: {
+              create: [
+                {
+                  from: "COACH",
+                  text: formatApprovalMessage({
+                    type: "REQUEST",
+                    amountCents: newPriceCents,
+                    note: notes,
+                  }),
+                },
+              ],
+            },
           },
         });
 

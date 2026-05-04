@@ -15,6 +15,7 @@ import { db } from "@/lib/db";
 import { verifyCertification } from "@/services/circle";
 import { sendApprovalRequest, sendEscalation } from "@/services/notifications";
 import { logAudit } from "@/lib/audit";
+import { formatApprovalMessage } from "@/lib/approvals/approval-thread";
 
 export type ApprovalType =
     | "WORKSHOP_REQUEST"
@@ -132,6 +133,25 @@ async function createManualApproval(
 ): Promise<ApprovalEvaluationResult> {
     const routeTo = process.env.ADMIN_EMAIL || "suzanne@scalingup.com";
 
+    // BUG-06–08: seed the initial coach message inline for CUSTOM_PRICING so
+    // the thread is complete from the moment the approval lands. Prisma
+    // nested-create is atomic with the parent insert; no $transaction needed.
+    const seedMessages =
+        input.type === "CUSTOM_PRICING"
+            ? {
+                  create: [
+                      {
+                          from: "COACH",
+                          text: formatApprovalMessage({
+                              type: "REQUEST",
+                              amountCents: input.newPriceCents ?? input.amount ?? 0,
+                              note: input.customPricingNotes,
+                          }),
+                      },
+                  ],
+              }
+            : undefined;
+
     // Create approval queue record
     const approval = await db.approvalQueue.create({
         data: {
@@ -143,6 +163,7 @@ async function createManualApproval(
             requestedBy: input.requestedBy,
             requestedAt: new Date(),
             notes: input.customPricingNotes ? input.customPricingNotes : undefined,
+            ...(seedMessages ? { messages: seedMessages } : {}),
         }
     });
 

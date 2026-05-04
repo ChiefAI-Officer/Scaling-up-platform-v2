@@ -7,6 +7,7 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { sendWorkshopApprovedEmail, sendWorkshopDeniedEmail, sendApprovalInfoRequestEmail, sendCounterOfferEmail } from "@/services/notifications";
 import { inngest } from "@/inngest/client";
 import { runAutoBuild, type AutoBuildResult } from "@/lib/auto-build-service";
+import { formatApprovalMessage, appendApprovalMessage } from "@/lib/approvals/approval-thread";
 
 const DEFAULT_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const MAX_APPROVAL_LINK_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days guardrail
@@ -108,6 +109,21 @@ export async function GET(
         // Process the action
         const newStatus = action === "approve" ? "APPROVED" : "DENIED";
 
+        // BUG-06–08: extract requested price (CUSTOM_PRICING) so the seeded
+        // message reads "Approved at $X.XX" instead of bare "Approved".
+        let approvedAmountCents: number | undefined;
+        if (newStatus === "APPROVED" && approval.type === "CUSTOM_PRICING") {
+            try {
+                const reqData = JSON.parse(approval.requestData ?? "{}") as {
+                    newPriceCents?: number;
+                    amount?: number;
+                };
+                approvedAmountCents = reqData.newPriceCents ?? reqData.amount;
+            } catch {
+                /* malformed JSON — skip the amount; "Approved" is still correct */
+            }
+        }
+
         await db.$transaction(async (tx) => {
             await tx.approvalQueue.update({
                 where: { id },
@@ -125,6 +141,22 @@ export async function GET(
                     data: { status: "DENIED" },
                 });
             }
+            // BUG-06–08: append the terminal admin message inside the same tx
+            // so the thread is complete the moment the status flips.
+            await appendApprovalMessage(tx, {
+                approvalId: id,
+                from: "ADMIN",
+                text:
+                    newStatus === "APPROVED"
+                        ? formatApprovalMessage({
+                              type: "APPROVED",
+                              amountCents: approvedAmountCents,
+                          })
+                        : formatApprovalMessage({
+                              type: "DENIED",
+                              note: "Denied via email link",
+                          }),
+            });
         });
 
         // Send notification email to coach (non-blocking)
@@ -391,6 +423,16 @@ export async function POST(
                         data: { status: "AWAITING_APPROVAL" },
                     });
                 }
+                // BUG-06–08: append admin counter-offer message inside the same tx.
+                await appendApprovalMessage(tx, {
+                    approvalId: id,
+                    from: "ADMIN",
+                    text: formatApprovalMessage({
+                        type: "COUNTER_OFFER",
+                        amountCents: counterOfferCents,
+                        note: counterOfferNote ?? undefined,
+                    }),
+                });
             });
             // Notify coach (non-blocking)
             {
@@ -497,6 +539,28 @@ export async function POST(
                     where: { id },
                     data: { status: newStatus, respondedBy: actor.email, respondedAt: new Date(), responseReason: reason },
                 });
+                // BUG-06–08: append admin terminal message inside the same tx.
+                let approvedAmountCents: number | undefined;
+                if (newStatus === "APPROVED") {
+                    try {
+                        const reqData = JSON.parse(approval.requestData ?? "{}") as {
+                            newPriceCents?: number;
+                        };
+                        approvedAmountCents = reqData.newPriceCents;
+                    } catch { /* leave undefined */ }
+                }
+                await appendApprovalMessage(tx, {
+                    approvalId: id,
+                    from: "ADMIN",
+                    text:
+                        newStatus === "APPROVED"
+                            ? formatApprovalMessage({
+                                  type: "APPROVED",
+                                  amountCents: approvedAmountCents,
+                                  note: reason,
+                              })
+                            : formatApprovalMessage({ type: "DENIED", note: reason }),
+                });
             });
             await logAudit({
                 entityType: "ApprovalQueue",
@@ -526,6 +590,19 @@ export async function POST(
                     data: { status: "DENIED" },
                 });
             }
+            // BUG-06–08: append admin terminal message inside the same tx so
+            // the thread is complete the moment the status flips.
+            await appendApprovalMessage(tx, {
+                approvalId: id,
+                from: "ADMIN",
+                text:
+                    newStatus === "APPROVED"
+                        ? formatApprovalMessage({ type: "APPROVED", note: reason })
+                        : formatApprovalMessage({
+                              type: "DENIED",
+                              note: reason || "Denied by administrator",
+                          }),
+            });
         });
 
         // Send notification email to coach (non-blocking)
