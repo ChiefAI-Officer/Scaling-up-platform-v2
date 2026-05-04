@@ -64,14 +64,10 @@ export function ThankYouPageTemplate({
   const additionalMessage = stripPlaceholders(content.additionalMessage);
   const calendarReminderText = stripPlaceholders(content.calendarReminderText);
 
-  const effectivePriceCents = workshop.earlyBirdPriceCents ?? workshop.priceCents ?? 0;
-  const shouldTrackAffiliateSale = !isPreview && !workshop.isFree && effectivePriceCents > 0;
-  const affiliateSaleAmount = (effectivePriceCents / 100).toFixed(2);
-  const affiliateOrderNumber = workshop.title || workshop.id;
-  const affiliateTrackingUrl = `https://scalingup.idevaffiliate.com/sale.php?profile=72198&idev_saleamt=${encodeURIComponent(
-    affiliateSaleAmount
-  )}&idev_ordernum=${encodeURIComponent(affiliateOrderNumber)}`;
-
+  // CHG-03: hardcoded iDev pixel removed. The page-level handler renders
+  // <CustomCodeRenderer> using LandingPage.customCode + the resolved
+  // Stripe session amount. Keeping the pixel hardcoded here would cause
+  // double-firing when admins set their own customCode on the template.
   const eventDate = new Date(workshop.eventDate).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -102,15 +98,9 @@ export function ThankYouPageTemplate({
 
   return (
     <div className="min-h-screen bg-muted">
-      {/* Affiliate tracking pixel */}
-      {shouldTrackAffiliateSale ? (
-        <img
-          src={affiliateTrackingUrl}
-          style={{ height: 0, width: 0, border: 0, position: "absolute" }}
-          alt=""
-          aria-hidden="true"
-        />
-      ) : null}
+      {/* CHG-03: iDev affiliate pixel rendered by <CustomCodeRenderer> at the
+          page handler, not here, so it can read LandingPage.customCode + the
+          resolved Stripe session amount. */}
 
       {/* Preview banner */}
       {isPreview && (

@@ -189,6 +189,10 @@ export async function POST(request: NextRequest) {
             });
         } else {
             // Create new with default SOLO_LANDING template
+            // CHG-03: customCode only appears on THANK_YOU pages, so this
+            // SOLO_LANDING create site doesn't need to copy it. We
+            // intentionally do NOT accept customCode from the request body
+            // (would be a coach-XSS path).
             landingPage = await db.landingPage.create({
                 data: {
                     workshopId,

@@ -161,11 +161,14 @@ describe("ThankYouPageTemplate", () => {
       expect(pixel).not.toBeInTheDocument();
     });
 
-    it("renders affiliate tracking pixel for paid workshops in live mode", () => {
+    // CHG-03: the hardcoded iDev pixel is no longer rendered by the
+    // template. <CustomCodeRenderer> at the page handler now reads
+    // LandingPage.customCode + the resolved Stripe session amount.
+    it("does NOT render affiliate pixel from the template (CustomCodeRenderer owns this)", () => {
       const paidWorkshop = { ...baseWorkshop, isFree: false, priceCents: 19900 };
       render(<ThankYouPageTemplate content={baseContent} workshop={paidWorkshop} isPreview={false} />);
       const pixel = document.querySelector('img[src*="idevaffiliate"]');
-      expect(pixel).toBeInTheDocument();
+      expect(pixel).not.toBeInTheDocument();
     });
   });
 });

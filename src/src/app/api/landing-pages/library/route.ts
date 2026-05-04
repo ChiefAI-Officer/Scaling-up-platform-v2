@@ -261,6 +261,10 @@ export async function POST(request: NextRequest) {
             content: finalContent,
             status: "DRAFT",
             publishedAt: null,
+            // CHG-03: copy customCode from the source LandingPage so cloned
+            // pages keep their iDev pixel. Coach-accessible routes never
+            // accept customCode from request bodies.
+            customCode: sourcePage.customCode ?? null,
           },
         });
 

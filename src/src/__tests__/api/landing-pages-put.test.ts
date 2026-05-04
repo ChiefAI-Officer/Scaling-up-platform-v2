@@ -26,6 +26,10 @@ jest.mock("@/lib/db", () => ({
       create: jest.fn(),
       update: jest.fn(),
     },
+    pageTemplate: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
   },
 }));
 

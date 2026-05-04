@@ -10,9 +10,21 @@ import { SoloLandingPageTemplate, SoloContent } from "@/components/templates/sol
 import { DuoLandingPageTemplate, DuoContent } from "@/components/templates/duo-landing-page-template";
 import { stripPlaceholders } from "@/lib/templates/template-utils";
 import { formatVenueAddress, normalizeVideoUrl } from "@/lib/templates/landing-page-overlay";
+import { resolveCustomCodeRenderer } from "@/lib/templates/resolve-custom-code-renderer";
+
+// CHG-03: paid thank-you path needs fresh data on every request. Stripe SDK
+// uses native fetch; Next.js 16 caches SC fetches by default and stale
+// payment_status: "unpaid" could be returned post-webhook. Force-dynamic
+// guarantees the SC is re-rendered each time.
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+  // CHG-03: paid checkout redirects to /workshop/[slug]?session_id=cs_test_...
+  // when a THANK_YOU LandingPage is published. The handler uses session_id
+  // to look up the registration so <CustomCodeRenderer> can fire iDev with
+  // real attribution data.
+  searchParams?: Promise<{ session_id?: string }>;
 }
 
 // Content type interfaces
@@ -105,8 +117,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function LandingPageView({ params }: PageProps) {
+export default async function LandingPageView({ params, searchParams }: PageProps) {
   const { slug } = await params;
+  const sp = (await searchParams) ?? {};
+  const sessionId = typeof sp.session_id === "string" ? sp.session_id : undefined;
 
   const landingPage = await db.landingPage.findUnique({
     where: { slug },
@@ -148,8 +162,23 @@ export default async function LandingPageView({ params }: PageProps) {
         return <DuoLandingPageTemplate content={mergedContent as DuoContent} workshop={workshop} isPreview={false} />;
       case "REGISTRATION":
         return <RegistrationPageTemplate content={mergedContent} workshop={workshop} isPreview={false} />;
-      case "THANK_YOU":
-        return <ThankYouPageTemplate content={mergedContent} workshop={workshop} isPreview={false} />;
+      case "THANK_YOU": {
+        // CHG-03: when a paid registration just landed here (session_id in
+        // the URL), resolve the registration + effective amount and render
+        // the iDev pixel via <CustomCodeRenderer>.
+        const renderer = await resolveCustomCodeRenderer({
+          sessionId,
+          workshopId: workshop.id,
+          isFree: workshop.isFree ?? false,
+          customCode: landingPage.customCode,
+        });
+        return (
+          <>
+            <ThankYouPageTemplate content={mergedContent} workshop={workshop} isPreview={false} />
+            {renderer}
+          </>
+        );
+      }
       default:
         notFound();
     }

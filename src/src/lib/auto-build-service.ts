@@ -86,7 +86,8 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
 
     let activeTemplates = await db.pageTemplate.findMany({
         where: { isActive: true, ...categoryFilter },
-        select: { id: true, templateType: true, content: true, categoryId: true },
+        // CHG-03: include customCode so it copies through to LandingPage at build time.
+        select: { id: true, templateType: true, content: true, categoryId: true, customCode: true },
     });
 
     // Deduplicate — prefer category-scoped over global for same template type
@@ -103,7 +104,8 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
     if (activeTemplates.length === 0 && workshop.categoryId) {
         activeTemplates = await db.pageTemplate.findMany({
             where: { isActive: true },
-            select: { id: true, templateType: true, content: true, categoryId: true },
+            // CHG-03: include customCode so it copies through to LandingPage at build time.
+            select: { id: true, templateType: true, content: true, categoryId: true, customCode: true },
         });
     }
 
@@ -180,6 +182,9 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
                 status: "PUBLISHED",
                 publishedAt: new Date(),
                 sourceTemplateId: tpl.id,
+                // CHG-03: copy admin-blessed customCode through at build time.
+                // Coach-accessible routes never accept customCode from request bodies.
+                customCode: tpl.customCode ?? null,
             },
         });
 
