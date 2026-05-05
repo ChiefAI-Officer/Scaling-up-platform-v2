@@ -7,6 +7,7 @@ import { autoBuildWorkshop } from "@/inngest/functions/auto-build-workshop";
 import { workshopCompletionSummary } from "@/inngest/functions/workshop-completion-summary";
 import { workshopDateChange } from "@/inngest/functions/workshop-date-change";
 import { triggerWorkflowStep } from "@/inngest/functions/trigger-workflow-step";
+import { processPaymentCompleted } from "@/inngest/functions/process-payment-completed";
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -18,5 +19,6 @@ export const { GET, POST, PUT } = serve({
         workshopCompletionSummary,
         workshopDateChange,
         triggerWorkflowStep,
+        processPaymentCompleted,
     ],
 });

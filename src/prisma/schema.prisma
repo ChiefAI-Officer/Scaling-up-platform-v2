@@ -269,6 +269,13 @@ model Registration {
   // Feb25: Marketing opt-in (Sprint 6 UI, pre-added here)
   marketingOptIn Boolean @default(false)
 
+  // Stripe webhook fix (May 2026): function-level idempotency marker for
+  // processPaymentCompleted Inngest function. NULL = side effects pending.
+  paymentProcessedAt DateTime?
+  // Stripe webhook fix (May 2026): atomic claim for at-most-once paid
+  // confirmation email. Pre-empted before SMTP send; rolled back on error.
+  notificationSentAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -281,6 +288,8 @@ model Registration {
   // to scope it to the workshop. Without this index, every paid thank-you
   // hit does a sequential scan against the registrations table.
   @@index([stripeSessionId])
+  @@index([paymentProcessedAt])
+  @@index([notificationSentAt])
   @@map("registrations")
 }
 

@@ -118,7 +118,7 @@ describe("Stripe webhook API", () => {
     expect(response.status).toBe(400);
   });
 
-  it("processes checkout completion and syncs HubSpot contact", async () => {
+  it("v5: processes checkout completion fast — single DB update, NO inline HubSpot/SMTP, emits both Inngest events", async () => {
     process.env.HUBSPOT_ACCESS_TOKEN = "test-token";
     (constructWebhookEvent as jest.Mock).mockReturnValue({
       id: "evt_1",
@@ -128,58 +128,44 @@ describe("Stripe webhook API", () => {
           id: "cs_test",
           amount_total: 49500,
           payment_intent: "pi_123",
-          metadata: {
-            registrationId: "reg-1",
-          },
+          metadata: { registrationId: "reg-1" },
         },
       },
     });
     (db.registration.findUnique as jest.Mock).mockResolvedValue({
       id: "reg-1",
       email: "user@example.com",
+      firstName: "Ari",
+      workshopId: "ws-1",
       paymentStatus: "PENDING",
       status: "PENDING_PAYMENT",
       stripePaymentId: null,
+      paymentProcessedAt: null,
     });
-    (db.registration.update as jest.Mock)
-      .mockResolvedValueOnce({
-        id: "reg-1",
-        email: "user@example.com",
-        firstName: "Ari",
-        lastName: "Stone",
-        company: "Scaling Up",
-        jobTitle: "CEO",
-        phone: "123",
-        workshop: {
-          title: "Scaling Up",
-          eventDate: new Date("2026-05-01T10:00:00.000Z"),
-          coach: {
-            firstName: "John",
-            lastName: "Smith",
-          },
-        },
-      })
-      .mockResolvedValueOnce({
-        id: "reg-1",
-        hubspotContactId: "hs_123",
-      });
-    (createOrUpdateContact as jest.Mock).mockResolvedValue("hs_123");
+    (db.registration.update as jest.Mock).mockResolvedValueOnce({});
 
     const response = await POST(
-      buildWebhookRequest({
-        signature: "good-signature",
-        body: JSON.stringify({}),
-      })
+      buildWebhookRequest({ signature: "good-signature", body: "{}" })
     );
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.received).toBe(true);
-    expect(db.registration.update).toHaveBeenCalledTimes(2);
-    expect(createOrUpdateContact).toHaveBeenCalledWith(
+    // v5: single DB update on the slim path (the 2nd HubSpot-id update is
+    // gone — handled by Inngest function instead)
+    expect(db.registration.update).toHaveBeenCalledTimes(1);
+    // v5: HubSpot is NOT called inline anymore
+    expect(createOrUpdateContact).not.toHaveBeenCalled();
+    // v5: notification is NOT called inline anymore
+    expect(sendRegistrationNotification).not.toHaveBeenCalled();
+    // v5: emits both events on fresh transition
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "registration/created" })
+    );
+    expect(inngest.send).toHaveBeenCalledWith(
       expect.objectContaining({
-        email: "user@example.com",
-        workshop_name: "Scaling Up",
+        name: "registration/payment-completed",
+        data: expect.objectContaining({ registrationId: "reg-1" }),
       })
     );
   });
@@ -257,43 +243,88 @@ describe("Stripe webhook API", () => {
     expect(db.registration.update).not.toHaveBeenCalled();
   });
 
-  it("ignores duplicate checkout completion events idempotently", async () => {
-    process.env.HUBSPOT_ACCESS_TOKEN = "test-token";
+  it("v5: skips emit when paymentProcessedAt is set (truly idempotent)", async () => {
     (constructWebhookEvent as jest.Mock).mockReturnValue({
-      id: "evt_1",
+      id: "evt_already",
       type: "checkout.session.completed",
       data: {
         object: {
-          id: "cs_test",
+          id: "cs_already",
           amount_total: 49500,
-          payment_intent: "pi_123",
-          metadata: {
-            registrationId: "reg-1",
-          },
+          payment_intent: "pi_already",
+          metadata: { registrationId: "reg-already-processed" },
         },
       },
     });
     (db.registration.findUnique as jest.Mock).mockResolvedValue({
-      id: "reg-1",
-      email: "user@example.com",
+      id: "reg-already-processed",
+      email: "done@example.com",
+      firstName: "Done",
+      workshopId: "ws-1",
       paymentStatus: "COMPLETED",
-      stripePaymentId: "pi_123",
+      status: "REGISTERED",
+      stripePaymentId: "pi_already",
+      paymentProcessedAt: new Date("2026-04-29T15:00:00Z"),
     });
 
     const response = await POST(
-      buildWebhookRequest({
-        signature: "good-signature",
-        body: JSON.stringify({}),
-      })
+      buildWebhookRequest({ signature: "good-signature", body: "{}" })
     );
 
     expect(response.status).toBe(200);
+    // True idempotency: nothing happens because paymentProcessedAt is set.
     expect(db.registration.update).not.toHaveBeenCalled();
-    expect(createOrUpdateContact).not.toHaveBeenCalled();
+    expect(inngest.send).not.toHaveBeenCalled();
   });
 
-  it("publishes registration/created Inngest event after checkout completion", async () => {
-    process.env.HUBSPOT_ACCESS_TOKEN = "test-token";
+  it("v5: CASUALTY PATH — paymentStatus=COMPLETED + paymentProcessedAt=NULL still emits payment-completed (the Apr 30 outage rows)", async () => {
+    // This is the critical bug from the Apr 30 outage: the existing
+    // duplicate guard skipped this case, leaving side effects unprocessed.
+    // v5 must emit the event so the Inngest function picks it up.
+    (constructWebhookEvent as jest.Mock).mockReturnValue({
+      id: "evt_casualty",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          id: "cs_casualty",
+          amount_total: 49500,
+          payment_intent: "pi_casualty",
+          metadata: { registrationId: "reg-casualty" },
+        },
+      },
+    });
+    (db.registration.findUnique as jest.Mock).mockResolvedValue({
+      id: "reg-casualty",
+      email: "casualty@example.com",
+      firstName: "Casualty",
+      workshopId: "ws-casualty",
+      paymentStatus: "COMPLETED", // already completed by Apr 30 attempt
+      status: "REGISTERED",
+      stripePaymentId: "pi_casualty",
+      paymentProcessedAt: null, // but side effects didn't finish
+    });
+
+    const response = await POST(
+      buildWebhookRequest({ signature: "good-signature", body: "{}" })
+    );
+
+    expect(response.status).toBe(200);
+    // No DB update (paymentStatus is already COMPLETED)
+    expect(db.registration.update).not.toHaveBeenCalled();
+    // No registration/created re-emit (already emitted on first attempt)
+    expect(inngest.send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: "registration/created" })
+    );
+    // BUT registration/payment-completed IS emitted to drive missing side effects
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "registration/payment-completed",
+        data: expect.objectContaining({ registrationId: "reg-casualty" }),
+      })
+    );
+  });
+
+  it("v5: publishes registration/created Inngest event on PENDING→COMPLETED transition only", async () => {
     (constructWebhookEvent as jest.Mock).mockReturnValue({
       id: "evt_inngest_1",
       type: "checkout.session.completed",
@@ -302,52 +333,24 @@ describe("Stripe webhook API", () => {
           id: "cs_inngest",
           amount_total: 10000,
           payment_intent: "pi_inngest",
-          metadata: {
-            registrationId: "reg-inngest",
-          },
+          metadata: { registrationId: "reg-inngest" },
         },
       },
     });
     (db.registration.findUnique as jest.Mock).mockResolvedValue({
       id: "reg-inngest",
       email: "buyer@example.com",
+      firstName: "Jane",
+      workshopId: "ws-inngest",
       paymentStatus: "PENDING",
       status: "PENDING_PAYMENT",
       stripePaymentId: null,
+      paymentProcessedAt: null,
     });
-    (db.registration.update as jest.Mock).mockResolvedValueOnce({
-      id: "reg-inngest",
-      email: "buyer@example.com",
-      firstName: "Jane",
-      lastName: "Doe",
-      company: "Acme",
-      jobTitle: "CTO",
-      phone: "555-1234",
-      workshop: {
-        id: "ws-inngest",
-        title: "Test Workshop",
-        workshopCode: "WS-2026-ABCD",
-        eventDate: new Date("2026-06-01T10:00:00.000Z"),
-        eventTime: "10:00",
-        timezone: "America/New_York",
-        duration: "2 hours",
-        format: "VIRTUAL",
-        virtualLink: "https://zoom.us/j/123",
-        coach: {
-          id: "coach-1",
-          firstName: "Coach",
-          lastName: "Smith",
-          email: "coach@example.com",
-        },
-      },
-    }).mockResolvedValue({});
-    (createOrUpdateContact as jest.Mock).mockResolvedValue("hs_inngest");
+    (db.registration.update as jest.Mock).mockResolvedValueOnce({});
 
     await POST(
-      buildWebhookRequest({
-        signature: "good-signature",
-        body: JSON.stringify({}),
-      })
+      buildWebhookRequest({ signature: "good-signature", body: "{}" })
     );
 
     expect(inngest.send).toHaveBeenCalledWith(
@@ -356,78 +359,16 @@ describe("Stripe webhook API", () => {
         data: expect.objectContaining({
           registrationId: "reg-inngest",
           workshopId: "ws-inngest",
+          email: "buyer@example.com",
+          firstName: "Jane",
         }),
       })
     );
   });
 
-  it("sends registration notification after checkout completion", async () => {
-    process.env.HUBSPOT_ACCESS_TOKEN = "test-token";
-    (constructWebhookEvent as jest.Mock).mockReturnValue({
-      id: "evt_notif_1",
-      type: "checkout.session.completed",
-      data: {
-        object: {
-          id: "cs_notif",
-          amount_total: 10000,
-          payment_intent: "pi_notif",
-          metadata: {
-            registrationId: "reg-notif",
-          },
-        },
-      },
-    });
-    (db.registration.findUnique as jest.Mock).mockResolvedValue({
-      id: "reg-notif",
-      email: "notif@example.com",
-      paymentStatus: "PENDING",
-      status: "PENDING_PAYMENT",
-      stripePaymentId: null,
-    });
-    (db.registration.update as jest.Mock).mockResolvedValueOnce({
-      id: "reg-notif",
-      email: "notif@example.com",
-      firstName: "Notify",
-      lastName: "User",
-      company: "TestCo",
-      jobTitle: null,
-      phone: "555-0000",
-      workshop: {
-        id: "ws-notif",
-        title: "Notification Workshop",
-        workshopCode: "WS-2026-NOTF",
-        eventDate: new Date("2026-06-15T09:00:00.000Z"),
-        eventTime: "09:00",
-        timezone: "America/New_York",
-        duration: "2 hours",
-        format: "VIRTUAL",
-        virtualLink: "https://zoom.us/j/456",
-        coach: {
-          id: "coach-2",
-          firstName: "Notify",
-          lastName: "Coach",
-          email: "ncoach@example.com",
-        },
-      },
-    }).mockResolvedValue({});
-    (createOrUpdateContact as jest.Mock).mockResolvedValue("hs_notif");
-
-    await POST(
-      buildWebhookRequest({
-        signature: "good-signature",
-        body: JSON.stringify({}),
-      })
-    );
-
-    expect(sendRegistrationNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        workshopId: "ws-notif",
-        workshopTitle: "Notification Workshop",
-        coachEmail: "ncoach@example.com",
-        registrantEmail: "notif@example.com",
-      })
-    );
-  });
+  // v5: notification is no longer sent inline from the webhook — it's
+  // handled by the processPaymentCompleted Inngest function with strict
+  // retry semantics. See process-payment-completed.test.ts for coverage.
 
   it("cancels PENDING registration when checkout.session.expired fires", async () => {
     (constructWebhookEvent as jest.Mock).mockReturnValue({
@@ -484,8 +425,7 @@ describe("Stripe webhook API", () => {
     expect(db.registration.updateMany).not.toHaveBeenCalled();
   });
 
-  it("processes payment_intent.succeeded when registrationId metadata exists", async () => {
-    process.env.HUBSPOT_ACCESS_TOKEN = "test-token";
+  it("v5: payment_intent.succeeded fallback uses same slim path — emits BOTH events on fresh transition", async () => {
     (constructWebhookEvent as jest.Mock).mockReturnValue({
       id: "evt_pi_1",
       type: "payment_intent.succeeded",
@@ -494,58 +434,42 @@ describe("Stripe webhook API", () => {
           id: "pi_789",
           amount: 29900,
           amount_received: 29900,
-          metadata: {
-            registrationId: "reg-2",
-          },
+          metadata: { registrationId: "reg-2" },
         },
       },
     });
-
     (db.registration.findUnique as jest.Mock).mockResolvedValue({
       id: "reg-2",
       email: "paid@example.com",
+      firstName: "Pay",
+      workshopId: "ws-2",
       paymentStatus: "PENDING",
       status: "PENDING_PAYMENT",
       stripePaymentId: null,
+      paymentProcessedAt: null,
     });
-
-    (db.registration.update as jest.Mock)
-      .mockResolvedValueOnce({
-        id: "reg-2",
-        email: "paid@example.com",
-        firstName: "Pay",
-        lastName: "User",
-        company: "Scaling Up",
-        jobTitle: "Owner",
-        phone: "123",
-        workshop: {
-          title: "Paid Workshop",
-          eventDate: new Date("2026-05-01T10:00:00.000Z"),
-          coach: {
-            firstName: "Coach",
-            lastName: "One",
-          },
-        },
-      })
-      .mockResolvedValueOnce({
-        id: "reg-2",
-        hubspotContactId: "hs_paid_1",
-      });
-    (createOrUpdateContact as jest.Mock).mockResolvedValue("hs_paid_1");
+    (db.registration.update as jest.Mock).mockResolvedValueOnce({});
 
     const response = await POST(
-      buildWebhookRequest({
-        signature: "good-signature",
-        body: JSON.stringify({}),
-      })
+      buildWebhookRequest({ signature: "good-signature", body: "{}" })
     );
 
     expect(response.status).toBe(200);
-    expect(db.registration.update).toHaveBeenCalledTimes(2);
-    expect(createOrUpdateContact).toHaveBeenCalledWith(
+    // v5 slim: single update, NO inline HubSpot/notification
+    expect(db.registration.update).toHaveBeenCalledTimes(1);
+    expect(createOrUpdateContact).not.toHaveBeenCalled();
+    expect(sendRegistrationNotification).not.toHaveBeenCalled();
+    // Both events emitted on fresh transition; payment-completed includes the source
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "registration/created" })
+    );
+    expect(inngest.send).toHaveBeenCalledWith(
       expect.objectContaining({
-        email: "paid@example.com",
-        workshop_name: "Paid Workshop",
+        name: "registration/payment-completed",
+        data: expect.objectContaining({
+          registrationId: "reg-2",
+          source: "payment_intent.succeeded",
+        }),
       })
     );
   });
