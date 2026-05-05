@@ -213,6 +213,7 @@ export async function GET(
             try {
                 await inngest.send({
                     name: "workshop/approved",
+                    id: `workshop-approved-${approval.workshopId}-${id}`,
                     data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
                 });
             } catch (err) {
@@ -657,6 +658,7 @@ export async function POST(
             try {
                 await inngest.send({
                     name: "workshop/approved",
+                    id: `workshop-approved-${approval.workshopId}-${id}`,
                     data: { approvalId: id, workshopId: approval.workshopId, coachId: approval.coachId || "" },
                 });
             } catch (err) {

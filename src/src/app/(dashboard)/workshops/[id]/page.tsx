@@ -541,9 +541,7 @@ export default async function WorkshopDetailPage({
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                  <Badge variant={executionStatusVariant(status)}>
-                                    {status}
-                                  </Badge>
+                                  {/* BUG-MAY4-3: per-step badge removed — step fires per-recipient, no single status */}
                                   <TriggerNowButton
                                     stepId={step.id}
                                     workshopId={workshop.id}

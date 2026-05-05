@@ -464,6 +464,7 @@ describe("Approval respond API", () => {
     expect(body.pagesCreated).toBeDefined();
     expect(inngest.send).toHaveBeenCalledWith({
       name: "workshop/approved",
+      id: "workshop-approved-ws-100-apr-4",
       data: {
         approvalId: "apr-4",
         workshopId: "ws-100",

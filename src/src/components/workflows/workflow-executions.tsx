@@ -189,9 +189,7 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
                         )}
                       </div>
                     </div>
-                    <Badge variant={statusInfo.variant}>
-                      {statusInfo.label}
-                    </Badge>
+                    {/* BUG-MAY4-3: per-step badge removed — a step can have N recipients with mixed outcomes */}
                   </div>
                 );
               })}

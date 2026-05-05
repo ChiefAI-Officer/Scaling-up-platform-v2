@@ -239,16 +239,32 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
         },
     });
 
-    // Step 7: Send coach notification email
-    await sendWorkshopBuiltEmail({
-        coachEmail: workshop.coach.email,
-        coachName: `${workshop.coach.firstName} ${workshop.coach.lastName}`,
-        workshopTitle: workshop.title,
-        workshopId: workshop.id,
-        pagesCreated: created,
-        preEventWorkflow: preEventWorkflow?.name || null,
-        postEventWorkflow: postEventWorkflow?.name || null,
+    // Step 7: Send coach notification email — atomic claim prevents duplicate sends
+    // on concurrent approval paths (GET email link + POST dashboard both call runAutoBuild).
+    const { count: emailClaimed } = await db.workshop.updateMany({
+        where: { id: workshopId, workshopBuiltEmailSentAt: null },
+        data: { workshopBuiltEmailSentAt: new Date() },
     });
+    if (emailClaimed > 0) {
+        try {
+            await sendWorkshopBuiltEmail({
+                coachEmail: workshop.coach.email,
+                coachName: `${workshop.coach.firstName} ${workshop.coach.lastName}`,
+                workshopTitle: workshop.title,
+                workshopId: workshop.id,
+                pagesCreated: created,
+                preEventWorkflow: preEventWorkflow?.name || null,
+                postEventWorkflow: postEventWorkflow?.name || null,
+            });
+        } catch (e) {
+            // SMTP failed after claim — clear so a future retry can re-attempt
+            await db.workshop.update({
+                where: { id: workshopId },
+                data: { workshopBuiltEmailSentAt: null },
+            });
+            throw e;
+        }
+    }
 
     return {
         success: true,
