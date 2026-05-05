@@ -72,12 +72,23 @@ type WorkflowStepTrigger = {
     };
 };
 
+// Stripe webhook fix (May 2026, plan v5): drives the processPaymentCompleted
+// Inngest function which handles HubSpot sync + strict notification + marks
+// the row processed. Emitted by the slim Stripe webhook handler.
+type RegistrationPaymentCompleted = {
+    data: {
+        registrationId: string;
+        source: "checkout.session.completed" | "payment_intent.succeeded" | "recovery";
+    };
+};
+
 type Events = {
     "workshop/created": WorkshopCreated;
     "workshop/approved": WorkshopApproved;
     "workshop/completed": WorkshopCompleted;
     "workshop/date-changed": WorkshopDateChanged;
     "registration/created": RegistrationCreated;
+    "registration/payment-completed": RegistrationPaymentCompleted;
     "approval/requested": ApprovalRequested;
     "workflow/schedule": WorkflowSchedule;
     "workflow/step.execute": WorkflowStepExecute;

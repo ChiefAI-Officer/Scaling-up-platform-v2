@@ -1121,3 +1121,93 @@ async function sendTeamsNotification(data: { title: string; text: string; link: 
         console.error("Failed to send Teams notification:", error);
     }
 }
+
+/**
+ * STRICT variant of registration notification — Stripe webhook fix (May 2026 v5).
+ *
+ * Calls sendEmailViaSMTP DIRECTLY (no try/catch swallow), so SMTP failures
+ * propagate to the caller. Use ONLY in retryable contexts (the
+ * processPaymentCompleted Inngest function step). Inngest's retry semantics
+ * are what make this safe — a thrown error retries the step, not silent loss.
+ *
+ * Sends 3 emails, same as the silent variant:
+ *   1. admin notification
+ *   2. coach notification
+ *   3. attendee confirmation (with ICS calendar attachment)
+ *
+ * If any of the 3 fails, the whole helper throws and Inngest retries the
+ * entire step — emails already sent on this attempt may resend on retry.
+ * Acceptable for paid-registration confirmations: better duplicate than missing.
+ */
+export async function sendPaidRegistrationNotificationStrict(data: {
+    workshopId?: string;
+    workshopTitle: string;
+    workshopCode: string | null;
+    coachEmail: string;
+    coachName: string;
+    registrantName: string;
+    registrantEmail: string;
+    registrantCompany?: string;
+    icsAttachment: { filename: string; content: string };
+}): Promise<void> {
+    const codeLabel = data.workshopCode ? ` [${data.workshopCode}]` : "";
+
+    const adminCoachHtml = `
+    <h2>New Registration${codeLabel}: ${data.workshopTitle}</h2>
+    <p><strong>Registrant:</strong> ${data.registrantName}</p>
+    <p><strong>Email:</strong> ${data.registrantEmail}</p>
+    ${data.registrantCompany ? `<p><strong>Company:</strong> ${data.registrantCompany}</p>` : ""}
+    <p><strong>Workshop:</strong> ${data.workshopTitle}</p>
+    <p><strong>Coach:</strong> ${data.coachName}</p>
+    `;
+
+    const attachments: SmtpAttachment[] = [{
+        filename: data.icsAttachment.filename,
+        content: data.icsAttachment.content,
+        contentType: "text/calendar",
+    }];
+
+    // Admin email — strict (propagates SMTP errors).
+    await sendEmailViaSMTP({
+        to: process.env.ADMIN_EMAIL || "admin@scalingup.com",
+        subject: `[Registration] ${data.registrantName} registered for ${data.workshopTitle}`,
+        html: adminCoachHtml,
+        telemetry: {
+            workshopId: data.workshopId,
+            workshopCode: data.workshopCode || undefined,
+            recipientRole: "STAFF" as const,
+        },
+    });
+
+    // Coach email — strict.
+    await sendEmailViaSMTP({
+        to: data.coachEmail,
+        subject: `New registration: ${data.registrantName} for ${data.workshopTitle}`,
+        html: adminCoachHtml,
+        telemetry: {
+            workshopId: data.workshopId,
+            workshopCode: data.workshopCode || undefined,
+            recipientRole: "COACH" as const,
+        },
+    });
+
+    // Attendee confirmation — strict, includes ICS attachment.
+    await sendEmailViaSMTP({
+        to: data.registrantEmail,
+        subject: `You're Registered: ${data.workshopTitle}`,
+        html: `
+        <h2>You're Registered!</h2>
+        <p>Hi ${data.registrantName},</p>
+        <p>You're confirmed for <strong>${data.workshopTitle}</strong> with ${data.coachName}.</p>
+        <p>We've attached a calendar file (.ics) so you can add this event to your calendar.</p>
+        <p>See you there!</p>
+        <p>— The Scaling Up Team</p>
+        `,
+        attachments,
+        telemetry: {
+            workshopId: data.workshopId,
+            workshopCode: data.workshopCode || undefined,
+            recipientRole: "ATTENDEE" as const,
+        },
+    });
+}

@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { constructWebhookEvent } from "@/services/stripe";
-import { createOrUpdateContact } from "@/services/hubspot";
 import { inngest } from "@/inngest/client";
-import { sendRegistrationNotification } from "@/services/notifications";
-import {
-  generateIcsContent,
-  parseDurationHours,
-  buildLocationString,
-} from "@/lib/ics-generator";
 import Stripe from "stripe";
+
+// Stripe webhook fix (May 2026): pin runtime + extend timeout. Heavy work
+// is offloaded to the processPaymentCompleted Inngest function so this
+// handler stays well under 2s; the maxDuration=30 is a safety margin.
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
@@ -84,58 +84,18 @@ export async function POST(request: NextRequest) {
   }
 }
 
-interface RegistrationWithWorkshopForSync {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  company: string | null;
-  jobTitle: string | null;
-  phone: string | null;
-  workshop: {
-    title: string;
-    eventDate: Date;
-    coach: {
-      firstName: string;
-      lastName: string;
-    };
-  };
-}
-
-async function syncRegistrationToHubSpot(
-  registration: RegistrationWithWorkshopForSync,
-  registrationId: string
-) {
-  if (!process.env.HUBSPOT_ACCESS_TOKEN) {
-    console.warn("HUBSPOT_ACCESS_TOKEN is not set; skipping HubSpot sync");
-    return;
-  }
-
-  try {
-    const hubspotContactId = await createOrUpdateContact({
-      email: registration.email,
-      firstname: registration.firstName,
-      lastname: registration.lastName,
-      company: registration.company || undefined,
-      jobtitle: registration.jobTitle || undefined,
-      phone: registration.phone || undefined,
-      workshop_name: registration.workshop.title,
-      workshop_date: registration.workshop.eventDate.toISOString(),
-      coach_name: `${registration.workshop.coach.firstName} ${registration.workshop.coach.lastName}`,
-    });
-
-    await db.registration.update({
-      where: { id: registrationId },
-      data: { hubspotContactId },
-    });
-
-    console.log(`HubSpot contact synced: ${hubspotContactId}`);
-  } catch (error) {
-    console.error("Failed to sync to HubSpot:", error);
-    // Don't fail the webhook - HubSpot sync can be retried
-  }
-}
-
+/**
+ * Stripe webhook fix (May 2026, v5):
+ * Slim handler — verifies the payment in DB and emits two Inngest events.
+ * All slow side effects (HubSpot, SMTP+ICS) are handled by the
+ * processPaymentCompleted Inngest function with retries + idempotency.
+ *
+ * Idempotency:
+ *  - Skip emit ONLY when paymentProcessedAt is set (truly done).
+ *  - paymentStatus=COMPLETED with paymentProcessedAt=NULL is the casualty
+ *    class from the Apr 30 outage and MUST emit the event so side effects
+ *    are processed.
+ */
 async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const { registrationId } = session.metadata || {};
   const paymentIntentId =
@@ -153,9 +113,12 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     select: {
       id: true,
       email: true,
+      firstName: true,
+      workshopId: true,
       paymentStatus: true,
       status: true,
       stripePaymentId: true,
+      paymentProcessedAt: true,
     },
   });
 
@@ -164,97 +127,73 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     return;
   }
 
-  if (
-    existing.paymentStatus === "COMPLETED" &&
-    existing.stripePaymentId &&
-    paymentIntentId &&
-    existing.stripePaymentId === paymentIntentId
-  ) {
-    console.log(`Duplicate checkout.session.completed ignored for registration ${registrationId}`);
-    return;
-  }
-
-  // Don't overwrite cancelled registrations
+  // Never re-instate a cancelled registration
   if (existing.status === "CANCELLED") {
     console.log(`Skipping checkout completion for CANCELLED registration ${registrationId}`);
     return;
   }
 
-  // Update registration with payment info
-  const registration = await db.registration.update({
-    where: { id: registrationId },
-    data: {
-      paymentStatus: "COMPLETED",
-      stripePaymentId: paymentIntentId,
-      amountPaidCents: session.amount_total || 0,
-      status: "REGISTERED",
-    },
-    include: {
-      workshop: {
-        include: {
-          workshopType: true,
-          coach: true,
-        },
+  // v5 idempotency: skip ONLY when side effects are truly done.
+  if (existing.paymentProcessedAt) {
+    console.log(`paymentProcessedAt set — skipping emit for registration ${registrationId}`);
+    return;
+  }
+
+  // Fresh PENDING → COMPLETED transition: update payment fields and emit
+  // registration/created (drives existing scheduleEmailSequence). Stripe
+  // retries land here with paymentStatus already COMPLETED, which means we
+  // skip the update + registration/created emit but still emit the
+  // payment-completed event below to trigger missing side effects.
+  const justTransitioned = existing.paymentStatus !== "COMPLETED";
+  if (justTransitioned) {
+    await db.registration.update({
+      where: { id: registrationId },
+      data: {
+        paymentStatus: "COMPLETED",
+        stripePaymentId: paymentIntentId,
+        amountPaidCents: session.amount_total || 0,
+        status: "REGISTERED",
       },
-    },
-  });
+    });
 
-  await syncRegistrationToHubSpot(registration, registrationId);
-
-  // Publish registration/created event now that payment is confirmed.
-  // For paid workshops, this is deferred from registration creation to here.
-  if (existing.paymentStatus !== "COMPLETED") {
     try {
       await inngest.send({
         name: "registration/created",
         data: {
-          registrationId: registration.id,
-          workshopId: registration.workshop.id,
-          email: registration.email,
-          firstName: registration.firstName,
+          registrationId: existing.id,
+          workshopId: existing.workshopId,
+          email: existing.email,
+          firstName: existing.firstName,
         },
       });
     } catch (error) {
       console.error("Failed to publish registration/created event:", error);
     }
+  }
 
-    try {
-      const workshop = registration.workshop;
-      const coach = workshop.coach;
-      const icsContent = generateIcsContent({
-        uid: `workshop-${workshop.id}@scaling-up-platform.com`,
-        title: workshop.title,
-        description: workshop.description,
-        eventDate: workshop.eventDate,
-        eventTime: workshop.eventTime,
-        timezone: workshop.timezone,
-        durationHours: parseDurationHours(workshop.duration),
-        location: buildLocationString(workshop),
-      });
-      const safeTitle = workshop.title
-        .replace(/[^a-zA-Z0-9-_ ]/g, "")
-        .replace(/\s+/g, "-")
-        .substring(0, 50);
-
-      await sendRegistrationNotification({
-        workshopId: workshop.id,
-        workshopTitle: workshop.title,
-        workshopCode: workshop.workshopCode,
-        coachEmail: coach.email,
-        coachName: `${coach.firstName} ${coach.lastName}`,
-        registrantName: `${registration.firstName} ${registration.lastName}`,
-        registrantEmail: registration.email,
-        registrantCompany: registration.company ?? undefined,
-        icsAttachment: { filename: `${safeTitle}.ics`, content: icsContent },
-      });
-    } catch (error) {
-      console.error("Failed to send registration notification:", error);
-    }
+  // Always emit registration/payment-completed when paymentProcessedAt is null.
+  // Inngest function handles HubSpot sync, strict notification, and marks
+  // paymentProcessedAt at the end. This is the casualty-class recovery path:
+  // even on Stripe retries (where existing.paymentStatus is already COMPLETED),
+  // we re-emit so missed side effects from the Apr 30 outage get processed.
+  try {
+    await inngest.send({
+      name: "registration/payment-completed",
+      data: { registrationId, source: "checkout.session.completed" },
+    });
+  } catch (error) {
+    console.error("Failed to publish registration/payment-completed event:", error);
   }
 
   console.log(`Payment completed for registration: ${registrationId}`);
 }
 
+/**
+ * Fallback handler for payment_intent.succeeded events. Same v5 semantics
+ * as handleCheckoutComplete; checkout.session.completed is the canonical
+ * trigger but if Stripe sends payment_intent.succeeded first/instead, this
+ * picks it up safely.
+ */
 async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
   const { registrationId } = paymentIntent.metadata || {};
   if (!registrationId) {
@@ -267,9 +206,12 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     select: {
       id: true,
       email: true,
+      firstName: true,
+      workshopId: true,
       paymentStatus: true,
       status: true,
       stripePaymentId: true,
+      paymentProcessedAt: true,
     },
   });
 
@@ -278,87 +220,50 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
     return;
   }
 
-  if (
-    existing.paymentStatus === "COMPLETED" &&
-    existing.stripePaymentId &&
-    existing.stripePaymentId === paymentIntent.id
-  ) {
-    console.log(`Duplicate payment_intent.succeeded ignored for registration ${registrationId}`);
-    return;
-  }
-
   if (existing.status === "CANCELLED") {
     console.log(`Skipping payment_intent.succeeded for CANCELLED registration ${registrationId}`);
     return;
   }
 
-  const registration = await db.registration.update({
-    where: { id: registrationId },
-    data: {
-      paymentStatus: "COMPLETED",
-      stripePaymentId: paymentIntent.id,
-      amountPaidCents: paymentIntent.amount_received || paymentIntent.amount || 0,
-      status: "REGISTERED",
-    },
-    include: {
-      workshop: {
-        include: {
-          coach: true,
-        },
+  if (existing.paymentProcessedAt) {
+    console.log(`paymentProcessedAt set — skipping emit for registration ${registrationId}`);
+    return;
+  }
+
+  const justTransitioned = existing.paymentStatus !== "COMPLETED";
+  if (justTransitioned) {
+    await db.registration.update({
+      where: { id: registrationId },
+      data: {
+        paymentStatus: "COMPLETED",
+        stripePaymentId: paymentIntent.id,
+        amountPaidCents: paymentIntent.amount_received || paymentIntent.amount || 0,
+        status: "REGISTERED",
       },
-    },
-  });
+    });
 
-  await syncRegistrationToHubSpot(registration, registrationId);
-
-  // Publish Inngest event + send notifications if not already done by checkout handler
-  if (existing.paymentStatus !== "COMPLETED") {
     try {
       await inngest.send({
         name: "registration/created",
         data: {
-          registrationId: registration.id,
-          workshopId: registration.workshop.id,
-          email: registration.email,
-          firstName: registration.firstName,
+          registrationId: existing.id,
+          workshopId: existing.workshopId,
+          email: existing.email,
+          firstName: existing.firstName,
         },
       });
     } catch (error) {
       console.error("Failed to publish registration/created event (payment_intent):", error);
     }
+  }
 
-    try {
-      const workshop = registration.workshop;
-      const coach = workshop.coach;
-      const icsContent = generateIcsContent({
-        uid: `workshop-${workshop.id}@scaling-up-platform.com`,
-        title: workshop.title,
-        description: workshop.description,
-        eventDate: workshop.eventDate,
-        eventTime: workshop.eventTime,
-        timezone: workshop.timezone,
-        durationHours: parseDurationHours(workshop.duration),
-        location: buildLocationString(workshop),
-      });
-      const safeTitle = workshop.title
-        .replace(/[^a-zA-Z0-9-_ ]/g, "")
-        .replace(/\s+/g, "-")
-        .substring(0, 50);
-
-      await sendRegistrationNotification({
-        workshopId: workshop.id,
-        workshopTitle: workshop.title,
-        workshopCode: workshop.workshopCode,
-        coachEmail: coach.email,
-        coachName: `${coach.firstName} ${coach.lastName}`,
-        registrantName: `${registration.firstName} ${registration.lastName}`,
-        registrantEmail: registration.email,
-        registrantCompany: registration.company ?? undefined,
-        icsAttachment: { filename: `${safeTitle}.ics`, content: icsContent },
-      });
-    } catch (error) {
-      console.error("Failed to send registration notification (payment_intent):", error);
-    }
+  try {
+    await inngest.send({
+      name: "registration/payment-completed",
+      data: { registrationId, source: "payment_intent.succeeded" },
+    });
+  } catch (error) {
+    console.error("Failed to publish registration/payment-completed event (payment_intent):", error);
   }
 
   console.log(`Payment intent succeeded for registration: ${registrationId}`);
