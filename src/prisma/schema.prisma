@@ -207,6 +207,9 @@ model Workshop {
   // JV-27: Terms acceptance
   termsAcceptedAt DateTime?
 
+  // BUG-MAY4-2: atomic guard — set when the "Workshop Ready" email is sent (null = not yet sent)
+  workshopBuiltEmailSentAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

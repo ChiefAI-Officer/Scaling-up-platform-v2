@@ -13,6 +13,7 @@ jest.mock("@/lib/db", () => ({
     workshop: {
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     landingPage: {
       findUnique: jest.fn(),
@@ -118,6 +119,7 @@ function setupSuccessScenario() {
   (db.workflow.findFirst as jest.Mock).mockResolvedValue(null); // no workflows
   (db.landingPage.findFirst as jest.Mock).mockResolvedValue({ slug: "test-solo-slug" });
   (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
+  (db.workshop.updateMany as jest.Mock).mockResolvedValue({ count: 1 }); // email claim succeeds
 }
 
 // --- Tests ---
