@@ -1302,6 +1302,84 @@ describe("execute-workflow Inngest function", () => {
   });
 
   // ------------------------------------------------------------------
+  // BUG-MAY4-1b: 0-attendees → SKIPPED (not false SENT)
+  // ------------------------------------------------------------------
+  describe("BUG-MAY4-1b: zero-registrant steps record SKIPPED, not SENT", () => {
+    it("EMAIL_ATTENDEES with 0 registrants: records SKIPPED, sends no emails", async () => {
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({
+            stepType: "EMAIL_ATTENDEES",
+            subject: "Hi",
+            body: "Body",
+          }),
+        ],
+      });
+      findUnique.mockResolvedValue(assignment);
+      registrationFindMany.mockResolvedValue([]); // 0 registrants
+
+      await invoke();
+
+      expect(mockSendEmail).not.toHaveBeenCalled();
+      const sentCall = executionCreate.mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SENT"
+      );
+      expect(sentCall).toBeUndefined();
+      const skippedCall = executionCreate.mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SKIPPED"
+      );
+      expect(skippedCall).toBeDefined();
+    });
+
+    it("SEND_SURVEY_LINK with 0 registrants: records SKIPPED with 'no recipients' reason", async () => {
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({
+            id: "step-survey",
+            stepType: "SEND_SURVEY_LINK",
+            subject: "Survey",
+            body: "Take it",
+          }),
+        ],
+      });
+      findUnique.mockResolvedValue(assignment);
+      registrationFindMany.mockResolvedValue([]);
+
+      await invoke();
+
+      expect(mockSendEmail).not.toHaveBeenCalled();
+      expect(mockGetOrCreateSurveyLink).not.toHaveBeenCalled();
+      const skippedCall = executionCreate.mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SKIPPED"
+      );
+      expect(skippedCall).toBeDefined();
+    });
+
+    it("SEND_FILE_LINK with 0 registrants: records SKIPPED, sends no emails", async () => {
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({
+            id: "step-files",
+            stepType: "SEND_FILE_LINK",
+            subject: "Files",
+            body: "Get them",
+          }),
+        ],
+      });
+      findUnique.mockResolvedValue(assignment);
+      registrationFindMany.mockResolvedValue([]);
+
+      await invoke();
+
+      expect(mockSendEmail).not.toHaveBeenCalled();
+      const skippedCall = executionCreate.mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SKIPPED"
+      );
+      expect(skippedCall).toBeDefined();
+    });
+  });
+
+  // ------------------------------------------------------------------
   // BUG-09: scheduledFor preservation
   // ------------------------------------------------------------------
   describe("BUG-09 scheduledFor preservation", () => {

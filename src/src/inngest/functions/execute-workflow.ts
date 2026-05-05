@@ -18,6 +18,7 @@ import {
   scheduleWorkflowExecution,
   recordWorkflowExecution,
 } from "@/lib/workflows/record-workflow-execution";
+import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
 import { buildLocationString } from "@/lib/ics-generator";
 import {
   buildProtectedEmailAttachments,
@@ -94,8 +95,16 @@ export const executeWorkflow = inngest.createFunction(
     const { workflow, workshop } = assignment;
     const appUrl = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
-    // eventDate may be serialized to string through Inngest step.run
-    const eventDate = new Date(workshop.eventDate);
+    // BUG-MAY4-1a: Workshop.eventDate is stored as midnight UTC; the actual
+    // time-of-day lives in workshop.eventTime ("16:00 - 18:00") and the IANA
+    // zone in workshop.timezone. Combine them to the true start moment so
+    // calculateSendDate offsets land on real wall-clock times instead of
+    // ~20 hours before the event.
+    const eventDate = resolveEventStartMoment({
+      eventDate: new Date(workshop.eventDate),
+      eventTime: workshop.eventTime,
+      timezone: workshop.timezone,
+    });
 
     // Build context for variable interpolation
     const baseContext: WorkflowContext = {
@@ -349,14 +358,16 @@ export const executeWorkflow = inngest.createFunction(
                 });
               }
 
-              // Record execution (BUG-09: preserve scheduledFor + transition SCHEDULED row)
+              // BUG-MAY4-1b: 0 registrants → SKIPPED (not false SENT)
+              const emailsSent = sentEmails.size;
               await recordWorkflowExecution(db, {
                 executionId,
                 stepId: workflowStep.id,
                 workshopId: workshop.id,
-                status: "SENT",
+                status: emailsSent > 0 ? "SENT" : "SKIPPED",
                 scheduledFor: effectiveScheduledFor,
                 executedAt: new Date(),
+                ...(emailsSent === 0 ? { error: "No recipients at scheduled time" } : {}),
               });
 
               stepsExecuted++;
