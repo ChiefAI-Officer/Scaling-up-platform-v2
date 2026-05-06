@@ -397,6 +397,19 @@ export const executeWorkflow = inngest.createFunction(
                 select: { id: true, email: true, firstName: true, lastName: true, company: true },
               });
 
+              if (registrations.length === 0) {
+                await recordWorkflowExecution(db, {
+                  executionId,
+                  stepId: workflowStep.id,
+                  workshopId: workshop.id,
+                  status: "SKIPPED",
+                  scheduledFor: effectiveScheduledFor,
+                  executedAt: new Date(),
+                  error: "No recipients at scheduled time",
+                });
+                return;
+              }
+
               const surveyType = resolveSurveyType(workflowStep);
               let sentCount = 0;
               for (const reg of registrations) {
@@ -550,6 +563,7 @@ export const executeWorkflow = inngest.createFunction(
               });
               const fileLinks = buildFileLinksHtml(protectedLinks);
 
+              let fileEmailsSent = 0;
               for (const reg of registrations) {
                 const personalContext: WorkflowContext = {
                   ...baseContext,
@@ -584,18 +598,20 @@ export const executeWorkflow = inngest.createFunction(
                     },
                   },
                 });
+                fileEmailsSent++;
               }
 
               await recordWorkflowExecution(db, {
                 executionId,
                 stepId: workflowStep.id,
                 workshopId: workshop.id,
-                status: "SENT",
+                status: fileEmailsSent > 0 ? "SENT" : "SKIPPED",
                 scheduledFor: effectiveScheduledFor,
                 executedAt: new Date(),
+                ...(fileEmailsSent === 0 ? { error: "No recipients at scheduled time" } : {}),
               });
 
-              stepsExecuted++;
+              if (fileEmailsSent > 0) stepsExecuted++;
               return;
             }
 

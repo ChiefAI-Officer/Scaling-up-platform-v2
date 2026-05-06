@@ -15,6 +15,7 @@ import {
     type WorkflowContext,
 } from "@/lib/workflows/workflow-service";
 import { STEP_TYPES, TRIGGER_TYPES } from "@/lib/workflows/workflow-types";
+import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
 import { buildLocationString } from "@/lib/ics-generator";
 import {
     buildProtectedEmailAttachments,
@@ -106,7 +107,15 @@ export const triggerWorkflowStep = inngest.createFunction(
 
         const appUrl =
             process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
-        const eventDate = new Date(workshop.eventDate);
+        // BUG-MAY4 follow-on: workshop.eventDate is midnight UTC; the actual event
+        // start is in eventTime + timezone. Resolve to the true UTC moment so the
+        // workshopDate / workshopTime context vars match what users actually see
+        // in their inbox — same swap execute-workflow.ts already got in BUG-MAY4-1a.
+        const eventDate = resolveEventStartMoment({
+            eventDate: new Date(workshop.eventDate),
+            eventTime: workshop.eventTime,
+            timezone: workshop.timezone,
+        });
 
         const baseContext: WorkflowContext = {
             workshopTitle: workshop.title,

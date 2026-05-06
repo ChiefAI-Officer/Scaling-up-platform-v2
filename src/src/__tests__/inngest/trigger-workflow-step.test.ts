@@ -43,6 +43,10 @@ jest.mock("@/lib/workflows/workflow-service", () => ({
     interpolateTemplate: jest.fn((input: string) => input),
 }));
 
+jest.mock("@/lib/workflows/resolve-event-start-moment", () => ({
+    resolveEventStartMoment: jest.fn(),
+}));
+
 jest.mock("@/lib/workflows/workflow-types", () => ({
     STEP_TYPES: {
         EMAIL_ATTENDEES: "EMAIL_ATTENDEES",
@@ -95,6 +99,8 @@ jest.mock("@/lib/surveys/survey-automation", () => ({
 
 import { db } from "@/lib/db";
 import { sendEmailViaSMTP } from "@/lib/smtp-transport";
+import { interpolateTemplate } from "@/lib/workflows/workflow-service";
+import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
 
 // Force the module to load so capturedHandler is assigned
 import "@/inngest/functions/trigger-workflow-step";
@@ -169,6 +175,10 @@ describe("triggerWorkflowStep Inngest function", () => {
         (db.workflowStep.findUnique as jest.Mock).mockResolvedValue(makeWorkflowStep());
         (db.workshop.findUnique as jest.Mock).mockResolvedValue(makeWorkshop());
         (db.registration.findMany as jest.Mock).mockResolvedValue([]);
+        // Default: pass through eventDate untouched. Specific tests override.
+        (resolveEventStartMoment as jest.Mock).mockImplementation(
+            (input: { eventDate: Date }) => input.eventDate
+        );
     });
 
     // ------------------------------------------
@@ -498,6 +508,52 @@ describe("triggerWorkflowStep Inngest function", () => {
                     data: expect.objectContaining({ status: "SENT" }),
                 })
             );
+        });
+    });
+
+    // ------------------------------------------
+    // BUG-MAY4 follow-on: workshopDate uses resolveEventStartMoment, not raw midnight UTC
+    // ------------------------------------------
+    describe("workshopDate context: uses resolveEventStartMoment", () => {
+        it("interpolates workshopDate from resolveEventStartMoment, NOT raw workshop.eventDate", async () => {
+            // Workshop eventDate is stored as midnight UTC of one day; the true
+            // local-zone start moment is on a different calendar day.
+            (db.workshop.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkshop({
+                    eventDate: new Date("2026-06-01T00:00:00.000Z"), // Mon Jun 1 in UTC
+                    eventTime: "9:00 AM",
+                    timezone: "America/New_York",
+                })
+            );
+            // Force resolveEventStartMoment to return a clearly different date
+            // so the test can distinguish raw-eventDate vs resolved-moment paths.
+            (resolveEventStartMoment as jest.Mock).mockReturnValue(
+                new Date("2026-07-15T13:00:00.000Z") // Wed Jul 15 in UTC
+            );
+
+            await capturedHandler({ event: buildEvent(), step: mockStep });
+
+            // Verify resolveEventStartMoment was called with the workshop's date/time/zone
+            expect(resolveEventStartMoment).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    eventTime: "9:00 AM",
+                    timezone: "America/New_York",
+                })
+            );
+
+            // Verify interpolateTemplate received workshopDate from the RESOLVED moment,
+            // not from raw workshop.eventDate (Jun 1).
+            const interpolateCalls = (interpolateTemplate as jest.Mock).mock.calls;
+            const callsWithWorkshopDate = interpolateCalls.filter(
+                ([, ctx]: [unknown, { workshopDate?: string } | undefined]) =>
+                    ctx && typeof ctx.workshopDate === "string"
+            );
+            expect(callsWithWorkshopDate.length).toBeGreaterThan(0);
+            for (const [, ctx] of callsWithWorkshopDate) {
+                expect(ctx.workshopDate).toContain("July");
+                expect(ctx.workshopDate).toContain("15");
+                expect(ctx.workshopDate).not.toContain("June");
+            }
         });
     });
 });
