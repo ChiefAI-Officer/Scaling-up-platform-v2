@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Wireframe 03 — Wizard Step 3: Schedule</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .radio-stack { display: flex; flex-direction: column; gap: 0.625rem; }
+    .radio-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.875rem 1rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 0.5rem;
+      cursor: pointer;
+      background: hsl(var(--card));
+    }
+    .radio-card:hover { border-color: hsl(var(--primary) / 0.4); }
+    .radio-card.is-selected {
+      border-color: hsl(var(--primary));
+      background: hsl(var(--primary) / 0.04);
+    }
+    .radio-dot {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: 2px solid hsl(var(--border));
+      flex-shrink: 0;
+      margin-top: 2px;
+      position: relative;
+    }
+    .radio-card.is-selected .radio-dot { border-color: hsl(var(--primary)); }
+    .radio-card.is-selected .radio-dot::after {
+      content: ""; width: 10px; height: 10px; border-radius: 50%;
+      background: hsl(var(--primary)); position: absolute; top: 2px; left: 2px;
+    }
+    .radio-body { flex: 1; }
+    .radio-label { font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.125rem; }
+    .radio-desc { font-size: 0.8125rem; color: hsl(var(--muted-foreground)); margin: 0; }
+    .grid-form { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .check-row { display: flex; align-items: flex-start; gap: 0.625rem; padding: 0.5rem 0; }
+    .check-box {
+      width: 18px; height: 18px;
+      border: 1.5px solid hsl(var(--primary));
+      background: hsl(var(--primary));
+      border-radius: 4px;
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.75rem;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .info-card {
+      background: hsl(var(--primary) / 0.05);
+      border: 1px solid hsl(var(--primary) / 0.2);
+      color: hsl(224 76% 30%);
+      padding: 0.75rem 0.875rem;
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      margin-top: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.1 spec ref: <code>AssessmentCampaign</code> fields, v6.4 <code>expiresAt</code> rule, v7.1 evergreen PUBLIC</span>
+    <a href="index.html">← Back to wireframe index</a>
+  </div>
+
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">SU</span>
+        <span>Scaling Up Platform</span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Workspace</div>
+        <a class="wf-sidebar-link" href="#">📊 Dashboard</a>
+        <a class="wf-sidebar-link is-active" href="#">🏢 Organizations</a>
+        <a class="wf-sidebar-link" href="#">👥 Coaches</a>
+        <a class="wf-sidebar-link" href="#">🧾 Approvals</a>
+        <div class="wf-sidebar-section-title">Content</div>
+        <a class="wf-sidebar-link" href="#">📐 Templates</a>
+        <a class="wf-sidebar-link" href="#">⚙ Workflows</a>
+      </nav>
+    </aside>
+
+    <div class="wf-main">
+      <header class="wf-topbar">
+        <nav class="wf-breadcrumb">
+          <a href="#">Organizations</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Acme Corporation</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">New Assessment</span>
+        </nav>
+        <span class="wf-text-xs wf-text-muted">Signed in as <strong>jeff@scalingup.com</strong></span>
+      </header>
+
+      <div class="wf-page">
+        <div class="wf-page-header">
+          <h1 class="wf-page-title">Schedule &amp; Access</h1>
+          <p class="wf-page-subtitle">Name the assessment and choose when it opens and closes.</p>
+        </div>
+
+        <div class="wf-stepper">
+          <div class="wf-stepper-item is-complete">
+            <span class="wf-stepper-circle">✓</span>
+            <span class="wf-stepper-label">Template</span>
+          </div>
+          <div class="wf-stepper-item is-complete">
+            <span class="wf-stepper-circle">✓</span>
+            <span class="wf-stepper-label">Participants</span>
+          </div>
+          <div class="wf-stepper-item is-active">
+            <span class="wf-stepper-circle">3</span>
+            <span class="wf-stepper-label">Schedule</span>
+          </div>
+          <div class="wf-stepper-item">
+            <span class="wf-stepper-circle">4</span>
+            <span class="wf-stepper-label">Review</span>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap: 1rem;">
+          <!-- DETAILS -->
+          <div class="wf-card">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Campaign Details</h2>
+              <p class="wf-card-description">Names and descriptions are visible in respondent invitation emails.</p>
+            </div>
+            <div class="wf-card-body">
+              <label class="wf-label">Campaign name</label>
+              <input type="text" class="wf-input" value="Q2 2026 Rockefeller Habits Check-in">
+              <p class="wf-help-text">Defaults from template + current quarter. You can rename freely.</p>
+
+              <div style="margin-top: 1rem;">
+                <label class="wf-label">Description (optional)</label>
+                <textarea class="wf-textarea" placeholder="A short description shown to respondents on the survey page.">Quarterly Rockefeller Habits self-assessment for Acme leadership and platform engineering teams. Aim to complete by end of week.</textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- SCHEDULE -->
+          <div class="wf-card">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Schedule</h2>
+              <p class="wf-card-description">Magic-link invitation emails fire when the assessment opens.</p>
+            </div>
+            <div class="wf-card-body">
+              <div class="grid-form">
+                <div>
+                  <label class="wf-label">Open at</label>
+                  <input type="text" class="wf-input" value="May 6, 2026 — 10:30 AM EST">
+                  <p class="wf-help-text">Defaults to "now". Set a future date to schedule.</p>
+                </div>
+                <div>
+                  <label class="wf-label">Time zone</label>
+                  <select class="wf-select">
+                    <option>America/New_York (EST/EDT)</option>
+                    <option>America/Los_Angeles</option>
+                    <option>UTC</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="margin-top: 1.25rem;">
+                <label class="wf-label">End mode</label>
+                <div class="radio-stack">
+                  <div class="radio-card">
+                    <span class="radio-dot"></span>
+                    <div class="radio-body">
+                      <div class="radio-label">Open-ended</div>
+                      <p class="radio-desc">Stays open until you close it manually. Recommended for evergreen public quizzes.</p>
+                    </div>
+                  </div>
+                  <div class="radio-card is-selected">
+                    <span class="radio-dot"></span>
+                    <div class="radio-body">
+                      <div class="radio-label">Closes after a specific date</div>
+                      <p class="radio-desc">Submissions reject after the close date with a friendly "campaign closed" message.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid-form" style="margin-top: 1rem;">
+                <div>
+                  <label class="wf-label">Close at</label>
+                  <input type="text" class="wf-input" value="May 20, 2026 — 11:59 PM EST">
+                  <p class="wf-help-text">Magic-link tokens expire at this time too.</p>
+                </div>
+                <div>
+                  <label class="wf-label">&nbsp;</label>
+                  <div class="info-card">
+                    💡 Token expiry rule: <strong>min(closeAt, sentAt + 90 days)</strong>. So tokens last at most 90 days even on long-running campaigns.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NOTIFICATIONS -->
+          <div class="wf-card">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Notifications</h2>
+              <p class="wf-card-description">What you get pinged about as responses come in.</p>
+            </div>
+            <div class="wf-card-body">
+              <div class="check-row">
+                <span class="check-box">✓</span>
+                <div>
+                  <div class="wf-font-medium wf-text-sm">Notify admin on each submission</div>
+                  <div class="wf-text-xs wf-text-muted">An email goes to <strong>jeff@scalingup.com</strong> every time a respondent submits.</div>
+                </div>
+              </div>
+              <div class="check-row">
+                <span class="check-box" style="background: hsl(var(--card)); border-color: hsl(var(--border)); color: transparent;"></span>
+                <div>
+                  <div class="wf-font-medium wf-text-sm">Daily digest summary</div>
+                  <div class="wf-text-xs wf-text-muted">A roll-up email at 9 AM each day showing yesterday's activity.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; margin-top:1.5rem;">
+          <a href="02-wizard-step2-participants.html" class="wf-btn wf-btn-ghost">← Back: Participants</a>
+          <a href="05-wizard-step4-review.html" class="wf-btn wf-btn-primary">Next: Review →</a>
+        </div>
+
+        <p class="wf-text-xs wf-text-muted" style="margin-top:0.75rem;">For PUBLIC templates, the next button reads <strong>"Next: Public Configuration →"</strong> and routes to <a href="04-wizard-step3a-public-config.html" class="wf-text-primary">Step 3a</a> first.</p>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>

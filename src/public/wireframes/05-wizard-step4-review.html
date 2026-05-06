@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Wireframe 05 — Wizard Step 4: Review</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .review-section {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .review-section:last-child { border-bottom: 0; }
+    .review-section-head {
+      display: flex; align-items:center; justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .review-section-title {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .review-section-edit {
+      font-size: 0.8125rem;
+      color: hsl(var(--primary));
+      text-decoration: none;
+    }
+    .review-section-edit:hover { text-decoration: underline; }
+    .kv-row {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 0.75rem;
+      padding: 0.375rem 0;
+      align-items: start;
+    }
+    .kv-key { color: hsl(var(--muted-foreground)); font-size: 0.875rem; }
+    .kv-val { font-size: 0.875rem; font-weight: 500; }
+
+    .next-card {
+      background: hsl(var(--primary) / 0.04);
+      border: 1px solid hsl(var(--primary) / 0.2);
+      border-radius: 0.5rem;
+      padding: 1.25rem;
+    }
+    .next-card-title {
+      font-size: 0.875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: hsl(var(--primary));
+      margin: 0 0 0.625rem;
+    }
+    .next-card-text { font-size: 0.875rem; line-height: 1.6; margin: 0; }
+    .next-card-text strong { font-weight: 600; }
+
+    .embed-block {
+      background: hsl(222.2 84% 4.9%);
+      color: hsl(160 84% 65%);
+      font-family: ui-monospace, "Geist Mono", Menlo, monospace;
+      font-size: 0.8125rem;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      white-space: pre;
+      margin-top: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.1 spec ref: <code>createCampaign(...)</code> + optional <code>inviteRespondents(...)</code></span>
+    <a href="index.html">← Back to wireframe index</a>
+  </div>
+
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">SU</span>
+        <span>Scaling Up Platform</span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Workspace</div>
+        <a class="wf-sidebar-link is-active" href="#">🏢 Organizations</a>
+        <a class="wf-sidebar-link" href="#">👥 Coaches</a>
+        <div class="wf-sidebar-section-title">Content</div>
+        <a class="wf-sidebar-link" href="#">📐 Templates</a>
+      </nav>
+    </aside>
+
+    <div class="wf-main">
+      <header class="wf-topbar">
+        <nav class="wf-breadcrumb">
+          <a href="#">Organizations</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Acme Corporation</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">New Assessment</span>
+        </nav>
+        <span class="wf-text-xs wf-text-muted">Signed in as <strong>jeff@scalingup.com</strong></span>
+      </header>
+
+      <div class="wf-page">
+        <div class="wf-page-header">
+          <h1 class="wf-page-title">Review &amp; Create</h1>
+          <p class="wf-page-subtitle">Last chance to edit. After creation, invitation emails go out immediately to all participants.</p>
+        </div>
+
+        <div class="wf-stepper">
+          <div class="wf-stepper-item is-complete">
+            <span class="wf-stepper-circle">✓</span>
+            <span class="wf-stepper-label">Template</span>
+          </div>
+          <div class="wf-stepper-item is-complete">
+            <span class="wf-stepper-circle">✓</span>
+            <span class="wf-stepper-label">Participants</span>
+          </div>
+          <div class="wf-stepper-item is-complete">
+            <span class="wf-stepper-circle">✓</span>
+            <span class="wf-stepper-label">Schedule</span>
+          </div>
+          <div class="wf-stepper-item is-active">
+            <span class="wf-stepper-circle">4</span>
+            <span class="wf-stepper-label">Review</span>
+          </div>
+        </div>
+
+        <div class="wf-card wf-mb-3">
+          <div class="wf-card-header">
+            <h2 class="wf-card-title">Review your new assessment</h2>
+            <p class="wf-card-description">Each section can be edited individually without restarting the wizard.</p>
+          </div>
+
+          <!-- TEMPLATE -->
+          <div class="review-section">
+            <div class="review-section-head">
+              <div class="review-section-title">Template</div>
+              <a href="01-wizard-step1-template.html" class="review-section-edit">Edit →</a>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Template</div>
+              <div class="kv-val">Rockefeller Habits Checklist <span class="wf-badge wf-badge-invited">INVITED</span></div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Language</div>
+              <div class="kv-val">English (US)</div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Question count</div>
+              <div class="kv-val">40 questions across 10 sections (SLIDER_LIKERT 0–3)</div>
+            </div>
+          </div>
+
+          <!-- ORG -->
+          <div class="review-section">
+            <div class="review-section-head">
+              <div class="review-section-title">Organization</div>
+              <a href="01-wizard-step1-template.html" class="review-section-edit">Edit →</a>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Client organization</div>
+              <div class="kv-val">Acme Corporation</div>
+            </div>
+          </div>
+
+          <!-- PARTICIPANTS -->
+          <div class="review-section">
+            <div class="review-section-head">
+              <div class="review-section-title">Participants</div>
+              <a href="02-wizard-step2-participants.html" class="review-section-edit">Edit →</a>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Total invited</div>
+              <div class="kv-val">18 members</div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Teams selected</div>
+              <div class="kv-val">Engineering › Platform · Engineering › Frontend · Executive</div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Snapshot taken</div>
+              <div class="kv-val">Now (team membership at this moment is preserved for longitudinal aggregates)</div>
+            </div>
+          </div>
+
+          <!-- SCHEDULE -->
+          <div class="review-section">
+            <div class="review-section-head">
+              <div class="review-section-title">Schedule</div>
+              <a href="03-wizard-step3-schedule.html" class="review-section-edit">Edit →</a>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Campaign name</div>
+              <div class="kv-val">Q2 2026 Rockefeller Habits Check-in</div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Open at</div>
+              <div class="kv-val">May 6, 2026 — 10:30 AM EST (now)</div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Close at</div>
+              <div class="kv-val">May 20, 2026 — 11:59 PM EST</div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Token expiry</div>
+              <div class="kv-val">May 20, 2026 (capped at min(closeAt, sentAt + 90 days))</div>
+            </div>
+            <div class="kv-row">
+              <div class="kv-key">Notifications</div>
+              <div class="kv-val">Notify admin on each submission ✓</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- WHAT HAPPENS NEXT -->
+        <div class="next-card">
+          <div class="next-card-title">What happens next</div>
+          <p class="next-card-text">After you click <strong>Create &amp; Activate</strong>, the platform will:</p>
+          <ol style="font-size:0.875rem; line-height: 1.7; margin: 0.5rem 0 0; padding-left: 1.25rem;">
+            <li>Create the campaign in <strong>ACTIVE</strong> status (or <strong>SCHEDULED</strong> if openAt is in the future).</li>
+            <li>Generate a magic-link invitation row for each of the <strong>18 participants</strong> (status: <code>PENDING</code>).</li>
+            <li>Send 18 invitation emails immediately. Each contains a unique fragment-based token, valid until <strong>May 20, 2026</strong>.</li>
+            <li>Flip each invitation to <code>SENT</code> on a successful email send. Failed sends stay <code>PENDING</code> and surface in the campaign detail with a "Retry" badge.</li>
+            <li>Open the campaign detail page so you can monitor responses live.</li>
+          </ol>
+        </div>
+
+        <!-- (Hidden in this INVITED variant: PUBLIC embed code lives below if accessMode=PUBLIC) -->
+        <details class="wf-mb-3" style="margin-top: 1.5rem; border: 1px dashed hsl(var(--border)); border-radius: 6px; padding: 0.875rem 1rem;">
+          <summary style="cursor: pointer; font-size: 0.8125rem; color: hsl(var(--muted-foreground));">
+            🔍 Wireframe note: PUBLIC mode also shows an embed-code block here
+          </summary>
+          <div style="margin-top: 0.75rem; font-size:0.8125rem; color: hsl(var(--muted-foreground));">
+            For PUBLIC quizzes, this section additionally renders the public quiz URL and a copy-paste iframe snippet:
+          </div>
+          <div class="embed-block">&lt;iframe
+  src="https://platform.scalingup.com/quiz/sunhub-quick-quiz"
+  width="100%"
+  height="800"
+  style="border:0;"
+  title="Scaling Up Quick Quiz"&gt;
+&lt;/iframe&gt;</div>
+        </details>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; gap: 0.5rem; margin-top:1.5rem;">
+          <a href="03-wizard-step3-schedule.html" class="wf-btn wf-btn-ghost">← Back: Schedule</a>
+          <div style="display:flex; gap: 0.5rem;">
+            <button class="wf-btn wf-btn-secondary">Save as Draft</button>
+            <a href="06-campaign-detail-overview.html" class="wf-btn wf-btn-primary">Create &amp; Activate →</a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Wireframe 10 — Trends</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .composite-chart-card {
+      padding: 1.5rem 1.75rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .chart-area {
+      position: relative;
+      height: 240px;
+      margin-top: 1rem;
+    }
+    .chart-svg { width: 100%; height: 100%; }
+
+    .sparkline-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.625rem;
+    }
+    .spark-card {
+      padding: 0.625rem 0.875rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      display: grid;
+      grid-template-columns: 1fr 80px 90px;
+      gap: 0.625rem;
+      align-items: center;
+    }
+    .spark-q { font-size: 0.8125rem; font-weight: 500; }
+    .spark-svg { height: 32px; width: 100%; }
+    .spark-trend {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-align: right;
+    }
+    .spark-trend.is-up { color: hsl(var(--success)); }
+    .spark-trend.is-down { color: hsl(var(--destructive)); }
+    .spark-trend.is-flat { color: hsl(var(--muted-foreground)); }
+
+    .accordion-item {
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      background: hsl(var(--card));
+    }
+    .accordion-head {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .accordion-content {
+      padding: 0 1rem 0.75rem;
+      border-top: 1px dashed hsl(var(--border));
+      padding-top: 0.5rem;
+    }
+    .response-row {
+      padding: 0.5rem 0;
+      border-bottom: 1px dashed hsl(var(--border));
+      font-size: 0.875rem;
+    }
+    .response-row:last-child { border-bottom: 0; }
+    .response-meta {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      margin-bottom: 0.25rem;
+    }
+
+    .empty-note {
+      padding: 1rem;
+      background: hsl(var(--muted));
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+      text-align: center;
+    }
+
+    .profile-card {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem;
+    }
+    .profile-num {
+      padding: 0.875rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+    }
+    .profile-num-label {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .profile-num-val {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0.25rem 0;
+    }
+    .profile-num-trend {
+      font-size: 0.75rem;
+      color: hsl(var(--success));
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.1 spec ref: template-agnostic Trends with type-aware rendering, <code>tierMetricValue</code> composite</span>
+    <a href="index.html">← Back to wireframe index</a>
+  </div>
+
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">SU</span>
+        <span>Scaling Up Platform</span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Workspace</div>
+        <a class="wf-sidebar-link is-active" href="#">🏢 Organizations</a>
+        <a class="wf-sidebar-link" href="#">👥 Coaches</a>
+        <div class="wf-sidebar-section-title">Content</div>
+        <a class="wf-sidebar-link" href="#">📐 Templates</a>
+      </nav>
+    </aside>
+
+    <div class="wf-main">
+      <header class="wf-topbar">
+        <nav class="wf-breadcrumb">
+          <a href="#">Acme Corporation</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Rockefeller Habits Checklist</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Trends</span>
+        </nav>
+        <span class="wf-text-xs wf-text-muted">Signed in as <strong>jeff@scalingup.com</strong></span>
+      </header>
+
+      <div class="wf-page">
+        <div class="wf-page-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h1 class="wf-page-title">Trends — Rockefeller Habits Checklist</h1>
+            <p class="wf-page-subtitle">Year-over-year scoring across 3 campaigns at Acme Corporation. Composite score plots <code>submission.result.tierMetricValue</code>.</p>
+          </div>
+          <div style="display:flex; gap:0.5rem;">
+            <select class="wf-select" style="max-width: 220px;">
+              <option>All participants</option>
+              <option>Engineering</option>
+              <option>Engineering › Platform</option>
+              <option>Executive</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="wf-tabs">
+          <a class="wf-tab" href="06-campaign-detail-overview.html">Overview</a>
+          <a class="wf-tab" href="07-campaign-detail-respondents.html">Respondents</a>
+          <a class="wf-tab" href="09-team-aggregate-panel.html">Aggregate</a>
+          <a class="wf-tab is-active" href="10-trends-page.html">Trends</a>
+        </div>
+
+        <!-- COMPOSITE CHART -->
+        <div class="composite-chart-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <h2 class="wf-card-title" style="margin-bottom:0.125rem;">Composite Score Over Time</h2>
+              <p class="wf-card-description">Tier metric: <strong>count_achieved</strong> (questions scored ≥ 2 / 40 total). Higher is better.</p>
+            </div>
+            <div style="display:flex; gap:0.875rem; font-size: 0.75rem;">
+              <span class="wf-text-muted">⬤ Acme Corporation — All participants</span>
+            </div>
+          </div>
+
+          <div class="chart-area">
+            <svg class="chart-svg" viewBox="0 0 800 220" preserveAspectRatio="none">
+              <!-- gridlines -->
+              <line x1="80" y1="20" x2="780" y2="20" stroke="hsl(214 32% 91%)" stroke-dasharray="3,4"/>
+              <line x1="80" y1="60" x2="780" y2="60" stroke="hsl(214 32% 91%)" stroke-dasharray="3,4"/>
+              <line x1="80" y1="100" x2="780" y2="100" stroke="hsl(214 32% 91%)" stroke-dasharray="3,4"/>
+              <line x1="80" y1="140" x2="780" y2="140" stroke="hsl(214 32% 91%)" stroke-dasharray="3,4"/>
+              <line x1="80" y1="180" x2="780" y2="180" stroke="hsl(214 32% 91%)" stroke-dasharray="3,4"/>
+
+              <!-- y-axis labels -->
+              <text x="65" y="24" text-anchor="end" font-size="11" fill="hsl(215 16% 47%)">40</text>
+              <text x="65" y="64" text-anchor="end" font-size="11" fill="hsl(215 16% 47%)">30</text>
+              <text x="65" y="104" text-anchor="end" font-size="11" fill="hsl(215 16% 47%)">20</text>
+              <text x="65" y="144" text-anchor="end" font-size="11" fill="hsl(215 16% 47%)">10</text>
+              <text x="65" y="184" text-anchor="end" font-size="11" fill="hsl(215 16% 47%)">0</text>
+
+              <!-- Tier bands (faint) -->
+              <rect x="80" y="20" width="700" height="48" fill="hsl(160 84% 95%)" opacity="0.5"/>
+              <rect x="80" y="68" width="700" height="60" fill="hsl(38 92% 95%)" opacity="0.5"/>
+              <rect x="80" y="128" width="700" height="56" fill="hsl(0 84% 95%)" opacity="0.5"/>
+
+              <!-- Tier band labels -->
+              <text x="775" y="44" text-anchor="end" font-size="10" font-weight="600" fill="hsl(160 84% 28%)">GREAT (33–40)</text>
+              <text x="775" y="98" text-anchor="end" font-size="10" font-weight="600" fill="hsl(26 83% 30%)">OK (17–32)</text>
+              <text x="775" y="158" text-anchor="end" font-size="10" font-weight="600" fill="hsl(0 84% 35%)">LOW (0–16)</text>
+
+              <!-- Line: composite -->
+              <polyline
+                points="200,140 460,108 720,52"
+                fill="none"
+                stroke="hsl(224 76% 48%)"
+                stroke-width="3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+
+              <!-- Data points -->
+              <circle cx="200" cy="140" r="6" fill="white" stroke="hsl(224 76% 48%)" stroke-width="3"/>
+              <circle cx="460" cy="108" r="6" fill="white" stroke="hsl(224 76% 48%)" stroke-width="3"/>
+              <circle cx="720" cy="52" r="6" fill="white" stroke="hsl(224 76% 48%)" stroke-width="3"/>
+
+              <!-- Data point labels -->
+              <text x="200" y="132" text-anchor="middle" font-size="12" font-weight="700" fill="hsl(222 84% 5%)">15</text>
+              <text x="460" y="100" text-anchor="middle" font-size="12" font-weight="700" fill="hsl(222 84% 5%)">23</text>
+              <text x="720" y="44" text-anchor="middle" font-size="12" font-weight="700" fill="hsl(222 84% 5%)">28.6</text>
+
+              <!-- x-axis labels -->
+              <text x="200" y="210" text-anchor="middle" font-size="11" fill="hsl(215 16% 47%)">Q2 2025</text>
+              <text x="460" y="210" text-anchor="middle" font-size="11" fill="hsl(215 16% 47%)">Q4 2025</text>
+              <text x="720" y="210" text-anchor="middle" font-size="11" fill="hsl(215 16% 47%)">Q2 2026 (current)</text>
+            </svg>
+          </div>
+
+          <div style="display:flex; gap:1rem; margin-top:1rem; padding-top:1rem; border-top: 1px solid hsl(var(--border)); font-size:0.8125rem;">
+            <div style="flex:1;">
+              <div class="wf-text-xs wf-text-muted" style="text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Year-over-year change</div>
+              <div class="wf-font-bold" style="font-size: 1.125rem; color: hsl(var(--success)); margin-top: 0.25rem;">+13.6 pts ↑</div>
+              <div class="wf-text-xs wf-text-muted">Q2-25 → Q2-26 — a one-tier jump</div>
+            </div>
+            <div style="flex:1;">
+              <div class="wf-text-xs wf-text-muted" style="text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Quarter-over-quarter</div>
+              <div class="wf-font-bold" style="font-size: 1.125rem; color: hsl(var(--success)); margin-top: 0.25rem;">+5.6 pts ↑</div>
+              <div class="wf-text-xs wf-text-muted">Q4-25 → Q2-26</div>
+            </div>
+            <div style="flex:1;">
+              <div class="wf-text-xs wf-text-muted" style="text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Tier breakdown trend</div>
+              <div style="font-size: 0.875rem; margin-top: 0.25rem;">Low → OK → <strong style="color: hsl(var(--success));">Great-trending</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PER-QUESTION SPARKLINES -->
+        <div class="wf-card wf-mb-3">
+          <div class="wf-card-header">
+            <h2 class="wf-card-title">Per-Question Sparklines</h2>
+            <p class="wf-card-description">Score trend per question across the 3 campaigns. Click any to drill in.</p>
+          </div>
+          <div class="wf-card-body">
+            <div class="sparkline-grid">
+
+              <div class="spark-card">
+                <span class="spark-q">Q1.1 — Team understands differences</span>
+                <svg class="spark-svg" viewBox="0 0 100 32" preserveAspectRatio="none">
+                  <polyline points="5,20 50,18 95,8" fill="none" stroke="hsl(160 84% 39%)" stroke-width="2"/>
+                </svg>
+                <span class="spark-trend is-up">+1.6 ↑</span>
+              </div>
+
+              <div class="spark-card">
+                <span class="spark-q">Q1.2 — Weekly strategic meetings</span>
+                <svg class="spark-svg" viewBox="0 0 100 32" preserveAspectRatio="none">
+                  <polyline points="5,16 50,12 95,9" fill="none" stroke="hsl(160 84% 39%)" stroke-width="2"/>
+                </svg>
+                <span class="spark-trend is-up">+0.9 ↑</span>
+              </div>
+
+              <div class="spark-card">
+                <span class="spark-q">Q2.1 — Critical Number identified</span>
+                <svg class="spark-svg" viewBox="0 0 100 32" preserveAspectRatio="none">
+                  <polyline points="5,22 50,16 95,12" fill="none" stroke="hsl(160 84% 39%)" stroke-width="2"/>
+                </svg>
+                <span class="spark-trend is-up">+1.0 ↑</span>
+              </div>
+
+              <div class="spark-card">
+                <span class="spark-q">Q2.2 — 3-5 Priorities (Rocks) ranked</span>
+                <svg class="spark-svg" viewBox="0 0 100 32" preserveAspectRatio="none">
+                  <polyline points="5,18 50,20 95,18" fill="none" stroke="hsl(38 92% 50%)" stroke-width="2"/>
+                </svg>
+                <span class="spark-trend is-flat">flat</span>
+              </div>
+
+              <div class="spark-card">
+                <span class="spark-q">Q3.1 — Daily huddle &lt; 15min</span>
+                <svg class="spark-svg" viewBox="0 0 100 32" preserveAspectRatio="none">
+                  <polyline points="5,12 50,8 95,5" fill="none" stroke="hsl(160 84% 39%)" stroke-width="2"/>
+                </svg>
+                <span class="spark-trend is-up">+0.7 ↑</span>
+              </div>
+
+              <div class="spark-card">
+                <span class="spark-q">Q5.4 — Mid-mgmt closes loop on input</span>
+                <svg class="spark-svg" viewBox="0 0 100 32" preserveAspectRatio="none">
+                  <polyline points="5,10 50,16 95,22" fill="none" stroke="hsl(0 84% 60%)" stroke-width="2"/>
+                </svg>
+                <span class="spark-trend is-down">−1.2 ↓</span>
+              </div>
+            </div>
+            <div style="text-align:center; padding: 0.75rem; margin-top: 0.5rem; font-size:0.8125rem; color: hsl(var(--muted-foreground));">
+              ⤵ Showing 6 of 40 sparklines. Click "View all" to expand.
+            </div>
+          </div>
+        </div>
+
+        <!-- QUALITATIVE RESPONSES -->
+        <div class="wf-card wf-mb-3">
+          <div class="wf-card-header">
+            <h2 class="wf-card-title">Qualitative Responses</h2>
+            <p class="wf-card-description">Free-text answers (TEXT, TEXTAREA, COMPOUND.textValue) ordered newest-first per question. No averaging.</p>
+          </div>
+          <div class="wf-card-body">
+            <div class="empty-note">
+              ℹ The Rockefeller Habits Checklist has no TEXT/TEXTAREA/COMPOUND questions, so this section is empty. <strong>For QSP v2 and Vision Alignment</strong> templates, each free-text question gets its own accordion here showing every respondent's verbatim answer with timestamps, ordered newest-first.
+            </div>
+          </div>
+        </div>
+
+        <!-- PROFILE NUMBERS -->
+        <div class="wf-card">
+          <div class="wf-card-header">
+            <h2 class="wf-card-title">Profile Numbers</h2>
+            <p class="wf-card-description">NUMBER-type answers tracked separately from the composite score. Year-over-year change shown.</p>
+          </div>
+          <div class="wf-card-body">
+            <div class="empty-note" style="margin-bottom: 1rem;">
+              ℹ The Rockefeller Habits Checklist has no NUMBER questions, so this panel only appears for templates like <strong>Vision Alignment</strong> (revenue, employees, gross margin, customers) or <strong>Scaling Up Assessment</strong> (employee count, company age).
+            </div>
+
+            <div class="wf-text-xs wf-text-muted wf-mb-2"><strong>Example preview</strong> (rendered when Vision Alignment is the template):</div>
+            <div class="profile-card">
+              <div class="profile-num">
+                <div class="profile-num-label">Revenue</div>
+                <div class="profile-num-val">$24.5M</div>
+                <div class="profile-num-trend">+18% YoY</div>
+              </div>
+              <div class="profile-num">
+                <div class="profile-num-label">Employees</div>
+                <div class="profile-num-val">112</div>
+                <div class="profile-num-trend">+24 YoY</div>
+              </div>
+              <div class="profile-num">
+                <div class="profile-num-label">Gross margin</div>
+                <div class="profile-num-val">62%</div>
+                <div class="profile-num-trend">+4 pts YoY</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>
