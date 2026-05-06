@@ -339,6 +339,24 @@ export const triggerWorkflowStep = inngest.createFunction(
                         },
                     });
 
+                    // BUG-MAY4 follow-on: distinguish "0 recipients" from
+                    // "registrants exist but link generation failed". Without
+                    // this short-circuit, both cases hit the same misleading
+                    // 'No survey link could be generated' message below.
+                    if (registrations.length === 0) {
+                        await db.workflowStepExecution.create({
+                            data: {
+                                stepId: workflowStep.id,
+                                workshopId: workshop.id,
+                                status: "SKIPPED",
+                                scheduledFor: new Date(),
+                                executedAt: new Date(),
+                                errorMessage: "No recipients at scheduled time",
+                            },
+                        });
+                        return;
+                    }
+
                     const surveyType = resolveSurveyType(workflowStep);
                     let sentCount = 0;
                     for (const reg of registrations) {
@@ -515,6 +533,7 @@ export const triggerWorkflowStep = inngest.createFunction(
                     });
                     const fileLinks = buildFileLinksHtml(protectedLinks);
 
+                    let fileEmailsSent = 0;
                     for (const reg of registrations) {
                         const personalContext: WorkflowContext = {
                             ...baseContext,
@@ -552,6 +571,7 @@ export const triggerWorkflowStep = inngest.createFunction(
                                     },
                                 },
                             });
+                            fileEmailsSent++;
                         } catch (smtpErr) {
                             const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
                             const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
@@ -575,13 +595,19 @@ export const triggerWorkflowStep = inngest.createFunction(
                         }
                     }
 
+                    // BUG-MAY4 follow-on: terminal status must reflect actual
+                    // sends. With 0 registrants the loop runs zero times and
+                    // the row was previously written as SENT — false positive.
                     await db.workflowStepExecution.create({
                         data: {
                             stepId: workflowStep.id,
                             workshopId: workshop.id,
-                            status: "SENT",
+                            status: fileEmailsSent > 0 ? "SENT" : "SKIPPED",
                             scheduledFor: new Date(),
                             executedAt: new Date(),
+                            ...(fileEmailsSent === 0
+                                ? { errorMessage: "No recipients at scheduled time" }
+                                : {}),
                         },
                     });
                     return;

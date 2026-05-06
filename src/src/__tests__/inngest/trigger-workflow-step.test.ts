@@ -509,6 +509,107 @@ describe("triggerWorkflowStep Inngest function", () => {
                 })
             );
         });
+
+        // BUG-MAY4 follow-on (gap caught via prod verification May 6): trigger
+        // path had its own SEND_SURVEY_LINK handler with the misleading message.
+        it("with 0 registrants: records SKIPPED with errorMessage='No recipients at scheduled time'", async () => {
+            (db.workflowStep.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkflowStep({
+                    stepType: "SEND_SURVEY_LINK",
+                    triggerType: "RELATIVE_TO_EVENT",
+                    offsetDays: -7,
+                    surveyTemplateId: null,
+                })
+            );
+            (db.registration.findMany as jest.Mock).mockResolvedValue([]);
+
+            await capturedHandler({ event: buildEvent(), step: mockStep });
+
+            expect(sendEmailViaSMTP).not.toHaveBeenCalled();
+            expect(getOrCreateSurveyLink).not.toHaveBeenCalled();
+            expect(db.workflowStepExecution.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        status: "SKIPPED",
+                        errorMessage: "No recipients at scheduled time",
+                    }),
+                })
+            );
+        });
+
+        it("with registrants but link generation fails: keeps 'No survey link could be generated' message", async () => {
+            (db.workflowStep.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkflowStep({
+                    stepType: "SEND_SURVEY_LINK",
+                    triggerType: "RELATIVE_TO_EVENT",
+                    offsetDays: -7,
+                    surveyTemplateId: null,
+                })
+            );
+            (db.registration.findMany as jest.Mock).mockResolvedValue([
+                { id: "reg-1", email: "alice@example.com", firstName: "A", lastName: "B", company: "" },
+            ]);
+            (getOrCreateSurveyLink as jest.Mock).mockResolvedValue(null);
+
+            await capturedHandler({ event: buildEvent(), step: mockStep });
+
+            expect(sendEmailViaSMTP).not.toHaveBeenCalled();
+            expect(db.workflowStepExecution.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        status: "SKIPPED",
+                        errorMessage: "No survey link could be generated",
+                    }),
+                })
+            );
+        });
+    });
+
+    // BUG-MAY4 follow-on (gap caught via prod verification May 6): trigger
+    // path SEND_FILE_LINK had its own unconditional status: "SENT" terminal write.
+    describe("SEND_FILE_LINK step", () => {
+        const { getWorkflowStepFiles, buildProtectedEmailAttachments } =
+            jest.requireMock("@/lib/files/file-service");
+
+        it("with files attached AND 0 registrants: records SKIPPED, NOT SENT", async () => {
+            (getWorkflowStepFiles as jest.Mock).mockResolvedValue([
+                { id: "file-1", filename: "guide.pdf", contentType: "application/pdf" },
+            ]);
+            (buildProtectedEmailAttachments as jest.Mock).mockReturnValue([
+                {
+                    filename: "guide.pdf",
+                    path: "https://app.test/files/file-1/download?t=abc",
+                    contentType: "application/pdf",
+                },
+            ]);
+            (db.workflowStep.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkflowStep({
+                    stepType: "SEND_FILE_LINK",
+                    triggerType: "RELATIVE_TO_EVENT",
+                    offsetDays: -1,
+                })
+            );
+            (db.registration.findMany as jest.Mock).mockResolvedValue([]);
+
+            await capturedHandler({ event: buildEvent(), step: mockStep });
+
+            expect(sendEmailViaSMTP).not.toHaveBeenCalled();
+
+            const createCalls = (db.workflowStepExecution.create as jest.Mock).mock.calls;
+            const sentCall = createCalls.find(
+                ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SENT"
+            );
+            expect(sentCall).toBeUndefined();
+
+            expect(db.workflowStepExecution.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        status: "SKIPPED",
+                        errorMessage: "No recipients at scheduled time",
+                    }),
+                })
+            );
+        });
     });
 
     // ------------------------------------------
