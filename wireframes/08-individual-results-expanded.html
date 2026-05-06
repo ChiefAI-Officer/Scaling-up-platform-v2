@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Wireframe 08 — Individual Results</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .results-page { max-width: 880px; margin: 0 auto; }
+    .respondent-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1.5rem;
+    }
+    .tier-banner-lg {
+      padding: 1.5rem 2rem;
+      border-radius: 12px;
+      background: linear-gradient(135deg, hsl(160 84% 95%), hsl(160 84% 90%));
+      border: 1px solid hsl(160 84% 75%);
+      color: hsl(160 84% 18%);
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+    .tier-icon {
+      width: 64px; height: 64px;
+      background: hsl(160 84% 39%);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .tier-text-block { flex: 1; }
+    .tier-tier-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+    .tier-headline {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 0.125rem 0;
+    }
+    .tier-tagline { font-size: 0.9375rem; margin: 0; }
+
+    .checklist-section {
+      margin-bottom: 1rem;
+    }
+    .checklist-head {
+      font-weight: 600;
+      font-size: 0.9375rem;
+      padding: 0.625rem 1rem;
+      background: hsl(var(--muted));
+      border-radius: 6px 6px 0 0;
+      border: 1px solid hsl(var(--border));
+      border-bottom: 0;
+    }
+    .checklist-items {
+      border: 1px solid hsl(var(--border));
+      border-radius: 0 0 6px 6px;
+      padding: 0.5rem 1rem;
+    }
+    .checklist-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.625rem;
+      padding: 0.375rem 0;
+      font-size: 0.875rem;
+    }
+    .check-icon {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.6875rem;
+      font-weight: 800;
+      margin-top: 1px;
+    }
+    .check-icon.is-passed { background: hsl(var(--success)); color: white; }
+    .check-icon.is-passed::before { content: "✓"; }
+    .check-icon.is-not-passed { background: hsl(var(--border)); color: hsl(var(--muted-foreground)); }
+    .check-icon.is-not-passed::before { content: ""; }
+
+    .checklist-footer {
+      text-align: right;
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+      margin-top: 0.5rem;
+      padding: 0.625rem 1rem;
+    }
+
+    .scoring-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .scoring-table th, .scoring-table td {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .scoring-table th {
+      text-align: left;
+      background: hsl(var(--muted));
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: hsl(var(--muted-foreground));
+    }
+    .scoring-table tr.totals-row {
+      font-weight: 700;
+      background: hsl(var(--primary) / 0.06);
+    }
+    .scoring-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    .conclusion {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      text-align: center;
+    }
+    .conclusion-headline {
+      font-size: 1.125rem;
+      font-weight: 700;
+      margin: 0 0 0.375rem;
+    }
+    .conclusion-msg {
+      font-size: 0.9375rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.1 spec ref: <code>&lt;AssessmentResultView&gt;</code> shared component (also reused for PUBLIC results page)</span>
+    <a href="index.html">← Back to wireframe index</a>
+  </div>
+
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">SU</span>
+        <span>Scaling Up Platform</span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Workspace</div>
+        <a class="wf-sidebar-link is-active" href="#">🏢 Organizations</a>
+        <a class="wf-sidebar-link" href="#">👥 Coaches</a>
+      </nav>
+    </aside>
+
+    <div class="wf-main">
+      <header class="wf-topbar">
+        <nav class="wf-breadcrumb">
+          <a href="#">Acme Corporation</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="07-campaign-detail-respondents.html">Q2 2026 Rockefeller</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Sarah Chen — Results</span>
+        </nav>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <button class="wf-btn wf-btn-secondary">🖨 Print / Save as PDF</button>
+        </div>
+      </header>
+
+      <div class="wf-page" style="padding-top:2rem;">
+        <div class="results-page">
+
+          <!-- HEAD -->
+          <div class="respondent-head">
+            <div>
+              <h1 class="wf-page-title">Sarah Chen</h1>
+              <p class="wf-page-subtitle">sarah.chen@acme.com · Engineering › Platform</p>
+              <div class="wf-text-xs wf-text-muted" style="margin-top: 0.375rem;">
+                Submitted <strong>May 6, 2026 · 11:34 AM EST</strong> · Took 14 min 22 sec · <span class="wf-pill wf-pill-submitted">SUBMITTED</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- TIER BANNER -->
+          <div class="tier-banner-lg">
+            <div class="tier-icon">37</div>
+            <div class="tier-text-block">
+              <div class="tier-tier-label">Tier · Great</div>
+              <h2 class="tier-headline">That is a great overall score.</h2>
+              <p class="tier-tagline">You have completed <strong>37 of the 40 Checklist Items</strong>.</p>
+            </div>
+          </div>
+
+          <!-- INTRO -->
+          <div class="wf-card wf-mb-3">
+            <div class="wf-card-body">
+              <p style="font-size: 0.9375rem; line-height: 1.65; margin: 0;">A good strategy falls apart if you don't make great Execution Decisions. The Rockefeller Habits Checklist surfaces where your business is executing well and where attention is needed. Below, each habit you scored a <strong>2 or 3</strong> appears as ✓.</p>
+            </div>
+          </div>
+
+          <!-- HABITS CHECKLIST (showing 3 of 10 sections + truncation note) -->
+          <div class="checklist-section">
+            <div class="checklist-head">S1 — The executive team is healthy and aligned.</div>
+            <div class="checklist-items">
+              <div class="checklist-item"><span class="check-icon is-passed"></span><span>Team members understand each other's differences, priorities, and styles.</span></div>
+              <div class="checklist-item"><span class="check-icon is-passed"></span><span>The team meets frequently (weekly is best) for strategic thinking.</span></div>
+              <div class="checklist-item"><span class="check-icon is-passed"></span><span>The team participates in ongoing executive education (monthly recommended).</span></div>
+              <div class="checklist-item"><span class="check-icon is-passed"></span><span>The team is able to engage in constructive debates and all members feel comfortable participating.</span></div>
+            </div>
+          </div>
+
+          <div class="checklist-section">
+            <div class="checklist-head">S2 — Everyone is aligned with the #1 thing that needs to be accomplished this quarter.</div>
+            <div class="checklist-items">
+              <div class="checklist-item"><span class="check-icon is-passed"></span><span>The Critical Number is identified to move the company ahead this quarter.</span></div>
+              <div class="checklist-item"><span class="check-icon is-not-passed"></span><span style="color: hsl(var(--muted-foreground));">3-5 Priorities (Rocks) that support the Critical Number are identified and ranked.</span></div>
+              <div class="checklist-item"><span class="check-icon is-not-passed"></span><span style="color: hsl(var(--muted-foreground));">A Quarterly Theme and Celebration/Reward are announced to all employees.</span></div>
+              <div class="checklist-item"><span class="check-icon is-not-passed"></span><span style="color: hsl(var(--muted-foreground));">Quarterly Theme/Critical Number posted throughout the company.</span></div>
+            </div>
+          </div>
+
+          <div class="checklist-section">
+            <div class="checklist-head">S3 — Communication rhythm is established.</div>
+            <div class="checklist-items">
+              <div class="checklist-item"><span class="check-icon is-passed"></span><span>All employees are in a daily huddle that lasts less than 15 minutes.</span></div>
+              <div class="checklist-item"><span class="check-icon is-passed"></span><span>All teams have a weekly meeting.</span></div>
+              <div class="checklist-item"><span class="check-icon is-passed"></span><span>The executive and middle managers meet for a day of learning and DNA transfer each month.</span></div>
+              <div class="checklist-item"><span class="check-icon is-passed"></span><span>Quarterly and annually, the executive and middle managers meet offsite to work on the 4 Decisions.</span></div>
+            </div>
+          </div>
+
+          <div style="text-align:center; padding: 1rem; color: hsl(var(--muted-foreground)); font-size: 0.8125rem; background: hsl(var(--muted) / 0.4); border-radius: 6px; margin-bottom: 1.25rem;">
+            ⤵ Sections S4 through S10 truncated for wireframe brevity. Full report shows all 10.
+          </div>
+
+          <div class="checklist-footer wf-card">
+            <strong>37 of 40 Checklist Items Completed</strong>
+          </div>
+
+          <!-- SCORING TABLE -->
+          <div class="wf-card" style="margin-top: 1.5rem;">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Scoring Table</h2>
+              <p class="wf-card-description">Per-section totals and averages.</p>
+            </div>
+            <table class="scoring-table">
+              <thead>
+                <tr>
+                  <th>Section</th>
+                  <th class="num" style="text-align:right;">Total</th>
+                  <th class="num" style="text-align:right;">Average</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>S1 — Executive team aligned</td><td class="num">8</td><td class="num">2.0</td></tr>
+                <tr><td>S2 — Quarterly priorities aligned</td><td class="num">5</td><td class="num">1.25</td></tr>
+                <tr><td>S3 — Communication rhythm</td><td class="num">9</td><td class="num">2.25</td></tr>
+                <tr><td>S4 — Accountability assigned</td><td class="num">9</td><td class="num">2.25</td></tr>
+                <tr><td>S5 — Employee input collected</td><td class="num">9</td><td class="num">2.25</td></tr>
+                <tr><td>S6 — Customer feedback rhythm</td><td class="num">9</td><td class="num">2.25</td></tr>
+                <tr><td>S7 — Core Values alive</td><td class="num">9</td><td class="num">2.25</td></tr>
+                <tr><td>S8 — Strategy articulated</td><td class="num">9</td><td class="num">2.25</td></tr>
+                <tr><td>S9 — KPIs at every level</td><td class="num">9</td><td class="num">2.25</td></tr>
+                <tr><td>S10 — Plans visible everywhere</td><td class="num">9</td><td class="num">2.25</td></tr>
+                <tr class="totals-row">
+                  <td>Total</td>
+                  <td class="num">85</td>
+                  <td class="num">2.13</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- CONCLUSION -->
+          <div class="conclusion" style="margin-top: 1.5rem;">
+            <p class="conclusion-headline">You have completed 37 of the 40 Checklist Items.</p>
+            <p class="conclusion-msg">That is a great overall score. Keep going — focus next on Section S2 (Quarterly Priorities) where you scored lowest.</p>
+          </div>
+
+          <p class="wf-text-xs wf-text-muted" style="text-align:center; margin-top: 1.5rem;">— End of report —</p>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

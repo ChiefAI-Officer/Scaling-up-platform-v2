@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Wireframe 01 — Wizard Step 1: Template &amp; Organization</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .template-list { display: flex; flex-direction: column; gap: 0.625rem; }
+    .template-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.875rem;
+      padding: 1rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: border-color 150ms, background 150ms;
+      background: hsl(var(--card));
+    }
+    .template-card:hover { border-color: hsl(var(--primary) / 0.4); background: hsl(var(--muted) / 0.4); }
+    .template-card.is-selected {
+      border-color: hsl(var(--primary));
+      background: hsl(var(--primary) / 0.04);
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.08);
+    }
+    .template-radio {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: 2px solid hsl(var(--border));
+      flex-shrink: 0;
+      margin-top: 2px;
+      position: relative;
+    }
+    .template-card.is-selected .template-radio { border-color: hsl(var(--primary)); }
+    .template-card.is-selected .template-radio::after {
+      content: ""; width: 10px; height: 10px; border-radius: 50%;
+      background: hsl(var(--primary)); position: absolute;
+      top: 2px; left: 2px;
+    }
+    .template-body { flex: 1; }
+    .template-title-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      flex-wrap: wrap; margin-bottom: 0.25rem;
+    }
+    .template-name { font-weight: 600; font-size: 0.9375rem; }
+    .template-desc { font-size: 0.8125rem; color: hsl(var(--muted-foreground)); margin: 0; line-height: 1.5; }
+    .template-meta {
+      display: flex; gap: 0.875rem; font-size: 0.75rem;
+      color: hsl(var(--muted-foreground)); margin-top: 0.5rem;
+    }
+    .group-divider {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin: 0.5rem 0 0.625rem;
+    }
+    .group-divider::before, .group-divider::after {
+      content: ""; flex: 1; height: 1px; background: hsl(var(--border));
+    }
+    .group-divider-text {
+      font-size: 0.6875rem; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.1 spec ref: <code>campaign-service.ts → createCampaign(...)</code> + Q7 nav labels</span>
+    <a href="index.html">← Back to wireframe index</a>
+  </div>
+
+  <div class="wf-shell">
+    <!-- SIDEBAR -->
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">SU</span>
+        <span>Scaling Up Platform</span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Workspace</div>
+        <a class="wf-sidebar-link" href="#">📊 Dashboard</a>
+        <a class="wf-sidebar-link" href="#">📋 Workshops</a>
+        <a class="wf-sidebar-link is-active" href="#">🏢 Organizations</a>
+        <a class="wf-sidebar-link" href="#">👥 Coaches</a>
+        <a class="wf-sidebar-link" href="#">🧾 Approvals</a>
+        <div class="wf-sidebar-section-title">Content</div>
+        <a class="wf-sidebar-link" href="#">📐 Templates</a>
+        <a class="wf-sidebar-link" href="#">⚙ Workflows</a>
+        <a class="wf-sidebar-link" href="#">🗂 Files</a>
+        <div class="wf-sidebar-section-title">Settings</div>
+        <a class="wf-sidebar-link" href="#">💵 Pricing</a>
+        <a class="wf-sidebar-link" href="#">📂 Categories</a>
+      </nav>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="wf-main">
+      <header class="wf-topbar">
+        <nav class="wf-breadcrumb">
+          <a href="#">Organizations</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Acme Corporation</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">New Assessment</span>
+        </nav>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span class="wf-text-xs wf-text-muted">Signed in as <strong>jeff@scalingup.com</strong></span>
+        </div>
+      </header>
+
+      <div class="wf-page">
+        <div class="wf-page-header">
+          <h1 class="wf-page-title">Create Assessment</h1>
+          <p class="wf-page-subtitle">Run a Scaling Up assessment for Acme Corporation. Choose a template to begin.</p>
+        </div>
+
+        <!-- STEPPER -->
+        <div class="wf-stepper">
+          <div class="wf-stepper-item is-active">
+            <span class="wf-stepper-circle">1</span>
+            <span class="wf-stepper-label">Template</span>
+          </div>
+          <div class="wf-stepper-item">
+            <span class="wf-stepper-circle">2</span>
+            <span class="wf-stepper-label">Participants</span>
+          </div>
+          <div class="wf-stepper-item">
+            <span class="wf-stepper-circle">3</span>
+            <span class="wf-stepper-label">Schedule</span>
+          </div>
+          <div class="wf-stepper-item">
+            <span class="wf-stepper-circle">4</span>
+            <span class="wf-stepper-label">Review</span>
+          </div>
+        </div>
+
+        <div class="wf-row">
+          <!-- LEFT: ORG (locked) -->
+          <div class="wf-col" style="max-width: 360px; flex: 0 0 360px;">
+            <div class="wf-card">
+              <div class="wf-card-header">
+                <h2 class="wf-card-title">Organization</h2>
+                <p class="wf-card-description">Pre-selected from your current context.</p>
+              </div>
+              <div class="wf-card-body">
+                <label class="wf-label">Client organization</label>
+                <select class="wf-select" disabled>
+                  <option>Acme Corporation</option>
+                </select>
+                <p class="wf-help-text">To run an assessment for a different organization, navigate to that organization first.</p>
+
+                <div style="margin-top:1.25rem; padding:0.875rem; background: hsl(var(--muted)); border-radius: 6px;">
+                  <div class="wf-text-xs wf-font-semibold wf-mb-1">Quick org snapshot</div>
+                  <div class="wf-text-sm">5 teams · 47 members · 2 prior assessments</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: TEMPLATE -->
+          <div class="wf-col" style="flex: 1;">
+            <div class="wf-card">
+              <div class="wf-card-header">
+                <h2 class="wf-card-title">Template</h2>
+                <p class="wf-card-description">Pick the assessment to run. Templates marked PUBLIC are evergreen lead-magnet quizzes.</p>
+              </div>
+              <div class="wf-card-body">
+                <div class="template-list">
+
+                  <!-- Rockefeller -->
+                  <div class="template-card is-selected">
+                    <span class="template-radio"></span>
+                    <div class="template-body">
+                      <div class="template-title-row">
+                        <span class="template-name">Rockefeller Habits Checklist</span>
+                        <span class="wf-badge wf-badge-invited">INVITED</span>
+                      </div>
+                      <p class="template-desc">The 4 Decisions checklist — 10 sections × 4 questions on a 0–3 scale, scored against tier thresholds. Coach-administered, attributable, longitudinal.</p>
+                      <div class="template-meta">
+                        <span>📋 40 questions</span>
+                        <span>🌐 enUS</span>
+                        <span>🏷 Annual cadence</span>
+                        <span>📈 Trend-enabled</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Vision Alignment -->
+                  <div class="template-card">
+                    <span class="template-radio"></span>
+                    <div class="template-body">
+                      <div class="template-title-row">
+                        <span class="template-name">Leadership Vision Alignment</span>
+                        <span class="wf-badge wf-badge-invited">INVITED</span>
+                      </div>
+                      <p class="template-desc">Mixed-type assessment: NUMBER inputs (revenue, headcount), free-text strengths/weaknesses, 0–2 ratings on 15 business dimensions, multi-select top-3 obstacles.</p>
+                      <div class="template-meta">
+                        <span>📋 ~30 questions</span>
+                        <span>🌐 enUS</span>
+                        <span>🏷 Annual / semi-annual</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- QSP v2 -->
+                  <div class="template-card">
+                    <span class="template-radio"></span>
+                    <div class="template-body">
+                      <div class="template-title-row">
+                        <span class="template-name">Quarterly Session Prep v2</span>
+                        <span class="wf-badge wf-badge-invited">INVITED</span>
+                      </div>
+                      <p class="template-desc">4-part quarterly review: rate-and-explain compound questions (1–10 + text), Start/Stop/Keep, alignment ratings, biggest challenges.</p>
+                      <div class="template-meta">
+                        <span>📋 ~20 questions</span>
+                        <span>🌐 enUS</span>
+                        <span>🏷 Quarterly</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Scaling Up Assessment -->
+                  <div class="template-card" style="opacity: 0.6;">
+                    <span class="template-radio"></span>
+                    <div class="template-body">
+                      <div class="template-title-row">
+                        <span class="template-name">Scaling Up Assessment</span>
+                        <span class="wf-badge wf-badge-invited">INVITED</span>
+                        <span class="wf-badge" style="background: hsl(38 92% 92%); color: hsl(26 83% 30%);">v1.6 — Coming after July 1</span>
+                      </div>
+                      <p class="template-desc">Full deep-dive with anonymity flag and matrix-scored 0–10 questions. Ships after Jeff's matrix is complete.</p>
+                      <div class="template-meta">
+                        <span>📋 Pending matrix</span>
+                        <span>🌐 enUS</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- PUBLIC group -->
+                  <div class="group-divider">
+                    <span class="group-divider-text">Public Lead-Magnet Quizzes</span>
+                  </div>
+
+                  <!-- SunHub -->
+                  <div class="template-card">
+                    <span class="template-radio"></span>
+                    <div class="template-body">
+                      <div class="template-title-row">
+                        <span class="template-name">SunHub Quick Quiz — "Will you scale or fail?"</span>
+                        <span class="wf-badge wf-badge-public">PUBLIC</span>
+                      </div>
+                      <p class="template-desc">8-question 0–10 quick assessment across People / Strategy / Cash / Execution. Lead-magnet flow with CTA buttons (40-Q deep dive, coach session, book purchase).</p>
+                      <div class="template-meta">
+                        <span>📋 8 questions</span>
+                        <span>🌐 enUS</span>
+                        <span>🔗 Embeddable</span>
+                        <span>📤 Lead capture</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Website -->
+                  <div class="template-card">
+                    <span class="template-radio"></span>
+                    <div class="template-body">
+                      <div class="template-title-row">
+                        <span class="template-name">Website Scaling Up 4 Decisions Assessment</span>
+                        <span class="wf-badge wf-badge-public">PUBLIC</span>
+                      </div>
+                      <p class="template-desc">32-question 0–10 assessment across the 4 Decisions framework. Captures referring coach email; results route to taker, registered coach, and Scaling Up team.</p>
+                      <div class="template-meta">
+                        <span>📋 32 questions</span>
+                        <span>🌐 enUS</span>
+                        <span>🔗 Embeddable</span>
+                        <span>👥 Coach attribution</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+              <div class="wf-card-footer">
+                <a href="#" class="wf-btn wf-btn-ghost">Cancel</a>
+                <a href="02-wizard-step2-participants.html" class="wf-btn wf-btn-primary">Next: Participants →</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Wireframe 06 — Campaign Detail: Overview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .campaign-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .campaign-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .campaign-meta strong { color: hsl(var(--foreground)); font-weight: 600; }
+    .actions-row { display: flex; gap: 0.5rem; flex-shrink: 0; }
+    .icon-cell { display: inline-flex; align-items: center; gap: 0.375rem; }
+    .row-action-btn {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      background: transparent;
+      border: 1px solid hsl(var(--border));
+      padding: 0.25rem 0.625rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .row-action-btn:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+    .row-action-btn.is-destructive:hover { color: hsl(var(--destructive)); border-color: hsl(var(--destructive)); }
+
+    /* Mini sparkline */
+    .mini-spark {
+      height: 28px; width: 100%;
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      margin-top: 0.5rem;
+    }
+    .mini-spark-bar {
+      flex: 1;
+      background: hsl(var(--primary) / 0.4);
+      border-radius: 1px;
+    }
+    .mini-spark-bar.is-current { background: hsl(var(--primary)); }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.1 spec ref: <code>AssessmentInvitation</code> status enum, VIEWED monotonicity</span>
+    <a href="index.html">← Back to wireframe index</a>
+  </div>
+
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">SU</span>
+        <span>Scaling Up Platform</span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Workspace</div>
+        <a class="wf-sidebar-link" href="#">📊 Dashboard</a>
+        <a class="wf-sidebar-link is-active" href="#">🏢 Organizations</a>
+        <a class="wf-sidebar-link" href="#">👥 Coaches</a>
+        <a class="wf-sidebar-link" href="#">🧾 Approvals</a>
+        <div class="wf-sidebar-section-title">Content</div>
+        <a class="wf-sidebar-link" href="#">📐 Templates</a>
+        <a class="wf-sidebar-link" href="#">⚙ Workflows</a>
+      </nav>
+    </aside>
+
+    <div class="wf-main">
+      <header class="wf-topbar">
+        <nav class="wf-breadcrumb">
+          <a href="#">Organizations</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Acme Corporation</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Assessments</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Q2 2026 Rockefeller Habits Check-in</span>
+        </nav>
+        <span class="wf-text-xs wf-text-muted">Signed in as <strong>jeff@scalingup.com</strong></span>
+      </header>
+
+      <div class="wf-page">
+        <!-- HEADER -->
+        <div class="campaign-header">
+          <div>
+            <h1 class="wf-page-title" style="display:flex; align-items:center; gap:0.625rem;">
+              Q2 2026 Rockefeller Habits Check-in
+              <span class="wf-pill wf-pill-active">ACTIVE</span>
+              <span class="wf-badge wf-badge-invited">INVITED</span>
+            </h1>
+            <p class="wf-page-subtitle">Rockefeller Habits Checklist · Acme Corporation</p>
+            <div class="campaign-meta">
+              <span><strong>Opened:</strong> May 6, 2026 — 10:30 AM</span>
+              <span><strong>Closes:</strong> May 20, 2026 — 11:59 PM</span>
+              <span><strong>Created by:</strong> Jeff Verdun</span>
+              <span><strong>Alias:</strong> <code style="background: hsl(var(--muted)); padding: 0.0625rem 0.375rem; border-radius: 3px; font-family: ui-monospace, monospace;">acme_rockhabits_enus_260506103000</code></span>
+            </div>
+          </div>
+          <div class="actions-row">
+            <button class="wf-btn wf-btn-secondary">📤 Resend All Pending</button>
+            <button class="wf-btn wf-btn-secondary">📥 Export CSV</button>
+            <button class="wf-btn wf-btn-destructive">Close Campaign</button>
+          </div>
+        </div>
+
+        <!-- TABS -->
+        <div class="wf-tabs">
+          <a class="wf-tab is-active" href="06-campaign-detail-overview.html">Overview</a>
+          <a class="wf-tab" href="07-campaign-detail-respondents.html">Respondents</a>
+          <a class="wf-tab" href="09-team-aggregate-panel.html">Aggregate</a>
+          <a class="wf-tab" href="10-trends-page.html">Trends</a>
+        </div>
+
+        <!-- STATS -->
+        <div class="wf-stat-grid">
+          <div class="wf-stat-card">
+            <div class="wf-stat-label">Invited</div>
+            <div class="wf-stat-value">18</div>
+            <div class="mini-spark">
+              <div class="mini-spark-bar" style="height: 30%;"></div>
+              <div class="mini-spark-bar" style="height: 50%;"></div>
+              <div class="mini-spark-bar" style="height: 80%;"></div>
+              <div class="mini-spark-bar" style="height: 100%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 100%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 100%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 100%;"></div>
+            </div>
+            <div class="wf-stat-trend">All sent within 6 minutes</div>
+          </div>
+          <div class="wf-stat-card">
+            <div class="wf-stat-label">Viewed</div>
+            <div class="wf-stat-value" style="color: hsl(var(--status-viewed));">12</div>
+            <div class="mini-spark">
+              <div class="mini-spark-bar" style="height: 0%;"></div>
+              <div class="mini-spark-bar" style="height: 25%;"></div>
+              <div class="mini-spark-bar" style="height: 60%;"></div>
+              <div class="mini-spark-bar" style="height: 85%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 100%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 90%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 70%;"></div>
+            </div>
+            <div class="wf-stat-trend">66% open rate so far</div>
+          </div>
+          <div class="wf-stat-card">
+            <div class="wf-stat-label">Submitted</div>
+            <div class="wf-stat-value" style="color: hsl(var(--status-submitted));">7</div>
+            <div class="mini-spark">
+              <div class="mini-spark-bar" style="height: 0%;"></div>
+              <div class="mini-spark-bar" style="height: 15%;"></div>
+              <div class="mini-spark-bar" style="height: 40%;"></div>
+              <div class="mini-spark-bar" style="height: 65%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 80%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 100%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 90%;"></div>
+            </div>
+            <div class="wf-stat-trend">39% completion · last: 2h ago</div>
+          </div>
+          <div class="wf-stat-card">
+            <div class="wf-stat-label">Pending</div>
+            <div class="wf-stat-value" style="color: hsl(var(--muted-foreground));">11</div>
+            <div class="mini-spark">
+              <div class="mini-spark-bar" style="height: 100%;"></div>
+              <div class="mini-spark-bar" style="height: 95%;"></div>
+              <div class="mini-spark-bar" style="height: 80%;"></div>
+              <div class="mini-spark-bar" style="height: 70%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 65%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 60%;"></div>
+              <div class="mini-spark-bar is-current" style="height: 55%;"></div>
+            </div>
+            <div class="wf-stat-trend">Trending down — chase if needed</div>
+          </div>
+        </div>
+
+        <!-- INVITATIONS TABLE -->
+        <div class="wf-card">
+          <div class="wf-card-header" style="display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <h2 class="wf-card-title">Invitations</h2>
+              <p class="wf-card-description">Magic-link delivery state for each participant.</p>
+            </div>
+            <div style="display:flex; gap:0.5rem;">
+              <select class="wf-select" style="font-size:0.8125rem; padding: 0.375rem 0.5rem;">
+                <option>All statuses (18)</option>
+                <option>PENDING (4)</option>
+                <option>SENT (7)</option>
+                <option>VIEWED (5)</option>
+                <option>SUBMITTED (7)</option>
+              </select>
+              <input type="text" class="wf-input" placeholder="Search…" style="width:200px; font-size:0.8125rem; padding: 0.375rem 0.625rem;">
+            </div>
+          </div>
+          <table class="wf-table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Email</th>
+                <th>Team</th>
+                <th>Status</th>
+                <th>Sent</th>
+                <th>Last action</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="wf-font-medium">Linda Marsh</span> <span class="wf-text-xs wf-text-muted">CEO</span></td>
+                <td>linda.marsh@acme.com</td>
+                <td>Executive</td>
+                <td><span class="wf-pill wf-pill-submitted">SUBMITTED</span></td>
+                <td>May 6, 10:30 AM</td>
+                <td>Submitted 2h ago</td>
+                <td style="text-align:right;">
+                  <button class="row-action-btn">View</button>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="wf-font-medium">Robert Kim</span> <span class="wf-text-xs wf-text-muted">CFO</span></td>
+                <td>robert.kim@acme.com</td>
+                <td>Executive</td>
+                <td><span class="wf-pill wf-pill-submitted">SUBMITTED</span></td>
+                <td>May 6, 10:30 AM</td>
+                <td>Submitted 4h ago</td>
+                <td style="text-align:right;">
+                  <button class="row-action-btn">View</button>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="wf-font-medium">Diana Okonkwo</span> <span class="wf-text-xs wf-text-muted">COO</span></td>
+                <td>diana.o@acme.com</td>
+                <td>Executive</td>
+                <td><span class="wf-pill wf-pill-viewed">VIEWED</span></td>
+                <td>May 6, 10:30 AM</td>
+                <td>Opened email · 23m ago</td>
+                <td style="text-align:right;">
+                  <button class="row-action-btn">Resend</button>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="wf-font-medium">Sarah Chen</span></td>
+                <td>sarah.chen@acme.com</td>
+                <td>Engineering › Platform</td>
+                <td><span class="wf-pill wf-pill-submitted">SUBMITTED</span></td>
+                <td>May 6, 10:31 AM</td>
+                <td>Submitted 1h ago</td>
+                <td style="text-align:right;">
+                  <button class="row-action-btn">View</button>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="wf-font-medium">Marcus Rivera</span></td>
+                <td>marcus.rivera@acme.com</td>
+                <td>Engineering › Platform</td>
+                <td><span class="wf-pill wf-pill-viewed">VIEWED</span></td>
+                <td>May 6, 10:31 AM</td>
+                <td>Opened · 1h 12m ago</td>
+                <td style="text-align:right;">
+                  <button class="row-action-btn">Resend</button>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="wf-font-medium">Priya Krishnan</span></td>
+                <td>priya.k@acme.com</td>
+                <td>Engineering › Platform</td>
+                <td><span class="wf-pill wf-pill-sent">SENT</span></td>
+                <td>May 6, 10:31 AM</td>
+                <td>—</td>
+                <td style="text-align:right;">
+                  <button class="row-action-btn">Resend</button>
+                  <button class="row-action-btn is-destructive">Revoke</button>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="wf-font-medium">Jordan Park</span></td>
+                <td>jordan.park@acme.com</td>
+                <td>Engineering › Frontend</td>
+                <td><span class="wf-pill wf-pill-submitted">SUBMITTED</span></td>
+                <td>May 6, 10:32 AM</td>
+                <td>Submitted 30m ago</td>
+                <td style="text-align:right;">
+                  <button class="row-action-btn">View</button>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="wf-font-medium">Tasha Whitfield</span></td>
+                <td>tasha.w@acme.com</td>
+                <td>Engineering › Frontend</td>
+                <td><span class="wf-pill wf-pill-pending">PENDING</span></td>
+                <td><span class="wf-text-muted">SMTP failed — retry pending</span></td>
+                <td>—</td>
+                <td style="text-align:right;">
+                  <button class="row-action-btn">Retry</button>
+                  <button class="row-action-btn is-destructive">Revoke</button>
+                </td>
+              </tr>
+              <tr style="background: hsl(var(--muted) / 0.3);">
+                <td colspan="7" style="text-align:center; padding: 0.75rem; color: hsl(var(--muted-foreground)); font-size: 0.8125rem;">
+                  + 10 more invitations (showing 8 of 18)
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>

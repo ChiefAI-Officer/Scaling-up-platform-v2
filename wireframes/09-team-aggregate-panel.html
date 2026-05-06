@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Wireframe 09 — Team Aggregate Panel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .scope-row {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      margin-bottom: 1rem;
+      padding: 0.625rem 0.875rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+    }
+
+    .stacked-bar-row {
+      display: grid;
+      grid-template-columns: 1fr 200px 80px;
+      gap: 0.625rem;
+      align-items: center;
+      padding: 0.5rem 0;
+      font-size: 0.8125rem;
+      border-bottom: 1px dashed hsl(var(--border));
+    }
+    .stacked-bar-row:last-child { border-bottom: 0; }
+    .stacked-bar-question { color: hsl(var(--foreground)); }
+    .stacked-bar-track {
+      height: 12px;
+      border-radius: 9999px;
+      overflow: hidden;
+      display: flex;
+      background: hsl(var(--muted));
+    }
+    .stacked-bar-fill { height: 100%; }
+    .stacked-bar-meta {
+      text-align: right;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-variant-numeric: tabular-nums;
+    }
+
+    .legend-pills {
+      display: flex;
+      gap: 0.875rem;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .legend-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .legend-pill::before {
+      content: "";
+      width: 10px; height: 10px;
+      border-radius: 2px;
+    }
+    .legend-0::before { background: hsl(var(--tier-low)); }
+    .legend-1::before { background: hsl(var(--tier-ok)); }
+    .legend-2::before { background: hsl(160 84% 50%); }
+    .legend-3::before { background: hsl(160 84% 30%); }
+
+    .section-bar-row {
+      display: grid;
+      grid-template-columns: 220px 1fr 80px;
+      gap: 0.875rem;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px dashed hsl(var(--border));
+      font-size: 0.875rem;
+    }
+    .section-bar-row:last-child { border-bottom: 0; }
+
+    .tier-distribution-mini {
+      display: flex;
+      gap: 4px;
+      align-items: flex-end;
+      height: 56px;
+      margin-top: 0.5rem;
+    }
+    .tier-distribution-mini > div {
+      flex: 1;
+      border-radius: 2px 2px 0 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 0.75rem;
+      padding-bottom: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.1 spec ref: <code>getCampaignAggregate(...)</code>, scope filter via <code>teamPathAtAdd</code></span>
+    <a href="index.html">← Back to wireframe index</a>
+  </div>
+
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">SU</span>
+        <span>Scaling Up Platform</span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Workspace</div>
+        <a class="wf-sidebar-link is-active" href="#">🏢 Organizations</a>
+        <a class="wf-sidebar-link" href="#">👥 Coaches</a>
+        <div class="wf-sidebar-section-title">Content</div>
+        <a class="wf-sidebar-link" href="#">📐 Templates</a>
+      </nav>
+    </aside>
+
+    <div class="wf-main">
+      <header class="wf-topbar">
+        <nav class="wf-breadcrumb">
+          <a href="#">Acme Corporation</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="06-campaign-detail-overview.html">Q2 2026 Rockefeller</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Aggregate</span>
+        </nav>
+        <span class="wf-text-xs wf-text-muted">Signed in as <strong>jeff@scalingup.com</strong></span>
+      </header>
+
+      <div class="wf-page">
+        <div class="wf-page-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h1 class="wf-page-title">Q2 2026 Rockefeller — Aggregate</h1>
+            <p class="wf-page-subtitle">Live aggregate computed on each visit. Filtered by team membership snapshot at participant-add time.</p>
+          </div>
+          <div style="display:flex; gap:0.5rem;">
+            <button class="wf-btn wf-btn-secondary">📥 Export aggregate CSV</button>
+          </div>
+        </div>
+
+        <div class="wf-tabs">
+          <a class="wf-tab" href="06-campaign-detail-overview.html">Overview</a>
+          <a class="wf-tab" href="07-campaign-detail-respondents.html">Respondents</a>
+          <a class="wf-tab is-active" href="09-team-aggregate-panel.html">Aggregate</a>
+          <a class="wf-tab" href="10-trends-page.html">Trends</a>
+        </div>
+
+        <!-- SCOPE FILTER -->
+        <div class="scope-row">
+          <span class="wf-text-sm wf-text-muted">Scope to team:</span>
+          <select class="wf-select" style="max-width: 280px;">
+            <option>All participants (7 of 18 submissions)</option>
+            <option>Engineering (4 submissions)</option>
+            <option>Engineering › Platform (3 submissions)</option>
+            <option>Engineering › Frontend (1 submission)</option>
+            <option>Executive (3 submissions)</option>
+          </select>
+          <span class="wf-text-xs wf-text-muted">↳ Uses snapshot of team membership at participant-add time. Stable across team reorganizations.</span>
+        </div>
+
+        <!-- STATS ROW -->
+        <div class="wf-stat-grid">
+          <div class="wf-stat-card">
+            <div class="wf-stat-label">Submissions</div>
+            <div class="wf-stat-value">7 / 18</div>
+            <div class="wf-stat-trend">39% completion</div>
+          </div>
+          <div class="wf-stat-card">
+            <div class="wf-stat-label">Avg score (count_achieved)</div>
+            <div class="wf-stat-value" style="color: hsl(var(--success));">28.6</div>
+            <div class="wf-stat-trend">/ 40 — strong start</div>
+          </div>
+          <div class="wf-stat-card">
+            <div class="wf-stat-label">Tier distribution</div>
+            <div class="tier-distribution-mini">
+              <div class="wf-bar-low" style="height: 30%;">1</div>
+              <div class="wf-bar-ok" style="height: 60%;">3</div>
+              <div class="wf-bar-great" style="height: 100%;">3</div>
+            </div>
+            <div class="wf-stat-trend" style="margin-top: 0.625rem;">Low / OK / Great</div>
+          </div>
+          <div class="wf-stat-card">
+            <div class="wf-stat-label">Highest tier</div>
+            <div class="wf-stat-value" style="color: hsl(var(--success)); font-size: 1.25rem; line-height: 1.4;">Great</div>
+            <div class="wf-stat-trend">3 respondents at 33+/40</div>
+          </div>
+        </div>
+
+        <div class="wf-row">
+
+          <!-- LEFT: PER-SECTION AVERAGES -->
+          <div class="wf-card" style="flex: 0 0 460px;">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Per-Section Averages</h2>
+              <p class="wf-card-description">Mean section average across submissions (0–3 scale).</p>
+            </div>
+            <div class="wf-card-body">
+              <div class="section-bar-row">
+                <span>S1 — Executive team aligned</span>
+                <div class="wf-bar-track"><div class="wf-bar-fill wf-bar-great" style="width: 80%;"></div></div>
+                <span class="wf-text-xs">2.40 / 3</span>
+              </div>
+              <div class="section-bar-row">
+                <span>S2 — Quarterly priorities</span>
+                <div class="wf-bar-track"><div class="wf-bar-fill wf-bar-ok" style="width: 50%;"></div></div>
+                <span class="wf-text-xs">1.50 / 3</span>
+              </div>
+              <div class="section-bar-row">
+                <span>S3 — Communication rhythm</span>
+                <div class="wf-bar-track"><div class="wf-bar-fill wf-bar-great" style="width: 75%;"></div></div>
+                <span class="wf-text-xs">2.25 / 3</span>
+              </div>
+              <div class="section-bar-row">
+                <span>S4 — Accountability assigned</span>
+                <div class="wf-bar-track"><div class="wf-bar-fill wf-bar-great" style="width: 70%;"></div></div>
+                <span class="wf-text-xs">2.10 / 3</span>
+              </div>
+              <div class="section-bar-row">
+                <span>S5 — Employee input collected</span>
+                <div class="wf-bar-track"><div class="wf-bar-fill wf-bar-ok" style="width: 55%;"></div></div>
+                <span class="wf-text-xs">1.65 / 3</span>
+              </div>
+              <div class="section-bar-row">
+                <span>S6 — Customer feedback rhythm</span>
+                <div class="wf-bar-track"><div class="wf-bar-fill wf-bar-ok" style="width: 60%;"></div></div>
+                <span class="wf-text-xs">1.80 / 3</span>
+              </div>
+              <div class="section-bar-row">
+                <span>S7 — Core Values alive</span>
+                <div class="wf-bar-track"><div class="wf-bar-fill wf-bar-great" style="width: 85%;"></div></div>
+                <span class="wf-text-xs">2.55 / 3</span>
+              </div>
+              <div class="section-bar-row">
+                <span>S8 — Strategy articulated</span>
+                <div class="wf-bar-track"><div class="wf-bar-fill wf-bar-great" style="width: 75%;"></div></div>
+                <span class="wf-text-xs">2.25 / 3</span>
+              </div>
+              <div class="section-bar-row">
+                <span>S9 — KPIs at every level</span>
+                <div class="wf-bar-track"><div class="wf-bar-fill wf-bar-great" style="width: 70%;"></div></div>
+                <span class="wf-text-xs">2.10 / 3</span>
+              </div>
+              <div class="section-bar-row">
+                <span>S10 — Plans visible everywhere</span>
+                <div class="wf-bar-track"><div class="wf-bar-fill wf-bar-great" style="width: 75%;"></div></div>
+                <span class="wf-text-xs">2.25 / 3</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: PER-QUESTION DISTRIBUTION -->
+          <div class="wf-card" style="flex: 1;">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Per-Question Distribution</h2>
+              <p class="wf-card-description">Distribution of scores 0–3 across all submissions for each of the 40 questions.</p>
+              <div class="legend-pills" style="margin-top:0.625rem;">
+                <span class="legend-pill legend-0">0 — Not true</span>
+                <span class="legend-pill legend-1">1</span>
+                <span class="legend-pill legend-2">2</span>
+                <span class="legend-pill legend-3">3 — Completely true</span>
+              </div>
+            </div>
+            <div class="wf-card-body">
+              <details open>
+                <summary style="font-weight: 600; padding: 0.5rem 0; cursor: pointer; color: hsl(var(--foreground));">S1 — Executive team aligned (4 questions)</summary>
+                <div class="stacked-bar-row">
+                  <span class="stacked-bar-question">Q1.1 — Team understands differences and priorities</span>
+                  <div class="stacked-bar-track">
+                    <div class="stacked-bar-fill" style="background: hsl(var(--tier-low)); width: 0%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(var(--tier-ok)); width: 14%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(160 84% 50%); width: 43%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(160 84% 30%); width: 43%;"></div>
+                  </div>
+                  <span class="stacked-bar-meta">avg 2.29</span>
+                </div>
+                <div class="stacked-bar-row">
+                  <span class="stacked-bar-question">Q1.2 — Team meets weekly for strategic thinking</span>
+                  <div class="stacked-bar-track">
+                    <div class="stacked-bar-fill" style="background: hsl(var(--tier-low)); width: 0%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(var(--tier-ok)); width: 0%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(160 84% 50%); width: 71%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(160 84% 30%); width: 29%;"></div>
+                  </div>
+                  <span class="stacked-bar-meta">avg 2.29</span>
+                </div>
+                <div class="stacked-bar-row">
+                  <span class="stacked-bar-question">Q1.3 — Ongoing executive education</span>
+                  <div class="stacked-bar-track">
+                    <div class="stacked-bar-fill" style="background: hsl(var(--tier-low)); width: 14%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(var(--tier-ok)); width: 14%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(160 84% 50%); width: 43%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(160 84% 30%); width: 29%;"></div>
+                  </div>
+                  <span class="stacked-bar-meta">avg 1.86</span>
+                </div>
+                <div class="stacked-bar-row">
+                  <span class="stacked-bar-question">Q1.4 — Constructive debate &amp; participation</span>
+                  <div class="stacked-bar-track">
+                    <div class="stacked-bar-fill" style="background: hsl(var(--tier-low)); width: 0%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(var(--tier-ok)); width: 14%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(160 84% 50%); width: 14%;"></div>
+                    <div class="stacked-bar-fill" style="background: hsl(160 84% 30%); width: 71%;"></div>
+                  </div>
+                  <span class="stacked-bar-meta">avg 2.57</span>
+                </div>
+              </details>
+
+              <details>
+                <summary style="font-weight: 600; padding: 0.5rem 0; cursor: pointer; color: hsl(var(--foreground));">S2 — Quarterly priorities aligned</summary>
+                <p class="wf-text-xs wf-text-muted" style="padding-left: 0.5rem;">— Click to expand —</p>
+              </details>
+
+              <details>
+                <summary style="font-weight: 600; padding: 0.5rem 0; cursor: pointer; color: hsl(var(--foreground));">S3 — Communication rhythm</summary>
+                <p class="wf-text-xs wf-text-muted" style="padding-left: 0.5rem;">— Click to expand —</p>
+              </details>
+
+              <div style="text-align:center; padding: 1rem; color: hsl(var(--muted-foreground)); font-size: 0.8125rem; margin-top: 0.5rem;">
+                ⤵ Sections S2–S10 collapsed. Full report shows all 40 questions.
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>

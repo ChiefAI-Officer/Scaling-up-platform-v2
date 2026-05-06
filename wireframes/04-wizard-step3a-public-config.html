@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Wireframe 04 — Wizard Step 3a: PUBLIC Config</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px dashed hsl(var(--border));
+    }
+    .toggle-row:last-child { border-bottom: 0; }
+    .toggle-row.is-locked { opacity: 0.7; }
+    .toggle-info { flex: 1; }
+    .toggle-name {
+      font-weight: 500; font-size: 0.875rem;
+      display: flex; gap: 0.5rem; align-items: center;
+    }
+    .toggle-help { font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-top: 0.125rem; }
+    .toggle-switch {
+      width: 36px; height: 20px;
+      border-radius: 999px;
+      background: hsl(var(--primary));
+      position: relative;
+      transition: background 150ms;
+      flex-shrink: 0;
+    }
+    .toggle-switch.is-off { background: hsl(var(--border)); }
+    .toggle-switch::after {
+      content: "";
+      position: absolute;
+      width: 14px; height: 14px;
+      background: white;
+      border-radius: 50%;
+      top: 3px;
+      left: 19px;
+      transition: left 150ms;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+    .toggle-switch.is-off::after { left: 3px; }
+
+    .preview-card {
+      background: hsl(var(--background));
+      border: 1px dashed hsl(var(--border));
+      border-radius: 6px;
+      padding: 1rem;
+      font-size: 0.8125rem;
+      margin-top: 0.875rem;
+    }
+    .preview-form-field {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0.375rem 0;
+    }
+
+    .cta-row {
+      display: grid;
+      grid-template-columns: 2fr 3fr 1.5fr auto;
+      gap: 0.5rem;
+      padding: 0.625rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      align-items: end;
+      margin-bottom: 0.625rem;
+    }
+    .cta-row .wf-input,
+    .cta-row .wf-select { padding: 0.375rem 0.625rem; font-size: 0.8125rem; }
+    .cta-row .wf-label { font-size: 0.6875rem; }
+    .drag-handle { color: hsl(var(--muted-foreground)); padding: 0 0.25rem; cursor: grab; }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.1 spec ref: <code>publicConfig.leadCapture / resultsRouting / ctaButtons</code>, referringCoachEmail allowlist</span>
+    <a href="index.html">← Back to wireframe index</a>
+  </div>
+
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">SU</span>
+        <span>Scaling Up Platform</span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Workspace</div>
+        <a class="wf-sidebar-link is-active" href="#">🏢 Organizations</a>
+        <a class="wf-sidebar-link" href="#">👥 Coaches</a>
+        <div class="wf-sidebar-section-title">Content</div>
+        <a class="wf-sidebar-link" href="#">📐 Templates</a>
+      </nav>
+    </aside>
+
+    <div class="wf-main">
+      <header class="wf-topbar">
+        <nav class="wf-breadcrumb">
+          <a href="#">Organizations</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Acme Corporation</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">New Public Quiz</span>
+        </nav>
+        <span class="wf-text-xs wf-text-muted">Signed in as <strong>jeff@scalingup.com</strong></span>
+      </header>
+
+      <div class="wf-page">
+        <div class="wf-page-header">
+          <h1 class="wf-page-title">Public Quiz Configuration <span class="wf-badge wf-badge-public" style="vertical-align: middle;">PUBLIC</span></h1>
+          <p class="wf-page-subtitle">Configure the lead-capture form, where results are emailed, and post-results call-to-action buttons.</p>
+        </div>
+
+        <div class="wf-stepper">
+          <div class="wf-stepper-item is-complete">
+            <span class="wf-stepper-circle">✓</span>
+            <span class="wf-stepper-label">Template</span>
+          </div>
+          <div class="wf-stepper-item is-complete">
+            <span class="wf-stepper-circle">✓</span>
+            <span class="wf-stepper-label">Schedule</span>
+          </div>
+          <div class="wf-stepper-item is-active">
+            <span class="wf-stepper-circle">3a</span>
+            <span class="wf-stepper-label">PUBLIC config</span>
+          </div>
+          <div class="wf-stepper-item">
+            <span class="wf-stepper-circle">4</span>
+            <span class="wf-stepper-label">Review</span>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap: 1rem;">
+          <!-- LEAD CAPTURE -->
+          <div class="wf-card">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Lead-Capture Form</h2>
+              <p class="wf-card-description">Fields shown on the public quiz before respondents start. Email is required.</p>
+            </div>
+            <div class="wf-card-body">
+              <div class="toggle-row is-locked">
+                <div class="toggle-info">
+                  <div class="toggle-name">Email <span class="wf-badge" style="background: hsl(var(--muted)); color: hsl(var(--muted-foreground));">Required</span></div>
+                  <div class="toggle-help">Always collected. Used to email results back to the taker.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Name</div>
+                  <div class="toggle-help">First and last name on a single line.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Company</div>
+                  <div class="toggle-help">Free-text. Helps coaches contextualize follow-up.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Job title</div>
+                  <div class="toggle-help">Free-text. Filters respondents in the lead report.</div>
+                </div>
+                <span class="toggle-switch is-off"></span>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Referring coach email</div>
+                  <div class="toggle-help">Helper text shown on form: "If your coach is a registered Scaling Up coach, they'll receive your results." Unverified emails get stored but NOT emailed (privacy guard).</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+
+              <div class="preview-card">
+                <div class="wf-text-xs wf-font-semibold wf-mb-2">Form preview (this is what respondents see)</div>
+                <div class="preview-form-field"><span style="width: 28%;">Email *</span><span class="wf-text-muted">┃ alice@acme.com</span></div>
+                <div class="preview-form-field"><span style="width: 28%;">Name</span><span class="wf-text-muted">┃ Alice Chen</span></div>
+                <div class="preview-form-field"><span style="width: 28%;">Company</span><span class="wf-text-muted">┃ Acme Corporation</span></div>
+                <div class="preview-form-field"><span style="width: 28%;">Coach's email</span><span class="wf-text-muted">┃ coach@example.com</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RESULTS ROUTING -->
+          <div class="wf-card">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Results Routing</h2>
+              <p class="wf-card-description">Who gets emailed when a respondent submits.</p>
+            </div>
+            <div class="wf-card-body">
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Email results to taker</div>
+                  <div class="toggle-help">Sends the score, tier message, and CTA buttons to the email entered in the form.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Email results to referring coach (if registered)</div>
+                  <div class="toggle-help">Only fires if the entered coach email matches a Scaling Up <code>Coach</code> record. Unmatched emails do NOT receive results.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+
+              <div style="margin-top: 1rem;">
+                <label class="wf-label">Always CC these emails (comma-separated)</label>
+                <input type="text" class="wf-input" value="coach@scalingup.com">
+                <p class="wf-help-text">Defaults to <strong>coach@scalingup.com</strong> for the Scaling Up team to follow up with leads.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- CTAs -->
+          <div class="wf-card">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Call-to-Action Buttons</h2>
+              <p class="wf-card-description">Shown on the results page. Each can be gated to a specific tier (e.g., only show "Book a coach session" to Low / OK tiers).</p>
+            </div>
+            <div class="wf-card-body">
+              <div class="cta-row">
+                <div>
+                  <label class="wf-label">Label</label>
+                  <input type="text" class="wf-input" value="Roll out the 40-Q deep dive">
+                </div>
+                <div>
+                  <label class="wf-label">URL</label>
+                  <input type="text" class="wf-input" value="https://platform.scalingup.com/contact?intent=full-assessment">
+                </div>
+                <div>
+                  <label class="wf-label">Show for tier</label>
+                  <select class="wf-select">
+                    <option>Any</option>
+                    <option>Low</option>
+                    <option>OK</option>
+                    <option>Great</option>
+                  </select>
+                </div>
+                <span class="drag-handle">⋮⋮</span>
+              </div>
+              <div class="cta-row">
+                <div>
+                  <label class="wf-label">Label</label>
+                  <input type="text" class="wf-input" value="Schedule a complimentary coach session">
+                </div>
+                <div>
+                  <label class="wf-label">URL</label>
+                  <input type="text" class="wf-input" value="https://coaches.scalingup.com/coach-match-after-assessment-form">
+                </div>
+                <div>
+                  <label class="wf-label">Show for tier</label>
+                  <select class="wf-select">
+                    <option>Any</option>
+                  </select>
+                </div>
+                <span class="drag-handle">⋮⋮</span>
+              </div>
+              <div class="cta-row">
+                <div>
+                  <label class="wf-label">Label</label>
+                  <input type="text" class="wf-input" value="Buy the Scaling Up book">
+                </div>
+                <div>
+                  <label class="wf-label">URL</label>
+                  <input type="text" class="wf-input" value="https://scalingup.com/book/">
+                </div>
+                <div>
+                  <label class="wf-label">Show for tier</label>
+                  <select class="wf-select">
+                    <option>Low</option>
+                    <option>OK</option>
+                    <option>Great</option>
+                    <option>Any</option>
+                  </select>
+                </div>
+                <span class="drag-handle">⋮⋮</span>
+              </div>
+
+              <button class="wf-btn wf-btn-secondary" style="width: 100%; margin-top: 0.5rem;">+ Add another CTA</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; margin-top:1.5rem;">
+          <a href="03-wizard-step3-schedule.html" class="wf-btn wf-btn-ghost">← Back: Schedule</a>
+          <a href="05-wizard-step4-review.html" class="wf-btn wf-btn-primary">Next: Review →</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>
