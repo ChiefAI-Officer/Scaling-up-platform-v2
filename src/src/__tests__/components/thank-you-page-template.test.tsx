@@ -74,6 +74,22 @@ describe("ThankYouPageTemplate", () => {
       expect(iframe).toHaveAttribute("src", "https://player.vimeo.com/video/123");
     });
 
+    it("normalizes bare vimeo.com/ID URL on iframe src (covers admin editor preview)", () => {
+      const content = { ...baseContent, videoUrl: "https://vimeo.com/1170718882" };
+      render(<ThankYouPageTemplate content={content} workshop={baseWorkshop} />);
+      expect(document.querySelector("iframe")?.getAttribute("src")).toBe(
+        "https://player.vimeo.com/video/1170718882"
+      );
+    });
+
+    it("normalizes vimeo.com/ID/HASH path-form share URL to canonical ?h= form", () => {
+      const content = { ...baseContent, videoUrl: "https://vimeo.com/1170718882/13d047cf12" };
+      render(<ThankYouPageTemplate content={content} workshop={baseWorkshop} />);
+      expect(document.querySelector("iframe")?.getAttribute("src")).toBe(
+        "https://player.vimeo.com/video/1170718882?h=13d047cf12"
+      );
+    });
+
     it("does not render video iframe when videoUrl is empty", () => {
       render(<ThankYouPageTemplate content={baseContent} workshop={baseWorkshop} />);
       expect(document.querySelector("iframe")).not.toBeInTheDocument();

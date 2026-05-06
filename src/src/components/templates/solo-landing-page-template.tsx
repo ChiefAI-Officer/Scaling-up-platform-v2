@@ -2,6 +2,7 @@
 
 import { formatCurrency } from "@/lib/utils";
 import { stripPlaceholders } from "@/lib/templates/template-utils";
+import { normalizeVideoUrl } from "@/lib/templates/landing-page-overlay";
 
 export interface SoloContent {
   heroTitle?: string;
@@ -62,7 +63,7 @@ export function SoloLandingPageTemplate({
   const partnerName = content.partnerName || "";
   const partnerTagline = content.partnerTagline || "";
   const partnerLogoUrl = content.partnerLogoUrl || "";
-  const videoUrl = content.videoUrl || "";
+  const videoUrl = normalizeVideoUrl(content.videoUrl);
   const benefits = (content.benefits || []).map(stripPlaceholders);
   const registrationUrl = content.registrationUrl || "#";
 

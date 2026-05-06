@@ -51,9 +51,29 @@ describe("normalizeVideoUrl", () => {
     );
   });
 
-  it("converts private vimeo.com/ID/hash URL to player.vimeo.com format", () => {
+  it("converts private vimeo.com/ID/HASH (path-form) to canonical player ?h= query form", () => {
+    // Vimeo's canonical embed URL for unlisted videos uses ?h=HASH query string,
+    // not path-form HASH. Path-form 410s on the player domain for unlisted videos.
     expect(normalizeVideoUrl("https://vimeo.com/123456789/abc123def456")).toBe(
-      "https://player.vimeo.com/video/123456789/abc123def456"
+      "https://player.vimeo.com/video/123456789?h=abc123def456"
+    );
+  });
+
+  it("converts vimeo.com/ID?h=HASH (query-form share URL) to canonical player ?h= form", () => {
+    expect(normalizeVideoUrl("https://vimeo.com/1170718882?h=13d047cf12")).toBe(
+      "https://player.vimeo.com/video/1170718882?h=13d047cf12"
+    );
+  });
+
+  it("leaves canonical player.vimeo.com/video/ID?h=HASH unchanged (idempotent)", () => {
+    expect(
+      normalizeVideoUrl("https://player.vimeo.com/video/1170718882?h=13d047cf12")
+    ).toBe("https://player.vimeo.com/video/1170718882?h=13d047cf12");
+  });
+
+  it("leaves vimeo.com/channels/staffpicks/ID unchanged (channel URL not supported)", () => {
+    expect(normalizeVideoUrl("https://vimeo.com/channels/staffpicks/123456789")).toBe(
+      "https://vimeo.com/channels/staffpicks/123456789"
     );
   });
 

@@ -117,4 +117,32 @@ describe("SoloLandingPageTemplate", () => {
       expect(SAMPLE_WORKSHOP_SOLO.id).toBeDefined();
     });
   });
+
+  describe("video embed normalization", () => {
+    it("normalizes vimeo.com path-form share URLs to canonical player ?h= form (covers admin editor preview)", () => {
+      const { container } = render(
+        <SoloLandingPageTemplate
+          content={{ ...baseContent, videoUrl: "https://vimeo.com/1170718882/13d047cf12" }}
+          workshop={baseWorkshop}
+        />
+      );
+      const iframe = container.querySelector("iframe");
+      expect(iframe).not.toBeNull();
+      expect(iframe?.getAttribute("src")).toBe(
+        "https://player.vimeo.com/video/1170718882?h=13d047cf12"
+      );
+    });
+
+    it("normalizes a bare vimeo.com/ID URL to player.vimeo.com format", () => {
+      const { container } = render(
+        <SoloLandingPageTemplate
+          content={{ ...baseContent, videoUrl: "https://vimeo.com/1170718882" }}
+          workshop={baseWorkshop}
+        />
+      );
+      expect(container.querySelector("iframe")?.getAttribute("src")).toBe(
+        "https://player.vimeo.com/video/1170718882"
+      );
+    });
+  });
 });

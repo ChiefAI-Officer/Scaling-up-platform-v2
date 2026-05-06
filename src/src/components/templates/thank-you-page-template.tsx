@@ -1,6 +1,7 @@
 "use client";
 
 import { stripPlaceholders } from "@/lib/templates/template-utils";
+import { normalizeVideoUrl } from "@/lib/templates/landing-page-overlay";
 import {
   buildGoogleCalendarUrl,
   parseDurationHours,
@@ -60,7 +61,7 @@ export function ThankYouPageTemplate({
 }: ThankYouPageTemplateProps) {
   const headline = stripPlaceholders(content.headline);
   const subheadline = stripPlaceholders(content.subheadline);
-  const videoUrl = content.videoUrl || "";
+  const videoUrl = normalizeVideoUrl(content.videoUrl);
   const additionalMessage = stripPlaceholders(content.additionalMessage);
   const calendarReminderText = stripPlaceholders(content.calendarReminderText);
 

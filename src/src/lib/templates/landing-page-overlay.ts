@@ -8,15 +8,16 @@
 export { formatVenueAddress } from "@/lib/templates/template-interpolation";
 
 /**
- * Normalises a video URL to the embed format required by the iframe.
+ * Normalises a video URL to the canonical embed format required by the iframe.
  *
- * Vimeo:
- *   https://vimeo.com/123456789 → https://player.vimeo.com/video/123456789
- *   Private videos with a hash segment are also handled:
- *   https://vimeo.com/123456789/abc123def456 → https://player.vimeo.com/video/123456789/abc123def456
- *   Leaves already-correct player.vimeo.com URLs unchanged.
- *   Note: Channel-style URLs (vimeo.com/channels/staffpicks/ID) are not supported
- *   and will be returned unchanged. Only direct video URLs are converted.
+ * Vimeo (canonical embed URL is query-form `?h=HASH` per Vimeo docs;
+ * path-form HASH 410s on the player domain for unlisted videos):
+ *   https://vimeo.com/ID                  → https://player.vimeo.com/video/ID
+ *   https://vimeo.com/ID/HASH             → https://player.vimeo.com/video/ID?h=HASH
+ *   https://vimeo.com/ID?h=HASH           → https://player.vimeo.com/video/ID?h=HASH
+ *   https://player.vimeo.com/video/ID     → unchanged
+ *   https://player.vimeo.com/video/ID?h=H → unchanged
+ *   Channel-style URLs (vimeo.com/channels/...) are not supported and pass through.
  *
  * YouTube:
  *   https://www.youtube.com/watch?v=ID → https://www.youtube.com/embed/ID
@@ -24,15 +25,22 @@ export { formatVenueAddress } from "@/lib/templates/template-interpolation";
  *   https://www.youtube.com/embed/ID → unchanged (already embed format)
  *
  * Returns empty string for null/undefined input.
- * Unknown formats are returned unchanged.
+ * Unknown formats are returned unchanged. Function is idempotent.
  */
 export function normalizeVideoUrl(url: string | null | undefined): string {
   if (!url) return "";
 
-  // Vimeo — handles private video URLs (vimeo.com/ID or vimeo.com/ID/hash)
-  const vimeoMatch = url.match(/(?:vimeo\.com\/)(\d+(?:\/[a-f0-9]+)?)/);
+  // Vimeo — captures: (1) ID, (2) path-form HASH, (3) query-form HASH.
+  // Optional `video/` prefix lets us also match player.vimeo.com URLs.
+  const vimeoMatch = url.match(
+    /vimeo\.com\/(?:video\/)?(\d+)(?:\/([a-f0-9]+)|\?h=([a-f0-9]+))?/
+  );
   if (vimeoMatch) {
-    return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+    const id = vimeoMatch[1];
+    const hash = vimeoMatch[2] || vimeoMatch[3];
+    return hash
+      ? `https://player.vimeo.com/video/${id}?h=${hash}`
+      : `https://player.vimeo.com/video/${id}`;
   }
 
   // YouTube — handles watch URLs (youtube.com/watch?v=ID), short URLs (youtu.be/ID),
