@@ -1353,6 +1353,36 @@ describe("execute-workflow Inngest function", () => {
         ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SKIPPED"
       );
       expect(skippedCall).toBeDefined();
+      // BUG-MAY4 follow-on: error must say "no recipients", NOT "No survey link could be generated"
+      expect(skippedCall?.[0]?.data?.errorMessage).toBe("No recipients at scheduled time");
+    });
+
+    it("SEND_SURVEY_LINK with registrants but link generation fails: keeps 'No survey link could be generated' message", async () => {
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({
+            id: "step-survey",
+            stepType: "SEND_SURVEY_LINK",
+            subject: "Survey",
+            body: "Take it",
+          }),
+        ],
+      });
+      findUnique.mockResolvedValue(assignment);
+      registrationFindMany.mockResolvedValue([
+        { id: "reg-1", email: "a@test.com", firstName: "A", lastName: "B", company: "" },
+      ]);
+      mockGetOrCreateSurveyLink.mockResolvedValue(null); // generation fails
+
+      await invoke();
+
+      expect(mockSendEmail).not.toHaveBeenCalled();
+      const skippedCall = executionCreate.mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SKIPPED"
+      );
+      expect(skippedCall).toBeDefined();
+      // Genuine link-gen failure path keeps its specific message — regression guard
+      expect(skippedCall?.[0]?.data?.errorMessage).toBe("No survey link could be generated");
     });
 
     it("SEND_FILE_LINK with 0 registrants: records SKIPPED, sends no emails", async () => {
@@ -1376,6 +1406,49 @@ describe("execute-workflow Inngest function", () => {
         ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SKIPPED"
       );
       expect(skippedCall).toBeDefined();
+    });
+
+    it("SEND_FILE_LINK with files attached AND 0 registrants: records SKIPPED, NOT SENT", async () => {
+      // BUG-MAY4 follow-on: files attached but no recipients → must NOT record SENT
+      mockGetStepFiles.mockResolvedValue([
+        { id: "file-1", filename: "guide.pdf", contentType: "application/pdf" },
+      ]);
+      mockBuildAttachments.mockReturnValue([
+        {
+          filename: "guide.pdf",
+          path: "https://app.test/api/files/file-1/download?token=abc",
+          contentType: "application/pdf",
+        },
+      ]);
+
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({
+            id: "step-files",
+            stepType: "SEND_FILE_LINK",
+            subject: "Files",
+            body: "{{fileLinks}}",
+          }),
+        ],
+      });
+      findUnique.mockResolvedValue(assignment);
+      registrationFindMany.mockResolvedValue([]); // 0 recipients
+
+      await invoke();
+
+      expect(mockSendEmail).not.toHaveBeenCalled();
+
+      // Must NOT have a SENT record — the previous false-SENT bug
+      const sentCall = executionCreate.mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SENT"
+      );
+      expect(sentCall).toBeUndefined();
+
+      const skippedCall = executionCreate.mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SKIPPED"
+      );
+      expect(skippedCall).toBeDefined();
+      expect(skippedCall?.[0]?.data?.errorMessage).toBe("No recipients at scheduled time");
     });
   });
 
