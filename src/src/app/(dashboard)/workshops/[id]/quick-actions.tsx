@@ -37,6 +37,10 @@ export function QuickActions({
         router.push(`/workshops/${workshopId}/landing-pages`);
     };
 
+    const handleViewSurveyResults = () => {
+        router.push(`/workshops/${workshopId}/surveys`);
+    };
+
     const handleViewPublicPage = () => {
         window.open(`/workshop/${landingPageSlug}`, "_blank");
     };
@@ -63,6 +67,15 @@ export function QuickActions({
                     View Public Page
                 </Button>
             )}
+
+            {/* BUG-MAY6-8: parity with coach — admin can now view per-workshop survey results */}
+            <Button
+                variant="secondary"
+                onClick={handleViewSurveyResults}
+                className="w-full bg-muted text-foreground hover:bg-accent border-0 justify-center"
+            >
+                View Survey Results
+            </Button>
 
             <Button
                 variant="secondary"

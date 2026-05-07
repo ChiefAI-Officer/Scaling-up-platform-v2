@@ -1,23 +1,27 @@
+// BUG-MAY6-8: admin per-workshop survey results view (parity with coach).
+// Coach view at (portal)/portal/workshops/[id]/surveys/page.tsx renders the
+// same shared component; auth lives in the (dashboard) layout (non-COACH only).
+// Admin's data fetch is NOT scoped by coachId — admin sees every workshop.
 import { notFound } from "next/navigation";
-import { requireCoach } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import {
   SurveyResultsView,
   type SurveyResultTemplateGroup,
 } from "@/components/surveys/survey-results-view";
 
-interface SurveyResultsPageProps {
+export const dynamic = "force-dynamic";
+
+interface AdminSurveyResultsPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function CoachSurveyResultsPage({
+export default async function AdminSurveyResultsPage({
   params,
-}: SurveyResultsPageProps) {
+}: AdminSurveyResultsPageProps) {
   const { id: workshopId } = await params;
-  const { coach } = await requireCoach();
 
-  const workshop = await db.workshop.findFirst({
-    where: { id: workshopId, coachId: coach.id },
+  const workshop = await db.workshop.findUnique({
+    where: { id: workshopId },
     select: { id: true, title: true },
   });
 
@@ -72,7 +76,7 @@ export default async function CoachSurveyResultsPage({
   return (
     <SurveyResultsView
       workshopTitle={workshop.title}
-      backHref={`/portal/workshops/${workshopId}`}
+      backHref={`/workshops/${workshopId}`}
       templateGroups={Array.from(templateMap.values())}
     />
   );
