@@ -26,7 +26,9 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
     jobTitle: "",
     phone: "",
     discountCode: "",
-    marketingOptIn: false,
+    // BUG-MAY6-6: opt-in pre-checked by default per Jeff (May 7 standing meeting).
+    // Users explicitly uncheck if they don't want communications.
+    marketingOptIn: true,
   });
 
   const [emailError, setEmailError] = useState<string | null>(null);

@@ -57,7 +57,9 @@ const defaultFormData: WorkshopFormData = {
     title: "",
     description: "",
     useCoachPhoto: true,
-    format: "IN_PERSON",
+    // BUG-MAY6-7: Virtual is the more common workshop format now (Jeff May 7
+    // standing meeting). Coaches running an in-person workshop explicitly switch.
+    format: "VIRTUAL",
     eventDate: "",
     eventTime: "09:00",
     timezone: "America/New_York",
