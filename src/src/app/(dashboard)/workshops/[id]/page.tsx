@@ -28,6 +28,7 @@ import { QuickActions } from "./quick-actions";
 import { RegistrationRemoveButton } from "./registration-remove-button";
 import { WorkshopInlineEditForm } from "@/components/workshops/WorkshopInlineEditForm";
 import { TriggerNowButton } from "@/components/workflows/trigger-now-button";
+import { ApprovalThread } from "@/components/approvals/approval-thread";
 import { formatStepLabel } from "@/lib/workflows/workflow-types";
 import { requireAuth } from "@/lib/auth/authorization";
 
@@ -79,6 +80,13 @@ export default async function WorkshopDetailPage({
         approvals: {
           where: { type: { in: ["WORKSHOP_REQUEST", "CUSTOM_PRICING"] } },
           orderBy: { requestedAt: "asc" },
+          // BUG-MAY6-5: include the ApprovalMessage thread for parity with the
+          // coach view. Pre-fix admin only saw `notes` + `coachResponse`
+          // denormalized fields, so counter-offer threads on CUSTOM_PRICING
+          // approvals were invisible.
+          include: {
+            messages: { orderBy: { createdAt: "asc" } },
+          },
         },
       },
     }),
@@ -422,48 +430,44 @@ export default async function WorkshopDetailPage({
               )}
             </CardContent>
           </Card>
-          {/* Conversation History */}
+          {/* Conversation History — BUG-MAY6-5: aggregate ApprovalMessage rows
+              across ALL approvals (WORKSHOP_REQUEST + CUSTOM_PRICING) for the
+              workshop, identical to the coach side. Pre-fix admin rendered
+              only the denormalized notes/coachResponse fields, missing the
+              counter-offer thread Jeff flagged on May 7. */}
           <Card>
             <CardHeader>
               <CardTitle>Conversation History</CardTitle>
             </CardHeader>
             <CardContent>
-              {workshop.approvals.length === 0 ? (
+              {!workshop.approvals.some((r) => r.messages.length > 0) ? (
                 <p className="text-muted-foreground text-sm">
                   No prior admin/coach messages for this workshop.
                 </p>
               ) : (
-                <div className="space-y-4">
-                  {workshop.approvals.map((record) => (
-                    <div key={record.id} className="space-y-2">
-                      <p className="text-xs text-muted-foreground">
-                        {formatTimestamp(record.requestedAt)}
-                        {record.type === "CUSTOM_PRICING" && (
-                          <span className="ml-2 font-medium">(Custom Pricing Request)</span>
-                        )}
-                      </p>
-                      {record.notes && (
-                        <div className="ml-2 pl-3 border-l-2 border-border">
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                            Admin
+                <div className="space-y-6">
+                  {workshop.approvals
+                    .filter((record) => record.messages.length > 0)
+                    .map((record) => {
+                      const msgs = record.messages.map((m) => ({
+                        ...m,
+                        createdAt:
+                          m.createdAt instanceof Date
+                            ? m.createdAt.toISOString()
+                            : m.createdAt,
+                      }));
+                      return (
+                        <div key={record.id} className="space-y-2">
+                          <p className="text-xs text-muted-foreground">
+                            {formatTimestamp(record.requestedAt)}
+                            {record.type === "CUSTOM_PRICING" && (
+                              <span className="ml-2 font-medium">(Custom Pricing Request)</span>
+                            )}
                           </p>
-                          <p className="text-sm text-foreground whitespace-pre-wrap">
-                            {record.notes}
-                          </p>
+                          <ApprovalThread messages={msgs} perspective="admin" />
                         </div>
-                      )}
-                      {record.coachResponse && (
-                        <div className="ml-2 pl-3 border-l-2 border-primary/40">
-                          <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">
-                            Coach
-                          </p>
-                          <p className="text-sm text-foreground whitespace-pre-wrap">
-                            {record.coachResponse}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                      );
+                    })}
                 </div>
               )}
             </CardContent>
