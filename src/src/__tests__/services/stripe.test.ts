@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 // Mock Stripe before importing the module under test
 const mockSessionsCreate = jest.fn();
 const mockPromotionCodesList = jest.fn();
@@ -20,7 +18,11 @@ jest.mock("stripe", () => {
 // Set STRIPE_SECRET_KEY so getStripeClient() doesn't throw
 process.env.STRIPE_SECRET_KEY = "sk_test_fake";
 
-import { buildWorkshopPromotionName, createCheckoutSession } from "@/services/stripe";
+import {
+  buildWorkshopPromotionName,
+  createCheckoutSession,
+  StripeDiscountCodeError,
+} from "@/services/stripe";
 
 const baseCheckoutParams = {
   workshopId: "ws-1",
@@ -41,13 +43,94 @@ describe("createCheckoutSession — allow_promotion_codes vs discounts", () => {
     });
   });
 
-  it("sets allow_promotion_codes=true when NO discount code is provided", async () => {
+  it("does NOT set allow_promotion_codes and omits discounts key when no discount code (BUG-MAY6-4)", async () => {
     await createCheckoutSession(baseCheckoutParams);
 
     expect(mockSessionsCreate).toHaveBeenCalledTimes(1);
     const params = mockSessionsCreate.mock.calls[0][0];
-    expect(params.allow_promotion_codes).toBe(true);
-    expect(params.discounts).toBeUndefined();
+    // BUG-MAY6-4 Path B: Stripe-hosted promo entry must be disabled to
+    // prevent any active code in our Stripe account from being typed at checkout
+    expect(params.allow_promotion_codes).toBeFalsy();
+    // Key must be ABSENT (not undefined) so Stripe doesn't trip on the shape
+    expect("discounts" in params).toBe(false);
+  });
+
+  it("rejects code when workshop allowlist is empty (BUG-MAY6-4 cross-workshop leak guard)", async () => {
+    // Repro: Workshop A has coupon "HALF". Workshop B has no coupons.
+    // Coach-side allowedPromotionCodeIds for Workshop B comes through as []
+    // because Workshop.coupons is empty. Without the fix, the membership check
+    // is skipped entirely and ANY active code in our Stripe account is accepted.
+    mockPromotionCodesList.mockResolvedValue({
+      data: [
+        {
+          id: "promo_workshop_a_half",
+          active: true,
+          times_redeemed: 0,
+          max_redemptions: null,
+          expires_at: null,
+        },
+      ],
+    });
+
+    await expect(
+      createCheckoutSession({
+        ...baseCheckoutParams,
+        discountCode: "HALF",
+        allowedPromotionCodeIds: [],
+      })
+    ).rejects.toThrow(StripeDiscountCodeError);
+
+    // Session must not have been created
+    expect(mockSessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects code when workshop allowlist excludes the matched promo ID (regression guard)", async () => {
+    mockPromotionCodesList.mockResolvedValue({
+      data: [
+        {
+          id: "promo_workshop_a_half",
+          active: true,
+          times_redeemed: 0,
+          max_redemptions: null,
+          expires_at: null,
+        },
+      ],
+    });
+
+    await expect(
+      createCheckoutSession({
+        ...baseCheckoutParams,
+        discountCode: "HALF",
+        allowedPromotionCodeIds: ["promo_workshop_b_save"],
+      })
+    ).rejects.toThrow(StripeDiscountCodeError);
+
+    expect(mockSessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it("accepts code when workshop allowlist includes the matched promo ID (regression guard for valid path)", async () => {
+    mockPromotionCodesList.mockResolvedValue({
+      data: [
+        {
+          id: "promo_workshop_a_half",
+          active: true,
+          times_redeemed: 0,
+          max_redemptions: null,
+          expires_at: null,
+        },
+      ],
+    });
+
+    await createCheckoutSession({
+      ...baseCheckoutParams,
+      discountCode: "HALF",
+      allowedPromotionCodeIds: ["promo_workshop_a_half"],
+    });
+
+    expect(mockSessionsCreate).toHaveBeenCalledTimes(1);
+    const params = mockSessionsCreate.mock.calls[0][0];
+    expect(params.discounts).toEqual([{ promotion_code: "promo_workshop_a_half" }]);
+    expect(params.allow_promotion_codes).toBeFalsy();
   });
 
   it("does NOT set allow_promotion_codes when discounts are applied (Stripe rejects both)", async () => {

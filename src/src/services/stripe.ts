@@ -103,11 +103,13 @@ export async function createCheckoutSession({
         return false;
       }
 
-      if (
-        Array.isArray(allowedPromotionCodeIds) &&
-        allowedPromotionCodeIds.length > 0 &&
-        !allowedPromotionCodeIds.includes(item.id)
-      ) {
+      // BUG-MAY6-4 Path A: empty allowlist must reject (workshop has zero
+      // coupons → no code is valid for it). Earlier code skipped the check
+      // entirely when the array was empty, leaking other workshops' codes.
+      const allowed = Array.isArray(allowedPromotionCodeIds)
+        ? allowedPromotionCodeIds
+        : [];
+      if (!allowed.includes(item.id)) {
         return false;
       }
 
@@ -129,7 +131,7 @@ export async function createCheckoutSession({
     metadata.discountCode = normalizedDiscountCode;
   }
 
-  const session = await stripe.checkout.sessions.create({
+  const params: Stripe.Checkout.SessionCreateParams = {
     payment_method_types: ["card"],
     line_items: [
       {
@@ -145,14 +147,19 @@ export async function createCheckoutSession({
       },
     ],
     mode: "payment",
-    ...(discounts ? {} : { allow_promotion_codes: true }),
-    discounts,
     success_url: successUrl,
     cancel_url: cancelUrl,
     customer_email: customerEmail,
     metadata,
     payment_intent_data: { metadata },
-  });
+  };
+  // BUG-MAY6-4: never set allow_promotion_codes. Stripe-hosted promo entry
+  // would accept any active code in our account, bypassing workshop scoping.
+  // All coupon entry must go through our in-app form → validator → discounts.
+  if (discounts) {
+    params.discounts = discounts;
+  }
+  const session = await stripe.checkout.sessions.create(params);
 
   return session;
 }
