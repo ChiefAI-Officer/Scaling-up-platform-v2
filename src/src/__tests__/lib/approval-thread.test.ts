@@ -56,16 +56,27 @@ describe("formatApprovalMessage", () => {
         expect(formatApprovalMessage({ type: "DENIED" })).toBe("Denied:");
     });
 
-    it("INFO_REQUEST: text is the admin question (note)", () => {
+    // BUG-MAY7-2: distinguish info request/response from other approval-thread
+    // messages so the UI doesn't render bare notes that look like generic
+    // comments. Prefix added at format time; stored messages stay unprefixed.
+    it("INFO_REQUEST: prefixes admin question with 'Info request:'", () => {
         expect(
             formatApprovalMessage({ type: "INFO_REQUEST", note: "what is the venue?" })
-        ).toBe("what is the venue?");
+        ).toBe("Info request: what is the venue?");
     });
 
-    it("INFO_RESPONSE: text is the coach reply (note)", () => {
+    it("INFO_REQUEST: empty note returns empty string (no bare prefix)", () => {
+        expect(formatApprovalMessage({ type: "INFO_REQUEST" })).toBe("");
+    });
+
+    it("INFO_RESPONSE: prefixes coach reply with 'Info response:'", () => {
         expect(
             formatApprovalMessage({ type: "INFO_RESPONSE", note: "venue is ABC Hall" })
-        ).toBe("venue is ABC Hall");
+        ).toBe("Info response: venue is ABC Hall");
+    });
+
+    it("INFO_RESPONSE: empty note returns empty string (no bare prefix)", () => {
+        expect(formatApprovalMessage({ type: "INFO_RESPONSE" })).toBe("");
     });
 
     it("COUNTER_ACCEPT: 'Accepted counter-offer of $X.XX'", () => {

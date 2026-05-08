@@ -68,8 +68,10 @@ export function formatApprovalMessage(input: FormatInput): string {
             return `Denied:${input.note ? " " + input.note : ""}`;
 
         case "INFO_REQUEST":
+            return input.note ? `Info request: ${input.note}` : "";
+
         case "INFO_RESPONSE":
-            return input.note ?? "";
+            return input.note ? `Info response: ${input.note}` : "";
 
         case "COUNTER_ACCEPT":
             return `Accepted counter-offer of ${formatDollars(input.amountCents ?? 0)}`;
