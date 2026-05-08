@@ -96,9 +96,12 @@ interface NewWorkshopFormProps {
 }
 
 // MR-21: Multi-coupon entry
+// ENH-MAY6-7: discriminated discount type — percent or fixed dollar amount.
 interface CouponEntry {
   code: string;
+  discountType: "PERCENT" | "AMOUNT";
   discountPercent: string;
+  discountAmountDollars: string; // form input as decimal dollars; converted to cents at submit
   singleUse: boolean;
 }
 
@@ -454,7 +457,37 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
             : undefined,
         customPricingRequest: formData.customPricingRequest || undefined,
         // MR-21: multi-coupon list (admin-only; empty for coach portal)
-        coupons: coupons.length > 0 ? JSON.stringify(coupons) : undefined,
+        // ENH-MAY6-7: serialize discriminated discount type. Convert
+        // discountAmountDollars (form input) → discountAmountCents (server
+        // shape). discountPercent stays a string in the form, server schema
+        // coerces to number.
+        coupons:
+          coupons.length > 0
+            ? JSON.stringify(
+                coupons.map((c) => {
+                  const base = {
+                    code: c.code,
+                    discountType: c.discountType,
+                    singleUse: c.singleUse,
+                  };
+                  if (c.discountType === "AMOUNT") {
+                    const dollars = Number(c.discountAmountDollars);
+                    return {
+                      ...base,
+                      discountAmountCents: Math.round(
+                        (isFinite(dollars) ? dollars : 0) * 100
+                      ),
+                    };
+                  }
+                  return {
+                    ...base,
+                    discountPercent: c.discountPercent
+                      ? Number(c.discountPercent)
+                      : undefined,
+                  };
+                })
+              )
+            : undefined,
       };
 
       if (isCoachPortal) {
@@ -1053,7 +1086,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                       <Label>Coupon Codes</Label>
                       <button
                         type="button"
-                        onClick={() => setCoupons((prev) => [...prev, { code: "", discountPercent: "", singleUse: false }])}
+                        onClick={() => setCoupons((prev) => [...prev, { code: "", discountType: "PERCENT", discountPercent: "", discountAmountDollars: "", singleUse: false }])}
                         className="text-xs text-primary hover:text-primary/80 font-medium"
                       >
                         + Add Coupon
@@ -1070,16 +1103,37 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
                           placeholder="e.g., SU50-DETROIT"
                           className="flex-1"
                         />
+                        {/* ENH-MAY6-7: discount type selector + conditional value input */}
                         <select
-                          value={coupon.discountPercent}
-                          onChange={(e) => setCoupons((prev) => prev.map((c, i) => i === idx ? { ...c, discountPercent: e.target.value } : c))}
+                          value={coupon.discountType}
+                          onChange={(e) => setCoupons((prev) => prev.map((c, i) => i === idx ? { ...c, discountType: e.target.value as "PERCENT" | "AMOUNT" } : c))}
                           className="rounded-md border border-border px-2 py-2 text-sm focus:border-primary"
                         >
-                          <option value="">%</option>
-                          {COUPON_PRESETS.map((p) => (
-                            <option key={p.value} value={p.value}>{p.label}</option>
-                          ))}
+                          <option value="PERCENT">%</option>
+                          <option value="AMOUNT">$</option>
                         </select>
+                        {coupon.discountType === "PERCENT" ? (
+                          <select
+                            value={coupon.discountPercent}
+                            onChange={(e) => setCoupons((prev) => prev.map((c, i) => i === idx ? { ...c, discountPercent: e.target.value } : c))}
+                            className="rounded-md border border-border px-2 py-2 text-sm focus:border-primary"
+                          >
+                            <option value="">choose %</option>
+                            {COUPON_PRESETS.map((p) => (
+                              <option key={p.value} value={p.value}>{p.label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Input
+                            type="number"
+                            placeholder="$ off"
+                            value={coupon.discountAmountDollars}
+                            onChange={(e) => setCoupons((prev) => prev.map((c, i) => i === idx ? { ...c, discountAmountDollars: e.target.value } : c))}
+                            className="w-28 text-sm"
+                            min={0.01}
+                            step="0.01"
+                          />
+                        )}
                         <label className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
                           <input
                             type="checkbox"

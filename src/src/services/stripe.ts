@@ -31,7 +31,12 @@ interface CreateWorkshopPromotionCodeParams {
   workshopCode: string;
   workshopTitle: string;
   code: string;
-  discountPercent: number;
+  // ENH-MAY6-7: discriminated discount type. PERCENT requires discountPercent;
+  // AMOUNT requires discountAmountCents (Stripe also requires currency for
+  // amount_off, hard-coded to "usd").
+  discountType: "PERCENT" | "AMOUNT";
+  discountPercent?: number;
+  discountAmountCents?: number;
   singleUse: boolean;
 }
 
@@ -168,12 +173,33 @@ export async function createWorkshopPromotionCode({
   workshopCode,
   workshopTitle,
   code,
+  discountType,
   discountPercent,
+  discountAmountCents,
   singleUse,
 }: CreateWorkshopPromotionCodeParams): Promise<{
   stripeCouponId: string;
   stripePromotionCodeId: string;
 }> {
+  // ENH-MAY6-7: validate discriminator at the boundary so callers fail fast.
+  if (discountType === "PERCENT") {
+    if (typeof discountPercent !== "number") {
+      throw new Error(
+        "createWorkshopPromotionCode: PERCENT requires discountPercent"
+      );
+    }
+  } else if (discountType === "AMOUNT") {
+    if (typeof discountAmountCents !== "number") {
+      throw new Error(
+        "createWorkshopPromotionCode: AMOUNT requires discountAmountCents"
+      );
+    }
+  } else {
+    throw new Error(
+      `createWorkshopPromotionCode: unknown discountType ${discountType as string}`
+    );
+  }
+
   const stripe = getStripeClient();
 
   // Check if promotion code already exists (handles retries after partial failures)
@@ -192,15 +218,26 @@ export async function createWorkshopPromotionCode({
     };
   }
 
-  const coupon = await stripe.coupons.create({
-    percent_off: discountPercent,
+  // ENH-MAY6-7: build the Stripe coupon params per discount type. Stripe enforces
+  // mutual exclusivity between percent_off and amount_off; amount_off requires
+  // currency. Hard-coded "usd" — no other currency is currently supported by
+  // the platform.
+  const couponParams: Stripe.CouponCreateParams = {
     duration: "once",
     name: buildWorkshopPromotionName(workshopTitle, code),
     metadata: {
       workshopCode,
       promotionCode: code,
     },
-  });
+  };
+  if (discountType === "PERCENT") {
+    couponParams.percent_off = discountPercent;
+  } else {
+    couponParams.amount_off = discountAmountCents;
+    couponParams.currency = "usd";
+  }
+
+  const coupon = await stripe.coupons.create(couponParams);
 
   const promotionCode = await stripe.promotionCodes.create({
     promotion: {

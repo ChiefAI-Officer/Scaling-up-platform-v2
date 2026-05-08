@@ -429,7 +429,10 @@ export async function PATCH(
             workshopCode: existing.workshopCode ?? "",
             workshopTitle: existing.title,
             code: coupon.code,
+            // ENH-MAY6-7: discriminated discount type — PERCENT vs AMOUNT.
+            discountType: coupon.discountType,
             discountPercent: coupon.discountPercent,
+            discountAmountCents: coupon.discountAmountCents,
             singleUse: coupon.singleUse,
           })
         )

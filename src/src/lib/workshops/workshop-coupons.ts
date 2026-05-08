@@ -1,32 +1,81 @@
 import { z } from "zod";
 
+// ENH-MAY6-7: discriminated discount type. Legacy rows (no discountType) read
+// back as PERCENT for backwards compatibility.
+export type WorkshopCouponDiscountType = "PERCENT" | "AMOUNT";
+
 export interface WorkshopCouponRecord {
   code: string;
-  discountPercent: number;
+  discountType: WorkshopCouponDiscountType;
+  discountPercent?: number;
+  discountAmountCents?: number;
   singleUse: boolean;
   stripeCouponId?: string | null;
   stripePromotionCodeId?: string | null;
 }
 
-const workshopCouponSchema = z.object({
-  code: z
-    .string()
-    .trim()
-    .min(1, "Coupon code is required")
-    .max(64, "Coupon code is too long")
-    .transform((value) => value.toUpperCase()),
-  discountPercent: z.coerce
-    .number()
-    .int("Discount percent must be a whole number")
-    .min(1, "Discount percent must be at least 1")
-    .max(100, "Discount percent cannot exceed 100"),
-  singleUse: z.preprocess(
-    (value) => value === true || value === "true",
-    z.boolean()
-  ),
-  stripeCouponId: z.string().optional().nullable(),
-  stripePromotionCodeId: z.string().optional().nullable(),
-});
+const workshopCouponSchema = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .min(1, "Coupon code is required")
+      .max(64, "Coupon code is too long")
+      .transform((value) => value.toUpperCase()),
+    // discountType is optional in input — defaults to PERCENT for legacy rows.
+    discountType: z.enum(["PERCENT", "AMOUNT"]).optional(),
+    discountPercent: z.coerce
+      .number()
+      .int("Discount percent must be a whole number")
+      .min(1, "Discount percent must be at least 1")
+      .max(100, "Discount percent cannot exceed 100")
+      .optional(),
+    discountAmountCents: z.coerce
+      .number()
+      .int("Discount amount must be a whole number of cents")
+      .min(1, "Discount amount must be at least 1 cent")
+      .optional(),
+    singleUse: z.preprocess(
+      (value) => value === true || value === "true",
+      z.boolean()
+    ),
+    stripeCouponId: z.string().optional().nullable(),
+    stripePromotionCodeId: z.string().optional().nullable(),
+  })
+  .superRefine((coupon, ctx) => {
+    // Resolve effective discountType: explicit, else infer from which field is set.
+    const type =
+      coupon.discountType ??
+      (coupon.discountAmountCents !== undefined ? "AMOUNT" : "PERCENT");
+
+    if (type === "PERCENT") {
+      if (coupon.discountPercent === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["discountPercent"],
+          message: "PERCENT coupons must specify discountPercent",
+        });
+      }
+    } else {
+      // AMOUNT
+      if (coupon.discountAmountCents === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["discountAmountCents"],
+          message: "AMOUNT coupons must specify discountAmountCents",
+        });
+      }
+    }
+  })
+  .transform((coupon) => {
+    const type =
+      coupon.discountType ??
+      (coupon.discountAmountCents !== undefined ? "AMOUNT" : "PERCENT");
+    return {
+      ...coupon,
+      discountType: type as WorkshopCouponDiscountType,
+    };
+  });
 
 const workshopCouponsSchema = z
   .array(workshopCouponSchema)

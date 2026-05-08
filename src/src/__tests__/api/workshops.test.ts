@@ -352,6 +352,8 @@ describe("Workshops API", () => {
                 code: "SAVE50",
                 discountPercent: 50,
                 singleUse: false,
+                // ENH-MAY6-7: schema transform appends discountType=PERCENT for legacy shape
+                discountType: "PERCENT",
                 stripeCouponId: "coupon_SAVE50",
                 stripePromotionCodeId: "promo_SAVE50",
               },
@@ -359,6 +361,7 @@ describe("Workshops API", () => {
                 code: "VIP100",
                 discountPercent: 100,
                 singleUse: true,
+                discountType: "PERCENT",
                 stripeCouponId: "coupon_VIP100",
                 stripePromotionCodeId: "promo_VIP100",
               },

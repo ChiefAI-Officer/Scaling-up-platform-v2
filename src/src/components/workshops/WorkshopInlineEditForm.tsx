@@ -97,11 +97,35 @@ export function WorkshopInlineEditForm({
   const [success, setSuccess] = useState(false);
   const [stripeWarning, setStripeWarning] = useState<string | null>(null);
 
-  const [coupons, setCoupons] = React.useState<Array<{ id: string; code: string; discountPercent: number; singleUse: boolean }>>(
+  // ENH-MAY6-7: discriminated discount type — coupons can be a percentage off
+  // OR a fixed dollar amount. Legacy stored rows (no discountType) read back
+  // as PERCENT for backwards compatibility.
+  type CouponState = {
+    id: string;
+    code: string;
+    discountType: "PERCENT" | "AMOUNT";
+    discountPercent: number;
+    discountAmountCents: number;
+    singleUse: boolean;
+  };
+  const [coupons, setCoupons] = React.useState<CouponState[]>(
     () => {
       try {
-        const parsed = JSON.parse(couponsProp ?? "[]") as Array<{ code: string; discountPercent: number; singleUse: boolean }>;
-        return parsed.map((c) => ({ id: crypto.randomUUID(), ...c }));
+        const parsed = JSON.parse(couponsProp ?? "[]") as Array<{
+          code: string;
+          discountType?: "PERCENT" | "AMOUNT";
+          discountPercent?: number;
+          discountAmountCents?: number;
+          singleUse: boolean;
+        }>;
+        return parsed.map((c) => ({
+          id: crypto.randomUUID(),
+          code: c.code,
+          discountType: c.discountType ?? "PERCENT",
+          discountPercent: c.discountPercent ?? 10,
+          discountAmountCents: c.discountAmountCents ?? 0,
+          singleUse: c.singleUse,
+        }));
       } catch {
         return [];
       }
@@ -306,7 +330,7 @@ export function WorkshopInlineEditForm({
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Coupon Codes</p>
             <button
               type="button"
-              onClick={() => setCoupons([...coupons, { id: crypto.randomUUID(), code: "", discountPercent: 10, singleUse: false }])}
+              onClick={() => setCoupons([...coupons, { id: crypto.randomUUID(), code: "", discountType: "PERCENT", discountPercent: 10, discountAmountCents: 0, singleUse: false }])}
               className="text-xs text-primary hover:underline"
             >
               + Add Coupon
@@ -325,20 +349,50 @@ export function WorkshopInlineEditForm({
                 className="flex-1 text-sm"
                 maxLength={64}
               />
-              <Input
-                type="number"
-                placeholder="%"
-                value={coupon.discountPercent}
+              {/* ENH-MAY6-7: discount type selector + conditional input */}
+              <select
+                value={coupon.discountType}
                 onChange={(e) => {
                   const c = [...coupons];
-                  c[i] = { ...c[i], discountPercent: Number(e.target.value) };
+                  c[i] = { ...c[i], discountType: e.target.value as "PERCENT" | "AMOUNT" };
                   setCoupons(c);
                 }}
-                className="w-20 text-sm"
-                min={1}
-                max={100}
-                step="1"
-              />
+                className="text-sm border border-input rounded-md px-2 py-1 bg-background h-9"
+              >
+                <option value="PERCENT">%</option>
+                <option value="AMOUNT">$</option>
+              </select>
+              {coupon.discountType === "PERCENT" ? (
+                <Input
+                  type="number"
+                  placeholder="%"
+                  value={coupon.discountPercent}
+                  onChange={(e) => {
+                    const c = [...coupons];
+                    c[i] = { ...c[i], discountPercent: Number(e.target.value) };
+                    setCoupons(c);
+                  }}
+                  className="w-20 text-sm"
+                  min={1}
+                  max={100}
+                  step="1"
+                />
+              ) : (
+                <Input
+                  type="number"
+                  placeholder="$"
+                  value={coupon.discountAmountCents > 0 ? (coupon.discountAmountCents / 100).toFixed(2) : ""}
+                  onChange={(e) => {
+                    const c = [...coupons];
+                    const dollars = Number(e.target.value);
+                    c[i] = { ...c[i], discountAmountCents: Math.round((isFinite(dollars) ? dollars : 0) * 100) };
+                    setCoupons(c);
+                  }}
+                  className="w-24 text-sm"
+                  min={0.01}
+                  step="0.01"
+                />
+              )}
               <label className="flex items-center gap-1 text-xs whitespace-nowrap text-foreground">
                 <input
                   type="checkbox"

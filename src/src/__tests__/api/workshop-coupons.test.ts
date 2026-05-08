@@ -88,7 +88,10 @@ describe("PATCH /api/workshops/[id] — coupon editing", () => {
 
     expect(res.status).toBe(200);
     const updateCall = (db.workshop.update as jest.Mock).mock.calls[0][0];
-    expect(updateCall.data.coupons).toBe(JSON.stringify(coupons));
+    // ENH-MAY6-7: schema transform appends discountType=PERCENT to legacy-shape coupons
+    expect(updateCall.data.coupons).toBe(
+      JSON.stringify([{ ...coupons[0], discountType: "PERCENT" }])
+    );
   });
 
   it("admin PATCH with invalid coupon (negative discount) returns 400", async () => {
