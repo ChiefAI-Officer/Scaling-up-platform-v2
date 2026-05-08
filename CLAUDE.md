@@ -17,10 +17,24 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 8, 2026 — v2.5 sprint Wave 1 shipped (BUG-MAY7-2 + ENH-MAY6-4, direct push to main) |
+| **Last Updated** | May 8, 2026 — v2.5 sprint Wave 2 shipped (ENH-MAY6-2 + ENH-MAY6-10, direct push to main) |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
+
+**v2.5 Sprint — Wave 2** — Complete (May 8 2026, direct push to main, Alpha mode):
+- Plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md` + `PLAN.md` (3-round claudex Claude+Codex adversarial review). Wave 2 = schema + data-model changes batched together.
+- **ENH-MAY6-2** (Notion: [3598c45d…3679](https://www.notion.so/3598c45dd8298124b82efcc5caa63679)) — Admin notes side table picked over Workshop column for **structural** privacy: coach-facing Prisma includes on Workshop never reach this row, so notes cannot leak via accidental `select: '*'` or `include: { workshop: true }`. New model `WorkshopAdminNote { workshopId @unique, body, updatedBy, updatedAt }` with cascade delete. New `PATCH /api/workshops/[id]/admin-notes` route gated to ADMIN/STAFF only — coach gets 403, unauthenticated gets 401. Mounted on the admin workshop detail page sidebar via new `<AdminNotesEditor>` client component (textarea + Save + privacy disclaimer "Admin/staff only. Not visible to the coach."). 10 RED→GREEN tests across the API route and the editor component.
+- **ENH-MAY6-10** (Notion: [3598c45d…e34b](https://www.notion.so/3598c45dd82981f1854de26f20dfe34b)) — Per-recipient child rows on workflow execution status. Jeff's literal ask was "It show a line for each person it emails" — but the existing data was step-level rollups (one row per step covering N recipients invisibly). Restructured: new `WorkflowStepExecution.parentId` self-FK + `recipientEmail` snapshot column + composite unique `(parentId, registrationId)`. Top-level rows have parentId=null (parent rollup OR legacy single-target steps); per-recipient child rows have parentId set + non-null registrationId + non-null recipientEmail. Helper `recordRecipientExecution()` at `lib/workflows/recipient-execution.ts` upserts keyed on (parentId, registrationId) for replay idempotency. `execute-workflow.ts` SEND_SURVEY_LINK / SEND_FILE_LINK / EMAIL_ATTENDEES handlers call the helper after each successful SMTP send. Existing dedup guards filter `parentId: null` so children's SENT doesn't trigger the step-level skip. Workshop detail pages (admin + coach) filter `executions where parentId=null` so coach surfaces never see per-recipient PII. `/api/workflows/[id]/executions` tightened from any-session to ADMIN/STAFF only. Render in `workflow-executions.tsx` groups rows by parentId, sorts children by recipient email, shows per-recipient delivery status indented under the parent step row.
+- **Slim Alpha posture; deferred for hardening (PLAN.md changelog has full list):**
+  - `trigger-workflow-step.ts` (manual Trigger Now path) still writes step-level rows only — follow-on for parity.
+  - Per-recipient pre-send DB-check idempotency: Inngest replay can produce duplicate sends to already-SENT recipients. Acceptable in Alpha.
+  - `finalizeParentRollup` (FAILED > SENT > SKIPPED precedence) shipped as helper but not yet called from execute-workflow — parent uses existing sentCount-based status.
+  - Deterministic parent.id via `inngestRunId` for forceResend audit trail — deferred.
+  - Error redaction codes for `errorMessage` — deferred.
+  - Round-3 ops findings (alerts/runbook/PII retention) filed as ops follow-ons.
+- 998 tests passing (up from 989).
+- Sprint ledger: `plans/JEFF_MAY6_SPRINT.md` (Wave 3–5 still pending).
 
 **v2.5 Sprint — Wave 1** — Complete (May 8 2026, direct push to main, Alpha mode):
 - Plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md` (co-validated by Claude + Codex). Sprint sequencing reordered by blast radius into 5 waves; Wave 1 is the pure-UI one-liners (no schema, no API).

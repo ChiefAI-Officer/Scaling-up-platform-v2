@@ -36,7 +36,7 @@ Two related Jeff Verdun emails on May 6, 2026 fold into this sprint:
 | ID | Title | Sev | State | Notion |
 |----|-------|-----|-------|--------|
 | ENH-MAY6-1 | Registration list on coach workshop page (parity with admin) | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd8298101b9e4dd59bf88c935) |
-| ENH-MAY6-2 | Admin notes field on workshop (admin eyes only) | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd8298124b82efcc5caa63679) |
+| ENH-MAY6-2 | Admin notes field on workshop (admin eyes only) | P2 | **shipped May 8** (commit `5c6ef26`) | [ticket](https://www.notion.so/3598c45dd8298124b82efcc5caa63679) |
 | ENH-MAY6-3 | Survey preview option | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd829817fab21eada0bd8a07c) |
 | ENH-MAY6-4 | Affiliate code option only on Thank You page in template editor | P2 | **shipped May 8** (commit `ba13410`) | [ticket](https://www.notion.so/3598c45dd82981fe8fced24d1cb34b09) |
 | ENH-MAY6-5 | Affiliate code editable on individual workshop, not just template | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd829816ba15fe2a425274d7c) |
@@ -44,7 +44,7 @@ Two related Jeff Verdun emails on May 6, 2026 fold into this sprint:
 | ENH-MAY6-7 | Coupon codes support dollar amounts (sequence behind BUG-MAY6-4) | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd8298103aa74e667ff62bf91) |
 | ENH-MAY6-8 | Aggregator: show who answered + show text answers | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd829813386a6c5d32e0f0647) |
 | ENH-MAY6-9 | Aggregator promoted to top-level toolset (filter/sort/group like Financials) | P2 | ready-for-human | [ticket](https://www.notion.so/3598c45dd829816db51cd20d28d634ce) |
-| ENH-MAY6-10 | Workflow execution status: include recipient email per row | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd82981f1854de26f20dfe34b) |
+| ENH-MAY6-10 | Workflow execution status: include recipient email per row | P2 | **shipped May 8** (commit `2fa224c`, slim Alpha) | [ticket](https://www.notion.so/3598c45dd82981f1854de26f20dfe34b) |
 | ENH-MAY6-11 | Thanks-for-registering + thanks-for-attending emails should be coach-editable | P2 | ready-for-human | [ticket](https://www.notion.so/3598c45dd82981308afbff2e0cf4f067) |
 
 ### Questions (2)
@@ -130,3 +130,35 @@ Plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md` — co-validated by Claude
 - 4 new RED→GREEN render tests in `src/__tests__/components/template-content-editor-affiliate.test.tsx` asserting field visibility per templateType. Tests required `queryAllByText` (not `queryByText`) because the Affiliate Card renders the title twice (CardTitle + Label inside the Card).
 
 **Wave 1 totals:** 989 tests passing (up from 981 at sprint start, +25 over the day's full sprint work). Per-wave verification posture (one build/lint/test/push per wave, not per ticket) saved roughly 30 min vs the original "per-ticket verify" plan.
+
+---
+
+## v2.5 Sprint — Wave 2 (May 8, 2026)
+
+Schema + data-model changes batched together. Both tickets shipped together via the per-wave verification posture; one Vercel deploy, one Notion sync, one CLAUDE.md update.
+
+**ENH-MAY6-2** → `5c6ef26` (May 8 2026, cherry-picked to main):
+- Side-table approach (`WorkshopAdminNote`) picked over a Workshop column for **structural** privacy, not policy. Coach-facing Prisma includes on Workshop never reach this table — there is no path that leaks notes via accidental `select: '*'` or `include: { workshop: true }`. Schema: `model WorkshopAdminNote { id, workshopId @unique, body, updatedBy, updatedAt, createdAt, workshop @relation onDelete: Cascade }` + reverse relation `adminNote WorkshopAdminNote?` on Workshop.
+- API: new `PATCH /api/workshops/[id]/admin-notes` route, ADMIN/STAFF only via `getApiActor` + `isPrivilegedRole`. Coach gets 403; unauthenticated gets 401; non-string body gets 400; missing workshop gets 404. Body capped at 5000 chars. Audit log entry on every save.
+- UI: new `<AdminNotesEditor workshopId initialBody />` client component (textarea + Save + privacy disclaimer "Admin/staff only. Not visible to the coach."). Save uses fetch PATCH; surfaces server errors inline. Mounted in admin workshop detail page sidebar (above Quick Actions). Page-side adds a parallel `db.workshopAdminNote.findUnique({ where: { workshopId: id }, select: { body: true } })` to the existing `Promise.all`.
+- Tests: 6 RED→GREEN in `__tests__/api/workshop-admin-notes.test.ts` (coach-403, unauth-401, admin-upsert, staff-upsert, 404, 400-invalid-body) + 4 in `__tests__/components/admin-notes-editor.test.tsx` (render pre-fill, privacy disclaimer, PATCH on Save, error surface). All 10 GREEN.
+
+**ENH-MAY6-10** → `2fa224c` (May 8 2026, cherry-picked to main, slim Alpha posture):
+- Source: Jeff Verdun PDF May 6 → "On the execution status screen under workflows. It show a line for each person it emails. It should include the email of who it was sent to." The ticket assumed per-recipient rows existed in code; inspection confirmed the data was step-level rollups (one row per step covering N recipients invisibly). Restructured to deliver Jeff's literal ask.
+- Architecture: Claude + Codex 3-round adversarial review via `/claudex:plan` (PLAN.md). Final plan accepted 4 high + 3 medium + 1 low across 3 review rounds. Slim Alpha implementation accepts a defined set of deferred hardening (documented in PLAN.md Changelog).
+- **Schema:** new `WorkflowStepExecution.parentId` self-FK + `recipientEmail` snapshot column + composite unique `(parentId, registrationId)`. Top-level rows have parentId=null (parent rollup OR legacy single-target steps); per-recipient child rows have parentId set + non-null registrationId + non-null recipientEmail. Postgres treats NULLs as distinct in UNIQUE, so the composite key allows the parent (NULL) + N children (non-NULL distinct registrationIds) to coexist.
+- **Helper:** `recordRecipientExecution(client, args)` at `lib/workflows/recipient-execution.ts` upserts keyed on (parentId, registrationId) for replay idempotency, validates non-empty parentId / registrationId / recipientEmail at runtime. `finalizeParentRollup(client, parentId)` exported but not yet called from execute-workflow (deferred wiring; Alpha posture).
+- **Writers:** `execute-workflow.ts` SEND_SURVEY_LINK / SEND_FILE_LINK / EMAIL_ATTENDEES handlers now call `recordRecipientExecution(db, ...)` after each successful SMTP send. Existing dedup guards (`findFirst where status: SENT`) filter `parentId: null` so children's SENT doesn't trigger the step-level skip. `trigger-workflow-step.ts` (manual Trigger Now) deferred — filed follow-on for parity.
+- **Readers:** workshop detail pages (admin + coach) filter `executions where parentId=null` so coach surfaces never see per-recipient PII. Admin sees only step-level status badges; admin /workflows execution-status screen sees full per-recipient detail.
+- **API auth:** `/api/workflows/[id]/executions` tightened from `getServerSession` (any auth) to `getApiActor` + `isPrivilegedRole` (ADMIN/STAFF only). Coach gets 403 even if they guess a workflow id.
+- **Render:** `workflow-executions.tsx` Execution interface adds `parentId` and `recipientEmail`. Group rows by parentId, sort children by recipient email asc, show per-recipient delivery status indented under the parent step row with status badge per child. Parent rows show recipient count subtitle ("3 recipients").
+- Tests: 7 RED→GREEN in `__tests__/lib/recipient-execution.test.ts` (helper upsert keyed on composite unique, helper rejects malformed input, errorMessage capture, finalizeParentRollup precedence FAILED > SENT > SKIPPED + no-children no-op) + 2 mock additions in `execute-workflow.test.ts` (upsert + findMany default mocks so existing 989 tests stay green). 998 total tests, all GREEN.
+- **Slim Alpha posture; deferred for hardening (full list in PLAN.md Changelog):**
+  - `trigger-workflow-step.ts` per-recipient writes (manual Trigger Now path).
+  - Per-recipient pre-send DB-check idempotency — Inngest replay can produce duplicate sends to already-SENT recipients. Risk acceptable in Alpha (no real users; admin can manually clean up).
+  - `finalizeParentRollup` wiring — parent rollup status uses existing sentCount-based logic (parent SENT if any sent, SKIPPED if none) instead of FAILED > SENT > SKIPPED precedence. Per-recipient FAILED rows still visible on the admin /workflows screen.
+  - Deterministic parent.id via `inngestRunId` for forceResend audit trail.
+  - Error redaction codes (sanitized "smtp_send_failed" / "link_generation_failed" instead of raw provider strings in errorMessage).
+- **Round-3 ops findings filed as separate follow-ons:** structured logging + alerts + runbook for the new parent/child state machine; PII retention/erasure policy for recipient email audit data; concurrency limit + load test for large workshop sizes.
+
+**Wave 2 totals:** 998 tests passing (up from 989 at end of Wave 1). Three new migrations: `add_workshop_admin_note`, `add_workflow_step_execution_recipient_email`, `add_workflow_step_execution_parent_id` (all marked applied via `prisma migrate resolve --applied` since `db push` synced the schema directly to Neon).
