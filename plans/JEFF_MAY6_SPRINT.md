@@ -23,7 +23,7 @@ Two related Jeff Verdun emails on May 6, 2026 fold into this sprint:
 | BUG-MAY6-2 | Post-Event Coach Survey Sequence does not auto-attach (categoryId wildcard) | P0 | **shipped May 7** | [ticket](https://www.notion.so/3598c45dd82981658cddc67c70c1aee3) | 7:29 PM email |
 | BUG-MAY6-3 | calculateSendDate ignores timezone for sendTimeOfDay (post-event 9 AM fires at 5 AM ET) | P0 | **shipped May 7** | [ticket](https://www.notion.so/3598c45dd82981abbce9c584b79ecae7) | 7:29 PM email |
 | BUG-MAY6-4 | Coupon codes not workshop-scoped (revenue/integrity bug) | P0 | **shipped May 7** (commit `b50ddd7`) | [ticket](https://www.notion.so/3598c45dd829811c81b0c227a77c4895) | 3:55 PM email |
-| BUG-MAY6-4a | Audit prior cross-workshop coupon redemptions | P0 | ready-for-human | [ticket](https://www.notion.so/3598c45dd82981c5847fe5be0eb1f634) | spawned from BUG-MAY6-4 |
+| BUG-MAY6-4a | Audit prior cross-workshop coupon redemptions | P0 | **shipped May 8** (commit `0580aa6`, audit script ready for Jeff) | [ticket](https://www.notion.so/3598c45dd82981c5847fe5be0eb1f634) | spawned from BUG-MAY6-4 |
 | BUG-MAY6-5 | Admin convo history shows partial vs coach (full) | P1/High | ready-for-agent | [ticket](https://www.notion.so/3598c45dd829813aaafccad91625f7fe) | 3:55 PM email |
 | BUG-MAY6-6 | Registration page marketing opt-in default unchecked | P1 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd82981648487fa138cdb8685) | 3:55 PM email |
 | BUG-MAY6-7 | Workshop wizard defaults to Physical, should default to Virtual | P1 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd82981758aa9c9b39336154a) | 3:55 PM email |
@@ -207,3 +207,49 @@ UI surfaces batch — three independent UI improvements shipped together.
 - No new tests added — render is straightforward and the existing question-stats logic that drives the page is already covered by the survey-service tests.
 
 **Wave 4 totals:** 1015 tests passing (up from 1010, +5 new SurveyFormView tests).
+
+---
+
+## v2.5 Sprint — Wave 5 (May 8, 2026)
+
+**BUG-MAY6-4a** → `0580aa6` (May 8 2026):
+- Read-only diagnostic script at `src/scripts/audit-cross-workshop-coupons.ts`. Lists historical Stripe redemptions where the promo code's `metadata.workshopCode` does NOT match the registration's workshopCode — i.e. cross-workshop redemptions that happened before the BUG-MAY6-4 fix shipped on May 7.
+- Output: CSV to stdout with columns `registration_id, email, name, workshop_code, workshop_title, amount, redeemed_promo_code, redeemed_workshop_code, verdict, session_id`. Verdict is `OK` / `MISMATCH` / `no_session_id` / `no_metadata` / `stripe_error`.
+- Approach: query `Registration` rows with `stripePaymentId` set + `paymentStatus = COMPLETED`. For each, retrieve the Stripe checkout session and read `total_details.breakdown.discounts`. For each discount, retrieve the promotion code (or fall back to coupon-level metadata). Compare metadata.workshopCode against the registration's workshop.workshopCode.
+- Flags: `--since YYYY-MM-DD` to scope by date, `--limit N` to cap row count for performance.
+- Read-only / dry-run only. No DB writes. No Stripe writes. No auto-refunds — operator hands MISMATCH rows to Jeff for per-case judgment per memory rule.
+- Smoke-test: not run yet — operator can run via `npx tsx scripts/audit-cross-workshop-coupons.ts --limit 5` to verify shape, then drop the limit for the full sweep.
+
+---
+
+## v2.5 Sprint — Final Tally (May 8, 2026)
+
+**11 tickets shipped in 5 waves over the day.** Direct push to main, Alpha mode.
+
+| Wave | Tickets | Commits |
+|---|---|---|
+| 1 | BUG-MAY7-2, ENH-MAY6-4 | `6984701`, `fcd7351` (cherry-picked as `072c77b`, `ba13410` to main) |
+| 2 | ENH-MAY6-2, ENH-MAY6-10 | `5c6ef26`, `d22ceec` (+ `12cd36a` recovering missing helper files) |
+| 3 | ENH-MAY6-7, ENH-MAY6-5 | `657b2d3`, `6a5a462` |
+| 4 | ENH-MAY6-3, ENH-MAY6-1, ENH-MAY6-8 | `39f9e3e`, `99edada`, `f34500b` |
+| 5 | BUG-MAY6-4a | `0580aa6` |
+
+**Test count:** 964 → 1015 (+51 over the sprint).
+
+**Co-validate posture:**
+- `/co-validate` Claude+Codex run on the sprint plan → 4 high + 2 medium + 1 low findings, all incorporated.
+- `/claudex:plan` 3-round Claude+Codex adversarial review on ENH-MAY6-10 (the per-recipient row restructure) → 4 high + 3 medium + 1 low → 3 high + 3 medium + 1 low across rounds. Slim Alpha posture deliberately deferred 5 hardening items (documented in PLAN.md Changelog).
+
+**Open follow-ons** (filed in PLAN.md Changelog and CLAUDE.md):
+- `trigger-workflow-step.ts` per-recipient writes (manual Trigger Now path) — parity with execute-workflow.
+- Per-recipient pre-send DB-check idempotency to prevent Inngest replay duplicate sends.
+- `finalizeParentRollup` wiring in execute-workflow (the helper exists; the call site doesn't yet use it; parent rollup uses sentCount logic).
+- Deterministic parent.id via `inngestRunId` for forceResend audit trail.
+- Error redaction codes (sanitized strings in errorMessage instead of raw provider errors).
+- Ops follow-ons from claudex round 3: structured logging/alerts/runbook for parent/child workflow execution state, PII retention/erasure policy for recipient email audit data, concurrency limit + load test.
+- ENH-MAY6-6 (affiliate provider switch) — still `needs-info` from Jeff.
+- ENH-MAY6-9 (aggregator promoted to top-level toolset) — still `ready-for-human` (design pass).
+- ENH-MAY6-11 (coach-editable thanks-for-registering + thanks-for-attending emails) — still `ready-for-human` (product call).
+- BUG-MAY6-9 (per-respondent attribution surface different from ENH-MAY6-8) — Phase 2 wishlist.
+- Q-MAY6-1, Q-MAY6-2 — questions, not tasks.
+- STRIPE_WEBHOOK_SECRET rotation — pending Josh's authenticator.

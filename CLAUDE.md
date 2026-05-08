@@ -17,10 +17,29 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 8, 2026 — v2.5 sprint Wave 4 shipped (ENH-MAY6-3 + ENH-MAY6-1 + ENH-MAY6-8, direct push to main) |
+| **Last Updated** | May 8, 2026 — v2.5 sprint COMPLETE (11 tickets shipped across 5 waves; only ENH-MAY6-6/9/11 + BUG-MAY6-9 remain blocked on Jeff/design/product input) |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
+
+**v2.5 Sprint — COMPLETE** (May 8 2026): 11 tickets shipped in 5 waves over the day. Direct push to main, Alpha mode. Test count 964 → 1015 (+51). Sprint plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Sprint ledger with full per-wave impl details: `plans/JEFF_MAY6_SPRINT.md`.
+
+**Wave 5 — BUG-MAY6-4a** (Notion: [3598c45d…f634](https://www.notion.so/3598c45dd82981c5847fe5be0eb1f634)) — Audit script at `src/scripts/audit-cross-workshop-coupons.ts` lists historical Stripe redemptions where the promo code's `metadata.workshopCode` doesn't match the registration's workshopCode (cross-workshop redemptions before the May 7 fix). Output is CSV to stdout with verdict per row. Read-only / dry-run only. Operator-invoked via `npx tsx scripts/audit-cross-workshop-coupons.ts [--since YYYY-MM-DD] [--limit N]`. Hand-off to Jeff for per-case refund/accept judgment. NO auto-refunds.
+
+**Open follow-ons (deferred for Beta hardening or external input):**
+- `trigger-workflow-step.ts` per-recipient writes (manual Trigger Now parity)
+- Per-recipient pre-send DB-check idempotency (Inngest replay duplicate-send risk)
+- `finalizeParentRollup` wiring in execute-workflow (helper exists, call site uses sentCount)
+- Deterministic parent.id via `inngestRunId` for forceResend audit trail
+- Error redaction codes for `WorkflowStepExecution.errorMessage`
+- Structured logging/alerts/runbook for parent/child workflow execution state
+- PII retention/erasure policy for recipient email audit data
+- Concurrency limit + load test for large-attendee workshops
+- ENH-MAY6-6 — affiliate provider switch (needs Jeff)
+- ENH-MAY6-9 — aggregator as top-level toolset (needs design)
+- ENH-MAY6-11 — coach-editable transactional emails (needs product call)
+- BUG-MAY6-9 — per-respondent attribution surface (Phase 2)
+- STRIPE_WEBHOOK_SECRET rotation — pending Josh's authenticator
 
 **v2.5 Sprint — Wave 4** — Complete (May 8 2026, direct push to main, Alpha mode):
 - Plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Wave 4 = UI surfaces batch.
