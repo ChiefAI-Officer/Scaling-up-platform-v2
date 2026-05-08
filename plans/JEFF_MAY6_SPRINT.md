@@ -35,14 +35,14 @@ Two related Jeff Verdun emails on May 6, 2026 fold into this sprint:
 
 | ID | Title | Sev | State | Notion |
 |----|-------|-----|-------|--------|
-| ENH-MAY6-1 | Registration list on coach workshop page (parity with admin) | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd8298101b9e4dd59bf88c935) |
+| ENH-MAY6-1 | Registration list on coach workshop page (parity with admin) | P2 | **shipped May 8** (commit `99edada`) | [ticket](https://www.notion.so/3598c45dd8298101b9e4dd59bf88c935) |
 | ENH-MAY6-2 | Admin notes field on workshop (admin eyes only) | P2 | **shipped May 8** (commit `5c6ef26`) | [ticket](https://www.notion.so/3598c45dd8298124b82efcc5caa63679) |
-| ENH-MAY6-3 | Survey preview option | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd829817fab21eada0bd8a07c) |
+| ENH-MAY6-3 | Survey preview option | P2 | **shipped May 8** (commit `39f9e3e`) | [ticket](https://www.notion.so/3598c45dd829817fab21eada0bd8a07c) |
 | ENH-MAY6-4 | Affiliate code option only on Thank You page in template editor | P2 | **shipped May 8** (commit `ba13410`) | [ticket](https://www.notion.so/3598c45dd82981fe8fced24d1cb34b09) |
 | ENH-MAY6-5 | Affiliate code editable on individual workshop, not just template | P2 | **shipped May 8** (commit `6a5a462`) | [ticket](https://www.notion.so/3598c45dd829816ba15fe2a425274d7c) |
 | ENH-MAY6-6 | Affiliate code: swap iDev for new provider (security: pin host, do NOT relax validator) | P2 | needs-info | [ticket](https://www.notion.so/3598c45dd82981aab737f994366bca1e) |
 | ENH-MAY6-7 | Coupon codes support dollar amounts (sequence behind BUG-MAY6-4) | P2 | **shipped May 8** (commit `657b2d3`) | [ticket](https://www.notion.so/3598c45dd8298103aa74e667ff62bf91) |
-| ENH-MAY6-8 | Aggregator: show who answered + show text answers | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd829813386a6c5d32e0f0647) |
+| ENH-MAY6-8 | Aggregator: show who answered + show text answers | P2 | **shipped May 8** (commit `f34500b`) | [ticket](https://www.notion.so/3598c45dd829813386a6c5d32e0f0647) |
 | ENH-MAY6-9 | Aggregator promoted to top-level toolset (filter/sort/group like Financials) | P2 | ready-for-human | [ticket](https://www.notion.so/3598c45dd829816db51cd20d28d634ce) |
 | ENH-MAY6-10 | Workflow execution status: include recipient email per row | P2 | **shipped May 8** (commit `2fa224c`, slim Alpha) | [ticket](https://www.notion.so/3598c45dd82981f1854de26f20dfe34b) |
 | ENH-MAY6-11 | Thanks-for-registering + thanks-for-attending emails should be coach-editable | P2 | ready-for-human | [ticket](https://www.notion.so/3598c45dd82981308afbff2e0cf4f067) |
@@ -183,3 +183,27 @@ Stripe + per-workshop customCode batch.
 - No new tests added — existing CHG-03 customCode validation + LandingPage tests cover the validation path. Smoke-verify on production after deploy.
 
 **Wave 3 totals:** 1010 tests passing (unchanged — no test count increase from ENH-MAY6-5 since validation reuses CHG-03's existing helpers).
+
+---
+
+## v2.5 Sprint — Wave 4 (May 8, 2026)
+
+UI surfaces batch — three independent UI improvements shipped together.
+
+**ENH-MAY6-3** → `39f9e3e` (May 8 2026):
+- Pure read-only renderer `<SurveyFormView>` at `components/surveys/survey-form-view.tsx` takes a question list + `mode: "preview"` prop. Submit button is rendered DISABLED with no `onSubmit` prop and the component fires zero fetches — preview-mode invariant locked by tests. Renders all 7 question types (TEXT/TEXTAREA/RATING/NPS/SINGLE_CHOICE/MULTI_CHOICE/YES_NO).
+- Mounted in `survey-template-editor.tsx` as a "Preview" button → modal that takes the live editor's questions array and renders them. Modal closes on backdrop click or X button. Only shown for non-new templates with at least one question.
+- 5 RED→GREEN render tests asserting: all question types render; Submit button disabled; no fetch fires on interaction; preview-mode disclaimer visible; questions render in sortOrder.
+
+**ENH-MAY6-1** → `99edada` (May 8 2026):
+- Coach portal workshop detail page now shows a read-only registrations table. Pre-fix coaches only saw a count. Per Codex review on Wave 4 plan: skipped the "extract a shared component" abstraction (admin's RegistrationsTable carries Cancel/Refund/Remove + admin-specific data shape). Built a small inline read-only table directly on the coach page — 50 lines of presentation code, no abstraction overhead.
+- Columns: Name, Email, Company, Payment status (badge), Attended (✓/—), Registered date (via formatTimestamp). No edit or delete actions. Server-side scoped via existing `requireCoach()` + workshopId-scoped `findUnique`. Coach cannot access another coach's workshop — same auth boundary as the rest of the portal page.
+- Test mock fix: `coach-workshop-detail-files.test.tsx` now mocks `registrations: []` since the include now fetches that field.
+
+**ENH-MAY6-8** → `f34500b` (May 8 2026):
+- Aggregate page's per-question render now lists verbatim text answers for TEXT/TEXTAREA question types with respondent attribution. Each answer rendered as a card with the verbatim value + "— FirstName LastName" footer (or "Anonymous" if no registration captured, or email if firstName/lastName empty). Shows up to 50 text answers per question.
+- New "Respondents" panel below the per-question section lists everyone who answered the survey as small pills (name as label, email as title tooltip).
+- `getSurveyResults()` already returned the joined `registration` data via the existing `responses` field — the aggregate page just wasn't rendering it. Zero new schema; zero new server-side code; pure UI surface change.
+- No new tests added — render is straightforward and the existing question-stats logic that drives the page is already covered by the survey-service tests.
+
+**Wave 4 totals:** 1015 tests passing (up from 1010, +5 new SurveyFormView tests).

@@ -17,10 +17,18 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 8, 2026 — v2.5 sprint Wave 3 shipped (ENH-MAY6-7 + ENH-MAY6-5, direct push to main) |
+| **Last Updated** | May 8, 2026 — v2.5 sprint Wave 4 shipped (ENH-MAY6-3 + ENH-MAY6-1 + ENH-MAY6-8, direct push to main) |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
+
+**v2.5 Sprint — Wave 4** — Complete (May 8 2026, direct push to main, Alpha mode):
+- Plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Wave 4 = UI surfaces batch.
+- **ENH-MAY6-3** (Notion: [3598c45d…a07c](https://www.notion.so/3598c45dd829817fab21eada0bd8a07c)) — Survey preview modal in template editor. Pure read-only `<SurveyFormView>` at `components/surveys/survey-form-view.tsx` with `mode="preview"` prop. Submit button rendered DISABLED, zero fetches fire — preview-mode invariant locked by 5 RED→GREEN tests. Modal triggered by Preview button on the editor's header (only shown for non-new templates with questions).
+- **ENH-MAY6-1** (Notion: [3598c45d…c935](https://www.notion.so/3598c45dd8298101b9e4dd59bf88c935)) — Coach portal workshop detail page now shows a read-only registrations table (Name/Email/Company/Payment/Attended/Registered). Per Codex Wave 4 plan review: skipped the "extract shared component" abstraction (admin table carries Cancel/Refund/Remove + admin-specific data shape) — built a small inline read-only table on the coach page. 3 similar lines > premature abstraction.
+- **ENH-MAY6-8** (Notion: [3598c45d…0647](https://www.notion.so/3598c45dd829813386a6c5d32e0f0647)) — Aggregate page now shows verbatim text answers (TEXT/TEXTAREA) with respondent attribution + a "Respondents" panel listing everyone who answered. `getSurveyResults()` already returned joined registration data — the page just wasn't rendering it. Pure UI change.
+- 1015 tests passing (up from 1010).
+- Sprint ledger: `plans/JEFF_MAY6_SPRINT.md` (Wave 5 still pending).
 
 **v2.5 Sprint — Wave 3** — Complete (May 8 2026, direct push to main, Alpha mode):
 - Plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Wave 3 = Stripe + per-workshop customCode.
