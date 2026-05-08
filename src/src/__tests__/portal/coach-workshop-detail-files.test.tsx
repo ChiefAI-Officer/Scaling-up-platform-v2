@@ -103,6 +103,8 @@ describe("Coach workshop detail file links", () => {
       isFree: false,
       workshopType: { name: "AI Workshop" },
       _count: { registrations: 1 },
+      // ENH-MAY6-1: coach detail page now also fetches the registration list
+      registrations: [],
     });
     (db.workflowAssignment.findMany as jest.Mock).mockResolvedValue([]);
     (db.survey.count as jest.Mock).mockResolvedValue(0);
@@ -178,6 +180,7 @@ describe("Coach workshop detail file links", () => {
       isFree: false,
       workshopType: { name: "AI Workshop" },
       _count: { registrations: 0 },
+      registrations: [],
     });
     const element = await WorkshopDetailsPage({
       params: Promise.resolve({ id: "ws-1" }),

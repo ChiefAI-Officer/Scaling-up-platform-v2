@@ -71,6 +71,24 @@ export default async function WorkshopDetailsPage({
         pricingTier: { select: { name: true, amountCents: true } },
         workshopType: { select: { name: true } },
         _count: { select: { registrations: { where: { paymentStatus: { not: "PENDING" } } } } },
+        // ENH-MAY6-1: read-only registration list for the coach portal — same
+        // columns as admin's table but no Cancel/Refund/Remove actions.
+        registrations: {
+          where: { paymentStatus: { not: "PENDING" } },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            company: true,
+            paymentStatus: true,
+            attended: true,
+            attendedAt: true,
+            createdAt: true,
+            amountPaidCents: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
     }),
     db.workflowAssignment.findMany({
@@ -430,6 +448,59 @@ export default async function WorkshopDetailsPage({
             pricingTierId={workshop.pricingTierId}
           />
         </>
+      )}
+
+      {/* ENH-MAY6-1: read-only registrations list — coach can see who registered for their workshop, no Cancel/Refund/Remove actions (admin-only). */}
+      {workshop.registrations.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Registrations ({workshop.registrations.length})
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <th className="pb-2 pr-4">Name</th>
+                  <th className="pb-2 pr-4">Email</th>
+                  <th className="pb-2 pr-4">Company</th>
+                  <th className="pb-2 pr-4">Payment</th>
+                  <th className="pb-2 pr-4">Attended</th>
+                  <th className="pb-2">Registered</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workshop.registrations.map((r) => (
+                  <tr key={r.id} className="border-b border-border/50">
+                    <td className="py-2 pr-4 font-medium text-foreground">
+                      {r.firstName} {r.lastName}
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground truncate max-w-[200px]">{r.email}</td>
+                    <td className="py-2 pr-4 text-muted-foreground">{r.company || "—"}</td>
+                    <td className="py-2 pr-4">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          r.paymentStatus === "COMPLETED" || r.paymentStatus === "FREE"
+                            ? "bg-success/10 text-success"
+                            : r.paymentStatus === "FAILED"
+                              ? "bg-destructive/10 text-destructive"
+                              : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {r.paymentStatus}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4 text-muted-foreground">
+                      {r.attended ? "✓" : "—"}
+                    </td>
+                    <td className="py-2 text-muted-foreground text-xs">
+                      {formatTimestamp(r.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {/* MR-29: Workshop files for download */}
