@@ -228,12 +228,33 @@ model Workshop {
   workflowAssignments WorkflowAssignment[]  // JV-11: Workflow linkage
   fileAttachments        FileAttachment[]      // JV-12: File attachments
   workflowStepExecutions WorkflowStepExecution[]
+  adminNote              WorkshopAdminNote?    // ENH-MAY6-2: admin-only side table
 
   @@index([coachId])
   @@index([status])
   @@index([eventDate])
   @@index([categoryId])
   @@map("workshops")
+}
+
+// ============================================
+// Admin-Only Side Tables (ENH-MAY6-2)
+// ============================================
+// Side table over column for structural privacy. Coach-facing Prisma includes
+// on Workshop never reach this table — there is no path that can leak admin
+// notes to a coach payload via accidental select:* or include:{workshop:true}.
+
+model WorkshopAdminNote {
+  id         String   @id @default(cuid())
+  workshopId String   @unique
+  body       String
+  updatedBy  String   // User.id of the admin/staff who last saved
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@map("workshop_admin_notes")
 }
 
 // ============================================
@@ -887,6 +908,19 @@ model WorkflowStepExecution {
   workshop       Workshop  @relation(fields: [workshopId], references: [id], onDelete: Cascade)
   registrationId String?   // Which registrant (for attendee-targeted emails)
 
+  // ENH-MAY6-10: parent/child rollup model. Top-level rows have parentId=null
+  // (existing rows + parent rollups). Per-recipient child rows have parentId
+  // set + non-null registrationId + non-null recipientEmail. Composite unique
+  // (parentId, registrationId) makes child upserts idempotent across replays.
+  // Coach surfaces filter parentId=null to avoid leaking recipient PII.
+  parentId       String?
+  parent         WorkflowStepExecution?  @relation("ParentChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children       WorkflowStepExecution[] @relation("ParentChildren")
+
+  // ENH-MAY6-10: snapshot of the recipient email at row-write time. Set on
+  // child rows; null on parent/legacy rows.
+  recipientEmail String?
+
   // Execution state: PENDING, SCHEDULED, SENT, FAILED, SKIPPED
   status       String    @default("PENDING")
   scheduledFor DateTime? // When Inngest should fire
@@ -901,10 +935,12 @@ model WorkflowStepExecution {
 
   step WorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
+  @@unique([parentId, registrationId], name: "WorkflowStepExecution_parent_recipient_unique")
   @@index([stepId])
   @@index([workshopId])
   @@index([status])
   @@index([scheduledFor])
+  @@index([parentId])
   @@map("workflow_step_executions")
 }
 

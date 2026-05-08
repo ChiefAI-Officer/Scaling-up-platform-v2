@@ -19,6 +19,9 @@ jest.mock("@/lib/db", () => ({
       create: jest.fn(async () => ({ id: "exec-new" })),
       update: jest.fn(async () => ({ id: "exec-new" })),
       findFirst: jest.fn(),
+      // ENH-MAY6-10: per-recipient child writes via upsert.
+      upsert: jest.fn(async () => ({ id: "child-new" })),
+      findMany: jest.fn(async () => []),
     },
     registration: { findMany: jest.fn() },
   },

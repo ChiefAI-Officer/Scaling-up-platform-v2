@@ -29,6 +29,7 @@ import { RegistrationRemoveButton } from "./registration-remove-button";
 import { WorkshopInlineEditForm } from "@/components/workshops/WorkshopInlineEditForm";
 import { TriggerNowButton } from "@/components/workflows/trigger-now-button";
 import { ApprovalThread } from "@/components/approvals/approval-thread";
+import { AdminNotesEditor } from "@/components/workshops/admin-notes-editor";
 import { formatStepLabel } from "@/lib/workflows/workflow-types";
 import { requireAuth } from "@/lib/auth/authorization";
 
@@ -56,7 +57,7 @@ export default async function WorkshopDetailPage({
   const session = await requireAuth();
   const { id } = await params;
 
-  const [workshop, categories, workflowAssignments] = await Promise.all([
+  const [workshop, categories, workflowAssignments, adminNote] = await Promise.all([
     db.workshop.findUnique({
       where: { id },
       include: {
@@ -101,7 +102,9 @@ export default async function WorkshopDetailPage({
               orderBy: { sortOrder: "asc" },
               include: {
                 executions: {
-                  where: { workshopId: id },
+                  // ENH-MAY6-10: filter to parent rows only — child recipient
+                  // rows must not surface as the per-step status badge.
+                  where: { workshopId: id, parentId: null },
                   orderBy: { createdAt: "desc" },
                   take: 1,
                 },
@@ -110,6 +113,12 @@ export default async function WorkshopDetailPage({
           },
         },
       },
+    }),
+    // ENH-MAY6-2: admin notes side table — fetched ONLY on this admin route.
+    // Coach-facing routes never query this model, so the body cannot leak.
+    db.workshopAdminNote.findUnique({
+      where: { workshopId: id },
+      select: { body: true },
     }),
   ]);
 
@@ -562,6 +571,19 @@ export default async function WorkshopDetailPage({
               </CardContent>
             </Card>
           )}
+
+          {/* ENH-MAY6-2: Admin Notes (admin/staff only — side table) */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Admin Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AdminNotesEditor
+                workshopId={workshop.id}
+                initialBody={adminNote?.body ?? ""}
+              />
+            </CardContent>
+          </Card>
 
           {/* Quick Links */}
           <Card>

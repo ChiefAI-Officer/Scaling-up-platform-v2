@@ -17,6 +17,10 @@ interface Execution {
   stepId: string;
   workshopId: string;
   registrationId: string | null;
+  // ENH-MAY6-10: parent/child rollup. parentId=null = top-level rows;
+  // parentId set + recipientEmail set = per-recipient child rows.
+  parentId: string | null;
+  recipientEmail: string | null;
   status: string;
   scheduledFor: string | null;
   executedAt: string | null;
@@ -157,42 +161,79 @@ export function WorkflowExecutions({ workflowId }: WorkflowExecutionsProps) {
             </span>
           </div>
           <div className="divide-y divide-border">
-            {group.executions
-              .sort((a, b) => a.step.sortOrder - b.step.sortOrder)
-              .map((exec) => {
-                const statusInfo = STATUS_STYLES[exec.status] || STATUS_STYLES.PENDING;
-                return (
-                  <div key={exec.id} className="px-4 py-2.5 flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex-shrink-0 w-6 h-6 bg-muted rounded-full flex items-center justify-center text-xs font-medium text-muted-foreground">
-                        {exec.step.sortOrder + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-foreground truncate">
-                          {STEP_TYPE_LABELS[exec.step.stepType as StepType] || exec.step.stepType}
-                          {exec.step.subject && (
-                            <span className="text-muted-foreground ml-1">— {exec.step.subject}</span>
-                          )}
-                        </p>
-                        {exec.scheduledFor && exec.status === "SCHEDULED" && (
-                          <p className="text-xs text-warning">
-                            Scheduled: {new Date(exec.scheduledFor).toLocaleString()}
-                          </p>
-                        )}
-                        {exec.executedAt && (
-                          <p className="text-xs text-muted-foreground">
-                            {exec.status === "SENT" ? "Sent" : "Executed"}: {new Date(exec.executedAt).toLocaleString()}
-                          </p>
-                        )}
-                        {exec.errorMessage && (
-                          <p className="text-xs text-destructive truncate">{exec.errorMessage}</p>
-                        )}
+            {/* ENH-MAY6-10: render top-level rows; nest per-recipient children under each. */}
+            {(() => {
+              const topLevel = group.executions.filter((e) => e.parentId === null);
+              const childrenByParent = new Map<string, Execution[]>();
+              for (const e of group.executions) {
+                if (e.parentId !== null) {
+                  if (!childrenByParent.has(e.parentId)) childrenByParent.set(e.parentId, []);
+                  childrenByParent.get(e.parentId)!.push(e);
+                }
+              }
+              return topLevel
+                .sort((a, b) => a.step.sortOrder - b.step.sortOrder)
+                .map((exec) => {
+                  const children = (childrenByParent.get(exec.id) || []).sort(
+                    (a, b) => (a.recipientEmail || "").localeCompare(b.recipientEmail || "")
+                  );
+                  return (
+                    <div key={exec.id}>
+                      <div className="px-4 py-2.5 flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="flex-shrink-0 w-6 h-6 bg-muted rounded-full flex items-center justify-center text-xs font-medium text-muted-foreground">
+                            {exec.step.sortOrder + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-foreground truncate">
+                              {STEP_TYPE_LABELS[exec.step.stepType as StepType] || exec.step.stepType}
+                              {exec.step.subject && (
+                                <span className="text-muted-foreground ml-1">— {exec.step.subject}</span>
+                              )}
+                            </p>
+                            {exec.scheduledFor && exec.status === "SCHEDULED" && (
+                              <p className="text-xs text-warning">
+                                Scheduled: {new Date(exec.scheduledFor).toLocaleString()}
+                              </p>
+                            )}
+                            {exec.executedAt && (
+                              <p className="text-xs text-muted-foreground">
+                                {exec.status === "SENT" ? "Sent" : "Executed"}: {new Date(exec.executedAt).toLocaleString()}
+                              </p>
+                            )}
+                            {children.length > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                {children.length} recipient{children.length !== 1 ? "s" : ""}
+                              </p>
+                            )}
+                            {exec.errorMessage && (
+                              <p className="text-xs text-destructive truncate">{exec.errorMessage}</p>
+                            )}
+                          </div>
+                        </div>
                       </div>
+                      {children.length > 0 && (
+                        <div className="bg-muted/30 border-t border-border/50">
+                          {children.map((child) => {
+                            const childStatus = STATUS_STYLES[child.status] || STATUS_STYLES.PENDING;
+                            return (
+                              <div
+                                key={child.id}
+                                className="pl-12 pr-4 py-1.5 flex items-center justify-between text-xs"
+                              >
+                                <span className="text-muted-foreground truncate">
+                                  {child.recipientEmail || "(unknown recipient)"}
+                                </span>
+                                <Badge variant={childStatus.variant}>{childStatus.label}</Badge>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                    {/* BUG-MAY4-3: per-step badge removed — a step can have N recipients with mixed outcomes */}
-                  </div>
-                );
-              })}
+                  );
+                });
+            })()}
           </div>
         </div>
       ))}

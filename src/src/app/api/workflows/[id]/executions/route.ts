@@ -3,8 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import { z } from "zod";
 
@@ -16,9 +15,15 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  // ENH-MAY6-10: tighten to admin/staff only. Per-recipient child rows surface
+  // attendee emails + per-recipient delivery status — coach role must not be
+  // able to read this endpoint regardless of which workflow id they guess.
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isPrivilegedRole(actor.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const paramsValidation = workflowExecutionsParamsSchema.safeParse(await params);

@@ -83,7 +83,9 @@ export default async function WorkshopDetailsPage({
               orderBy: { sortOrder: "asc" },
               include: {
                 executions: {
-                  where: { workshopId: id },
+                  // ENH-MAY6-10: filter to parent rows only — coach must never
+                  // see per-recipient child rows (admin-only PII boundary).
+                  where: { workshopId: id, parentId: null },
                   orderBy: { createdAt: "desc" },
                   take: 1,
                 },

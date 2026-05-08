@@ -10,7 +10,6 @@ import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
 import {
   interpolateTemplate,
-  calculateSendDate,
   type WorkflowContext,
 } from "@/lib/workflows/workflow-service";
 import { TRIGGER_TYPES, STEP_TYPES } from "@/lib/workflows/workflow-types";
@@ -18,7 +17,10 @@ import {
   scheduleWorkflowExecution,
   recordWorkflowExecution,
 } from "@/lib/workflows/record-workflow-execution";
+// ENH-MAY6-10: per-recipient child rows for the workflow execution audit.
+import { recordRecipientExecution } from "@/lib/workflows/recipient-execution";
 import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
+import { orderStepsForExecution } from "@/lib/workflows/order-steps-for-execution";
 import { buildLocationString } from "@/lib/ics-generator";
 import {
   buildProtectedEmailAttachments,
@@ -130,8 +132,20 @@ export const executeWorkflow = inngest.createFunction(
     let stepsExecuted = 0;
     let stepsFailed = 0;
 
+    // BUG-MAY6-1: Sort steps by their computed sendAt before iteration. The
+    // sequential step.sleepUntil loop below only moves time forward, so any
+    // step whose offset is earlier-in-time than a previous step's would skip
+    // its sleep (past-guard) and fire immediately. Sorting ensures each
+    // RELATIVE step sleeps until exactly its scheduled time. Non-RELATIVE
+    // steps carry no sendAt and execute first in their original sortOrder.
+    const orderedSteps = orderStepsForExecution(
+      workflow.steps,
+      eventDate,
+      workshop.timezone,
+    );
+
     // Step 2: Process each workflow step
-    for (const workflowStep of workflow.steps) {
+    for (const { step: workflowStep, sendAt: precomputedSendAt } of orderedSteps) {
       const stepName = `step-${workflowStep.sortOrder}-${workflowStep.stepType}`;
 
       // BUG-09: track scheduledFor + the SCHEDULED row id (if any) so the
@@ -141,14 +155,8 @@ export const executeWorkflow = inngest.createFunction(
       let executionId: string | undefined;
 
       // Determine timing
-      if (workflowStep.triggerType === TRIGGER_TYPES.RELATIVE_TO_EVENT) {
-        const sendAt = calculateSendDate(
-          eventDate,
-          workflowStep.offsetDays ?? 0,
-          workflowStep.offsetHours,
-          workflowStep.sendTimeOfDay,
-          workshop.timezone
-        );
+      if (workflowStep.triggerType === TRIGGER_TYPES.RELATIVE_TO_EVENT && precomputedSendAt) {
+        const sendAt = precomputedSendAt;
         effectiveScheduledFor = sendAt;
 
         // Schedule for future; if already past, fire immediately (no sleep)
@@ -261,12 +269,15 @@ export const executeWorkflow = inngest.createFunction(
             case STEP_TYPES.EMAIL_ATTENDEES: {
               recipientRole = "ATTENDEE";
 
-              // Dedup guard: skip if this step was already successfully executed (Inngest retry)
+              // Dedup guard: skip if this step was already successfully executed (Inngest retry).
+              // ENH-MAY6-10: filter to parentId: null so per-recipient child SENT rows
+              // don't trigger the dedup. Only the parent rollup signals "step finished."
               const existingExecution = await db.workflowStepExecution.findFirst({
                 where: {
                   stepId: workflowStep.id,
                   workshopId: workshop.id,
                   status: "SENT",
+                  parentId: null,
                 },
               });
               if (existingExecution) {
@@ -356,6 +367,19 @@ export const executeWorkflow = inngest.createFunction(
                     },
                   },
                 });
+
+                // ENH-MAY6-10: per-recipient audit row for the admin
+                // execution-status screen ("a line for each person it emails").
+                if (executionId) {
+                  await recordRecipientExecution(db, {
+                    parentId: executionId,
+                    stepId: workflowStep.id,
+                    workshopId: workshop.id,
+                    registrationId: reg.id,
+                    recipientEmail: reg.email,
+                    status: "SENT",
+                  });
+                }
               }
 
               // BUG-MAY4-1b: 0 registrants → SKIPPED (not false SENT)
@@ -377,11 +401,13 @@ export const executeWorkflow = inngest.createFunction(
             case STEP_TYPES.SEND_SURVEY_LINK: {
               recipientRole = "ATTENDEE";
 
+              // ENH-MAY6-10: dedup guard filters to parent rows only.
               const existingExecution = await db.workflowStepExecution.findFirst({
                 where: {
                   stepId: workflowStep.id,
                   workshopId: workshop.id,
                   status: "SENT",
+                  parentId: null,
                 },
               });
               if (existingExecution) {
@@ -468,6 +494,18 @@ export const executeWorkflow = inngest.createFunction(
                   },
                 });
                 sentCount++;
+
+                // ENH-MAY6-10: per-recipient audit row.
+                if (executionId) {
+                  await recordRecipientExecution(db, {
+                    parentId: executionId,
+                    stepId: workflowStep.id,
+                    workshopId: workshop.id,
+                    registrationId: reg.id,
+                    recipientEmail: reg.email,
+                    status: "SENT",
+                  });
+                }
               }
 
               await recordWorkflowExecution(db, {
@@ -489,11 +527,13 @@ export const executeWorkflow = inngest.createFunction(
             case STEP_TYPES.SEND_FILE_LINK: {
               recipientRole = "ATTENDEE";
 
+              // ENH-MAY6-10: dedup guard filters to parent rows only.
               const existingExecution = await db.workflowStepExecution.findFirst({
                 where: {
                   stepId: workflowStep.id,
                   workshopId: workshop.id,
                   status: "SENT",
+                  parentId: null,
                 },
               });
               if (existingExecution) {
@@ -599,6 +639,18 @@ export const executeWorkflow = inngest.createFunction(
                   },
                 });
                 fileEmailsSent++;
+
+                // ENH-MAY6-10: per-recipient audit row.
+                if (executionId) {
+                  await recordRecipientExecution(db, {
+                    parentId: executionId,
+                    stepId: workflowStep.id,
+                    workshopId: workshop.id,
+                    registrationId: reg.id,
+                    recipientEmail: reg.email,
+                    status: "SENT",
+                  });
+                }
               }
 
               await recordWorkflowExecution(db, {
