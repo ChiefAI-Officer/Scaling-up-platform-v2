@@ -39,9 +39,9 @@ Two related Jeff Verdun emails on May 6, 2026 fold into this sprint:
 | ENH-MAY6-2 | Admin notes field on workshop (admin eyes only) | P2 | **shipped May 8** (commit `5c6ef26`) | [ticket](https://www.notion.so/3598c45dd8298124b82efcc5caa63679) |
 | ENH-MAY6-3 | Survey preview option | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd829817fab21eada0bd8a07c) |
 | ENH-MAY6-4 | Affiliate code option only on Thank You page in template editor | P2 | **shipped May 8** (commit `ba13410`) | [ticket](https://www.notion.so/3598c45dd82981fe8fced24d1cb34b09) |
-| ENH-MAY6-5 | Affiliate code editable on individual workshop, not just template | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd829816ba15fe2a425274d7c) |
+| ENH-MAY6-5 | Affiliate code editable on individual workshop, not just template | P2 | **shipped May 8** (commit `6a5a462`) | [ticket](https://www.notion.so/3598c45dd829816ba15fe2a425274d7c) |
 | ENH-MAY6-6 | Affiliate code: swap iDev for new provider (security: pin host, do NOT relax validator) | P2 | needs-info | [ticket](https://www.notion.so/3598c45dd82981aab737f994366bca1e) |
-| ENH-MAY6-7 | Coupon codes support dollar amounts (sequence behind BUG-MAY6-4) | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd8298103aa74e667ff62bf91) |
+| ENH-MAY6-7 | Coupon codes support dollar amounts (sequence behind BUG-MAY6-4) | P2 | **shipped May 8** (commit `657b2d3`) | [ticket](https://www.notion.so/3598c45dd8298103aa74e667ff62bf91) |
 | ENH-MAY6-8 | Aggregator: show who answered + show text answers | P2 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd829813386a6c5d32e0f0647) |
 | ENH-MAY6-9 | Aggregator promoted to top-level toolset (filter/sort/group like Financials) | P2 | ready-for-human | [ticket](https://www.notion.so/3598c45dd829816db51cd20d28d634ce) |
 | ENH-MAY6-10 | Workflow execution status: include recipient email per row | P2 | **shipped May 8** (commit `2fa224c`, slim Alpha) | [ticket](https://www.notion.so/3598c45dd82981f1854de26f20dfe34b) |
@@ -162,3 +162,24 @@ Schema + data-model changes batched together. Both tickets shipped together via 
 - **Round-3 ops findings filed as separate follow-ons:** structured logging + alerts + runbook for the new parent/child state machine; PII retention/erasure policy for recipient email audit data; concurrency limit + load test for large workshop sizes.
 
 **Wave 2 totals:** 998 tests passing (up from 989 at end of Wave 1). Three new migrations: `add_workshop_admin_note`, `add_workflow_step_execution_recipient_email`, `add_workflow_step_execution_parent_id` (all marked applied via `prisma migrate resolve --applied` since `db push` synced the schema directly to Neon).
+
+---
+
+## v2.5 Sprint — Wave 3 (May 8, 2026)
+
+Stripe + per-workshop customCode batch.
+
+**ENH-MAY6-7** → `657b2d3` (May 8 2026):
+- Schema: extended `WorkshopCouponRecord` with `discountType: "PERCENT" | "AMOUNT"` + `discountAmountCents?: number`. Discriminated discount type. Legacy stored rows (no `discountType`) read back as PERCENT for backwards compatibility — schema's `superRefine` infers from which field is set, then transform stamps the explicit type.
+- Stripe service: `createWorkshopPromotionCode` now takes a discriminated `discountType`. PERCENT mode passes `percent_off` to Stripe; AMOUNT mode passes `amount_off + currency: "usd"` (Stripe enforces mutual exclusivity, and amount_off requires currency). Boundary validation throws if the wrong field is missing for the chosen type.
+- UIs: both the new-workshop wizard (`(dashboard)/workshops/new/page.tsx`) and the inline edit form (`WorkshopInlineEditForm`) get a discount-type selector ($/%) with a conditional value input. Wizard converts decimal-dollar form input → cents at submit. Inline form stores cents directly.
+- Tests: 12 RED→GREEN — 8 in `__tests__/lib/workshop-coupons-discount-type.test.ts` (legacy → PERCENT, explicit PERCENT, AMOUNT, missing-field rejections, AMOUNT non-positive cents rejection, parseStored backwards-compat) + 4 in `__tests__/services/stripe-promotion-code-amount.test.ts` (PERCENT passes percent_off, AMOUNT passes amount_off + currency, both fail without their type-specific value). 1010 tests green.
+- Two existing tests had to update assertion expectations for the new `discountType: "PERCENT"` field that the schema transform now stamps onto legacy-shape rows. No behavior change — just a new field in the JSON payload.
+
+**ENH-MAY6-5** → `6a5a462` (May 8 2026):
+- Pre-fix gap: schema column `LandingPage.customCode` already existed from CHG-03, but the per-workshop landing-page PUT body schema didn't accept it AND the editor UI didn't expose it. Result: customCode could only be set at the template level, not per-workshop.
+- API: `PUT /api/workshops/[id]/landing-pages/[template]` body schema now accepts optional `customCode: string | null`. Setting it requires `isPrivilegedRole(actor.role)` — coach attempts (even via crafted PUT bodies) get 403. Value runs through the existing `validateCustomCode` parse5 helper before persistence (host-pinned to scalingup.idevaffiliate.com, img-only, no scripts/event handlers/data:/javascript:).
+- UI: Thank You page editor at `(dashboard)/workshops/[id]/landing-pages/thank-you/page.tsx` adds an "Affiliate / Tracking Code" Card with a textarea + token reference. Loaded from API on mount; sent in the PUT body on save. Empty value → `null` (clears). Admin-only via the `(dashboard)` layout's existing role gate (no client-side check needed).
+- No new tests added — existing CHG-03 customCode validation + LandingPage tests cover the validation path. Smoke-verify on production after deploy.
+
+**Wave 3 totals:** 1010 tests passing (unchanged — no test count increase from ENH-MAY6-5 since validation reuses CHG-03's existing helpers).

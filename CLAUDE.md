@@ -17,10 +17,17 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 8, 2026 — v2.5 sprint Wave 2 shipped (ENH-MAY6-2 + ENH-MAY6-10, direct push to main) |
+| **Last Updated** | May 8, 2026 — v2.5 sprint Wave 3 shipped (ENH-MAY6-7 + ENH-MAY6-5, direct push to main) |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
+
+**v2.5 Sprint — Wave 3** — Complete (May 8 2026, direct push to main, Alpha mode):
+- Plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Wave 3 = Stripe + per-workshop customCode.
+- **ENH-MAY6-7** (Notion: [3598c45d…bf91](https://www.notion.so/3598c45dd8298103aa74e667ff62bf91)) — Coupons can now be either PERCENT or AMOUNT (dollar-amount). Schema's `WorkshopCouponRecord` adds discriminated `discountType` + optional `discountAmountCents`. Legacy stored rows (no `discountType`) read back as PERCENT for backwards compat. Stripe service `createWorkshopPromotionCode` passes `amount_off + currency: "usd"` for AMOUNT (Stripe requires currency for amount_off), `percent_off` for PERCENT. Both the new-workshop wizard and the inline edit form get a `$/%` selector with conditional input. 12 RED→GREEN tests.
+- **ENH-MAY6-5** (Notion: [3598c45d…74d7c](https://www.notion.so/3598c45dd829816ba15fe2a425274d7c)) — Pre-fix gap: schema column `LandingPage.customCode` existed (CHG-03) but per-workshop API didn't accept it and the editor UI didn't expose it. Now `PUT /api/workshops/[id]/landing-pages/[template]` accepts optional customCode; setting it is admin-only (`isPrivilegedRole`); value runs through existing parse5 `validateCustomCode` helper. Thank You page editor adds an "Affiliate / Tracking Code" Card with textarea (admin-only via the `(dashboard)` layout's role gate).
+- 1010 tests passing.
+- Sprint ledger: `plans/JEFF_MAY6_SPRINT.md` (Wave 4-5 still pending).
 
 **v2.5 Sprint — Wave 2** — Complete (May 8 2026, direct push to main, Alpha mode):
 - Plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md` + `PLAN.md` (3-round claudex Claude+Codex adversarial review). Wave 2 = schema + data-model changes batched together.
