@@ -192,7 +192,8 @@ export function TemplateContentEditor({
                             <ThankYouForm data={tyData} onChange={setTyData} />
                         )}
 
-                        {/* Affiliate / Tracking Code */}
+                        {/* ENH-MAY6-4: affiliate code only fires on THANK_YOU — hide on other tabs */}
+                        {templateType === "THANK_YOU" && (
                         <Card>
                             <CardHeader>
                                 <CardTitle>Affiliate / Tracking Code</CardTitle>
@@ -220,6 +221,7 @@ export function TemplateContentEditor({
                                 </div>
                             </CardContent>
                         </Card>
+                        )}
 
                         {/* Save button */}
                         <div className="flex items-center gap-3">
@@ -267,8 +269,6 @@ export function TemplateContentEditor({
                 <FallbackJsonEditor
                     templateId={templateId}
                     initialContent={initialContent}
-                    customCode={customCode}
-                    onCustomCodeChange={setCustomCode}
                 />
             )}
         </div>
@@ -793,13 +793,9 @@ function ThankYouPreview({ data }: { data: ThankYouFields }) {
 function FallbackJsonEditor({
     templateId,
     initialContent,
-    customCode,
-    onCustomCodeChange,
 }: {
     templateId: string;
     initialContent: string;
-    customCode: string | null;
-    onCustomCodeChange: (val: string | null) => void;
 }) {
     const [content, setContent] = useState(initialContent);
     const [saving, setSaving] = useState(false);
@@ -821,7 +817,7 @@ function FallbackJsonEditor({
             const res = await fetch(`/api/page-templates/${templateId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ content, customCode }),
+                body: JSON.stringify({ content }),
             });
             // CHG-03: surface validation errors (e.g. customCode rejected) inline.
             const data = await res.json().catch(() => ({}));
@@ -856,25 +852,6 @@ function FallbackJsonEditor({
                 className="w-full h-[500px] font-mono text-xs bg-background border border-border rounded-lg p-3 resize-y"
                 spellCheck={false}
             />
-            <div>
-                <label className="block text-sm font-medium text-foreground mb-1">
-                    Affiliate / Tracking Code
-                    <span className="ml-1 text-xs text-muted-foreground">(optional)</span>
-                </label>
-                <textarea
-                    rows={6}
-                    value={customCode ?? ""}
-                    onChange={(e) => onCustomCodeChange(e.target.value || null)}
-                    placeholder={`<img src="https://scalingup.idevaffiliate.com/sale.php?profile=72198&idev_saleamt={{saleAmount}}&idev_ordernum={{orderNumber}}">`}
-                    className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background font-mono"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">
-                    Pasted code renders on THANK_YOU page after paid registration. Tokens:{" "}
-                    <code>{"{{saleAmount}}"}</code>, <code>{"{{orderNumber}}"}</code>,{" "}
-                    <code>{"{{email}}"}</code>, <code>{"{{currency}}"}</code>.{" "}
-                    <code>&lt;img&gt;</code> pixel only — <code>&lt;script&gt;</code> rejected.
-                </p>
-            </div>
             <div className="flex items-center gap-3">
                 <Button onClick={handleSave} disabled={saving}>
                     {saving ? "Saving..." : "Save Template"}
