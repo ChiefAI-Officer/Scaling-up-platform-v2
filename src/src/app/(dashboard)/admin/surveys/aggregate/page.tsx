@@ -192,8 +192,58 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                       })}
                   </div>
                 )}
+
+                {/* ENH-MAY6-8: render verbatim text answers per respondent for TEXT/TEXTAREA questions */}
+                {(q.type === "TEXT" || q.type === "TEXTAREA") && (
+                  <div className="space-y-2 mt-2">
+                    {results.responses
+                      .flatMap((s) =>
+                        s.answers
+                          .filter((a) => a.questionId === q.questionId && a.value && a.value.trim().length > 0)
+                          .map((a) => ({
+                            value: a.value,
+                            respondent: s.registration
+                              ? `${s.registration.firstName} ${s.registration.lastName}`.trim() || s.registration.email
+                              : "Anonymous",
+                          }))
+                      )
+                      .slice(0, 50)
+                      .map((entry, idx) => (
+                        <div key={idx} className="rounded-md border border-border/50 bg-muted/30 p-3 text-sm">
+                          <p className="text-foreground whitespace-pre-wrap">{entry.value}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">— {entry.respondent}</p>
+                        </div>
+                      ))}
+                    {results.responses.flatMap((s) => s.answers.filter((a) => a.questionId === q.questionId && a.value && a.value.trim().length > 0)).length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">No text answers yet.</p>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
+          </div>
+
+          {/* ENH-MAY6-8: who answered — list of respondent names across all responses */}
+          <div className="rounded-xl border border-border bg-card p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+              Respondents ({results.responses.length})
+            </h3>
+            <div className="flex flex-wrap gap-2 text-sm">
+              {results.responses.map((s) => {
+                const name = s.registration
+                  ? `${s.registration.firstName} ${s.registration.lastName}`.trim() || s.registration.email
+                  : "Anonymous";
+                return (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs text-foreground"
+                    title={s.registration?.email}
+                  >
+                    {name}
+                  </span>
+                );
+              })}
+            </div>
           </div>
 
           {/* Per-Workshop Breakdown */}
