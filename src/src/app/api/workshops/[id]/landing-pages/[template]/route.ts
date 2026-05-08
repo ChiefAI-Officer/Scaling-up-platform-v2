@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { canManageCoachData, getApiActor } from "@/lib/auth/authorization";
+import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { validateCustomCode } from "@/lib/templates/interpolate-custom-code";
 import { z } from "zod";
 
 const VALID_TEMPLATES = ["BIO_PAGE", "SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] as const;
@@ -18,6 +19,10 @@ const landingPageParamsSchema = z.object({
 const updateLandingPageBodySchema = z.object({
   content: z.unknown(),
   status: z.enum(["DRAFT", "PUBLISHED", "CANCELLED"]).optional(),
+  // ENH-MAY6-5: admin can edit per-workshop affiliate/tracking code.
+  // Coach role attempts get 403. parse5 validation runs server-side via
+  // validateCustomCode (CHG-03). Pass null to clear.
+  customCode: z.string().nullable().optional(),
 });
 
 function normalizeTemplate(template: string): TemplateType | null {
@@ -139,7 +144,28 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { content, status } = bodyValidation.data;
+    const { content, status, customCode } = bodyValidation.data;
+
+    // ENH-MAY6-5: customCode editing is admin/staff only. Coach attempts
+    // (including via crafted PUT bodies) are rejected. validateCustomCode is
+    // re-run server-side regardless — defense in depth, parse5 host-pinned.
+    if (customCode !== undefined) {
+      if (!isPrivilegedRole(actor.role)) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden — admin/staff only" },
+          { status: 403 }
+        );
+      }
+      if (customCode !== null && customCode.length > 0) {
+        const validation = validateCustomCode(customCode);
+        if (!validation.valid) {
+          return NextResponse.json(
+            { success: false, error: validation.error },
+            { status: 400 }
+          );
+        }
+      }
+    }
 
     // Check if workshop exists
     // CHG-03: include categoryId so we can match a per-category PageTemplate
@@ -178,6 +204,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           status: status || existing.status,
           publishedAt: status === "PUBLISHED" ? new Date() : existing.publishedAt,
           updatedAt: new Date(),
+          // ENH-MAY6-5: only set customCode when explicitly provided.
+          // Undefined keeps existing value; null clears.
+          ...(customCode !== undefined ? { customCode } : {}),
         },
       });
     } else {
@@ -215,7 +244,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           content: JSON.stringify(content),
           status: status || "DRAFT",
           publishedAt: status === "PUBLISHED" ? new Date() : null,
-          customCode: chosenTemplate?.customCode ?? null,
+          // ENH-MAY6-5: explicit body customCode wins over template-default.
+          customCode: customCode ?? chosenTemplate?.customCode ?? null,
         },
       });
     }

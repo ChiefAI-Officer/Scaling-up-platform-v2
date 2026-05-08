@@ -34,6 +34,8 @@ export default function ThankYouPageEditor() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState<ThankYouPageData>(DEFAULT_DATA);
+  // ENH-MAY6-5: per-workshop affiliate/tracking code (admin-only via route gate).
+  const [customCode, setCustomCode] = useState<string>("");
 
   useEffect(() => {
     async function loadData() {
@@ -44,6 +46,7 @@ export default function ThankYouPageEditor() {
         if (pageData.success && pageData.data) {
           const content = JSON.parse(pageData.data.content);
           setFormData((prev) => ({ ...prev, ...content }));
+          setCustomCode(pageData.data.customCode ?? "");
         }
       } catch {
         setError("Failed to load data");
@@ -74,6 +77,9 @@ export default function ThankYouPageEditor() {
           body: JSON.stringify({
             content: formData,
             status: publish ? "PUBLISHED" : "DRAFT",
+            // ENH-MAY6-5: persist per-workshop affiliate code. Empty string
+            // → null (clear). Server runs parse5 validation again.
+            customCode: customCode.trim().length > 0 ? customCode : null,
           }),
         }
       );
@@ -157,6 +163,31 @@ export default function ThankYouPageEditor() {
                 iDevAffiliate tracking fires automatically on this Thank You page for paid workshops only
                 using the hidden image tag format (sale amount + workshop title order number).
               </div>
+            </CardContent>
+          </Card>
+
+          {/* ENH-MAY6-5: per-workshop affiliate / tracking code (admin-only via route gate) */}
+          <Card>
+            <CardHeader><CardTitle>Affiliate / Tracking Code</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              <Label htmlFor="customCode">
+                Per-workshop override
+                <span className="ml-1 text-xs text-muted-foreground">(optional)</span>
+              </Label>
+              <textarea
+                id="customCode"
+                rows={6}
+                value={customCode}
+                onChange={(e) => { setCustomCode(e.target.value); setSuccess(false); }}
+                placeholder={`<img src="https://scalingup.idevaffiliate.com/sale.php?profile=72198&idev_saleamt={{saleAmount}}&idev_ordernum={{orderNumber}}">`}
+                className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Renders on this workshop&apos;s THANK_YOU page after paid registration.
+                Tokens: <code>{"{{saleAmount}}"}</code>, <code>{"{{orderNumber}}"}</code>,
+                <code>{"{{email}}"}</code>, <code>{"{{currency}}"}</code>.{" "}
+                <code>&lt;img&gt;</code> pixel only — <code>&lt;script&gt;</code> rejected. Empty clears.
+              </p>
             </CardContent>
           </Card>
 
