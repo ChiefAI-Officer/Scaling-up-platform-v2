@@ -10,6 +10,8 @@ import {
   QUESTION_TYPE_LABELS,
 } from "@/lib/surveys/survey-types";
 import type { SurveyType, QuestionType } from "@/lib/surveys/survey-types";
+// ENH-MAY6-3: pure read-only renderer for the Preview modal.
+import { SurveyFormView } from "@/components/surveys/survey-form-view";
 
 // ============================================
 // Types
@@ -85,6 +87,9 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
 
   // Active tab
   const [activeTab, setActiveTab] = useState<"builder" | "assign" | "results">("builder");
+
+  // ENH-MAY6-3: Preview modal state.
+  const [showPreview, setShowPreview] = useState(false);
 
   // Assignment state
   const [assignWorkshopId, setAssignWorkshopId] = useState("");
@@ -293,14 +298,26 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
             {isNew ? "New Survey Template" : template?.name || ""}
           </h1>
         </div>
-        {!isNew && (
-          <button
-            onClick={deleteTemplate}
-            className="text-sm text-destructive hover:text-destructive/80"
-          >
-            Delete Template
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {/* ENH-MAY6-3: open the preview modal — read-only render of the template's questions */}
+          {!isNew && questions.length > 0 && (
+            <button
+              onClick={() => setShowPreview(true)}
+              className="text-sm text-primary hover:text-primary/80 underline"
+              type="button"
+            >
+              Preview
+            </button>
+          )}
+          {!isNew && (
+            <button
+              onClick={deleteTemplate}
+              className="text-sm text-destructive hover:text-destructive/80"
+            >
+              Delete Template
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -561,6 +578,44 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
             <SurveyResultsPanel templateId={template.id} />
           )}
         </>
+      )}
+
+      {/* ENH-MAY6-3: Preview modal — pure read-only render of the questions */}
+      {showPreview && template && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowPreview(false)}
+        >
+          <div
+            className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-background shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 flex items-center justify-between border-b border-border bg-card px-6 py-3">
+              <h3 className="text-sm font-semibold text-foreground">Survey Preview</h3>
+              <button
+                type="button"
+                onClick={() => setShowPreview(false)}
+                aria-label="Close preview"
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                ✕ Close
+              </button>
+            </div>
+            <SurveyFormView
+              templateName={name || template.name}
+              questions={questions.map((q) => ({
+                id: q.id,
+                questionType: q.questionType,
+                label: q.label,
+                description: q.description,
+                isRequired: q.isRequired,
+                options: q.options ? JSON.parse(q.options) : undefined,
+                sortOrder: q.sortOrder,
+              }))}
+              mode="preview"
+            />
+          </div>
+        </div>
       )}
     </div>
   );
