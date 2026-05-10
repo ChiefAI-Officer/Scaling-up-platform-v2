@@ -28,7 +28,7 @@ Two related Jeff Verdun emails on May 6, 2026 fold into this sprint:
 | BUG-MAY6-6 | Registration page marketing opt-in default unchecked | P1 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd82981648487fa138cdb8685) | 3:55 PM email |
 | BUG-MAY6-7 | Workshop wizard defaults to Physical, should default to Virtual | P1 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd82981758aa9c9b39336154a) | 3:55 PM email |
 | BUG-MAY6-8 | Survey results screen missing from admin workshop page (parity with coach) | P1 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd82981e082d0f625028c8dbf) | 3:55 PM email |
-| BUG-MAY6-9 | Survey results don't show name of respondent | P1 | ready-for-agent | [ticket](https://www.notion.so/3598c45dd82981fd9251db782ae96d28) | 3:55 PM email |
+| BUG-MAY6-9 | Survey results don't show name of respondent | P1 | **shipped May 10** (commits `e48030d` + `ccb8dc6`, Wave 6) | [ticket](https://www.notion.so/3598c45dd82981fd9251db782ae96d28) | 3:55 PM email |
 | BUG-MAY7-2 | INFO_REQUEST/INFO_RESPONSE prefix in approval thread | P2 | **shipped May 8** (commit `ba13410`) | [ticket](https://www.notion.so/3598c45dd8298176894df6331a37ab27) | spawned from BUG-MAY6-5 verify |
 
 ### Enhancements for v2.5 (11)
@@ -250,6 +250,45 @@ UI surfaces batch — three independent UI improvements shipped together.
 - ENH-MAY6-6 (affiliate provider switch) — still `needs-info` from Jeff.
 - ENH-MAY6-9 (aggregator promoted to top-level toolset) — still `ready-for-human` (design pass).
 - ENH-MAY6-11 (coach-editable thanks-for-registering + thanks-for-attending emails) — still `ready-for-human` (product call).
-- BUG-MAY6-9 (per-respondent attribution surface different from ENH-MAY6-8) — Phase 2 wishlist.
 - Q-MAY6-1, Q-MAY6-2 — questions, not tasks.
 - STRIPE_WEBHOOK_SECRET rotation — pending Josh's authenticator.
+
+---
+
+## v2.5 Sprint — Wave 6 (May 10, 2026)
+
+**BUG-MAY6-9** + Tier B (`finalizeParentRollup` wiring + link-gen FAILED children) → `e48030d`, `ccb8dc6` (May 10 2026).
+
+**Tier A — BUG-MAY6-9: per-survey respondent attribution.**
+- Source: same Jeff May 6 email — "results aggregator do not show who answered, also do not show text based answers." ENH-MAY6-8 (Wave 4) fixed the cross-workshop aggregate page; the per-workshop admin + coach surfaces still discarded `survey.registration` even though both pages already fetched it via Prisma include.
+- Fix at `src/components/surveys/survey-results-view.tsx`: `SurveyResultResponse` interface now carries optional `registration: { firstName, lastName, email } | null`. Inline `formatRespondentLabel()` helper (trimmed full name → email → "Anonymous") used for both per-answer attribution and the new Respondents pill panel rendered at the top of each template card. TEXT/TEXTAREA rendering refactored to per-response (was per-answer flat-map) so the response→registration link survives.
+- Both consumer pages (`(dashboard)/workshops/[id]/surveys/page.tsx` + `(portal)/portal/workshops/[id]/surveys/page.tsx`) now pass `registration: survey.registration ?? null` through.
+- Tests: 5 RED→GREEN at `__tests__/components/survey-results-view-respondent.test.tsx` covering name attribution, null registration → "Anonymous", empty firstName/lastName → email fallback, Respondents panel count + names, back-compat (responses without `registration` field).
+
+**Tier B — `finalizeParentRollup` wiring + link-gen FAILED children for SEND_SURVEY_LINK.**
+- Source: deferred slim-Alpha hardening item from Wave 2 ENH-MAY6-10. Closes Codex round-3 high-3 (silent skips on link-gen failure should produce visible FAILED rows so ops can see the failure).
+- Fix at `src/inngest/functions/execute-workflow.ts`:
+  1. Imports `finalizeParentRollup` from `lib/workflows/recipient-execution`.
+  2. SEND_SURVEY_LINK per-recipient loop: when `getOrCreateSurveyLink` returns null, writes `recordRecipientExecution(... status: "FAILED", errorMessage: "link_generation_failed")` then continues (was a silent `continue`). Gated on `executionId` because the immediate path doesn't have a parent row yet.
+  3. After post-loop `recordWorkflowExecution`, calls `finalizeParentRollup(db, executionId)` for SEND_SURVEY_LINK / SEND_FILE_LINK / EMAIL_ATTENDEES. Parent now reflects FAILED > SENT > SKIPPED precedence over actual children. SEND_FILE_LINK + EMAIL_ATTENDEES paths today have no FAILED children (they throw on SMTP error → Inngest retries) so the rollup is a no-op for them; future SMTP error classification work can flip them on without further wiring.
+- Slim Alpha posture: still deferred — `trigger-workflow-step.ts` per-recipient writes (Trigger Now parity), per-recipient pre-send idempotency, immediate-path `executionId` synthesis with deterministic key (`inngestRunId` + `stepId`), SMTP error classification.
+- Tests: 1 RED→GREEN extending `__tests__/inngest/execute-workflow.test.ts` — SEND_SURVEY_LINK with mixed link-gen failure (one recipient null + one success) writes a FAILED child row with the right `parentId`, calls `finalizeParentRollup` with the parent id, and the rollup `findMany` returning `[FAILED, SENT]` triggers a parent `update({ status: "FAILED" })`.
+
+**Final Wave 6 metrics:** 1015 → 1021 tests (+6). Vercel build green. Two cherry-picked commits (`e48030d` + `ccb8dc6`) on `main`.
+
+---
+
+## v2.5 Sprint — Updated Final Tally (May 10, 2026)
+
+**13 tickets shipped in 6 waves over three sessions.** Direct push to main, Alpha mode.
+
+| Wave | Tickets | Commits |
+|---|---|---|
+| 1 | BUG-MAY7-2, ENH-MAY6-4 | `6984701`, `fcd7351` |
+| 2 | ENH-MAY6-2, ENH-MAY6-10 | `5c6ef26`, `d22ceec` (+ `12cd36a`) |
+| 3 | ENH-MAY6-7, ENH-MAY6-5 | `657b2d3`, `6a5a462` |
+| 4 | ENH-MAY6-3, ENH-MAY6-1, ENH-MAY6-8 | `39f9e3e`, `99edada`, `f34500b` |
+| 5 | BUG-MAY6-4a | `0580aa6` |
+| 6 | BUG-MAY6-9, finalizeParentRollup wiring | `e48030d`, `ccb8dc6` |
+
+**Test count:** 964 → 1021 (+57 across the sprint).
