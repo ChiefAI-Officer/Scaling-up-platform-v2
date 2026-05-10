@@ -18,7 +18,10 @@ import {
   recordWorkflowExecution,
 } from "@/lib/workflows/record-workflow-execution";
 // ENH-MAY6-10: per-recipient child rows for the workflow execution audit.
-import { recordRecipientExecution } from "@/lib/workflows/recipient-execution";
+import {
+  recordRecipientExecution,
+  finalizeParentRollup,
+} from "@/lib/workflows/recipient-execution";
 import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
 import { orderStepsForExecution } from "@/lib/workflows/order-steps-for-execution";
 import { buildLocationString } from "@/lib/ics-generator";
@@ -394,6 +397,12 @@ export const executeWorkflow = inngest.createFunction(
                 ...(emailsSent === 0 ? { error: "No recipients at scheduled time" } : {}),
               });
 
+              // BUG-MAY6-9 / Wave 6 Tier B: roll parent up over actual children
+              // (FAILED > SENT > SKIPPED). No-op when no children exist.
+              if (executionId) {
+                await finalizeParentRollup(db, executionId);
+              }
+
               stepsExecuted++;
               return; // Skip the generic send below
             }
@@ -447,6 +456,21 @@ export const executeWorkflow = inngest.createFunction(
                 });
 
                 if (!surveyLink) {
+                  // BUG-MAY6-9 / Wave 6 Tier B: record per-recipient FAILED
+                  // child so ops sees the link-gen failure instead of a
+                  // silent skip. Gated on executionId — the immediate path
+                  // has no parent and is documented as a deferred Beta gap.
+                  if (executionId) {
+                    await recordRecipientExecution(db, {
+                      parentId: executionId,
+                      stepId: workflowStep.id,
+                      workshopId: workshop.id,
+                      registrationId: reg.id,
+                      recipientEmail: reg.email,
+                      status: "FAILED",
+                      errorMessage: "link_generation_failed",
+                    });
+                  }
                   continue;
                 }
 
@@ -517,6 +541,13 @@ export const executeWorkflow = inngest.createFunction(
                 executedAt: new Date(),
                 ...(sentCount === 0 ? { error: "No survey link could be generated" } : {}),
               });
+
+              // BUG-MAY6-9 / Wave 6 Tier B: parent rollup uses FAILED > SENT >
+              // SKIPPED precedence so a step with link-gen failures + sends
+              // surfaces as FAILED on the parent row.
+              if (executionId) {
+                await finalizeParentRollup(db, executionId);
+              }
 
               if (sentCount > 0) {
                 stepsExecuted++;
@@ -662,6 +693,14 @@ export const executeWorkflow = inngest.createFunction(
                 executedAt: new Date(),
                 ...(fileEmailsSent === 0 ? { error: "No recipients at scheduled time" } : {}),
               });
+
+              // BUG-MAY6-9 / Wave 6 Tier B: parent rollup. SEND_FILE_LINK
+              // throws on SMTP error so FAILED children only land via future
+              // SMTP error classification work — today this is a no-op when
+              // no children exist (matches existing behavior).
+              if (executionId) {
+                await finalizeParentRollup(db, executionId);
+              }
 
               if (fileEmailsSent > 0) stepsExecuted++;
               return;

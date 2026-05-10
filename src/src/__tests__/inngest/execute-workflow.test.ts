@@ -1543,4 +1543,77 @@ describe("execute-workflow Inngest function", () => {
       expect(executionUpdate).not.toHaveBeenCalled();
     });
   });
+
+  describe("BUG-MAY6-9 / Wave 6 Tier B: link-gen FAILED children + parent rollup", () => {
+    it("SEND_SURVEY_LINK with mixed link-gen failure: writes FAILED child for failing recipient and rolls parent up to FAILED", async () => {
+      const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      mockCalculateSendDate.mockReturnValue(futureDate);
+
+      const executionCreateMock = db.workflowStepExecution.create as jest.Mock;
+      const executionUpsertMock = db.workflowStepExecution.upsert as jest.Mock;
+      const executionFindManyMock = db.workflowStepExecution.findMany as jest.Mock;
+      const executionUpdateMock = db.workflowStepExecution.update as jest.Mock;
+
+      // Pre-loop SCHEDULED parent row id
+      executionCreateMock.mockResolvedValue({ id: "parent-1" });
+
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({
+            id: "step-survey",
+            stepType: "SEND_SURVEY_LINK",
+            triggerType: "RELATIVE_TO_EVENT",
+            offsetDays: -1,
+          }),
+        ],
+      });
+      findUnique.mockResolvedValue(assignment);
+      registrationFindMany.mockResolvedValue([
+        { id: "reg-1", email: "fail@test.com", firstName: "Fail", lastName: "User", company: "" },
+        { id: "reg-2", email: "ok@test.com", firstName: "OK", lastName: "User", company: "" },
+      ]);
+
+      // First recipient → null (link-gen failure); second → success
+      mockGetOrCreateSurveyLink
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ surveyId: "survey-2", surveyUrl: "https://app.test/s/2" });
+
+      // After children are written, finalizeParentRollup reads them
+      executionFindManyMock.mockResolvedValueOnce([
+        { status: "FAILED" },
+        { status: "SENT" },
+      ]);
+
+      await invoke();
+
+      // Per-recipient FAILED child write for the failing recipient
+      const failedUpsert = executionUpsertMock.mock.calls.find(
+        (call) =>
+          call[0]?.create?.status === "FAILED" &&
+          call[0]?.create?.errorMessage === "link_generation_failed"
+      );
+      expect(failedUpsert).toBeDefined();
+      expect(failedUpsert![0].create.recipientEmail).toBe("fail@test.com");
+      expect(failedUpsert![0].create.parentId).toBe("parent-1");
+
+      // Per-recipient SENT child write for the successful recipient (existing behavior)
+      const sentUpsert = executionUpsertMock.mock.calls.find(
+        (call) =>
+          call[0]?.create?.status === "SENT" &&
+          call[0]?.create?.recipientEmail === "ok@test.com"
+      );
+      expect(sentUpsert).toBeDefined();
+
+      // Parent rollup: findMany on children, then update parent to FAILED
+      expect(executionFindManyMock).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ parentId: "parent-1" }) })
+      );
+      const rollupUpdate = executionUpdateMock.mock.calls.find(
+        (call) =>
+          call[0]?.where?.id === "parent-1" &&
+          call[0]?.data?.status === "FAILED"
+      );
+      expect(rollupUpdate).toBeDefined();
+    });
+  });
 });
