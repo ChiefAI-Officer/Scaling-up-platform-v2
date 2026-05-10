@@ -66,6 +66,7 @@ export default async function CoachSurveyResultsPage({
         value: a.value,
         numValue: a.numValue,
       })),
+      registration: survey.registration ?? null,
     });
   }
 

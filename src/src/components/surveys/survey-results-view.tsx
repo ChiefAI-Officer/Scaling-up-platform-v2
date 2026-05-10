@@ -13,6 +13,21 @@ export interface SurveyResultAnswer {
 export interface SurveyResultResponse {
   id: string;
   answers: SurveyResultAnswer[];
+  // BUG-MAY6-9: per-survey respondent attribution. Optional so older callers
+  // and tests that don't pass registration still type-check.
+  registration?: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+}
+
+function formatRespondentLabel(
+  registration: SurveyResultResponse["registration"]
+): string {
+  if (!registration) return "Anonymous";
+  const fullName = `${registration.firstName} ${registration.lastName}`.trim();
+  return fullName || registration.email || "Anonymous";
 }
 
 export interface SurveyResultQuestion {
@@ -78,6 +93,26 @@ export function SurveyResultsView({
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* BUG-MAY6-9: who answered — pill panel at top of each template card */}
+                {group.responses.length > 0 && (
+                  <div className="rounded-lg border border-border/50 bg-muted/20 p-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                      Respondents ({group.responses.length})
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {group.responses.map((s) => (
+                        <span
+                          key={s.id}
+                          className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs text-foreground"
+                          title={s.registration?.email}
+                        >
+                          {formatRespondentLabel(s.registration)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {group.questions.map((question) => {
                   const allAnswers = group.responses.flatMap((s) =>
                     s.answers.filter((a) => a.questionId === question.id)
@@ -144,19 +179,40 @@ export function SurveyResultsView({
                       )}
 
                       {["TEXT", "TEXTAREA"].includes(question.questionType) && (
-                        <div className="space-y-1">
-                          {allAnswers.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No responses</p>
-                          ) : (
-                            allAnswers.map((answer) => (
-                              <p
-                                key={answer.id}
-                                className="text-sm text-foreground bg-muted px-3 py-2 rounded-md"
+                        <div className="space-y-2">
+                          {(() => {
+                            // BUG-MAY6-9: render per-response so we can attach
+                            // respondent attribution to each text answer.
+                            const entries = group.responses.flatMap((s) =>
+                              s.answers
+                                .filter((a) => a.questionId === question.id)
+                                .map((a) => ({
+                                  answerId: a.id,
+                                  value: a.value,
+                                  respondent: formatRespondentLabel(s.registration),
+                                }))
+                            );
+                            if (entries.length === 0) {
+                              return (
+                                <p className="text-sm text-muted-foreground">
+                                  No responses
+                                </p>
+                              );
+                            }
+                            return entries.map((entry) => (
+                              <div
+                                key={entry.answerId}
+                                className="rounded-md bg-muted px-3 py-2"
                               >
-                                {answer.value || "—"}
-                              </p>
-                            ))
-                          )}
+                                <p className="text-sm text-foreground whitespace-pre-wrap">
+                                  {entry.value || "—"}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  — {entry.respondent}
+                                </p>
+                              </div>
+                            ));
+                          })()}
                         </div>
                       )}
                     </div>

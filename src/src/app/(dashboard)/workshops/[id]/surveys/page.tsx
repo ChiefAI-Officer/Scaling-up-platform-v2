@@ -70,6 +70,7 @@ export default async function AdminSurveyResultsPage({
         value: a.value,
         numValue: a.numValue,
       })),
+      registration: survey.registration ?? null,
     });
   }
 
