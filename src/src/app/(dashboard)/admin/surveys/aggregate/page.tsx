@@ -14,28 +14,77 @@ import { getSurveyResults } from "@/lib/surveys/survey-service";
 import { SURVEY_TYPE_LABELS } from "@/lib/surveys/survey-types";
 import type { SurveyType } from "@/lib/surveys/survey-types";
 import { FadeUp } from "@/components/ui/animated";
+import { SurveyFilters } from "@/components/surveys/survey-filters";
 
 interface PageProps {
-  searchParams: Promise<{ templateId?: string }>;
+  searchParams: Promise<{
+    templateId?: string;
+    coachId?: string;
+    categoryId?: string;
+    workshopFormat?: string;
+    startDate?: string;
+    endDate?: string;
+    groupBy?: string;
+  }>;
 }
+
+type GroupByOpt = "coach" | "category" | "format" | "workshopType";
 
 export default async function AggregateSurveyResultsPage({ searchParams }: PageProps) {
   await requireAdmin();
-  const { templateId } = await searchParams;
+  const sp = await searchParams;
 
-  // Fetch all templates with response counts
-  const templates = await db.surveyTemplate.findMany({
-    where: { isActive: true },
-    include: {
-      _count: { select: { surveys: true } },
-      questions: { orderBy: { sortOrder: "asc" } },
-    },
-    orderBy: { name: "asc" },
-  });
+  // ENH-MAY6-9: parse + sanitize filter params into the shape getSurveyResults expects.
+  const startDate = sp.startDate ? new Date(sp.startDate) : undefined;
+  const endDate = sp.endDate ? new Date(sp.endDate) : undefined;
+  const validGroupBy: Set<GroupByOpt> = new Set([
+    "coach",
+    "category",
+    "format",
+    "workshopType",
+  ]);
+  const groupBy: GroupByOpt | undefined =
+    sp.groupBy && validGroupBy.has(sp.groupBy as GroupByOpt)
+      ? (sp.groupBy as GroupByOpt)
+      : undefined;
+  const validFormats = ["VIRTUAL", "IN_PERSON", "HYBRID"];
+  const workshopFormat =
+    sp.workshopFormat && validFormats.includes(sp.workshopFormat)
+      ? sp.workshopFormat
+      : undefined;
+
+  // Fetch templates + coach/category dropdown data
+  const [templates, coaches, categories] = await Promise.all([
+    db.surveyTemplate.findMany({
+      where: { isActive: true },
+      include: {
+        _count: { select: { surveys: true } },
+        questions: { orderBy: { sortOrder: "asc" } },
+      },
+      orderBy: { name: "asc" },
+    }),
+    db.coach.findMany({
+      select: { id: true, firstName: true, lastName: true },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    }),
+    db.category.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   // Get aggregated results for selected template (or first with responses)
-  const selectedId = templateId || templates.find((t) => t._count.surveys > 0)?.id;
-  const results = selectedId ? await getSurveyResults(selectedId) : null;
+  const selectedId = sp.templateId || templates.find((t) => t._count.surveys > 0)?.id;
+  const results = selectedId
+    ? await getSurveyResults(selectedId, {
+        coachId: sp.coachId,
+        categoryId: sp.categoryId,
+        workshopFormat,
+        startDate,
+        endDate,
+        groupBy,
+      })
+    : null;
 
   // Get per-workshop breakdown for the selected template
   let workshopBreakdown: Array<{
@@ -47,8 +96,25 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
   }> = [];
 
   if (selectedId) {
+    // Round 2 M7: the side breakdown query MUST receive the same filters as
+    // the main getSurveyResults query, otherwise summary cards and per-
+    // workshop breakdown disagree on totals.
+    const workshopSubFilter: Record<string, unknown> = {};
+    if (sp.coachId) workshopSubFilter.coachId = sp.coachId;
+    if (sp.categoryId) workshopSubFilter.categoryId = sp.categoryId;
+    if (workshopFormat) workshopSubFilter.format = workshopFormat;
+    const completedAtBoundary: Record<string, unknown> = { not: null };
+    if (startDate) completedAtBoundary.gte = startDate;
+    if (endDate) completedAtBoundary.lte = endDate;
+
     const surveys = await db.survey.findMany({
-      where: { templateId: selectedId, completedAt: { not: null } },
+      where: {
+        templateId: selectedId,
+        completedAt: completedAtBoundary,
+        ...(Object.keys(workshopSubFilter).length > 0
+          ? { workshop: workshopSubFilter }
+          : {}),
+      },
       select: {
         workshopId: true,
         npsScore: true,
@@ -119,6 +185,9 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
         ))}
       </div>
 
+      {/* ENH-MAY6-9: filters mirror Financials pattern */}
+      <SurveyFilters coaches={coaches} categories={categories} />
+
       {!results && (
         <div className="rounded-lg border-2 border-dashed border-border p-12 text-center">
           <h3 className="text-lg font-medium text-foreground">No survey data</h3>
@@ -147,6 +216,31 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
               <p className="mt-2 text-2xl font-semibold text-foreground">{workshopBreakdown.length}</p>
             </div>
           </div>
+
+          {/* ENH-MAY6-9: group-by breakdown */}
+          {results.groups && results.groups.length > 0 && (
+            <div className="rounded-xl border border-border bg-card p-5">
+              <h2 className="text-lg font-semibold text-foreground mb-3">
+                By {groupBy === "workshopType" ? "Workshop Type" : (groupBy ?? "").charAt(0).toUpperCase() + (groupBy ?? "").slice(1)}
+              </h2>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 font-medium text-muted-foreground">Group</th>
+                    <th className="text-right py-2 font-medium text-muted-foreground">Responses</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.groups.map((g) => (
+                    <tr key={g.key} className="border-b border-border last:border-0">
+                      <td className="py-2">{g.label}</td>
+                      <td className="text-right py-2">{g.responseCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Per-Question Stats */}
           <div className="space-y-4">

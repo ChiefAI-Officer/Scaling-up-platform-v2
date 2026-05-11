@@ -4,6 +4,7 @@
  * CRUD for survey templates, questions, and response handling.
  */
 
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { QuestionType, SurveyType } from "@/lib/surveys/survey-types";
 
@@ -246,18 +247,61 @@ export async function submitSurveyResponse(
 // Analytics / Aggregation
 // ============================================
 
-export async function getSurveyResults(templateId: string, workshopId?: string) {
-  const whereClause = {
+export interface SurveyResultsFilters {
+  workshopId?: string;
+  coachId?: string;
+  categoryId?: string;
+  workshopFormat?: string;
+  startDate?: Date;
+  endDate?: Date;
+  groupBy?: "coach" | "category" | "format" | "workshopType";
+}
+
+// Overload preserves the legacy 2-arg signature so existing callers don't break.
+export async function getSurveyResults(
+  templateId: string,
+  workshopIdOrFilters?: string | SurveyResultsFilters,
+) {
+  // Back-compat: 2-arg string form means filter by single workshopId.
+  const filters: SurveyResultsFilters =
+    typeof workshopIdOrFilters === "string"
+      ? { workshopId: workshopIdOrFilters }
+      : workshopIdOrFilters ?? {};
+
+  // ENH-MAY6-9: filters thread through the Workshop relation for coach,
+  // category, and format. Date range applies to Survey.completedAt directly.
+  const workshopFilter: Prisma.WorkshopWhereInput = {};
+  if (filters.coachId) workshopFilter.coachId = filters.coachId;
+  if (filters.categoryId) workshopFilter.categoryId = filters.categoryId;
+  if (filters.workshopFormat) workshopFilter.format = filters.workshopFormat;
+
+  const completedAtFilter: Prisma.DateTimeNullableFilter = { not: null };
+  if (filters.startDate) completedAtFilter.gte = filters.startDate;
+  if (filters.endDate) completedAtFilter.lte = filters.endDate;
+
+  const where: Prisma.SurveyWhereInput = {
     templateId,
-    completedAt: { not: null },
-    ...(workshopId ? { workshopId } : {}),
+    completedAt: completedAtFilter,
   };
+  if (filters.workshopId) where.workshopId = filters.workshopId;
+  if (Object.keys(workshopFilter).length > 0) where.workshop = workshopFilter;
 
   const surveys = await db.survey.findMany({
-    where: whereClause,
+    where,
     include: {
       answers: { include: { question: true } },
-      workshop: { select: { title: true, workshopCode: true } },
+      workshop: {
+        select: {
+          title: true,
+          workshopCode: true,
+          coachId: true,
+          categoryId: true,
+          format: true,
+          coach: { select: { firstName: true, lastName: true } },
+          workshopCategory: { select: { id: true, name: true } },
+          workshopType: { select: { id: true, name: true } },
+        },
+      },
       registration: { select: { firstName: true, lastName: true, email: true } },
     },
     orderBy: { completedAt: "desc" },
@@ -318,11 +362,56 @@ export async function getSurveyResults(templateId: string, workshopId?: string) 
     return stats;
   });
 
+  // ENH-MAY6-9: optional group-by breakdown.
+  type GroupBucket = { key: string; label: string; responseCount: number };
+  let groups: GroupBucket[] | undefined;
+  if (filters.groupBy) {
+    const buckets = new Map<string, GroupBucket>();
+    for (const s of surveys) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const w = (s as any).workshop;
+      if (!w) continue;
+      let key = "";
+      let label = "";
+      switch (filters.groupBy) {
+        case "coach":
+          key = w.coachId ?? "";
+          label = w.coach
+            ? `${w.coach.firstName ?? ""} ${w.coach.lastName ?? ""}`.trim() || key
+            : key;
+          break;
+        case "category":
+          key = w.categoryId ?? "uncategorized";
+          label = w.workshopCategory?.name ?? "Uncategorized";
+          break;
+        case "format":
+          key = w.format ?? "unknown";
+          label = key;
+          break;
+        case "workshopType":
+          key = w.workshopType?.id ?? "untyped";
+          label = w.workshopType?.name ?? "Untyped";
+          break;
+      }
+      if (!key) continue;
+      const existing = buckets.get(key);
+      if (existing) {
+        existing.responseCount += 1;
+      } else {
+        buckets.set(key, { key, label, responseCount: 1 });
+      }
+    }
+    groups = Array.from(buckets.values()).sort(
+      (a, b) => b.responseCount - a.responseCount,
+    );
+  }
+
   return {
     templateName: template.name,
     surveyType: template.surveyType,
     totalResponses: surveys.length,
     questionStats,
     responses: surveys,
+    groups,
   };
 }
