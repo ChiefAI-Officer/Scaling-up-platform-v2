@@ -157,3 +157,66 @@ describe("interpolateCustomCode — token substitution", () => {
         expect(out).not.toContain("onerror=");
     });
 });
+
+describe("validateCustomCode — AFFILIATE_PIXEL_HOSTS env var (ENH-MAY6-6)", () => {
+    const ORIGINAL = process.env.AFFILIATE_PIXEL_HOSTS;
+
+    afterEach(() => {
+        jest.resetModules();
+        if (ORIGINAL === undefined) {
+            delete process.env.AFFILIATE_PIXEL_HOSTS;
+        } else {
+            process.env.AFFILIATE_PIXEL_HOSTS = ORIGINAL;
+        }
+    });
+
+    function freshValidator() {
+        jest.resetModules();
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        return require("@/lib/templates/interpolate-custom-code") as typeof import("@/lib/templates/interpolate-custom-code");
+    }
+
+    it("falls back to scalingup.idevaffiliate.com when env unset", () => {
+        delete process.env.AFFILIATE_PIXEL_HOSTS;
+        const { validateCustomCode } = freshValidator();
+        const ok = validateCustomCode(
+            `<img src="https://scalingup.idevaffiliate.com/sale.php?profile=72198">`
+        );
+        expect(ok).toEqual({ valid: true });
+    });
+
+    it("uses single env host (rejects the old iDev host when overridden)", () => {
+        process.env.AFFILIATE_PIXEL_HOSTS = "trackdesk.example.com";
+        const { validateCustomCode } = freshValidator();
+        const rejected = validateCustomCode(
+            `<img src="https://scalingup.idevaffiliate.com/sale.php?profile=72198">`
+        );
+        expect(rejected).toMatchObject({ valid: false });
+        const allowed = validateCustomCode(
+            `<img src="https://trackdesk.example.com/track.png">`
+        );
+        expect(allowed).toEqual({ valid: true });
+    });
+
+    it("supports comma-separated multi-host list with whitespace tolerance", () => {
+        process.env.AFFILIATE_PIXEL_HOSTS = "  a.example.com , b.example.com  ";
+        const { validateCustomCode } = freshValidator();
+        expect(validateCustomCode(`<img src="https://a.example.com/x.png">`)).toEqual({
+            valid: true,
+        });
+        expect(validateCustomCode(`<img src="https://b.example.com/y.png">`)).toEqual({
+            valid: true,
+        });
+        expect(validateCustomCode(`<img src="https://c.example.com/z.png">`)).toMatchObject({
+            valid: false,
+        });
+    });
+
+    it("is case-insensitive on host comparison", () => {
+        process.env.AFFILIATE_PIXEL_HOSTS = "AFFILIATE.Example.COM";
+        const { validateCustomCode } = freshValidator();
+        expect(validateCustomCode(`<img src="https://affiliate.example.com/x">`)).toEqual({
+            valid: true,
+        });
+    });
+});

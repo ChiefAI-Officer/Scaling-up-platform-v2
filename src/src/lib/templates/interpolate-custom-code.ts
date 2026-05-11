@@ -28,7 +28,34 @@ type ChildNode = DefaultTreeAdapterMap["childNode"];
 
 export type ValidationResult = { valid: true } | { valid: false; error: string };
 
-const ALLOWED_HOSTS = new Set<string>(["scalingup.idevaffiliate.com"]);
+// ENH-MAY6-6: affiliate-pixel host allowlist is env-driven so swapping providers
+// is a Vercel env change, not a code change. Comma-separated, whitespace-tolerant,
+// lowercased. Falls back to the historical iDev host in both dev and prod when
+// AFFILIATE_PIXEL_HOSTS is unset — logs a one-time `console.warn` in prod so the
+// operator sees a deprecation breadcrumb (do NOT throw — would brick cold starts
+// if the env var was pushed after the code deploy).
+const DEFAULT_AFFILIATE_HOSTS = ["scalingup.idevaffiliate.com"];
+
+let envFallbackWarned = false;
+
+function getAllowedHosts(): Set<string> {
+    const raw = process.env.AFFILIATE_PIXEL_HOSTS;
+    if (!raw || raw.trim().length === 0) {
+        if (process.env.NODE_ENV === "production" && !envFallbackWarned) {
+            console.warn(
+                "[affiliate] AFFILIATE_PIXEL_HOSTS unset in production; falling back to default host. Set the env var to swap providers."
+            );
+            envFallbackWarned = true;
+        }
+        return new Set(DEFAULT_AFFILIATE_HOSTS);
+    }
+    const parts = raw
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => s.length > 0);
+    return new Set(parts.length > 0 ? parts : DEFAULT_AFFILIATE_HOSTS);
+}
+
 const ALLOWED_ATTRS = new Set<string>(["src", "width", "height", "alt"]);
 
 function isElement(node: ChildNode): node is Element {
@@ -104,10 +131,11 @@ function validateNode(node: ChildNode): ValidationResult {
                     error: "src must use https:// (the production CSP and the page itself reject http://).",
                 };
             }
-            if (!ALLOWED_HOSTS.has(url.host)) {
+            const allowedHosts = getAllowedHosts();
+            if (!allowedHosts.has(url.host.toLowerCase())) {
                 return {
                     valid: false,
-                    error: `host "${url.host}" isn't on the iDev allowlist.`,
+                    error: `host "${url.host}" isn't on the affiliate allowlist.`,
                 };
             }
         }
