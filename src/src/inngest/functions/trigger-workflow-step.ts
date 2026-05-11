@@ -16,6 +16,10 @@ import {
 } from "@/lib/workflows/workflow-service";
 import { STEP_TYPES, TRIGGER_TYPES } from "@/lib/workflows/workflow-types";
 import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
+import {
+    recordRecipientExecution,
+    finalizeParentRollup,
+} from "@/lib/workflows/recipient-execution";
 import { buildLocationString } from "@/lib/ics-generator";
 import {
     buildProtectedEmailAttachments,
@@ -357,6 +361,21 @@ export const triggerWorkflowStep = inngest.createFunction(
                         return;
                     }
 
+                    // Wave 6 follow-on: pre-create the parent row before the
+                    // loop so per-recipient child rows have a parentId to
+                    // attach to (parity with execute-workflow.ts's pre-loop
+                    // scheduleWorkflowExecution path).
+                    const parentRow = await db.workflowStepExecution.create({
+                        data: {
+                            stepId: workflowStep.id,
+                            workshopId: workshop.id,
+                            status: "SCHEDULED",
+                            scheduledFor: new Date(),
+                        },
+                        select: { id: true },
+                    });
+                    const parentId = parentRow.id;
+
                     const surveyType = resolveSurveyType(workflowStep);
                     let sentCount = 0;
                     for (const reg of registrations) {
@@ -367,7 +386,21 @@ export const triggerWorkflowStep = inngest.createFunction(
                             templateId: workflowStep.surveyTemplateId ?? undefined,
                         });
 
-                        if (!surveyLink) continue;
+                        if (!surveyLink) {
+                            // Wave 6 follow-on: per-recipient FAILED child
+                            // row so the on-call manual repro produces the
+                            // same evidence as a scheduled fire.
+                            await recordRecipientExecution(db, {
+                                parentId,
+                                stepId: workflowStep.id,
+                                workshopId: workshop.id,
+                                registrationId: reg.id,
+                                recipientEmail: reg.email,
+                                status: "FAILED",
+                                errorMessage: "link_generation_failed",
+                            });
+                            continue;
+                        }
 
                         const personalContext: WorkflowContext = {
                             ...baseContext,
@@ -415,6 +448,15 @@ export const triggerWorkflowStep = inngest.createFunction(
                                 },
                             });
                             sentCount++;
+                            // Wave 6 follow-on: per-recipient SENT child row.
+                            await recordRecipientExecution(db, {
+                                parentId,
+                                stepId: workflowStep.id,
+                                workshopId: workshop.id,
+                                registrationId: reg.id,
+                                recipientEmail: reg.email,
+                                status: "SENT",
+                            });
                         } catch (smtpErr) {
                             const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
                             const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
@@ -423,13 +465,13 @@ export const triggerWorkflowStep = inngest.createFunction(
                                 // Transient error — let Inngest retry
                                 throw smtpErr;
                             }
-                            // Terminal auth error — record FAILED and stop retrying
-                            await db.workflowStepExecution.create({
+                            // Terminal auth error — transition the existing
+                            // parent row to FAILED (Wave 6 follow-on: was a
+                            // second create()).
+                            await db.workflowStepExecution.update({
+                                where: { id: parentId },
                                 data: {
-                                    stepId: workflowStep.id,
-                                    workshopId: workshop.id,
                                     status: "FAILED",
-                                    scheduledFor: new Date(),
                                     executedAt: new Date(),
                                     errorMessage: msg || "SMTP send failed",
                                 },
@@ -438,12 +480,12 @@ export const triggerWorkflowStep = inngest.createFunction(
                         }
                     }
 
-                    await db.workflowStepExecution.create({
+                    // Wave 6 follow-on: transition the pre-created parent row
+                    // to its terminal status via update (was a second create()).
+                    await db.workflowStepExecution.update({
+                        where: { id: parentId },
                         data: {
-                            stepId: workflowStep.id,
-                            workshopId: workshop.id,
                             status: sentCount > 0 ? "SENT" : "SKIPPED",
-                            scheduledFor: new Date(),
                             executedAt: new Date(),
                             ...(sentCount === 0
                                 ? {
@@ -453,6 +495,11 @@ export const triggerWorkflowStep = inngest.createFunction(
                                 : {}),
                         },
                     });
+
+                    // Roll the parent up over actual children (FAILED > SENT
+                    // > SKIPPED). With link-gen FAILED children present, a
+                    // partial-failure step surfaces as FAILED on the parent.
+                    await finalizeParentRollup(db, parentId);
                     return;
                 }
 

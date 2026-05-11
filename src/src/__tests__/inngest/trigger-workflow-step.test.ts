@@ -14,7 +14,14 @@
 
 jest.mock("@/lib/db", () => ({
     db: {
-        workflowStepExecution: { findFirst: jest.fn(), create: jest.fn() },
+        workflowStepExecution: {
+            findFirst: jest.fn(),
+            create: jest.fn(),
+            // Wave 6 follow-on: Trigger Now per-recipient parity needs these.
+            update: jest.fn(async () => ({ id: "exec-1" })),
+            upsert: jest.fn(async () => ({ id: "child-1" })),
+            findMany: jest.fn(async () => []),
+        },
         workflowStep: { findUnique: jest.fn() },
         workshop: { findUnique: jest.fn() },
         registration: { findMany: jest.fn() },
@@ -470,11 +477,15 @@ describe("triggerWorkflowStep Inngest function", () => {
                 { id: "reg-1", email: "alice@example.com", firstName: "Alice", lastName: "A", company: "Acme" },
             ]);
             (getOrCreateSurveyLink as jest.Mock).mockResolvedValue(null);
+            // Wave 6 follow-on: parent row is pre-created with SCHEDULED, then
+            // updated to terminal status via update().
+            (db.workflowStepExecution.create as jest.Mock).mockResolvedValueOnce({ id: "parent-skip" });
 
             await capturedHandler({ event: buildEvent(), step: mockStep });
 
-            expect(db.workflowStepExecution.create).toHaveBeenCalledWith(
+            expect(db.workflowStepExecution.update).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    where: { id: "parent-skip" },
                     data: expect.objectContaining({ status: "SKIPPED" }),
                 })
             );
@@ -499,12 +510,15 @@ describe("triggerWorkflowStep Inngest function", () => {
                 surveyUrl: "https://example.com/survey/1",
                 surveyType: "PRE_WORKSHOP",
             });
+            // Wave 6 follow-on: parent row pre-created SCHEDULED, updated to SENT.
+            (db.workflowStepExecution.create as jest.Mock).mockResolvedValueOnce({ id: "parent-sent" });
 
             await capturedHandler({ event: buildEvent(), step: mockStep });
 
             expect(sendEmailViaSMTP).toHaveBeenCalledTimes(2);
-            expect(db.workflowStepExecution.create).toHaveBeenCalledWith(
+            expect(db.workflowStepExecution.update).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    where: { id: "parent-sent" },
                     data: expect.objectContaining({ status: "SENT" }),
                 })
             );
@@ -550,12 +564,15 @@ describe("triggerWorkflowStep Inngest function", () => {
                 { id: "reg-1", email: "alice@example.com", firstName: "A", lastName: "B", company: "" },
             ]);
             (getOrCreateSurveyLink as jest.Mock).mockResolvedValue(null);
+            // Wave 6 follow-on: parent pre-created SCHEDULED, updated to SKIPPED.
+            (db.workflowStepExecution.create as jest.Mock).mockResolvedValueOnce({ id: "parent-linkfail" });
 
             await capturedHandler({ event: buildEvent(), step: mockStep });
 
             expect(sendEmailViaSMTP).not.toHaveBeenCalled();
-            expect(db.workflowStepExecution.create).toHaveBeenCalledWith(
+            expect(db.workflowStepExecution.update).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    where: { id: "parent-linkfail" },
                     data: expect.objectContaining({
                         status: "SKIPPED",
                         errorMessage: "No survey link could be generated",
@@ -655,6 +672,112 @@ describe("triggerWorkflowStep Inngest function", () => {
                 expect(ctx.workshopDate).toContain("15");
                 expect(ctx.workshopDate).not.toContain("June");
             }
+        });
+    });
+
+    // ----------------------------------------------------------------
+    // Wave 6 follow-on: per-recipient parity with execute-workflow.ts
+    // ----------------------------------------------------------------
+    describe("Trigger Now per-recipient parity (Wave 6 follow-on)", () => {
+        beforeEach(() => {
+            (db.workflowStepExecution.create as jest.Mock).mockResolvedValue({ id: "parent-trig-1" });
+            (db.workflowStepExecution.update as jest.Mock).mockResolvedValue({ id: "parent-trig-1" });
+            (db.workflowStepExecution.upsert as jest.Mock).mockClear();
+            (db.workflowStepExecution.findMany as jest.Mock).mockReset().mockResolvedValue([]);
+            (db.workflowStepExecution.findFirst as jest.Mock).mockResolvedValue(null);
+        });
+
+        async function invokeSurvey() {
+            (db.workflowStep.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkflowStep({ stepType: "SEND_SURVEY_LINK", triggerType: "ON_REGISTRATION" })
+            );
+            (db.workshop.findUnique as jest.Mock).mockResolvedValue(makeWorkshop());
+            return capturedHandler({ event: buildEvent(), step: mockStep });
+        }
+
+        it("SEND_SURVEY_LINK: pre-creates parent (SCHEDULED) before the recipient loop", async () => {
+            (db.registration.findMany as jest.Mock).mockResolvedValue([
+                { id: "reg-1", email: "ok@test.com", firstName: "OK", lastName: "User", company: "" },
+            ]);
+            const { getOrCreateSurveyLink } = await import("@/lib/surveys/survey-automation");
+            (getOrCreateSurveyLink as jest.Mock).mockResolvedValue({
+                surveyId: "s1", surveyUrl: "https://app.test/s/1",
+            });
+
+            await invokeSurvey();
+
+            // Parent row pre-created with SCHEDULED status (not the final post-loop create)
+            const scheduledCreate = (db.workflowStepExecution.create as jest.Mock).mock.calls.find(
+                (call) => call[0]?.data?.status === "SCHEDULED"
+            );
+            expect(scheduledCreate).toBeDefined();
+            expect(scheduledCreate![0].data.stepId).toBe("step-1");
+            expect(scheduledCreate![0].data.workshopId).toBe("ws-1");
+        });
+
+        it("SEND_SURVEY_LINK: link-gen null writes FAILED per-recipient child row + continues", async () => {
+            (db.registration.findMany as jest.Mock).mockResolvedValue([
+                { id: "reg-fail", email: "fail@test.com", firstName: "Fail", lastName: "User", company: "" },
+                { id: "reg-ok", email: "ok@test.com", firstName: "OK", lastName: "User", company: "" },
+            ]);
+            const { getOrCreateSurveyLink } = await import("@/lib/surveys/survey-automation");
+            (getOrCreateSurveyLink as jest.Mock)
+                .mockResolvedValueOnce(null)
+                .mockResolvedValueOnce({ surveyId: "s2", surveyUrl: "https://app.test/s/2" });
+
+            await invokeSurvey();
+
+            // FAILED child for the link-gen failure
+            const failedUpsert = (db.workflowStepExecution.upsert as jest.Mock).mock.calls.find(
+                (call) =>
+                    call[0]?.create?.status === "FAILED" &&
+                    call[0]?.create?.errorMessage === "link_generation_failed"
+            );
+            expect(failedUpsert).toBeDefined();
+            expect(failedUpsert![0].create.parentId).toBe("parent-trig-1");
+            expect(failedUpsert![0].create.recipientEmail).toBe("fail@test.com");
+
+            // SENT child for the successful recipient
+            const sentUpsert = (db.workflowStepExecution.upsert as jest.Mock).mock.calls.find(
+                (call) =>
+                    call[0]?.create?.status === "SENT" &&
+                    call[0]?.create?.recipientEmail === "ok@test.com"
+            );
+            expect(sentUpsert).toBeDefined();
+            expect(sentUpsert![0].create.parentId).toBe("parent-trig-1");
+        });
+
+        it("SEND_SURVEY_LINK: post-loop transitions parent SCHEDULED → terminal via update (not new create); calls finalizeParentRollup", async () => {
+            (db.registration.findMany as jest.Mock).mockResolvedValue([
+                { id: "reg-1", email: "ok@test.com", firstName: "OK", lastName: "User", company: "" },
+            ]);
+            const { getOrCreateSurveyLink } = await import("@/lib/surveys/survey-automation");
+            (getOrCreateSurveyLink as jest.Mock).mockResolvedValue({
+                surveyId: "s1", surveyUrl: "https://app.test/s/1",
+            });
+            // Rollup read: single SENT child → parent rolls up to SENT
+            (db.workflowStepExecution.findMany as jest.Mock).mockResolvedValueOnce([
+                { status: "SENT" },
+            ]);
+
+            await invokeSurvey();
+
+            // Parent transitioned via update, not a second create
+            const updateCall = (db.workflowStepExecution.update as jest.Mock).mock.calls.find(
+                (call) => call[0]?.where?.id === "parent-trig-1"
+            );
+            expect(updateCall).toBeDefined();
+
+            // Only ONE create on the parent (the initial SCHEDULED) — not two
+            const parentCreates = (db.workflowStepExecution.create as jest.Mock).mock.calls.filter(
+                (call) => call[0]?.data?.stepId === "step-1" && !call[0]?.data?.parentId
+            );
+            expect(parentCreates).toHaveLength(1);
+
+            // Rollup read fired against the parent id
+            expect(db.workflowStepExecution.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({ where: expect.objectContaining({ parentId: "parent-trig-1" }) })
+            );
         });
     });
 });
