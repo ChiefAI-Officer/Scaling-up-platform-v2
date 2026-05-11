@@ -10,7 +10,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Client, FilterOperatorEnum } from "@hubspot/api-client";
+import { Client } from "@hubspot/api-client";
+import { FilterOperatorEnum } from "@hubspot/api-client/lib/codegen/crm/contacts";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { lookupHubSpotContact } from "@/services/hubspot";
 
