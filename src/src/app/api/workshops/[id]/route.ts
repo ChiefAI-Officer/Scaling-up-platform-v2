@@ -7,7 +7,7 @@ import { chargeCancellationFee, createWorkshopPromotionCode } from "@/services/s
 import { buildWorkshopVariables, interpolateContent, rewriteIdentityFields } from "@/lib/templates/template-interpolation";
 import { sendCustomPriceChangeEmail } from "@/services/notifications";
 import { formatApprovalMessage } from "@/lib/approvals/approval-thread";
-import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
+import { parseStoredWorkshopCoupons, parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 import { inngest } from "@/inngest/client";
 import { parseDurationHours } from "@/lib/ics-generator";
 import { cancelWorkflowExecutions } from "@/lib/workflows/workflow-service";
@@ -345,6 +345,69 @@ export async function PATCH(
       }
     }
 
+    // Sync coupons to Stripe BEFORE writing to DB so the returned
+    // stripePromotionCodeId can be persisted in the same workshop.update.
+    // Without this the checkout-time validator can't match redeemed codes
+    // against the workshop allowlist (validation reads stripePromotionCodeId
+    // from Workshop.coupons).
+    const stripeErrors: string[] = [];
+    if (parsedCoupons !== undefined) {
+      if (!existing.workshopCode) {
+        if (parsedCoupons.length > 0) {
+          stripeErrors.push("Workshop code is missing — coupons saved to DB but not synced to Stripe.");
+        }
+      } else if (parsedCoupons.length > 0) {
+        // Reuse existing Stripe IDs when the coupon's economic shape is unchanged,
+        // so re-saving the workshop doesn't orphan a new promotion code in Stripe
+        // on every PATCH.
+        const previousCoupons = parseStoredWorkshopCoupons(existing.coupons);
+        const previousByCode = new Map(previousCoupons.map((c) => [c.code, c]));
+
+        const results = await Promise.allSettled(
+          parsedCoupons.map(async (coupon) => {
+            const previous = previousByCode.get(coupon.code);
+            const economicShapeMatches =
+              previous &&
+              previous.stripePromotionCodeId &&
+              previous.discountType === coupon.discountType &&
+              previous.discountPercent === coupon.discountPercent &&
+              previous.discountAmountCents === coupon.discountAmountCents &&
+              previous.singleUse === coupon.singleUse;
+            if (economicShapeMatches) {
+              return {
+                stripeCouponId: previous.stripeCouponId ?? null,
+                stripePromotionCodeId: previous.stripePromotionCodeId ?? null,
+              };
+            }
+            return createWorkshopPromotionCode({
+              workshopCode: existing.workshopCode ?? "",
+              workshopTitle: existing.title,
+              code: coupon.code,
+              discountType: coupon.discountType,
+              discountPercent: coupon.discountPercent,
+              discountAmountCents: coupon.discountAmountCents,
+              singleUse: coupon.singleUse,
+            });
+          })
+        );
+
+        parsedCoupons = parsedCoupons.map((coupon, i) => {
+          const result = results[i];
+          if (result.status === "fulfilled") {
+            return {
+              ...coupon,
+              stripeCouponId: result.value.stripeCouponId ?? null,
+              stripePromotionCodeId: result.value.stripePromotionCodeId ?? null,
+            };
+          }
+          const msg = `Coupon "${coupon.code}" failed to sync to Stripe: ${(result.reason as Error)?.message ?? "unknown error"}`;
+          console.error("[coupon-sync]", msg);
+          stripeErrors.push(msg);
+          return coupon;
+        });
+      }
+    }
+
     const workshop = await db.workshop.update({
       where: { id },
       data: {
@@ -416,34 +479,6 @@ export async function PATCH(
         console.error("[PATCH /workshops] Failed to emit workshop/date-changed:", err);
         // Non-blocking: workshop update still succeeds.
       }
-    }
-
-    // Sync coupons to Stripe (non-blocking — DB save already succeeded)
-    const stripeErrors: string[] = [];
-    if (!existing.workshopCode) {
-      stripeErrors.push("Workshop code is missing — coupons saved to DB but not synced to Stripe.");
-    } else if (parsedCoupons !== undefined && parsedCoupons.length > 0) {
-      const results = await Promise.allSettled(
-        parsedCoupons.map((coupon) =>
-          createWorkshopPromotionCode({
-            workshopCode: existing.workshopCode ?? "",
-            workshopTitle: existing.title,
-            code: coupon.code,
-            // ENH-MAY6-7: discriminated discount type — PERCENT vs AMOUNT.
-            discountType: coupon.discountType,
-            discountPercent: coupon.discountPercent,
-            discountAmountCents: coupon.discountAmountCents,
-            singleUse: coupon.singleUse,
-          })
-        )
-      );
-      results.forEach((result, i) => {
-        if (result.status === "rejected") {
-          const msg = `Coupon "${parsedCoupons[i].code}" failed to sync to Stripe: ${(result.reason as Error)?.message ?? "unknown error"}`;
-          console.error("[coupon-sync]", msg);
-          stripeErrors.push(msg);
-        }
-      });
     }
 
     return NextResponse.json({
