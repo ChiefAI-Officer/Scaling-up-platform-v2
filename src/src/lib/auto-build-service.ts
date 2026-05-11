@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { buildWorkshopVariables, interpolateContent, templateHasPlaceholders, findRemainingPlaceholders } from "@/lib/templates/template-interpolation";
 import { sendWorkshopBuiltEmail } from "@/services/notifications";
 import { inngest } from "@/inngest/client";
+import { findAutoAttachWorkflow } from "@/lib/workflows/find-auto-attach-workflow";
 
 export interface AutoBuildResult {
     success: boolean;
@@ -289,20 +290,24 @@ async function assignWorkflow(
     workshop: WorkshopForAssignment,
     phase: "PRE_EVENT" | "POST_EVENT"
 ): Promise<{ name: string; assignmentId: string } | null> {
-    const workflow = await db.workflow.findFirst({
+    // BUG-MAY6-2: Fetch all eligible templates (small cardinality), then rank
+    // in code. The previous Prisma findFirst path treated categoryId as hard
+    // equality (so wildcard-category workflows never matched a categoried
+    // workshop) and relied on `orderBy: { workshopFormat: "desc" }` for
+    // specificity — but Postgres' default null ordering for DESC is NULLS
+    // FIRST, so wildcard format actually beat specific format. See
+    // lib/workflows/find-auto-attach-workflow.ts.
+    const candidates = await db.workflow.findMany({
         where: {
             isActive: true,
+            isTemplate: true, // only auto-attach templates, never customized clones
             workflowPhase: phase,
-            ...(workshop.workshopCategory?.id ? { categoryId: workshop.workshopCategory.id } : {}),
-            OR: [
-                { workshopFormat: workshop.format },
-                { workshopFormat: null },
-            ],
         },
-        orderBy: [
-            { workshopFormat: "desc" },
-            { updatedAt: "desc" },
-        ],
+    });
+
+    const workflow = findAutoAttachWorkflow(candidates, {
+        workshopCategoryId: workshop.workshopCategory?.id ?? null,
+        workshopFormat: workshop.format,
     });
 
     if (!workflow) return null;

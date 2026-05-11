@@ -25,6 +25,7 @@ jest.mock("@/lib/db", () => ({
     },
     workflow: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
     },
     workflowAssignment: {
       findUnique: jest.fn(),
@@ -116,7 +117,8 @@ function setupSuccessScenario() {
   (db.pageTemplate.findMany as jest.Mock).mockResolvedValue(mockTemplates);
   (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null); // no existing pages
   (db.landingPage.create as jest.Mock).mockResolvedValue({ id: "lp-new" });
-  (db.workflow.findFirst as jest.Mock).mockResolvedValue(null); // no workflows
+  (db.workflow.findFirst as jest.Mock).mockResolvedValue(null); // no workflows (legacy)
+  (db.workflow.findMany as jest.Mock).mockResolvedValue([]); // no workflow candidates
   (db.landingPage.findFirst as jest.Mock).mockResolvedValue({ slug: "test-solo-slug" });
   (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
   (db.workshop.updateMany as jest.Mock).mockResolvedValue({ count: 1 }); // email claim succeeds
@@ -195,10 +197,34 @@ describe("runAutoBuild", () => {
     (db.landingPage.findFirst as jest.Mock).mockResolvedValue({ slug: "test-slug" });
     (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
 
-    // Mock workflows exist
-    (db.workflow.findFirst as jest.Mock)
-      .mockResolvedValueOnce({ id: "wf-pre", name: "Pre-Event Sequence", isActive: true })
-      .mockResolvedValueOnce({ id: "wf-post", name: "Post-Event Follow Up", isActive: true });
+    // Mock workflows exist — assignWorkflow now fetches templates via findMany
+    // and ranks in code via findAutoAttachWorkflow. Provide one PRE_EVENT and
+    // one POST_EVENT candidate, both wildcard category/format so they match
+    // any workshop.
+    const baseUpdatedAt = new Date("2026-05-01T00:00:00Z");
+    (db.workflow.findMany as jest.Mock)
+      .mockResolvedValueOnce([
+        {
+          id: "wf-pre",
+          name: "Pre-Event Sequence",
+          isActive: true,
+          isTemplate: true,
+          categoryId: null,
+          workshopFormat: null,
+          updatedAt: baseUpdatedAt,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "wf-post",
+          name: "Post-Event Follow Up",
+          isActive: true,
+          isTemplate: true,
+          categoryId: null,
+          workshopFormat: null,
+          updatedAt: baseUpdatedAt,
+        },
+      ]);
     (db.workflowAssignment.findUnique as jest.Mock).mockResolvedValue(null); // not already assigned
     (db.workflowAssignment.create as jest.Mock)
       .mockResolvedValueOnce({ id: "wa-1" })

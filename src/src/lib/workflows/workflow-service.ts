@@ -8,6 +8,7 @@
 import { db } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import type { StepType, TriggerType } from "@/lib/workflows/workflow-types";
+import { setWallClockInTimezone } from "@/lib/workflows/resolve-event-start-moment";
 
 // ============================================
 // Types
@@ -314,7 +315,14 @@ export function calculateSendDate(
   // Skip when offsetHours is set — hour offsets are relative to event start time
   if (sendTimeOfDay && !offsetHours) {
     const [hours, minutes] = sendTimeOfDay.split(":").map(Number);
-    sendDate.setHours(hours, minutes, 0, 0);
+    if (timezone) {
+      // BUG-MAY6-3: Honor the workshop's timezone. Pre-fix this used
+      // sendDate.setHours which is server-local — UTC on Vercel — so
+      // "09:00" fired at 09:00 UTC = 4–5 AM Eastern. Now we resolve the
+      // wall-clock 09:00 in the workshop's IANA zone to a UTC moment.
+      return setWallClockInTimezone(sendDate, timezone, hours, minutes);
+    }
+    sendDate.setUTCHours(hours, minutes, 0, 0);
   }
 
   return sendDate;

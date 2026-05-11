@@ -51,6 +51,39 @@ function parseStartTime(raw: string | null | undefined): { hour: number; minute:
 }
 
 /**
+ * BUG-MAY6-3: Given an existing UTC Date and a target wall-clock time
+ * (hours/minutes) in an IANA timezone, return a new UTC Date whose local
+ * time IN THAT TIMEZONE is the requested hour/minute on the same calendar
+ * date the original Date represents in the timezone.
+ *
+ * Used by calculateSendDate to honor sendTimeOfDay (e.g., "09:00") relative
+ * to the workshop's timezone instead of the server's local time.
+ */
+export function setWallClockInTimezone(
+  date: Date,
+  timezone: string,
+  hour: number,
+  minute: number,
+): Date {
+  // Extract the calendar Y-M-D in the target timezone (the date may differ
+  // from the UTC date when the wall-clock time-of-day has been adjusted).
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    fmt.formatToParts(date).map((p) => [p.type, p.value])
+  );
+  const year = parseInt(parts.year, 10);
+  const month = parseInt(parts.month, 10);
+  const day = parseInt(parts.day, 10);
+
+  return zonedWallClockToUtc(year, month, day, hour, minute, timezone);
+}
+
+/**
  * Given a wall-clock moment (year/month/day/hour/minute) in a specific IANA
  * timezone, return the corresponding UTC Date. Handles DST transitions via
  * Intl.DateTimeFormat (the platform's tzdata).

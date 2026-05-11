@@ -21,15 +21,14 @@ describe("calculateSendDate", () => {
     expect(result.getTime()).toBe(new Date("2026-06-14T14:00:00Z").getTime());
   });
 
-  it("days offset with sendTimeOfDay='09:00' overrides time to 09:00", () => {
+  it("days offset with sendTimeOfDay='09:00' and no timezone arg overrides time to UTC 09:00", () => {
+    // BUG-MAY6-3: when timezone is omitted, sendTimeOfDay is interpreted as UTC.
+    // Pre-fix this used local setHours, which made the test server-TZ-dependent.
+    // Production (Vercel) is UTC so behavior is unchanged there.
     const result = calculateSendDate(eventDate, -1, null, "09:00");
-    // Should be June 14 at 09:00 (local time — setHours uses local)
-    const expected = new Date("2026-06-14T14:00:00Z");
-    expected.setDate(expected.getDate()); // June 14
-    // Re-derive: eventDate - 1 day = June 14 14:00 UTC, then setHours(9,0,0,0) in local
     const manualExpected = new Date(eventDate);
-    manualExpected.setDate(manualExpected.getDate() - 1);
-    manualExpected.setHours(9, 0, 0, 0);
+    manualExpected.setUTCDate(manualExpected.getUTCDate() - 1);
+    manualExpected.setUTCHours(9, 0, 0, 0);
     expect(result.getTime()).toBe(manualExpected.getTime());
   });
 
@@ -90,19 +89,20 @@ describe("calculateSendDate", () => {
 
   // ---- Edge cases ----
 
-  it("zero offsetHours with sendTimeOfDay still applies sendTimeOfDay", () => {
-    // offsetHours=0 is falsy, so sendTimeOfDay should still be applied
+  it("zero offsetHours with sendTimeOfDay still applies sendTimeOfDay (UTC when no timezone arg)", () => {
+    // offsetHours=0 is falsy, so sendTimeOfDay should still be applied. With
+    // no timezone arg the time is interpreted as UTC (BUG-MAY6-3).
     const result = calculateSendDate(eventDate, 0, 0, "09:00");
     const expected = new Date(eventDate);
-    expected.setHours(9, 0, 0, 0);
+    expected.setUTCHours(9, 0, 0, 0);
     expect(result.getTime()).toBe(expected.getTime());
   });
 
-  it("null offsetHours with sendTimeOfDay applies sendTimeOfDay", () => {
+  it("null offsetHours with sendTimeOfDay applies sendTimeOfDay (UTC when no timezone arg)", () => {
     const result = calculateSendDate(eventDate, 1, null, "10:30");
     const expected = new Date(eventDate);
-    expected.setDate(expected.getDate() + 1);
-    expected.setHours(10, 30, 0, 0);
+    expected.setUTCDate(expected.getUTCDate() + 1);
+    expected.setUTCHours(10, 30, 0, 0);
     expect(result.getTime()).toBe(expected.getTime());
   });
 
