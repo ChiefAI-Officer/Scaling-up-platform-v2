@@ -8,6 +8,7 @@ import { sendEmailViaSMTP, type SmtpAttachment } from "@/lib/smtp-transport";
 import { db } from "@/lib/db";
 import { generateIcsContent, buildLocationString } from "@/lib/ics-generator";
 import { formatEventDateUTC } from "@/lib/utils";
+import { composeRegistrationConfirmationEmail } from "@/lib/notifications/transactional-email-template";
 
 // ============================================
 // Types
@@ -153,17 +154,18 @@ export async function sendRegistrationNotification(data: {
     });
 
     if (data.icsAttachment) {
+        // ENH-MAY6-11: attendee email uses admin-editable template if present,
+        // hardcoded HTML otherwise. Kill switch lives in the helper.
+        const composed = await composeRegistrationConfirmationEmail({
+            workshopTitle: data.workshopTitle,
+            coachName: data.coachName,
+            registrantName: data.registrantName,
+            registrantEmail: data.registrantEmail,
+        });
         await sendNotificationEmail({
             to: data.registrantEmail,
-            subject: `You're Registered: ${data.workshopTitle}`,
-            html: `
-            <h2>You're Registered!</h2>
-            <p>Hi ${data.registrantName},</p>
-            <p>You're confirmed for <strong>${data.workshopTitle}</strong> with ${data.coachName}.</p>
-            <p>We've attached a calendar file (.ics) so you can add this event to your calendar.</p>
-            <p>See you there!</p>
-            <p>— The Scaling Up Team</p>
-            `,
+            subject: composed.subject,
+            html: composed.html,
             attachments,
             telemetry: {
                 workshopId: data.workshopId,
@@ -1192,17 +1194,17 @@ export async function sendPaidRegistrationNotificationStrict(data: {
     });
 
     // Attendee confirmation — strict, includes ICS attachment.
+    // ENH-MAY6-11: uses admin-editable template if present.
+    const composed = await composeRegistrationConfirmationEmail({
+        workshopTitle: data.workshopTitle,
+        coachName: data.coachName,
+        registrantName: data.registrantName,
+        registrantEmail: data.registrantEmail,
+    });
     await sendEmailViaSMTP({
         to: data.registrantEmail,
-        subject: `You're Registered: ${data.workshopTitle}`,
-        html: `
-        <h2>You're Registered!</h2>
-        <p>Hi ${data.registrantName},</p>
-        <p>You're confirmed for <strong>${data.workshopTitle}</strong> with ${data.coachName}.</p>
-        <p>We've attached a calendar file (.ics) so you can add this event to your calendar.</p>
-        <p>See you there!</p>
-        <p>— The Scaling Up Team</p>
-        `,
+        subject: composed.subject,
+        html: composed.html,
         attachments,
         telemetry: {
             workshopId: data.workshopId,

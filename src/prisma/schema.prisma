@@ -992,3 +992,25 @@ model AdminInvite {
   @@index([email])
   @@map("admin_invites")
 }
+
+// ENH-MAY6-11 (May 2026): admin/staff-editable transactional email body +
+// subject for system-driven emails (registration confirmation today; thanks-
+// for-attending in v2). Single global template per emailType. Missing row
+// → composer falls back to hardcoded HTML, so prod can deploy with zero
+// backfill. previousSubject/previousBody capture the prior values on each
+// save for one-step "Restore previous." version is monotonic for
+// optimistic concurrency (PUT requires matching version).
+model TransactionalEmailTemplate {
+  id              String   @id @default(cuid())
+  emailType       String   @unique // "REGISTRATION_CONFIRMATION"
+  subject         String
+  body            String   // HTML, supports {{token}} interpolation
+  version         Int      @default(1)
+  updatedBy       String?
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  previousSubject String?
+  previousBody    String?
+
+  @@map("transactional_email_templates")
+}

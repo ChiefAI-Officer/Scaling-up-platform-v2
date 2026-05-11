@@ -20,6 +20,7 @@ const navLinks = [
   { href: "/admin/approvals", label: "Approvals" },
   { href: "/admin/registrations", label: "Registrations" },
   { href: "/admin/refunds-needed", label: "Refunds" },
+  { href: "/admin/transactional-emails", label: "Emails" },
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/pricing", label: "Pricing" },
   { href: "/admin/financials", label: "Financials" },
