@@ -370,7 +370,9 @@ describe("triggerWorkflowStep Inngest function", () => {
 
             // Only one email should have been sent despite two registrations
             expect(sendEmailViaSMTP).toHaveBeenCalledTimes(1);
-            expect(db.workflowStepExecution.create).toHaveBeenCalledWith(
+            // Wave 6 follow-on Part 2: terminal status now lives on the
+            // parent row via update() (was a second create()).
+            expect(db.workflowStepExecution.update).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({ status: "SENT" }),
                 })
@@ -612,13 +614,20 @@ describe("triggerWorkflowStep Inngest function", () => {
 
             expect(sendEmailViaSMTP).not.toHaveBeenCalled();
 
-            const createCalls = (db.workflowStepExecution.create as jest.Mock).mock.calls;
-            const sentCall = createCalls.find(
+            // Wave 6 follow-on Part 2: no terminal SENT anywhere — on parent
+            // create OR update. The pre-loop SCHEDULED create is fine.
+            const sentCreateOnParent = (db.workflowStepExecution.create as jest.Mock).mock.calls.find(
+                ([arg]: [{ data?: Record<string, unknown> }]) =>
+                    arg?.data?.status === "SENT" && !arg?.data?.parentId
+            );
+            expect(sentCreateOnParent).toBeUndefined();
+            const sentUpdate = (db.workflowStepExecution.update as jest.Mock).mock.calls.find(
                 ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SENT"
             );
-            expect(sentCall).toBeUndefined();
+            expect(sentUpdate).toBeUndefined();
 
-            expect(db.workflowStepExecution.create).toHaveBeenCalledWith(
+            // Parent transitions to SKIPPED via update().
+            expect(db.workflowStepExecution.update).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
                         status: "SKIPPED",
@@ -745,6 +754,133 @@ describe("triggerWorkflowStep Inngest function", () => {
             );
             expect(sentUpsert).toBeDefined();
             expect(sentUpsert![0].create.parentId).toBe("parent-trig-1");
+        });
+
+        // ---- EMAIL_ATTENDEES parity ----
+
+        async function invokeAttendees() {
+            (db.workflowStep.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkflowStep({ stepType: "EMAIL_ATTENDEES", triggerType: "ON_REGISTRATION" })
+            );
+            (db.workshop.findUnique as jest.Mock).mockResolvedValue(makeWorkshop());
+            return capturedHandler({ event: buildEvent(), step: mockStep });
+        }
+
+        it("EMAIL_ATTENDEES: pre-creates parent (SCHEDULED), writes per-recipient SENT children, transitions parent via update + calls finalizeParentRollup", async () => {
+            (db.registration.findMany as jest.Mock).mockResolvedValue([
+                { id: "reg-1", email: "a@test.com", firstName: "A", lastName: "One", company: "" },
+                { id: "reg-2", email: "b@test.com", firstName: "B", lastName: "Two", company: "" },
+            ]);
+            (db.workflowStepExecution.findMany as jest.Mock).mockResolvedValueOnce([
+                { status: "SENT" }, { status: "SENT" },
+            ]);
+
+            await invokeAttendees();
+
+            // Parent pre-created SCHEDULED
+            const scheduledCreate = (db.workflowStepExecution.create as jest.Mock).mock.calls.find(
+                (call) => call[0]?.data?.status === "SCHEDULED" && !call[0]?.data?.parentId
+            );
+            expect(scheduledCreate).toBeDefined();
+
+            // Per-recipient SENT children for both recipients
+            const sentChildren = (db.workflowStepExecution.upsert as jest.Mock).mock.calls.filter(
+                (call) =>
+                    call[0]?.create?.status === "SENT" &&
+                    call[0]?.create?.parentId === "parent-trig-1"
+            );
+            expect(sentChildren.length).toBe(2);
+
+            // Parent transitions terminal via update — not a second create
+            const updateCall = (db.workflowStepExecution.update as jest.Mock).mock.calls.find(
+                (call) => call[0]?.where?.id === "parent-trig-1" && call[0]?.data?.status === "SENT"
+            );
+            expect(updateCall).toBeDefined();
+
+            // Rollup called
+            expect(db.workflowStepExecution.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({ where: expect.objectContaining({ parentId: "parent-trig-1" }) })
+            );
+        });
+
+        it("EMAIL_ATTENDEES with 0 registrants: parent transitions to SKIPPED (BUG-MAY4-1b twin fix)", async () => {
+            (db.registration.findMany as jest.Mock).mockResolvedValue([]);
+
+            await invokeAttendees();
+
+            // No emails sent
+            expect(sendEmailViaSMTP).not.toHaveBeenCalled();
+
+            // Parent updated to SKIPPED — NOT a false-positive SENT
+            const skippedUpdate = (db.workflowStepExecution.update as jest.Mock).mock.calls.find(
+                (call) => call[0]?.where?.id === "parent-trig-1" && call[0]?.data?.status === "SKIPPED"
+            );
+            expect(skippedUpdate).toBeDefined();
+
+            // Confirm no SENT update or SENT create on the parent
+            const sentTerminalAnywhere =
+                (db.workflowStepExecution.update as jest.Mock).mock.calls.find(
+                    (call) => call[0]?.data?.status === "SENT"
+                ) ||
+                (db.workflowStepExecution.create as jest.Mock).mock.calls.find(
+                    (call) => call[0]?.data?.status === "SENT" && !call[0]?.data?.parentId
+                );
+            expect(sentTerminalAnywhere).toBeUndefined();
+        });
+
+        // ---- SEND_FILE_LINK parity ----
+
+        async function invokeFileLink() {
+            const { getWorkflowStepFiles, buildProtectedEmailAttachments } =
+                jest.requireMock("@/lib/files/file-service");
+            (getWorkflowStepFiles as jest.Mock).mockResolvedValue([
+                { id: "file-1", filename: "guide.pdf", contentType: "application/pdf" },
+            ]);
+            (buildProtectedEmailAttachments as jest.Mock).mockReturnValue([
+                { filename: "guide.pdf", path: "https://app.test/files/file-1", contentType: "application/pdf" },
+            ]);
+            (db.workflowStep.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkflowStep({ stepType: "SEND_FILE_LINK", triggerType: "ON_REGISTRATION" })
+            );
+            (db.workshop.findUnique as jest.Mock).mockResolvedValue(makeWorkshop());
+            return capturedHandler({ event: buildEvent(), step: mockStep });
+        }
+
+        it("SEND_FILE_LINK: pre-creates parent (SCHEDULED), writes per-recipient SENT children, transitions parent via update + calls finalizeParentRollup", async () => {
+            (db.registration.findMany as jest.Mock).mockResolvedValue([
+                { id: "reg-1", email: "a@test.com", firstName: "A", lastName: "One", company: "" },
+            ]);
+            (db.workflowStepExecution.findMany as jest.Mock).mockResolvedValueOnce([
+                { status: "SENT" },
+            ]);
+
+            await invokeFileLink();
+
+            // Parent pre-created SCHEDULED
+            const scheduledCreate = (db.workflowStepExecution.create as jest.Mock).mock.calls.find(
+                (call) => call[0]?.data?.status === "SCHEDULED" && !call[0]?.data?.parentId
+            );
+            expect(scheduledCreate).toBeDefined();
+
+            // Per-recipient SENT child
+            const sentChild = (db.workflowStepExecution.upsert as jest.Mock).mock.calls.find(
+                (call) =>
+                    call[0]?.create?.status === "SENT" &&
+                    call[0]?.create?.parentId === "parent-trig-1" &&
+                    call[0]?.create?.recipientEmail === "a@test.com"
+            );
+            expect(sentChild).toBeDefined();
+
+            // Parent transitions via update
+            const updateCall = (db.workflowStepExecution.update as jest.Mock).mock.calls.find(
+                (call) => call[0]?.where?.id === "parent-trig-1" && call[0]?.data?.status === "SENT"
+            );
+            expect(updateCall).toBeDefined();
+
+            // Rollup called
+            expect(db.workflowStepExecution.findMany).toHaveBeenCalledWith(
+                expect.objectContaining({ where: expect.objectContaining({ parentId: "parent-trig-1" }) })
+            );
         });
 
         it("SEND_SURVEY_LINK: post-loop transitions parent SCHEDULED → terminal via update (not new create); calls finalizeParentRollup", async () => {

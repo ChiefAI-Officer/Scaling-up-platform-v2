@@ -204,6 +204,20 @@ export const triggerWorkflowStep = inngest.createFunction(
                         },
                     });
 
+                    // Wave 6 follow-on Part 2: pre-create parent row so
+                    // per-recipient children attach + parent transitions
+                    // via update (parity with execute-workflow.ts).
+                    const parentRow = await db.workflowStepExecution.create({
+                        data: {
+                            stepId: workflowStep.id,
+                            workshopId: workshop.id,
+                            status: "SCHEDULED",
+                            scheduledFor: new Date(),
+                        },
+                        select: { id: true },
+                    });
+                    const parentId = parentRow.id;
+
                     const canAttach = canDeliverWorkflowAttachments({
                         recipientRole,
                         workshopStatus: workshop.status,
@@ -291,6 +305,15 @@ export const triggerWorkflowStep = inngest.createFunction(
                                     },
                                 },
                             });
+                            // Wave 6 follow-on Part 2: per-recipient SENT child.
+                            await recordRecipientExecution(db, {
+                                parentId,
+                                stepId: workflowStep.id,
+                                workshopId: workshop.id,
+                                registrationId: reg.id,
+                                recipientEmail: reg.email,
+                                status: "SENT",
+                            });
                         } catch (smtpErr) {
                             const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
                             const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
@@ -299,13 +322,12 @@ export const triggerWorkflowStep = inngest.createFunction(
                                 // Transient error — let Inngest retry
                                 throw smtpErr;
                             }
-                            // Terminal auth error — record FAILED and stop retrying
-                            await db.workflowStepExecution.create({
+                            // Terminal auth error — transition the existing
+                            // parent to FAILED via update (was a second create).
+                            await db.workflowStepExecution.update({
+                                where: { id: parentId },
                                 data: {
-                                    stepId: workflowStep.id,
-                                    workshopId: workshop.id,
                                     status: "FAILED",
-                                    scheduledFor: new Date(),
                                     executedAt: new Date(),
                                     errorMessage: msg || "SMTP send failed",
                                 },
@@ -314,15 +336,22 @@ export const triggerWorkflowStep = inngest.createFunction(
                         }
                     }
 
-                    await db.workflowStepExecution.create({
+                    // Wave 6 follow-on Part 2: transition parent SCHEDULED →
+                    // terminal via update. Also fixes latent BUG-MAY4-1b twin —
+                    // post-loop create previously wrote unconditional SENT
+                    // even with 0 registrants. Now reflects actual sends.
+                    const emailsSent = sentEmails.size;
+                    await db.workflowStepExecution.update({
+                        where: { id: parentId },
                         data: {
-                            stepId: workflowStep.id,
-                            workshopId: workshop.id,
-                            status: "SENT",
-                            scheduledFor: new Date(),
+                            status: emailsSent > 0 ? "SENT" : "SKIPPED",
                             executedAt: new Date(),
+                            ...(emailsSent === 0
+                                ? { errorMessage: "No recipients at scheduled time" }
+                                : {}),
                         },
                     });
+                    await finalizeParentRollup(db, parentId);
                     return;
                 }
 
@@ -580,6 +609,19 @@ export const triggerWorkflowStep = inngest.createFunction(
                     });
                     const fileLinks = buildFileLinksHtml(protectedLinks);
 
+                    // Wave 6 follow-on Part 2: pre-create parent so per-recipient
+                    // children attach + post-loop update (parity with SEND_SURVEY_LINK).
+                    const parentRow = await db.workflowStepExecution.create({
+                        data: {
+                            stepId: workflowStep.id,
+                            workshopId: workshop.id,
+                            status: "SCHEDULED",
+                            scheduledFor: new Date(),
+                        },
+                        select: { id: true },
+                    });
+                    const parentId = parentRow.id;
+
                     let fileEmailsSent = 0;
                     for (const reg of registrations) {
                         const personalContext: WorkflowContext = {
@@ -619,6 +661,15 @@ export const triggerWorkflowStep = inngest.createFunction(
                                 },
                             });
                             fileEmailsSent++;
+                            // Wave 6 follow-on Part 2: per-recipient SENT child.
+                            await recordRecipientExecution(db, {
+                                parentId,
+                                stepId: workflowStep.id,
+                                workshopId: workshop.id,
+                                registrationId: reg.id,
+                                recipientEmail: reg.email,
+                                status: "SENT",
+                            });
                         } catch (smtpErr) {
                             const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
                             const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
@@ -627,13 +678,12 @@ export const triggerWorkflowStep = inngest.createFunction(
                                 // Transient error — let Inngest retry
                                 throw smtpErr;
                             }
-                            // Terminal auth error — record FAILED and stop retrying
-                            await db.workflowStepExecution.create({
+                            // Terminal auth error — transition existing parent
+                            // to FAILED via update (was a second create).
+                            await db.workflowStepExecution.update({
+                                where: { id: parentId },
                                 data: {
-                                    stepId: workflowStep.id,
-                                    workshopId: workshop.id,
                                     status: "FAILED",
-                                    scheduledFor: new Date(),
                                     executedAt: new Date(),
                                     errorMessage: msg || "SMTP send failed",
                                 },
@@ -642,21 +692,20 @@ export const triggerWorkflowStep = inngest.createFunction(
                         }
                     }
 
-                    // BUG-MAY4 follow-on: terminal status must reflect actual
-                    // sends. With 0 registrants the loop runs zero times and
-                    // the row was previously written as SENT — false positive.
-                    await db.workflowStepExecution.create({
+                    // Wave 6 follow-on Part 2: transition parent SCHEDULED →
+                    // terminal via update. Preserves BUG-MAY4 fix: 0 registrants
+                    // → SKIPPED, not false SENT.
+                    await db.workflowStepExecution.update({
+                        where: { id: parentId },
                         data: {
-                            stepId: workflowStep.id,
-                            workshopId: workshop.id,
                             status: fileEmailsSent > 0 ? "SENT" : "SKIPPED",
-                            scheduledFor: new Date(),
                             executedAt: new Date(),
                             ...(fileEmailsSent === 0
                                 ? { errorMessage: "No recipients at scheduled time" }
                                 : {}),
                         },
                     });
+                    await finalizeParentRollup(db, parentId);
                     return;
                 }
 
