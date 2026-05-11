@@ -300,6 +300,13 @@ model Registration {
   // confirmation email. Pre-empted before SMTP send; rolled back on error.
   notificationSentAt DateTime?
 
+  // Q-MAY6-1: refund-needed digest. Suzanne (STAFF) marks rows refunded after
+  // processing the refund in the Stripe dashboard. stripeRefundId is the
+  // operator-provided evidence ("re_..."), required at mark-refunded time.
+  refundedAt     DateTime?
+  refundedBy     String?
+  stripeRefundId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
