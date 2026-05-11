@@ -11,7 +11,9 @@ import { AddCertificationModal } from "@/components/coaches/add-certification-mo
 import { RemoveCertificationButton } from "@/components/coaches/remove-certification-button";
 import { DeleteCoachButton } from "@/components/coaches/delete-coach-button";
 import { SendPasswordResetButton } from "@/components/coaches/send-password-reset-button";
+import { HubSpotSideCard } from "@/components/coaches/hubspot-side-card";
 import { requireAuth } from "@/lib/auth/authorization";
+import { lookupHubSpotContact, getHubSpotPortalId } from "@/services/hubspot";
 
 interface CoachDetailPageProps {
   params: Promise<{ id: string }>;
@@ -93,6 +95,12 @@ export default async function CoachDetailPage({
   if (!coach) {
     notFound();
   }
+
+  // Q-MAY6-2: HubSpot side card lookup (server-side, non-blocking).
+  // Discriminated result so the side card renders distinct UI for
+  // unconfigured / not_found / error / found — never crashes the page.
+  const hubspotLookup = await lookupHubSpotContact(coach.email);
+  const hubspotPortalId = getHubSpotPortalId();
 
   // Check ALL workshops for active status (not limited by take: 10 display query)
   const activeWorkshopCount = await db.workshop.count({
@@ -359,6 +367,9 @@ export default async function CoachDetailPage({
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Q-MAY6-2: HubSpot lookup */}
+          <HubSpotSideCard lookup={hubspotLookup} portalId={hubspotPortalId} />
+
           {/* Certifications */}
           <Card>
             <CardHeader>

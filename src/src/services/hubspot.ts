@@ -297,3 +297,97 @@ export async function getCoachByEmail(email: string): Promise<unknown | null> {
   }
   return getContactByEmail(email);
 }
+
+// ---------------------------------------------------------------------------
+// Q-MAY6-2: HubSpot side card on admin coach detail
+// ---------------------------------------------------------------------------
+//
+// Operator runbook: opening an admin coach detail page calls
+// `lookupHubSpotContact(coach.email)` to render the HubSpot side card showing
+// lifecycle stage + last modified + "View in HubSpot" link.
+//
+// Discriminated result (Round 2 M5): callers get { kind: "unconfigured" |
+// "not_found" | "error" | "found" } so the UI renders distinct states. Null-
+// collapsing auth errors to "Not found" would hide real failures.
+//
+// Property request is intentionally minimal — `lifecyclestage` and
+// `lastmodifieddate` are HubSpot stock properties on every account. We do
+// NOT request `hs_lead_status` because some accounts strip optional defaults
+// and a single PROPERTY_DOESNT_EXIST validation error fails the whole search.
+//
+// Error log payload sanitized: status + category only. No email, body, or
+// headers. Side card renders a generic error state.
+
+export interface HubSpotSideCardContact {
+  id: string;
+  properties: {
+    email?: string;
+    firstname?: string;
+    lastname?: string;
+    lifecyclestage?: string;
+    lastmodifieddate?: string;
+  };
+}
+
+export type HubSpotLookupResult =
+  | { kind: "unconfigured" }
+  | { kind: "not_found" }
+  | { kind: "error"; status: number; category?: string }
+  | { kind: "found"; contact: HubSpotSideCardContact };
+
+export async function lookupHubSpotContact(
+  email: string,
+): Promise<HubSpotLookupResult> {
+  if (!isHubSpotConfigured()) {
+    return { kind: "unconfigured" };
+  }
+  try {
+    const searchResponse = await hubspotClient.crm.contacts.searchApi.doSearch({
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: "email",
+              operator: FilterOperatorEnum.Eq,
+              value: email,
+            },
+          ],
+        },
+      ],
+      properties: [
+        "email",
+        "firstname",
+        "lastname",
+        "lifecyclestage",
+        "lastmodifieddate",
+      ],
+      limit: 1,
+    });
+
+    const first = searchResponse.results?.[0];
+    if (!first) {
+      return { kind: "not_found" };
+    }
+    return {
+      kind: "found",
+      contact: {
+        id: first.id,
+        properties: (first.properties ?? {}) as HubSpotSideCardContact["properties"],
+      },
+    };
+  } catch (error: unknown) {
+    // Sanitized: never log the searched email, raw body, or headers.
+    const e = error as { code?: number; status?: number; body?: { category?: string } };
+    const status =
+      typeof e?.code === "number" ? e.code : typeof e?.status === "number" ? e.status : 0;
+    const category = e?.body?.category;
+    console.error("[HubSpot] side-card lookup failed:", { status, category });
+    return { kind: "error", status, category };
+  }
+}
+
+export function getHubSpotPortalId(): string | null {
+  const raw = process.env.HUBSPOT_PORTAL_ID;
+  if (!raw || raw.trim().length === 0) return null;
+  return raw.trim();
+}
