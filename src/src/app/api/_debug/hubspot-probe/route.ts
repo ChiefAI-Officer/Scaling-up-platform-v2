@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
-import { lookupHubSpotContact, isHubSpotConfigured } from "@/services/hubspot";
+import { lookupHubSpotContact } from "@/services/hubspot";
 
 export async function GET(request: NextRequest) {
   const actor = await getApiActor();
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   if (!email) {
     return NextResponse.json({ error: "Missing ?email=" }, { status: 400 });
   }
-  const tokenSet = isHubSpotConfigured();
+  const tokenSet = Boolean(process.env.HUBSPOT_ACCESS_TOKEN);
   const result = await lookupHubSpotContact(email);
   return NextResponse.json({
     tokenSet,
