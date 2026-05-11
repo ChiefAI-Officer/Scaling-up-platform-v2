@@ -276,6 +276,20 @@ UI surfaces batch — three independent UI improvements shipped together.
 
 **Final Wave 6 metrics:** 1015 → 1021 tests (+6). Vercel build green. Two cherry-picked commits (`e48030d` + `ccb8dc6`) on `main`.
 
+### Wave 6 follow-on — Trigger Now per-recipient parity (May 10, 2026, commit `c204dbf`)
+
+Closes Codex round-3 MED 3 from the Wave 6 review. The manual Trigger Now path (`trigger-workflow-step.ts`) was diverging from the scheduled `execute-workflow.ts` path: silent skip on `!surveyLink`, no per-recipient rows. On-call manual repro produced different audit data than the scheduled fire that originally failed.
+
+- Pre-create parent WorkflowStepExecution row with `status: "SCHEDULED"` before the recipient loop in SEND_SURVEY_LINK handler; capture `parentId`.
+- On `!surveyLink`: write FAILED child via `recordRecipientExecution` with `errorMessage: "link_generation_failed"` then continue.
+- After successful `sendEmailViaSMTP`: write SENT child via `recordRecipientExecution`.
+- Post-loop: transition parent SCHEDULED → terminal via `db.workflowStepExecution.update({ where: { id: parentId } })` (was a second `create()`).
+- Call `finalizeParentRollup(db, parentId)` so parent reflects FAILED > SENT > SKIPPED precedence over actual children.
+
+3 new RED→GREEN tests + 3 existing tests updated (create→update transition). 1021 → 1024 tests.
+
+**Scope:** SEND_SURVEY_LINK only. SEND_FILE_LINK + EMAIL_ATTENDEES Trigger Now paths still throw on SMTP error → Inngest retry, no FAILED children today. They flip on together with the Beta rollup-retry-safety unit once SMTP error classification lands.
+
 ---
 
 ## v2.5 Sprint — Updated Final Tally (May 10, 2026)
@@ -290,5 +304,6 @@ UI surfaces batch — three independent UI improvements shipped together.
 | 4 | ENH-MAY6-3, ENH-MAY6-1, ENH-MAY6-8 | `39f9e3e`, `99edada`, `f34500b` |
 | 5 | BUG-MAY6-4a | `0580aa6` |
 | 6 | BUG-MAY6-9, finalizeParentRollup wiring | `e48030d`, `ccb8dc6` |
+| 6+ | Trigger Now per-recipient parity (Wave 6 follow-on) | `c204dbf` |
 
-**Test count:** 964 → 1021 (+57 across the sprint).
+**Test count:** 964 → 1024 (+60 across the sprint).

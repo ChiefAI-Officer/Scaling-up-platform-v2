@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 10, 2026 — v2.5 sprint Wave 6 shipped (BUG-MAY6-9 + finalizeParentRollup wiring); 1021 tests; remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 are externally blocked on Jeff/design/product input |
+| **Last Updated** | May 10, 2026 — Wave 6 shipped (BUG-MAY6-9 + finalizeParentRollup wiring) + follow-on (Trigger Now per-recipient parity); 1024 tests; remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 are externally blocked on Jeff/design/product input |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
@@ -29,13 +29,18 @@ the full workshop lifecycle from request through post-event follow-up.
 - **Tier B: link-gen FAILED children + finalizeParentRollup wiring.** `execute-workflow.ts` SEND_SURVEY_LINK now writes a per-recipient FAILED child row (`errorMessage: "link_generation_failed"`) when `getOrCreateSurveyLink` returns null (was a silent `continue`). Post-loop `finalizeParentRollup(db, executionId)` call added after `recordWorkflowExecution` for SEND_SURVEY_LINK / SEND_FILE_LINK / EMAIL_ATTENDEES — parent now reflects FAILED > SENT > SKIPPED precedence over actual children. Both gated on `executionId` (set by pre-loop `scheduleWorkflowExecution` on the future RELATIVE_TO_EVENT path); the immediate path remains a documented gap until per-recipient idempotency lands in Beta. SEND_FILE_LINK + EMAIL_ATTENDEES rollup is a no-op today (no FAILED children) — enables future SMTP error classification work to flip them on without further wiring. 1 new RED→GREEN test extends `__tests__/inngest/execute-workflow.test.ts`.
 - 1021 tests passing (up from 1015).
 
+**Wave 6 follow-on — Trigger Now per-recipient parity** (May 10 2026, commit `c204dbf`, direct push to main):
+- Closes Codex round-3 MED 3 from the Wave 6 review. `trigger-workflow-step.ts` (manual Trigger Now path) SEND_SURVEY_LINK handler was diverging from the scheduled `execute-workflow.ts` path: silently `continue`d on `!surveyLink` and wrote no per-recipient rows. On-call manual repro produced different audit data than the scheduled fire that originally failed.
+- Fix at `src/inngest/functions/trigger-workflow-step.ts`: (1) Pre-create parent WorkflowStepExecution row with `status: "SCHEDULED"` at top of SEND_SURVEY_LINK handler, capture `parentId`. (2) On `!surveyLink`, call `recordRecipientExecution` with `status: "FAILED"` + `errorMessage: "link_generation_failed"` then continue. (3) After successful SMTP send, call `recordRecipientExecution` with `status: "SENT"`. (4) Replace post-loop `db.workflowStepExecution.create({ data: { status: TERMINAL } })` with `update({ where: { id: parentId } })` — was a second create. (5) Call `finalizeParentRollup(db, parentId)` post-update.
+- Scope: SEND_SURVEY_LINK only. SEND_FILE_LINK + EMAIL_ATTENDEES Trigger Now paths still use the old shape — they ship together with the Beta rollup-retry-safety unit once SMTP error classification lands (same scope decision as Wave 6 scheduled-path).
+- 3 new RED→GREEN tests + 3 existing tests updated for create→update transition. 1021 → 1024 tests.
+
 **Wave 5 — BUG-MAY6-4a** (Notion: [3598c45d…f634](https://www.notion.so/3598c45dd82981c5847fe5be0eb1f634)) — Audit script at `src/scripts/audit-cross-workshop-coupons.ts` lists historical Stripe redemptions where the promo code's `metadata.workshopCode` doesn't match the registration's workshopCode (cross-workshop redemptions before the May 7 fix). Output is CSV to stdout with verdict per row. Read-only / dry-run only. Operator-invoked via `npx tsx scripts/audit-cross-workshop-coupons.ts [--since YYYY-MM-DD] [--limit N]`. Hand-off to Jeff for per-case refund/accept judgment. NO auto-refunds.
 
 **Open follow-ons (deferred for Beta hardening or external input):**
-- `trigger-workflow-step.ts` per-recipient writes (manual Trigger Now parity)
 - Per-recipient pre-send DB-check idempotency (Inngest replay duplicate-send risk)
 - Immediate-path `executionId` synthesis with deterministic idempotency key (`inngestRunId` + `stepId`) so SEND_SURVEY_LINK FAILED-child writes work on the immediate path too — Wave 6 covers only the future RELATIVE_TO_EVENT path
-- SEND_FILE_LINK / EMAIL_ATTENDEES FAILED-child writes (need SMTP error classification: terminal vs transient)
+- SEND_FILE_LINK / EMAIL_ATTENDEES FAILED-child writes (need SMTP error classification: terminal vs transient) — applies to BOTH execute-workflow.ts and trigger-workflow-step.ts
 - Deterministic parent.id via `inngestRunId` for forceResend audit trail
 - Error redaction codes for `WorkflowStepExecution.errorMessage`
 - Structured logging/alerts/runbook for parent/child workflow execution state
