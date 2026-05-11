@@ -290,6 +290,22 @@ Closes Codex round-3 MED 3 from the Wave 6 review. The manual Trigger Now path (
 
 **Scope:** SEND_SURVEY_LINK only. SEND_FILE_LINK + EMAIL_ATTENDEES Trigger Now paths still throw on SMTP error → Inngest retry, no FAILED children today. They flip on together with the Beta rollup-retry-safety unit once SMTP error classification lands.
 
+### Wave 6 follow-on Part 2 — Trigger Now EMAIL_ATTENDEES + SEND_FILE_LINK parity (May 10, 2026, commit `d88eb8c`)
+
+Extends Part 1's pattern to the remaining two per-recipient step types in `trigger-workflow-step.ts`:
+
+- **EMAIL_ATTENDEES handler:** pre-creates parent SCHEDULED, writes per-recipient SENT child after each successful SMTP, transitions parent via `update()` (was a second `create()`) with `emailsSent > 0 ? "SENT" : "SKIPPED"`, calls `finalizeParentRollup`. Side-effect: fixes latent BUG-MAY4-1b twin — old post-loop `create()` wrote unconditional `status: "SENT"` even with 0 registrants.
+- **SEND_FILE_LINK handler:** same pattern. Pre-create parent, per-recipient SENT writes, post-loop `update()` for terminal status, rollup call.
+- Terminal-auth-error FAILED branches in both handlers now `update` the existing parent (was a second `create()` that orphaned the SCHEDULED row).
+
+3 new RED→GREEN tests + 2 existing tests updated for create→update transition. 1024 → 1027 tests.
+
+**Still scope-deferred (Beta rollup-retry-safety unit):**
+- SMTP transient-error retry semantics with per-recipient pre-send dedup. Today, on Inngest retry, recipients who already received an email on the first run may receive a second.
+- Per-recipient pre-send DB-check idempotency (skip recipients with SENT child rows from a prior run).
+- Immediate/past-time `executionId` synthesis on `execute-workflow.ts` SEND_SURVEY_LINK with deterministic key (`inngestRunId` + `stepId`).
+- True per-recipient FAILED-child writes on SMTP errors (need terminal-vs-transient classification).
+
 ---
 
 ## v2.5 Sprint — Updated Final Tally (May 10, 2026)
@@ -304,6 +320,7 @@ Closes Codex round-3 MED 3 from the Wave 6 review. The manual Trigger Now path (
 | 4 | ENH-MAY6-3, ENH-MAY6-1, ENH-MAY6-8 | `39f9e3e`, `99edada`, `f34500b` |
 | 5 | BUG-MAY6-4a | `0580aa6` |
 | 6 | BUG-MAY6-9, finalizeParentRollup wiring | `e48030d`, `ccb8dc6` |
-| 6+ | Trigger Now per-recipient parity (Wave 6 follow-on) | `c204dbf` |
+| 6+ | Trigger Now per-recipient parity (SEND_SURVEY_LINK) | `c204dbf` |
+| 6++ | Trigger Now EMAIL_ATTENDEES + SEND_FILE_LINK parity (+ BUG-MAY4-1b twin fix) | `d88eb8c` |
 
-**Test count:** 964 → 1024 (+60 across the sprint).
+**Test count:** 964 → 1027 (+63 across the sprint).
