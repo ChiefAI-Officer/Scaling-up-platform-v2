@@ -32,6 +32,14 @@ interface Approval {
   notes?: string | null;
   requestData?: Record<string, unknown> | null;
   messages?: ApprovalMessage[];
+  workshop?: {
+    id: string;
+    title: string;
+    priceCents: number;
+    pricingTier?: {
+      name: string;
+    } | null;
+  } | null;
 }
 
 interface ApprovalsApiResponse {
@@ -341,9 +349,9 @@ export default function ApprovalsPage() {
                   >
                     {approval.type.replace(/_/g, " ")}
                   </span>
-                  {approval.type === "CUSTOM_PRICING" && typeof approval.requestData?.newPriceCents === "number" && (
+                  {approval.type === "CUSTOM_PRICING" && (
                     <span className="inline-block ml-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300">
-                      Custom Price: ${(approval.requestData.newPriceCents / 100).toLocaleString()}
+                      Custom Price Requested
                     </span>
                   )}
                   {approval.status === "COUNTER_OFFERED" && typeof approval.counterOfferCents === "number" && (
@@ -362,6 +370,39 @@ export default function ApprovalsPage() {
                   </Link>
                 ) : (
                   <p className="text-foreground">{approval.details}</p>
+                )}
+                {approval.type === "CUSTOM_PRICING" && (
+                  <div className="mt-2 space-y-1">
+                    {(() => {
+                      const requestData = approval.requestData as Record<string, unknown> | undefined;
+                      const newPriceCents = requestData?.newPriceCents;
+                      const oldPriceCents = requestData?.oldPriceCents;
+
+                      // Determine the original price source: prefer requestData.oldPriceCents, fallback to workshop.priceCents
+                      let originalPriceCents: number | undefined;
+                      if (typeof oldPriceCents === "number") {
+                        originalPriceCents = oldPriceCents;
+                      } else if (approval.workshop) {
+                        originalPriceCents = approval.workshop.priceCents;
+                      }
+
+                      return (
+                        <>
+                          {typeof originalPriceCents === "number" && (
+                            <p className="text-xs text-muted-foreground">
+                              Original: ${(originalPriceCents / 100).toLocaleString()}
+                              {approval.workshop?.pricingTier?.name && ` (${approval.workshop.pricingTier.name})`}
+                            </p>
+                          )}
+                          {typeof newPriceCents === "number" && (
+                            <p className="text-xs text-muted-foreground font-medium">
+                              Requested: ${(newPriceCents / 100).toLocaleString()}
+                            </p>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
                 )}
                 {approval.type === "CUSTOM_PRICING" && approval.notes && (
                   <p className="text-sm text-muted-foreground mt-1 italic">

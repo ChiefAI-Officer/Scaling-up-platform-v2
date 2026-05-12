@@ -164,6 +164,12 @@ export async function GET(request: NextRequest) {
                         title: true,
                         eventDate: true,
                         workshopCode: true,
+                        priceCents: true,
+                        pricingTier: {
+                            select: {
+                                name: true,
+                            },
+                        },
                     },
                 },
                 messages: {
