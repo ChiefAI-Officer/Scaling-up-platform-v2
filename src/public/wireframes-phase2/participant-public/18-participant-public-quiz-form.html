@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>New 11 — PUBLIC Participant Quiz Form (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    body { background: hsl(220 14% 96%); }
+
+    .page-head { max-width: 1280px; margin: 0 auto; padding: 1.5rem 2rem 0.5rem; }
+    .page-head h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 0.25rem; }
+    .page-head p { font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin: 0; }
+
+    .quiz-shell {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .quiz-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.625rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .quiz-logo { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; letter-spacing: -0.01em; color: hsl(var(--primary)); font-size: 0.9375rem; text-decoration: none; }
+    .quiz-logo__mark { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%)); color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem; letter-spacing: 0.02em; }
+    .quiz-logo__text { line-height: 1.1; }
+    .quiz-logo__sub { display: block; font-size: 0.625rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+
+    /* Progress (sticky-top on mobile) */
+    .quiz-progress {
+      position: sticky;
+      top: 49px;
+      z-index: 9;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.625rem 1.25rem;
+    }
+    .quiz-progress__row { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.375rem; font-weight: 500; }
+    .quiz-progress__row strong { color: hsl(var(--foreground)); font-weight: 600; }
+    .quiz-progress__bar { height: 4px; background: hsl(var(--muted)); border-radius: 9999px; overflow: hidden; }
+    .quiz-progress__fill { height: 100%; background: linear-gradient(90deg, hsl(224 76% 48%), hsl(224 76% 58%)); border-radius: 9999px; }
+
+    /* Question body */
+    .quiz-body { padding: 1.5rem 1.25rem 1rem; flex: 1; }
+    .question-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 1.5rem 1.25rem 1.75rem; box-shadow: var(--shadow-xs); }
+    .question-section {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(271 81% 40%);
+      background: hsl(271 81% 95%);
+      padding: 0.25rem 0.625rem;
+      border-radius: 9999px;
+      display: inline-block;
+      margin: 0 0 0.875rem;
+    }
+    .question-text { font-size: 1.125rem; font-weight: 600; letter-spacing: -0.005em; line-height: 1.35; margin: 0 0 1.5rem; color: hsl(var(--foreground)); }
+    .slider-answer { display: flex; justify-content: center; margin-bottom: 1rem; font-size: 0.8125rem; color: hsl(var(--muted-foreground)); font-weight: 500; }
+    .slider-answer strong { color: hsl(var(--primary)); font-weight: 700; margin-left: 0.25rem; }
+
+    /* 0-5 slider */
+    .slider-wrap { padding: 0.5rem 0.25rem 0; }
+    .slider-track {
+      position: relative;
+      height: 44px;
+      display: flex;
+      align-items: center;
+    }
+    .slider-track__rail {
+      width: 100%;
+      height: 6px;
+      background: hsl(var(--muted));
+      border-radius: 9999px;
+      position: relative;
+    }
+    .slider-track__fill {
+      height: 100%;
+      background: linear-gradient(90deg, hsl(224 76% 48%), hsl(224 76% 58%));
+      border-radius: 9999px;
+      width: 60%; /* value 3 of 5 = 60% */
+    }
+    .slider-track__thumb {
+      position: absolute;
+      top: 50%;
+      width: 24px;
+      height: 24px;
+      background: white;
+      border: 3px solid hsl(224 76% 48%);
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+      transform: translate(-50%, -50%);
+      left: 60%;
+    }
+    .slider-track__thumb::before {
+      content: '';
+      position: absolute;
+      inset: -10px;
+      border-radius: 50%;
+    }
+    .slider-track__ticks {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      margin-top: 0.375rem;
+      padding: 0 4px;
+    }
+    .slider-track__ticks span {
+      text-align: center;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+    }
+    .slider-track__ticks span:nth-child(-n+4) {
+      color: hsl(224 76% 48%);
+      font-weight: 700;
+    }
+    .slider-anchors {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.625rem;
+      padding: 0 2px;
+    }
+    .slider-anchors span {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      max-width: 45%;
+    }
+    .slider-anchors span:first-child { text-align: left; }
+    .slider-anchors span:last-child { text-align: right; }
+    .slider-anchors strong { display: block; color: hsl(var(--foreground)); font-weight: 600; font-size: 0.8125rem; }
+
+    /* Nav */
+    .quiz-nav {
+      padding: 1rem 1.25rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+    }
+    .quiz-nav .wf-btn {
+      width: 100%;
+      justify-content: center;
+      padding: 0.75rem 1rem;
+      font-size: 0.9375rem;
+      font-weight: 600;
+    }
+
+    /* Content-flag note */
+    .content-flag-note {
+      margin: 1rem 1.25rem;
+      padding: 0.625rem 0.875rem;
+      background: hsl(38 92% 95%);
+      border: 1px solid hsl(38 92% 80%);
+      border-radius: 8px;
+      font-size: 0.6875rem;
+      color: hsl(26 83% 30%);
+      line-height: 1.4;
+    }
+    .content-flag-note strong { font-weight: 700; }
+
+    /* Footer */
+    .quiz-footer { padding: 1rem 1.25rem; text-align: center; font-size: 0.6875rem; color: hsl(var(--muted-foreground)); border-top: 1px solid hsl(var(--border)); letter-spacing: 0.02em; }
+    .quiz-footer strong { color: hsl(var(--foreground)); font-weight: 600; }
+
+    /* Desktop overrides */
+    .desktop-frame .quiz-header { padding: 0.75rem 2rem; }
+    .desktop-frame .quiz-progress { padding: 0.875rem 2rem; top: 53px; }
+    .desktop-frame .quiz-body { padding: 2.5rem 2rem 1rem; max-width: 800px; margin: 0 auto; width: 100%; }
+    .desktop-frame .question-card { padding: 2rem 2rem 2.25rem; }
+    .desktop-frame .question-text { font-size: 1.3125rem; }
+    .desktop-frame .slider-track__rail, .desktop-frame .slider-track__ticks { max-width: 640px; margin-left: auto; margin-right: auto; }
+    .desktop-frame .slider-anchors { max-width: 640px; margin-left: auto; margin-right: auto; }
+    .desktop-frame .quiz-nav {
+      flex-direction: row;
+      justify-content: flex-end;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+    }
+    .desktop-frame .quiz-nav .wf-btn { width: auto; min-width: 140px; }
+    .desktop-frame .quiz-nav .wf-btn-primary { order: 2; }
+    .desktop-frame .quiz-nav .wf-btn-secondary { order: 1; }
+
+    /* Mobile overrides */
+    .mobile-frame .quiz-header { padding: 0.625rem 1rem; }
+    .mobile-frame .quiz-progress { padding: 0.5rem 1rem; top: 49px; }
+    .mobile-frame .quiz-body { padding: 1rem; }
+    .mobile-frame .question-card { padding: 1rem 1rem 1.25rem; }
+    .mobile-frame .question-text { font-size: 1.0625rem; }
+  </style>
+</head>
+<body>
+
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 11 (PUBLIC quiz form, responsive 0-5 slider).</span>
+    <a href="../index.html" class="wf-back-to-index">← Back to Phase 2 index</a>
+  </div>
+
+  <div class="page-head">
+    <h1>New 11 — PUBLIC Participant: Quiz Form (responsive 0-5 slider)</h1>
+    <p>
+      Mobile (390 × 844) and desktop (1280 × 800) previews side-by-side.
+      The 32-question Website Assessment quiz form. 0-5 SLIDER_LIKERT scale (matches Esperto's actual scale, captured May 12 via direct inspection — "Weak" 0 → "Strong" 5).
+      Sticky header + progress (Q15 of 32). NO org name in header (PUBLIC quizzes aren't org-scoped).
+      Question text is placeholder; verbatim Esperto questions gate behind <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED</code> flag per v7.4.
+    </p>
+  </div>
+
+  <div class="viewport-pair">
+
+    <!-- MOBILE -->
+    <div class="viewport-frame mobile-frame">
+      <div class="viewport-frame__label"><span>Mobile</span><span class="viewport-frame__chrome">390 × 844 · iPhone-size</span></div>
+      <div class="viewport-frame__body">
+        <div class="quiz-shell screen">
+          <header class="quiz-header">
+            <a class="quiz-logo" href="#" aria-label="Scaling Up home">
+              <span class="quiz-logo__mark">SU</span>
+              <span class="quiz-logo__text">Scaling Up<span class="quiz-logo__sub">Assessment</span></span>
+            </a>
+          </header>
+
+          <div class="quiz-progress" aria-label="Quiz progress">
+            <div class="quiz-progress__row">
+              <span><strong>Question 15</strong> of 32</span>
+              <span>47%</span>
+            </div>
+            <div class="quiz-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="32" aria-valuenow="15">
+              <div class="quiz-progress__fill" style="width: 47%;"></div>
+            </div>
+          </div>
+
+          <main class="quiz-body">
+            <div class="question-card">
+              <span class="question-section">Strategy</span>
+              <h2 class="question-text">Our team is aligned on the company's #1 priority this quarter.</h2>
+              <div class="slider-answer" aria-live="polite">Your answer:<strong>3</strong></div>
+              <div class="slider-wrap">
+                <div class="slider-track">
+                  <div class="slider-track__rail" aria-hidden="true">
+                    <div class="slider-track__fill"></div>
+                  </div>
+                  <span class="slider-track__thumb" role="slider" aria-valuemin="0" aria-valuemax="5" aria-valuenow="3" tabindex="0"></span>
+                </div>
+                <div class="slider-track__ticks" aria-hidden="true">
+                  <span class="active">0</span><span class="active">1</span><span class="active">2</span><span class="active">3</span><span>4</span><span>5</span>
+                </div>
+                <div class="slider-anchors">
+                  <span><strong>0 — Weak</strong></span>
+                  <span><strong>5 — Strong</strong></span>
+                </div>
+              </div>
+            </div>
+          </main>
+
+          <div class="quiz-nav">
+            <a href="#" class="wf-btn wf-btn-primary">Next →</a>
+            <a href="#" class="wf-btn wf-btn-secondary">← Previous</a>
+          </div>
+
+          <div class="content-flag-note">
+            <strong>v7.4 content placeholder.</strong> Production-approved Esperto questions ("Everyone on the leadership team is an A player.", "All team members feel comfortable debating and discussing the brutal facts.", etc. — 32 total) gate behind <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>.
+          </div>
+
+          <footer class="quiz-footer">Powered by <strong>Scaling Up</strong></footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESKTOP -->
+    <div class="viewport-frame desktop-frame">
+      <div class="viewport-frame__label"><span>Desktop</span><span class="viewport-frame__chrome">1280 × 800</span></div>
+      <div class="viewport-frame__body">
+        <div class="quiz-shell screen">
+          <header class="quiz-header">
+            <a class="quiz-logo" href="#" aria-label="Scaling Up home">
+              <span class="quiz-logo__mark">SU</span>
+              <span class="quiz-logo__text">Scaling Up<span class="quiz-logo__sub">Assessment</span></span>
+            </a>
+          </header>
+
+          <div class="quiz-progress" aria-label="Quiz progress">
+            <div class="quiz-progress__row" style="max-width: 800px; margin-left: auto; margin-right: auto; width: 100%;">
+              <span><strong>Question 15</strong> of 32</span>
+              <span>47% complete</span>
+            </div>
+            <div class="quiz-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="32" aria-valuenow="15" style="max-width: 800px; margin: 0 auto;">
+              <div class="quiz-progress__fill" style="width: 47%;"></div>
+            </div>
+          </div>
+
+          <main class="quiz-body">
+            <div class="question-card">
+              <span class="question-section">Strategy</span>
+              <h2 class="question-text">Our team is aligned on the company's #1 priority this quarter.</h2>
+              <div class="slider-answer" aria-live="polite">Your answer:<strong>3</strong></div>
+              <div class="slider-wrap">
+                <div class="slider-track">
+                  <div class="slider-track__rail" aria-hidden="true">
+                    <div class="slider-track__fill"></div>
+                  </div>
+                  <span class="slider-track__thumb" role="slider" aria-valuemin="0" aria-valuemax="5" aria-valuenow="3" tabindex="0"></span>
+                </div>
+                <div class="slider-track__ticks" aria-hidden="true">
+                  <span class="active">0</span><span class="active">1</span><span class="active">2</span><span class="active">3</span><span>4</span><span>5</span>
+                </div>
+                <div class="slider-anchors">
+                  <span><strong>0 — Weak</strong></span>
+                  <span><strong>5 — Strong</strong></span>
+                </div>
+              </div>
+            </div>
+          </main>
+
+          <div class="quiz-nav">
+            <a href="#" class="wf-btn wf-btn-secondary">← Previous</a>
+            <a href="#" class="wf-btn wf-btn-primary">Next →</a>
+          </div>
+
+          <div class="content-flag-note" style="max-width: 800px; margin-left: auto; margin-right: auto;">
+            <strong>v7.4 content placeholder.</strong> Production-approved Esperto questions (32 verbatim items spanning People / Strategy / Execution / Cash) gate behind <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>.
+          </div>
+
+          <footer class="quiz-footer" style="padding: 1.25rem 2rem;">Powered by <strong>Scaling Up</strong></footer>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
