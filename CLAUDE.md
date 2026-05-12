@@ -17,10 +17,30 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 12, 2026 — Wave 8-D shipped: HubSpot coach_contract_status auto-approval with shadow mode + allowlist + fail-closed; 1114 tests; remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 externally blocked |
+| **Last Updated** | May 12, 2026 — Squash Round 12 complete (Waves 12-A/B/C/D + Wave 8-D): password hint fix, coach integration IDs, survey per-person ratings, custom price approval display, HubSpot auto-approval; 1114 tests; remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 externally blocked |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
+
+**Squash Round 12 — Jeff May 12 Follow-On Items** (May 12 2026, direct push to main, Alpha mode):
+Source: Jeff Verdun email "Bug List/Improvement List 5/12/26". Wave 11 already shipped double-email + format-default fixes. Wave 12 + Wave 8-D cover the remaining items. 1030 → 1114 tests (+84).
+
+**Wave 12-A — Password UI Label Fix:**
+- Password hint text in 3 UI surfaces corrected from "12 characters" → "8 characters" to match the Zod schema `.min(8)` already enforced since Sprint 1.
+- Files: `app/(public)/register/page.tsx`, `components/auth/change-password-form.tsx`.
+- New test file `__tests__/auth/password-hint-text.test.tsx` (2 RED→GREEN render tests).
+
+**Wave 12-B — Coach Integration IDs:**
+- `hubspotId` and `circleId` were in the Prisma schema (`Coach` model, both `String? @unique`) but not exposed in any UI.
+- Admin coach create form (`coaches/new/page.tsx`) and edit form (`coaches/[id]/edit/page.tsx`) now show editable "HubSpot Contact ID" + "Circle Member ID" text inputs via new `allowEditIntegrationIds?: boolean` prop on `CoachProfileForm`.
+- Coach portal settings page shows both IDs as read-only monospace text (no editing — protects HubSpot/Circle sync integrity).
+- API PATCH `api/coaches/[id]/route.ts`: coach session → 403; Prisma P2002 unique constraint on either ID → 409 with message "This HubSpot/Circle ID is already assigned to another coach".
+- New test file `__tests__/api/coach-integration-ids.test.ts` (3 tests: admin 200, coach 403, duplicate 409).
+
+**Wave 12-C — Survey Per-Person Ratings:**
+- `SurveyResultsView` (per-workshop view) now lists individual respondent ratings below the average for RATING/NPS questions. Uses existing `formatRespondentLabel()` helper (full name → email → "Anonymous"). Denominator: `/5` for RATING, `/10` for NPS.
+- `SurveyResultsPanel` (template editor aggregate view) distribution histogram was already implemented — 12-C-2 was a no-op.
+- New test file `__tests__/surveys/survey-results-per-person.test.tsx` (4 tests: named respondents, anonymous, email-only fallback, empty state).
 
 **Wave 12-D — Admin Approvals Price Display** (May 12 2026, direct push to main, Alpha mode):
 - Admin approvals list for CUSTOM_PRICING now shows both "Original" and "Requested" prices for easy comparison.
