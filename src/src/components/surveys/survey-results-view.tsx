@@ -126,14 +126,55 @@ export function SurveyResultsView({
 
                       {(question.questionType === "RATING" ||
                         question.questionType === "NPS") && (
-                        <div className="text-sm text-muted-foreground">
+                        <div className="space-y-2">
                           {(() => {
                             const nums = allAnswers
                               .filter((a) => a.numValue !== null)
                               .map((a) => a.numValue!);
-                            if (nums.length === 0) return "No responses";
+                            if (nums.length === 0) {
+                              return (
+                                <p className="text-sm text-muted-foreground">
+                                  No responses
+                                </p>
+                              );
+                            }
                             const avg = nums.reduce((s, n) => s + n, 0) / nums.length;
-                            return `Average: ${avg.toFixed(1)} (${nums.length} response${nums.length !== 1 ? "s" : ""})`;
+                            const denominator = question.questionType === "NPS" ? 10 : 5;
+                            // Build per-respondent entries using the same pattern as TEXT/TEXTAREA
+                            const perPerson = group.responses.flatMap((s) =>
+                              s.answers
+                                .filter(
+                                  (a) =>
+                                    a.questionId === question.id &&
+                                    a.numValue !== null
+                                )
+                                .map((a) => ({
+                                  answerId: a.id,
+                                  score: a.numValue!,
+                                  respondent: formatRespondentLabel(s.registration),
+                                }))
+                            );
+                            return (
+                              <>
+                                <p className="text-sm text-muted-foreground">
+                                  {`Average: ${avg.toFixed(1)} (${nums.length} response${nums.length !== 1 ? "s" : ""})`}
+                                </p>
+                                <div className="space-y-1 mt-1">
+                                  {perPerson.map((entry) => (
+                                    <div
+                                      key={entry.answerId}
+                                      className="flex items-center gap-2 text-sm text-foreground"
+                                    >
+                                      <span className="text-muted-foreground">●</span>
+                                      <span className="font-medium">{entry.respondent}:</span>
+                                      <span>
+                                        {entry.score}/{denominator}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            );
                           })()}
                         </div>
                       )}
