@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>New 12 — PUBLIC Participant Results Page (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    body { background: hsl(220 14% 96%); }
+
+    .page-head { max-width: 1280px; margin: 0 auto; padding: 1.5rem 2rem 0.5rem; }
+    .page-head h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 0.25rem; }
+    .page-head p { font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin: 0; }
+
+    .quiz-shell { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: hsl(var(--background)); color: hsl(var(--foreground)); min-height: 100%; display: flex; flex-direction: column; }
+
+    .quiz-header { position: sticky; top: 0; z-index: 10; background: hsl(var(--card)); border-bottom: 1px solid hsl(var(--border)); padding: 0.625rem 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .quiz-logo { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; color: hsl(var(--primary)); font-size: 0.9375rem; text-decoration: none; }
+    .quiz-logo__mark { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%)); color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem; }
+    .quiz-logo__text { line-height: 1.1; }
+    .quiz-logo__sub { display: block; font-size: 0.625rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+    .quiz-header__respondent { font-size: 0.75rem; color: hsl(var(--muted-foreground)); font-weight: 500; text-align: right; line-height: 1.2; }
+    .quiz-header__respondent strong { display: block; color: hsl(var(--foreground)); font-weight: 600; font-size: 0.8125rem; }
+
+    /* Email-confirmation banner */
+    .email-banner { padding: 0.625rem 1.25rem; background: hsl(160 84% 95%); border-bottom: 1px solid hsl(160 84% 80%); color: hsl(160 84% 22%); font-size: 0.75rem; font-weight: 500; display: flex; align-items: center; gap: 0.5rem; }
+    .email-banner::before { content: '✓'; font-weight: 700; }
+
+    .results-body { flex: 1; padding: 1.5rem 1.25rem 0; }
+
+    /* Welcome video placeholder */
+    .welcome-video {
+      background: hsl(var(--muted));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      aspect-ratio: 16/9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.625rem;
+      color: hsl(var(--muted-foreground));
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+    .welcome-video__icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%));
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      box-shadow: var(--shadow-lg);
+    }
+    .welcome-video__label { font-size: 0.8125rem; font-weight: 600; color: hsl(var(--foreground)); }
+    .welcome-video__sub { font-size: 0.6875rem; opacity: 0.85; text-align: center; padding: 0 1rem; }
+    .welcome-video__flag { position: absolute; top: 0.625rem; right: 0.625rem; font-size: 0.5625rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 0.1875rem 0.5rem; background: hsl(38 92% 95%); color: hsl(26 83% 30%); border-radius: 9999px; }
+
+    /* 4 Decisions score bars */
+    .decisions-block { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 1.25rem 1.25rem; box-shadow: var(--shadow-xs); margin-bottom: 1.5rem; }
+    .decisions-title { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: hsl(var(--muted-foreground)); margin: 0 0 0.875rem; }
+    .decisions-grid { display: grid; grid-template-columns: 1fr; gap: 0.875rem; }
+    .decision { display: flex; flex-direction: column; gap: 0.375rem; }
+    .decision__head { display: flex; justify-content: space-between; align-items: baseline; }
+    .decision__name { font-size: 0.875rem; font-weight: 600; color: hsl(var(--foreground)); }
+    .decision__score { font-size: 0.875rem; font-weight: 700; color: hsl(var(--primary)); font-variant-numeric: tabular-nums; }
+    .decision__bar { height: 8px; background: hsl(var(--muted)); border-radius: 9999px; overflow: hidden; }
+    .decision__fill { height: 100%; border-radius: 9999px; background: linear-gradient(90deg, hsl(224 76% 48%), hsl(224 76% 58%)); }
+    .decision--strong .decision__fill { background: linear-gradient(90deg, hsl(160 84% 40%), hsl(160 84% 50%)); }
+    .decision--strong .decision__score { color: hsl(160 84% 40%); }
+    .decision--weak .decision__fill { background: linear-gradient(90deg, hsl(0 75% 50%), hsl(0 75% 60%)); }
+    .decision--weak .decision__score { color: hsl(0 75% 50%); }
+
+    /* Narrative sections */
+    .narrative { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 1.25rem 1.25rem; box-shadow: var(--shadow-xs); margin-bottom: 1.5rem; }
+    .narrative h3 { font-size: 1.0625rem; font-weight: 700; letter-spacing: -0.005em; margin: 0 0 0.625rem; color: hsl(var(--foreground)); }
+    .narrative p { font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin: 0 0 0.75rem; line-height: 1.55; }
+    .narrative p:last-child { margin-bottom: 0; }
+    .narrative__flag-note { margin-top: 1rem; padding: 0.625rem 0.875rem; background: hsl(38 92% 95%); border: 1px solid hsl(38 92% 80%); border-radius: 8px; font-size: 0.6875rem; color: hsl(26 83% 30%); line-height: 1.4; }
+    .narrative__flag-note strong { font-weight: 700; }
+
+    /* Primary CTA */
+    .primary-cta-wrap { padding: 0.5rem 0 1.5rem; text-align: center; }
+    .primary-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.625rem;
+      padding: 1rem 1.5rem;
+      background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%));
+      color: white;
+      font-size: 0.9375rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      border-radius: 10px;
+      text-decoration: none;
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .primary-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(29, 78, 216, 0.35); }
+    .primary-cta__arrow { font-size: 1.0625rem; }
+
+    /* Secondary contact panel */
+    .contact-panel { padding: 0 1.25rem 1.5rem; text-align: center; font-size: 0.8125rem; color: hsl(var(--muted-foreground)); line-height: 1.6; }
+    .contact-panel a { color: hsl(var(--primary)); text-decoration: none; font-weight: 600; }
+    .contact-panel a:hover { text-decoration: underline; }
+
+    /* Verne signature footer */
+    .signature {
+      background: hsl(var(--muted));
+      padding: 1.5rem 1.25rem;
+      margin-top: 0;
+      text-align: center;
+      border-top: 1px solid hsl(var(--border));
+      position: relative;
+    }
+    .signature__copy { font-size: 0.8125rem; color: hsl(var(--foreground)); line-height: 1.55; max-width: 540px; margin: 0 auto; }
+    .signature__copy strong { font-weight: 700; }
+    .signature__phone { display: block; margin-top: 0.625rem; font-size: 0.75rem; color: hsl(var(--muted-foreground)); }
+    .signature__flag { position: absolute; top: 0.625rem; right: 0.625rem; font-size: 0.5625rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 0.1875rem 0.5rem; background: hsl(38 92% 95%); color: hsl(26 83% 30%); border-radius: 9999px; }
+
+    .quiz-footer { padding: 1rem 1.25rem; text-align: center; font-size: 0.6875rem; color: hsl(var(--muted-foreground)); border-top: 1px solid hsl(var(--border)); letter-spacing: 0.02em; }
+    .quiz-footer strong { color: hsl(var(--foreground)); font-weight: 600; }
+
+    /* Desktop adjustments */
+    .desktop-frame .quiz-header { padding: 0.75rem 2rem; }
+    .desktop-frame .email-banner { padding: 0.75rem 2rem; }
+    .desktop-frame .results-body { padding: 2rem 2rem 0; max-width: 800px; margin: 0 auto; width: 100%; }
+    .desktop-frame .decisions-grid { grid-template-columns: 1fr 1fr; gap: 1rem 1.5rem; }
+    .desktop-frame .primary-cta-wrap { padding: 0.5rem 2rem 2rem; max-width: 800px; margin: 0 auto; }
+    .desktop-frame .contact-panel { padding: 0 2rem 2rem; }
+    .desktop-frame .signature { padding: 2rem 2rem; }
+    .desktop-frame .narrative h3 { font-size: 1.1875rem; }
+    .desktop-frame .narrative p { font-size: 0.9375rem; }
+
+    /* Mobile adjustments */
+    .mobile-frame .quiz-header { padding: 0.625rem 1rem; }
+    .mobile-frame .results-body { padding: 1rem; }
+    .mobile-frame .decisions-block { padding: 1rem; }
+    .mobile-frame .narrative { padding: 1rem; }
+  </style>
+</head>
+<body>
+
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 12 (PUBLIC results page, Esperto pattern, content-flagged).</span>
+    <a href="../index.html" class="wf-back-to-index">← Back to Phase 2 index</a>
+  </div>
+
+  <div class="page-head">
+    <h1>New 12 — PUBLIC Participant: Results Page (Esperto pattern, content-flagged)</h1>
+    <p>
+      Mobile (390 × 844) and desktop (1280 × 800) previews side-by-side.
+      Final screen in the PUBLIC participant flow — rendered post-contact-form-submit per Esperto's end-loaded pattern.
+      Structure verbatim from Esperto (captured May 12 via direct inspection): Vimeo welcome video → 4 Decisions score bars → narrative sections → primary CTA → secondary contact → Verne signature footer.
+      <strong>Esperto-derived content (Vimeo video, narrative copy, Verne signature) renders as placeholder by default in v1; production content gates behind <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>.</strong>
+      Mock scores: People 40/50, Strategy 24/30, Execution 24/30, Cash 24/30.
+    </p>
+  </div>
+
+  <div class="viewport-pair">
+
+    <!-- MOBILE -->
+    <div class="viewport-frame mobile-frame">
+      <div class="viewport-frame__label"><span>Mobile</span><span class="viewport-frame__chrome">390 × 844 · iPhone-size</span></div>
+      <div class="viewport-frame__body">
+        <div class="quiz-shell screen">
+          <header class="quiz-header">
+            <a class="quiz-logo" href="#" aria-label="Scaling Up home">
+              <span class="quiz-logo__mark">SU</span>
+              <span class="quiz-logo__text">Scaling Up<span class="quiz-logo__sub">Assessment</span></span>
+            </a>
+            <div class="quiz-header__respondent">
+              <strong>Jane Doe</strong>
+              Your results
+            </div>
+          </header>
+
+          <div class="email-banner">
+            Your results have been emailed to you and to <strong style="color: inherit;">coach@scalingup.com</strong>
+          </div>
+
+          <main class="results-body">
+            <!-- Welcome video placeholder (gated) -->
+            <div class="welcome-video" aria-label="Welcome video placeholder">
+              <span class="welcome-video__flag">Placeholder</span>
+              <div class="welcome-video__icon">▶</div>
+              <span class="welcome-video__label">Welcome to your assessment</span>
+              <span class="welcome-video__sub">Production renders Vimeo 1127444963 (Verne Harnish welcome) once <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>.</span>
+            </div>
+
+            <!-- 4 Decisions score bars -->
+            <div class="decisions-block">
+              <p class="decisions-title">Your 4 Decisions scores</p>
+              <div class="decisions-grid">
+                <div class="decision decision--strong">
+                  <div class="decision__head">
+                    <span class="decision__name">People</span>
+                    <span class="decision__score">40 / 50</span>
+                  </div>
+                  <div class="decision__bar"><div class="decision__fill" style="width: 80%;"></div></div>
+                </div>
+                <div class="decision">
+                  <div class="decision__head">
+                    <span class="decision__name">Strategy</span>
+                    <span class="decision__score">24 / 30</span>
+                  </div>
+                  <div class="decision__bar"><div class="decision__fill" style="width: 80%;"></div></div>
+                </div>
+                <div class="decision">
+                  <div class="decision__head">
+                    <span class="decision__name">Execution</span>
+                    <span class="decision__score">24 / 30</span>
+                  </div>
+                  <div class="decision__bar"><div class="decision__fill" style="width: 80%;"></div></div>
+                </div>
+                <div class="decision">
+                  <div class="decision__head">
+                    <span class="decision__name">Cash</span>
+                    <span class="decision__score">24 / 30</span>
+                  </div>
+                  <div class="decision__bar"><div class="decision__fill" style="width: 80%;"></div></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Narrative sections -->
+            <div class="narrative">
+              <h3>Your Results</h3>
+              <p>Your responses suggest a strong foundation across the 4 Decisions. There are specific areas where focused attention this quarter could move you forward.</p>
+              <p>Below: a few short notes on where to start, what comes next, and how a Scaling Up coach can help.</p>
+              <div class="narrative__flag-note">
+                <strong>v7.4 placeholder copy.</strong> Production renders verbatim Esperto narrative ("Where to Start", "Next step", "Complimentary One-Hour") once <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>.
+              </div>
+            </div>
+
+            <!-- Primary CTA -->
+            <div class="primary-cta-wrap">
+              <a class="primary-cta" href="https://coaches.scalingup.com/coach-match-after-assessment-form" target="_blank" rel="noopener">
+                Yes — I'd like a complimentary follow-up
+                <span class="primary-cta__arrow">→</span>
+              </a>
+            </div>
+
+            <!-- Secondary contact panel -->
+            <div class="contact-panel">
+              Questions? Email us at <a href="mailto:coach@scalingup.com">coach@scalingup.com</a> or visit our <a href="https://scalingup.com/" target="_blank" rel="noopener">website</a>.
+            </div>
+          </main>
+
+          <!-- Verne signature footer -->
+          <section class="signature" aria-label="Author signature">
+            <span class="signature__flag">Placeholder</span>
+            <p class="signature__copy">
+              Production renders the Verne Harnish signature block here (verbatim from Esperto: "Keep Scaling, / Verne Harnish, CEO / Scaling Up" + book references) once <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>.
+            </p>
+            <span class="signature__phone">703-858-2300</span>
+          </section>
+
+          <footer class="quiz-footer">Powered by <strong>Scaling Up</strong></footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESKTOP -->
+    <div class="viewport-frame desktop-frame">
+      <div class="viewport-frame__label"><span>Desktop</span><span class="viewport-frame__chrome">1280 × 800</span></div>
+      <div class="viewport-frame__body">
+        <div class="quiz-shell screen">
+          <header class="quiz-header">
+            <a class="quiz-logo" href="#" aria-label="Scaling Up home">
+              <span class="quiz-logo__mark">SU</span>
+              <span class="quiz-logo__text">Scaling Up<span class="quiz-logo__sub">Assessment</span></span>
+            </a>
+            <div class="quiz-header__respondent">
+              <strong>Jane Doe</strong>
+              Your results
+            </div>
+          </header>
+
+          <div class="email-banner">
+            Your results have been emailed to you and to <strong style="color: inherit;">coach@scalingup.com</strong>
+          </div>
+
+          <main class="results-body">
+            <div class="welcome-video" aria-label="Welcome video placeholder">
+              <span class="welcome-video__flag">Placeholder</span>
+              <div class="welcome-video__icon">▶</div>
+              <span class="welcome-video__label">Welcome to your assessment</span>
+              <span class="welcome-video__sub">Production renders Vimeo 1127444963 (Verne Harnish welcome) once <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>.</span>
+            </div>
+
+            <div class="decisions-block">
+              <p class="decisions-title">Your 4 Decisions scores</p>
+              <div class="decisions-grid">
+                <div class="decision decision--strong">
+                  <div class="decision__head"><span class="decision__name">People</span><span class="decision__score">40 / 50</span></div>
+                  <div class="decision__bar"><div class="decision__fill" style="width: 80%;"></div></div>
+                </div>
+                <div class="decision">
+                  <div class="decision__head"><span class="decision__name">Strategy</span><span class="decision__score">24 / 30</span></div>
+                  <div class="decision__bar"><div class="decision__fill" style="width: 80%;"></div></div>
+                </div>
+                <div class="decision">
+                  <div class="decision__head"><span class="decision__name">Execution</span><span class="decision__score">24 / 30</span></div>
+                  <div class="decision__bar"><div class="decision__fill" style="width: 80%;"></div></div>
+                </div>
+                <div class="decision">
+                  <div class="decision__head"><span class="decision__name">Cash</span><span class="decision__score">24 / 30</span></div>
+                  <div class="decision__bar"><div class="decision__fill" style="width: 80%;"></div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="narrative">
+              <h3>Your Results</h3>
+              <p>Your responses suggest a strong foundation across the 4 Decisions. There are specific areas where focused attention this quarter could move you forward.</p>
+              <p>Below: a few short notes on where to start, what comes next, and how a Scaling Up coach can help.</p>
+              <div class="narrative__flag-note">
+                <strong>v7.4 placeholder copy.</strong> Production renders verbatim Esperto narrative ("Where to Start", "Next step", "Complimentary One-Hour") once <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>.
+              </div>
+            </div>
+          </main>
+
+          <div class="primary-cta-wrap">
+            <a class="primary-cta" href="https://coaches.scalingup.com/coach-match-after-assessment-form" target="_blank" rel="noopener">
+              Yes — I'd like a complimentary follow-up
+              <span class="primary-cta__arrow">→</span>
+            </a>
+          </div>
+
+          <div class="contact-panel">
+            Questions? Email us at <a href="mailto:coach@scalingup.com">coach@scalingup.com</a> or visit our <a href="https://scalingup.com/" target="_blank" rel="noopener">website</a>.
+          </div>
+
+          <section class="signature" aria-label="Author signature">
+            <span class="signature__flag">Placeholder</span>
+            <p class="signature__copy">
+              Production renders the Verne Harnish signature block here (verbatim from Esperto: "Keep Scaling, / Verne Harnish, CEO / Scaling Up" + book references — Scaling Up / The Greatest Business Decisions of All Time / Mastering the Rockefeller Habits) once <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>.
+            </p>
+            <span class="signature__phone">703-858-2300</span>
+          </section>
+
+          <footer class="quiz-footer" style="padding: 1.25rem 2rem;">Powered by <strong>Scaling Up</strong></footer>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
