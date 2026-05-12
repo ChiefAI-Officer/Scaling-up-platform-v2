@@ -1,8 +1,11 @@
 import https from "https";
 import { Client } from "@hubspot/api-client";
 import { FilterOperatorEnum } from "@hubspot/api-client/lib/codegen/crm/contacts";
+import { getCachedLookup, setCachedLookup } from "./hubspot-lookup-cache";
 
 const HUBSPOT_TIMEOUT_MS = 15_000;
+const HUBSPOT_LOOKUP_ABORT_MS = 8_000;
+const HUBSPOT_LOOKUP_CACHE_TTL_MS = 5 * 60_000;
 
 function isHubSpotConfigured(): boolean {
   return !!process.env.HUBSPOT_ACCESS_TOKEN;
@@ -23,10 +26,35 @@ function getHubSpotClient(): Client {
   return _hubspotClient;
 }
 
-// Backward-compatible export
+// Backward-compatible export.
+//
+// BUG-MAY11-2 fix: the previous Proxy passed `receiver` (the Proxy itself) to
+// `Reflect.get`, so HubSpot Client getters that lazy-cached on `this` wrote
+// their cache to the Proxy's empty target object — every chained read then
+// returned undefined. Drop `receiver`, return raw values, and bind top-level
+// functions back to the real client. Per-(client, prop) WeakMap cache keeps
+// bound function identity stable across reads so callers that store or
+// compare SDK method references keep working.
+const _hubspotBoundCache = new WeakMap<Client, Map<string | symbol, unknown>>();
+
 const hubspotClient = new Proxy({} as Client, {
-  get(_target, prop, receiver) {
-    return Reflect.get(getHubSpotClient(), prop, receiver);
+  get(_target, prop) {
+    const client = getHubSpotClient();
+    const value = (client as unknown as Record<string | symbol, unknown>)[
+      prop as string | symbol
+    ];
+    if (typeof value !== "function") return value;
+    let cache = _hubspotBoundCache.get(client);
+    if (!cache) {
+      cache = new Map();
+      _hubspotBoundCache.set(client, cache);
+    }
+    let bound = cache.get(prop);
+    if (!bound) {
+      bound = (value as (...args: unknown[]) => unknown).bind(client);
+      cache.set(prop, bound);
+    }
+    return bound;
   },
 });
 
@@ -332,57 +360,126 @@ export interface HubSpotSideCardContact {
 export type HubSpotLookupResult =
   | { kind: "unconfigured" }
   | { kind: "not_found" }
-  | { kind: "error"; status: number; category?: string }
+  | {
+      kind: "error";
+      status: number;
+      category?: string;
+      reason?: "timeout" | "sdk" | "unknown";
+    }
   | { kind: "found"; contact: HubSpotSideCardContact };
 
 export async function lookupHubSpotContact(
   email: string,
 ): Promise<HubSpotLookupResult> {
+  // Runtime kill switch — operator flips HUBSPOT_SIDE_CARD_ENABLED="false" +
+  // redeploys to disable the side card without code changes (Wave 8-A rollback).
+  if (process.env.HUBSPOT_SIDE_CARD_ENABLED === "false") {
+    return { kind: "unconfigured" };
+  }
   if (!isHubSpotConfigured()) {
     return { kind: "unconfigured" };
   }
-  try {
-    const searchResponse = await hubspotClient.crm.contacts.searchApi.doSearch({
-      filterGroups: [
-        {
-          filters: [
-            {
-              propertyName: "email",
-              operator: FilterOperatorEnum.Eq,
-              value: email,
-            },
-          ],
-        },
-      ],
-      properties: [
-        "email",
-        "firstname",
-        "lastname",
-        "lifecyclestage",
-        "lastmodifieddate",
-      ],
-      limit: 1,
-    });
 
+  const cached = getCachedLookup(email);
+  if (cached) {
+    console.info(
+      `[hubspot.lookup] kind=${cached.kind} durationMs=0 cacheHit=true`,
+    );
+    return cached;
+  }
+
+  const start = Date.now();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    HUBSPOT_LOOKUP_ABORT_MS,
+  );
+
+  try {
+    const searchResponse = await hubspotClient.crm.contacts.searchApi.doSearch(
+      {
+        filterGroups: [
+          {
+            filters: [
+              {
+                propertyName: "email",
+                operator: FilterOperatorEnum.Eq,
+                value: email,
+              },
+            ],
+          },
+        ],
+        properties: [
+          "email",
+          "firstname",
+          "lastname",
+          "lifecyclestage",
+          "lastmodifieddate",
+        ],
+        limit: 1,
+      },
+      // HubSpot SDK forwards request options to its underlying HTTP client;
+      // `signal` lets us abort on timeout. Typed as never because the SDK's
+      // public signature does not yet expose the options arg.
+      { signal: controller.signal } as unknown as never,
+    );
+
+    const durationMs = Date.now() - start;
     const first = searchResponse.results?.[0];
     if (!first) {
-      return { kind: "not_found" };
+      const result: HubSpotLookupResult = { kind: "not_found" };
+      setCachedLookup(email, result, Date.now() + HUBSPOT_LOOKUP_CACHE_TTL_MS);
+      console.info(
+        `[hubspot.lookup] kind=not_found durationMs=${durationMs} cacheHit=false`,
+      );
+      return result;
     }
-    return {
+    const result: HubSpotLookupResult = {
       kind: "found",
       contact: {
         id: first.id,
-        properties: (first.properties ?? {}) as HubSpotSideCardContact["properties"],
+        properties: (first.properties ??
+          {}) as HubSpotSideCardContact["properties"],
       },
     };
+    setCachedLookup(email, result, Date.now() + HUBSPOT_LOOKUP_CACHE_TTL_MS);
+    console.info(
+      `[hubspot.lookup] kind=found durationMs=${durationMs} cacheHit=false`,
+    );
+    return result;
   } catch (error: unknown) {
-    // Sanitized: never log the searched email, raw body, or headers.
-    const e = error as { code?: number; status?: number; body?: { category?: string } };
+    const durationMs = Date.now() - start;
+    const e = error as {
+      code?: number | string;
+      status?: number;
+      name?: string;
+      body?: { category?: string };
+    };
+    const isAbort =
+      e?.name === "AbortError" ||
+      e?.code === "ABORT_ERR" ||
+      e?.code === "ERR_CANCELED";
+    if (isAbort) {
+      console.error(
+        `[hubspot.lookup] kind=error reason=timeout status=0 durationMs=${durationMs} cacheHit=false`,
+      );
+      return { kind: "error", status: 0, reason: "timeout" };
+    }
     const status =
-      typeof e?.code === "number" ? e.code : typeof e?.status === "number" ? e.status : 0;
+      typeof e?.code === "number"
+        ? e.code
+        : typeof e?.status === "number"
+          ? e.status
+          : 0;
     const category = e?.body?.category;
-    console.error("[HubSpot] side-card lookup failed:", { status, category });
-    return { kind: "error", status, category };
+    const reason: "sdk" | "unknown" = status === 0 ? "sdk" : "unknown";
+    // Sanitized: never log the searched email, raw body, or headers.
+    console.error(
+      `[hubspot.lookup] kind=error status=${status} reason=${reason} durationMs=${durationMs} cacheHit=false`,
+    );
+    return { kind: "error", status, category, reason };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

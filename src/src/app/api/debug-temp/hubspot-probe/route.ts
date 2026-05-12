@@ -1,37 +1,91 @@
 /**
- * TEMPORARY DIAGNOSTIC — Wave 7-C HubSpot side card triage.
+ * TEMPORARY DIAGNOSTIC — Wave 8-A HubSpot Proxy fix verification.
  *
- * Admin+staff only. Returns the discriminated lookup result + raw error
- * details (status, category, message hint) so we can diagnose why every
- * lookup is returning the error state. To be deleted once the issue is
- * identified.
+ * Hardened per Codex round-2/round-3:
+ * - ADMIN-only (no STAFF)
+ * - Lookup by `?coachId=<cuid>` so real emails never appear in URL access logs
+ * - Short-lived `?ack=wave8a` guard — refuse without it
+ * - Optional `?isolation=1` compares the shared Proxy path against a fresh
+ *   `new Client({ accessToken, httpAgent })` to isolate Proxy vs httpAgent
+ *   as the failure variable
+ * - Response is sanitized: no body, no message, no email
+ * - Includes `deployedCommit` so verify steps can pin a specific Vercel build
  *
- * Query: ?email=<coach email>
+ * Lifetime: deleted in Wave 8-B once live verification passes.
  */
 
+import https from "https";
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@hubspot/api-client";
 import { FilterOperatorEnum } from "@hubspot/api-client/lib/codegen/crm/contacts";
-import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { z } from "zod";
+import { getApiActor } from "@/lib/auth/authorization";
+import { db } from "@/lib/db";
 import { lookupHubSpotContact } from "@/services/hubspot";
+
+const querySchema = z.object({
+  coachId: z.string().cuid(),
+  ack: z.literal("wave8a"),
+  isolation: z.enum(["0", "1"]).optional(),
+});
+
+type IsolationOutcome =
+  | { kind: "skipped" }
+  | { kind: "success"; httpAgentPresent: boolean }
+  | { kind: "error"; status: number; category?: string };
 
 export async function GET(request: NextRequest) {
   const actor = await getApiActor();
-  if (!actor || !isPrivilegedRole(actor.role)) {
+  if (!actor || actor.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const email = request.nextUrl.searchParams.get("email");
-  if (!email) {
-    return NextResponse.json({ error: "Missing ?email=" }, { status: 400 });
-  }
-  const tokenSet = Boolean(process.env.HUBSPOT_ACCESS_TOKEN);
-  const result = await lookupHubSpotContact(email);
 
-  // Direct unwrapped call to surface raw error shape for diagnosis.
-  // Will be deleted once root cause identified.
-  let rawErr: Record<string, unknown> | null = null;
+  const params = Object.fromEntries(request.nextUrl.searchParams.entries());
+  const parsed = querySchema.safeParse(params);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Bad request" }, { status: 400 });
+  }
+  const { coachId, isolation } = parsed.data;
+
+  const coach = await db.coach.findUnique({
+    where: { id: coachId },
+    select: { email: true },
+  });
+  if (!coach?.email) {
+    return NextResponse.json({ error: "Coach not found" }, { status: 404 });
+  }
+
+  const deployedCommit =
+    process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null;
+
+  const shared = await lookupHubSpotContact(coach.email);
+  const sharedSanitized =
+    shared.kind === "error"
+      ? { kind: shared.kind, status: shared.status, category: shared.category }
+      : shared.kind === "found"
+        ? { kind: shared.kind, id: shared.contact.id }
+        : { kind: shared.kind };
+
+  let isolationOutcome: IsolationOutcome = { kind: "skipped" };
+  if (isolation === "1") {
+    isolationOutcome = await runIsolationProbe(coach.email);
+  }
+
+  return NextResponse.json({
+    deployedCommit,
+    tokenSet: Boolean(process.env.HUBSPOT_ACCESS_TOKEN),
+    shared: sharedSanitized,
+    isolation: isolationOutcome,
+  });
+}
+
+async function runIsolationProbe(email: string): Promise<IsolationOutcome> {
+  const httpAgent = new https.Agent({ timeout: 15_000 });
+  const client = new Client({
+    accessToken: process.env.HUBSPOT_ACCESS_TOKEN,
+    httpAgent,
+  });
   try {
-    const client = new Client({ accessToken: process.env.HUBSPOT_ACCESS_TOKEN });
     await client.crm.contacts.searchApi.doSearch({
       filterGroups: [
         {
@@ -40,33 +94,22 @@ export async function GET(request: NextRequest) {
           ],
         },
       ],
-      properties: ["email", "firstname", "lastname", "lifecyclestage", "lastmodifieddate"],
+      properties: ["email", "lifecyclestage", "lastmodifieddate"],
       limit: 1,
     });
-  } catch (err: unknown) {
-    const e = err as {
-      code?: unknown;
-      status?: unknown;
-      name?: unknown;
-      message?: unknown;
-      body?: unknown;
+    return { kind: "success", httpAgentPresent: true };
+  } catch (error: unknown) {
+    const e = error as {
+      code?: number | string;
+      status?: number;
+      body?: { category?: string };
     };
-    rawErr = {
-      typeofErr: typeof err,
-      constructorName:
-        err && typeof err === "object" ? err.constructor?.name ?? null : null,
-      name: e?.name ?? null,
-      message: typeof e?.message === "string" ? e.message : null,
-      code: e?.code ?? null,
-      status: e?.status ?? null,
-      bodyType: typeof e?.body,
-      bodyPreview:
-        typeof e?.body === "string"
-          ? e.body.slice(0, 500)
-          : JSON.stringify(e?.body ?? null).slice(0, 500),
-      keys: err && typeof err === "object" ? Object.keys(err) : [],
-    };
+    const status =
+      typeof e?.code === "number"
+        ? e.code
+        : typeof e?.status === "number"
+          ? e.status
+          : 0;
+    return { kind: "error", status, category: e?.body?.category };
   }
-
-  return NextResponse.json({ tokenSet, result, rawErr });
 }
