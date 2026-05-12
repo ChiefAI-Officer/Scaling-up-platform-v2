@@ -33,7 +33,7 @@ instead. v7.3 had 13 Wave 1 tasks; v7.4 has 9.
 | #     | Task                                                          | Status |
 |-------|---------------------------------------------------------------|--------|
 | 1     | Revised 08 — Individual Results (visual refinement)           | [x]    |
-| 2     | Revised 09 — Team Aggregate Panel (per Jeff May 8 feedback)   | [ ]    |
+| 2     | Revised 02 — Wizard Step 2: Participants (assign-only)        | [x]    |
 | 3     | Revised 10 — Trends Page (per Jeff May 8 feedback)            | [ ]    |
 | 7     | New — INVITED Participant: Survey Start                       | [ ]    |
 | 8     | New — INVITED Participant: Survey In-Progress (slider)        | [ ]    |

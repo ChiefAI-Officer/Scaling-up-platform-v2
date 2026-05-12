@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Revised 02 — Wizard Step 2: Participants (assign-only) (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ---------- Admin shell (sidebar + main, mirrored from Phase 1 _shared.css) ---------- */
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 0.875rem;
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+
+    .wf-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-breadcrumb {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page {
+      padding: 2rem;
+      width: 100%;
+    }
+    .wf-page-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .wf-page-subtitle {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.9375rem;
+      margin: 0;
+    }
+
+    /* ---------- Stepper ---------- */
+    .wf-stepper {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin: 1.5rem 0;
+    }
+    .wf-stepper-item {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      flex: 1;
+    }
+    .wf-stepper-item:not(:last-child)::after {
+      content: "";
+      flex: 1;
+      height: 2px;
+      background: hsl(var(--border));
+      margin: 0 0.75rem;
+    }
+    .wf-stepper-item.is-complete:not(:last-child)::after {
+      background: hsl(var(--primary));
+    }
+    .wf-stepper-circle {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .wf-stepper-item.is-active .wf-stepper-circle {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-stepper-item.is-complete .wf-stepper-circle {
+      background: hsl(var(--success));
+      color: white;
+    }
+    .wf-stepper-label {
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-stepper-item.is-active .wf-stepper-label,
+    .wf-stepper-item.is-complete .wf-stepper-label {
+      color: hsl(var(--foreground));
+      font-weight: 500;
+    }
+
+    /* ---------- Form inputs ---------- */
+    .wf-input {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      border: 1px solid hsl(var(--border));
+      font-size: 0.875rem;
+      background: hsl(var(--card));
+      color: hsl(var(--foreground));
+      font-family: inherit;
+    }
+    .wf-input:focus {
+      outline: none;
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+    }
+
+    /* ---------- Tree (team hierarchy) ---------- */
+    .wf-tree { list-style: none; padding: 0; margin: 0; font-size: 0.875rem; }
+    .wf-tree li { padding: 0; margin: 0; }
+    .wf-tree-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.375rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .wf-tree-row:hover { background: hsl(var(--muted)); }
+    .wf-tree-children { padding-left: 1.5rem; list-style: none; }
+    .wf-tree-count {
+      margin-left: auto;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+    }
+
+    .tree-checkbox {
+      width: 16px; height: 16px;
+      border: 1.5px solid hsl(var(--border));
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .tree-checkbox.is-checked {
+      background: hsl(var(--primary));
+      border-color: hsl(var(--primary));
+      color: white;
+    }
+    .tree-checkbox.is-partial {
+      background: hsl(var(--primary) / 0.4);
+      border-color: hsl(var(--primary));
+    }
+    .tree-checkbox::after { content: ""; }
+    .tree-checkbox.is-checked::after { content: "✓"; font-size: 11px; font-weight: 800; }
+    .tree-checkbox.is-partial::after { content: "—"; font-size: 12px; font-weight: 800; color: white; }
+    .tree-toggle {
+      width: 16px;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.625rem;
+      flex-shrink: 0;
+    }
+
+    /* ---------- Two-pane grid ---------- */
+    .pane-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .pane-toolbar {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    /* ---------- Selected pills ---------- */
+    .selected-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.625rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+    }
+    .selected-pill-info { flex: 1; min-width: 0; }
+    .selected-pill-name { font-size: 0.875rem; font-weight: 500; }
+    .selected-pill-meta {
+      font-size: 0.75rem; color: hsl(var(--muted-foreground));
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .selected-pill-x {
+      color: hsl(var(--muted-foreground));
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0 0.25rem;
+    }
+    .selected-pill-x:hover { color: hsl(var(--destructive)); }
+
+    /* ---------- Hint banner (replaces the removed ad-hoc form) ---------- */
+    .hint-banner {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px dashed hsl(var(--border));
+    }
+    .hint-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.875rem 1rem;
+      background: hsl(var(--muted));
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      color: hsl(var(--foreground));
+      line-height: 1.5;
+    }
+    .hint-card__icon {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700;
+      font-size: 0.875rem;
+    }
+    .hint-card__body { flex: 1; min-width: 0; }
+    .hint-card__body a {
+      color: hsl(var(--primary));
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .hint-card__body a:hover { text-decoration: underline; }
+
+    /* ---------- Invited-only note (yellow secondary) ---------- */
+    .invited-note {
+      margin-top: 1rem;
+      background: hsl(38 92% 95%);
+      border: 1px solid hsl(38 92% 80%);
+      color: hsl(26 83% 30%);
+      padding: 0.625rem 0.875rem;
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      line-height: 1.5;
+    }
+    .invited-note strong { font-weight: 700; }
+
+    /* ---------- Card (reused in both panes) ---------- */
+    .wf-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-xs);
+    }
+    .wf-card-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .wf-card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 0.125rem;
+    }
+    .wf-card-description {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.875rem;
+      margin: 0;
+    }
+    .wf-card-body { padding: 1.5rem; }
+
+    /* ---------- Wizard nav footer ---------- */
+    .wf-wizard-nav {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Wireframe banner -->
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 2 (revised 02, Step 2 assign-only per Jeff May 8).</span>
+    <a href="../index.html">← Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page header -->
+  <div class="page-head">
+    <h1>Revised 02 — Wizard Step 2: Participants (assign-only)</h1>
+    <p>
+      Step 2 only appears for <strong>INVITED</strong> templates. Member creation is admin-side; this step assigns existing members to the campaign.
+      Deltas vs Phase 1: the "Add ad-hoc member" form is removed and replaced with a hint banner pointing to the admin User Setup page.
+    </p>
+  </div>
+
+  <!-- Admin shell -->
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">SU</span>
+        <span>Scaling Up Platform</span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Workspace</div>
+        <a class="wf-sidebar-link" href="#">📊 Dashboard</a>
+        <a class="wf-sidebar-link" href="#">📋 Workshops</a>
+        <a class="wf-sidebar-link is-active" href="#">🏢 Organizations</a>
+        <a class="wf-sidebar-link" href="#">👥 Coaches</a>
+        <a class="wf-sidebar-link" href="#">🧾 Approvals</a>
+        <div class="wf-sidebar-section-title">Content</div>
+        <a class="wf-sidebar-link" href="#">📐 Templates</a>
+        <a class="wf-sidebar-link" href="#">⚙ Workflows</a>
+        <a class="wf-sidebar-link" href="#">🗂 Files</a>
+      </nav>
+    </aside>
+
+    <div class="wf-main">
+      <header class="wf-topbar">
+        <nav class="wf-breadcrumb">
+          <a href="#">Organizations</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Acme Corporation</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">New Assessment</span>
+        </nav>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span class="wf-text-xs wf-text-muted">Signed in as <strong>jeff@scalingup.com</strong></span>
+        </div>
+      </header>
+
+      <div class="wf-page">
+        <div class="wf-page-header">
+          <h1 class="wf-page-title">Choose Participants</h1>
+          <p class="wf-page-subtitle">
+            Step 2 of 4: Participants — assign existing members from <strong>Acme Corporation</strong> to receive the Rockefeller Habits Checklist.
+          </p>
+        </div>
+
+        <div class="wf-stepper">
+          <div class="wf-stepper-item is-complete">
+            <span class="wf-stepper-circle">✓</span>
+            <span class="wf-stepper-label">Template</span>
+          </div>
+          <div class="wf-stepper-item is-active">
+            <span class="wf-stepper-circle">2</span>
+            <span class="wf-stepper-label">Participants</span>
+          </div>
+          <div class="wf-stepper-item">
+            <span class="wf-stepper-circle">3</span>
+            <span class="wf-stepper-label">Schedule</span>
+          </div>
+          <div class="wf-stepper-item">
+            <span class="wf-stepper-circle">4</span>
+            <span class="wf-stepper-label">Review</span>
+          </div>
+        </div>
+
+        <div class="pane-grid">
+          <!-- LEFT: TREE -->
+          <div class="wf-card">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Team Hierarchy</h2>
+              <p class="wf-card-description">Check a team to add all its members. Subteams are auto-included.</p>
+            </div>
+            <div class="wf-card-body">
+              <div class="pane-toolbar">
+                <input type="text" class="wf-input" placeholder="Search teams or members…" style="flex:1;">
+              </div>
+
+              <ul class="wf-tree">
+                <!-- Acme Corporation root -->
+                <li>
+                  <div class="wf-tree-row">
+                    <span class="tree-toggle">▼</span>
+                    <span class="tree-checkbox is-partial"></span>
+                    <span class="wf-font-semibold">Acme Corporation</span>
+                    <span class="wf-tree-count">47 members</span>
+                  </div>
+                  <ul class="wf-tree wf-tree-children">
+                    <!-- Engineering -->
+                    <li>
+                      <div class="wf-tree-row">
+                        <span class="tree-toggle">▼</span>
+                        <span class="tree-checkbox is-partial"></span>
+                        <span class="wf-font-medium">Engineering</span>
+                        <span class="wf-tree-count">27 members</span>
+                      </div>
+                      <ul class="wf-tree wf-tree-children">
+                        <li>
+                          <div class="wf-tree-row">
+                            <span class="tree-toggle">▶</span>
+                            <span class="tree-checkbox is-checked"></span>
+                            <span>Platform</span>
+                            <span class="wf-tree-count">12 members</span>
+                          </div>
+                        </li>
+                        <li>
+                          <div class="wf-tree-row">
+                            <span class="tree-toggle">▶</span>
+                            <span class="tree-checkbox"></span>
+                            <span>Backend</span>
+                            <span class="wf-tree-count">8 members</span>
+                          </div>
+                        </li>
+                        <li>
+                          <div class="wf-tree-row">
+                            <span class="tree-toggle">▶</span>
+                            <span class="tree-checkbox"></span>
+                            <span>Frontend</span>
+                            <span class="wf-tree-count">7 members</span>
+                          </div>
+                        </li>
+                      </ul>
+                    </li>
+                    <!-- Sales -->
+                    <li>
+                      <div class="wf-tree-row">
+                        <span class="tree-toggle">▼</span>
+                        <span class="tree-checkbox"></span>
+                        <span class="wf-font-medium">Sales</span>
+                        <span class="wf-tree-count">20 members</span>
+                      </div>
+                      <ul class="wf-tree wf-tree-children">
+                        <li>
+                          <div class="wf-tree-row">
+                            <span class="tree-toggle">▶</span>
+                            <span class="tree-checkbox"></span>
+                            <span>Field</span>
+                            <span class="wf-tree-count">10 members</span>
+                          </div>
+                        </li>
+                        <li>
+                          <div class="wf-tree-row">
+                            <span class="tree-toggle">▶</span>
+                            <span class="tree-checkbox"></span>
+                            <span>Inside</span>
+                            <span class="wf-tree-count">10 members</span>
+                          </div>
+                        </li>
+                      </ul>
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- RIGHT: SELECTED -->
+          <div class="wf-card">
+            <div class="wf-card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <h2 class="wf-card-title">Selected Members</h2>
+                <p class="wf-card-description"><strong>12</strong> of 47 members selected.</p>
+              </div>
+              <button class="wf-btn wf-btn-ghost wf-text-xs">Clear all</button>
+            </div>
+            <div class="wf-card-body">
+              <div style="display:flex; flex-direction:column; gap:0.5rem; max-height: 360px; overflow-y:auto;">
+
+                <div class="selected-pill">
+                  <div class="selected-pill-info">
+                    <div class="selected-pill-name">John Smith</div>
+                    <div class="selected-pill-meta">john@acme.com · Engineering › Platform</div>
+                  </div>
+                  <span class="selected-pill-x">×</span>
+                </div>
+                <div class="selected-pill">
+                  <div class="selected-pill-info">
+                    <div class="selected-pill-name">Sarah Lee</div>
+                    <div class="selected-pill-meta">sarah@acme.com · Engineering › Platform</div>
+                  </div>
+                  <span class="selected-pill-x">×</span>
+                </div>
+                <div class="selected-pill">
+                  <div class="selected-pill-info">
+                    <div class="selected-pill-name">Mike Chen</div>
+                    <div class="selected-pill-meta">mike@acme.com · Engineering › Backend</div>
+                  </div>
+                  <span class="selected-pill-x">×</span>
+                </div>
+                <div class="selected-pill">
+                  <div class="selected-pill-info">
+                    <div class="selected-pill-name">Priya Krishnan</div>
+                    <div class="selected-pill-meta">priya@acme.com · Engineering › Platform</div>
+                  </div>
+                  <span class="selected-pill-x">×</span>
+                </div>
+                <div class="selected-pill">
+                  <div class="selected-pill-info">
+                    <div class="selected-pill-name">Marcus Rivera</div>
+                    <div class="selected-pill-meta">marcus@acme.com · Engineering › Platform</div>
+                  </div>
+                  <span class="selected-pill-x">×</span>
+                </div>
+                <div class="selected-pill">
+                  <div class="selected-pill-info">
+                    <div class="selected-pill-name">Tasha Whitfield</div>
+                    <div class="selected-pill-meta">tasha@acme.com · Engineering › Platform</div>
+                  </div>
+                  <span class="selected-pill-x">×</span>
+                </div>
+                <div class="selected-pill">
+                  <div class="selected-pill-info">
+                    <div class="selected-pill-name">Jordan Park</div>
+                    <div class="selected-pill-meta">jordan@acme.com · Engineering › Platform</div>
+                  </div>
+                  <span class="selected-pill-x">×</span>
+                </div>
+                <div style="text-align:center; padding:0.5rem; color: hsl(var(--muted-foreground)); font-size:0.8125rem;">
+                  + 5 more selected (collapsed for wireframe brevity)
+                </div>
+              </div>
+
+              <!-- HINT BANNER — replaces the removed ad-hoc form -->
+              <div class="hint-banner">
+                <div class="hint-card">
+                  <div class="hint-card__icon">→</div>
+                  <div class="hint-card__body">
+                    Need to add a new member? Go to <a href="/admin/users">Admin → Users</a> to create the member first, then return here.
+                  </div>
+                </div>
+
+                <!-- Yellow secondary note inside the right pane near the hint banner -->
+                <div class="invited-note">
+                  <strong>ℹ Step 2 only appears for INVITED templates.</strong> Member creation is admin-side; this step assigns existing members to the campaign.
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="wf-wizard-nav">
+          <a href="#" class="wf-btn wf-btn-secondary">← Back</a>
+          <a href="#" class="wf-btn wf-btn-primary">Next: Schedule →</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>
