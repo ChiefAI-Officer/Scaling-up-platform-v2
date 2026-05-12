@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 11, 2026 — verification sweep + BUG-MAY11-1 hotfix (workshop PATCH now persists stripePromotionCodeId so coupons actually redeem at checkout); 1030 tests; remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 externally blocked |
+| **Last Updated** | May 12, 2026 — Wave 12-A/B/C shipped: password hint fix (8 chars), admin/coach integration ID fields (hubspotId/circleId), per-person RATING/NPS breakdown in workshop survey view; 1100 tests; 12-C-2 distribution histogram already implemented (no-op); remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 externally blocked |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
