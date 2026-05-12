@@ -488,3 +488,25 @@ export function getHubSpotPortalId(): string | null {
   if (!raw || raw.trim().length === 0) return null;
   return raw.trim();
 }
+
+/**
+ * Fetch the `coach_contract_status` custom property for a contact by HubSpot contact ID.
+ *
+ * Returns the raw string value (e.g. "Certified Coach", "Pending") or null when the
+ * property is absent/empty.  Throws on HTTP error so the caller can fail-closed.
+ *
+ * Used by the Wave 8-D HubSpot auto-approval path in approval-engine.ts.
+ */
+export async function getHubSpotCoachContractStatus(
+  hubspotContactId: string,
+): Promise<string | null> {
+  if (!isHubSpotConfigured()) {
+    return null;
+  }
+  // Throws on any API error — caller must catch and fail-closed.
+  const contact = await hubspotClient.crm.contacts.basicApi.getById(
+    hubspotContactId,
+    ["coach_contract_status"],
+  );
+  return contact.properties?.coach_contract_status ?? null;
+}

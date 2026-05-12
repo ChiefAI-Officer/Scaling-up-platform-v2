@@ -16,6 +16,8 @@ import { verifyCertification } from "@/services/circle";
 import { sendApprovalRequest, sendEscalation } from "@/services/notifications";
 import { logAudit } from "@/lib/audit";
 import { formatApprovalMessage } from "@/lib/approvals/approval-thread";
+import { getHubSpotCoachContractStatus } from "@/services/hubspot";
+import { inngest } from "@/inngest/client";
 
 export type ApprovalType =
     | "WORKSHOP_REQUEST"
@@ -28,6 +30,7 @@ export interface ApprovalEvaluationInput {
     type: ApprovalType;
     coachId: string;
     coachEmail: string;
+    hubspotId?: string; // Coach's HubSpot contact ID — used for Wave 8-D auto-approval
     workshopId?: string;
     workshopTypeSlug?: string;
     amount?: number; // For refunds, in cents
@@ -84,6 +87,15 @@ export async function evaluateApproval(
         }
     }
 
+    // Workshop Request: Wave 8-D — HubSpot coach_contract_status auto-approval
+    // (runs before Circle cert check; fail-closed on API error; supports shadow + allowlist)
+    if (input.type === "WORKSHOP_REQUEST") {
+        const hsAutoApproveResult = await evaluateHubSpotAutoApprove(input);
+        if (hsAutoApproveResult !== null) {
+            return hsAutoApproveResult;
+        }
+    }
+
     // Workshop Request: Check certification confidence
     if (input.type === "WORKSHOP_REQUEST") {
         const certResult = await verifyCertification(
@@ -122,6 +134,128 @@ export async function evaluateApproval(
 
     // Default: route to manual approval
     return await createManualApproval(input, "Unknown request type");
+}
+
+/**
+ * Wave 8-D: HubSpot coach_contract_status auto-approval helper.
+ *
+ * Returns an ApprovalEvaluationResult to short-circuit evaluateApproval when the
+ * HubSpot check is conclusive (either auto-approved or explicitly routed to manual).
+ * Returns null to indicate "no opinion" — caller falls through to the Circle path.
+ *
+ * Safety levers:
+ *   HUBSPOT_AUTO_APPROVE_ENABLED="true"     — kill switch (default: off)
+ *   HUBSPOT_AUTO_APPROVE_SHADOW="true"      — log but never act
+ *   HUBSPOT_AUTO_APPROVE_ALLOWLIST="a@b,c@d" — comma-separated email allowlist
+ */
+async function evaluateHubSpotAutoApprove(
+    input: ApprovalEvaluationInput,
+): Promise<ApprovalEvaluationResult | null> {
+    // 1. Kill switch
+    if (process.env.HUBSPOT_AUTO_APPROVE_ENABLED !== "true") {
+        return null;
+    }
+
+    // 2. Require hubspotId
+    if (!input.hubspotId) {
+        return null;
+    }
+
+    // 3. Allowlist gate (optional — if unset, all coaches are eligible)
+    const allowlistRaw = process.env.HUBSPOT_AUTO_APPROVE_ALLOWLIST;
+    if (allowlistRaw) {
+        const allowed = allowlistRaw.split(",").map((e) => e.trim().toLowerCase());
+        if (!allowed.includes(input.coachEmail.toLowerCase())) {
+            return null;
+        }
+    }
+
+    // 4. Fetch HubSpot status — fail-closed on error
+    let contractStatus: string | null;
+    try {
+        contractStatus = await getHubSpotCoachContractStatus(input.hubspotId);
+    } catch (err) {
+        console.error(
+            "[hubspot-auto-approve] HubSpot auto-approve lookup failed, falling back to manual review",
+            err,
+        );
+        return {
+            autoApproved: false,
+            reason: "hubspot_api_error: HubSpot lookup failed, routing to manual review",
+        };
+    }
+
+    // 5. Shadow mode — log but do not act
+    if (process.env.HUBSPOT_AUTO_APPROVE_SHADOW === "true") {
+        console.log(
+            `[hubspot-auto-approve] shadow: would auto-approve coachEmail=${input.coachEmail} hubspotId=${input.hubspotId} contractStatus=${contractStatus}`,
+        );
+        return {
+            autoApproved: false,
+            reason: "shadow_mode: HubSpot auto-approve shadow mode active, routing to manual review",
+        };
+    }
+
+    // 6. Check status value
+    if (contractStatus !== "Certified Coach") {
+        return {
+            autoApproved: false,
+            reason: `status_not_certified: HubSpot coach_contract_status="${contractStatus}", routing to manual review`,
+        };
+    }
+
+    // 7. Auto-approve — create ApprovalQueue row then update to APPROVED
+    const approval = await db.approvalQueue.create({
+        data: {
+            type: input.type,
+            status: "PENDING",
+            requestData: JSON.stringify(input),
+            coachId: input.coachId,
+            workshopId: input.workshopId,
+            requestedBy: input.requestedBy,
+            requestedAt: new Date(),
+        },
+    });
+
+    await db.approvalQueue.update({
+        where: { id: approval.id },
+        data: {
+            status: "APPROVED",
+            respondedBy: "system:hubspot-coach-status",
+            respondedAt: new Date(),
+            decision: "APPROVED",
+            responseReason: "Auto-approved: HubSpot coach_contract_status = Certified Coach",
+        },
+    });
+
+    await db.auditLog.create({
+        data: {
+            entityType: "ApprovalQueue",
+            entityId: approval.id,
+            action: "auto_approved_hubspot_coach_status",
+            performedBy: "system:hubspot-coach-status",
+            changes: JSON.stringify({
+                coachContractStatus: contractStatus,
+                hubspotId: input.hubspotId,
+            }),
+        },
+    });
+
+    // Emit Inngest event so auto-build fires
+    await inngest.send({
+        name: "workshop/approved",
+        data: {
+            approvalId: approval.id,
+            workshopId: input.workshopId ?? "",
+            coachId: input.coachId,
+        },
+    });
+
+    return {
+        autoApproved: true,
+        reason: `Auto-approved: HubSpot coach_contract_status = Certified Coach`,
+        approvalId: approval.id,
+    };
 }
 
 /**

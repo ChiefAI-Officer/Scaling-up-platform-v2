@@ -288,6 +288,7 @@ export async function POST(request: NextRequest) {
             select: {
                 firstName: true, lastName: true, email: true,
                 title: true, linkedinUrl: true, bio: true, profileImage: true,
+                hubspotId: true, // Wave 8-D: needed for HubSpot auto-approval
             },
         });
         if (!coachBio) {
@@ -462,6 +463,7 @@ export async function POST(request: NextRequest) {
             type: input.type as ApprovalType,
             coachId,
             coachEmail,
+            hubspotId: coachBio.hubspotId ?? undefined, // Wave 8-D: HubSpot auto-approval
             workshopId,
             workshopTypeSlug,
             amount: input.amount,
