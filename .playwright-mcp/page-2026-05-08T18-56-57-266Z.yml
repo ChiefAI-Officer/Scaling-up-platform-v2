@@ -1,0 +1,19 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "Forgot password" [level=3] [ref=e5]
+      - paragraph [ref=e6]: Enter your account email and we'll send a reset link.
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - text: Email
+          - textbox "Email" [ref=e10]:
+            - /placeholder: admin@scalingup.com
+        - button "Send reset link" [ref=e11] [cursor=pointer]
+      - paragraph [ref=e12]:
+        - text: Remember your password?
+        - link "Back to login" [ref=e13] [cursor=pointer]:
+          - /url: /login
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e14]

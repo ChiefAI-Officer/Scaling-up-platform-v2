@@ -1,0 +1,62 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - menubar [ref=e10]:
+            - menuitem "Dashboard" [ref=e11] [cursor=pointer]
+            - menuitem "All Workshops" [ref=e12] [cursor=pointer]
+            - menuitem "Templates" [ref=e13] [cursor=pointer]
+            - menuitem "Workflows" [ref=e14] [cursor=pointer]
+            - menuitem "Surveys" [ref=e15] [cursor=pointer]
+            - menuitem "Files" [ref=e16] [cursor=pointer]
+            - menuitem "Partners" [ref=e17] [cursor=pointer]
+            - menuitem "Coaches" [ref=e18] [cursor=pointer]
+            - menuitem "Approvals" [ref=e19] [cursor=pointer]
+            - menuitem "Registrations" [ref=e20] [cursor=pointer]
+            - menuitem "Refunds" [ref=e21] [cursor=pointer]
+            - menuitem "Emails" [ref=e22] [cursor=pointer]
+            - menuitem "Categories" [ref=e23] [cursor=pointer]
+            - menuitem "Pricing" [ref=e24] [cursor=pointer]
+            - menuitem "Financials" [ref=e25] [cursor=pointer]
+        - generic [ref=e26]:
+          - generic "Logged in user" [ref=e27]: jcbdelossantos.va@gmail.com
+          - button "Switch to dark mode" [ref=e28] [cursor=pointer]:
+            - img [ref=e29]
+          - generic [ref=e31]:
+            - link "Settings" [ref=e32] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=e33]
+          - generic [ref=e34]: A
+    - main "Page content" [ref=e35]:
+      - generic [ref=e36]:
+        - heading "Approval Queue" [level=2] [ref=e37]
+        - generic [ref=e38]:
+          - button "Pending" [ref=e39] [cursor=pointer]
+          - button "Counter-Offered" [ref=e40] [cursor=pointer]
+          - button "Info Requested" [ref=e41] [cursor=pointer]
+          - button "Approved" [ref=e42] [cursor=pointer]
+          - button "Denied" [ref=e43] [cursor=pointer]
+          - button "All" [ref=e44] [cursor=pointer]
+        - paragraph [ref=e45]: Showing pending approvals
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - heading "WORKSHOP REQUEST Demo Coach" [level=3] [ref=e55]:
+              - generic [ref=e56]: WORKSHOP REQUEST
+              - text: Demo Coach
+            - 'link "Workshop: MAY12 BUG-MAY6 verify - DELETE" [ref=e57] [cursor=pointer]':
+              - /url: /workshops/cmp2gsqwj0001ncuywyfoo25x
+            - generic [ref=e58]:
+              - generic [ref=e59]: "Requested: May 12, 2026"
+              - generic [ref=e60]: WS-2026-PLH3
+          - generic [ref=e65]: Approved
+    - contentinfo [ref=e49]:
+      - paragraph [ref=e51]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e52]

@@ -1,0 +1,191 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - menubar [ref=e10]:
+            - menuitem "Dashboard" [ref=e11] [cursor=pointer]
+            - menuitem "All Workshops" [ref=e12] [cursor=pointer]
+            - menuitem "Templates" [ref=e13] [cursor=pointer]
+            - menuitem "Workflows" [ref=e14] [cursor=pointer]
+            - menuitem "Surveys" [ref=e15] [cursor=pointer]
+            - menuitem "Files" [ref=e16] [cursor=pointer]
+            - menuitem "Partners" [ref=e17] [cursor=pointer]
+            - menuitem "Coaches" [ref=e18] [cursor=pointer]
+            - menuitem "Approvals" [ref=e19] [cursor=pointer]
+            - menuitem "Registrations" [ref=e20] [cursor=pointer]
+            - menuitem "Categories" [ref=e21] [cursor=pointer]
+            - menuitem "Pricing" [ref=e22] [cursor=pointer]
+            - menuitem "Financials" [ref=e23] [cursor=pointer]
+        - generic [ref=e24]:
+          - generic "Logged in user" [ref=e25]: jcbdelossantos.va@gmail.com
+          - button "Switch to dark mode" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+          - generic [ref=e29]:
+            - link "Settings" [ref=e30] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=e31]
+          - generic [ref=e32]: A
+    - main "Page content" [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - link "Templates" [ref=e36] [cursor=pointer]:
+            - /url: /templates
+          - generic [ref=e37]: /
+          - generic [ref=e38]: Standard Solo Landing Page
+        - generic [ref=e39]:
+          - generic [ref=e41]:
+            - heading "Standard Solo Landing Page" [level=1] [ref=e42]
+            - paragraph [ref=e43]: SOLO LANDING · All Categories• Active
+          - generic [ref=e44]:
+            - text: Template variables like
+            - code [ref=e45]: "{{coach_name}}"
+            - text: are replaced with real workshop data during auto-build. The preview shows sample data.
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - generic [ref=e48]:
+                - heading "Hero Section" [level=3] [ref=e50]
+                - generic [ref=e51]:
+                  - generic [ref=e52]:
+                    - text: Title
+                    - textbox "Title" [ref=e53]: "{{workshop_title}}"
+                  - generic [ref=e54]:
+                    - text: Subtitle
+                    - textbox "Subtitle" [ref=e55]: Build Value. Scale Up. Finish Strong.
+              - generic [ref=e56]:
+                - heading "Coach Info" [level=3] [ref=e58]
+                - generic [ref=e59]:
+                  - generic [ref=e60]:
+                    - text: Coach Name
+                    - textbox "Coach Name" [ref=e61]: "{{coach_name}}"
+                    - paragraph [ref=e62]: "Use {{coach_name}} for auto-fill"
+                  - generic [ref=e63]:
+                    - text: Coach Photo URL
+                    - textbox "Coach Photo URL" [ref=e64]: "{{coach_photo}}"
+                  - generic [ref=e65]:
+                    - text: Coach Title
+                    - textbox "Coach Title" [ref=e66]: "{{coach_title}}"
+              - generic [ref=e67]:
+                - heading "Event & Content" [level=3] [ref=e69]
+                - generic [ref=e70]:
+                  - generic [ref=e71]:
+                    - generic [ref=e72]:
+                      - text: Day
+                      - textbox "Day" [ref=e73]: "{{event_day}}"
+                    - generic [ref=e74]:
+                      - text: Date
+                      - textbox "Date" [ref=e75]: "{{event_date_no_weekday}}"
+                  - generic [ref=e76]:
+                    - generic [ref=e77]:
+                      - text: Time
+                      - textbox "Time" [ref=e78]: "{{workshop_time}}"
+                    - generic [ref=e79]:
+                      - text: Timezone
+                      - textbox "Timezone" [ref=e80]: America/New_York
+                  - generic [ref=e81]:
+                    - text: About Section Title
+                    - textbox "About Section Title" [ref=e82]: About This Workshop
+                  - generic [ref=e83]:
+                    - text: About Description
+                    - textbox "About Description" [ref=e84]: "{{workshop_description}}"
+                  - generic [ref=e85]:
+                    - text: Benefits (What You’ll Learn)
+                    - generic [ref=e86]:
+                      - generic [ref=e87]:
+                        - textbox "Benefit point..." [ref=e88]: Proven frameworks used by 80,000+ companies worldwide
+                        - button "×" [ref=e89] [cursor=pointer]
+                      - generic [ref=e90]:
+                        - textbox "Benefit point..." [ref=e91]: Hands-on exercises you can apply immediately
+                        - button "×" [ref=e92] [cursor=pointer]
+                      - generic [ref=e93]:
+                        - textbox "Benefit point..." [ref=e94]: "Personalized coaching and Q&A with {{coach_first_name}}"
+                        - button "×" [ref=e95] [cursor=pointer]
+                      - generic [ref=e96]:
+                        - textbox "Benefit point..." [ref=e97]: Networking with fellow business leaders
+                        - button "×" [ref=e98] [cursor=pointer]
+                      - generic [ref=e99]:
+                        - textbox "Benefit point..." [ref=e100]: Post-workshop resources and follow-up support
+                        - button "×" [ref=e101] [cursor=pointer]
+                      - button "+ Add Benefit" [ref=e102] [cursor=pointer]
+              - generic [ref=e103]:
+                - heading "Video & CTA" [level=3] [ref=e105]
+                - generic [ref=e106]:
+                  - generic [ref=e107]:
+                    - text: Video Embed URL
+                    - textbox "Video Embed URL" [ref=e108]:
+                      - /placeholder: https://player.vimeo.com/video/...
+                    - paragraph [ref=e109]: Vimeo or YouTube embed URL. Leave empty to hide.
+                  - generic [ref=e110]:
+                    - text: CTA Button Text
+                    - textbox "CTA Button Text" [ref=e111]: Register Here
+              - button "Save Template" [ref=e113] [cursor=pointer]
+            - generic [ref=e115]:
+              - heading "Live Preview" [level=3] [ref=e117]
+              - generic [ref=e120]:
+                - generic [ref=e121]: Preview — sample data shown
+                - generic [ref=e125]:
+                  - generic [ref=e126]:
+                    - generic [ref=e127]:
+                      - img [ref=e128]
+                      - text: Scaling Up Workshop
+                    - 'heading "Sample: Scaling Up Masterclass" [level=1] [ref=e130]'
+                    - paragraph [ref=e131]: A hands-on session facilitated by Jane Smith
+                  - generic [ref=e133]:
+                    - img "Jane Smith" [ref=e134]
+                    - generic [ref=e135]: Jane Smith
+                    - generic [ref=e136]: Scaling Up Certified Coach
+                - main [ref=e138]:
+                  - generic [ref=e139]:
+                    - generic [ref=e140]:
+                      - generic [ref=e141]:
+                        - heading "About This Workshop" [level=2] [ref=e142]
+                        - paragraph [ref=e143]: An intensive workshop on the Rockefeller Habits methodology for scaling businesses.
+                      - generic [ref=e144]:
+                        - heading "What You'll Walk Away With" [level=3] [ref=e145]
+                        - generic [ref=e146]:
+                          - generic [ref=e147]:
+                            - generic [ref=e148]: "1"
+                            - generic [ref=e149]: Proven frameworks used by 80,000+ companies worldwide
+                          - generic [ref=e150]:
+                            - generic [ref=e151]: "2"
+                            - generic [ref=e152]: Hands-on exercises you can apply immediately
+                          - generic [ref=e153]:
+                            - generic [ref=e154]: "3"
+                            - generic [ref=e155]: Personalized coaching and Q&A with Jane
+                          - generic [ref=e156]:
+                            - generic [ref=e157]: "4"
+                            - generic [ref=e158]: Networking with fellow business leaders
+                          - generic [ref=e159]:
+                            - generic [ref=e160]: "5"
+                            - generic [ref=e161]: Post-workshop resources and follow-up support
+                    - generic [ref=e163]:
+                      - generic [ref=e164]:
+                        - paragraph [ref=e165]: Investment
+                        - paragraph [ref=e166]: $199.00
+                      - generic [ref=e167]:
+                        - generic [ref=e168]:
+                          - generic [ref=e169]:
+                            - img [ref=e171]
+                            - paragraph
+                          - generic [ref=e173]:
+                            - img [ref=e175]
+                            - paragraph [ref=e178]: 9:00 AM - 12:00 PM
+                          - generic [ref=e179]:
+                            - img [ref=e181]
+                            - paragraph [ref=e186]: Limited seats available
+                        - button "Register Now" [disabled] [ref=e187]
+                        - paragraph [ref=e188]: Secure checkout · Instant confirmation
+                - generic [ref=e190]:
+                  - heading "Ready to Scale?" [level=3] [ref=e191]
+                  - paragraph [ref=e192]: Secure your spot today and take the next step toward building a stronger, more valuable business.
+                  - button "Register Now" [disabled] [ref=e193]
+    - contentinfo [ref=e194]:
+      - paragraph [ref=e196]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e197]

@@ -1,0 +1,151 @@
+- generic [ref=e13]:
+  - banner [ref=e14]:
+    - paragraph [ref=e18]
+  - main [ref=e19]:
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - textbox "We use cash from customers to fuel our growth." [ref=e1046]:
+          - button "We use cash from customers to fuel our growth." [ref=e1048] [cursor=pointer]:
+            - generic:
+              - generic: We use cash from customers to fuel our growth.
+          - generic [ref=e1051]:
+            - slider [ref=e1055] [cursor=pointer]
+            - generic [ref=e1057]:
+              - paragraph [ref=e1060]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e1082]: Strong
+        - textbox "We have large cash reserves or access to amounts of cash to pursue opportunities and survive downturns/mistakes." [ref=e1085]:
+          - button "We have large cash reserves or access to amounts of cash to pursue opportunities and survive downturns/mistakes." [ref=e1087] [cursor=pointer]:
+            - generic:
+              - generic: We have large cash reserves or access to amounts of cash to pursue opportunities and survive downturns/mistakes.
+          - generic [ref=e1090]:
+            - slider [ref=e1094] [cursor=pointer]
+            - generic [ref=e1096]:
+              - paragraph [ref=e1099]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e1121]: Strong
+        - textbox "Our financial statements are accurate and timely." [ref=e1124]:
+          - button "Our financial statements are accurate and timely." [ref=e1126] [cursor=pointer]:
+            - generic:
+              - generic: Our financial statements are accurate and timely.
+          - generic [ref=e1129]:
+            - slider [ref=e1133] [cursor=pointer]
+            - generic [ref=e1135]:
+              - paragraph [ref=e1138]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e1160]: Strong
+        - textbox "We consistently review 12 month cash flow projections with our team." [ref=e1163]:
+          - button "We consistently review 12 month cash flow projections with our team." [ref=e1165] [cursor=pointer]:
+            - generic:
+              - generic: We consistently review 12 month cash flow projections with our team.
+          - generic [ref=e1168]:
+            - slider [ref=e1172] [cursor=pointer]
+            - generic [ref=e1174]:
+              - paragraph [ref=e1177]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e1199]: Strong
+        - textbox "We have an accurate understanding of how much it costs to acquire a new customer." [ref=e1202]:
+          - button "We have an accurate understanding of how much it costs to acquire a new customer." [ref=e1204] [cursor=pointer]:
+            - generic:
+              - generic: We have an accurate understanding of how much it costs to acquire a new customer.
+          - generic [ref=e1207]:
+            - slider [ref=e1211] [cursor=pointer]
+            - generic [ref=e1213]:
+              - paragraph [ref=e1216]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e1238]: Strong
+        - textbox "We have an accurate understanding of the average lifetime value of each customer." [ref=e1241]:
+          - button "We have an accurate understanding of the average lifetime value of each customer." [ref=e1243] [cursor=pointer]:
+            - generic:
+              - generic: We have an accurate understanding of the average lifetime value of each customer.
+          - generic [ref=e1246]:
+            - slider [ref=e1250] [cursor=pointer]
+            - generic [ref=e1252]:
+              - paragraph [ref=e1255]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e1277]: Strong
+        - textbox "We regularly pursue ideas for reducing our cash conversion cycle (time from placing $1/&#8364;1/&#163;1 of working capital into operations until it returns as cash)." [ref=e1280]:
+          - button "We regularly pursue ideas for reducing our cash conversion cycle (time from placing $1/&#8364;1/&#163;1 of working capital into operations until it returns as cash)." [ref=e1282] [cursor=pointer]:
+            - generic:
+              - generic: We regularly pursue ideas for reducing our cash conversion cycle (time from placing $1/€1/£1 of working capital into operations until it returns as cash).
+          - generic [ref=e1285]:
+            - slider [ref=e1289] [cursor=pointer]
+            - generic [ref=e1291]:
+              - paragraph [ref=e1294]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e1316]: Strong
+        - textbox "We have effective accounts payable and accounts receivable policies." [ref=e1319]:
+          - button "We have effective accounts payable and accounts receivable policies." [ref=e1321] [cursor=pointer]:
+            - generic:
+              - generic: We have effective accounts payable and accounts receivable policies.
+          - generic [ref=e1324]:
+            - slider [ref=e1328] [cursor=pointer]
+            - generic [ref=e1330]:
+              - paragraph [ref=e1333]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e1355]: Strong
+      - generic [ref=e35]:
+        - progressbar [ref=e711]
+        - generic [ref=e36]:
+          - button "Previous" [ref=e715] [cursor=pointer]
+          - button "Next" [active] [ref=e358] [cursor=pointer]
+  - contentinfo:
+    - paragraph:
+      - link "powered by Esperto" [ref=e41] [cursor=pointer]:
+        - /url: https://esperto.one

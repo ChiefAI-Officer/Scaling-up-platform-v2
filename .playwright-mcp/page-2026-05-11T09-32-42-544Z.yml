@@ -1,0 +1,54 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]: Scaling Up Coach
+      - navigation [ref=e6]:
+        - link "Dashboard" [ref=e7] [cursor=pointer]:
+          - /url: /portal/home
+          - img [ref=e9]
+          - generic [ref=e14]: Dashboard
+        - link "My Workshops" [ref=e15] [cursor=pointer]:
+          - /url: /portal/workshops
+          - img [ref=e17]
+          - generic [ref=e19]: My Workshops
+        - link "Registrations" [ref=e20] [cursor=pointer]:
+          - /url: /portal/registrations
+          - img [ref=e22]
+          - generic [ref=e27]: Registrations
+        - link "Request Workshop" [ref=e28] [cursor=pointer]:
+          - /url: /portal/request
+          - img [ref=e30]
+          - generic [ref=e32]: Request Workshop
+        - link "Settings" [ref=e35] [cursor=pointer]:
+          - /url: /portal/settings
+          - img [ref=e37]
+          - generic [ref=e40]: Settings
+      - link "J JC Coach" [ref=e41] [cursor=pointer]:
+        - /url: /portal/settings
+        - generic [ref=e42]:
+          - generic [ref=e43]: J
+          - generic [ref=e44]:
+            - paragraph [ref=e45]: JC
+            - paragraph [ref=e46]: Coach
+    - generic [ref=e47]:
+      - banner [ref=e48]:
+        - generic [ref=e49]:
+          - button "Switch to dark mode" [ref=e50] [cursor=pointer]:
+            - img [ref=e51]
+          - link "Settings" [ref=e54] [cursor=pointer]:
+            - /url: /portal/settings
+          - button "Sign Out" [ref=e55]
+      - main [ref=e56]:
+        - main "Page not found" [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]: "404"
+            - heading "Page not found" [level=1] [ref=e60]
+            - paragraph [ref=e61]: Sorry, we couldn't find the page you're looking for. It may have been moved or deleted.
+            - generic [ref=e62]:
+              - link "Go to home" [ref=e63] [cursor=pointer]:
+                - /url: /
+              - link "Go to dashboard" [ref=e64] [cursor=pointer]:
+                - /url: /dashboard
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e65]

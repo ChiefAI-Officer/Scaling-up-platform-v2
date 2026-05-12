@@ -1,0 +1,164 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - menubar [ref=e10]:
+            - menuitem "Dashboard" [ref=e11] [cursor=pointer]
+            - menuitem "All Workshops" [ref=e12] [cursor=pointer]
+            - menuitem "Templates" [ref=e13] [cursor=pointer]
+            - menuitem "Workflows" [ref=e14] [cursor=pointer]
+            - menuitem "Surveys" [ref=e15] [cursor=pointer]
+            - menuitem "Files" [ref=e16] [cursor=pointer]
+            - menuitem "Partners" [ref=e17] [cursor=pointer]
+            - menuitem "Coaches" [ref=e18] [cursor=pointer]
+            - menuitem "Approvals" [ref=e19] [cursor=pointer]
+            - menuitem "Registrations" [ref=e20] [cursor=pointer]
+            - menuitem "Categories" [ref=e21] [cursor=pointer]
+            - menuitem "Pricing" [ref=e22] [cursor=pointer]
+            - menuitem "Financials" [ref=e23] [cursor=pointer]
+        - generic [ref=e24]:
+          - generic "Logged in user" [ref=e25]: jcbdelossantos.va@gmail.com
+          - button "Switch to dark mode" [ref=e145] [cursor=pointer]:
+            - img [ref=e146]
+          - generic [ref=e33]:
+            - link "Settings" [ref=e34] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=e35]
+          - generic [ref=e36]: A
+    - main "Page content" [ref=e37]:
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - link [ref=e42] [cursor=pointer]:
+                - /url: /admin/workflows
+                - img [ref=e43]
+              - heading "Edit Workflow" [level=1] [ref=e45]
+            - paragraph [ref=e46]: Build automated email sequences for your workshops.
+          - button "Save Workflow" [ref=e47]
+        - generic [ref=e48]:
+          - heading "Workflow Details" [level=2] [ref=e49]
+          - generic [ref=e50]:
+            - generic [ref=e51]:
+              - generic [ref=e52]: Name *
+              - textbox "Name *" [ref=e53]:
+                - /placeholder: e.g., Standard Pre-Event Sequence
+                - text: Standard Test Event
+            - generic [ref=e54]:
+              - generic [ref=e55]: Description
+              - textbox "Description" [ref=e56]:
+                - /placeholder: Brief description of this workflow's purpose
+                - text: Test Event
+          - generic [ref=e57] [cursor=pointer]:
+            - checkbox "Save as feature template (reusable across workshops) What is a feature template?" [checked] [ref=e58]
+            - text: Save as feature template (reusable across workshops)
+            - button "What is a feature template?" [ref=e59]: "?"
+          - generic [ref=e60]:
+            - generic [ref=e61]:
+              - generic [ref=e62]: Category (auto-assign)
+              - combobox "Category (auto-assign)" [ref=e63]:
+                - option "Any category"
+                - option "AI"
+                - option "Exit & Valuation"
+                - option "Scaling Up Master Class" [selected]
+            - generic [ref=e64]:
+              - generic [ref=e65]: Format (auto-assign)
+              - combobox "Format (auto-assign)" [ref=e66]:
+                - option "Any format" [selected]
+                - option "In-Person"
+                - option "Virtual"
+            - generic [ref=e67]:
+              - generic [ref=e68]: Phase (auto-assign)
+              - combobox "Phase (auto-assign)" [ref=e69]:
+                - option "Not set"
+                - option "Pre-Event" [selected]
+                - option "Post-Event"
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - button "Steps (3)" [ref=e72]
+            - button "Timeline" [ref=e73]
+            - button "Execution Status" [ref=e74]
+          - generic [ref=e75]:
+            - generic [ref=e77]:
+              - button "Show Variables" [ref=e78]
+              - button "+ Add Step" [ref=e79]
+            - generic [ref=e80]:
+              - generic [ref=e81]:
+                - generic [ref=e82]:
+                  - generic [ref=e83]: "1"
+                  - generic [ref=e84]:
+                    - generic [ref=e86]: Email Attendees
+                    - paragraph [ref=e87]: 1h before
+                    - paragraph [ref=e88]: "Subject: 1hr before"
+                - generic [ref=e89]:
+                  - button "Edit" [ref=e90]
+                  - button "Delete" [ref=e91]
+              - generic [ref=e92]:
+                - generic [ref=e178]:
+                  - generic [ref=e179]: "2"
+                  - generic [ref=e180]:
+                    - generic [ref=e182]: Send Survey Link
+                    - paragraph [ref=e183]: 2h before
+                    - paragraph [ref=e184]: "Subject: Survey for your upcoming workshop"
+                - generic [ref=e100]:
+                  - button "Edit" [ref=e185]
+                  - button "Delete" [ref=e186]
+              - generic [ref=e103]:
+                - generic [ref=e104]:
+                  - generic [ref=e105]: "3"
+                  - generic [ref=e106]:
+                    - generic [ref=e108]: Send File Access Link
+                    - paragraph [ref=e109]: 1h before
+                    - paragraph [ref=e110]: "Subject: Here is the reading material for your workshop"
+                - generic [ref=e111]:
+                  - button "Edit" [ref=e112]
+                  - button "Delete" [ref=e113]
+        - generic [ref=e114]:
+          - heading "Assigned Workshops (4)" [level=2] [ref=e115]
+          - generic [ref=e116]:
+            - generic [ref=e117]:
+              - generic [ref=e118]: Assign to Workshop
+              - combobox "Assign to Workshop" [ref=e119]:
+                - option "Select a workshop..." [selected]
+                - option "[WS-2026-U8E3] Scaling Up AI with Lynne Verdun — Jul 25, 2026"
+            - button "Assign" [disabled] [ref=e120]
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - generic [ref=e123]:
+                - text: Scaling Up Master Class with Lynne Verdun
+                - generic [ref=e124]: "[WS-2026-4MYR]"
+                - text: Aug 8, 2026
+                - generic [ref=e125]: PRE_EVENT
+              - button "Remove" [ref=e126]
+            - generic [ref=e127]:
+              - generic [ref=e128]:
+                - text: Scaling Up Master Class with Lynne Verdun
+                - generic [ref=e129]: "[WS-2026-8NFZ]"
+                - text: Oct 1, 2026
+                - generic [ref=e130]: PRE_EVENT
+              - button "Remove" [ref=e131]
+            - generic [ref=e132]:
+              - generic [ref=e133]:
+                - text: Scaling Up Master Class workflow testing
+                - generic [ref=e134]: "[WS-2026-HQA7]"
+                - text: May 6, 2026
+                - generic [ref=e135]: PRE_EVENT
+              - button "Remove" [ref=e136]
+            - generic [ref=e137]:
+              - generic [ref=e138]:
+                - text: Master class Testing workflows 2
+                - generic [ref=e139]: "[WS-2026-SVGY]"
+                - text: May 6, 2026
+                - generic [ref=e140]: PRE_EVENT
+              - button "Remove" [ref=e141]
+    - contentinfo [ref=e142]:
+      - paragraph [ref=e144]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e148]

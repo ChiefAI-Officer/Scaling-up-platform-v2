@@ -1,0 +1,146 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - menubar [ref=e10]:
+            - menuitem "Dashboard" [ref=e11] [cursor=pointer]
+            - menuitem "All Workshops" [ref=e12] [cursor=pointer]
+            - menuitem "Templates" [ref=e13] [cursor=pointer]
+            - menuitem "Workflows" [ref=e14] [cursor=pointer]
+            - menuitem "Surveys" [ref=e15] [cursor=pointer]
+            - menuitem "Files" [ref=e16] [cursor=pointer]
+            - menuitem "Partners" [ref=e17] [cursor=pointer]
+            - menuitem "Coaches" [ref=e18] [cursor=pointer]
+            - menuitem "Approvals" [ref=e19] [cursor=pointer]
+            - menuitem "Registrations" [ref=e20] [cursor=pointer]
+            - menuitem "Categories" [ref=e21] [cursor=pointer]
+            - menuitem "Pricing" [ref=e22] [cursor=pointer]
+            - menuitem "Financials" [ref=e23] [cursor=pointer]
+        - generic [ref=e24]:
+          - generic "Logged in user" [ref=e25]: jcbdelossantos.va@gmail.com
+          - button "Switch to dark mode" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+          - generic [ref=e29]:
+            - link "Settings" [ref=e30] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=e31]
+          - generic [ref=e32]: A
+    - main "Page content" [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - link "Templates" [ref=e36] [cursor=pointer]:
+            - /url: /templates
+          - generic [ref=e37]: /
+          - generic [ref=e38]: Standard Thank You Page
+        - generic [ref=e39]:
+          - generic [ref=e41]:
+            - heading "Standard Thank You Page" [level=1] [ref=e42]
+            - paragraph [ref=e43]: THANK YOU · All Categories• Active
+          - generic [ref=e44]:
+            - text: Template variables like
+            - code [ref=e45]: "{{coach_name}}"
+            - text: are replaced with real workshop data during auto-build. The preview shows sample data.
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - generic [ref=e48]:
+                - heading "Content" [level=3] [ref=e50]
+                - generic [ref=e51]:
+                  - generic [ref=e52]:
+                    - text: Headline
+                    - textbox "Headline" [ref=e53]: You're Registered!
+                  - generic [ref=e54]:
+                    - text: Sub-headline
+                    - textbox "Sub-headline" [ref=e55]: "Thank you for registering for {{workshop_title}} with {{coach_name}}."
+              - generic [ref=e56]:
+                - heading "Video" [level=3] [ref=e58]
+                - generic [ref=e60]:
+                  - text: Video Embed URL
+                  - textbox "Video Embed URL" [ref=e61]:
+                    - /placeholder: https://player.vimeo.com/video/...
+                    - text: https://vimeo.com/458938400/f41203ac8d
+                  - paragraph [ref=e62]: Vimeo or YouTube embed URL. Leave empty to hide video.
+              - generic [ref=e63]:
+                - heading "Additional Options" [level=3] [ref=e65]
+                - generic [ref=e66]:
+                  - generic [ref=e67]:
+                    - text: Additional Message
+                    - textbox "Additional Message" [ref=e68]:
+                      - /placeholder: Any additional instructions or message...
+                      - text: "We've sent a confirmation email to your inbox with all the details. Please add {{event_date_no_weekday}} at {{workshop_time}} to your calendar so you don't miss it."
+                  - generic [ref=e69]:
+                    - text: Calendar Reminder Text
+                    - textbox "Calendar Reminder Text" [ref=e70]: Add this event to your calendar
+              - generic [ref=e71]:
+                - heading "Affiliate / Tracking Code" [level=3] [ref=e73]
+                - generic [ref=e75]:
+                  - generic [ref=e76]: Affiliate / Tracking Code(optional)
+                  - textbox "Affiliate / Tracking Code(optional)" [ref=e77]:
+                    - /placeholder: "<img src=\"https://scalingup.idevaffiliate.com/sale.php?profile=72198&idev_saleamt={{saleAmount}}&idev_ordernum={{orderNumber}}\">"
+                    - text: "<img src=\"https://scalingup.idevaffiliate.com/sale.php?profile=72198&idev_saleamt={{saleAmount}}&idev_ordernum={{orderNumber}}&email_address={{email}}\">"
+                  - paragraph [ref=e78]:
+                    - text: "Pasted code renders on THANK_YOU page after paid registration. Tokens:"
+                    - code [ref=e79]: "{{saleAmount}}"
+                    - text: ","
+                    - code [ref=e80]: "{{orderNumber}}"
+                    - text: ","
+                    - code [ref=e81]: "{{email}}"
+                    - text: ","
+                    - code [ref=e82]: "{{currency}}"
+                    - text: .
+                    - code [ref=e83]: <img>
+                    - text: pixel only —
+                    - code [ref=e84]: <script>
+                    - text: rejected.
+              - button "Save Template" [ref=e86] [cursor=pointer]
+            - generic [ref=e88]:
+              - heading "Live Preview" [level=3] [ref=e90]
+              - generic [ref=e93]:
+                - generic [ref=e94]: Preview — sample data shown
+                - generic [ref=e96]:
+                  - generic [ref=e97]:
+                    - generic [ref=e98]:
+                      - img [ref=e100]
+                      - heading "You're Registered!" [level=1] [ref=e102]
+                      - paragraph [ref=e103]: "Thank you for registering for Sample: Scaling Up Masterclass with Jane Smith."
+                    - generic [ref=e104]:
+                      - heading "Workshop Details" [level=2] [ref=e105]
+                      - generic [ref=e106]:
+                        - generic [ref=e107]:
+                          - img [ref=e109]
+                          - generic [ref=e111]:
+                            - paragraph [ref=e112]: Thursday, June 18, 2026
+                            - paragraph [ref=e113]: 09:00 - 17:00 America/New_York
+                        - generic [ref=e114]:
+                          - img [ref=e116]
+                          - generic [ref=e119]:
+                            - paragraph [ref=e120]: Virtual Workshop
+                            - paragraph [ref=e121]: Virtual Workshop
+                        - generic [ref=e122]:
+                          - img [ref=e124]
+                          - generic [ref=e127]:
+                            - paragraph [ref=e128]: "Sample: Scaling Up Masterclass"
+                            - paragraph [ref=e129]: Scaling Up Workshop
+                      - iframe [ref=e132]:
+                        
+                      - paragraph [ref=e134]: We've sent a confirmation email to your inbox with all the details. Please add at 9:00 AM - 12:00 PM to your calendar so you don't miss it.
+                    - generic [ref=e136]:
+                      - paragraph [ref=e137]: Add this event to your calendar
+                      - generic [ref=e138]:
+                        - button "Google Calendar" [disabled] [ref=e139]:
+                          - img [ref=e140]
+                          - text: Google Calendar
+                        - button "Download .ics" [disabled] [ref=e142]:
+                          - img [ref=e143]
+                          - text: Download .ics
+                  - paragraph [ref=e146]: A confirmation email has been sent to your inbox.
+    - contentinfo [ref=e147]:
+      - paragraph [ref=e149]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e150]

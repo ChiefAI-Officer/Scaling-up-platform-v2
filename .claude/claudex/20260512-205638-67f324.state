@@ -1,0 +1,14 @@
+mode: plan
+phase: done
+topic: "Squash Round 11 Pass 3 (round 6 overall) — adversarial pass on TWO newly-added scope items in PLAN.md (already at 753 lines, rounds 1-5 folded). NEW ITEM 1: Wave 11-A scope add — hide the Get Directions button on the registration confirmation email when workshop.format equals VIRTUAL. Conditional render in the email body composer plus 3 render tests covering IN_PERSON / HYBRID / VIRTUAL. NEW ITEM 2: New Wave 11-G — workflow step trusts pinned surveyTemplateId at execute-time. Today the runtime executor in execute-workflow.ts re-filters survey templates on isActive=true so unticking a templates Active toggle breaks any workflow step pointing at it. Jeff Slack commitment is: picker stays filtered to active (default UX), runtime drops the isActive clause when stepRow.surveyTemplateId is already pinned, auto-attach paths unchanged. CRITICAL CONSTRAINT: execute-workflow.ts and trigger-workflow-step.ts and lib/workflows/* are listed in the plans Not touched section due to parallel-instance coordination from the May 6 workflow-bugs round; verify whether that coordination lock has lifted or whether Wave 11-G must be cut to ENH-MAY12-2 follow-on. Adversarial focus only on the new items (do not re-grill rounds 1-5 content): (a) does the directions-button conditional also need to hide the directions link inside the ICS calendar invite payload (which lives in ics-generator.ts buildLocationString and is separate from email body)? (b) is hide-for-VIRTUAL-only correct or should HYBRID also hide when no physical venue is set? (c) is the workflow off-limits lock still active or has the parallel instance finished — verify via git log / commit history on the off-limits files since 2026-05-06? (d) when an admin EDITS a workflow step that already pins a now-inactive template, should the picker render the inactive selection or force re-pick from active templates? Edge case worth specifying. (e) does the auto-attach-via-email-on-registration AND the auto-attach-on-POST_EVENT-transition path need any code change, or does it already short-circuit on isActive correctly? (f) ergonomic risk: the duality of Active-for-auto-attach vs Pinned-overrides-Active for workflow steps may confuse coaches — should we add a UI hint in the workflow-step picker explaining the contract? (g) test gaps — list the specific RED-GREEN tests needed for the new items that are NOT already in PLAN.md."
+round: 2
+max_rounds: 1
+from_draft: true
+interview_used: false
+review_id: 20260512-205638-67f324
+repo_root: /Users/diushianstand/Scaling-up-platform-v2
+session_id: unknown
+started_at: 2026-05-12T20:56:38Z
+started_at_epoch: 1778619398
+last_updated_at: 2026-05-12T21:02:06Z
+decision_signal: no-material-findings

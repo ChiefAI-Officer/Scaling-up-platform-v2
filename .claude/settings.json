@@ -94,7 +94,17 @@
       "mcp__plugin_claude-mem_mcp-search__smart_unfold",
       "mcp__plugin_claude-mem_mcp-search__smart_search",
       "Skill(codex)",
-      "Skill(codex:*)"
+      "Skill(codex:*)",
+      "Skill(claudex:plan)",
+      "Skill(claudex:plan:*)",
+      "mcp__playwright__browser_tabs",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_select_option",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_handle_dialog",
+      "WebFetch(domain:scaling-up-platform-v2-k83c89d8m-chief-aio-fficer.vercel.app)",
+      "Read(//tmp/**)",
+      "Read(//private/tmp/**)"
     ],
     "additionalDirectories": [
       "/Users/diushianstand/.claude/worklogs",

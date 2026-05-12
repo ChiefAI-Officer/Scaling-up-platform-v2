@@ -1,0 +1,199 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - menubar [ref=e10]:
+            - menuitem "Dashboard" [ref=e11] [cursor=pointer]
+            - menuitem "All Workshops" [ref=e12] [cursor=pointer]
+            - menuitem "Templates" [ref=e13] [cursor=pointer]
+            - menuitem "Workflows" [ref=e14] [cursor=pointer]
+            - menuitem "Surveys" [ref=e15] [cursor=pointer]
+            - menuitem "Files" [ref=e16] [cursor=pointer]
+            - menuitem "Partners" [ref=e17] [cursor=pointer]
+            - menuitem "Coaches" [ref=e18] [cursor=pointer]
+            - menuitem "Approvals" [ref=e19] [cursor=pointer]
+            - menuitem "Registrations" [ref=e20] [cursor=pointer]
+            - menuitem "Categories" [ref=e21] [cursor=pointer]
+            - menuitem "Pricing" [ref=e22] [cursor=pointer]
+            - menuitem "Financials" [ref=e23] [cursor=pointer]
+        - generic [ref=e24]:
+          - generic "Logged in user" [ref=e25]: jcbdelossantos.va@gmail.com
+          - button "Switch to dark mode" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+          - generic [ref=e29]:
+            - link "Settings" [ref=e30] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=e31]
+          - generic [ref=e32]: A
+    - main "Page content" [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - heading "All Workshops" [level=1] [ref=e38]
+            - paragraph [ref=e39]: Manage all workshop events
+          - link "+ New Workshop" [ref=e40] [cursor=pointer]:
+            - /url: /workshops/new
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - img [ref=e43]
+            - textbox "Search by title or coach..." [ref=e46]
+          - combobox [ref=e47]:
+            - option "All Statuses" [selected]
+            - option "Info Requested"
+            - option "Denied"
+            - option "Awaiting Approval"
+            - option "Pre-Event"
+            - option "Post-Event"
+            - option "Completed"
+            - option "Canceled"
+        - generic [ref=e48]:
+          - table [ref=e50]:
+            - rowgroup [ref=e51]:
+              - row "Workshop Coach Submit Date Start Date Start Time Workshop Type Cost Format Registrations Landing URL Status Actions" [ref=e52]:
+                - columnheader "Workshop" [ref=e53]:
+                  - link "Workshop" [ref=e54] [cursor=pointer]:
+                    - /url: /workshops?sort=title&order=asc&per_page=25&page=1
+                    - text: Workshop
+                    - img [ref=e55]
+                - columnheader "Coach" [ref=e58]:
+                  - link "Coach" [ref=e59] [cursor=pointer]:
+                    - /url: /workshops?sort=coach&order=asc&per_page=25&page=1
+                    - text: Coach
+                    - img [ref=e60]
+                - columnheader "Submit Date" [ref=e63]:
+                  - link "Submit Date" [ref=e64] [cursor=pointer]:
+                    - /url: /workshops?sort=createdAt&order=asc&per_page=25&page=1
+                    - text: Submit Date
+                    - img [ref=e65]
+                - columnheader "Start Date" [ref=e67]:
+                  - link "Start Date" [ref=e68] [cursor=pointer]:
+                    - /url: /workshops?sort=eventDate&order=asc&per_page=25&page=1
+                    - text: Start Date
+                    - img [ref=e69]
+                - columnheader "Start Time" [ref=e72]
+                - columnheader "Workshop Type" [ref=e73]
+                - columnheader "Cost" [ref=e74]
+                - columnheader "Format" [ref=e75]
+                - columnheader "Registrations" [ref=e76]
+                - columnheader "Landing URL" [ref=e77]
+                - columnheader "Status" [ref=e78]
+                - columnheader "Actions" [ref=e79]
+            - rowgroup [ref=e80]:
+              - row "Master class Testing workflows 2 Scaling Up Master Class Lynne Verdun May 6, 2026 May 6, 2026 16:00 Half Day $300.00 Virtual 4 / 50 Pre-Event Edit" [ref=e81]:
+                - cell "Master class Testing workflows 2 Scaling Up Master Class" [ref=e82]:
+                  - link "Master class Testing workflows 2" [ref=e83] [cursor=pointer]:
+                    - /url: /workshops/cmoub9xdl0001f1mfadipfveq
+                  - paragraph [ref=e84]: Scaling Up Master Class
+                - cell "Lynne Verdun" [ref=e85]
+                - cell "May 6, 2026" [ref=e86]
+                - cell "May 6, 2026" [ref=e87]
+                - cell "16:00" [ref=e88]
+                - cell "Half Day" [ref=e89]
+                - cell "$300.00" [ref=e90]
+                - cell "Virtual" [ref=e91]
+                - cell "4 / 50" [ref=e92]:
+                  - link "4 / 50" [ref=e93] [cursor=pointer]:
+                    - /url: /workshops/cmoub9xdl0001f1mfadipfveq#registrations
+                - cell [ref=e94]:
+                  - button "https://scaling-up-platform-v2.vercel.app/workshop/master-class-testing-workflows-2-solo-landing-moub9z0m" [ref=e95]:
+                    - img [ref=e96]
+                - cell "Pre-Event" [ref=e98]:
+                  - generic [ref=e99]: Pre-Event
+                - cell "Edit" [ref=e100]:
+                  - link "Edit" [ref=e101] [cursor=pointer]:
+                    - /url: /workshops/cmoub9xdl0001f1mfadipfveq/landing-pages
+              - row "Scaling Up Master Class workflow testing Scaling Up Master Class Lynne Verdun May 6, 2026 May 6, 2026 12:00 Half Day $300.00 Virtual 2 / 50 Pre-Event Edit" [ref=e102]:
+                - cell "Scaling Up Master Class workflow testing Scaling Up Master Class" [ref=e103]:
+                  - link "Scaling Up Master Class workflow testing" [ref=e104] [cursor=pointer]:
+                    - /url: /workshops/cmou2rdud000pgt5yt383scxn
+                  - paragraph [ref=e105]: Scaling Up Master Class
+                - cell "Lynne Verdun" [ref=e106]
+                - cell "May 6, 2026" [ref=e107]
+                - cell "May 6, 2026" [ref=e108]
+                - cell "12:00" [ref=e109]
+                - cell "Half Day" [ref=e110]
+                - cell "$300.00" [ref=e111]
+                - cell "Virtual" [ref=e112]
+                - cell "2 / 50" [ref=e113]:
+                  - link "2 / 50" [ref=e114] [cursor=pointer]:
+                    - /url: /workshops/cmou2rdud000pgt5yt383scxn#registrations
+                - cell [ref=e115]:
+                  - button "https://scaling-up-platform-v2.vercel.app/workshop/scaling-up-master-class-workflow-testing-solo-landing-mou2rjoy" [ref=e116]:
+                    - img [ref=e117]
+                - cell "Pre-Event" [ref=e119]:
+                  - generic [ref=e120]: Pre-Event
+                - cell "Edit" [ref=e121]:
+                  - link "Edit" [ref=e122] [cursor=pointer]:
+                    - /url: /workshops/cmou2rdud000pgt5yt383scxn/landing-pages
+              - row "Scaling Up Master Class with Lynne Verdun Scaling Up Master Class Lynne Verdun May 6, 2026 Oct 1, 2026 08:00 Half Day $300.00 Virtual 2 / 50 Pre-Event Edit" [ref=e123]:
+                - cell "Scaling Up Master Class with Lynne Verdun Scaling Up Master Class" [ref=e124]:
+                  - link "Scaling Up Master Class with Lynne Verdun" [ref=e125] [cursor=pointer]:
+                    - /url: /workshops/cmou026ko0001tnxf0w6ld3ea
+                  - paragraph [ref=e126]: Scaling Up Master Class
+                - cell "Lynne Verdun" [ref=e127]
+                - cell "May 6, 2026" [ref=e128]
+                - cell "Oct 1, 2026" [ref=e129]
+                - cell "08:00" [ref=e130]
+                - cell "Half Day" [ref=e131]
+                - cell "$300.00" [ref=e132]
+                - cell "Virtual" [ref=e133]
+                - cell "2 / 50" [ref=e134]:
+                  - link "2 / 50" [ref=e135] [cursor=pointer]:
+                    - /url: /workshops/cmou026ko0001tnxf0w6ld3ea#registrations
+                - cell [ref=e136]:
+                  - button "https://scaling-up-platform-v2.vercel.app/workshop/scaling-up-master-class-with-lynne-verdun-solo-landing-mou027qe" [ref=e137]:
+                    - img [ref=e138]
+                - cell "Pre-Event" [ref=e140]:
+                  - generic [ref=e141]: Pre-Event
+                - cell "Edit" [ref=e142]:
+                  - link "Edit" [ref=e143] [cursor=pointer]:
+                    - /url: /workshops/cmou026ko0001tnxf0w6ld3ea/landing-pages
+              - row "Scaling Up AI with Lynne Verdun AI Workshop Lynne Verdun Apr 29, 2026 Jul 25, 2026 08:00 Half-Day $299.00 Virtual 1 / 30 Pre-Event Edit" [ref=e144]:
+                - cell "Scaling Up AI with Lynne Verdun AI Workshop" [ref=e145]:
+                  - link "Scaling Up AI with Lynne Verdun" [ref=e146] [cursor=pointer]:
+                    - /url: /workshops/cmoke8c6b0002e557mmt2xgfl
+                  - paragraph [ref=e147]: AI Workshop
+                - cell "Lynne Verdun" [ref=e148]
+                - cell "Apr 29, 2026" [ref=e149]
+                - cell "Jul 25, 2026" [ref=e150]
+                - cell "08:00" [ref=e151]
+                - cell "Half-Day" [ref=e152]
+                - cell "$299.00" [ref=e153]
+                - cell "Virtual" [ref=e154]
+                - cell "1 / 30" [ref=e155]:
+                  - link "1 / 30" [ref=e156] [cursor=pointer]:
+                    - /url: /workshops/cmoke8c6b0002e557mmt2xgfl#registrations
+                - cell [ref=e157]:
+                  - button "https://scaling-up-platform-v2.vercel.app/workshop/scaling-up-ai-with-lynne-verdun-solo-landing-moke9jz7" [ref=e158]:
+                    - img [ref=e159]
+                - cell "Pre-Event" [ref=e161]:
+                  - generic [ref=e162]: Pre-Event
+                - cell "Edit" [ref=e163]:
+                  - link "Edit" [ref=e164] [cursor=pointer]:
+                    - /url: /workshops/cmoke8c6b0002e557mmt2xgfl/landing-pages
+          - generic [ref=e165]:
+            - generic [ref=e166]:
+              - generic [ref=e167]: "Rows per page:"
+              - link "10" [ref=e168] [cursor=pointer]:
+                - /url: /workshops?sort=createdAt&order=desc&per_page=10&page=1
+              - link "25" [ref=e169] [cursor=pointer]:
+                - /url: /workshops?sort=createdAt&order=desc&per_page=25&page=1
+              - link "50" [ref=e170] [cursor=pointer]:
+                - /url: /workshops?sort=createdAt&order=desc&per_page=50&page=1
+            - generic [ref=e171]:
+              - generic [ref=e172]: 1–4 of 4
+              - link "← Prev" [disabled]:
+                - /url: /workshops?sort=createdAt&order=desc&per_page=25&page=0
+              - link "Next →" [disabled]:
+                - /url: /workshops?sort=createdAt&order=desc&per_page=25&page=2
+    - contentinfo [ref=e173]:
+      - paragraph [ref=e175]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e176]

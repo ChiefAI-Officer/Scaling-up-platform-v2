@@ -206,7 +206,7 @@ export default function CoachRegistrationPage() {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Password must be at least 12 characters and include upper/lowercase
+                Password must be at least 8 characters and include upper/lowercase
                 letters, a number, and a special character.
               </p>
 

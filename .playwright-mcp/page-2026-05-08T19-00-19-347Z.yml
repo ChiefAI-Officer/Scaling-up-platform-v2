@@ -1,0 +1,205 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - menubar [ref=e10]:
+            - menuitem "Dashboard" [ref=e11] [cursor=pointer]
+            - menuitem "All Workshops" [ref=e12] [cursor=pointer]
+            - menuitem "Templates" [ref=e13] [cursor=pointer]
+            - menuitem "Workflows" [ref=e14] [cursor=pointer]
+            - menuitem "Surveys" [ref=e15] [cursor=pointer]
+            - menuitem "Files" [ref=e16] [cursor=pointer]
+            - menuitem "Partners" [ref=e17] [cursor=pointer]
+            - menuitem "Coaches" [ref=e18] [cursor=pointer]
+            - menuitem "Approvals" [ref=e19] [cursor=pointer]
+            - menuitem "Registrations" [ref=e20] [cursor=pointer]
+            - menuitem "Categories" [ref=e21] [cursor=pointer]
+            - menuitem "Pricing" [ref=e22] [cursor=pointer]
+            - menuitem "Financials" [ref=e23] [cursor=pointer]
+        - generic [ref=e24]:
+          - generic "Logged in user" [ref=e25]: jcbdelossantos.va@gmail.com
+          - button "Switch to dark mode" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+          - generic [ref=e29]:
+            - link "Settings" [ref=e30] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=e31]
+          - generic [ref=e32]: A
+    - main "Page content" [ref=e33]:
+      - generic [ref=e177]:
+        - generic [ref=e179]:
+          - generic [ref=e180]:
+            - link "← Workshops" [ref=e182] [cursor=pointer]:
+              - /url: /workshops
+            - heading "Master class Testing workflows 2" [level=1] [ref=e183]
+            - generic [ref=e184]:
+              - generic [ref=e185]: WS-2026-SVGY
+              - generic [ref=e186]: Pre-Event
+              - generic [ref=e187]: Scaling Up Master Class
+          - generic [ref=e188]:
+            - button "Move to Post-Event" [ref=e189] [cursor=pointer]
+            - button "Move to Canceled" [ref=e190] [cursor=pointer]
+        - generic [ref=e191]:
+          - generic [ref=e194]:
+            - paragraph [ref=e195]: Event Date
+            - paragraph [ref=e196]: May 6, 2026
+            - paragraph [ref=e197]: 16:00 - 18:00
+          - generic [ref=e200]:
+            - paragraph [ref=e201]: Registrations
+            - paragraph [ref=e202]: 4 / 50
+            - paragraph [ref=e203]: 46 spots left
+          - generic [ref=e206]:
+            - paragraph [ref=e207]: Revenue
+            - paragraph [ref=e208]: $1,050.00
+            - paragraph [ref=e209]: 4 paid
+          - generic [ref=e212]:
+            - paragraph [ref=e213]: Format
+            - paragraph [ref=e214]: Virtual
+            - paragraph [ref=e215]: virtual-session
+        - generic [ref=e217]:
+          - generic [ref=e218]:
+            - generic [ref=e219]:
+              - heading "Workshop Details" [level=3] [ref=e221]
+              - generic [ref=e222]:
+                - generic [ref=e223]:
+                  - paragraph [ref=e224]: Description
+                  - paragraph [ref=e225]: Everything you need to know about using Scaling Up tools in your coaching practice.
+                - generic [ref=e226]:
+                  - generic [ref=e227]:
+                    - paragraph [ref=e228]: Coach
+                    - paragraph [ref=e229]: Lynne Verdun
+                    - paragraph [ref=e230]: jeff.verdun@outlook.com
+                  - generic [ref=e231]:
+                    - paragraph [ref=e232]: Pricing
+                    - paragraph [ref=e233]: $300.00
+                - generic [ref=e234]:
+                  - paragraph [ref=e235]: Landing Page
+                  - generic [ref=e236]:
+                    - button "https://scaling-up-platform-v2.vercel.app/workshop/master-class-testing-workflows-2-solo-landing-moub9z0m" [ref=e237]:
+                      - img [ref=e238]
+                    - link "Open ↗" [ref=e240] [cursor=pointer]:
+                      - /url: https://scaling-up-platform-v2.vercel.app/workshop/master-class-testing-workflows-2-solo-landing-moub9z0m
+                - button "Edit Details" [ref=e241] [cursor=pointer]
+            - generic [ref=e242]:
+              - heading "Registrations (4)" [level=3] [ref=e244]
+              - table [ref=e247]:
+                - rowgroup [ref=e248]:
+                  - row "Name Email Status Payment Date Actions" [ref=e249]:
+                    - columnheader "Name" [ref=e250]
+                    - columnheader "Email" [ref=e251]
+                    - columnheader "Status" [ref=e252]
+                    - columnheader "Payment" [ref=e253]
+                    - columnheader "Date" [ref=e254]
+                    - columnheader "Actions" [ref=e255]
+                - rowgroup [ref=e256]:
+                  - row "Gabe Test gabriel@chiefaiofficer.com REGISTERED COMPLETED May 8, 2026 Remove" [ref=e257]:
+                    - cell "Gabe Test" [ref=e258]
+                    - cell "gabriel@chiefaiofficer.com" [ref=e259]
+                    - cell "REGISTERED" [ref=e260]:
+                      - generic [ref=e261]: REGISTERED
+                    - cell "COMPLETED" [ref=e262]:
+                      - generic [ref=e263]: COMPLETED
+                    - cell "May 8, 2026" [ref=e264]
+                    - cell "Remove" [ref=e265]:
+                      - button "Remove" [ref=e266] [cursor=pointer]
+                  - row "Jeff Verdun jeff.verdun@outlook.com REGISTERED COMPLETED May 6, 2026 Remove" [ref=e267]:
+                    - cell "Jeff Verdun" [ref=e268]
+                    - cell "jeff.verdun@outlook.com" [ref=e269]
+                    - cell "REGISTERED" [ref=e270]:
+                      - generic [ref=e271]: REGISTERED
+                    - cell "COMPLETED" [ref=e272]:
+                      - generic [ref=e273]: COMPLETED
+                    - cell "May 6, 2026" [ref=e274]
+                    - cell "Remove" [ref=e275]:
+                      - button "Remove" [ref=e276] [cursor=pointer]
+                  - row "George Jetson cfinetman@yahoo.com REGISTERED COMPLETED May 6, 2026 Remove" [ref=e277]:
+                    - cell "George Jetson" [ref=e278]
+                    - cell "cfinetman@yahoo.com" [ref=e279]
+                    - cell "REGISTERED" [ref=e280]:
+                      - generic [ref=e281]: REGISTERED
+                    - cell "COMPLETED" [ref=e282]:
+                      - generic [ref=e283]: COMPLETED
+                    - cell "May 6, 2026" [ref=e284]
+                    - cell "Remove" [ref=e285]:
+                      - button "Remove" [ref=e286] [cursor=pointer]
+                  - row "Bilbo Baggins cfinetman@gmail.com REGISTERED COMPLETED May 6, 2026 Remove" [ref=e287]:
+                    - cell "Bilbo Baggins" [ref=e288]
+                    - cell "cfinetman@gmail.com" [ref=e289]
+                    - cell "REGISTERED" [ref=e290]:
+                      - generic [ref=e291]: REGISTERED
+                    - cell "COMPLETED" [ref=e292]:
+                      - generic [ref=e293]: COMPLETED
+                    - cell "May 6, 2026" [ref=e294]
+                    - cell "Remove" [ref=e295]:
+                      - button "Remove" [ref=e296] [cursor=pointer]
+            - generic [ref=e297]:
+              - heading "Conversation History" [level=3] [ref=e299]
+              - generic [ref=e302]:
+                - paragraph [ref=e303]: May 6, 2026
+                - generic [ref=e304]:
+                  - heading "Conversation" [level=4] [ref=e305]
+                  - generic [ref=e307]:
+                    - generic [ref=e308]: You (Admin)· May 6, 2026
+                    - paragraph [ref=e309]: Approved
+          - generic [ref=e310]:
+            - generic [ref=e311]:
+              - heading "Automation Tasks" [level=3] [ref=e313]
+              - generic [ref=e316]:
+                - generic [ref=e317]: WORKSHOP_SETUP_METADATA
+                - generic [ref=e318]: PENDING
+            - generic [ref=e319]:
+              - heading "Workflow Status" [level=3] [ref=e321]
+              - generic [ref=e323]:
+                - generic [ref=e324]:
+                  - paragraph [ref=e325]: Standard Test Event
+                  - generic [ref=e326]:
+                    - generic [ref=e327]:
+                      - generic [ref=e328]: "1."
+                      - generic [ref=e329]:
+                        - generic [ref=e330]: 1hr before
+                        - text: May 6, 2026
+                      - button "Trigger Now" [ref=e332] [cursor=pointer]
+                    - generic [ref=e333]:
+                      - generic [ref=e334]: "2."
+                      - generic [ref=e335]:
+                        - generic [ref=e336]: Survey for your upcoming workshop
+                        - text: May 8, 2026
+                      - button "Trigger Now" [ref=e338] [cursor=pointer]
+                    - generic [ref=e339]:
+                      - generic [ref=e340]: "3."
+                      - generic [ref=e341]:
+                        - generic [ref=e342]: Here is the reading material for your workshop
+                        - text: May 6, 2026
+                      - button "Trigger Now" [ref=e344] [cursor=pointer]
+                - generic [ref=e345]:
+                  - paragraph [ref=e346]: Email Coach Test
+                  - generic [ref=e348]:
+                    - generic [ref=e349]: "1."
+                    - generic [ref=e350]:
+                      - generic [ref=e351]: 1hr after event email coach test workflow.
+                      - text: May 6, 2026
+                    - button "Trigger Now" [ref=e353] [cursor=pointer]
+            - generic [ref=e354]:
+              - heading "Admin Notes" [level=3] [ref=e356]
+              - generic [ref=e358]:
+                - paragraph [ref=e359]: Admin/staff only. Not visible to the coach.
+                - textbox "Internal notes about this workshop…" [ref=e360]
+                - button "Save Notes" [ref=e362] [cursor=pointer]
+            - generic [ref=e363]:
+              - heading "Quick Actions" [level=3] [ref=e365]
+              - generic [ref=e367]:
+                - button "Edit Landing Page" [ref=e368] [cursor=pointer]
+                - button "View Public Page" [ref=e369] [cursor=pointer]
+                - button "View Survey Results" [ref=e370] [cursor=pointer]
+                - button "Export Registrations" [ref=e371] [cursor=pointer]
+    - contentinfo [ref=e173]:
+      - paragraph [ref=e175]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e176]

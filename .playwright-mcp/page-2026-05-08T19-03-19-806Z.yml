@@ -1,0 +1,121 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - menubar [ref=e10]:
+            - menuitem "Dashboard" [ref=e11] [cursor=pointer]
+            - menuitem "All Workshops" [ref=e12] [cursor=pointer]
+            - menuitem "Templates" [ref=e13] [cursor=pointer]
+            - menuitem "Workflows" [ref=e14] [cursor=pointer]
+            - menuitem "Surveys" [ref=e15] [cursor=pointer]
+            - menuitem "Files" [ref=e16] [cursor=pointer]
+            - menuitem "Partners" [ref=e17] [cursor=pointer]
+            - menuitem "Coaches" [ref=e18] [cursor=pointer]
+            - menuitem "Approvals" [ref=e19] [cursor=pointer]
+            - menuitem "Registrations" [ref=e20] [cursor=pointer]
+            - menuitem "Categories" [ref=e21] [cursor=pointer]
+            - menuitem "Pricing" [ref=e22] [cursor=pointer]
+            - menuitem "Financials" [ref=e23] [cursor=pointer]
+        - generic [ref=e24]:
+          - generic "Logged in user" [ref=e25]: jcbdelossantos.va@gmail.com
+          - button "Switch to dark mode" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+          - generic [ref=e29]:
+            - link "Settings" [ref=e30] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=e31]
+          - generic [ref=e32]: A
+    - main "Page content" [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - heading "Survey Templates" [level=1] [ref=e37]
+            - paragraph [ref=e38]: Build custom surveys to collect pre/post-event feedback and NPS scores.
+          - generic [ref=e39]:
+            - link "Aggregated Results" [ref=e40] [cursor=pointer]:
+              - /url: /admin/surveys/aggregate
+            - link "+ Create Template" [ref=e41] [cursor=pointer]:
+              - /url: /admin/surveys/templates/new
+        - table [ref=e44]:
+          - rowgroup [ref=e45]:
+            - row "Name Type Questions Responses Status Actions" [ref=e46]:
+              - columnheader "Name" [ref=e47]
+              - columnheader "Type" [ref=e48]
+              - columnheader "Questions" [ref=e49]
+              - columnheader "Responses" [ref=e50]
+              - columnheader "Status" [ref=e51]
+              - columnheader "Actions" [ref=e52]
+          - rowgroup [ref=e53]:
+            - row "General Pre-Workshop Survey Pre-Workshop 3 6 Active Edit Results Delete" [ref=e54]:
+              - cell "General Pre-Workshop Survey" [ref=e55]:
+                - generic [ref=e57]: General Pre-Workshop Survey
+              - cell "Pre-Workshop" [ref=e58]:
+                - generic [ref=e59]: Pre-Workshop
+              - cell "3" [ref=e60]
+              - cell "6" [ref=e61]
+              - cell "Active" [ref=e62]:
+                - generic [ref=e63]: Active
+              - cell "Edit Results Delete" [ref=e64]:
+                - generic [ref=e65]:
+                  - link "Edit" [ref=e66] [cursor=pointer]:
+                    - /url: /admin/surveys/templates/cmojsc5nx00007aife961l2ur
+                  - link "Results" [ref=e67] [cursor=pointer]:
+                    - /url: /admin/surveys/templates/cmojsc5nx00007aife961l2ur?tab=results
+                  - button "Delete" [ref=e68]
+            - row "1 question quiz Post-Workshop 1 0 Active Edit Delete" [ref=e69]:
+              - cell "1 question quiz" [ref=e70]:
+                - generic [ref=e72]: 1 question quiz
+              - cell "Post-Workshop" [ref=e73]:
+                - generic [ref=e74]: Post-Workshop
+              - cell "1" [ref=e75]
+              - cell "0" [ref=e76]
+              - cell "Active" [ref=e77]:
+                - generic [ref=e78]: Active
+              - cell "Edit Delete" [ref=e79]:
+                - generic [ref=e80]:
+                  - link "Edit" [ref=e81] [cursor=pointer]:
+                    - /url: /admin/surveys/templates/cmo31l4qd0005rlivo2bjqoul
+                  - button "Delete" [ref=e82]
+            - row "Coach 30-Day Follow-Up Survey 30-day post-event check-in — conversion tracking and long-term outcomes. Post-Workshop 5 0 Active Edit Delete" [ref=e83]:
+              - cell "Coach 30-Day Follow-Up Survey 30-day post-event check-in — conversion tracking and long-term outcomes." [ref=e84]:
+                - generic [ref=e85]:
+                  - generic [ref=e86]: Coach 30-Day Follow-Up Survey
+                  - generic [ref=e87]: 30-day post-event check-in — conversion tracking and long-term outcomes.
+              - cell "Post-Workshop" [ref=e88]:
+                - generic [ref=e89]: Post-Workshop
+              - cell "5" [ref=e90]
+              - cell "0" [ref=e91]
+              - cell "Active" [ref=e92]:
+                - generic [ref=e93]: Active
+              - cell "Edit Delete" [ref=e94]:
+                - generic [ref=e95]:
+                  - link "Edit" [ref=e96] [cursor=pointer]:
+                    - /url: /admin/surveys/templates/coach-30day-followup-seed
+                  - button "Delete" [ref=e97]
+            - row "Coach Post-Workshop Survey Post-event feedback from the coach — attendance, quality, conversions, and partnerships. Post-Workshop 5 0 Active Edit Delete" [ref=e98]:
+              - cell "Coach Post-Workshop Survey Post-event feedback from the coach — attendance, quality, conversions, and partnerships." [ref=e99]:
+                - generic [ref=e100]:
+                  - generic [ref=e101]: Coach Post-Workshop Survey
+                  - generic [ref=e102]: Post-event feedback from the coach — attendance, quality, conversions, and partnerships.
+              - cell "Post-Workshop" [ref=e103]:
+                - generic [ref=e104]: Post-Workshop
+              - cell "5" [ref=e105]
+              - cell "0" [ref=e106]
+              - cell "Active" [ref=e107]:
+                - generic [ref=e108]: Active
+              - cell "Edit Delete" [ref=e109]:
+                - generic [ref=e110]:
+                  - link "Edit" [ref=e111] [cursor=pointer]:
+                    - /url: /admin/surveys/templates/coach-post-workshop-seed
+                  - button "Delete" [ref=e112]
+    - contentinfo [ref=e113]:
+      - paragraph [ref=e115]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e116]

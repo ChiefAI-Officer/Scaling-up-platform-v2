@@ -1,0 +1,153 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - menubar [ref=e10]:
+            - menuitem "Dashboard" [ref=e11] [cursor=pointer]
+            - menuitem "All Workshops" [ref=e12] [cursor=pointer]
+            - menuitem "Templates" [ref=e13] [cursor=pointer]
+            - menuitem "Workflows" [ref=e14] [cursor=pointer]
+            - menuitem "Surveys" [ref=e15] [cursor=pointer]
+            - menuitem "Files" [ref=e16] [cursor=pointer]
+            - menuitem "Partners" [ref=e17] [cursor=pointer]
+            - menuitem "Coaches" [ref=e18] [cursor=pointer]
+            - menuitem "Approvals" [ref=e19] [cursor=pointer]
+            - menuitem "Registrations" [ref=e20] [cursor=pointer]
+            - menuitem "Categories" [ref=e21] [cursor=pointer]
+            - menuitem "Pricing" [ref=e22] [cursor=pointer]
+            - menuitem "Financials" [ref=e23] [cursor=pointer]
+        - generic [ref=e24]:
+          - generic "Logged in user" [ref=e25]: jcbdelossantos.va@gmail.com
+          - button "Switch to dark mode" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+          - generic [ref=e29]:
+            - link "Settings" [ref=e30] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=e31]
+          - generic [ref=e32]: A
+    - main "Page content" [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - link "← Back to Templates" [ref=e37] [cursor=pointer]:
+              - /url: /admin/surveys
+            - heading "General Pre-Workshop Survey" [level=1] [ref=e38]
+          - generic [ref=e39]:
+            - button "Preview" [active] [ref=e40]
+            - button "Delete Template" [ref=e41]
+        - generic [ref=e42]:
+          - heading "Template Details" [level=2] [ref=e43]
+          - generic [ref=e44]:
+            - generic [ref=e45]:
+              - generic [ref=e46]: Name
+              - textbox "e.g., Post-Workshop Feedback" [ref=e47]: General Pre-Workshop Survey
+            - generic [ref=e48]:
+              - generic [ref=e49]: Survey Type
+              - combobox [ref=e50]:
+                - option "Pre-Workshop" [selected]
+                - option "Post-Workshop"
+                - option "NPS Score"
+            - generic [ref=e51]:
+              - generic [ref=e52]: Category
+              - combobox [ref=e53]:
+                - option "All Categories (Generic)" [selected]
+                - option "AI"
+                - option "Exit & Valuation"
+                - option "Scaling Up Master Class"
+              - paragraph [ref=e54]: Auto-assigned to workshops in this category
+            - generic [ref=e55]:
+              - generic [ref=e56]: Description
+              - textbox "Optional description" [ref=e57]
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - checkbox "Active" [checked] [ref=e60]
+              - text: Active
+            - button "Save Changes" [ref=e61]
+        - navigation [ref=e63]:
+          - button "Questions (3)" [ref=e64]
+          - button "Assign to Workshops" [ref=e65]
+          - button "Results" [ref=e66]
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - generic [ref=e69]:
+              - button "▲" [disabled] [ref=e70]
+              - button "▼" [ref=e71]
+            - generic [ref=e72]:
+              - generic [ref=e73]:
+                - generic [ref=e74]: Q1
+                - generic [ref=e75]: Short Text
+                - generic [ref=e76]: Required
+              - paragraph [ref=e77]: What is your primary goal for attending this workshop?
+            - generic [ref=e78]:
+              - button "Edit" [ref=e79]
+              - button "Remove" [ref=e80]
+          - generic [ref=e81]:
+            - generic [ref=e82]:
+              - button "▲" [ref=e83]
+              - button "▼" [ref=e84]
+            - generic [ref=e85]:
+              - generic [ref=e86]:
+                - generic [ref=e87]: Q2
+                - generic [ref=e88]: Rating (1-5)
+                - generic [ref=e89]: Required
+              - paragraph [ref=e90]: How familiar are you with the workshop topic? (1 = beginner, 5 = expert)
+            - generic [ref=e91]:
+              - button "Edit" [ref=e92]
+              - button "Remove" [ref=e93]
+          - generic [ref=e94]:
+            - generic [ref=e95]:
+              - button "▲" [ref=e96]
+              - button "▼" [disabled] [ref=e97]
+            - generic [ref=e98]:
+              - generic [ref=e99]:
+                - generic [ref=e100]: Q3
+                - generic [ref=e101]: Short Text
+              - paragraph [ref=e102]: What is your biggest challenge related to this topic?
+            - generic [ref=e103]:
+              - button "Edit" [ref=e104]
+              - button "Remove" [ref=e105]
+          - generic [ref=e106]:
+            - paragraph [ref=e107]: Add Question
+            - generic [ref=e108]:
+              - button "+ Short Text" [ref=e109]
+              - button "+ Long Text" [ref=e110]
+              - button "+ Rating (1-5)" [ref=e111]
+              - button "+ NPS Score (0-10)" [ref=e112]
+              - button "+ Single Choice" [ref=e113]
+              - button "+ Multiple Choice" [ref=e114]
+              - button "+ Yes / No" [ref=e115]
+        - generic [ref=e121]:
+          - generic [ref=e122]:
+            - heading "Survey Preview" [level=3] [ref=e123]
+            - button "Close preview" [ref=e124]: ✕ Close
+          - generic [ref=e126]:
+            - generic [ref=e127]:
+              - heading "General Pre-Workshop Survey" [level=2] [ref=e128]
+              - paragraph [ref=e129]: Preview mode — answers are not saved, no submission will fire.
+            - generic [ref=e130]:
+              - generic [ref=e131]:
+                - generic [ref=e133]: 1. What is your primary goal for attending this workshop?*
+                - textbox "Your answer..." [ref=e134]
+              - generic [ref=e135]:
+                - generic [ref=e137]: 2. How familiar are you with the workshop topic? (1 = beginner, 5 = expert)*
+                - generic [ref=e138]:
+                  - button "1" [ref=e139]
+                  - button "2" [ref=e140]
+                  - button "3" [ref=e141]
+                  - button "4" [ref=e142]
+                  - button "5" [ref=e143]
+              - generic [ref=e144]:
+                - generic [ref=e146]: 3. What is your biggest challenge related to this topic?
+                - textbox "Your answer..." [ref=e147]
+            - button "Submit Survey (preview mode — disabled)" [disabled] [ref=e149]: Submit Survey
+    - contentinfo [ref=e116]:
+      - paragraph [ref=e118]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e119]

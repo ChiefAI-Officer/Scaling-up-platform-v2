@@ -1,0 +1,18 @@
+- generic [ref=e13]:
+  - banner [ref=e14]:
+    - paragraph [ref=e18]
+  - main [ref=e19]:
+    - generic [ref=e25]:
+      - textbox [ref=e29]:
+        - generic [ref=e31]:
+          - heading "Welcome to the Scaling Up 4 Decisionscc Assessment!" [level=1] [ref=e32]:
+            - text: Welcome to the Scaling Up 4 Decisions
+            - superscript [ref=e33]:
+              - img "cc" [ref=e34]
+            - text: Assessment!
+          - text: The following 32 questions are organized around the 4 Decisions framework – People, Strategy, Execution, and Cash. Average time to take the assessment is 4 minutes.
+      - button "Start" [ref=e40] [cursor=pointer]
+  - contentinfo:
+    - paragraph:
+      - link "powered by Esperto" [ref=e41] [cursor=pointer]:
+        - /url: https://esperto.one

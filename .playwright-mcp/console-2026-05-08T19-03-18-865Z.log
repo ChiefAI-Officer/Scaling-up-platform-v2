@@ -1,0 +1,3 @@
+[     966ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://scaling-up-platform-v2.vercel.app/_vercel/insights/script.js:0
+[     966ms] [ERROR] Refused to execute script from 'https://scaling-up-platform-v2.vercel.app/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled. @ https://scaling-up-platform-v2.vercel.app/admin/surveys:0
+[     966ms] [LOG] [Vercel Web Analytics] Failed to load script from /_vercel/insights/script.js. Be sure to enable Web Analytics for your project and deploy again. See https://vercel.com/docs/analytics/quickstart for more information. @ https://scaling-up-platform-v2.vercel.app/_next/static/chunks/fe648d365b0b9c2f.js:0

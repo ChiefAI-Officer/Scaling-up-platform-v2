@@ -1,0 +1,33 @@
+[    4419ms] [WARNING] No translation found for "esp.login.title.ssologinwith" ("{$START_PARAGRAPH} Please log-in with {$CLOSE_PARAGRAPH}"). @ https://www.scalinguptoolkit.com/login/main.954d5f788d03cb1a.js:0
+[    4420ms] [WARNING] No translation found for "esp.login.login.title.success l-membersuccess1" ("Your Request was sent successfully!"). @ https://www.scalinguptoolkit.com/login/main.954d5f788d03cb1a.js:0
+[    4420ms] [WARNING] No translation found for "esp.login.login.paragraph.success l-membersuccess2" ("Within a few moments, you will receive an email with further instructions."). @ https://www.scalinguptoolkit.com/login/main.954d5f788d03cb1a.js:0
+[   21139ms] [VERBOSE] [DOM] Password forms should have (optionally hidden) username fields for accessibility: (More info: https://goo.gl/9p2vKq) %o @ https://www.scalinguptoolkit.com/login/:0
+[   40640ms] [LOG] cookie dash reset @ https://www.scalinguptoolkit.com/login/main.954d5f788d03cb1a.js:0
+[   44350ms] [WARNING] No translation found for "esp.admin.dialog.welcome.title" ("Welcome, {$INTERPOLATION} {$INTERPOLATION_1}"). @ https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:0
+[   44350ms] [WARNING] No translation found for "esp.admin.form.label.showafterlogin" (" show after login "). @ https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:0
+[   45311ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ https://www.scalinguptoolkit.com/api/v1/settings/status/counts/samples:0
+[   45312ms] [LOG] 403!!!! @ https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:0
+[   45312ms] [LOG] Error: [object Object]
+    at https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:7831993
+    at t.n [as _subscribe] (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1533179)
+    at t._trySubscribe (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1321134)
+    at https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1321079
+    at Ra (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1318774)
+    at t.subscribe (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1320993)
+    at https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1535883
+    at B_._error (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1324506)
+    at B_.error (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1319132)
+    at B_._error (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1319372) @ https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:0
+[   45553ms] [ERROR] Failed to load resource: the server responded with a status of 403 (Forbidden) @ https://www.scalinguptoolkit.com/api/v1/settings/status/counts/users:0
+[   45553ms] [LOG] 403!!!! @ https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:0
+[   45553ms] [LOG] Error: [object Object]
+    at https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:7831993
+    at t.n [as _subscribe] (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1533179)
+    at t._trySubscribe (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1321134)
+    at https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1321079
+    at Ra (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1318774)
+    at t.subscribe (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1320993)
+    at https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1535883
+    at B_._error (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1324506)
+    at B_.error (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1319132)
+    at B_._error (https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:1:1319372) @ https://www.scalinguptoolkit.com/admin2/main.16382db1c26f2a2e.js:0

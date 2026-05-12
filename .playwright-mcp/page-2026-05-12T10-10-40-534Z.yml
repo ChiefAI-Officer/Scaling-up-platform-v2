@@ -1,0 +1,122 @@
+- generic [ref=e7]:
+  - navigation [ref=e8]:
+    - generic [ref=e9]:
+      - img [ref=e12]
+      - generic [ref=e13]:
+        - list [ref=e14]:
+          - listitem [ref=e15]:
+            - link "Home" [ref=e265] [cursor=pointer]:
+              - /url: /admin2/home
+          - listitem [ref=e17]:
+            - link "Members" [ref=e266] [cursor=pointer]:
+              - /url: /admin2/members
+          - listitem [ref=e19]:
+            - link "Campaigns" [ref=e267] [cursor=pointer]:
+              - /url: /admin2/campaigns
+          - listitem [ref=e21]:
+            - link "Reports" [ref=e268] [cursor=pointer]:
+              - /url: /admin2/reports
+        - list [ref=e24]:
+          - listitem [ref=e25]:
+            - button "0" [ref=e269] [cursor=pointer]:
+              - generic [ref=e28]:
+                - img [ref=e31]
+                - subscript [ref=e33]: "0"
+          - listitem [ref=e36]:
+            - button [ref=e37] [cursor=pointer]:
+              - img [ref=e40]
+          - listitem [ref=e44]:
+            - button "CD" [ref=e270] [cursor=pointer]:
+              - generic "44DDy8Qii9" [ref=e271]: CD
+  - main [ref=e52]:
+    - generic [ref=e54]:
+      - generic [ref=e55]:
+        - heading "Good morning, Chris Daigle!" [level=3] [ref=e272]
+        - generic [ref=e58]:
+          - button [ref=e59] [cursor=pointer]:
+            - img [ref=e62]
+          - button "Home" [ref=e273] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e70]: Home
+      - generic [ref=e74]:
+        - generic [ref=e80]:
+          - heading "Campaigns today:" [level=5] [ref=e274]
+          - list [ref=e82]:
+            - listitem [ref=e83] [cursor=pointer]:
+              - generic [ref=e84]: Rockefeller Habits Checklist - 04/2026
+              - generic [ref=e86]: in a day
+              - img [ref=e89]
+            - listitem [ref=e91] [cursor=pointer]:
+              - generic [ref=e92]: Scaling Up Assessment for Jaime Rodriguez - 04/2026
+              - generic [ref=e94]: in 2 days
+              - img [ref=e97]
+            - listitem [ref=e99] [cursor=pointer]:
+              - generic [ref=e100]: Leadership Vision Alignment Assessment for name of assessed person - 04/2026
+              - generic [ref=e102]: in 2 days
+              - img [ref=e105]
+            - listitem [ref=e107] [cursor=pointer]:
+              - generic [ref=e108]: Quarterly Session Preparation for Jaime Rodriguez - 04/2026
+              - generic [ref=e110]: in 2 days
+              - img [ref=e113]
+            - listitem [ref=e115] [cursor=pointer]:
+              - generic [ref=e116]: Quarterly Session Preparation v2 for Jaime Rodriguez - 04/2026
+              - generic [ref=e118]: in 2 days
+              - img [ref=e121]
+        - generic [ref=e128]:
+          - heading "Progress last 7 days:" [level=5] [ref=e275]
+          - generic [ref=e131]: "[object Object]"
+        - generic [ref=e144]: America/Toronto
+        - generic [ref=e151]:
+          - generic [ref=e152]: "2026"
+          - generic [ref=e153]: May
+          - generic [ref=e154]: "12"
+          - generic [ref=e155]: Tuesday
+          - generic [ref=e156]: Week 20
+        - generic [ref=e161]:
+          - generic [ref=e162] [cursor=pointer]:
+            - img [ref=e164]
+            - heading "5" [level=4] [ref=e276]
+            - generic [ref=e167]: Campaigns
+          - list [ref=e169]:
+            - listitem [ref=e170]:
+              - generic "new" [ref=e277]:
+                - img [ref=e172]
+                - img [ref=e174]
+            - listitem [ref=e176]:
+              - generic "invited" [ref=e278]:
+                - img [ref=e178]
+                - img [ref=e180]
+            - listitem [ref=e182]:
+              - generic "started" [ref=e279]:
+                - img [ref=e184]
+                - img [ref=e186]
+              - generic [ref=e188]: "4"
+            - listitem [ref=e189]:
+              - generic "completed" [ref=e280]:
+                - img [ref=e191]
+                - img [ref=e193]
+              - generic [ref=e195]: "1"
+        - generic [ref=e200]:
+          - generic [ref=e201] [cursor=pointer]:
+            - img [ref=e203]
+            - heading "1" [level=4] [ref=e281]
+            - generic [ref=e206]: Members
+          - list [ref=e208]:
+            - listitem [ref=e209]:
+              - generic "Company" [ref=e282]:
+                - img [ref=e212]
+                - img [ref=e214]
+              - generic [ref=e216]: "1"
+        - generic [ref=e225]:
+          - generic [ref=e226] [cursor=pointer]:
+            - img [ref=e228]
+            - heading "1" [level=4] [ref=e283]
+            - generic [ref=e231]: Reports
+          - generic [ref=e234]:
+            - generic [ref=e235]: Rockefeller Habits Checklist
+            - list [ref=e236]:
+              - listitem [ref=e237]:
+                - generic "personal" [ref=e284]:
+                  - img [ref=e240]
+                  - img [ref=e242]
+                - text: "1"

@@ -1,0 +1,7 @@
+[     538ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://scaling-up-platform-v2.vercel.app/_vercel/insights/script.js:0
+[     538ms] [ERROR] Refused to execute script from 'https://scaling-up-platform-v2.vercel.app/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled. @ https://scaling-up-platform-v2.vercel.app/workshops/cmou2rdud000pgt5yt383scxn/landing-pages/thank-you:0
+[     539ms] [LOG] [Vercel Web Analytics] Failed to load script from /_vercel/insights/script.js. Be sure to enable Web Analytics for your project and deploy again. See https://vercel.com/docs/analytics/quickstart for more information. @ https://scaling-up-platform-v2.vercel.app/_next/static/chunks/fe648d365b0b9c2f.js:0
+[     851ms] [ERROR] Framing 'https://player.vimeo.com/' violates the following report-only Content Security Policy directive: "frame-src https://js.stripe.com". The violation has been logged, but no further action has been taken.
+ @ https://scaling-up-platform-v2.vercel.app/workshops/cmou2rdud000pgt5yt383scxn/landing-pages/thank-you:0
+[    1295ms] [ERROR] Framing 'https://player.vimeo.com/' violates the following report-only Content Security Policy directive: "frame-src https://js.stripe.com". The violation has been logged, but no further action has been taken.
+ @ https://scaling-up-platform-v2.vercel.app/workshops/cmou2rdud000pgt5yt383scxn/landing-pages/thank-you:0

@@ -1,0 +1,151 @@
+- generic [ref=e13]:
+  - banner [ref=e14]:
+    - paragraph [ref=e18]
+  - main [ref=e19]:
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - textbox "Our net profit is three to five times industry average indicating effective execution of our strategy." [ref=e726]:
+          - button "Our net profit is three to five times industry average indicating effective execution of our strategy." [ref=e728] [cursor=pointer]:
+            - generic:
+              - generic: Our net profit is three to five times industry average indicating effective execution of our strategy.
+          - generic [ref=e731]:
+            - slider [ref=e735] [cursor=pointer]
+            - generic [ref=e737]:
+              - paragraph [ref=e740]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e762]: Strong
+        - textbox "We are making progress toward the company&#8217;s goals, and rarely spend time responding to crises." [ref=e765]:
+          - button "We are making progress toward the company&#8217;s goals, and rarely spend time responding to crises." [ref=e767] [cursor=pointer]:
+            - generic:
+              - generic: We are making progress toward the company’s goals, and rarely spend time responding to crises.
+          - generic [ref=e770]:
+            - slider [ref=e774] [cursor=pointer]
+            - generic [ref=e776]:
+              - paragraph [ref=e779]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e801]: Strong
+        - textbox "We have clearly-defined metrics assigned to each priority in our plan, which are regularly updated and visually displayed." [ref=e804]:
+          - button "We have clearly-defined metrics assigned to each priority in our plan, which are regularly updated and visually displayed." [ref=e806] [cursor=pointer]:
+            - generic:
+              - generic: We have clearly-defined metrics assigned to each priority in our plan, which are regularly updated and visually displayed.
+          - generic [ref=e809]:
+            - slider [ref=e813] [cursor=pointer]
+            - generic [ref=e815]:
+              - paragraph [ref=e818]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e840]: Strong
+        - textbox "I&#8217;m confident that each employee can clearly articulate our top quarterly priorities and their role in attaining them." [ref=e843]:
+          - button "I&#8217;m confident that each employee can clearly articulate our top quarterly priorities and their role in attaining them." [ref=e845] [cursor=pointer]:
+            - generic:
+              - generic: I’m confident that each employee can clearly articulate our top quarterly priorities and their role in attaining them.
+          - generic [ref=e848]:
+            - slider [ref=e852] [cursor=pointer]
+            - generic [ref=e854]:
+              - paragraph [ref=e857]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e879]: Strong
+        - textbox "We consistently receive feedback from our customers on how we are doing and what they have heard about our competitors." [ref=e882]:
+          - button "We consistently receive feedback from our customers on how we are doing and what they have heard about our competitors." [ref=e884] [cursor=pointer]:
+            - generic:
+              - generic: We consistently receive feedback from our customers on how we are doing and what they have heard about our competitors.
+          - generic [ref=e887]:
+            - slider [ref=e891] [cursor=pointer]
+            - generic [ref=e893]:
+              - paragraph [ref=e896]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e918]: Strong
+        - textbox "We have strong alignment between our strategic plan and quarterly priorities." [ref=e921]:
+          - button "We have strong alignment between our strategic plan and quarterly priorities." [ref=e923] [cursor=pointer]:
+            - generic:
+              - generic: We have strong alignment between our strategic plan and quarterly priorities.
+          - generic [ref=e926]:
+            - slider [ref=e930] [cursor=pointer]
+            - generic [ref=e932]:
+              - paragraph [ref=e935]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e957]: Strong
+        - textbox "We have regularly-established meetings to align activities with company priorities and identify and solve miscommunications." [ref=e960]:
+          - button "We have regularly-established meetings to align activities with company priorities and identify and solve miscommunications." [ref=e962] [cursor=pointer]:
+            - generic:
+              - generic: We have regularly-established meetings to align activities with company priorities and identify and solve miscommunications.
+          - generic [ref=e965]:
+            - slider [ref=e969] [cursor=pointer]
+            - generic [ref=e971]:
+              - paragraph [ref=e974]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e996]: Strong
+        - textbox "We have an effective process for employees to offer suggestions and feedback, in order to enhance our culture and strengthen our team." [ref=e999]:
+          - button "We have an effective process for employees to offer suggestions and feedback, in order to enhance our culture and strengthen our team." [ref=e1001] [cursor=pointer]:
+            - generic:
+              - generic: We have an effective process for employees to offer suggestions and feedback, in order to enhance our culture and strengthen our team.
+          - generic [ref=e1004]:
+            - slider [ref=e1008] [cursor=pointer]
+            - generic [ref=e1010]:
+              - paragraph [ref=e1013]: Weak
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - generic:
+                - paragraph
+              - paragraph [ref=e1035]: Strong
+      - generic [ref=e35]:
+        - progressbar [ref=e711]
+        - generic [ref=e36]:
+          - button "Previous" [ref=e715] [cursor=pointer]
+          - button "Next" [active] [ref=e358] [cursor=pointer]
+  - contentinfo:
+    - paragraph:
+      - link "powered by Esperto" [ref=e41] [cursor=pointer]:
+        - /url: https://esperto.one

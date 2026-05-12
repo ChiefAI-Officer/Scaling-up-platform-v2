@@ -1,0 +1,10 @@
+[     701ms] [ERROR] Framing 'https://player.vimeo.com/' violates the following report-only Content Security Policy directive: "frame-src https://js.stripe.com". The violation has been logged, but no further action has been taken.
+ @ https://scaling-up-platform-v2.vercel.app/templates/cmn8kvupm0005c38jrsg06z28/edit:0
+[     778ms] [INFO] Evaluating a string as JavaScript violates the following Content Security Policy directive because 'unsafe-eval' is not an allowed source of script: "script-src 'self' 'unsafe-inline' https://js.stripe.com".
+ The policy is report-only, so the violation has been logged but no further action has been taken. @ https://scaling-up-platform-v2.vercel.app/_next/static/chunks/8f0372769388ad4e.js:0
+[     801ms] [WARNING] [template-utils] Unresolved placeholder: We've sent a confirmation email to your inbox with all the details. Please add { @ https://scaling-up-platform-v2.vercel.app/_next/static/chunks/f1dfb6edd131d495.js:0
+[     921ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://scaling-up-platform-v2.vercel.app/_vercel/insights/script.js:0
+[     922ms] [ERROR] Refused to execute script from 'https://scaling-up-platform-v2.vercel.app/_vercel/insights/script.js' because its MIME type ('text/html') is not executable, and strict MIME type checking is enabled. @ https://scaling-up-platform-v2.vercel.app/templates/cmn8kvupm0005c38jrsg06z28/edit:0
+[     922ms] [LOG] [Vercel Web Analytics] Failed to load script from /_vercel/insights/script.js. Be sure to enable Web Analytics for your project and deploy again. See https://vercel.com/docs/analytics/quickstart for more information. @ https://scaling-up-platform-v2.vercel.app/_next/static/chunks/fe648d365b0b9c2f.js:0
+[    1339ms] [ERROR] Framing 'https://player.vimeo.com/' violates the following report-only Content Security Policy directive: "frame-src https://js.stripe.com". The violation has been logged, but no further action has been taken.
+ @ https://scaling-up-platform-v2.vercel.app/templates/cmn8kvupm0005c38jrsg06z28/edit:0

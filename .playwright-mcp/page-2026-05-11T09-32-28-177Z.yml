@@ -1,0 +1,76 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]: Scaling Up Coach
+      - navigation [ref=e6]:
+        - link "Dashboard" [ref=e7] [cursor=pointer]:
+          - /url: /portal/home
+          - img [ref=e9]
+          - generic [ref=e14]: Dashboard
+        - link "My Workshops" [ref=e15] [cursor=pointer]:
+          - /url: /portal/workshops
+          - img [ref=e17]
+          - generic [ref=e19]: My Workshops
+        - link "Registrations" [ref=e20] [cursor=pointer]:
+          - /url: /portal/registrations
+          - img [ref=e22]
+          - generic [ref=e27]: Registrations
+        - link "Request Workshop" [ref=e28] [cursor=pointer]:
+          - /url: /portal/request
+          - img [ref=e30]
+          - generic [ref=e32]: Request Workshop
+        - link "Settings" [ref=e35] [cursor=pointer]:
+          - /url: /portal/settings
+          - img [ref=e37]
+          - generic [ref=e40]: Settings
+      - link "J JC Coach" [ref=e41] [cursor=pointer]:
+        - /url: /portal/settings
+        - generic [ref=e42]:
+          - generic [ref=e43]: J
+          - generic [ref=e44]:
+            - paragraph [ref=e45]: JC
+            - paragraph [ref=e46]: Coach
+    - generic [ref=e47]:
+      - banner [ref=e48]:
+        - generic [ref=e49]:
+          - button "Switch to dark mode" [ref=e50] [cursor=pointer]:
+            - img [ref=e51]
+          - link "Settings" [ref=e54] [cursor=pointer]:
+            - /url: /portal/settings
+          - button "Sign Out" [ref=e55]
+      - main [ref=e56]:
+        - generic [ref=e57]:
+          - generic [ref=e59]:
+            - generic [ref=e60]:
+              - heading "My Workshops" [level=1] [ref=e61]
+              - paragraph [ref=e62]: Manage your upcoming and past events.
+            - link "Request New" [ref=e63] [cursor=pointer]:
+              - /url: /portal/request
+              - img [ref=e64]
+              - text: Request New
+          - generic [ref=e66]:
+            - generic [ref=e67]:
+              - generic [ref=e68]:
+                - img [ref=e69]
+                - textbox "Search workshops..." [ref=e72]
+              - button "Filters" [ref=e73]:
+                - img [ref=e74]
+                - text: Filters
+            - table [ref=e76]:
+              - rowgroup [ref=e77]:
+                - row "Workshop Date Registrations Approved Workshop Type Cost Landing Page Status Actions" [ref=e78]:
+                  - columnheader "Workshop" [ref=e79]
+                  - columnheader "Date" [ref=e80]
+                  - columnheader "Registrations" [ref=e81]
+                  - columnheader "Approved" [ref=e82]
+                  - columnheader "Workshop Type" [ref=e83]
+                  - columnheader "Cost" [ref=e84]
+                  - columnheader "Landing Page" [ref=e85]
+                  - columnheader "Status" [ref=e86]
+                  - columnheader "Actions" [ref=e87]
+              - rowgroup [ref=e88]:
+                - row "No workshops found. Request your first one above!" [ref=e89]:
+                  - cell "No workshops found. Request your first one above!" [ref=e90]
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e91]

@@ -1,0 +1,152 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - menubar [ref=e10]:
+            - menuitem "Dashboard" [ref=e11] [cursor=pointer]
+            - menuitem "All Workshops" [ref=e12] [cursor=pointer]
+            - menuitem "Templates" [ref=e13] [cursor=pointer]
+            - menuitem "Workflows" [ref=e14] [cursor=pointer]
+            - menuitem "Surveys" [ref=e15] [cursor=pointer]
+            - menuitem "Files" [ref=e16] [cursor=pointer]
+            - menuitem "Partners" [ref=e17] [cursor=pointer]
+            - menuitem "Coaches" [ref=e18] [cursor=pointer]
+            - menuitem "Approvals" [ref=e19] [cursor=pointer]
+            - menuitem "Registrations" [ref=e20] [cursor=pointer]
+            - menuitem "Categories" [ref=e21] [cursor=pointer]
+            - menuitem "Pricing" [ref=e22] [cursor=pointer]
+            - menuitem "Financials" [ref=e23] [cursor=pointer]
+        - generic [ref=e24]:
+          - generic "Logged in user" [ref=e25]: jcbdelossantos.va@gmail.com
+          - button "Switch to dark mode" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+          - generic [ref=e29]:
+            - link "Settings" [ref=e30] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=e31]
+          - generic [ref=e32]: A
+    - main "Page content" [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - heading "Templates" [level=1] [ref=e38]
+            - paragraph [ref=e39]: Edit the page templates used when building workshop-specific pages. Filter by category to manage per-category templates (AI vs Exit & Valuation).
+          - link "Create Template" [ref=e40] [cursor=pointer]:
+            - /url: /templates/new
+            - img [ref=e41]
+            - text: Create Template
+        - generic [ref=e43]:
+          - generic [ref=e44]: "Filter by category:"
+          - generic [ref=e45]:
+            - link "All" [ref=e46] [cursor=pointer]:
+              - /url: /templates
+            - link "AI" [ref=e47] [cursor=pointer]:
+              - /url: /templates?tab=cmlqyc0nh0007n407arhm5orz
+            - link "Exit & Valuation" [ref=e48] [cursor=pointer]:
+              - /url: /templates?tab=cmlqyc23m0008n4076vj86xyn
+            - link "Scaling Up Master Class" [ref=e49] [cursor=pointer]:
+              - /url: /templates?tab=cmng78bw9000kgjws9qjpps5p
+        - generic [ref=e50]:
+          - generic [ref=e53]:
+            - generic [ref=e54]: 📄
+            - generic [ref=e56]:
+              - generic [ref=e57]:
+                - heading "Solo Landing Page" [level=3] [ref=e58]
+                - paragraph [ref=e59]: Single coach workshop landing page
+                - generic [ref=e60]:
+                  - generic [ref=e61]: Active template
+                  - generic [ref=e63]: "|"
+                  - generic [ref=e64]:
+                    - img [ref=e65]
+                    - text: All Categories
+                  - generic [ref=e68]: "|"
+                  - generic [ref=e69]: Updated Apr 24, 2026
+              - generic [ref=e70]:
+                - button "Active" [ref=e71]:
+                  - img [ref=e72]
+                  - text: Active
+                - link "Edit" [ref=e74] [cursor=pointer]:
+                  - /url: /templates/cmn8kvt9o0001c38jwkowh5vk/edit
+                  - img [ref=e75]
+                  - text: Edit
+                - button "Delete" [disabled] [ref=e78]
+          - generic [ref=e81]:
+            - generic [ref=e82]: 📝
+            - generic [ref=e84]:
+              - generic [ref=e85]:
+                - heading "Registration Page" [level=3] [ref=e86]
+                - paragraph [ref=e87]: Registration form sub-page
+                - generic [ref=e88]:
+                  - generic [ref=e89]: Active template
+                  - generic [ref=e91]: "|"
+                  - generic [ref=e92]:
+                    - img [ref=e93]
+                    - text: All Categories
+                  - generic [ref=e96]: "|"
+                  - generic [ref=e97]: Updated Mar 31, 2026
+              - generic [ref=e98]:
+                - button "Active" [ref=e99]:
+                  - img [ref=e100]
+                  - text: Active
+                - link "Edit" [ref=e102] [cursor=pointer]:
+                  - /url: /templates/cmn8kvu6q0003c38jg47fc8m7/edit
+                  - img [ref=e103]
+                  - text: Edit
+                - button "Delete" [disabled] [ref=e106]
+          - generic [ref=e109]:
+            - generic [ref=e110]: 🎉
+            - generic [ref=e112]:
+              - generic [ref=e113]:
+                - heading "Thank You Page" [level=3] [ref=e114]
+                - paragraph [ref=e115]: Post-registration confirmation
+                - generic [ref=e116]:
+                  - generic [ref=e117]: Active template
+                  - generic [ref=e119]: "|"
+                  - generic [ref=e120]:
+                    - img [ref=e121]
+                    - text: All Categories
+                  - generic [ref=e124]: "|"
+                  - generic [ref=e125]: Updated May 6, 2026
+              - generic [ref=e126]:
+                - button "Active" [ref=e127]:
+                  - img [ref=e128]
+                  - text: Active
+                - link "Edit" [ref=e130] [cursor=pointer]:
+                  - /url: /templates/cmn8kvupm0005c38jrsg06z28/edit
+                  - img [ref=e131]
+                  - text: Edit
+                - button "Delete" [disabled] [ref=e134]
+        - paragraph [ref=e136]: 3 active / 3 total templates (all categories)
+        - generic [ref=e138]:
+          - heading "How Templates Work" [level=3] [ref=e139]:
+            - img [ref=e140]
+            - text: How Templates Work
+          - generic [ref=e142]:
+            - paragraph [ref=e143]:
+              - text: To set a global template, use the
+              - strong [ref=e144]: Set Template
+              - text: button on the
+              - strong [ref=e145]: All
+              - text: tab. To set a category-specific override, switch to that category tab and use
+              - strong [ref=e146]: Set Override
+              - text: or
+              - strong [ref=e147]: Set Template
+              - text: .
+            - paragraph [ref=e148]:
+              - text: Templates can be scoped to a category (AI or Exit & Valuation). When auto-build runs, it picks the category-specific template first and falls back to the global template if no override exists. Templates on the
+              - strong [ref=e149]: All
+              - text: tab have no category and apply to all workshops as a fallback.
+            - paragraph [ref=e150]:
+              - strong [ref=e151]: "Important:"
+              - text: Exit & Valuation templates are seeded but inactive by default. Activate them from this page only after verifying their content.
+    - contentinfo [ref=e152]:
+      - paragraph [ref=e154]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=e155]

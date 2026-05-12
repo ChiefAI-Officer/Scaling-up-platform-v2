@@ -125,7 +125,7 @@ export default function ChangePasswordForm() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Password must be at least 12 characters and include upper/lowercase letters,
+        Password must be at least 8 characters and include upper/lowercase letters,
         a number, and a special character.
       </p>
 
