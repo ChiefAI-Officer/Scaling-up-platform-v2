@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>New 07 — INVITED Participant Survey Form (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome (the host page that holds both frames) ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ===========================================================
+       Participant-facing chrome
+       NO admin sidebar, NO breadcrumb, NO admin topbar.
+       Just Scaling Up logo + org name in a sticky header.
+       =========================================================== */
+    .survey-shell {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Sticky participant header */
+    .survey-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.625rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .survey-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: hsl(var(--primary));
+      font-size: 0.9375rem;
+      text-decoration: none;
+    }
+    .survey-logo__mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%));
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+    }
+    .survey-logo__text { line-height: 1.1; }
+    .survey-logo__sub {
+      display: block;
+      font-size: 0.625rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .survey-header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      min-width: 0;
+    }
+    .survey-header-org {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+      text-align: right;
+      line-height: 1.2;
+    }
+    .survey-header-org strong {
+      display: block;
+      color: hsl(var(--foreground));
+      font-weight: 600;
+      font-size: 0.8125rem;
+    }
+    .autosave {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.6875rem;
+      font-weight: 500;
+      background: hsl(160 84% 95%);
+      color: hsl(160 84% 22%);
+      white-space: nowrap;
+    }
+    .autosave::before {
+      content: "✓";
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    /* ===========================================================
+       Hero (compact title block under header)
+       =========================================================== */
+    .survey-hero {
+      padding: 1rem 1.25rem 0.5rem;
+    }
+    .survey-hero__title {
+      font-size: 1.0625rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+      line-height: 1.3;
+    }
+    .survey-hero__sub {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.75rem;
+      align-items: center;
+    }
+    .survey-hero__sub strong { color: hsl(var(--foreground)); font-weight: 600; }
+    .survey-hero__dot {
+      display: inline-block;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: hsl(var(--muted-foreground));
+      opacity: 0.6;
+    }
+
+    /* ===========================================================
+       Progress indicator (sticky-top on mobile)
+       =========================================================== */
+    .survey-progress {
+      position: sticky;
+      top: 49px; /* below the survey-header */
+      z-index: 9;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.625rem 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .survey-progress__label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .survey-progress__bar {
+      flex: 1;
+      height: 6px;
+      background: hsl(var(--muted));
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+    .survey-progress__fill {
+      height: 100%;
+      background: linear-gradient(90deg, hsl(224 76% 48%), hsl(224 76% 58%));
+      border-radius: 9999px;
+    }
+    .survey-progress__pct {
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* ===========================================================
+       Question card — main content
+       =========================================================== */
+    .survey-body {
+      padding: 1.25rem;
+      flex: 1;
+    }
+    .question-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      padding: 1.25rem 1.25rem 1.5rem;
+      box-shadow: var(--shadow-xs);
+    }
+    .question-section {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 0.5rem;
+    }
+    .question-text {
+      font-size: 1.25rem;
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: -0.01em;
+      margin: 0 0 1.5rem;
+      color: hsl(var(--foreground));
+    }
+
+    /* ---------- Slider ---------- */
+    .slider-wrap {
+      margin-top: 0.5rem;
+    }
+    .slider-answer {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 0.625rem;
+    }
+    .slider-answer__chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.3125rem 0.75rem;
+      border-radius: 9999px;
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    .slider-answer__chip strong {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .slider-track {
+      position: relative;
+      height: 44px; /* touch target */
+      display: flex;
+      align-items: center;
+    }
+    .slider-track__rail {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 6px;
+      background: hsl(var(--muted));
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+    .slider-track__fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 66.66%; /* value 2 of max 3 */
+      background: linear-gradient(90deg, hsl(224 76% 48%), hsl(224 76% 58%));
+      border-radius: 9999px;
+    }
+    .slider-track__ticks {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+    .slider-tick {
+      width: 2px;
+      height: 12px;
+      background: hsl(var(--border));
+      border-radius: 1px;
+    }
+    .slider-tick--active {
+      background: hsl(var(--primary));
+    }
+    .slider-thumb {
+      position: absolute;
+      top: 50%;
+      left: 66.66%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: hsl(var(--card));
+      border: 3px solid hsl(var(--primary));
+      box-shadow: var(--shadow-md);
+      z-index: 2;
+    }
+    /* invisible touch-target around the thumb (44px) for mobile-friendliness */
+    .slider-thumb::before {
+      content: "";
+      position: absolute;
+      inset: -10px;
+      border-radius: 50%;
+    }
+
+    .slider-tickrow {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.375rem;
+      padding: 0 2px;
+    }
+    .slider-tickrow span {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: hsl(var(--muted-foreground));
+      font-variant-numeric: tabular-nums;
+      width: 12px;
+      text-align: center;
+    }
+    .slider-tickrow span.active {
+      color: hsl(var(--primary));
+      font-weight: 700;
+    }
+
+    .slider-anchors {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.625rem;
+      gap: 1rem;
+    }
+    .slider-anchor {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+      max-width: 45%;
+    }
+    .slider-anchor--right { text-align: right; }
+    .slider-anchor strong {
+      display: block;
+      color: hsl(var(--foreground));
+      font-weight: 600;
+      font-size: 0.75rem;
+    }
+
+    /* ===========================================================
+       Nav buttons
+       Mobile: stacked, full-width
+       Desktop: right-aligned inline
+       =========================================================== */
+    .survey-nav {
+      margin-top: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .survey-nav .wf-btn {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      font-size: 0.9375rem;
+    }
+
+    /* Desktop frame: override nav to inline right-aligned */
+    .desktop-frame .survey-nav {
+      flex-direction: row;
+      justify-content: flex-end;
+      gap: 0.625rem;
+    }
+    .desktop-frame .survey-nav .wf-btn {
+      width: auto;
+      padding: 0.5rem 1.25rem;
+      font-size: 0.875rem;
+    }
+    /* Visual order on desktop: Previous on left, Next on right */
+    .desktop-frame .survey-nav .wf-btn-primary { order: 2; }
+    .desktop-frame .survey-nav .wf-btn-secondary { order: 1; }
+    /* Mobile order: Previous on top, Next below (per spec). Use DOM order. */
+
+    /* ===========================================================
+       Desktop frame body — center content with max-width 720px,
+       progress shown inline with question count.
+       =========================================================== */
+    .desktop-frame .survey-hero,
+    .desktop-frame .survey-progress,
+    .desktop-frame .survey-body {
+      max-width: 720px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .desktop-frame .survey-progress {
+      top: 53px;
+    }
+    .desktop-frame .question-text {
+      font-size: 1.375rem;
+    }
+    .desktop-frame .slider-track__rail,
+    .desktop-frame .slider-track__ticks {
+      /* slider naturally fills 720px - 2*1.25rem padding = ~680px wide */
+    }
+    .desktop-frame .survey-hero {
+      padding: 1.25rem 1.25rem 0.75rem;
+    }
+
+    /* ===========================================================
+       Mobile frame tweaks
+       =========================================================== */
+    .mobile-frame .survey-header { padding: 0.625rem 1rem; }
+    .mobile-frame .survey-hero { padding: 0.875rem 1rem 0.5rem; }
+    .mobile-frame .survey-hero__title { font-size: 1rem; }
+    .mobile-frame .survey-progress { padding: 0.5rem 1rem; top: 49px; }
+    .mobile-frame .survey-body { padding: 1rem; }
+    .mobile-frame .question-card { padding: 1rem 1rem 1.25rem; }
+    .mobile-frame .question-text { font-size: 1.0625rem; }
+    .mobile-frame .survey-header-org { font-size: 0.6875rem; }
+    .mobile-frame .survey-header-org strong { font-size: 0.75rem; }
+    .mobile-frame .autosave { font-size: 0.625rem; padding: 0.1875rem 0.4375rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Wireframe banner -->
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 7 (INVITED participant survey form, mobile + desktop).</span>
+    <a href="../index.html" class="wf-back-to-index">← Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page header — explains what's being rendered -->
+  <div class="page-head">
+    <h1>New 07 — INVITED Participant: Survey Form</h1>
+    <p>
+      Mobile (390 × 844) and desktop (1280 × 800) previews rendered side-by-side.
+      The page a respondent sees after clicking their magic-link invite.
+      Sticky participant header (logo + org), sticky progress bar, 0–3 SLIDER_LIKERT only.
+      Both viewports show the same mock: Q8 of 40, section S2, current value 2.
+    </p>
+  </div>
+
+  <!-- Side-by-side mobile + desktop viewport pair -->
+  <div class="viewport-pair">
+
+    <!-- ============================================================
+         MOBILE FRAME (390 × 844)
+         ============================================================ -->
+    <div class="viewport-frame mobile-frame">
+      <div class="viewport-frame__label">
+        <span>Mobile</span>
+        <span class="viewport-frame__chrome">390 × 844 · iPhone-size</span>
+      </div>
+      <div class="viewport-frame__body">
+        <div class="survey-shell screen">
+
+          <!-- Participant header (sticky) -->
+          <header class="survey-header">
+            <a class="survey-logo" href="#" aria-label="Scaling Up home">
+              <span class="survey-logo__mark">SU</span>
+              <span class="survey-logo__text">
+                Scaling Up
+                <span class="survey-logo__sub">Assessment</span>
+              </span>
+            </a>
+            <div class="survey-header-right">
+              <span class="autosave" aria-live="polite">Saved · 12s ago</span>
+              <div class="survey-header-org" aria-label="Organization">
+                <strong>Acme Corp</strong>
+                <span>Invitation</span>
+              </div>
+            </div>
+          </header>
+
+          <!-- Compact hero -->
+          <div class="survey-hero">
+            <h1 class="survey-hero__title">Rockefeller Habits Checklist — Q2 2026 Check-in</h1>
+            <p class="survey-hero__sub">
+              <span>Sent by <strong>Sarah</strong>, your coach</span>
+              <span class="survey-hero__dot"></span>
+              <span>~3 min</span>
+            </p>
+          </div>
+
+          <!-- Sticky progress -->
+          <div class="survey-progress" role="progressbar" aria-valuemin="0" aria-valuemax="40" aria-valuenow="8" aria-label="Progress through survey">
+            <span class="survey-progress__label">Question 8 of 40</span>
+            <div class="survey-progress__bar">
+              <div class="survey-progress__fill" style="width: 20%;"></div>
+            </div>
+            <span class="survey-progress__pct">20%</span>
+          </div>
+
+          <!-- Question card -->
+          <main class="survey-body">
+            <section class="question-card" aria-labelledby="q8-text">
+              <p class="question-section">S2 — Everyone is aligned with the #1 thing</p>
+              <h2 class="question-text" id="q8-text">
+                Q2_1: The Critical Number is identified to move the company ahead this quarter.
+              </h2>
+
+              <div class="slider-wrap" role="group" aria-label="Rate from 0 to 3">
+                <!-- Current selection chip -->
+                <div class="slider-answer">
+                  <span class="slider-answer__chip" aria-live="polite">
+                    Your answer: <strong>2</strong>
+                  </span>
+                </div>
+
+                <!-- Slider track w/ thumb + ticks -->
+                <div class="slider-track" aria-hidden="true">
+                  <div class="slider-track__rail"></div>
+                  <div class="slider-track__fill"></div>
+                  <div class="slider-track__ticks">
+                    <span class="slider-tick slider-tick--active"></span>
+                    <span class="slider-tick slider-tick--active"></span>
+                    <span class="slider-tick slider-tick--active"></span>
+                    <span class="slider-tick"></span>
+                  </div>
+                  <div class="slider-thumb" role="slider" aria-valuemin="0" aria-valuemax="3" aria-valuenow="2" aria-label="Rating"></div>
+                </div>
+
+                <!-- Numeric tick row -->
+                <div class="slider-tickrow" aria-hidden="true">
+                  <span>0</span>
+                  <span>1</span>
+                  <span class="active">2</span>
+                  <span>3</span>
+                </div>
+
+                <!-- Anchor labels -->
+                <div class="slider-anchors">
+                  <div class="slider-anchor">
+                    <strong>0 — Not true</strong>
+                  </div>
+                  <div class="slider-anchor slider-anchor--right">
+                    <strong>3 — Completely true</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Nav -->
+              <div class="survey-nav">
+                <button class="wf-btn wf-btn-secondary" type="button">← Previous</button>
+                <button class="wf-btn wf-btn-primary" type="button">Next →</button>
+              </div>
+            </section>
+          </main>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         DESKTOP FRAME (1280 × 800)
+         ============================================================ -->
+    <div class="viewport-frame desktop-frame">
+      <div class="viewport-frame__label">
+        <span>Desktop</span>
+        <span class="viewport-frame__chrome">1280 × 800</span>
+      </div>
+      <div class="viewport-frame__body">
+        <div class="survey-shell screen">
+
+          <!-- Participant header (sticky) -->
+          <header class="survey-header" style="padding: 0.75rem 2rem;">
+            <a class="survey-logo" href="#" aria-label="Scaling Up home">
+              <span class="survey-logo__mark">SU</span>
+              <span class="survey-logo__text">
+                Scaling Up
+                <span class="survey-logo__sub">Assessment</span>
+              </span>
+            </a>
+            <div class="survey-header-right">
+              <span class="autosave" aria-live="polite">Saved · 12s ago</span>
+              <div class="survey-header-org" aria-label="Organization">
+                <strong>Acme Corporation</strong>
+                <span>Invitation from your coach</span>
+              </div>
+            </div>
+          </header>
+
+          <!-- Compact hero (centered, max-width 720) -->
+          <div class="survey-hero">
+            <h1 class="survey-hero__title">Rockefeller Habits Checklist — Q2 2026 Check-in</h1>
+            <p class="survey-hero__sub">
+              <span>Sent by <strong>Sarah</strong>, your coach</span>
+              <span class="survey-hero__dot"></span>
+              <span>Estimated time: ~3 min</span>
+              <span class="survey-hero__dot"></span>
+              <span>40 questions total</span>
+            </p>
+          </div>
+
+          <!-- Sticky progress (inline with count on desktop) -->
+          <div class="survey-progress" role="progressbar" aria-valuemin="0" aria-valuemax="40" aria-valuenow="8" aria-label="Progress through survey">
+            <span class="survey-progress__label">Question 8 of 40</span>
+            <div class="survey-progress__bar">
+              <div class="survey-progress__fill" style="width: 20%;"></div>
+            </div>
+            <span class="survey-progress__pct">20% complete</span>
+          </div>
+
+          <!-- Question card -->
+          <main class="survey-body">
+            <section class="question-card" aria-labelledby="q8-text-d">
+              <p class="question-section">S2 — Everyone is aligned with the #1 thing</p>
+              <h2 class="question-text" id="q8-text-d">
+                Q2_1: The Critical Number is identified to move the company ahead this quarter.
+              </h2>
+
+              <div class="slider-wrap" role="group" aria-label="Rate from 0 to 3">
+                <div class="slider-answer">
+                  <span class="slider-answer__chip" aria-live="polite">
+                    Your answer: <strong>2</strong>
+                  </span>
+                </div>
+
+                <div class="slider-track" aria-hidden="true">
+                  <div class="slider-track__rail"></div>
+                  <div class="slider-track__fill"></div>
+                  <div class="slider-track__ticks">
+                    <span class="slider-tick slider-tick--active"></span>
+                    <span class="slider-tick slider-tick--active"></span>
+                    <span class="slider-tick slider-tick--active"></span>
+                    <span class="slider-tick"></span>
+                  </div>
+                  <div class="slider-thumb" role="slider" aria-valuemin="0" aria-valuemax="3" aria-valuenow="2" aria-label="Rating"></div>
+                </div>
+
+                <div class="slider-tickrow" aria-hidden="true">
+                  <span>0</span>
+                  <span>1</span>
+                  <span class="active">2</span>
+                  <span>3</span>
+                </div>
+
+                <div class="slider-anchors">
+                  <div class="slider-anchor">
+                    <strong>0 — Not true</strong>
+                  </div>
+                  <div class="slider-anchor slider-anchor--right">
+                    <strong>3 — Completely true</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Nav (right-aligned inline on desktop) -->
+              <div class="survey-nav">
+                <button class="wf-btn wf-btn-secondary" type="button">← Previous</button>
+                <button class="wf-btn wf-btn-primary" type="button">Next →</button>
+              </div>
+            </section>
+          </main>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

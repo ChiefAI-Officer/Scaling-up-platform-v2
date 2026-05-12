@@ -35,7 +35,7 @@ instead. v7.3 had 13 Wave 1 tasks; v7.4 has 9.
 | 1     | Revised 08 — Individual Results (visual refinement)           | [x]    |
 | 2     | Revised 02 — Wizard Step 2: Participants (assign-only)        | [x]    |
 | 3     | Revised 04 — Public Config (relocated to admin lane)          | [x]    |
-| 7     | New — INVITED Participant: Survey Start                       | [ ]    |
+| 7     | New — INVITED Participant: Survey Form (mobile + desktop)     | [x]    |
 | 8     | New — INVITED Participant: Survey In-Progress (slider)        | [ ]    |
 | 9     | New — INVITED Participant: Survey Complete                    | [ ]    |
 | 10    | New — PUBLIC Participant: Landing + Lead-Capture (Website Assessment) | [ ]    |
@@ -65,8 +65,8 @@ wireframes-phase2/
 ├── README.md                         # This file
 ├── revisions/                        # Revised Phase 1 screens (08, 09, 10)
 │   └── 08-revised-individual-results.html
-└── new/                              # New Phase 2 screens (Wave 1 tasks 7-12)
-    └── (created as tasks land)
+└── participant-invited/              # INVITED participant flow (Wave 1 tasks 7-9)
+    └── 15-participant-survey-form.html
 ```
 
 ## Visual conventions
