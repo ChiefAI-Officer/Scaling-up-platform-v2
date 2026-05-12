@@ -17,10 +17,20 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 12, 2026 — Wave 12-A/B/C shipped: password hint fix (8 chars), admin/coach integration ID fields (hubspotId/circleId), per-person RATING/NPS breakdown in workshop survey view; 1100 tests; 12-C-2 distribution histogram already implemented (no-op); remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 externally blocked |
+| **Last Updated** | May 12, 2026 — Wave 12-D shipped: admin approvals show original + requested prices for CUSTOM_PRICING (with tier name); 1105 tests; remaining items Wave 12-E+ ENH-MAY6-6/9/11 + Q-MAY6-1/2 + Wave 13 items externally blocked |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
+
+**Wave 12-D — Admin Approvals Price Display** (May 12 2026, direct push to main, Alpha mode):
+- Admin approvals list for CUSTOM_PRICING now shows both "Original" and "Requested" prices for easy comparison.
+- **Original price source priority:** (1) `requestData.oldPriceCents` (snapshot stored at request time), (2) fallback to live `workshop.priceCents`.
+- Include pricing tier name when available: "Original: $X (Tier Name)".
+- API route `/api/approvals` now includes `workshop.priceCents` + `workshop.pricingTier.name` in Prisma select.
+- Approval interface extended with optional `workshop` property carrying pricing data.
+- CUSTOM_PRICING badge changed from showing the price to generic label "Custom Price Requested".
+- New test file `__tests__/admin/custom-price-approval.test.tsx` (5 tests covering fallback logic, tier display, both price lines, non-CUSTOM_PRICING no-op).
+- 1105 tests passing; build succeeds.
 
 **v2.5 Sprint — COMPLETE** (May 8 2026 + Wave 6 May 10): 13 tickets shipped across 6 waves over three sessions. Direct push to main, Alpha mode. Test count 964 → 1021 (+57). Sprint plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Sprint ledger with full per-wave impl details: `plans/JEFF_MAY6_SPRINT.md`.
 
