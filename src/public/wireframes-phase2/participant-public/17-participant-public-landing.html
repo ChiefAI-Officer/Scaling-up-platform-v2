@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>New 10 — PUBLIC Participant Quiz Landing (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* PUBLIC-quiz participant chrome (NO org name — PUBLIC quizzes aren't org-scoped) */
+    .quiz-shell {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .quiz-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.625rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .quiz-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: hsl(var(--primary));
+      font-size: 0.9375rem;
+      text-decoration: none;
+    }
+    .quiz-logo__mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%));
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+    }
+    .quiz-logo__text { line-height: 1.1; }
+    .quiz-logo__sub {
+      display: block;
+      font-size: 0.625rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+
+    /* Centered hero card */
+    .landing-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.25rem;
+      min-height: 0;
+    }
+    .hero-card {
+      width: 100%;
+      max-width: 560px;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      padding: 2rem 1.75rem;
+      text-align: center;
+    }
+    .hero-card__label {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: hsl(271 81% 40%);
+      background: hsl(271 81% 95%);
+      padding: 0.25rem 0.625rem;
+      border-radius: 9999px;
+      display: inline-block;
+      margin: 0 0 0.75rem;
+    }
+    .hero-card__title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 1rem;
+      line-height: 1.25;
+      color: hsl(var(--foreground));
+    }
+    .hero-card__body {
+      font-size: 0.9375rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 1.5rem;
+      line-height: 1.55;
+    }
+    .hero-card__stats {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.625rem;
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+      margin-bottom: 1.75rem;
+      padding: 0.5rem 0.875rem;
+      background: hsl(var(--muted));
+      border-radius: 9999px;
+    }
+    .hero-card__stats-dot {
+      display: inline-block;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: hsl(var(--muted-foreground));
+      opacity: 0.55;
+    }
+    .hero-card__cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.875rem 1.5rem;
+      background: hsl(var(--primary));
+      color: white;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.005em;
+      border-radius: 10px;
+      text-decoration: none;
+      box-shadow: 0 1px 3px rgba(29, 78, 216, 0.25);
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .hero-card__cta:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(29, 78, 216, 0.3);
+    }
+
+    /* v7.4 content-flag note (subtle, below CTA) */
+    .content-flag-note {
+      margin-top: 1rem;
+      padding: 0.625rem 0.875rem;
+      background: hsl(38 92% 95%);
+      border: 1px solid hsl(38 92% 80%);
+      border-radius: 8px;
+      font-size: 0.6875rem;
+      color: hsl(26 83% 30%);
+      line-height: 1.4;
+      text-align: left;
+    }
+    .content-flag-note strong { font-weight: 700; }
+
+    /* Footer */
+    .quiz-footer {
+      padding: 1.25rem;
+      text-align: center;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      border-top: 1px solid hsl(var(--border));
+      letter-spacing: 0.02em;
+    }
+    .quiz-footer strong {
+      color: hsl(var(--foreground));
+      font-weight: 600;
+    }
+
+    /* Desktop adjustments */
+    .desktop-frame .landing-body { padding: 3rem 2rem; }
+    .desktop-frame .hero-card { padding: 2.75rem 2.25rem; max-width: 600px; }
+    .desktop-frame .hero-card__title { font-size: 1.75rem; }
+    .desktop-frame .hero-card__body { font-size: 1rem; }
+    .desktop-frame .hero-card__cta {
+      width: auto;
+      padding: 0.875rem 2.5rem;
+    }
+
+    /* Mobile adjustments */
+    .mobile-frame .quiz-header { padding: 0.625rem 1rem; }
+    .mobile-frame .landing-body { padding: 1.5rem 1rem; }
+    .mobile-frame .hero-card { padding: 1.75rem 1.25rem; }
+    .mobile-frame .hero-card__title { font-size: 1.3125rem; }
+    .mobile-frame .hero-card__body { font-size: 0.9375rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Wireframe banner -->
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 10 (PUBLIC quiz landing, Start-only).</span>
+    <a href="../index.html" class="wf-back-to-index">← Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page header -->
+  <div class="page-head">
+    <h1>New 10 — PUBLIC Participant: Quiz Landing (Start-only)</h1>
+    <p>
+      Mobile (390 × 844) and desktop (1280 × 800) previews side-by-side.
+      Entry experience for the Website Assessment (public scalingup.com link → our hosted page).
+      Per v7.4 + Esperto end-loaded pattern: NO lead capture here — just intro + Start button. Contact form lands in Task 10.5 after the quiz (Task 11).
+      Default render shows v1 placeholder copy. Production-approved Esperto content (Scaling Up 4 Decisions Assessment title, 32 Q intro, etc.) gates behind <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>.
+    </p>
+  </div>
+
+  <!-- Side-by-side mobile + desktop viewport pair -->
+  <div class="viewport-pair">
+
+    <!-- ============================================================
+         MOBILE FRAME (390 × 844)
+         ============================================================ -->
+    <div class="viewport-frame mobile-frame">
+      <div class="viewport-frame__label">
+        <span>Mobile</span>
+        <span class="viewport-frame__chrome">390 × 844 · iPhone-size</span>
+      </div>
+      <div class="viewport-frame__body">
+        <div class="quiz-shell screen">
+
+          <!-- Sticky participant header (no org name — PUBLIC quizzes aren't org-scoped) -->
+          <header class="quiz-header">
+            <a class="quiz-logo" href="#" aria-label="Scaling Up home">
+              <span class="quiz-logo__mark">SU</span>
+              <span class="quiz-logo__text">
+                Scaling Up
+                <span class="quiz-logo__sub">Assessment</span>
+              </span>
+            </a>
+          </header>
+
+          <!-- Centered hero -->
+          <main class="landing-body">
+            <div class="hero-card">
+              <span class="hero-card__label">Public Assessment</span>
+              <h1 class="hero-card__title">Welcome to your assessment</h1>
+              <p class="hero-card__body">
+                A short series of questions to help you see where your business stands. Your responses inform your Scaling Up coach (if you have one) and your results email.
+              </p>
+              <div class="hero-card__stats">
+                <span>~32 questions</span>
+                <span class="hero-card__stats-dot"></span>
+                <span>~4 min</span>
+              </div>
+              <a class="hero-card__cta" href="18-participant-public-quiz-form.html">
+                Start
+                <span style="font-size: 1.0625rem;">→</span>
+              </a>
+
+              <div class="content-flag-note">
+                <strong>v7.4 content placeholder.</strong> Production-approved Esperto copy ("Welcome to the Scaling Up 4 Decisions Assessment!" + the 4-decisions intro + Verne welcome video) gates behind <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>. Default v1 ships this generic copy until Jeff's written sign-off lands.
+              </div>
+            </div>
+          </main>
+
+          <footer class="quiz-footer">
+            Powered by <strong>Scaling Up</strong>
+          </footer>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         DESKTOP FRAME (1280 × 800)
+         ============================================================ -->
+    <div class="viewport-frame desktop-frame">
+      <div class="viewport-frame__label">
+        <span>Desktop</span>
+        <span class="viewport-frame__chrome">1280 × 800</span>
+      </div>
+      <div class="viewport-frame__body">
+        <div class="quiz-shell screen">
+
+          <header class="quiz-header" style="padding: 0.75rem 2rem;">
+            <a class="quiz-logo" href="#" aria-label="Scaling Up home">
+              <span class="quiz-logo__mark">SU</span>
+              <span class="quiz-logo__text">
+                Scaling Up
+                <span class="quiz-logo__sub">Assessment</span>
+              </span>
+            </a>
+          </header>
+
+          <main class="landing-body">
+            <div class="hero-card">
+              <span class="hero-card__label">Public Assessment</span>
+              <h1 class="hero-card__title">Welcome to your assessment</h1>
+              <p class="hero-card__body">
+                A short series of questions to help you see where your business stands. Your responses inform your Scaling Up coach (if you have one) and your results email.
+              </p>
+              <div class="hero-card__stats">
+                <span>~32 questions</span>
+                <span class="hero-card__stats-dot"></span>
+                <span>~4 min</span>
+              </div>
+              <a class="hero-card__cta" href="18-participant-public-quiz-form.html">
+                Start
+                <span style="font-size: 1.0625rem;">→</span>
+              </a>
+
+              <div class="content-flag-note">
+                <strong>v7.4 content placeholder.</strong> Production-approved Esperto copy ("Welcome to the Scaling Up 4 Decisions Assessment!" + the 4-decisions intro + Verne welcome video) gates behind <code>WEBSITE_ASSESSMENT_CONTENT_APPROVED=true</code>. Default v1 ships this generic copy until Jeff's written sign-off lands.
+              </div>
+            </div>
+          </main>
+
+          <footer class="quiz-footer" style="padding: 1.5rem 2rem;">
+            Powered by <strong>Scaling Up</strong>
+          </footer>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

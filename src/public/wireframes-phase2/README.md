@@ -38,7 +38,7 @@ instead. v7.3 had 13 Wave 1 tasks; v7.4 has 9.
 | 7     | New — INVITED Participant: Survey Form (mobile + desktop)     | [x]    |
 | 8     | New — INVITED Participant: Magic-Link Landing                 | [x]    |
 | 9     | New — INVITED Participant: Thank-you                          | [x]    |
-| 10    | New — PUBLIC Participant: Quiz Landing (Start-only)           | [ ]    |
+| 10    | New — PUBLIC Participant: Quiz Landing (Start-only)           | [x]    |
 | 11    | New — PUBLIC Participant: Quiz Form (responsive 0-5 slider)   | [ ]    |
 | 10.5  | New — PUBLIC Participant: Contact Form (post-quiz lead capture) | [ ]  |
 | 12    | New — PUBLIC Participant: Results Page (Esperto pattern)      | [ ]    |
