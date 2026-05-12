@@ -36,12 +36,12 @@ instead. v7.3 had 13 Wave 1 tasks; v7.4 has 9.
 | 2     | Revised 02 — Wizard Step 2: Participants (assign-only)        | [x]    |
 | 3     | Revised 04 — Public Config (relocated to admin lane)          | [x]    |
 | 7     | New — INVITED Participant: Survey Form (mobile + desktop)     | [x]    |
-| 8     | New — INVITED Participant: Survey In-Progress (slider)        | [ ]    |
-| 9     | New — INVITED Participant: Survey Complete                    | [ ]    |
-| 10    | New — PUBLIC Participant: Landing + Lead-Capture (Website Assessment) | [ ]    |
-| 10.5  | New — PUBLIC Participant: Tier-Gated CTA                      | [ ]    |
-| 11    | New — PUBLIC Participant: Results (shared `<AssessmentResultView>`) | [ ]    |
-| 12    | New — Participant: Resume / Expired Link                      | [ ]    |
+| 8     | New — INVITED Participant: Magic-Link Landing                 | [x]    |
+| 9     | New — INVITED Participant: Thank-you                          | [x]    |
+| 10    | New — PUBLIC Participant: Quiz Landing (Start-only)           | [ ]    |
+| 11    | New — PUBLIC Participant: Quiz Form (responsive 0-5 slider)   | [ ]    |
+| 10.5  | New — PUBLIC Participant: Contact Form (post-quiz lead capture) | [ ]  |
+| 12    | New — PUBLIC Participant: Results Page (Esperto pattern)      | [ ]    |
 
 Tasks 4, 5, 6 (admin User Setup) and Task 13 (generalized PUBLIC wizard
 chrome) were dropped in v7.4.

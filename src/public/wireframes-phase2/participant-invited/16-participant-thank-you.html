@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>New 09 — INVITED Participant Thank-you (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome (host page that holds both frames) ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ===========================================================
+       Participant-facing chrome (matches Tasks 7 + 8)
+       =========================================================== */
+    .ty-shell {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Sticky participant header */
+    .ty-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.625rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .ty-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: hsl(var(--primary));
+      font-size: 0.9375rem;
+      text-decoration: none;
+    }
+    .ty-logo__mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%));
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+    }
+    .ty-logo__text { line-height: 1.1; }
+    .ty-logo__sub {
+      display: block;
+      font-size: 0.625rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .ty-header-org {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+      text-align: right;
+      line-height: 1.2;
+    }
+    .ty-header-org strong {
+      display: block;
+      color: hsl(var(--foreground));
+      font-weight: 600;
+      font-size: 0.8125rem;
+    }
+
+    /* ===========================================================
+       Body — centered hero card
+       =========================================================== */
+    .ty-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.25rem;
+    }
+    .ty-card {
+      width: 100%;
+      max-width: 560px;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 14px;
+      padding: 2rem 1.75rem;
+      box-shadow: var(--shadow-md);
+      text-align: center;
+    }
+
+    /* Green checkmark icon (~64px) */
+    .ty-check {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: hsl(var(--success) / 0.12);
+      color: hsl(var(--success));
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+      box-shadow: 0 0 0 6px hsl(var(--success) / 0.06);
+    }
+    .ty-check svg {
+      width: 32px;
+      height: 32px;
+      stroke: hsl(var(--success));
+      stroke-width: 3;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .ty-title {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin: 0 0 0.5rem;
+      color: hsl(var(--foreground));
+    }
+
+    .ty-lede {
+      font-size: 1rem;
+      font-weight: 500;
+      line-height: 1.55;
+      margin: 0 0 1rem;
+      color: hsl(var(--foreground));
+    }
+
+    .ty-sub {
+      font-size: 0.875rem;
+      line-height: 1.6;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 1.5rem;
+    }
+
+    .ty-resources {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: hsl(var(--primary));
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      transition: background 150ms;
+    }
+    .ty-resources:hover {
+      text-decoration: underline;
+      background: hsl(var(--primary) / 0.06);
+    }
+    .ty-resources::after {
+      content: " ↗";
+      font-weight: 700;
+    }
+
+    /* ===========================================================
+       Footer
+       =========================================================== */
+    .ty-footer {
+      padding: 1rem 1.25rem 1.5rem;
+      text-align: center;
+      font-size: 0.6875rem;
+      letter-spacing: 0.04em;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+    }
+
+    /* ===========================================================
+       Desktop frame tweaks
+       =========================================================== */
+    .desktop-frame .ty-body {
+      padding: 3rem 2rem;
+    }
+    .desktop-frame .ty-card {
+      max-width: 560px;
+      padding: 2.5rem 2.25rem;
+    }
+    .desktop-frame .ty-title {
+      font-size: 2rem;
+    }
+
+    /* ===========================================================
+       Mobile frame tweaks
+       =========================================================== */
+    .mobile-frame .ty-header { padding: 0.625rem 1rem; }
+    .mobile-frame .ty-body { padding: 1.5rem 1rem; }
+    .mobile-frame .ty-card {
+      padding: 1.75rem 1.25rem;
+      border-radius: 12px;
+    }
+    .mobile-frame .ty-title { font-size: 1.375rem; }
+    .mobile-frame .ty-lede { font-size: 0.9375rem; }
+    .mobile-frame .ty-check { width: 56px; height: 56px; margin-bottom: 1rem; }
+    .mobile-frame .ty-check svg { width: 28px; height: 28px; }
+    .mobile-frame .ty-header-org { font-size: 0.6875rem; }
+    .mobile-frame .ty-header-org strong { font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Wireframe banner -->
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 9 (INVITED participant thank-you, paired with Task 8).</span>
+    <a href="../index.html" class="wf-back-to-index">← Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page header — explains what's being rendered -->
+  <div class="page-head">
+    <h1>New 09 — INVITED Participant: Thank-you</h1>
+    <p>
+      Mobile (390 × 844) and desktop (1280 × 800) previews rendered side-by-side.
+      The page a respondent sees after submitting their final answer.
+      Closure experience — explicitly no "View Results" button per v7.4 (INVITED respondents don't see own results; coach debriefs in person).
+    </p>
+  </div>
+
+  <!-- Side-by-side mobile + desktop viewport pair -->
+  <div class="viewport-pair">
+
+    <!-- ============================================================
+         MOBILE FRAME (390 × 844)
+         ============================================================ -->
+    <div class="viewport-frame mobile-frame">
+      <div class="viewport-frame__label">
+        <span>Mobile</span>
+        <span class="viewport-frame__chrome">390 × 844 · iPhone-size</span>
+      </div>
+      <div class="viewport-frame__body">
+        <div class="ty-shell screen">
+
+          <!-- Participant header (sticky) -->
+          <header class="ty-header">
+            <a class="ty-logo" href="#" aria-label="Scaling Up home">
+              <span class="ty-logo__mark">SU</span>
+              <span class="ty-logo__text">
+                Scaling Up
+                <span class="ty-logo__sub">Assessment</span>
+              </span>
+            </a>
+            <div class="ty-header-org" aria-label="Organization">
+              <strong>Acme Corp</strong>
+              <span>Submitted</span>
+            </div>
+          </header>
+
+          <!-- Hero -->
+          <main class="ty-body">
+            <section class="ty-card" aria-labelledby="ty-title-m">
+              <div class="ty-check" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="img" aria-label="Submitted">
+                  <polyline points="5 12.5 10 17.5 19 7.5"></polyline>
+                </svg>
+              </div>
+              <h1 class="ty-title" id="ty-title-m">Thank you, John!</h1>
+              <p class="ty-lede">Your responses have been recorded.</p>
+              <p class="ty-sub">
+                Your coach Sarah will review your responses and follow up with you directly. You won't receive a copy of your individual results — your coach debriefs results in person.
+              </p>
+              <a class="ty-resources" href="https://scalingup.com/" target="_blank" rel="noopener">
+                Visit Scaling Up Resources
+              </a>
+            </section>
+          </main>
+
+          <!-- Footer -->
+          <footer class="ty-footer">
+            Powered by Scaling Up
+          </footer>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         DESKTOP FRAME (1280 × 800)
+         ============================================================ -->
+    <div class="viewport-frame desktop-frame">
+      <div class="viewport-frame__label">
+        <span>Desktop</span>
+        <span class="viewport-frame__chrome">1280 × 800</span>
+      </div>
+      <div class="viewport-frame__body">
+        <div class="ty-shell screen">
+
+          <!-- Participant header (sticky) -->
+          <header class="ty-header" style="padding: 0.75rem 2rem;">
+            <a class="ty-logo" href="#" aria-label="Scaling Up home">
+              <span class="ty-logo__mark">SU</span>
+              <span class="ty-logo__text">
+                Scaling Up
+                <span class="ty-logo__sub">Assessment</span>
+              </span>
+            </a>
+            <div class="ty-header-org" aria-label="Organization">
+              <strong>Acme Corporation</strong>
+              <span>Submission received</span>
+            </div>
+          </header>
+
+          <!-- Hero -->
+          <main class="ty-body">
+            <section class="ty-card" aria-labelledby="ty-title-d">
+              <div class="ty-check" aria-hidden="true">
+                <svg viewBox="0 0 24 24" role="img" aria-label="Submitted">
+                  <polyline points="5 12.5 10 17.5 19 7.5"></polyline>
+                </svg>
+              </div>
+              <h1 class="ty-title" id="ty-title-d">Thank you, John!</h1>
+              <p class="ty-lede">Your responses have been recorded.</p>
+              <p class="ty-sub">
+                Your coach Sarah will review your responses and follow up with you directly. You won't receive a copy of your individual results — your coach debriefs results in person.
+              </p>
+              <a class="ty-resources" href="https://scalingup.com/" target="_blank" rel="noopener">
+                Visit Scaling Up Resources
+              </a>
+            </section>
+          </main>
+
+          <!-- Footer -->
+          <footer class="ty-footer">
+            Powered by Scaling Up
+          </footer>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

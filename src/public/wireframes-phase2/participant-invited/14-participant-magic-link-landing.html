@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>New 08 — INVITED Participant Magic-link Landing (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome (host page that holds both frames) ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ===========================================================
+       Participant-facing chrome (matches Task 7 — no admin frame)
+       =========================================================== */
+    .landing-shell {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Sticky participant header (same shape as Task 7) */
+    .landing-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.625rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .landing-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: hsl(var(--primary));
+      font-size: 0.9375rem;
+      text-decoration: none;
+    }
+    .landing-logo__mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%));
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+    }
+    .landing-logo__text { line-height: 1.1; }
+    .landing-logo__sub {
+      display: block;
+      font-size: 0.625rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .landing-header-org {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+      text-align: right;
+      line-height: 1.2;
+    }
+    .landing-header-org strong {
+      display: block;
+      color: hsl(var(--foreground));
+      font-weight: 600;
+      font-size: 0.8125rem;
+    }
+
+    /* ===========================================================
+       Body — centered hero card
+       =========================================================== */
+    .landing-body {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.25rem;
+    }
+    .hero-card {
+      width: 100%;
+      max-width: 560px;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 14px;
+      padding: 2rem 1.75rem 1.75rem;
+      box-shadow: var(--shadow-md);
+      text-align: left;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.25rem 0.625rem;
+      border-radius: 9999px;
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+    .hero-eyebrow::before {
+      content: "✦";
+      font-size: 0.75rem;
+    }
+
+    .hero-title {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin: 0 0 0.5rem;
+      color: hsl(var(--foreground));
+    }
+
+    .hero-lede {
+      font-size: 1rem;
+      font-weight: 500;
+      line-height: 1.55;
+      margin: 0 0 0.75rem;
+      color: hsl(var(--foreground));
+    }
+    .hero-lede strong { font-weight: 700; }
+
+    .hero-sub {
+      font-size: 0.9375rem;
+      line-height: 1.6;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 1.5rem;
+    }
+
+    .hero-stats {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.875rem;
+      background: hsl(var(--muted));
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+    }
+    .hero-stats strong {
+      color: hsl(var(--foreground));
+      font-weight: 700;
+    }
+    .hero-stats__dot {
+      display: inline-block;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: hsl(var(--muted-foreground));
+      opacity: 0.6;
+    }
+
+    .hero-cta {
+      width: 100%;
+      padding: 0.875rem 1.25rem;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    .hero-cta::after {
+      content: " →";
+      font-weight: 700;
+    }
+
+    .hero-fine {
+      margin-top: 1rem;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* ===========================================================
+       Footer
+       =========================================================== */
+    .landing-footer {
+      padding: 1rem 1.25rem 1.5rem;
+      text-align: center;
+      font-size: 0.6875rem;
+      letter-spacing: 0.04em;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+    }
+
+    /* ===========================================================
+       Desktop frame — slightly larger CTA + right-aligned button
+       =========================================================== */
+    .desktop-frame .landing-body {
+      padding: 3rem 2rem;
+    }
+    .desktop-frame .hero-card {
+      max-width: 560px;
+      padding: 2.5rem 2.25rem 2rem;
+    }
+    .desktop-frame .hero-title {
+      font-size: 2rem;
+    }
+    .desktop-frame .hero-cta {
+      width: auto;
+      padding: 0.75rem 1.5rem;
+    }
+    .desktop-frame .hero-cta-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 0.5rem;
+    }
+    .desktop-frame .hero-fine {
+      text-align: right;
+      margin-top: 0.75rem;
+    }
+
+    /* ===========================================================
+       Mobile frame — keep CTA full-width
+       =========================================================== */
+    .mobile-frame .landing-header { padding: 0.625rem 1rem; }
+    .mobile-frame .landing-body { padding: 1.25rem 1rem 1.5rem; }
+    .mobile-frame .hero-card {
+      padding: 1.5rem 1.25rem 1.25rem;
+      border-radius: 12px;
+    }
+    .mobile-frame .hero-title { font-size: 1.375rem; }
+    .mobile-frame .hero-lede { font-size: 0.9375rem; }
+    .mobile-frame .hero-sub { font-size: 0.875rem; margin-bottom: 1.25rem; }
+    .mobile-frame .landing-header-org { font-size: 0.6875rem; }
+    .mobile-frame .landing-header-org strong { font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Wireframe banner -->
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 8 (INVITED participant magic-link landing).</span>
+    <a href="../index.html" class="wf-back-to-index">← Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page header — explains what's being rendered -->
+  <div class="page-head">
+    <h1>New 08 — INVITED Participant: Magic-link Landing</h1>
+    <p>
+      Mobile (390 × 844) and desktop (1280 × 800) previews rendered side-by-side.
+      The page a respondent sees after clicking their email invitation, before starting the quiz.
+      Standalone participant chrome (Scaling Up logo + Acme Corporation org name) — no admin frame.
+    </p>
+  </div>
+
+  <!-- Side-by-side mobile + desktop viewport pair -->
+  <div class="viewport-pair">
+
+    <!-- ============================================================
+         MOBILE FRAME (390 × 844)
+         ============================================================ -->
+    <div class="viewport-frame mobile-frame">
+      <div class="viewport-frame__label">
+        <span>Mobile</span>
+        <span class="viewport-frame__chrome">390 × 844 · iPhone-size</span>
+      </div>
+      <div class="viewport-frame__body">
+        <div class="landing-shell screen">
+
+          <!-- Participant header (sticky) -->
+          <header class="landing-header">
+            <a class="landing-logo" href="#" aria-label="Scaling Up home">
+              <span class="landing-logo__mark">SU</span>
+              <span class="landing-logo__text">
+                Scaling Up
+                <span class="landing-logo__sub">Assessment</span>
+              </span>
+            </a>
+            <div class="landing-header-org" aria-label="Organization">
+              <strong>Acme Corp</strong>
+              <span>Invitation</span>
+            </div>
+          </header>
+
+          <!-- Hero -->
+          <main class="landing-body">
+            <section class="hero-card" aria-labelledby="hero-title-m">
+              <span class="hero-eyebrow">You're invited</span>
+              <h1 class="hero-title" id="hero-title-m">Welcome, John!</h1>
+              <p class="hero-lede">
+                <strong>Acme Corporation</strong> invited you to take the Rockefeller Habits Checklist.
+              </p>
+              <p class="hero-sub">
+                This assessment takes about 3 minutes. Your responses help your team see how aligned you are on execution habits. Your coach will follow up with results.
+              </p>
+              <div class="hero-stats" aria-label="Assessment details">
+                <span><strong>40</strong> questions</span>
+                <span class="hero-stats__dot"></span>
+                <span><strong>~3</strong> min</span>
+              </div>
+              <button class="wf-btn wf-btn-primary hero-cta" type="button">Start Assessment</button>
+              <p class="hero-fine">
+                Your responses are confidential and shared only with your coach.
+              </p>
+            </section>
+          </main>
+
+          <!-- Footer -->
+          <footer class="landing-footer">
+            Powered by Scaling Up
+          </footer>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         DESKTOP FRAME (1280 × 800)
+         ============================================================ -->
+    <div class="viewport-frame desktop-frame">
+      <div class="viewport-frame__label">
+        <span>Desktop</span>
+        <span class="viewport-frame__chrome">1280 × 800</span>
+      </div>
+      <div class="viewport-frame__body">
+        <div class="landing-shell screen">
+
+          <!-- Participant header (sticky) -->
+          <header class="landing-header" style="padding: 0.75rem 2rem;">
+            <a class="landing-logo" href="#" aria-label="Scaling Up home">
+              <span class="landing-logo__mark">SU</span>
+              <span class="landing-logo__text">
+                Scaling Up
+                <span class="landing-logo__sub">Assessment</span>
+              </span>
+            </a>
+            <div class="landing-header-org" aria-label="Organization">
+              <strong>Acme Corporation</strong>
+              <span>Invitation from your coach</span>
+            </div>
+          </header>
+
+          <!-- Hero -->
+          <main class="landing-body">
+            <section class="hero-card" aria-labelledby="hero-title-d">
+              <span class="hero-eyebrow">You're invited</span>
+              <h1 class="hero-title" id="hero-title-d">Welcome, John!</h1>
+              <p class="hero-lede">
+                <strong>Acme Corporation</strong> invited you to take the Rockefeller Habits Checklist.
+              </p>
+              <p class="hero-sub">
+                This assessment takes about 3 minutes. Your responses help your team see how aligned you are on execution habits. Your coach will follow up with results.
+              </p>
+              <div class="hero-stats" aria-label="Assessment details">
+                <span><strong>40</strong> questions</span>
+                <span class="hero-stats__dot"></span>
+                <span><strong>~3</strong> min</span>
+              </div>
+              <div class="hero-cta-row">
+                <button class="wf-btn wf-btn-primary hero-cta" type="button">Start Assessment</button>
+              </div>
+              <p class="hero-fine">
+                Your responses are confidential and shared only with your coach.
+              </p>
+            </section>
+          </main>
+
+          <!-- Footer -->
+          <footer class="landing-footer">
+            Powered by Scaling Up
+          </footer>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
