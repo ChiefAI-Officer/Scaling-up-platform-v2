@@ -149,7 +149,7 @@
     .sections-list { list-style: none; padding: 0; margin: 0; }
     .sections-list li {
       display: grid;
-      grid-template-columns: 1fr auto auto 140px;
+      grid-template-columns: 1fr auto 140px;
       align-items: center;
       gap: 1rem;
       padding: 0.75rem 1.25rem;
@@ -388,7 +388,7 @@
               <p class="report-topbar-title">John Smith — Results</p>
               <p class="report-topbar-sub">Rockefeller Habits Checklist</p>
             </div>
-            <button class="wf-btn wf-btn-secondary wf-btn-sm" aria-label="Print or save as PDF">🖨 Print</button>
+            <button class="wf-btn wf-btn-secondary wf-btn-sm" aria-label="Print or save as PDF">Print</button>
           </header>
 
           <div class="report-body">
@@ -543,7 +543,7 @@
 
             <!-- DELTA #4: conclusion w/ reduced padding -->
             <div class="conclusion-card">
-              <h3>Keep going — you're close.</h3>
+              <h3>You have completed 37 of the 40 Checklist Items.</h3>
               <p>Lowest section: <strong>S2 Quarterly priorities</strong> (avg 1.25). Focus there next quarter.</p>
             </div>
 
@@ -571,7 +571,7 @@
             </div>
             <!-- DELTA #4: Print button promoted to header (was bottom row in Phase 1) -->
             <div style="display:flex; gap:0.5rem; align-items:center;">
-              <button class="wf-btn wf-btn-secondary wf-btn-sm">🖨 Print / Save as PDF</button>
+              <button class="wf-btn wf-btn-secondary wf-btn-sm">Print / Save as PDF</button>
             </div>
           </header>
 
@@ -609,8 +609,7 @@
 
                     <li>
                       <div class="sections-list__name"><span class="sections-list__name-code">S1</span>The executive team is healthy and aligned.</div>
-                      <div class="sections-list__num"><strong>8</strong> / 12</div>
-                      <div class="sections-list__num">avg <strong>2.0</strong> / 3</div>
+                      <div class="sections-list__num"><strong>8</strong> / 12 · avg <strong>2.0</strong></div>
                       <div class="score-bar" aria-label="67 percent">
                         <div class="score-bar__fill" style="width: 67%;"></div>
                       </div>
@@ -618,8 +617,7 @@
 
                     <li>
                       <div class="sections-list__name"><span class="sections-list__name-code">S2</span>Everyone is aligned with the #1 quarterly priority.</div>
-                      <div class="sections-list__num"><strong>5</strong> / 12</div>
-                      <div class="sections-list__num">avg <strong>1.25</strong> / 3</div>
+                      <div class="sections-list__num"><strong>5</strong> / 12 · avg <strong>1.25</strong></div>
                       <div class="score-bar score-bar--low" aria-label="42 percent — not achieved">
                         <div class="score-bar__fill" style="width: 42%;"></div>
                       </div>
@@ -627,57 +625,49 @@
 
                     <li>
                       <div class="sections-list__name"><span class="sections-list__name-code">S3</span>Communication rhythm is established.</div>
-                      <div class="sections-list__num"><strong>9</strong> / 12</div>
-                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12 · avg <strong>2.25</strong></div>
                       <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
                     </li>
 
                     <li>
                       <div class="sections-list__name"><span class="sections-list__name-code">S4</span>Each function has a single accountable person.</div>
-                      <div class="sections-list__num"><strong>9</strong> / 12</div>
-                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12 · avg <strong>2.25</strong></div>
                       <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
                     </li>
 
                     <li>
                       <div class="sections-list__name"><span class="sections-list__name-code">S5</span>Ongoing employee input is collected.</div>
-                      <div class="sections-list__num"><strong>9</strong> / 12</div>
-                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12 · avg <strong>2.25</strong></div>
                       <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
                     </li>
 
                     <li>
                       <div class="sections-list__name"><span class="sections-list__name-code">S6</span>Reporting and analysis of customer feedback.</div>
-                      <div class="sections-list__num"><strong>9</strong> / 12</div>
-                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12 · avg <strong>2.25</strong></div>
                       <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
                     </li>
 
                     <li>
                       <div class="sections-list__name"><span class="sections-list__name-code">S7</span>Core Values and Purpose are alive in the organization.</div>
-                      <div class="sections-list__num"><strong>9</strong> / 12</div>
-                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12 · avg <strong>2.25</strong></div>
                       <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
                     </li>
 
                     <li>
                       <div class="sections-list__name"><span class="sections-list__name-code">S8</span>Strategy is clearly articulated.</div>
-                      <div class="sections-list__num"><strong>9</strong> / 12</div>
-                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12 · avg <strong>2.25</strong></div>
                       <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
                     </li>
 
                     <li>
                       <div class="sections-list__name"><span class="sections-list__name-code">S9</span>All members can answer KPIs.</div>
-                      <div class="sections-list__num"><strong>9</strong> / 12</div>
-                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12 · avg <strong>2.25</strong></div>
                       <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
                     </li>
 
                     <li>
                       <div class="sections-list__name"><span class="sections-list__name-code">S10</span>Plans and performance are visible.</div>
-                      <div class="sections-list__num"><strong>9</strong> / 12</div>
-                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12 · avg <strong>2.25</strong></div>
                       <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
                     </li>
 
