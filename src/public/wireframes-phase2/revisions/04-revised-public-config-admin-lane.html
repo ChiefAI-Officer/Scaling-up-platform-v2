@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Revised 04 — Public Config (admin lane) (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ---------- Admin shell (sidebar + main, mirrored from Task 2) ---------- */
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 0.875rem;
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+
+    .wf-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-breadcrumb {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page {
+      padding: 2rem;
+      width: 100%;
+    }
+    .wf-page-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .wf-page-subtitle {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.9375rem;
+      margin: 0;
+    }
+
+    /* ---------- Stepper ---------- */
+    .wf-stepper {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin: 1.5rem 0;
+    }
+    .wf-stepper-item {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      flex: 1;
+    }
+    .wf-stepper-item:not(:last-child)::after {
+      content: "";
+      flex: 1;
+      height: 2px;
+      background: hsl(var(--border));
+      margin: 0 0.75rem;
+    }
+    .wf-stepper-item.is-complete:not(:last-child)::after {
+      background: hsl(var(--primary));
+    }
+    .wf-stepper-circle {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .wf-stepper-item.is-active .wf-stepper-circle {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-stepper-item.is-complete .wf-stepper-circle {
+      background: hsl(var(--success));
+      color: white;
+    }
+    .wf-stepper-label {
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-stepper-item.is-active .wf-stepper-label,
+    .wf-stepper-item.is-complete .wf-stepper-label {
+      color: hsl(var(--foreground));
+      font-weight: 500;
+    }
+
+    /* ---------- Form primitives (inlined; not in Phase 2 _shared.css) ---------- */
+    .wf-label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: hsl(var(--foreground));
+      margin-bottom: 0.375rem;
+    }
+    .wf-help-text {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      margin-top: 0.25rem;
+    }
+    .wf-input,
+    .wf-textarea,
+    .wf-select {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      border: 1px solid hsl(var(--border));
+      font-size: 0.875rem;
+      background: hsl(var(--card));
+      color: hsl(var(--foreground));
+      font-family: inherit;
+    }
+    .wf-input:focus,
+    .wf-textarea:focus,
+    .wf-select:focus {
+      outline: none;
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+    }
+    .wf-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .wf-badge-public { background: hsl(271 81% 95%); color: hsl(271 81% 40%); }
+
+    /* ---------- Card (reused, matches Task 2) ---------- */
+    .wf-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-xs);
+    }
+    .wf-card-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .wf-card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 0.125rem;
+    }
+    .wf-card-description {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.875rem;
+      margin: 0;
+    }
+    .wf-card-body { padding: 1.5rem; }
+
+    /* ---------- Toggle rows (from Phase 1 wireframe 04) ---------- */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px dashed hsl(var(--border));
+      gap: 1rem;
+    }
+    .toggle-row:last-child { border-bottom: 0; }
+    .toggle-row.is-locked { opacity: 0.7; }
+    .toggle-info { flex: 1; min-width: 0; }
+    .toggle-name {
+      font-weight: 500; font-size: 0.875rem;
+      display: flex; gap: 0.5rem; align-items: center;
+    }
+    .toggle-help {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      margin-top: 0.125rem;
+      line-height: 1.5;
+    }
+    .toggle-switch {
+      width: 36px; height: 20px;
+      border-radius: 999px;
+      background: hsl(var(--primary));
+      position: relative;
+      transition: background 150ms;
+      flex-shrink: 0;
+    }
+    .toggle-switch.is-off { background: hsl(var(--border)); }
+    .toggle-switch::after {
+      content: "";
+      position: absolute;
+      width: 14px; height: 14px;
+      background: white;
+      border-radius: 50%;
+      top: 3px;
+      left: 19px;
+      transition: left 150ms;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    }
+    .toggle-switch.is-off::after { left: 3px; }
+
+    .preview-card {
+      background: hsl(var(--background));
+      border: 1px dashed hsl(var(--border));
+      border-radius: 6px;
+      padding: 1rem;
+      font-size: 0.8125rem;
+      margin-top: 0.875rem;
+    }
+    .preview-form-field {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0.375rem 0;
+    }
+
+    /* ---------- CTA rows ---------- */
+    .cta-row {
+      display: grid;
+      grid-template-columns: 2fr 3fr 1.5fr auto;
+      gap: 0.5rem;
+      padding: 0.625rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      align-items: end;
+      margin-bottom: 0.625rem;
+    }
+    .cta-row .wf-input,
+    .cta-row .wf-select { padding: 0.375rem 0.625rem; font-size: 0.8125rem; }
+    .cta-row .wf-label { font-size: 0.6875rem; }
+    .drag-handle {
+      color: hsl(var(--muted-foreground));
+      padding: 0 0.25rem;
+      cursor: grab;
+      font-size: 1rem;
+    }
+
+    /* ---------- Admin-lane note (yellow secondary) ---------- */
+    .admin-lane-note {
+      margin-top: 1rem;
+      background: hsl(38 92% 95%);
+      border: 1px solid hsl(38 92% 80%);
+      color: hsl(26 83% 30%);
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      line-height: 1.55;
+    }
+    .admin-lane-note strong { font-weight: 700; }
+
+    /* ---------- v1.5 hint card (muted, sits below CTAs) ---------- */
+    .v15-hint {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.75rem 0.875rem;
+      background: hsl(var(--muted));
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.5;
+      margin-top: 0.75rem;
+    }
+    .v15-hint__icon {
+      flex-shrink: 0;
+      width: 22px; height: 22px;
+      border-radius: 6px;
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700;
+      font-size: 0.75rem;
+    }
+    .v15-hint strong { color: hsl(var(--foreground)); font-weight: 600; }
+
+    /* ---------- Wizard nav footer ---------- */
+    .wf-wizard-nav {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 1.5rem;
+    }
+
+    /* ---------- Cards stack ---------- */
+    .cards-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Wireframe banner -->
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 3 (revised 04, Public Config relocated to admin lane per Jeff May 8).</span>
+    <a href="../index.html">← Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page header -->
+  <div class="page-head">
+    <h1>Revised 04 — Public Config (admin lane)</h1>
+    <p>
+      Phase 1's Step 3a (Public Config) card moves from the <em>coach</em> wizard into the <em>admin</em> PUBLIC quiz wizard. PUBLIC campaigns are platform-level lead-magnet assets created by Scaling Up admins (per v7.2 + v7.4), not by coaches. Card content (Lead Capture / Results Routing / CTA Buttons) is preserved verbatim; chrome + step indicator + breadcrumb are admin-side.
+    </p>
+  </div>
+
+  <!-- Admin shell -->
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">SU</span>
+        <span>Scaling Up Platform</span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Workspace</div>
+        <a class="wf-sidebar-link" href="#">📊 Dashboard</a>
+        <a class="wf-sidebar-link" href="#">📋 Workshops</a>
+        <a class="wf-sidebar-link is-active" href="#">🏢 Organizations</a>
+        <a class="wf-sidebar-link" href="#">👥 Coaches</a>
+        <a class="wf-sidebar-link" href="#">🧾 Approvals</a>
+        <div class="wf-sidebar-section-title">Content</div>
+        <a class="wf-sidebar-link" href="#">📐 Templates</a>
+        <a class="wf-sidebar-link" href="#">⚙ Workflows</a>
+        <a class="wf-sidebar-link" href="#">🗂 Files</a>
+      </nav>
+    </aside>
+
+    <div class="wf-main">
+      <header class="wf-topbar">
+        <nav class="wf-breadcrumb">
+          <a href="#">Admin</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Assessments</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Public Quizzes</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">New Quiz</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Public Configuration</span>
+        </nav>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <span class="wf-text-xs wf-text-muted">Signed in as <strong>jeff@scalingup.com</strong></span>
+        </div>
+      </header>
+
+      <div class="wf-page">
+        <div class="wf-page-header">
+          <h1 class="wf-page-title">
+            Public Configuration
+            <span class="wf-badge wf-badge-public" style="vertical-align: middle;">PUBLIC</span>
+          </h1>
+          <p class="wf-page-subtitle">
+            Step 3 of 4: Configure the lead-capture form, results routing, and post-results CTAs for the <strong>Website Assessment</strong>.
+          </p>
+        </div>
+
+        <!-- Admin PUBLIC wizard stepper (4 steps: Template / Schedule / Public Config / Review) -->
+        <div class="wf-stepper">
+          <div class="wf-stepper-item is-complete">
+            <span class="wf-stepper-circle">✓</span>
+            <span class="wf-stepper-label">Template</span>
+          </div>
+          <div class="wf-stepper-item is-complete">
+            <span class="wf-stepper-circle">✓</span>
+            <span class="wf-stepper-label">Schedule</span>
+          </div>
+          <div class="wf-stepper-item is-active">
+            <span class="wf-stepper-circle">3</span>
+            <span class="wf-stepper-label">Public Config</span>
+          </div>
+          <div class="wf-stepper-item">
+            <span class="wf-stepper-circle">4</span>
+            <span class="wf-stepper-label">Review</span>
+          </div>
+        </div>
+
+        <!-- Admin-lane note: explains why this screen is admin-only -->
+        <div class="admin-lane-note">
+          <strong>ℹ This screen is only in the admin PUBLIC quiz wizard.</strong> Coaches do not create PUBLIC quizzes — public quizzes are platform-level lead-magnet assets created by Scaling Up admins.
+        </div>
+
+        <div class="cards-stack" style="margin-top: 1rem;">
+
+          <!-- LEAD CAPTURE FORM -->
+          <div class="wf-card">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Lead Capture Form</h2>
+              <p class="wf-card-description">Fields shown on the public quiz before respondents start. Email is required.</p>
+            </div>
+            <div class="wf-card-body">
+              <div class="toggle-row is-locked">
+                <div class="toggle-info">
+                  <div class="toggle-name">
+                    Email
+                    <span class="wf-badge" style="background: hsl(var(--muted)); color: hsl(var(--muted-foreground));">Required</span>
+                  </div>
+                  <div class="toggle-help">Always collected. Used to email results back to the taker.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Name</div>
+                  <div class="toggle-help">First and last name on a single line.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Company</div>
+                  <div class="toggle-help">Free-text. Helps coaches contextualize follow-up.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Job title</div>
+                  <div class="toggle-help">Free-text. Filters respondents in the lead report.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Referring coach email</div>
+                  <div class="toggle-help">Helper text shown on form: "If your coach is a registered Scaling Up coach, they'll receive your results." Unverified emails get stored but NOT emailed (privacy guard).</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+
+              <div class="preview-card">
+                <div class="wf-text-xs wf-font-semibold wf-mb-1">Form preview (this is what respondents see)</div>
+                <div class="preview-form-field"><span style="width: 28%;">Email *</span><span class="wf-text-muted">┃ alice@acme.com</span></div>
+                <div class="preview-form-field"><span style="width: 28%;">Name</span><span class="wf-text-muted">┃ Alice Chen</span></div>
+                <div class="preview-form-field"><span style="width: 28%;">Company</span><span class="wf-text-muted">┃ Acme Corporation</span></div>
+                <div class="preview-form-field"><span style="width: 28%;">Job title</span><span class="wf-text-muted">┃ VP of Operations</span></div>
+                <div class="preview-form-field"><span style="width: 28%;">Coach's email</span><span class="wf-text-muted">┃ coach@example.com</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- RESULTS ROUTING -->
+          <div class="wf-card">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Results Routing</h2>
+              <p class="wf-card-description">Who gets emailed when a respondent submits.</p>
+            </div>
+            <div class="wf-card-body">
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Email results to taker</div>
+                  <div class="toggle-help">Sends the score, tier message, and CTA buttons to the email entered in the form.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name">Email results to referring coach (if registered)</div>
+                  <div class="toggle-help">Only fires if the entered coach email matches a Scaling Up <code>Coach</code> record. Unmatched emails do NOT receive results.</div>
+                </div>
+                <span class="toggle-switch"></span>
+              </div>
+
+              <div style="margin-top: 1rem;">
+                <label class="wf-label">Always CC these emails (comma-separated)</label>
+                <input type="text" class="wf-input" value="coach@scalingup.com">
+                <p class="wf-help-text">Defaults to <strong>coach@scalingup.com</strong> for the Scaling Up team to follow up with leads.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- CTA BUTTONS -->
+          <div class="wf-card">
+            <div class="wf-card-header">
+              <h2 class="wf-card-title">Call-to-Action Buttons</h2>
+              <p class="wf-card-description">Shown on the results page. Each row can be gated to a tier (e.g., only show a coach-match CTA to Low / OK tiers).</p>
+            </div>
+            <div class="wf-card-body">
+              <div class="cta-row">
+                <div>
+                  <label class="wf-label">Label</label>
+                  <input type="text" class="wf-input" value="YES! I would like a complimentary follow-up">
+                </div>
+                <div>
+                  <label class="wf-label">URL</label>
+                  <input type="text" class="wf-input" value="https://coaches.scalingup.com/coach-match-after-assessment-form">
+                </div>
+                <div>
+                  <label class="wf-label">Show only for tier</label>
+                  <select class="wf-select">
+                    <option selected>Any</option>
+                    <option>Low</option>
+                    <option>OK</option>
+                    <option>Great</option>
+                  </select>
+                </div>
+                <span class="drag-handle">⋮⋮</span>
+              </div>
+
+              <button class="wf-btn wf-btn-secondary" style="width: 100%; margin-top: 0.25rem;" disabled>+ Add another CTA</button>
+
+              <div class="v15-hint">
+                <div class="v15-hint__icon">v1</div>
+                <div>
+                  <strong>v1 ships a single hardcoded CTA</strong> (the Esperto-derived coach-match URL above), per v7.4. The "+ Add another CTA" affordance is disabled in v1 — admin authoring UI to manage the array lands in <strong>v1.5</strong>. The Website Assessment is the only PUBLIC quiz at launch, so a single CTA is sufficient.
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Wizard nav footer -->
+        <div class="wf-wizard-nav">
+          <a href="#" class="wf-btn wf-btn-secondary">← Back</a>
+          <a href="#" class="wf-btn wf-btn-primary">Next: Review →</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>
