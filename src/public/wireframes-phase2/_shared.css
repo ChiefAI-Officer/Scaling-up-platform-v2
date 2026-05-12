@@ -1,0 +1,316 @@
+/* ===========================================
+   Scaling Up Assessment Tool — Phase 2 Wireframes
+   Shared styles
+   Inherits Phase 1 tokens (src/public/wireframes/_shared.css)
+   Adds: mobile/desktop frame utilities, score-bar utility
+   =========================================== */
+
+:root {
+  /* Core palette — HSL values from globals.css (mirrored from Phase 1) */
+  --background: 210 40% 98%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --primary: 224 76% 48%;             /* #1D4ED8 deep blue */
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --destructive: 0 84.2% 60.2%;
+  --border: 214.3 31.8% 91.4%;
+  --ring: 224 76% 48%;
+  --radius: 0.5rem;
+
+  /* Semantic */
+  --success: 160 84% 39%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 26 83% 14%;
+  --info: 199 89% 48%;
+
+  /* Status pills */
+  --status-pending: 215.4 16.3% 46.9%;
+  --status-sent: 224 76% 48%;
+  --status-viewed: 38 92% 50%;
+  --status-submitted: 160 84% 39%;
+  --status-revoked: 0 84.2% 60.2%;
+
+  /* Tier pills (Rockefeller) */
+  --tier-low: 0 84.2% 60.2%;
+  --tier-ok: 38 92% 50%;
+  --tier-great: 160 84% 39%;
+
+  /* Sidebar (admin nav) */
+  --sidebar: 222.2 84% 4.9%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-muted: 215 20.2% 65.1%;
+  --sidebar-border: 217.2 32.6% 17.5%;
+  --sidebar-active: 224 76% 48%;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+}
+
+* {
+  box-sizing: border-box;
+  border-color: hsl(var(--border));
+}
+
+html {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  margin: 0;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* ===========================================
+   Wireframe banner — yellow alert at top
+   =========================================== */
+.wf-banner {
+  background: hsl(38 92% 95%);
+  border-bottom: 1px solid hsl(38 92% 80%);
+  color: hsl(26 83% 25%);
+  padding: 0.5rem 1.5rem;
+  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.wf-banner strong { font-weight: 700; }
+.wf-banner a {
+  color: hsl(26 83% 25%);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+/* ===========================================
+   Back-to-index link (used on all wireframes)
+   =========================================== */
+.wf-back-to-index {
+  font-size: 0.8125rem;
+  color: hsl(var(--primary));
+  text-decoration: none;
+  font-weight: 500;
+}
+.wf-back-to-index:hover { text-decoration: underline; }
+
+/* ===========================================
+   Page header
+   =========================================== */
+.wf-page-header {
+  margin-bottom: 1.5rem;
+}
+.wf-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.25rem;
+}
+.wf-page-subtitle {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9375rem;
+  margin: 0;
+}
+
+/* ===========================================
+   Card
+   =========================================== */
+.wf-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+}
+.wf-card-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.wf-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.125rem;
+}
+.wf-card-description {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  margin: 0;
+}
+.wf-card-body { padding: 1.5rem; }
+.wf-card-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid hsl(var(--border));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* ===========================================
+   Buttons
+   =========================================== */
+.wf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 150ms;
+  white-space: nowrap;
+}
+.wf-btn-primary {
+  background: hsl(var(--primary));
+  color: white;
+}
+.wf-btn-primary:hover { background: hsl(224 76% 42%); box-shadow: var(--shadow-sm); }
+.wf-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.wf-btn-secondary {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+.wf-btn-secondary:hover { background: hsl(var(--muted)); }
+.wf-btn-ghost {
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}
+.wf-btn-ghost:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+
+/* Compact (sm) variant for header buttons */
+.wf-btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+/* ===========================================
+   Status pills (same as Phase 1)
+   =========================================== */
+.wf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.wf-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
+.wf-pill-submitted { background: hsl(160 84% 95%); color: hsl(160 84% 22%); }
+.wf-pill-submitted::before { background: hsl(var(--status-submitted)); }
+
+/* ===========================================
+   Helper utilities
+   =========================================== */
+.wf-text-sm { font-size: 0.875rem; }
+.wf-text-xs { font-size: 0.75rem; }
+.wf-text-muted { color: hsl(var(--muted-foreground)); }
+.wf-text-primary { color: hsl(var(--primary)); }
+.wf-font-medium { font-weight: 500; }
+.wf-font-semibold { font-weight: 600; }
+.wf-font-bold { font-weight: 700; }
+.wf-mb-1 { margin-bottom: 0.5rem; }
+.wf-mb-2 { margin-bottom: 1rem; }
+.wf-mb-3 { margin-bottom: 1.5rem; }
+.wf-mb-4 { margin-bottom: 2rem; }
+
+/* ===========================================
+   NEW IN PHASE 2 — Score bar utility
+   Used on revised 08 section list (achievement bars).
+   Width is set inline via style="--score: 75%".
+   =========================================== */
+.score-bar {
+  position: relative;
+  background: hsl(var(--muted));
+  border-radius: 9999px;
+  height: 8px;
+  width: 100%;
+  overflow: hidden;
+}
+.score-bar__fill {
+  height: 100%;
+  background: hsl(var(--success));
+  border-radius: 9999px;
+  transition: width 300ms ease;
+}
+/* Low variant — sub-1.5-avg sections render in gray (not achieved) */
+.score-bar--low .score-bar__fill {
+  background: hsl(var(--status-pending));
+}
+
+/* ===========================================
+   NEW IN PHASE 2 — Viewport frames
+   Render mobile (390×844) + desktop (1280×800) previews
+   side-by-side so reviewers see both adaptations.
+   =========================================== */
+.viewport-pair {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 2rem 1rem;
+}
+
+.viewport-frame {
+  background: hsl(var(--card));
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.viewport-frame__label {
+  background: hsl(var(--muted));
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.viewport-frame__chrome {
+  font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  opacity: 0.7;
+}
+.viewport-frame__body {
+  overflow: auto;
+}
+
+.mobile-frame { width: 390px; }
+.mobile-frame .viewport-frame__body {
+  width: 390px;
+  height: 844px;
+}
+
+.desktop-frame { width: 1280px; max-width: calc(100vw - 4rem); }
+.desktop-frame .viewport-frame__body {
+  width: 1280px;
+  height: 800px;
+}
+
+/* Container element rendered inside each frame's body — gets a "screen" treatment */
+.screen {
+  min-height: 100%;
+  background: hsl(var(--background));
+}
+
+/* When inside a frame, the screen is the scrolling container */
+.viewport-frame__body .screen {
+  min-height: 100%;
+}

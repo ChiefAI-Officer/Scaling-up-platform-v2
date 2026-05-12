@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Revised 08 — Individual Results (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ---------- Shared "Results report" styles used inside both frames ---------- */
+    .report {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      min-height: 100%;
+    }
+
+    .report-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .report-topbar-title {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0;
+      line-height: 1.2;
+    }
+    .report-topbar-sub {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    .report-body { padding: 1.25rem; }
+
+    /* DELTA #1 — Tier banner: single colored bar (was full card) */
+    .tier-bar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: linear-gradient(90deg, hsl(160 84% 39%), hsl(160 84% 32%));
+      color: white;
+      padding: 0.875rem 1.25rem;
+      border-radius: 10px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 1.25rem;
+    }
+    .tier-bar__label {
+      font-size: 0.6875rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.85;
+      padding: 0.125rem 0.5rem;
+      background: rgba(255,255,255,0.18);
+      border-radius: 9999px;
+      flex-shrink: 0;
+    }
+    .tier-bar__msg {
+      flex: 1;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      min-width: 0;
+    }
+    .tier-bar__score {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+    .tier-bar__score-sub {
+      font-size: 0.75rem;
+      opacity: 0.8;
+      font-weight: 500;
+    }
+
+    /* Respondent meta line */
+    .respondent-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 1rem;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      margin-bottom: 1.25rem;
+    }
+    .respondent-meta strong { color: hsl(var(--foreground)); font-weight: 600; }
+
+    /* DELTA #2 — Per-section list: single grouped table (was 10 stacked cards) */
+    .sections-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: var(--shadow-xs);
+      margin-bottom: 1.25rem;
+    }
+    .sections-card__head {
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid hsl(var(--border));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sections-card__head h2 {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      margin: 0;
+    }
+    .sections-card__head p {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    .sections-list { list-style: none; padding: 0; margin: 0; }
+    .sections-list li {
+      display: grid;
+      grid-template-columns: 1fr auto auto 140px;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid hsl(var(--border));
+      font-size: 0.875rem;
+    }
+    .sections-list li:last-child { border-bottom: 0; }
+    .sections-list li:hover { background: hsl(var(--muted) / 0.4); }
+
+    .sections-list__name {
+      font-weight: 500;
+      min-width: 0;
+    }
+    .sections-list__name-code {
+      display: inline-block;
+      font-weight: 700;
+      color: hsl(var(--primary));
+      margin-right: 0.375rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .sections-list__num {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+      text-align: right;
+      min-width: 56px;
+    }
+    .sections-list__num strong {
+      color: hsl(var(--foreground));
+      font-weight: 600;
+    }
+
+    /* DELTA #3 — Scoring sidebar (desktop) / accordion (mobile) */
+    .layout-with-sidebar {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    .layout-single { display: block; }
+
+    .sidebar-panel {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 10px;
+      padding: 1rem 1.125rem;
+      box-shadow: var(--shadow-xs);
+      position: sticky;
+      top: 5.5rem;
+    }
+    .sidebar-panel h3 {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 0.625rem;
+    }
+    .sidebar-panel table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+    }
+    .sidebar-panel th, .sidebar-panel td {
+      padding: 0.3125rem 0;
+      text-align: left;
+    }
+    .sidebar-panel th {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: hsl(var(--muted-foreground));
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .sidebar-panel td.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-weight: 500;
+    }
+    .sidebar-panel tr.total td {
+      border-top: 1px solid hsl(var(--border));
+      padding-top: 0.5rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+    }
+
+    /* Mobile accordion variant of the scoring table */
+    .scoring-accordion {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 10px;
+      margin-bottom: 1.25rem;
+      box-shadow: var(--shadow-xs);
+    }
+    .scoring-accordion summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 0.875rem 1.25rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .scoring-accordion summary::-webkit-details-marker { display: none; }
+    .scoring-accordion summary::after {
+      content: "▾";
+      color: hsl(var(--muted-foreground));
+      transition: transform 200ms;
+    }
+    .scoring-accordion[open] summary::after { transform: rotate(180deg); }
+    .scoring-accordion__inner {
+      padding: 0 1.25rem 1rem;
+    }
+    .scoring-accordion__inner table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+    }
+    .scoring-accordion__inner th, .scoring-accordion__inner td {
+      padding: 0.375rem 0;
+      text-align: left;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .scoring-accordion__inner th {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: hsl(var(--muted-foreground));
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .scoring-accordion__inner td.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .scoring-accordion__inner tr.total td {
+      border-top: 1px solid hsl(var(--border));
+      border-bottom: 0;
+      padding-top: 0.5rem;
+      font-weight: 700;
+    }
+
+    /* DELTA #4 — Conclusion card: padding -50%, button moved to header */
+    .conclusion-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 10px;
+      padding: 0.875rem 1.125rem; /* was 1.75rem 2.25rem in Phase 1 */
+      text-align: center;
+      box-shadow: var(--shadow-xs);
+      margin-bottom: 0.75rem;
+    }
+    .conclusion-card h3 {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      margin: 0 0 0.125rem;
+    }
+    .conclusion-card p {
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .end-of-report {
+      text-align: center;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- Mobile-frame-specific adjustments ---------- */
+    .mobile-frame .report-body { padding: 1rem; }
+    .mobile-frame .tier-bar {
+      flex-wrap: wrap;
+      gap: 0.625rem 1rem;
+      padding: 0.75rem 1rem;
+    }
+    .mobile-frame .tier-bar__msg { font-size: 0.875rem; }
+    .mobile-frame .tier-bar__score { font-size: 1.25rem; }
+    .mobile-frame .sections-list li {
+      /* Compress to 2 columns on mobile: name+bar on left, total on right */
+      grid-template-columns: 1fr auto;
+      gap: 0.5rem;
+      padding: 0.75rem 1rem;
+    }
+    .mobile-frame .sections-list li > .score-bar-wrap {
+      grid-column: 1 / -1;
+    }
+    .mobile-frame .sections-list__num { text-align: right; }
+    .mobile-frame .report-topbar { padding: 0.75rem 1rem; }
+    .mobile-frame .report-topbar-title { font-size: 0.875rem; }
+    .mobile-frame .wf-btn-sm { padding: 0.3125rem 0.625rem; font-size: 0.75rem; }
+
+    /* score-bar wrapper just keeps a fixed width on desktop */
+    .score-bar-wrap { width: 100%; }
+  </style>
+</head>
+<body>
+
+  <!-- Wireframe banner -->
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 1 (revised 08, visual refinement per Jeff May 8).</span>
+    <a href="../index.html">← Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page header — explains what's being rendered -->
+  <div class="page-head">
+    <h1>Revised 08 — Individual Results</h1>
+    <p>
+      Mobile (390 × 844) and desktop (1280 × 800) previews rendered side-by-side.
+      Deltas vs. Phase 1: tier banner collapsed to a colored bar, sections grouped
+      into one table with achievement bars, scoring table → desktop sidebar / mobile accordion,
+      conclusion padding reduced, Print button moved to header.
+    </p>
+  </div>
+
+  <!-- Side-by-side mobile + desktop viewport pair -->
+  <div class="viewport-pair">
+
+    <!-- ============================================================
+         MOBILE FRAME (390 × 844)
+         ============================================================ -->
+    <div class="viewport-frame mobile-frame">
+      <div class="viewport-frame__label">
+        <span>Mobile</span>
+        <span class="viewport-frame__chrome">390 × 844 · iPhone-size</span>
+      </div>
+      <div class="viewport-frame__body">
+        <div class="report screen">
+
+          <header class="report-topbar">
+            <div style="min-width:0;">
+              <p class="report-topbar-title">Your Results</p>
+              <p class="report-topbar-sub">Rockefeller Habits Checklist</p>
+            </div>
+            <button class="wf-btn wf-btn-secondary wf-btn-sm" aria-label="Print or save as PDF">🖨 Print</button>
+          </header>
+
+          <div class="report-body">
+
+            <!-- Respondent meta -->
+            <div class="respondent-meta">
+              <span><strong>John Smith</strong></span>
+              <span>john@acme.com</span>
+              <span>Engineering › Platform</span>
+              <span>Submitted Oct 15, 2026 · 3:42 PM EDT</span>
+            </div>
+
+            <!-- DELTA #1: collapsed tier banner (mobile wraps to 2 lines) -->
+            <div class="tier-bar" role="status" aria-label="Tier Great, 37 of 40">
+              <span class="tier-bar__label">Great</span>
+              <span class="tier-bar__msg">That is a great overall score.</span>
+              <span class="tier-bar__score">37<span class="tier-bar__score-sub"> / 40</span></span>
+            </div>
+
+            <!-- DELTA #3 (mobile): scoring as collapsed accordion ABOVE sections,
+                 collapsed by default so visual hierarchy stays on the sections. -->
+            <details class="scoring-accordion">
+              <summary>Scoring breakdown</summary>
+              <div class="scoring-accordion__inner">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Section</th>
+                      <th style="text-align:right;">Total</th>
+                      <th style="text-align:right;">Avg</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>S1</td><td class="num">8</td><td class="num">2.0</td></tr>
+                    <tr><td>S2</td><td class="num">5</td><td class="num">1.25</td></tr>
+                    <tr><td>S3</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S4</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S5</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S6</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S7</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S8</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S9</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S10</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr class="total">
+                      <td>Total</td>
+                      <td class="num">85</td>
+                      <td class="num">2.13</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </details>
+
+            <!-- DELTA #2: grouped sections list -->
+            <div class="sections-card">
+              <div class="sections-card__head">
+                <div>
+                  <h2>Sections</h2>
+                  <p>Average ≥ 1.5 = achieved</p>
+                </div>
+              </div>
+              <ul class="sections-list">
+
+                <li>
+                  <div class="sections-list__name"><span class="sections-list__name-code">S1</span>Executive team aligned</div>
+                  <div class="sections-list__num"><strong>8</strong> / 12 · avg 2.0</div>
+                  <div class="score-bar-wrap">
+                    <div class="score-bar" aria-label="Section achievement 67 percent">
+                      <div class="score-bar__fill" style="width: 67%;"></div>
+                    </div>
+                  </div>
+                </li>
+
+                <li>
+                  <div class="sections-list__name"><span class="sections-list__name-code">S2</span>Quarterly priorities aligned</div>
+                  <div class="sections-list__num"><strong>5</strong> / 12 · avg 1.25</div>
+                  <div class="score-bar-wrap">
+                    <div class="score-bar score-bar--low" aria-label="Section achievement 42 percent — not achieved">
+                      <div class="score-bar__fill" style="width: 42%;"></div>
+                    </div>
+                  </div>
+                </li>
+
+                <li>
+                  <div class="sections-list__name"><span class="sections-list__name-code">S3</span>Communication rhythm</div>
+                  <div class="sections-list__num"><strong>9</strong> / 12 · avg 2.25</div>
+                  <div class="score-bar-wrap">
+                    <div class="score-bar" aria-label="Section achievement 75 percent">
+                      <div class="score-bar__fill" style="width: 75%;"></div>
+                    </div>
+                  </div>
+                </li>
+
+                <li>
+                  <div class="sections-list__name"><span class="sections-list__name-code">S4</span>Accountability assigned</div>
+                  <div class="sections-list__num"><strong>9</strong> / 12 · avg 2.25</div>
+                  <div class="score-bar-wrap">
+                    <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                  </div>
+                </li>
+
+                <li>
+                  <div class="sections-list__name"><span class="sections-list__name-code">S5</span>Employee input collected</div>
+                  <div class="sections-list__num"><strong>9</strong> / 12 · avg 2.25</div>
+                  <div class="score-bar-wrap">
+                    <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                  </div>
+                </li>
+
+                <li>
+                  <div class="sections-list__name"><span class="sections-list__name-code">S6</span>Customer feedback rhythm</div>
+                  <div class="sections-list__num"><strong>9</strong> / 12 · avg 2.25</div>
+                  <div class="score-bar-wrap">
+                    <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                  </div>
+                </li>
+
+                <li>
+                  <div class="sections-list__name"><span class="sections-list__name-code">S7</span>Core values alive</div>
+                  <div class="sections-list__num"><strong>9</strong> / 12 · avg 2.25</div>
+                  <div class="score-bar-wrap">
+                    <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                  </div>
+                </li>
+
+                <li>
+                  <div class="sections-list__name"><span class="sections-list__name-code">S8</span>Strategy articulated</div>
+                  <div class="sections-list__num"><strong>9</strong> / 12 · avg 2.25</div>
+                  <div class="score-bar-wrap">
+                    <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                  </div>
+                </li>
+
+                <li>
+                  <div class="sections-list__name"><span class="sections-list__name-code">S9</span>KPIs at every level</div>
+                  <div class="sections-list__num"><strong>9</strong> / 12 · avg 2.25</div>
+                  <div class="score-bar-wrap">
+                    <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                  </div>
+                </li>
+
+                <li>
+                  <div class="sections-list__name"><span class="sections-list__name-code">S10</span>Plans visible everywhere</div>
+                  <div class="sections-list__num"><strong>9</strong> / 12 · avg 2.25</div>
+                  <div class="score-bar-wrap">
+                    <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                  </div>
+                </li>
+
+              </ul>
+            </div>
+
+            <!-- DELTA #4: conclusion w/ reduced padding -->
+            <div class="conclusion-card">
+              <h3>Keep going — you're close.</h3>
+              <p>Lowest section: <strong>S2 Quarterly priorities</strong> (avg 1.25). Focus there next quarter.</p>
+            </div>
+
+            <p class="end-of-report">— End of report —</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         DESKTOP FRAME (1280 × 800)
+         ============================================================ -->
+    <div class="viewport-frame desktop-frame">
+      <div class="viewport-frame__label">
+        <span>Desktop</span>
+        <span class="viewport-frame__chrome">1280 × 800</span>
+      </div>
+      <div class="viewport-frame__body">
+        <div class="report screen">
+
+          <header class="report-topbar">
+            <div>
+              <p class="report-topbar-title">John Smith — Results</p>
+              <p class="report-topbar-sub">Rockefeller Habits Checklist · Acme Corp · Q2 2026</p>
+            </div>
+            <!-- DELTA #4: Print button promoted to header (was bottom row in Phase 1) -->
+            <div style="display:flex; gap:0.5rem; align-items:center;">
+              <button class="wf-btn wf-btn-secondary wf-btn-sm">🖨 Print / Save as PDF</button>
+            </div>
+          </header>
+
+          <div class="report-body" style="max-width: 1180px; margin: 0 auto;">
+
+            <!-- Respondent meta -->
+            <div class="respondent-meta">
+              <span><strong>John Smith</strong></span>
+              <span>john@acme.com</span>
+              <span>Team · Engineering › Platform</span>
+              <span>Submitted <strong>Oct 15, 2026 · 3:42 PM EDT</strong></span>
+              <span class="wf-pill wf-pill-submitted">SUBMITTED</span>
+            </div>
+
+            <!-- DELTA #1: tier banner = single colored bar -->
+            <div class="tier-bar" role="status" aria-label="Tier Great, 37 of 40">
+              <span class="tier-bar__label">Great</span>
+              <span class="tier-bar__msg">That is a great overall score.</span>
+              <span class="tier-bar__score">37<span class="tier-bar__score-sub"> / 40</span></span>
+            </div>
+
+            <!-- DELTA #3 (desktop): two-column layout with sidebar -->
+            <div class="layout-with-sidebar">
+
+              <!-- Main column: sections list -->
+              <div>
+                <div class="sections-card">
+                  <div class="sections-card__head">
+                    <div>
+                      <h2>Sections</h2>
+                      <p>10 of 10 sections answered · achievement bar shows section average vs. 3.0</p>
+                    </div>
+                    <span class="wf-text-xs wf-text-muted">Avg ≥ 1.5 = achieved</span>
+                  </div>
+                  <ul class="sections-list">
+
+                    <li>
+                      <div class="sections-list__name"><span class="sections-list__name-code">S1</span>The executive team is healthy and aligned.</div>
+                      <div class="sections-list__num"><strong>8</strong> / 12</div>
+                      <div class="sections-list__num">avg <strong>2.0</strong> / 3</div>
+                      <div class="score-bar" aria-label="67 percent">
+                        <div class="score-bar__fill" style="width: 67%;"></div>
+                      </div>
+                    </li>
+
+                    <li>
+                      <div class="sections-list__name"><span class="sections-list__name-code">S2</span>Everyone is aligned with the #1 quarterly priority.</div>
+                      <div class="sections-list__num"><strong>5</strong> / 12</div>
+                      <div class="sections-list__num">avg <strong>1.25</strong> / 3</div>
+                      <div class="score-bar score-bar--low" aria-label="42 percent — not achieved">
+                        <div class="score-bar__fill" style="width: 42%;"></div>
+                      </div>
+                    </li>
+
+                    <li>
+                      <div class="sections-list__name"><span class="sections-list__name-code">S3</span>Communication rhythm is established.</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12</div>
+                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                    </li>
+
+                    <li>
+                      <div class="sections-list__name"><span class="sections-list__name-code">S4</span>Each function has a single accountable person.</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12</div>
+                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                    </li>
+
+                    <li>
+                      <div class="sections-list__name"><span class="sections-list__name-code">S5</span>Ongoing employee input is collected.</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12</div>
+                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                    </li>
+
+                    <li>
+                      <div class="sections-list__name"><span class="sections-list__name-code">S6</span>Reporting and analysis of customer feedback.</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12</div>
+                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                    </li>
+
+                    <li>
+                      <div class="sections-list__name"><span class="sections-list__name-code">S7</span>Core Values and Purpose are alive in the organization.</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12</div>
+                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                    </li>
+
+                    <li>
+                      <div class="sections-list__name"><span class="sections-list__name-code">S8</span>Strategy is clearly articulated.</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12</div>
+                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                    </li>
+
+                    <li>
+                      <div class="sections-list__name"><span class="sections-list__name-code">S9</span>All members can answer KPIs.</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12</div>
+                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                    </li>
+
+                    <li>
+                      <div class="sections-list__name"><span class="sections-list__name-code">S10</span>Plans and performance are visible.</div>
+                      <div class="sections-list__num"><strong>9</strong> / 12</div>
+                      <div class="sections-list__num">avg <strong>2.25</strong> / 3</div>
+                      <div class="score-bar"><div class="score-bar__fill" style="width: 75%;"></div></div>
+                    </li>
+
+                  </ul>
+                </div>
+
+                <!-- DELTA #4: tighter conclusion card -->
+                <div class="conclusion-card">
+                  <h3>You have completed 37 of the 40 Checklist Items.</h3>
+                  <p>That is a great overall score. Focus next quarter on <strong>S2 — Quarterly priorities</strong>, where you scored lowest.</p>
+                </div>
+
+                <p class="end-of-report">— End of report —</p>
+              </div>
+
+              <!-- Sidebar: scoring table -->
+              <aside class="sidebar-panel" aria-label="Scoring summary">
+                <h3>Scoring</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Section</th>
+                      <th style="text-align:right;">Total</th>
+                      <th style="text-align:right;">Avg</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>S1</td><td class="num">8</td><td class="num">2.00</td></tr>
+                    <tr><td>S2</td><td class="num">5</td><td class="num">1.25</td></tr>
+                    <tr><td>S3</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S4</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S5</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S6</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S7</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S8</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S9</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr><td>S10</td><td class="num">9</td><td class="num">2.25</td></tr>
+                    <tr class="total">
+                      <td>Total</td>
+                      <td class="num">85</td>
+                      <td class="num">2.13</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </aside>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

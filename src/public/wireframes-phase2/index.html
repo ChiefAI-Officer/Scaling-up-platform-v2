@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>Phase 2 Wireframes — Scaling Up Assessment Tool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="_shared.css">
+  <style>
+    .hero {
+      background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%));
+      color: white;
+      padding: 3rem 2rem;
+    }
+    .hero-inner { max-width: 1080px; margin: 0 auto; }
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.5rem;
+    }
+    .hero p {
+      font-size: 1rem;
+      opacity: 0.9;
+      margin: 0;
+      max-width: 720px;
+    }
+    .hero-meta {
+      margin-top: 1.5rem;
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.875rem;
+      opacity: 0.85;
+      flex-wrap: wrap;
+    }
+    .hero-meta strong { font-weight: 700; }
+
+    .container { max-width: 1080px; margin: 0 auto; padding: 2rem; }
+
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin: 2rem 0 1rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .wf-link {
+      display: flex;
+      gap: 1rem;
+      padding: 1.25rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      text-decoration: none;
+      color: hsl(var(--foreground));
+      box-shadow: var(--shadow-xs);
+      transition: transform 150ms, box-shadow 150ms, border-color 150ms;
+    }
+    .wf-link:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: hsl(var(--primary) / 0.4);
+    }
+
+    .wf-link-num {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.875rem;
+      flex-shrink: 0;
+      text-align: center;
+      line-height: 1.1;
+    }
+    .wf-link-body { flex: 1; min-width: 0; }
+    .wf-link-title {
+      font-weight: 600;
+      font-size: 0.9375rem;
+      margin: 0 0 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .wf-link-desc {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      margin: 0;
+      line-height: 1.5;
+    }
+    .wf-link-cta {
+      color: hsl(var(--primary));
+      font-size: 0.8125rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+      display: inline-block;
+    }
+    .wf-link-cta::after { content: " →"; }
+
+    .legend {
+      background: hsl(38 92% 95%);
+      border: 1px solid hsl(38 92% 80%);
+      color: hsl(26 83% 25%);
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    .legend strong { font-weight: 700; }
+
+    .phase1-link {
+      color: white;
+      opacity: 0.9;
+      text-decoration: underline;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    .phase1-link:hover { opacity: 1; }
+
+    .top-banner-flex {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Phase 2 Wave 1.</span>
+    <a href="../wireframes/index.html">← Phase 1 wireframes</a>
+  </div>
+
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="top-banner-flex">
+        <div>
+          <h1>Scaling Up Assessment Tool — Phase 2 Wireframes</h1>
+          <p>Revisions + new screens per Jeff's May 8 email + May 12 scope-lock + Codex v7.4 rescope (hardcoded Website Assessment, sliders only, content-flagged Esperto-derived copy).</p>
+        </div>
+      </div>
+      <div class="hero-meta">
+        <span><strong>Plan version:</strong> v7.4 (May 12, 2026)</span>
+        <span><strong>Wave 1 scope:</strong> 9 screens</span>
+        <span><strong>Stakeholder:</strong> Jeff Verdun</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="legend">
+      <strong>What's new in Phase 2.</strong> Phase 1 covered the Coach-side wizard + campaign detail (10 desktop-only wireframes). Phase 2 revises three of those (per Jeff's May 8 per-screen feedback) and adds six new INVITED + PUBLIC participant flows. Several Phase 2 wireframes render mobile + desktop side-by-side because participant + leader-facing surfaces will be viewed on phones. Admin-side wireframes (User Setup) were dropped at v7.4 — those go straight to code.
+    </div>
+
+    <div class="section-title">Wave 1 — Revisions</div>
+    <div class="grid">
+
+      <a class="wf-link" href="revisions/08-revised-individual-results.html">
+        <div class="wf-link-num">Rev<br>08</div>
+        <div class="wf-link-body">
+          <h3 class="wf-link-title">Revised 08 — Individual Results</h3>
+          <p class="wf-link-desc">Visual refinement per Jeff's May 8 flag ("Step 8: Needs visual refinement"). Tier banner collapsed to a single colored bar, sections grouped into one table, scoring moved to sidebar / mobile accordion, conclusion padding -50%, Print button promoted to header. First Phase 2 wireframe to render mobile + desktop together.</p>
+          <span class="wf-link-cta">View</span>
+        </div>
+      </a>
+
+    </div>
+
+    <p class="wf-text-xs wf-text-muted" style="margin-top: 2rem; text-align: center;">
+      More cards will be added by subsequent Wave 1 tasks. See <a href="README.md" style="color: hsl(var(--primary));">README</a> for the full Wave 1 task list.
+    </p>
+  </main>
+</body>
+</html>
