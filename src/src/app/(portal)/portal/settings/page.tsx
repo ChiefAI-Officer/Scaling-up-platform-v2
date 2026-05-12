@@ -61,6 +61,25 @@ export default async function SettingsPage() {
                     }}
                 />
 
+                {/* Read-only integration IDs — visible to coach but not editable */}
+                {(coach.hubspotId || coach.circleId) && (
+                    <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+                        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                            Integration IDs
+                        </h2>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">HubSpot Contact ID</span>
+                                <span className="font-mono text-foreground">{coach.hubspotId ?? "—"}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Circle Member ID</span>
+                                <span className="font-mono text-foreground">{coach.circleId ?? "—"}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="bg-card rounded-xl shadow-sm border border-border p-8">
                     <h2 className="text-lg font-semibold text-foreground mb-4">Change Password</h2>
                     <ChangePasswordForm />

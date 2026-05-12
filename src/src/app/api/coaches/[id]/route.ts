@@ -113,6 +113,21 @@ export async function PATCH(
       message: "Coach updated successfully",
     });
   } catch (error) {
+    // Handle Prisma unique constraint violation (P2002) on hubspotId or circleId
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error as { code: string }).code === "P2002"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "This HubSpot/Circle ID is already assigned to another coach",
+        },
+        { status: 409 }
+      );
+    }
     console.error("Error updating coach:", error);
     return NextResponse.json(
       { success: false, error: "Failed to update coach" },

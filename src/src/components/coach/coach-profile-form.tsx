@@ -20,10 +20,14 @@ interface CoachProfileFormProps {
         linkedinUrl?: string | null;
         showBookCallCta?: boolean;
         bookCallUrl?: string | null;
+        hubspotId?: string | null;
+        circleId?: string | null;
     };
+    /** When true, renders editable Integration IDs section (admin only). Default false. */
+    allowEditIntegrationIds?: boolean;
 }
 
-export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps) {
+export function CoachProfileForm({ coachId, initialData, allowEditIntegrationIds = false }: CoachProfileFormProps) {
     const router = useRouter();
     const [firstName, setFirstName] = useState(initialData.firstName);
     const [lastName, setLastName] = useState(initialData.lastName);
@@ -34,6 +38,8 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
     const [showBookCallCta, setShowBookCallCta] = useState(initialData.showBookCallCta ?? true);
     const [bookCallUrl, setBookCallUrl] = useState(initialData.bookCallUrl ?? "");
     const [profileImage, setProfileImage] = useState(initialData.profileImage || "");
+    const [hubspotId, setHubspotId] = useState(initialData.hubspotId ?? "");
+    const [circleId, setCircleId] = useState(initialData.circleId ?? "");
     const [uploading, setUploading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -83,12 +89,30 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
 
             const data = await res.json();
 
-            if (res.ok && data.success) {
-                setMessage({ type: "success", text: "Profile updated successfully." });
-                router.refresh();
-            } else {
+            if (!res.ok || !data.success) {
                 setMessage({ type: "error", text: data.error || "Failed to save changes." });
+                return;
             }
+
+            // If admin is editing integration IDs, send a separate PATCH to /api/coaches/[id]
+            if (allowEditIntegrationIds) {
+                const integRes = await fetch(`/api/coaches/${coachId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        hubspotId: hubspotId || null,
+                        circleId: circleId || null,
+                    }),
+                });
+                const integData = await integRes.json();
+                if (!integRes.ok || !integData.success) {
+                    setMessage({ type: "error", text: integData.error || "Failed to save integration IDs." });
+                    return;
+                }
+            }
+
+            setMessage({ type: "success", text: "Profile updated successfully." });
+            router.refresh();
         } catch {
             setMessage({ type: "error", text: "Network error. Please try again." });
         } finally {
@@ -232,6 +256,30 @@ export function CoachProfileForm({ coachId, initialData }: CoachProfileFormProps
                         onChange={(e) => setBookCallUrl(e.target.value)}
                     />
                     <p className="text-xs text-muted-foreground">Link for the button on your public bio page</p>
+                </div>
+            )}
+
+            {allowEditIntegrationIds && (
+                <div className="space-y-4 pt-2">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Integration IDs</h3>
+                    <div className="space-y-2">
+                        <Label htmlFor="hubspotId">HubSpot Contact ID</Label>
+                        <Input
+                            id="hubspotId"
+                            value={hubspotId}
+                            onChange={(e) => setHubspotId(e.target.value)}
+                            placeholder="e.g. 12345678"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="circleId">Circle Member ID</Label>
+                        <Input
+                            id="circleId"
+                            value={circleId}
+                            onChange={(e) => setCircleId(e.target.value)}
+                            placeholder="e.g. circle_abc123"
+                        />
+                    </div>
                 </div>
             )}
 

@@ -39,6 +39,7 @@ export default async function EditCoachPage({ params }: Props) {
       </div>
       <CoachProfileForm
         coachId={coach.id}
+        allowEditIntegrationIds
         initialData={{
           firstName: coach.firstName,
           lastName: coach.lastName,
@@ -50,6 +51,8 @@ export default async function EditCoachPage({ params }: Props) {
           linkedinUrl: coach.linkedinUrl,
           showBookCallCta: coach.showBookCallCta,
           bookCallUrl: coach.bookCallUrl,
+          hubspotId: coach.hubspotId,
+          circleId: coach.circleId,
         }}
       />
     </div>
