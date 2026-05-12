@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>New 10.5 — PUBLIC Participant Contact Form (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    body { background: hsl(220 14% 96%); }
+
+    .page-head { max-width: 1280px; margin: 0 auto; padding: 1.5rem 2rem 0.5rem; }
+    .page-head h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 0.25rem; }
+    .page-head p { font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin: 0; }
+
+    .quiz-shell {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .quiz-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.625rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .quiz-logo { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; letter-spacing: -0.01em; color: hsl(var(--primary)); font-size: 0.9375rem; text-decoration: none; }
+    .quiz-logo__mark { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%)); color: white; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem; letter-spacing: 0.02em; }
+    .quiz-logo__text { line-height: 1.1; }
+    .quiz-logo__sub { display: block; font-size: 0.625rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+
+    /* Progress (sticky, shows quiz complete) */
+    .quiz-progress {
+      position: sticky;
+      top: 49px;
+      z-index: 9;
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.625rem 1.25rem;
+    }
+    .quiz-progress__row { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.375rem; font-weight: 500; }
+    .quiz-progress__row strong { color: hsl(var(--foreground)); font-weight: 600; }
+    .quiz-progress__bar { height: 4px; background: hsl(var(--muted)); border-radius: 9999px; overflow: hidden; }
+    .quiz-progress__fill { height: 100%; background: linear-gradient(90deg, hsl(224 76% 48%), hsl(160 84% 40%)); border-radius: 9999px; width: 100%; }
+
+    .contact-body { flex: 1; padding: 1.5rem 1.25rem 1rem; }
+    .contact-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 12px; padding: 1.5rem 1.25rem 1.75rem; box-shadow: var(--shadow-xs); }
+    .contact-card__title { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 0.5rem; line-height: 1.25; color: hsl(var(--foreground)); }
+    .contact-card__sub { font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin: 0 0 1.25rem; line-height: 1.5; }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-grid { display: grid; gap: 0.875rem; margin-bottom: 0.5rem; }
+    .form-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      margin-bottom: 0.3125rem;
+      letter-spacing: -0.005em;
+    }
+    .form-label .required { color: hsl(0 75% 50%); margin-left: 0.125rem; }
+    .form-label .optional {
+      font-size: 0.6875rem;
+      font-weight: 500;
+      color: hsl(var(--muted-foreground));
+      margin-left: 0.375rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .form-input {
+      display: block;
+      width: 100%;
+      padding: 0.5625rem 0.75rem;
+      font-size: 0.875rem;
+      font-family: inherit;
+      background: white;
+      border: 1px solid hsl(var(--border));
+      border-radius: 7px;
+      color: hsl(var(--foreground));
+      transition: border-color 120ms ease, box-shadow 120ms ease;
+    }
+    .form-input::placeholder { color: hsl(var(--muted-foreground)); opacity: 0.7; }
+    .form-input:focus { outline: none; border-color: hsl(var(--primary)); box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1); }
+    .form-help {
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      margin-top: 0.3125rem;
+      line-height: 1.4;
+    }
+
+    .coach-callout {
+      margin-top: 1.25rem;
+      padding: 0.875rem 1rem;
+      background: hsl(38 92% 96%);
+      border: 1px solid hsl(38 92% 80%);
+      border-radius: 8px;
+    }
+    .coach-callout__title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: hsl(26 83% 30%);
+      margin: 0 0 0.375rem;
+      letter-spacing: 0.01em;
+    }
+    .coach-callout__desc {
+      font-size: 0.75rem;
+      color: hsl(26 83% 30%);
+      margin: 0 0 0.625rem;
+      line-height: 1.45;
+    }
+
+    .quiz-nav {
+      padding: 1rem 1.25rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+    }
+    .quiz-nav .wf-btn { width: 100%; justify-content: center; padding: 0.75rem 1rem; font-size: 0.9375rem; font-weight: 600; }
+
+    .quiz-footer { padding: 1rem 1.25rem; text-align: center; font-size: 0.6875rem; color: hsl(var(--muted-foreground)); border-top: 1px solid hsl(var(--border)); letter-spacing: 0.02em; }
+    .quiz-footer strong { color: hsl(var(--foreground)); font-weight: 600; }
+
+    /* Mobile: single column form */
+    .mobile-frame .form-grid { grid-template-columns: 1fr; }
+
+    /* Desktop: 2-column form */
+    .desktop-frame .quiz-header { padding: 0.75rem 2rem; }
+    .desktop-frame .quiz-progress { padding: 0.875rem 2rem; top: 53px; }
+    .desktop-frame .contact-body { padding: 2.5rem 2rem 1rem; max-width: 720px; margin: 0 auto; width: 100%; }
+    .desktop-frame .contact-card { padding: 2rem 2rem 2.25rem; }
+    .desktop-frame .form-grid { grid-template-columns: 1fr 1fr; }
+    .desktop-frame .form-grid--full { grid-template-columns: 1fr; }
+    .desktop-frame .quiz-nav {
+      flex-direction: row;
+      justify-content: flex-end;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+    }
+    .desktop-frame .quiz-nav .wf-btn { width: auto; min-width: 140px; }
+    .desktop-frame .quiz-nav .wf-btn-primary { order: 2; }
+    .desktop-frame .quiz-nav .wf-btn-secondary { order: 1; }
+  </style>
+</head>
+<body>
+
+  <div class="wf-banner">
+    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 10.5 (PUBLIC contact form, post-quiz lead capture, end-loaded per Esperto pattern).</span>
+    <a href="../index.html" class="wf-back-to-index">← Back to Phase 2 index</a>
+  </div>
+
+  <div class="page-head">
+    <h1>New 10.5 — PUBLIC Participant: Contact Form (post-quiz lead capture)</h1>
+    <p>
+      Mobile (390 × 844) and desktop (1280 × 800) previews side-by-side.
+      End-loaded lead capture per Esperto pattern (verified May 12). Sits between the quiz form (Task 11) and results (Task 12).
+      Required: First / Last / Email / Phone / Title / Company / Employees / City / Country.
+      Optional: State + Coach Email (referring coach allowlist per v7.1 — matched coach gets results emailed).
+    </p>
+  </div>
+
+  <div class="viewport-pair">
+
+    <!-- MOBILE -->
+    <div class="viewport-frame mobile-frame">
+      <div class="viewport-frame__label"><span>Mobile</span><span class="viewport-frame__chrome">390 × 844 · iPhone-size</span></div>
+      <div class="viewport-frame__body">
+        <div class="quiz-shell screen">
+          <header class="quiz-header">
+            <a class="quiz-logo" href="#" aria-label="Scaling Up home">
+              <span class="quiz-logo__mark">SU</span>
+              <span class="quiz-logo__text">Scaling Up<span class="quiz-logo__sub">Assessment</span></span>
+            </a>
+          </header>
+
+          <div class="quiz-progress" aria-label="Quiz complete">
+            <div class="quiz-progress__row">
+              <span><strong>Quiz complete</strong></span>
+              <span style="color: hsl(160 84% 40%); font-weight: 600;">100%</span>
+            </div>
+            <div class="quiz-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+              <div class="quiz-progress__fill"></div>
+            </div>
+          </div>
+
+          <main class="contact-body">
+            <div class="contact-card">
+              <h2 class="contact-card__title">Almost done — let's get your results</h2>
+              <p class="contact-card__sub">Enter your details below and we'll email your personalized results.</p>
+
+              <div class="form-grid">
+                <div>
+                  <label class="form-label">First name<span class="required">*</span></label>
+                  <input class="form-input" type="text" placeholder="Jane">
+                </div>
+                <div>
+                  <label class="form-label">Last name<span class="required">*</span></label>
+                  <input class="form-input" type="text" placeholder="Doe">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Email<span class="required">*</span></label>
+                <input class="form-input" type="email" placeholder="jane@example.com">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Phone<span class="required">*</span></label>
+                <input class="form-input" type="tel" placeholder="555-123-4567">
+              </div>
+
+              <div class="form-grid">
+                <div>
+                  <label class="form-label">Title<span class="required">*</span></label>
+                  <input class="form-input" type="text" placeholder="CEO">
+                </div>
+                <div>
+                  <label class="form-label">Company<span class="required">*</span></label>
+                  <input class="form-input" type="text" placeholder="Acme Inc.">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Number of employees<span class="required">*</span></label>
+                <input class="form-input" type="number" placeholder="50">
+              </div>
+
+              <div class="form-grid">
+                <div>
+                  <label class="form-label">City<span class="required">*</span></label>
+                  <input class="form-input" type="text" placeholder="Toronto">
+                </div>
+                <div>
+                  <label class="form-label">State<span class="optional">Optional</span></label>
+                  <input class="form-input" type="text" placeholder="ON">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Country<span class="required">*</span></label>
+                <select class="form-input">
+                  <option>Select country…</option>
+                  <option>Canada</option>
+                  <option>United States</option>
+                  <option>United Kingdom</option>
+                </select>
+              </div>
+
+              <div class="coach-callout">
+                <p class="coach-callout__title">Were you referred by a Scaling Up coach?</p>
+                <p class="coach-callout__desc">If a Scaling Up coach pointed you here, add their email and we'll send them a copy of your results too. Optional.</p>
+                <label class="form-label">Coach Email<span class="optional">Optional</span></label>
+                <input class="form-input" type="email" placeholder="coach@example.com">
+              </div>
+            </div>
+          </main>
+
+          <div class="quiz-nav">
+            <a href="19-participant-public-results.html" class="wf-btn wf-btn-primary">Complete →</a>
+            <a href="18-participant-public-quiz-form.html" class="wf-btn wf-btn-secondary">← Previous</a>
+          </div>
+
+          <footer class="quiz-footer">Powered by <strong>Scaling Up</strong></footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESKTOP -->
+    <div class="viewport-frame desktop-frame">
+      <div class="viewport-frame__label"><span>Desktop</span><span class="viewport-frame__chrome">1280 × 800</span></div>
+      <div class="viewport-frame__body">
+        <div class="quiz-shell screen">
+          <header class="quiz-header">
+            <a class="quiz-logo" href="#" aria-label="Scaling Up home">
+              <span class="quiz-logo__mark">SU</span>
+              <span class="quiz-logo__text">Scaling Up<span class="quiz-logo__sub">Assessment</span></span>
+            </a>
+          </header>
+
+          <div class="quiz-progress" aria-label="Quiz complete">
+            <div class="quiz-progress__row" style="max-width: 720px; margin-left: auto; margin-right: auto; width: 100%;">
+              <span><strong>Quiz complete</strong> · 32 of 32 answered</span>
+              <span style="color: hsl(160 84% 40%); font-weight: 600;">100%</span>
+            </div>
+            <div class="quiz-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" style="max-width: 720px; margin: 0 auto;">
+              <div class="quiz-progress__fill"></div>
+            </div>
+          </div>
+
+          <main class="contact-body">
+            <div class="contact-card">
+              <h2 class="contact-card__title">Almost done — let's get your results</h2>
+              <p class="contact-card__sub">Enter your details below and we'll email your personalized results. Your responses are private; only the data you provide here is shared with any referring coach.</p>
+
+              <div class="form-grid">
+                <div>
+                  <label class="form-label">First name<span class="required">*</span></label>
+                  <input class="form-input" type="text" placeholder="Jane">
+                </div>
+                <div>
+                  <label class="form-label">Last name<span class="required">*</span></label>
+                  <input class="form-input" type="text" placeholder="Doe">
+                </div>
+              </div>
+
+              <div class="form-grid">
+                <div>
+                  <label class="form-label">Email<span class="required">*</span></label>
+                  <input class="form-input" type="email" placeholder="jane@example.com">
+                </div>
+                <div>
+                  <label class="form-label">Phone<span class="required">*</span></label>
+                  <input class="form-input" type="tel" placeholder="555-123-4567">
+                </div>
+              </div>
+
+              <div class="form-grid">
+                <div>
+                  <label class="form-label">Title<span class="required">*</span></label>
+                  <input class="form-input" type="text" placeholder="CEO">
+                </div>
+                <div>
+                  <label class="form-label">Company<span class="required">*</span></label>
+                  <input class="form-input" type="text" placeholder="Acme Inc.">
+                </div>
+              </div>
+
+              <div class="form-grid">
+                <div>
+                  <label class="form-label">Number of employees<span class="required">*</span></label>
+                  <input class="form-input" type="number" placeholder="50">
+                </div>
+                <div>
+                  <label class="form-label">Country<span class="required">*</span></label>
+                  <select class="form-input">
+                    <option>Select country…</option>
+                    <option>Canada</option>
+                    <option>United States</option>
+                    <option>United Kingdom</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-grid">
+                <div>
+                  <label class="form-label">City<span class="required">*</span></label>
+                  <input class="form-input" type="text" placeholder="Toronto">
+                </div>
+                <div>
+                  <label class="form-label">State<span class="optional">Optional</span></label>
+                  <input class="form-input" type="text" placeholder="ON">
+                </div>
+              </div>
+
+              <div class="coach-callout">
+                <p class="coach-callout__title">Were you referred by a Scaling Up coach?</p>
+                <p class="coach-callout__desc">If a Scaling Up coach pointed you here, add their email and we'll send them a copy of your results too. Only emails matching a registered Scaling Up coach are honored (per v7.1 allowlist).</p>
+                <label class="form-label">Coach Email<span class="optional">Optional</span></label>
+                <input class="form-input" type="email" placeholder="coach@example.com">
+              </div>
+            </div>
+          </main>
+
+          <div class="quiz-nav">
+            <a href="18-participant-public-quiz-form.html" class="wf-btn wf-btn-secondary">← Previous</a>
+            <a href="19-participant-public-results.html" class="wf-btn wf-btn-primary">Complete →</a>
+          </div>
+
+          <footer class="quiz-footer" style="padding: 1.25rem 2rem;">Powered by <strong>Scaling Up</strong></footer>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>
