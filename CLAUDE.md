@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 12, 2026 — Wave 12-D shipped: admin approvals show original + requested prices for CUSTOM_PRICING (with tier name); 1105 tests; remaining items Wave 12-E+ ENH-MAY6-6/9/11 + Q-MAY6-1/2 + Wave 13 items externally blocked |
+| **Last Updated** | May 12, 2026 — Wave 8-D shipped: HubSpot coach_contract_status auto-approval with shadow mode + allowlist + fail-closed; 1114 tests; remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 externally blocked |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
@@ -30,7 +30,16 @@ the full workshop lifecycle from request through post-event follow-up.
 - Approval interface extended with optional `workshop` property carrying pricing data.
 - CUSTOM_PRICING badge changed from showing the price to generic label "Custom Price Requested".
 - New test file `__tests__/admin/custom-price-approval.test.tsx` (5 tests covering fallback logic, tier display, both price lines, non-CUSTOM_PRICING no-op).
-- 1105 tests passing; build succeeds.
+- 1114 tests passing; build succeeds.
+
+**Wave 8-D — HubSpot coach_contract_status auto-approval** (May 12 2026, direct push to main, Alpha mode):
+- New `getHubSpotCoachContractStatus(hubspotContactId)` exported from `services/hubspot.ts`: calls `basicApi.getById` with `["coach_contract_status"]` property, returns `string | null`, throws on API error (fail-closed).
+- New `evaluateHubSpotAutoApprove()` private helper in `lib/approval-engine.ts` inserts before the Circle cert check for `WORKSHOP_REQUEST` type. Three safety levers: `HUBSPOT_AUTO_APPROVE_ENABLED="true"` kill switch (default off), `HUBSPOT_AUTO_APPROVE_SHADOW="true"` log-only mode, `HUBSPOT_AUTO_APPROVE_ALLOWLIST="a@b,c@d"` comma-separated email allowlist. API error → `console.error` + return `{ autoApproved: false, reason: "hubspot_api_error: ..." }` (fail-closed, no DB write).
+- Auto-approve path: creates ApprovalQueue row (PENDING), updates it to APPROVED with `respondedBy: "system:hubspot-coach-status"`, writes AuditLog row, emits `workshop/approved` Inngest event.
+- `ApprovalEvaluationInput` gains optional `hubspotId?: string` field.
+- `api/approvals/route.ts` coachBio select now includes `hubspotId: true` and passes it to `evaluateApproval`.
+- 9/9 RED→GREEN tests at `__tests__/lib/hubspot-approval-engine.test.ts` (all 9 safety-lever scenarios).
+- 1114 tests passing (up from 1105).
 
 **v2.5 Sprint — COMPLETE** (May 8 2026 + Wave 6 May 10): 13 tickets shipped across 6 waves over three sessions. Direct push to main, Alpha mode. Test count 964 → 1021 (+57). Sprint plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Sprint ledger with full per-wave impl details: `plans/JEFF_MAY6_SPRINT.md`.
 
