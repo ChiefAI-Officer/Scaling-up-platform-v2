@@ -155,4 +155,62 @@ describe("POST /api/checkout", () => {
     expect(body.success).toBe(false);
     expect(body.error).toBe("Discount code is invalid or expired");
   });
+
+  /* ======================================================================== */
+  /*  Thank-you redirect helper integration (BUG-MAY13-3 Task A4)             */
+  /* ======================================================================== */
+
+  describe("thank-you redirect helper integration (BUG-MAY13-3 Task A4)", () => {
+    const ORIGINAL_ENV = process.env;
+    const APP_URL = "https://scaling-up-platform-v2.vercel.app";
+
+    beforeEach(() => {
+      process.env = {
+        ...ORIGINAL_ENV,
+        APP_URL,
+        NODE_ENV: "test",
+      };
+    });
+
+    afterEach(() => {
+      process.env = ORIGINAL_ENV;
+    });
+
+    it("published THANK_YOU exists → successUrl points to /workshop/<slug>?session_id={CHECKOUT_SESSION_ID}", async () => {
+      (db.landingPage.findFirst as jest.Mock).mockResolvedValue({
+        slug: "ws-2026-paid-thank-you",
+      });
+
+      const response = await POST(
+        asPostRequest(buildRequest({ registrationId: "reg-1" }))
+      );
+
+      expect(response.status).toBe(200);
+      expect(createCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          successUrl: `${APP_URL}/workshop/ws-2026-paid-thank-you?session_id={CHECKOUT_SESSION_ID}`,
+        })
+      );
+      // Helper looks up THANK_YOU on workshop.id, not landingPageSlug.
+      expect(db.landingPage.findFirst).toHaveBeenCalledWith({
+        where: { workshopId: "ws-1", template: "THANK_YOU", status: "PUBLISHED" },
+        select: { slug: true },
+      });
+    });
+
+    it("NO published THANK_YOU → successUrl falls back to /registration/success?session_id={CHECKOUT_SESSION_ID}", async () => {
+      (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const response = await POST(
+        asPostRequest(buildRequest({ registrationId: "reg-1" }))
+      );
+
+      expect(response.status).toBe(200);
+      expect(createCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          successUrl: `${APP_URL}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
+        })
+      );
+    });
+  });
 });
