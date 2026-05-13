@@ -18,7 +18,7 @@ export function MarkRefundedButton({ registrationId }: { registrationId: string 
 
   async function handleClick() {
     const stripeRefundId = window.prompt(
-      "Paste the Stripe refund ID (starts with 're_'). Process the refund in Stripe dashboard FIRST — this only records evidence.",
+      "Paste the Stripe refund ID from the Stripe dashboard (e.g. re_3Abc...).\n\nFind it at: Payments → [charge] → Refunds in the Stripe dashboard.\n\nProcess the refund in Stripe FIRST — this only records evidence.",
     );
     if (!stripeRefundId) return;
     const trimmed = stripeRefundId.trim();
