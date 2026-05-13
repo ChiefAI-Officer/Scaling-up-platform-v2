@@ -78,6 +78,10 @@ function makeSurvey(
       coach: { id: "c1", firstName: "Jane", lastName: "Doe" },
       workshopCategory: { id: "cat-1", name: "AI" },
     },
+    // Round 15 Wave 3 polish: registration FK present by default so the
+    // `respondent` mapping path is exercised. Override with `registration: null`
+    // for anonymous / non-registration survey shapes.
+    registration: { firstName: "Alex", lastName: "Smith", email: "alex@example.com" },
     answers: [],
     ...overrides,
   };
@@ -246,5 +250,55 @@ describe("getSurveyResponseRows", () => {
       surveyType: "POST_WORKSHOP",
     });
     expect(result.questions.map((q) => q.id)).toEqual(["q1", "q2"]);
+  });
+
+  // ============================================
+  // Round 15 Wave 3 polish: respondent field + Promise.all parallelism
+  // ============================================
+
+  it("runs surveyTemplate / count / findMany in parallel (each called exactly once)", async () => {
+    await getSurveyResponseRows("t1", {});
+    expect(db.surveyTemplate.findUnique).toHaveBeenCalledTimes(1);
+    expect(db.survey.count).toHaveBeenCalledTimes(1);
+    expect(db.survey.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("requests survey.registration FK in the findMany include (powers CSV export respondent column)", async () => {
+    await getSurveyResponseRows("t1", {});
+    const call = (db.survey.findMany as jest.Mock).mock.calls[0][0];
+    expect(call.include.registration).toEqual({
+      select: { firstName: true, lastName: true, email: true },
+    });
+  });
+
+  it("maps survey.registration → row.respondent { firstName, lastName, email }", async () => {
+    (db.survey.count as jest.Mock).mockResolvedValue(1);
+    (db.survey.findMany as jest.Mock).mockResolvedValue([
+      makeSurvey("s-resp", new Date("2026-05-12T14:00:00Z"), {
+        registration: {
+          firstName: "Riley",
+          lastName: "Chen",
+          email: "riley.chen@example.com",
+        },
+      }),
+    ]);
+    const result = await getSurveyResponseRows("t1", {});
+    expect(result.rows[0].respondent).toEqual({
+      firstName: "Riley",
+      lastName: "Chen",
+      email: "riley.chen@example.com",
+    });
+  });
+
+  it("returns respondent: null when survey.registration is null (anonymous / coach-survey path)", async () => {
+    (db.survey.count as jest.Mock).mockResolvedValue(1);
+    (db.survey.findMany as jest.Mock).mockResolvedValue([
+      makeSurvey("s-anon-resp", new Date("2026-05-12T14:00:00Z"), {
+        registration: null,
+      }),
+    ]);
+    const result = await getSurveyResponseRows("t1", {});
+    // Interface contract: respondent is `null` (not `undefined`) when missing.
+    expect(result.rows[0].respondent).toBeNull();
   });
 });

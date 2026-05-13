@@ -457,6 +457,13 @@ export interface SurveyResponseRow {
   workshop: { id: string; title: string; workshopCode: string | null };
   coach: { id: string; name: string | null } | null;
   category: { id: string; name: string } | null;
+  /**
+   * Round 15 Wave 3 polish: respondent identity, sourced from Survey.registration.
+   * Populated for PRE_WORKSHOP / POST_WORKSHOP surveys (registration-linked).
+   * `null` when the survey has no registration FK (anonymous / coach-survey path).
+   * Used by the Wave 5 CSV export to expose respondent name + email per row.
+   */
+  respondent: { firstName: string | null; lastName: string | null; email: string | null } | null;
   completedAt: Date;
   // Map keyed by questionId → SurveyAnswer fields (value + numValue).
   answersByQuestionId: Map<string, { value: string | null; numValue: number | null }>;
@@ -493,15 +500,6 @@ export async function getSurveyResponseRows(
 ): Promise<SurveyResponseRowsResult> {
   const cap = options?.cap === undefined ? ROW_CAP : options.cap;
 
-  const template = await db.surveyTemplate.findUnique({
-    where: { id: templateId },
-    include: { questions: { orderBy: { sortOrder: "asc" } } },
-  });
-
-  if (!template) {
-    throw new Error(`Survey template not found: ${templateId}`);
-  }
-
   // Filter shape mirrors getSurveyResults (ENH-MAY6-9): coach / category /
   // format filter via the Workshop relation; date range applies to
   // Survey.completedAt directly. workshopCategory (relation) NOT category (legacy enum).
@@ -526,11 +524,6 @@ export async function getSurveyResponseRows(
   };
   if (Object.keys(workshopFilter).length > 0) where.workshop = workshopFilter;
 
-  // Unfiltered match count is informational — it's the same WHERE clause as
-  // findMany so the consumer can compare to `rows.length` to know if the cap
-  // hid any rows.
-  const totalCount = await db.survey.count({ where });
-
   const findManyArgs: Prisma.SurveyFindManyArgs = {
     where,
     include: {
@@ -543,6 +536,9 @@ export async function getSurveyResponseRows(
           workshopCategory: { select: { id: true, name: true } },
         },
       },
+      // Round 15 Wave 3 polish: registration FK exposes respondent identity
+      // (firstName / lastName / email) for the Wave 5 CSV export.
+      registration: { select: { firstName: true, lastName: true, email: true } },
       answers: { select: { questionId: true, value: true, numValue: true } },
     },
     orderBy: { completedAt: "desc" },
@@ -551,7 +547,23 @@ export async function getSurveyResponseRows(
     findManyArgs.take = cap;
   }
 
-  const surveys = await db.survey.findMany(findManyArgs);
+  // Polish fix 1: parallelize the three independent Prisma queries. The count +
+  // findMany don't depend on the template lookup — they share the WHERE clause
+  // built above. Throwing on missing template happens AFTER the await so we
+  // don't waste a roundtrip when the template is missing, but the latency win
+  // for the common (template-exists) path is worth ~2× the previous sequential cost.
+  const [template, totalCount, surveys] = await Promise.all([
+    db.surveyTemplate.findUnique({
+      where: { id: templateId },
+      include: { questions: { orderBy: { sortOrder: "asc" } } },
+    }),
+    db.survey.count({ where }),
+    db.survey.findMany(findManyArgs),
+  ]);
+
+  if (!template) {
+    throw new Error(`Survey template not found: ${templateId}`);
+  }
 
   type SurveyShape = {
     id: string;
@@ -563,8 +575,16 @@ export async function getSurveyResponseRows(
       coach: { id: string; firstName: string | null; lastName: string | null } | null;
       workshopCategory: { id: string; name: string } | null;
     } | null;
+    registration: { firstName: string | null; lastName: string | null; email: string | null } | null;
     answers: { questionId: string; value: string | null; numValue: number | null }[];
   };
+
+  // Polish fix 2: cap detection must use the pre-filter Prisma result length
+  // (`surveys.length`) — NOT `rows.length` after the in-memory `.filter()`
+  // below. A surveys row dropped by the filter (no completedAt or no workshop)
+  // would otherwise make `rows.length === cap` false even when the query was
+  // truncated by `take: cap`, hiding the "showing first N of M" notice.
+  const cappedAt = cap !== null && surveys.length === cap && totalCount > cap ? cap : null;
 
   const rows: SurveyResponseRow[] = (surveys as unknown as SurveyShape[])
     .filter((s) => s.completedAt !== null && s.workshop !== null)
@@ -583,12 +603,17 @@ export async function getSurveyResponseRows(
         category: workshop.workshopCategory
           ? { id: workshop.workshopCategory.id, name: workshop.workshopCategory.name }
           : null,
+        respondent: s.registration
+          ? {
+              firstName: s.registration.firstName,
+              lastName: s.registration.lastName,
+              email: s.registration.email,
+            }
+          : null,
         completedAt: s.completedAt!,
         answersByQuestionId,
       };
     });
-
-  const cappedAt = cap !== null && rows.length === cap && totalCount > cap ? cap : null;
 
   return {
     template: { id: template.id, name: template.name, surveyType: template.surveyType },
