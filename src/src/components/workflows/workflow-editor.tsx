@@ -766,7 +766,7 @@ function StepCard({
   );
   // BUG-06: survey template picker state
   const [surveyTemplateId, setSurveyTemplateId] = useState<string | null>(step.surveyTemplateId ?? null);
-  const [surveyTemplates, setSurveyTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [surveyTemplates, setSurveyTemplates] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
   const [surveyTemplatesLoading, setSurveyTemplatesLoading] = useState(false);
 
   useEffect(() => {
@@ -1026,7 +1026,7 @@ function StepCard({
             <div className="h-9 bg-muted animate-pulse rounded-md" />
           ) : surveyTemplates.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No active survey templates.{" "}
+              No survey templates.{" "}
               <a href="/admin/surveys" className="underline text-primary">
                 Create one
               </a>
@@ -1041,7 +1041,7 @@ function StepCard({
               <option value="">Select a survey template...</option>
               {surveyTemplates.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}
+                  {t.name}{!t.isActive ? " (inactive)" : ""}
                 </option>
               ))}
             </select>
@@ -1229,7 +1229,7 @@ function NewStepForm({
   const [templateId, setTemplateId] = useState("");
   // BUG-06: survey template picker state
   const [surveyTemplateId, setSurveyTemplateId] = useState<string | null>(null);
-  const [surveyTemplates, setSurveyTemplates] = useState<{ id: string; name: string }[]>([]);
+  const [surveyTemplates, setSurveyTemplates] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
   const [surveyTemplatesLoading, setSurveyTemplatesLoading] = useState(false);
 
   useEffect(() => {
@@ -1382,7 +1382,7 @@ function NewStepForm({
             <div className="h-9 bg-muted animate-pulse rounded-md" />
           ) : surveyTemplates.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No active survey templates.{" "}
+              No survey templates.{" "}
               <a href="/admin/surveys" className="underline text-primary">
                 Create one
               </a>
@@ -1397,7 +1397,7 @@ function NewStepForm({
               <option value="">Select a survey template...</option>
               {surveyTemplates.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}
+                  {t.name}{!t.isActive ? " (inactive)" : ""}
                 </option>
               ))}
             </select>
