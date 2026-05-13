@@ -17,6 +17,11 @@ jest.mock("@/lib/db", () => ({
       findMany: jest.fn(),
       count: jest.fn(),
     },
+    // BUG-MAY13-3 Task A2: POST handler now calls
+    // resolveRegistrationSuccessUrl which queries landingPage.findFirst.
+    landingPage: {
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
   },
 }));
 

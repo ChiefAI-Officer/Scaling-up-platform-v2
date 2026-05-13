@@ -11,13 +11,28 @@ import { PhoneInputField } from "@/components/ui/phone-input";
 interface RegistrationFormProps {
   workshopId: string;
   isFree: boolean;
+  /**
+   * Optional navigation override. Real-browser default sets
+   * `window.location.href = url`. Tests can pass a jest.fn() to observe
+   * navigation without redefining JSDOM's non-configurable `window.location`.
+   */
+  navigate?: (url: string) => void;
 }
 
-export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) {
+export function RegistrationForm({
+  workshopId,
+  isFree,
+  navigate = (url: string) => {
+    window.location.href = url;
+  },
+}: RegistrationFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [registrationId, setRegistrationId] = useState<string | null>(null);
+  // BUG-MAY13-3 / Wave A Task A2: cache the server-provided redirect URL so we
+  // can reuse it if the user retries the submit after the initial POST.
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -66,6 +81,7 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
       }
 
       let regId = registrationId;
+      let nextRedirectUrl = redirectUrl;
 
       if (!regId) {
         // Create registration (or get existing PENDING one back)
@@ -96,10 +112,22 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
 
         regId = registrationData.data.id;
         setRegistrationId(regId);
+        // BUG-MAY13-3 / Wave A Task A2: server resolves THANK_YOU page URL.
+        if (typeof registrationData.redirectUrl === "string" && registrationData.redirectUrl) {
+          nextRedirectUrl = registrationData.redirectUrl;
+          setRedirectUrl(nextRedirectUrl);
+        }
       }
 
       if (isFree) {
-        router.push(`/registration/success?id=${regId}`);
+        // BUG-MAY13-3 / Wave A Task A2: prefer the server-provided URL (it may
+        // be absolute and target a different route group like /workshop/<slug>),
+        // fall back to the legacy success page only when omitted.
+        if (nextRedirectUrl) {
+          navigate(nextRedirectUrl);
+        } else {
+          router.push(`/registration/success?id=${regId}`);
+        }
       } else {
         const checkoutResponse = await fetch("/api/checkout", {
           method: "POST",
@@ -123,7 +151,7 @@ export function RegistrationForm({ workshopId, isFree }: RegistrationFormProps) 
           throw new Error(checkoutData.error || "Failed to create checkout");
         }
 
-        window.location.href = checkoutData.data.url;
+        navigate(checkoutData.data.url);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
