@@ -11,6 +11,7 @@ import { createOrUpdateContact } from "@/services/hubspot";
 import { createPreWorkshopSurvey, sendSurveyEmail } from "@/lib/surveys/survey-automation";
 import { z } from "zod";
 import { parseStoredWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
+import { getAppUrl, resolveRegistrationSuccessUrl } from "@/lib/workshops/thank-you-redirect";
 
 const workshopRegisterParamsSchema = z.object({
   id: z.string().min(1, "Workshop id is required"),
@@ -234,10 +235,14 @@ export async function POST(
         .catch((err) => console.error("Pre-workshop survey creation failed:", err));
     }
 
-    const appUrl = process.env.APP_URL || "http://localhost:3000";
+    const appUrl = getAppUrl();
 
     if (workshop.isFree) {
-      const redirectUrl = `${appUrl}/registration/success?id=${registration.id}`;
+      const redirectUrl = await resolveRegistrationSuccessUrl({
+        appUrl,
+        workshopId: workshop.id,
+        key: { kind: "free", registrationId: registration.id },
+      });
 
       if (!isJsonResponse) {
         return NextResponse.redirect(redirectUrl, { status: 303, headers: rateLimit.headers });
@@ -254,6 +259,12 @@ export async function POST(
       return jsonError("Workshop pricing is not configured", 400, rateLimit.headers);
     }
 
+    const successUrl = await resolveRegistrationSuccessUrl({
+      appUrl,
+      workshopId: workshop.id,
+      key: { kind: "paid", stripeSessionToken: "{CHECKOUT_SESSION_ID}" },
+    });
+
     const session = await createCheckoutSession({
       workshopId: workshop.id,
       workshopTitle: workshop.title,
@@ -264,7 +275,7 @@ export async function POST(
       allowedPromotionCodeIds: parseStoredWorkshopCoupons(workshop.coupons)
         .map((coupon) => coupon.stripePromotionCodeId)
         .filter((value): value is string => typeof value === "string" && value.length > 0),
-      successUrl: `${appUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
+      successUrl,
       cancelUrl: workshop.landingPageSlug
         ? `${appUrl}/workshop/${workshop.landingPageSlug}?cancelled=true`
         : `${appUrl}/`,

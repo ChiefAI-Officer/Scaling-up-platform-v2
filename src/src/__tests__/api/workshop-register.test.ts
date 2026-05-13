@@ -29,6 +29,7 @@ jest.mock("@/lib/db", () => ({
   db: {
     coach: { findFirst: jest.fn() },
     registration: { update: jest.fn() },
+    landingPage: { findFirst: jest.fn() },
   },
 }));
 
@@ -231,6 +232,10 @@ describe("POST /api/workshops/[id]/register", () => {
       id: "reg-1",
       stripeSessionId: "cs_test_123",
     });
+
+    // Default: no published THANK_YOU LandingPage → helper falls back to
+    // `/registration/success`. Individual tests can override per-test.
+    (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
   });
 
   /* ======================================================================== */
@@ -887,6 +892,124 @@ describe("POST /api/workshops/[id]/register", () => {
 
       expect(response.status).toBe(409);
       expect(body.error).toBe("Registration is currently busy. Please try again.");
+    });
+  });
+
+  /* ======================================================================== */
+  /*  14. Thank-you redirect helper integration (BUG-MAY13-3 Task A3)         */
+  /* ======================================================================== */
+
+  describe("thank-you redirect helper integration (BUG-MAY13-3 Task A3)", () => {
+    const ORIGINAL_ENV = process.env;
+    const APP_URL = "https://scaling-up-platform-v2.vercel.app";
+
+    beforeEach(() => {
+      process.env = {
+        ...ORIGINAL_ENV,
+        APP_URL,
+        NODE_ENV: "test",
+      };
+    });
+
+    afterEach(() => {
+      process.env = ORIGINAL_ENV;
+    });
+
+    it("free path + published THANK_YOU exists → JSON redirectUrl is the per-workshop slug URL (no query string)", async () => {
+      const workshop = makeFreeWorkshop();
+      const registration = makeRegistration();
+
+      (createWorkshopRegistration as jest.Mock).mockResolvedValue({
+        registration,
+        workshop,
+      });
+      (db.landingPage.findFirst as jest.Mock).mockResolvedValue({
+        slug: "ws-2026-a1b2-thank-you",
+      });
+
+      const response = await POST(buildJsonRequest(validPayload), routeParams("ws-1"));
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.success).toBe(true);
+      expect(body.redirectUrl).toBe(`${APP_URL}/workshop/ws-2026-a1b2-thank-you`);
+
+      // Helper called with workshop.id, not the param id
+      expect(db.landingPage.findFirst).toHaveBeenCalledWith({
+        where: { workshopId: "ws-1", template: "THANK_YOU", status: "PUBLISHED" },
+        select: { slug: true },
+      });
+    });
+
+    it("free path + NO published THANK_YOU → JSON redirectUrl falls back to /registration/success?id=<regId>", async () => {
+      const workshop = makeFreeWorkshop();
+      const registration = makeRegistration();
+
+      (createWorkshopRegistration as jest.Mock).mockResolvedValue({
+        registration,
+        workshop,
+      });
+      (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
+
+      const response = await POST(buildJsonRequest(validPayload), routeParams("ws-1"));
+      const body = await response.json();
+
+      expect(response.status).toBe(201);
+      expect(body.redirectUrl).toBe(`${APP_URL}/registration/success?id=reg-1`);
+    });
+
+    it("paid path + published THANK_YOU exists → createCheckoutSession called with successUrl pointing to /workshop/<slug>?session_id={CHECKOUT_SESSION_ID}", async () => {
+      const workshop = makePaidWorkshop();
+      const registration = makeRegistration({
+        workshopId: "ws-2",
+        paymentStatus: "PENDING",
+      });
+
+      (createWorkshopRegistration as jest.Mock).mockResolvedValue({
+        registration,
+        workshop,
+      });
+      (createCheckoutSession as jest.Mock).mockResolvedValue({
+        id: "cs_test_thankyou",
+        url: "https://checkout.stripe.com/test-session-thankyou",
+      });
+      (db.landingPage.findFirst as jest.Mock).mockResolvedValue({
+        slug: "ws-2026-paid-thank-you",
+      });
+
+      await POST(buildJsonRequest(validPayload), routeParams("ws-2"));
+
+      expect(createCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          successUrl: `${APP_URL}/workshop/ws-2026-paid-thank-you?session_id={CHECKOUT_SESSION_ID}`,
+        })
+      );
+    });
+
+    it("paid path + NO published THANK_YOU → createCheckoutSession called with successUrl falling back to /registration/success?session_id={CHECKOUT_SESSION_ID}", async () => {
+      const workshop = makePaidWorkshop();
+      const registration = makeRegistration({
+        workshopId: "ws-2",
+        paymentStatus: "PENDING",
+      });
+
+      (createWorkshopRegistration as jest.Mock).mockResolvedValue({
+        registration,
+        workshop,
+      });
+      (createCheckoutSession as jest.Mock).mockResolvedValue({
+        id: "cs_test_fallback",
+        url: "https://checkout.stripe.com/test-session-fallback",
+      });
+      (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await POST(buildJsonRequest(validPayload), routeParams("ws-2"));
+
+      expect(createCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          successUrl: `${APP_URL}/registration/success?session_id={CHECKOUT_SESSION_ID}`,
+        })
+      );
     });
   });
 });
