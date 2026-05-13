@@ -6,6 +6,54 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-13 — Squash Round 14 — BUG-MAY13-3 (Thank-You Redirect) + BUG-MAY13-2 (Survey View Mismatch) (May 13 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-13 ENTRY_SLUG:squash-round-14 -->
+
+Two bugs filed during Sprint 13 verification, fixed in one push. Plan reviewed by Codex (5 findings accepted before implementation). 7 commits, 26 new tests, 1169 → 1192.
+
+**Wave A — BUG-MAY13-3 (per-workshop thank-you redirect):**
+- New helper `resolveRegistrationSuccessUrl` at `src/lib/workshops/thank-you-redirect.ts` resolves post-registration redirect URLs. Uses discriminated union `{ kind: "free"; registrationId } | { kind: "paid"; stripeSessionToken }` to prevent callers from mixing identifiers. Returns `${appUrl}/workshop/<thank-you-slug>` (no query string per Codex review) for free + published THANK_YOU; `${appUrl}/workshop/<slug>?session_id={CHECKOUT_SESSION_ID}` for paid. Falls back to `/registration/success` when no THANK_YOU LandingPage exists.
+- New `getAppUrl()` helper colocated in same module returns `process.env.APP_URL || "http://localhost:3000"` — matches sibling-route pattern. Eliminates the divergent `?? NEXTAUTH_URL ?? ""` chain originally introduced in /api/registrations.
+- All four registration call sites unified:
+  - Public `RegistrationForm` (`(public)/workshop/[slug]/registration-form.tsx`) reads `data.redirectUrl` from POST response and navigates via injectable `navigate()` prop (DI seam for JSDOM testability; defaults to `window.location.href = url`). Defensive fallback to `/registration/success?id=X` if server omits the field.
+  - `POST /api/registrations` now returns `redirectUrl` in JSON response body alongside existing fields.
+  - `POST /api/workshops/[id]/register` free path (303 redirect Location header) + paid path (Stripe `successUrl` argument) both route through helper. Cancel URL untouched.
+  - `POST /api/checkout` migrated from inline `db.landingPage.findFirst` + ternary URL construction (~13 lines) to single helper call. Coupons, Stripe params, cancel URL all unchanged.
+- 14 new tests across 3 files: 6 unit tests for the helper (`__tests__/lib/thank-you-redirect.test.ts`), 2 API + 2 component tests for /api/registrations + RegistrationForm, 4 integration tests for /api/workshops/[id]/register.
+- Commits: `ea57936` (A1), `6997487` (A2), `64f68e3` (A2 fix — `getAppUrl` extraction), `242970a` (A3), `500e057` (A4).
+- THANK_YOU template content gate (pre-implementation): verified `ThankYouPageTemplate` already renders calendar (Google + .ics), workshop date/time/timezone, format, location, and title — registrants lose nothing under the new redirect.
+
+**Wave B — BUG-MAY13-2 (survey-template editor Results tab):**
+- Extracted `<SurveyResultsContent>` (pure body) from `<SurveyResultsView>` (page-chrome wrapper). `SurveyResultsView` becomes a thin shell: header + "Back to Workshop" link + mounts `<SurveyResultsContent>`. Public API of `SurveyResultsView` preserved verbatim — workshop-page consumers (admin + coach) untouched.
+- `<SurveyResultsContent>` gains optional `showWorkshop?: boolean` prop (default `false`). When `true` and a response has a `workshop` field, renders workshop attribution as a structured `<span>` element next to each respondent — NOT spliced into label strings. Codex anti-splice catch enforced by DOM-node-identity tests (`expect(janeNode).not.toBe(codeNode)`, not just textContent matching).
+- Extended `SurveyResultResponse` type with optional `workshop?: { title: string; workshopCode: string } | null` (structurally consistent with existing `registration?: { ... } | null` on same interface).
+- Template editor Results tab in `survey-template-editor.tsx` now mounts `<SurveyResultsContent showWorkshop templateGroups={...} />` instead of the deleted `<SurveyResultsPanel>`. Fixes Jeff's 5/12 complaint: "Survey results from the workshop view show correctly. The view from the results button on the survey setup shows differently." Both surfaces now use the same component; the template-editor side additionally shows a workshop column since responses span workshops.
+- Fixed Prisma fetch in `admin/surveys/templates/[id]/page.tsx` to include `answers: { include: { question: true } }` in the surveys include — previously missing, would have caused runtime failures when `<SurveyResultsContent>` tried to render per-question per-person results.
+- `<SurveyResultsPanel>` (~120 lines) deleted entirely (zero remaining consumers). `useEffect` import dropped from `survey-template-editor.tsx`.
+- 7 new tests across 2 files: 4 component tests for `SurveyResultsContent` (structural anti-splice + Wave 12-C regression guard + showWorkshop=false default + empty state), 3 admin tests for template-editor Results tab.
+- Commits: `3fccb22` (B1), `1f597fb` (B2).
+
+**Plan validation:** Codex review (`mcp__validate-plans-and-brainstorm-ideas__codex`) found 5 critical issues with the original plan, all accepted before any code was written:
+1. Missed `/api/registrations` + `RegistrationForm` client as the actual user-facing path
+2. Fake centralization — original plan didn't migrate `/api/checkout` (which already had inline duplicate logic)
+3. Speculative `regId` query param work — `/workshop/[slug]/page.tsx` ignores unused query params today
+4. Survey-template editor fetch missed `answers` join — `SurveyResultsView` cannot render without answers
+5. `SurveyResultsView` is page chrome (has "Back to Workshop" link) — must extract `SurveyResultsContent` body instead of reusing the wrapper
+
+Plan at `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Adversarial-review loop caught issues that would have shipped broken on the original draft.
+
+**Test count:** 1169 → 1192 (+23 new tests). `CI=true npm run build` clean. ESLint clean (2 pre-existing warnings on `survey-template-editor.tsx` for `QUESTION_TYPES` and `SurveyType` unused imports — pre-date Wave B).
+
+**Followups filed (non-blocking, future polish):**
+- `/api/survey-templates/[id]/results` route may be orphaned (aggregate page calls `getSurveyResults()` directly, bypassing the HTTP route). Confirm + delete.
+- `SerializedSurveyAnswer` type narrower than what the page serializes — tighten serialization or widen type.
+- Tombstone comment on the route in `survey-template-editor.tsx` slightly inaccurate.
+- Pre-existing ESLint warnings on `survey-template-editor.tsx`.
+- Add registrant-level variables to `buildWorkshopVariables()` for THANK_YOU template personalization (deferred from plan).
+- iDev pixel firing for free-workshop thank-you pages (deferred from plan).
+- Consolidation of `/admin/surveys/aggregate/page.tsx` with the template-editor Results tab (likely redundant after Wave B).
+
+---
+
 ### 2026-05-13 — Sprint 13 Follow-ons — DTSTART Fix, Virtual Format Defaults, ICS Directions Suppression (May 13 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-13 ENTRY_SLUG:squash-round-13-followon -->
 
 **Sprint 13 Follow-ons — DTSTART, Virtual Default, ICS Directions** (May 13 2026, direct push to main, Alpha mode):
