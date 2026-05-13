@@ -761,7 +761,9 @@ function StepCard({
   );
   const [subject, setSubject] = useState(step.subject ?? "");
   const [body, setBody] = useState(step.body ?? "");
-  const [templateId, setTemplateId] = useState(step.emailTemplateId ?? "");
+  const [templateId, setTemplateId] = useState(
+    step.stepType === STEP_TYPES.SEND_SURVEY_LINK ? "" : (step.emailTemplateId ?? "")
+  );
   // BUG-06: survey template picker state
   const [surveyTemplateId, setSurveyTemplateId] = useState<string | null>(step.surveyTemplateId ?? null);
   const [surveyTemplates, setSurveyTemplates] = useState<{ id: string; name: string }[]>([]);
@@ -908,6 +910,7 @@ function StepCard({
             onChange={(e) => {
               const next = e.target.value;
               if (next !== STEP_TYPES.SEND_SURVEY_LINK) setSurveyTemplateId(null);
+              if (next === STEP_TYPES.SEND_SURVEY_LINK) setTemplateId("");
               setStepType(next);
             }}
             className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
@@ -1088,6 +1091,14 @@ function StepCard({
               placeholder="Hi {{registrantName}},&#10;&#10;Your workshop is coming up..."
               className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm font-mono"
             />
+            {stepType === STEP_TYPES.SEND_SURVEY_LINK && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Leave blank to use the default email. If customizing, include{" "}
+                <code>{"{{surveyUrl}}"}</code> to insert the survey link.
+                Other variables: <code>{"{{workshopTitle}}"}</code>,{" "}
+                <code>{"{{registrantName}}"}</code>, <code>{"{{workshopDate}}"}</code>.
+              </p>
+            )}
           </div>
         </>
       )}
@@ -1147,6 +1158,10 @@ function StepCard({
       <div className="flex gap-2 pt-2">
         <button
           onClick={() => {
+            if (stepType === STEP_TYPES.SEND_SURVEY_LINK && body && !body.includes("{{surveyUrl}}")) {
+              toast({ variant: "destructive", title: "Survey body must include {{surveyUrl}}" });
+              return;
+            }
             if (stepType === STEP_TYPES.SEND_SURVEY_LINK && !surveyTemplateId) {
               toast({ title: "No survey template selected", description: "This step will fall back to auto-matching by category. Select a template for reliable delivery.", variant: "default" });
             }
@@ -1250,7 +1265,11 @@ function NewStepForm({
           <label className="block text-sm font-medium text-foreground">Step Type *</label>
           <select
             value={stepType}
-            onChange={(e) => setStepType(e.target.value as StepType)}
+            onChange={(e) => {
+              const next = e.target.value as StepType;
+              if (next === STEP_TYPES.SEND_SURVEY_LINK) setTemplateId("");
+              setStepType(next);
+            }}
             className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm"
           >
             {Object.entries(STEP_TYPE_LABELS).map(([value, label]) => (
@@ -1427,6 +1446,14 @@ function NewStepForm({
               placeholder="Hi {{registrantName}},&#10;&#10;Just a reminder that your workshop is coming up..."
               className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm font-mono"
             />
+            {stepType === STEP_TYPES.SEND_SURVEY_LINK && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Leave blank to use the default email. If customizing, include{" "}
+                <code>{"{{surveyUrl}}"}</code> to insert the survey link.
+                Other variables: <code>{"{{workshopTitle}}"}</code>,{" "}
+                <code>{"{{registrantName}}"}</code>, <code>{"{{workshopDate}}"}</code>.
+              </p>
+            )}
           </div>
         </>
       )}
@@ -1434,6 +1461,10 @@ function NewStepForm({
       <div className="flex gap-2 pt-2">
         <button
           onClick={() => {
+            if (stepType === STEP_TYPES.SEND_SURVEY_LINK && body && !body.includes("{{surveyUrl}}")) {
+              toast({ variant: "destructive", title: "Survey body must include {{surveyUrl}}" });
+              return;
+            }
             if (stepType === STEP_TYPES.SEND_SURVEY_LINK && !surveyTemplateId) {
               toast({ title: "No survey template selected", description: "This step will fall back to auto-matching by category. Select a template for reliable delivery.", variant: "default" });
             }
