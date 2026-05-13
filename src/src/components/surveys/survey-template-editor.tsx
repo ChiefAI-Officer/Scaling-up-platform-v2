@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,6 +12,14 @@ import {
 import type { SurveyType, QuestionType } from "@/lib/surveys/survey-types";
 // ENH-MAY6-3: pure read-only renderer for the Preview modal.
 import { SurveyFormView } from "@/components/surveys/survey-form-view";
+// BUG-MAY13-2 (Task B2): the Results tab now uses the same per-question
+// per-person renderer as the workshop-page survey view (no more aggregate-only
+// SurveyResultsPanel). `showWorkshop` is enabled because responses on a
+// template span multiple workshops, unlike the per-workshop pages.
+import {
+  SurveyResultsContent,
+  type SurveyResultTemplateGroup,
+} from "@/components/surveys/survey-results-view";
 
 // ============================================
 // Types
@@ -30,6 +38,18 @@ interface SerializedQuestion {
   updatedAt: string;
 }
 
+// BUG-MAY13-2 (Task B2): per-answer shape carried alongside each Survey so
+// the Results tab can mount <SurveyResultsContent>. The fields below mirror
+// what <SurveyResultsContent>/SurveyResultAnswer consume — id, questionId,
+// value, numValue. The joined `question` row is required to build the
+// SurveyResultQuestion list passed to the renderer.
+interface SerializedSurveyAnswer {
+  id: string;
+  questionId: string;
+  value: string | null;
+  numValue: number | null;
+}
+
 interface SerializedSurvey {
   id: string;
   surveyType: string;
@@ -39,6 +59,9 @@ interface SerializedSurvey {
   npsScore: number | null;
   workshop: { title: string; workshopCode: string };
   registration: { firstName: string; lastName: string; email: string } | null;
+  // BUG-MAY13-2 (Task B2): joined answers (with their question row attached
+  // by the page-level Prisma include). Required by <SurveyResultsContent>.
+  answers: SerializedSurveyAnswer[];
 }
 
 interface SerializedTemplate {
@@ -573,10 +596,50 @@ export function SurveyTemplateEditor({ template, workshops, categories, isNew }:
             </div>
           )}
 
-          {/* Results Tab */}
-          {activeTab === "results" && (
-            <SurveyResultsPanel templateId={template.id} />
-          )}
+          {/* Results Tab — BUG-MAY13-2 (Task B2):
+              Mounts the same <SurveyResultsContent> body used by the per-workshop
+              survey pages, ensuring the template-editor Results view shows the
+              same per-question + per-person shape (RATING/NPS bullets, text
+              answer attribution, Respondents pill panel). `showWorkshop` is on
+              because responses span multiple workshops here.
+
+              Empty-state semantics: if no completed surveys exist, we pass an
+              empty `templateGroups` array so the component renders its built-in
+              "No survey responses yet" card (replaces the prior aggregate-only
+              panel's "No responses collected yet" copy). */}
+          {activeTab === "results" && (() => {
+            const completedResponses = template.surveys
+              .filter((s) => s.completedAt !== null)
+              .map((s) => ({
+                id: s.id,
+                answers: s.answers.map((a) => ({
+                  id: a.id,
+                  questionId: a.questionId,
+                  value: a.value,
+                  numValue: a.numValue,
+                })),
+                registration: s.registration,
+                workshop: s.workshop,
+              }));
+            const templateGroups: SurveyResultTemplateGroup[] =
+              completedResponses.length === 0
+                ? []
+                : [
+                    {
+                      templateName: template.name,
+                      surveyType: template.surveyType,
+                      questions: template.questions.map((q) => ({
+                        id: q.id,
+                        label: q.label,
+                        questionType: q.questionType,
+                      })),
+                      responses: completedResponses,
+                    },
+                  ];
+            return (
+              <SurveyResultsContent showWorkshop templateGroups={templateGroups} />
+            );
+          })()}
         </>
       )}
 
@@ -847,124 +910,11 @@ function OptionsEditor({
   );
 }
 
-// ============================================
-// SurveyResultsPanel Sub-component
-// ============================================
-
-function SurveyResultsPanel({ templateId }: { templateId: string }) {
-  const [results, setResults] = useState<{
-    templateName: string;
-    surveyType: string;
-    totalResponses: number;
-    questionStats: {
-      questionId: string;
-      label: string;
-      type: string;
-      totalResponses: number;
-      avgNumeric?: number;
-      distribution?: Record<string, number>;
-    }[];
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`/api/survey-templates/${templateId}/results`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) setResults(data.data);
-      })
-      .finally(() => setLoading(false));
-  }, [templateId]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[200px] items-center justify-center text-muted-foreground">
-        Loading results...
-      </div>
-    );
-  }
-
-  if (!results || results.totalResponses === 0) {
-    return (
-      <div className="rounded-lg bg-card p-8 text-center shadow">
-        <p className="text-muted-foreground">No responses collected yet.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Summary */}
-      <div className="rounded-lg bg-card p-6 shadow">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-lg bg-primary/10 p-4 text-center">
-            <p className="text-3xl font-bold text-primary">{results.totalResponses}</p>
-            <p className="text-sm text-primary/80">Total Responses</p>
-          </div>
-          {results.questionStats
-            .filter((q) => q.avgNumeric !== undefined)
-            .slice(0, 2)
-            .map((q) => (
-              <div key={q.questionId} className="rounded-lg bg-status-post/10 p-4 text-center">
-                <p className="text-3xl font-bold text-status-post">
-                  {q.avgNumeric?.toFixed(1)}
-                </p>
-                <p className="text-sm text-status-post/80">
-                  Avg {q.type === "NPS" ? "NPS" : "Rating"}
-                </p>
-              </div>
-            ))}
-        </div>
-      </div>
-
-      {/* Per-question breakdown */}
-      {results.questionStats.map((stat) => (
-        <div key={stat.questionId} className="rounded-lg bg-card p-6 shadow">
-          <h4 className="text-sm font-semibold text-foreground">{stat.label}</h4>
-          <p className="text-xs text-muted-foreground">
-            {stat.totalResponses} responses &middot; {stat.type}
-          </p>
-
-          {stat.avgNumeric !== undefined && (
-            <div className="mt-3">
-              <div className="flex items-center gap-3">
-                <div className="h-2 flex-1 rounded-full bg-muted">
-                  <div
-                    className="h-2 rounded-full bg-primary"
-                    style={{
-                      width: `${
-                        stat.type === "NPS"
-                          ? (stat.avgNumeric / 10) * 100
-                          : (stat.avgNumeric / 5) * 100
-                      }%`,
-                    }}
-                  />
-                </div>
-                <span className="text-sm font-medium text-foreground">
-                  {stat.avgNumeric.toFixed(1)}{stat.type === "NPS" ? "/10" : "/5"}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {stat.distribution && (
-            <div className="mt-3 space-y-1">
-              {Object.entries(stat.distribution)
-                .sort(([, a], [, b]) => b - a)
-                .map(([value, count]) => (
-                  <div key={value} className="flex items-center gap-2 text-sm">
-                    <div className="h-2 rounded-full bg-primary/70" style={{
-                      width: `${(count / stat.totalResponses) * 100}%`,
-                      minWidth: "8px",
-                    }} />
-                    <span className="flex-shrink-0 text-muted-foreground">{value}</span>
-                    <span className="text-muted-foreground">({count})</span>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
+// BUG-MAY13-2 (Task B2): the legacy <SurveyResultsPanel> sub-component
+// (aggregate-only, fetched from /api/survey-templates/[id]/results) was
+// removed in favor of <SurveyResultsContent showWorkshop /> imported from
+// @/components/surveys/survey-results-view. See the Results tab above.
+//
+// The /api/survey-templates/[id]/results API route remains because it is
+// kept available for other potential consumers (e.g., the aggregate page),
+// even though this file no longer fetches from it.

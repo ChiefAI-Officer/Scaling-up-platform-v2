@@ -30,6 +30,10 @@ export default async function SurveyTemplateEditorPage({
           include: {
             workshop: { select: { title: true, workshopCode: true } },
             registration: { select: { firstName: true, lastName: true, email: true } },
+            // BUG-MAY13-2 (Task B2): include answers + their question join so the
+            // Results tab (mounted via <SurveyResultsContent>) can render per-question
+            // per-person breakdowns matching the workshop-page view.
+            answers: { include: { question: true } },
           },
           orderBy: { createdAt: "desc" },
           take: 50,
@@ -76,6 +80,30 @@ export default async function SurveyTemplateEditorPage({
           sentAt: s.sentAt?.toISOString() || null,
           completedAt: s.completedAt?.toISOString() || null,
           createdAt: s.createdAt.toISOString(),
+          // BUG-MAY13-2 (Task B2): serialize joined answers (and their nested
+          // question rows) so the Results tab can render per-question
+          // per-person breakdowns. <SurveyResultsContent> only consumes
+          // id/questionId/value/numValue from each answer, but we keep the
+          // raw timestamps as strings for typing parity with the rest of
+          // the serialized payload.
+          answers: s.answers.map((a) => ({
+            id: a.id,
+            surveyId: a.surveyId,
+            questionId: a.questionId,
+            value: a.value,
+            numValue: a.numValue,
+            createdAt: a.createdAt.toISOString(),
+            question: {
+              id: a.question.id,
+              templateId: a.question.templateId,
+              sortOrder: a.question.sortOrder,
+              questionType: a.question.questionType,
+              label: a.question.label,
+              description: a.question.description,
+              isRequired: a.question.isRequired,
+              options: a.question.options,
+            },
+          })),
         })),
       }
     : null;
