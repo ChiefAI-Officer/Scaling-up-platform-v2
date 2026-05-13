@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
+import { rowsToCsv } from "@/lib/utils/csv";
 
 export async function GET() {
   const actor = await getApiActor();
@@ -13,37 +14,37 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
-  const escape = (v: string | null | undefined): string => {
-    const s = v ?? "";
-    // CSV injection protection: prefix formula-starting chars with tab; always quote so the tab stays intact
-    const needsInjectionGuard = /^[=+\-@]/.test(s);
-    const safe = needsInjectionGuard ? `\t${s}` : s;
-    return needsInjectionGuard || safe.includes(",") || safe.includes('"') || safe.includes("\n") || safe.includes("\r")
-      ? `"${safe.replace(/"/g, '""')}"` : safe;
-  };
+  const headers = [
+    "First Name",
+    "Last Name",
+    "Email",
+    "Company",
+    "Job Title",
+    "Phone",
+    "Workshop",
+    "Event Date",
+    "Registration Date",
+    "Payment Status",
+    "Amount Paid",
+    "Marketing Opt-In",
+  ];
 
-  const header =
-    "First Name,Last Name,Email,Company,Job Title,Phone,Workshop,Event Date,Registration Date,Payment Status,Amount Paid,Marketing Opt-In";
-  const rows = registrations.map((r) =>
-    [
-      r.firstName,
-      r.lastName,
-      r.email,
-      r.company ?? "",
-      r.jobTitle ?? "",
-      r.phone ?? "",
-      r.workshop.title,
-      r.workshop.eventDate ? r.workshop.eventDate.toISOString().split("T")[0] : "",
-      r.createdAt.toISOString().split("T")[0],
-      r.paymentStatus,
-      ((r.amountPaidCents ?? 0) / 100).toFixed(2),
-      r.marketingOptIn ? "Yes" : "No",
-    ]
-      .map(escape)
-      .join(",")
-  );
+  const rows = registrations.map((r) => [
+    r.firstName,
+    r.lastName,
+    r.email,
+    r.company ?? "",
+    r.jobTitle ?? "",
+    r.phone ?? "",
+    r.workshop.title,
+    r.workshop.eventDate ? r.workshop.eventDate.toISOString().split("T")[0] : "",
+    r.createdAt.toISOString().split("T")[0],
+    r.paymentStatus,
+    ((r.amountPaidCents ?? 0) / 100).toFixed(2),
+    r.marketingOptIn ? "Yes" : "No",
+  ]);
 
-  const csv = [header, ...rows].join("\r\n");
+  const csv = rowsToCsv(headers, rows);
   const date = new Date().toISOString().split("T")[0];
 
   return new Response(csv, {
