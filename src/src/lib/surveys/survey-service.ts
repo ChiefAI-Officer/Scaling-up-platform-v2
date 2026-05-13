@@ -4,7 +4,7 @@
  * CRUD for survey templates, questions, and response handling.
  */
 
-import { Prisma } from "@prisma/client";
+import { Prisma, type SurveyQuestion } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { QuestionType, SurveyType } from "@/lib/surveys/survey-types";
 import { parseSurveyDateRange } from "@/lib/surveys/survey-types";
@@ -429,5 +429,172 @@ export async function getSurveyResults(
     questionStats,
     responses: surveys,
     groups,
+  };
+}
+
+// ============================================
+// Round 15 Wave 3: per-response flat-row helper
+// ============================================
+//
+// `getSurveyResponseRows` returns one row per completed survey response,
+// shaped for the new <SurveyResponsesTable> (Wave 4) and the CSV export
+// endpoint (Wave 5). Filters mirror `getSurveyResults` (coach / category /
+// format / date range) but this helper does NOT aggregate — it returns the
+// raw rows plus the ordered question list so the consumer can lay out the
+// columns deterministically.
+//
+// Cap behavior:
+// - Default cap = 500 rows (`ROW_CAP`). The UI table uses this default so
+//   the page never tries to render thousands of rows.
+// - `cap: null` returns all rows (no `take` clause). The CSV export uses
+//   this so the operator gets the full export.
+// - `cappedAt` is set ONLY when the actual returned row count equals the
+//   cap AND the unfiltered count exceeds the cap — so the consumer can
+//   surface a "showing first N of M" notice.
+
+export interface SurveyResponseRow {
+  surveyId: string;
+  workshop: { id: string; title: string; workshopCode: string | null };
+  coach: { id: string; name: string | null } | null;
+  category: { id: string; name: string } | null;
+  completedAt: Date;
+  // Map keyed by questionId → SurveyAnswer fields (value + numValue).
+  answersByQuestionId: Map<string, { value: string | null; numValue: number | null }>;
+}
+
+export interface SurveyResponseRowsResult {
+  template: { id: string; name: string; surveyType: string };
+  questions: SurveyQuestion[]; // ordered by sortOrder
+  rows: SurveyResponseRow[];
+  totalCount: number; // unfiltered match count (informational)
+  cappedAt: number | null; // non-null when rows.length === cap and totalCount > cap
+}
+
+export interface AggregateFilters {
+  coachId?: string;
+  categoryId?: string;
+  workshopFormat?: string;
+  startDate?: Date | string;
+  endDate?: Date | string;
+}
+
+const ROW_CAP = 500;
+
+function composeCoachName(coach: { firstName?: string | null; lastName?: string | null } | null | undefined): string | null {
+  if (!coach) return null;
+  const name = `${coach.firstName ?? ""} ${coach.lastName ?? ""}`.trim();
+  return name.length > 0 ? name : null;
+}
+
+export async function getSurveyResponseRows(
+  templateId: string,
+  filters: AggregateFilters,
+  options?: { cap?: number | null },
+): Promise<SurveyResponseRowsResult> {
+  const cap = options?.cap === undefined ? ROW_CAP : options.cap;
+
+  const template = await db.surveyTemplate.findUnique({
+    where: { id: templateId },
+    include: { questions: { orderBy: { sortOrder: "asc" } } },
+  });
+
+  if (!template) {
+    throw new Error(`Survey template not found: ${templateId}`);
+  }
+
+  // Filter shape mirrors getSurveyResults (ENH-MAY6-9): coach / category /
+  // format filter via the Workshop relation; date range applies to
+  // Survey.completedAt directly. workshopCategory (relation) NOT category (legacy enum).
+  const workshopFilter: Prisma.WorkshopWhereInput = {};
+  if (filters.coachId) workshopFilter.coachId = filters.coachId;
+  if (filters.categoryId) workshopFilter.categoryId = filters.categoryId;
+  if (filters.workshopFormat) workshopFilter.format = filters.workshopFormat;
+
+  const completedAtFilter: Prisma.DateTimeNullableFilter = { not: null };
+  const stringRange = parseSurveyDateRange({
+    startDate: typeof filters.startDate === "string" ? filters.startDate : undefined,
+    endDate: typeof filters.endDate === "string" ? filters.endDate : undefined,
+  });
+  if (stringRange.startDate) completedAtFilter.gte = stringRange.startDate;
+  if (stringRange.endDateExclusive) completedAtFilter.lt = stringRange.endDateExclusive;
+  if (filters.startDate instanceof Date) completedAtFilter.gte = filters.startDate;
+  if (filters.endDate instanceof Date) completedAtFilter.lt = filters.endDate;
+
+  const where: Prisma.SurveyWhereInput = {
+    templateId,
+    completedAt: completedAtFilter,
+  };
+  if (Object.keys(workshopFilter).length > 0) where.workshop = workshopFilter;
+
+  // Unfiltered match count is informational — it's the same WHERE clause as
+  // findMany so the consumer can compare to `rows.length` to know if the cap
+  // hid any rows.
+  const totalCount = await db.survey.count({ where });
+
+  const findManyArgs: Prisma.SurveyFindManyArgs = {
+    where,
+    include: {
+      workshop: {
+        select: {
+          id: true,
+          title: true,
+          workshopCode: true,
+          coach: { select: { id: true, firstName: true, lastName: true } },
+          workshopCategory: { select: { id: true, name: true } },
+        },
+      },
+      answers: { select: { questionId: true, value: true, numValue: true } },
+    },
+    orderBy: { completedAt: "desc" },
+  };
+  if (cap !== null) {
+    findManyArgs.take = cap;
+  }
+
+  const surveys = await db.survey.findMany(findManyArgs);
+
+  type SurveyShape = {
+    id: string;
+    completedAt: Date | null;
+    workshop: {
+      id: string;
+      title: string;
+      workshopCode: string | null;
+      coach: { id: string; firstName: string | null; lastName: string | null } | null;
+      workshopCategory: { id: string; name: string } | null;
+    } | null;
+    answers: { questionId: string; value: string | null; numValue: number | null }[];
+  };
+
+  const rows: SurveyResponseRow[] = (surveys as unknown as SurveyShape[])
+    .filter((s) => s.completedAt !== null && s.workshop !== null)
+    .map((s) => {
+      const workshop = s.workshop!;
+      const answersByQuestionId = new Map<string, { value: string | null; numValue: number | null }>();
+      for (const a of s.answers) {
+        answersByQuestionId.set(a.questionId, { value: a.value, numValue: a.numValue });
+      }
+      return {
+        surveyId: s.id,
+        workshop: { id: workshop.id, title: workshop.title, workshopCode: workshop.workshopCode },
+        coach: workshop.coach
+          ? { id: workshop.coach.id, name: composeCoachName(workshop.coach) }
+          : null,
+        category: workshop.workshopCategory
+          ? { id: workshop.workshopCategory.id, name: workshop.workshopCategory.name }
+          : null,
+        completedAt: s.completedAt!,
+        answersByQuestionId,
+      };
+    });
+
+  const cappedAt = cap !== null && rows.length === cap && totalCount > cap ? cap : null;
+
+  return {
+    template: { id: template.id, name: template.name, surveyType: template.surveyType },
+    questions: template.questions,
+    rows,
+    totalCount,
+    cappedAt,
   };
 }
