@@ -71,6 +71,12 @@ jest.mock("@/services/stripe", () => {
   };
 });
 
+jest.mock("@/inngest/client", () => ({
+  inngest: {
+    send: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
 jest.mock("@/services/notifications", () => ({
   sendRegistrationNotification: jest.fn().mockResolvedValue(undefined),
 }));
@@ -287,7 +293,7 @@ describe("POST /api/workshops/[id]/register", () => {
       expect(createCheckoutSession).not.toHaveBeenCalled();
     });
 
-    it("passes deterministic UID to generateIcsContent with domain suffix", async () => {
+    it("publishes registration/created to Inngest for free workshop (Wave 13-A)", async () => {
       const workshop = makeFreeWorkshop(); // id = "ws-1"
       const registration = makeRegistration();
 
@@ -298,10 +304,13 @@ describe("POST /api/workshops/[id]/register", () => {
 
       await POST(buildJsonRequest(validPayload), routeParams("ws-1"));
 
-      const { generateIcsContent } = jest.requireMock("@/lib/ics-generator");
-      expect(generateIcsContent).toHaveBeenCalledWith(
+      const { inngest } = jest.requireMock("@/inngest/client");
+      expect(inngest.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          uid: "workshop-ws-1@scaling-up-platform.com",
+          name: "registration/created",
+          data: expect.objectContaining({
+            registrationId: registration.id,
+          }),
         })
       );
     });

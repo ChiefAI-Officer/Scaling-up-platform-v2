@@ -30,6 +30,21 @@ export function parseDurationHours(duration: string | null | undefined): number 
 }
 
 /**
+ * Parse duration hours from a workshop, with eventTime as a future hint for
+ * end-time calculation (Wave 13-B will flesh this out to parse "HH:MM - HH:MM"
+ * ranges from eventTime). For now delegates to parseDurationHours.
+ */
+export function parseDurationHoursFromEvent(
+  duration: string | null | undefined,
+  eventTime: string | null | undefined,
+): number {
+  // Wave 13-B will implement eventTime-based range parsing ("09:00 - 17:00").
+  // This stub preserves existing behaviour while the import is wired.
+  void eventTime;
+  return parseDurationHours(duration);
+}
+
+/**
  * Build a location string from workshop venue data.
  */
 export function buildLocationString(workshop: {

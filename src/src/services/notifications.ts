@@ -1150,6 +1150,10 @@ export async function sendPaidRegistrationNotificationStrict(data: {
     registrantName: string;
     registrantEmail: string;
     registrantCompany?: string;
+    format?: string | null;
+    virtualLink?: string | null;
+    venueName?: string | null;
+    venueAddress?: string | null;
     icsAttachment: { filename: string; content: string };
 }): Promise<void> {
     const codeLabel = data.workshopCode ? ` [${data.workshopCode}]` : "";
@@ -1195,11 +1199,16 @@ export async function sendPaidRegistrationNotificationStrict(data: {
 
     // Attendee confirmation — strict, includes ICS attachment.
     // ENH-MAY6-11: uses admin-editable template if present.
+    // Wave 13-A: passes location fields so the email shows venue / virtual link.
     const composed = await composeRegistrationConfirmationEmail({
         workshopTitle: data.workshopTitle,
         coachName: data.coachName,
         registrantName: data.registrantName,
         registrantEmail: data.registrantEmail,
+        format: data.format,
+        virtualLink: data.virtualLink,
+        venueName: data.venueName,
+        venueAddress: data.venueAddress,
     });
     await sendEmailViaSMTP({
         to: data.registrantEmail,

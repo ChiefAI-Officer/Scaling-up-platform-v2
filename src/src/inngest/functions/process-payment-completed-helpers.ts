@@ -13,6 +13,7 @@ import { sendPaidRegistrationNotificationStrict } from "@/services/notifications
 import {
     generateIcsContent,
     parseDurationHours,
+    parseDurationHoursFromEvent,
     buildLocationString,
 } from "@/lib/ics-generator";
 
@@ -174,7 +175,7 @@ export async function sendNotificationWithAtomicClaim(
             eventDate: reg.workshop.eventDate,
             eventTime: reg.workshop.eventTime,
             timezone: reg.workshop.timezone,
-            durationHours: parseDurationHours(reg.workshop.duration),
+            durationHours: parseDurationHoursFromEvent(reg.workshop.duration, reg.workshop.eventTime),
             location: buildLocationString(reg.workshop),
         });
 
@@ -192,6 +193,10 @@ export async function sendNotificationWithAtomicClaim(
             registrantName: `${reg.firstName} ${reg.lastName}`,
             registrantEmail: reg.email,
             registrantCompany: reg.company ?? undefined,
+            format: reg.workshop.format,
+            virtualLink: reg.workshop.virtualLink,
+            venueName: reg.workshop.venueName,
+            venueAddress: reg.workshop.venueAddress,
             icsAttachment: {
                 filename: `${safeTitle}.ics`,
                 content: icsContent,
