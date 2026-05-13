@@ -17,10 +17,37 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 12, 2026 — ENH-MAY12-2: survey step subject/body always visible (stale emailTemplateId cleared); 1121 tests; remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 externally blocked |
+| **Last Updated** | May 12, 2026 — Squash Round 13: registration email double-send fixed, free ICS+location handler, range-aware ICS end-time, survey pinning bypass, refund hint; 1148 tests |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
+
+**Squash Round 13 — Registration Email + ICS + Survey Pinning + Refund Hint** (May 12 2026, direct push to main, Alpha mode):
+Source: Jeff Verdun email + Slack follow-ons from May 12. All Notion tasks created before implementation and assigned to gabriel@chiefaiofficer.com. 1121 → 1148 tests (+27).
+
+**Wave 13-A — Registration Email Fix:**
+- Removed legacy `"send-registration-email"` Inngest step from `schedule-emails.ts` — was firing an old Azure template for ALL registrations, causing PAID double-send.
+- Extended `RegistrationConfirmationContext` with `format`, `virtualLink`, `venueName`, `venueAddress` fields.
+- `buildLocationBlock()` helper in `transactional-email-template.ts`: VIRTUAL+virtualLink → join link (https-only scheme guard); IN_PERSON/HYBRID+venue → Get Directions (uses `buildLocationString` for Maps query, not raw JSON).
+- `sendPaidRegistrationNotificationStrict` + `sendNotificationWithAtomicClaim` thread all 4 location fields.
+- New `handleRegistrationCreatedFree` Inngest function on `registration/created` event: skip conditions (not_found, paid_path_handles, pre_cutoff, already_sent, race_lost), atomic claim pattern, ICS generation, SMTP rollback on failure.
+- `REGISTRATION_HANDLER_CUTOFF_AT` env var (documented in `.env.example`) controls which free registrations the handler processes.
+- `/api/workshops/[id]/register` route: removed fire-and-forget `sendRegistrationNotification`; now publishes `registration/created` to Inngest for FREE workshops.
+- 15 new tests across `handle-registration-created-free.test.ts` (8) + `transactional-email-template.test.ts` (3) + `workshop-register.test.ts` (4 updated).
+
+**Wave 13-B — ICS End-Time Fix:**
+- `parseDurationHours` extended: numeric-prefix regex (`"2 hours"` → 2, `"3 hours"` → 3), explicit `"8hr"`/`"4hr"` branches, `"full"` → 8, fallback changed from 8 → 2.
+- `parseDurationHoursFromEvent(duration, eventTime)` implemented: parses `"HH:MM - HH:MM"` (hyphen or en-dash) to derive duration from range; falls back to `parseDurationHours`.
+- All 5 remaining bare `parseDurationHours` callers migrated: `api/workshops/[id]/ics/route.ts`, `workshop-date-change.ts`, `thank-you-page-template.tsx`, `registration/success/page.tsx`, `process-payment-completed-helpers.ts` (already migrated in 13-A).
+- 11 new tests in `ics-generator.test.ts`.
+
+**Wave 11-G — Survey Template Pinning:**
+- `getOrCreateSurveyLink` in `survey-automation.ts` (line ~67): removed `isActive: true` from pinned-template lookup. Auto-attach paths keep `isActive: true`.
+- Workflow editor `StepCard` + `NewStepForm` state type updated to include `isActive: boolean`. Picker renders `(inactive)` suffix for inactive templates. Empty-state text changed to "No survey templates."
+- 5 new tests: `survey-automation-pinned.test.ts` (3) + `workflow-editor-survey-picker.test.tsx` (2).
+
+**Wave 13-C — Refund Screen Stripe ID Hint:**
+- `mark-refunded-button.tsx` prompt string updated: removed misleading "replace pi_ with re_" tip (Stripe refund IDs are separate objects). New text directs operators to Payments → [charge] → Refunds in Stripe dashboard. Validation regex (`/^re_[A-Za-z0-9]{14,}$/`) unchanged.
 
 **ENH-MAY12-2 — Survey Step Email Customization Fix** (May 12 2026, direct push to main, Alpha mode):
 - Jeff reported: "The surveys if you make them as templates you do not have any control over the email that comes with it."
