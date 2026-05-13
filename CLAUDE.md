@@ -17,10 +17,21 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | May 12, 2026 — Squash Round 12 complete (Waves 12-A/B/C/D + Wave 8-D): password hint fix, coach integration IDs, survey per-person ratings, custom price approval display, HubSpot auto-approval; 1114 tests; remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 externally blocked |
+| **Last Updated** | May 12, 2026 — ENH-MAY12-2: survey step subject/body always visible (stale emailTemplateId cleared); 1121 tests; remaining items ENH-MAY6-6/9/11 + Q-MAY6-1/2 externally blocked |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
+
+**ENH-MAY12-2 — Survey Step Email Customization Fix** (May 12 2026, direct push to main, Alpha mode):
+- Jeff reported: "The surveys if you make them as templates you do not have any control over the email that comes with it."
+- Root cause: `StepCard` initialized `templateId` from `step.emailTemplateId` even for `SEND_SURVEY_LINK` steps — a stale `emailTemplateId` in the DB (or set by switching from another step type) caused `{!templateId && ...}` block to hide the subject/body fields.
+- Fix 1: `StepCard` `useState` initializer clears templateId when `step.stepType === SEND_SURVEY_LINK`.
+- Fix 2: `StepCard` step-type onChange clears `templateId` when switching TO `SEND_SURVEY_LINK`.
+- Fix 3: `NewStepForm` step-type onChange clears `templateId` when switching TO `SEND_SURVEY_LINK`.
+- Fix 4: Both submit handlers validate that non-blank body includes `{{surveyUrl}}` — destructive toast + early return if missing (blank body allowed = uses default email).
+- Fix 5: Help text added below body textarea in both forms when `stepType === SEND_SURVEY_LINK`.
+- New test file `__tests__/components/workflow-editor-survey-email.test.tsx` (7 RED→GREEN tests).
+- 1121 tests passing (up from 1114).
 
 **Squash Round 12 — Jeff May 12 Follow-On Items** (May 12 2026, direct push to main, Alpha mode):
 Source: Jeff Verdun email "Bug List/Improvement List 5/12/26". Wave 11 already shipped double-email + format-default fixes. Wave 12 + Wave 8-D cover the remaining items. 1030 → 1114 tests (+84).
