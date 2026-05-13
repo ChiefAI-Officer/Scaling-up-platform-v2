@@ -13,6 +13,7 @@ import { sendPaidRegistrationNotificationStrict } from "@/services/notifications
 import {
     generateIcsContent,
     parseDurationHoursFromEvent,
+    buildIcsDescription,
     buildLocationString,
 } from "@/lib/ics-generator";
 
@@ -170,7 +171,7 @@ export async function sendNotificationWithAtomicClaim(
         const icsContent = generateIcsContent({
             uid: `workshop-${reg.workshop.id}@scaling-up-platform.com`,
             title: reg.workshop.title,
-            description: reg.workshop.description,
+            description: buildIcsDescription(reg.workshop),
             eventDate: reg.workshop.eventDate,
             eventTime: reg.workshop.eventTime,
             timezone: reg.workshop.timezone,

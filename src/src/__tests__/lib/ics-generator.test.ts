@@ -1,5 +1,7 @@
 import {
   buildGoogleCalendarUrl,
+  buildIcsDescription,
+  buildLocationString,
   generateIcsContent,
   IcsEventData,
   parseDurationHours,
@@ -113,5 +115,135 @@ describe("parseDurationHoursFromEvent", () => {
   it("prefers eventTime range over duration string", () => {
     // eventTime says 2h; duration string says 4h — eventTime wins
     expect(parseDurationHoursFromEvent("half-day", "10:00 - 12:00")).toBe(2);
+  });
+});
+
+describe("buildLocationString — virtual workshops (Gmail Directions button fix)", () => {
+  // BUG-MAY12: Gmail renders a "Directions" button at the top of inbox calendar
+  // previews whenever the ICS LOCATION field is set. For VIRTUAL workshops the
+  // location is a meeting URL, so "Directions" is useless. Return "" so
+  // generateIcsContent + buildGoogleCalendarUrl OMIT the LOCATION field.
+  it("returns empty string for VIRTUAL workshops (no Gmail Directions button)", () => {
+    expect(
+      buildLocationString({
+        format: "VIRTUAL",
+        virtualLink: "https://zoom.us/j/x",
+      })
+    ).toBe("");
+  });
+
+  it("returns empty string for VIRTUAL even when virtualLink is null/empty", () => {
+    expect(buildLocationString({ format: "VIRTUAL" })).toBe("");
+    expect(buildLocationString({ format: "VIRTUAL", virtualLink: null })).toBe("");
+  });
+
+  it("IN_PERSON still produces venue + address (regression)", () => {
+    expect(
+      buildLocationString({
+        format: "IN_PERSON",
+        venueName: "Marriott",
+        venueAddress: '{"city":"Austin"}',
+      })
+    ).toBe("Marriott, Austin");
+  });
+});
+
+describe("buildIcsDescription", () => {
+  it("appends join link for VIRTUAL with description", () => {
+    expect(
+      buildIcsDescription({
+        description: "Workshop on X",
+        format: "VIRTUAL",
+        virtualLink: "https://zoom.us/j/x",
+      })
+    ).toBe("Workshop on X\n\nJoin online: https://zoom.us/j/x");
+  });
+
+  it("returns just the join line for VIRTUAL with no description", () => {
+    expect(
+      buildIcsDescription({
+        description: null,
+        format: "VIRTUAL",
+        virtualLink: "https://zoom.us/j/x",
+      })
+    ).toBe("Join online: https://zoom.us/j/x");
+  });
+
+  it("returns description unchanged for IN_PERSON (no join line appended)", () => {
+    expect(
+      buildIcsDescription({
+        description: "Foo",
+        format: "IN_PERSON",
+        virtualLink: null,
+      })
+    ).toBe("Foo");
+  });
+
+  it("appends join link for HYBRID with virtualLink", () => {
+    expect(
+      buildIcsDescription({
+        description: "Hybrid event",
+        format: "HYBRID",
+        virtualLink: "https://meet.example.com/abc",
+      })
+    ).toBe("Hybrid event\n\nJoin online: https://meet.example.com/abc");
+  });
+
+  it("returns empty string for VIRTUAL with no description and no link", () => {
+    expect(
+      buildIcsDescription({
+        description: null,
+        format: "VIRTUAL",
+        virtualLink: null,
+      })
+    ).toBe("");
+  });
+});
+
+describe("generateIcsContent — Gmail Directions button regression", () => {
+  const baseEventDate = new Date("2026-06-15T00:00:00.000Z");
+
+  it("VIRTUAL: omits LOCATION line, puts join link in DESCRIPTION", () => {
+    const workshop = {
+      description: "Quarterly leadership virtual session",
+      format: "VIRTUAL",
+      virtualLink: "https://zoom.us/j/123456",
+    } as const;
+    const content = generateIcsContent({
+      uid: "wsv@example.com",
+      title: "Virtual Workshop",
+      description: buildIcsDescription(workshop),
+      eventDate: baseEventDate,
+      eventTime: "10:00 - 12:00",
+      timezone: "America/New_York",
+      durationHours: 2,
+      location: buildLocationString(workshop),
+    });
+    expect(content).not.toMatch(/^LOCATION:/m);
+    expect(content).not.toContain("LOCATION:");
+    expect(content).toContain(
+      "DESCRIPTION:Quarterly leadership virtual session\\n\\nJoin online: https://zoom.us/j/123456"
+    );
+  });
+
+  it("IN_PERSON: still emits LOCATION line (regression)", () => {
+    const workshop = {
+      description: "In-person session",
+      format: "IN_PERSON",
+      venueName: "Marriott",
+      venueAddress: '{"city":"Austin"}',
+      virtualLink: null,
+    } as const;
+    const content = generateIcsContent({
+      uid: "wsp@example.com",
+      title: "In-Person Workshop",
+      description: buildIcsDescription(workshop),
+      eventDate: baseEventDate,
+      eventTime: "09:00 - 17:00",
+      timezone: "America/Chicago",
+      durationHours: 8,
+      location: buildLocationString(workshop),
+    });
+    expect(content).toContain("LOCATION:Marriott\\, Austin");
   });
 });

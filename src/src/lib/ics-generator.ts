@@ -66,6 +66,15 @@ export function parseDurationHoursFromEvent(
 
 /**
  * Build a location string from workshop venue data.
+ *
+ * VIRTUAL workshops return "" so downstream `generateIcsContent` and
+ * `buildGoogleCalendarUrl` OMIT the LOCATION field entirely. Gmail uses the
+ * ICS LOCATION value to render a "Directions" button on calendar previews,
+ * which is useless when the location is a meeting URL (BUG-MAY12).
+ *
+ * For VIRTUAL/HYBRID workshops, the join link is surfaced inside the calendar
+ * event DESCRIPTION via `buildIcsDescription` so registrants can still click
+ * through from their calendar on the day of the event.
  */
 export function buildLocationString(workshop: {
   format: string;
@@ -75,7 +84,7 @@ export function buildLocationString(workshop: {
   virtualPlatform?: string | null;
 }): string {
   if (workshop.format === "VIRTUAL") {
-    return workshop.virtualLink || "Virtual Workshop";
+    return "";
   }
 
   const parts: string[] = [];
@@ -104,6 +113,26 @@ export function buildLocationString(workshop: {
   }
 
   return parts.join(", ") || "Location TBD";
+}
+
+/**
+ * Build the ICS DESCRIPTION text for a workshop, appending the join link
+ * for virtual/hybrid workshops so registrants can find it inside the
+ * calendar event (since we no longer set LOCATION for virtuals to avoid
+ * Gmail's incorrect "Directions" button).
+ */
+export function buildIcsDescription(workshop: {
+  description?: string | null;
+  format: string;
+  virtualLink?: string | null;
+}): string {
+  const base = workshop.description?.trim() ?? "";
+  const needsJoinLink =
+    (workshop.format === "VIRTUAL" || workshop.format === "HYBRID") &&
+    workshop.virtualLink;
+  if (!needsJoinLink) return base;
+  const joinLine = `Join online: ${workshop.virtualLink}`;
+  return base ? `${base}\n\n${joinLine}` : joinLine;
 }
 
 /**

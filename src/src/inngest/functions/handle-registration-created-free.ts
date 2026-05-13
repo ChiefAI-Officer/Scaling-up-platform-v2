@@ -18,6 +18,7 @@ import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
 import {
   generateIcsContent,
+  buildIcsDescription,
   buildLocationString,
   parseDurationHoursFromEvent,
 } from "@/lib/ics-generator";
@@ -98,7 +99,7 @@ export const handleRegistrationCreatedFree = inngest.createFunction(
       const icsContent = generateIcsContent({
         uid: `workshop-${workshop.id}@scaling-up-platform.com`,
         title: workshop.title,
-        description: workshop.description,
+        description: buildIcsDescription(workshop),
         eventDate: workshop.eventDate,
         eventTime: workshop.eventTime,
         timezone: workshop.timezone,

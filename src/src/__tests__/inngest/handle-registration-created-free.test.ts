@@ -41,6 +41,7 @@ jest.mock("@/services/notifications", () => ({
 jest.mock("@/lib/ics-generator", () => ({
   generateIcsContent: jest.fn().mockReturnValue("BEGIN:VCALENDAR\nEND:VCALENDAR"),
   buildLocationString: jest.fn().mockReturnValue("Virtual"),
+  buildIcsDescription: jest.fn().mockReturnValue("Workshop description"),
   parseDurationHoursFromEvent: jest.fn().mockReturnValue(8),
 }));
 
