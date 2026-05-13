@@ -73,7 +73,11 @@ function buildLocationBlock(ctx: RegistrationConfirmationContext): string {
 
   if (format === "VIRTUAL") {
     if (virtualLink) {
-      return `<p><strong>Join online:</strong> <a href="${escapeHtml(virtualLink)}">${escapeHtml(virtualLink)}</a></p>`;
+      const safeLink = virtualLink.startsWith("https://") || virtualLink.startsWith("http://") ? virtualLink : null;
+      if (safeLink) {
+        return `<p><strong>Join online:</strong> <a href="${escapeHtml(safeLink)}">${escapeHtml(safeLink)}</a></p>`;
+      }
+      // Link present but not a safe URL — fall through to generic note
     }
     return `<p>This is a virtual workshop. Join details will be shared by the coach.</p>`;
   }
