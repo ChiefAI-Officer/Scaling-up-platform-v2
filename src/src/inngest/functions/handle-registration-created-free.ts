@@ -143,7 +143,7 @@ export const handleRegistrationCreatedFree = inngest.createFunction(
       }
     });
 
-    if (result.sent === false) return { ok: true, skipped: result.reason };
+    if (!result.sent) return { ok: true, skipped: (result as { sent: false; reason: string }).reason };
     return { ok: true, registrationId };
   }
 );
