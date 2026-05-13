@@ -1,0 +1,546 @@
+# CLAUDE.md Changelog — Historical Implementation Detail
+
+Content extracted from CLAUDE.md on 2026-05-13. Organized newest-first by date. Each entry uses the format `### YYYY-MM-DD — <Title> <!-- ENTRY_ISO:YYYY-MM-DD ENTRY_SLUG:slug -->`.
+
+Future entries should be appended at the TOP of the entries section below (newest first), and the `LAST_UPDATED_ISO` / `LAST_UPDATED_SLUG` anchor in CLAUDE.md's Project Context table should be updated to match the new top entry. The Jest test `src/__tests__/lint/changelog-freshness.test.ts` enforces this invariant.
+
+---
+
+### 2026-05-12 — Squash Round 13 — Registration Email + ICS + Survey Pinning + Refund Hint (May 12 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-12 ENTRY_SLUG:squash-round-13 -->
+
+**Squash Round 13 — Registration Email + ICS + Survey Pinning + Refund Hint** (May 12 2026, direct push to main, Alpha mode):
+Source: Jeff Verdun email + Slack follow-ons from May 12. All Notion tasks created before implementation and assigned to gabriel@chiefaiofficer.com. 1121 → 1148 tests (+27).
+
+**Wave 13-A — Registration Email Fix:**
+- Removed legacy `"send-registration-email"` Inngest step from `schedule-emails.ts` — was firing an old Azure template for ALL registrations, causing PAID double-send.
+- Extended `RegistrationConfirmationContext` with `format`, `virtualLink`, `venueName`, `venueAddress` fields.
+- `buildLocationBlock()` helper in `transactional-email-template.ts`: VIRTUAL+virtualLink → join link (https-only scheme guard); IN_PERSON/HYBRID+venue → Get Directions (uses `buildLocationString` for Maps query, not raw JSON).
+- `sendPaidRegistrationNotificationStrict` + `sendNotificationWithAtomicClaim` thread all 4 location fields.
+- New `handleRegistrationCreatedFree` Inngest function on `registration/created` event: skip conditions (not_found, paid_path_handles, pre_cutoff, already_sent, race_lost), atomic claim pattern, ICS generation, SMTP rollback on failure.
+- `REGISTRATION_HANDLER_CUTOFF_AT` env var (documented in `.env.example`) controls which free registrations the handler processes.
+- `/api/workshops/[id]/register` route: removed fire-and-forget `sendRegistrationNotification`; now publishes `registration/created` to Inngest for FREE workshops.
+- 15 new tests across `handle-registration-created-free.test.ts` (8) + `transactional-email-template.test.ts` (3) + `workshop-register.test.ts` (4 updated).
+
+**Wave 13-B — ICS End-Time Fix:**
+- `parseDurationHours` extended: numeric-prefix regex (`"2 hours"` → 2, `"3 hours"` → 3), explicit `"8hr"`/`"4hr"` branches, `"full"` → 8, fallback changed from 8 → 2.
+- `parseDurationHoursFromEvent(duration, eventTime)` implemented: parses `"HH:MM - HH:MM"` (hyphen or en-dash) to derive duration from range; falls back to `parseDurationHours`.
+- All 5 remaining bare `parseDurationHours` callers migrated: `api/workshops/[id]/ics/route.ts`, `workshop-date-change.ts`, `thank-you-page-template.tsx`, `registration/success/page.tsx`, `process-payment-completed-helpers.ts` (already migrated in 13-A).
+- 11 new tests in `ics-generator.test.ts`.
+
+**Wave 11-G — Survey Template Pinning:**
+- `getOrCreateSurveyLink` in `survey-automation.ts` (line ~67): removed `isActive: true` from pinned-template lookup. Auto-attach paths keep `isActive: true`.
+- Workflow editor `StepCard` + `NewStepForm` state type updated to include `isActive: boolean`. Picker renders `(inactive)` suffix for inactive templates. Empty-state text changed to "No survey templates."
+- 5 new tests: `survey-automation-pinned.test.ts` (3) + `workflow-editor-survey-picker.test.tsx` (2).
+
+**Wave 13-C — Refund Screen Stripe ID Hint:**
+- `mark-refunded-button.tsx` prompt string updated: removed misleading "replace pi_ with re_" tip (Stripe refund IDs are separate objects). New text directs operators to Payments → [charge] → Refunds in Stripe dashboard. Validation regex (`/^re_[A-Za-z0-9]{14,}$/`) unchanged.
+
+### 2026-05-12 — ENH-MAY12-2 — Survey Step Email Customization Fix (May 12 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-12 ENTRY_SLUG:enh-may12-2-survey-step-fix -->
+
+**ENH-MAY12-2 — Survey Step Email Customization Fix** (May 12 2026, direct push to main, Alpha mode):
+- Jeff reported: "The surveys if you make them as templates you do not have any control over the email that comes with it."
+- Root cause: `StepCard` initialized `templateId` from `step.emailTemplateId` even for `SEND_SURVEY_LINK` steps — a stale `emailTemplateId` in the DB (or set by switching from another step type) caused `{!templateId && ...}` block to hide the subject/body fields.
+- Fix 1: `StepCard` `useState` initializer clears templateId when `step.stepType === SEND_SURVEY_LINK`.
+- Fix 2: `StepCard` step-type onChange clears `templateId` when switching TO `SEND_SURVEY_LINK`.
+- Fix 3: `NewStepForm` step-type onChange clears `templateId` when switching TO `SEND_SURVEY_LINK`.
+- Fix 4: Both submit handlers validate that non-blank body includes `{{surveyUrl}}` — destructive toast + early return if missing (blank body allowed = uses default email).
+- Fix 5: Help text added below body textarea in both forms when `stepType === SEND_SURVEY_LINK`.
+- New test file `__tests__/components/workflow-editor-survey-email.test.tsx` (7 RED→GREEN tests).
+- 1121 tests passing (up from 1114).
+
+### 2026-05-12 — Squash Round 12 — Jeff May 12 Follow-On Items (May 12 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-12 ENTRY_SLUG:squash-round-12 -->
+
+**Squash Round 12 — Jeff May 12 Follow-On Items** (May 12 2026, direct push to main, Alpha mode):
+Source: Jeff Verdun email "Bug List/Improvement List 5/12/26". Wave 11 already shipped double-email + format-default fixes. Wave 12 + Wave 8-D cover the remaining items. 1030 → 1114 tests (+84).
+
+**Wave 12-A — Password UI Label Fix:**
+- Password hint text in 3 UI surfaces corrected from "12 characters" → "8 characters" to match the Zod schema `.min(8)` already enforced since Sprint 1.
+- Files: `app/(public)/register/page.tsx`, `components/auth/change-password-form.tsx`.
+- New test file `__tests__/auth/password-hint-text.test.tsx` (2 RED→GREEN render tests).
+
+**Wave 12-B — Coach Integration IDs:**
+- `hubspotId` and `circleId` were in the Prisma schema (`Coach` model, both `String? @unique`) but not exposed in any UI.
+- Admin coach create form (`coaches/new/page.tsx`) and edit form (`coaches/[id]/edit/page.tsx`) now show editable "HubSpot Contact ID" + "Circle Member ID" text inputs via new `allowEditIntegrationIds?: boolean` prop on `CoachProfileForm`.
+- Coach portal settings page shows both IDs as read-only monospace text (no editing — protects HubSpot/Circle sync integrity).
+- API PATCH `api/coaches/[id]/route.ts`: coach session → 403; Prisma P2002 unique constraint on either ID → 409 with message "This HubSpot/Circle ID is already assigned to another coach".
+- New test file `__tests__/api/coach-integration-ids.test.ts` (3 tests: admin 200, coach 403, duplicate 409).
+
+**Wave 12-C — Survey Per-Person Ratings:**
+- `SurveyResultsView` (per-workshop view) now lists individual respondent ratings below the average for RATING/NPS questions. Uses existing `formatRespondentLabel()` helper (full name → email → "Anonymous"). Denominator: `/5` for RATING, `/10` for NPS.
+- `SurveyResultsPanel` (template editor aggregate view) distribution histogram was already implemented — 12-C-2 was a no-op.
+- New test file `__tests__/surveys/survey-results-per-person.test.tsx` (4 tests: named respondents, anonymous, email-only fallback, empty state).
+
+**Wave 12-D — Admin Approvals Price Display** (May 12 2026, direct push to main, Alpha mode):
+- Admin approvals list for CUSTOM_PRICING now shows both "Original" and "Requested" prices for easy comparison.
+- **Original price source priority:** (1) `requestData.oldPriceCents` (snapshot stored at request time), (2) fallback to live `workshop.priceCents`.
+- Include pricing tier name when available: "Original: $X (Tier Name)".
+- API route `/api/approvals` now includes `workshop.priceCents` + `workshop.pricingTier.name` in Prisma select.
+- Approval interface extended with optional `workshop` property carrying pricing data.
+- CUSTOM_PRICING badge changed from showing the price to generic label "Custom Price Requested".
+- New test file `__tests__/admin/custom-price-approval.test.tsx` (5 tests covering fallback logic, tier display, both price lines, non-CUSTOM_PRICING no-op).
+- 1114 tests passing; build succeeds.
+
+### 2026-05-12 — Wave 8-D — HubSpot coach_contract_status auto-approval (May 12 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-12 ENTRY_SLUG:wave-8-d-hubspot-auto-approve -->
+
+**Wave 8-D — HubSpot coach_contract_status auto-approval** (May 12 2026, direct push to main, Alpha mode):
+- New `getHubSpotCoachContractStatus(hubspotContactId)` exported from `services/hubspot.ts`: calls `basicApi.getById` with `["coach_contract_status"]` property, returns `string | null`, throws on API error (fail-closed).
+- New `evaluateHubSpotAutoApprove()` private helper in `lib/approval-engine.ts` inserts before the Circle cert check for `WORKSHOP_REQUEST` type. Three safety levers: `HUBSPOT_AUTO_APPROVE_ENABLED="true"` kill switch (default off), `HUBSPOT_AUTO_APPROVE_SHADOW="true"` log-only mode, `HUBSPOT_AUTO_APPROVE_ALLOWLIST="a@b,c@d"` comma-separated email allowlist. API error → `console.error` + return `{ autoApproved: false, reason: "hubspot_api_error: ..." }` (fail-closed, no DB write).
+- Auto-approve path: creates ApprovalQueue row (PENDING), updates it to APPROVED with `respondedBy: "system:hubspot-coach-status"`, writes AuditLog row, emits `workshop/approved` Inngest event.
+- `ApprovalEvaluationInput` gains optional `hubspotId?: string` field.
+- `api/approvals/route.ts` coachBio select now includes `hubspotId: true` and passes it to `evaluateApproval`.
+- 9/9 RED→GREEN tests at `__tests__/lib/hubspot-approval-engine.test.ts` (all 9 safety-lever scenarios).
+- 1114 tests passing (up from 1105).
+
+**v2.5 Sprint — COMPLETE** (May 8 2026 + Wave 6 May 10): 13 tickets shipped across 6 waves over three sessions. Direct push to main, Alpha mode. Test count 964 → 1021 (+57). Sprint plan: `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Sprint ledger with full per-wave impl details: `plans/JEFF_MAY6_SPRINT.md`.
+
+### 2026-05-11 — BUG-MAY11-1 — workshop PATCH never persisted stripePromotionCodeId (May 11 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-11 ENTRY_SLUG:bug-may11-1-stripe-promotion-id -->
+
+**BUG-MAY11-1 — workshop PATCH never persisted stripePromotionCodeId** (May 11 2026, direct push to main, Alpha mode):
+- Surfaced during the v2.5 end-to-end verification sweep. ENH-MAY6-7 (Wave 3 dollar-amount coupons) shipped with passing unit tests for `services/stripe.ts createWorkshopPromotionCode` (Stripe API call shape) but the integration was never exercised end-to-end. Saving any new coupon via the admin workshop edit form returned PATCH 200, but the public registration → Stripe Checkout flow rejected the code with "Discount code is invalid or expired" (POST `/api/checkout` → 400 `StripeDiscountCodeError`). Affected BOTH PERCENT and AMOUNT coupons — Stripe-side promotion code WAS created, the platform just never wrote the returned `stripePromotionCodeId` back into `Workshop.coupons`. Checkout-time validator read all-null `stripePromotionCodeId` from stored coupons → `allowedPromotionCodeIds` empty → reject.
+- Fix at `src/app/api/workshops/[id]/route.ts`: Stripe sync moved BEFORE the workshop.update (was a fire-and-forget block after). Each parsedCoupon's Stripe call result is merged back via `{ ...coupon, stripeCouponId, stripePromotionCodeId }` so the `serializeWorkshopCoupons(parsedCoupons)` written to DB carries the IDs. New pre-pass diff-checks each incoming coupon against `parseStoredWorkshopCoupons(existing.coupons)` and reuses existing `stripePromotionCodeId` when `code + discountType + discountPercent + discountAmountCents + singleUse` are unchanged — prevents orphaning a fresh Stripe promo code on every re-save (e.g. when the admin edits only the title).
+- 6/6 tests passing in `__tests__/api/workshop-coupons.test.ts`: existing-save-shape test updated to reflect the new merge; 3 new tests added (persist new ID, reuse existing ID on unchanged shape, recreate on changed shape). Full suite 1030/1030 (up from 1027).
+- Operator follow-up: the `WAVE6TEST10` Stripe promotion code created during today's reproduction is orphaned in Stripe (not deleted from Stripe's account; just removed from `Workshop.coupons`). Recommend deleting via Stripe dashboard. Pre-fix promo codes for historical coupons may also be orphaned — auditing them is a separate cleanup.
+
+### 2026-05-10 — Wave 6 — BUG-MAY6-9 + finalizeParentRollup wiring (May 10 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-10 ENTRY_SLUG:wave-6-bug-may6-9-rollup -->
+
+**Wave 6 — BUG-MAY6-9 + finalizeParentRollup wiring** (May 10 2026, direct push to main, Alpha mode):
+- **BUG-MAY6-9** — per-survey respondent attribution. The component `<SurveyResultsView>` shared between admin + coach per-workshop survey results pages was discarding `survey.registration` even though both consumer pages already fetched it via Prisma include. `SurveyResultResponse` interface now carries optional `registration: { firstName, lastName, email } | null`; both consumer pages thread it through; component renders attribution next to TEXT/TEXTAREA answers + a Respondents pill panel mirroring the aggregate-page (ENH-MAY6-8) pattern. Inline `formatRespondentLabel()` helper: trimmed full name → email → "Anonymous". 5 RED→GREEN tests at `__tests__/components/survey-results-view-respondent.test.tsx`.
+- **Tier B: link-gen FAILED children + finalizeParentRollup wiring.** `execute-workflow.ts` SEND_SURVEY_LINK now writes a per-recipient FAILED child row (`errorMessage: "link_generation_failed"`) when `getOrCreateSurveyLink` returns null (was a silent `continue`). Post-loop `finalizeParentRollup(db, executionId)` call added after `recordWorkflowExecution` for SEND_SURVEY_LINK / SEND_FILE_LINK / EMAIL_ATTENDEES — parent now reflects FAILED > SENT > SKIPPED precedence over actual children. Both gated on `executionId` (set by pre-loop `scheduleWorkflowExecution` on the future RELATIVE_TO_EVENT path); the immediate path remains a documented gap until per-recipient idempotency lands in Beta. SEND_FILE_LINK + EMAIL_ATTENDEES rollup is a no-op today (no FAILED children) — enables future SMTP error classification work to flip them on without further wiring. 1 new RED→GREEN test extends `__tests__/inngest/execute-workflow.test.ts`.
+- 1021 tests passing (up from 1015).
+
+### 2026-05-10 — Wave 6 follow-on Part 2 — Trigger Now EMAIL_ATTENDEES + SEND_FILE_LINK parity (May 10 2026, commit `d88eb8c`, direct push to main): <!-- ENTRY_ISO:2026-05-10 ENTRY_SLUG:wave-6-followon-part-2 -->
+
+**Wave 6 follow-on Part 2 — Trigger Now EMAIL_ATTENDEES + SEND_FILE_LINK parity** (May 10 2026, commit `d88eb8c`, direct push to main):
+- Extends the Part 1 pattern (parent pre-create + per-recipient SENT writes + post-loop update + finalizeParentRollup) to the EMAIL_ATTENDEES and SEND_FILE_LINK handlers in `trigger-workflow-step.ts`. Manual Trigger Now now produces the same audit shape as scheduled fires across all three per-recipient step types.
+- Side-effect: fixes latent BUG-MAY4-1b twin on Trigger Now EMAIL_ATTENDEES — the post-loop terminal write was `status: "SENT"` unconditionally, even with 0 registrants. Now `sentEmails.size > 0 ? "SENT" : "SKIPPED"` matching execute-workflow.ts.
+- Terminal-auth-error FAILED branches in both handlers now transition the existing parent via `update()` (was a second `create()` that orphaned the SCHEDULED row).
+- 3 new RED→GREEN tests + 2 existing tests updated. 1024 → 1027 tests.
+
+### 2026-05-10 — Wave 6 follow-on Part 1 — Trigger Now SEND_SURVEY_LINK parity (May 10 2026, commit `c204dbf`, direct push to main): <!-- ENTRY_ISO:2026-05-10 ENTRY_SLUG:wave-6-followon-part-1 -->
+
+**Wave 6 follow-on Part 1 — Trigger Now SEND_SURVEY_LINK parity** (May 10 2026, commit `c204dbf`, direct push to main):
+- Closes Codex round-3 MED 3 from the Wave 6 review. `trigger-workflow-step.ts` (manual Trigger Now path) SEND_SURVEY_LINK handler was diverging from the scheduled `execute-workflow.ts` path: silently `continue`d on `!surveyLink` and wrote no per-recipient rows. On-call manual repro produced different audit data than the scheduled fire that originally failed.
+- Fix at `src/inngest/functions/trigger-workflow-step.ts`: (1) Pre-create parent WorkflowStepExecution row with `status: "SCHEDULED"` at top of SEND_SURVEY_LINK handler, capture `parentId`. (2) On `!surveyLink`, call `recordRecipientExecution` with `status: "FAILED"` + `errorMessage: "link_generation_failed"` then continue. (3) After successful SMTP send, call `recordRecipientExecution` with `status: "SENT"`. (4) Replace post-loop `db.workflowStepExecution.create({ data: { status: TERMINAL } })` with `update({ where: { id: parentId } })` — was a second create. (5) Call `finalizeParentRollup(db, parentId)` post-update.
+- Scope: SEND_SURVEY_LINK only. SEND_FILE_LINK + EMAIL_ATTENDEES Trigger Now paths still use the old shape — they ship together with the Beta rollup-retry-safety unit once SMTP error classification lands (same scope decision as Wave 6 scheduled-path).
+- 3 new RED→GREEN tests + 3 existing tests updated for create→update transition. 1021 → 1024 tests.
+
+### 2026-05-08 — Wave 5 — BUG-MAY6-4a (Notion: [3598c45d…f634](https://www.notion.so/3598c45dd82981c5847fe5be0eb1f634)) — Audit script at `src/scripts/audit-cross-workshop-coupons.ts` lists historical Stripe redemptions where the promo code's `metadata.workshopCode` doesn't match the registration's workshopCode (cross-workshop redemptions before the May 7 fix). Output is CSV to stdout with verdict per row. Read-only / dry-run only. Operator-invoked via `npx tsx scripts/audit-cross-workshop-coupons.ts [--since YYYY-MM-DD] [--limit N]`. Hand-off to Jeff for per-case refund/accept judgment. NO auto-refunds. <!-- ENTRY_ISO:2026-05-08 ENTRY_SLUG:wave-5-bug-may6-4a-audit-script -->
+
+**Wave 5 — BUG-MAY6-4a** (Notion: [3598c45d…f634](https://www.notion.so/3598c45dd82981c5847fe5be0eb1f634)) — Audit script at `src/scripts/audit-cross-workshop-coupons.ts` lists historical Stripe redemptions where the promo code's `metadata.workshopCode` doesn't match the registration's workshopCode (cross-workshop redemptions before the May 7 fix). Output is CSV to stdout with verdict per row. Read-only / dry-run only. Operator-invoked via `npx tsx scripts/audit-cross-workshop-coupons.ts [--since YYYY-MM-DD] [--limit N]`. Hand-off to Jeff for per-case refund/accept judgment. NO auto-refunds.
+
+
+### 2026-05-07 — Jeff May 6 Workflow Bugs — Complete (May 7 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-07 ENTRY_SLUG:jeff-may6-workflow-bugs -->
+
+**Jeff May 6 Workflow Bugs** — Complete (May 7 2026, direct push to main, Alpha mode):
+- Source: Jeff Verdun email "Updated_workflow testing results" (May 6 7:29 PM). Workshop `WS-2026-SVOY` test surfaced two bugs; Codex co-validate caught a third latent bug that ships with the fix.
+- **BUG-MAY6-1** (Notion: [3598c45d…81e9](https://www.notion.so/3598c45dd82981e98578c7a6069f4ba4)) — "Standard Test Event" Step 2 (Send Survey Link, **2h before**) fired at 1h before. Root cause: `execute-workflow.ts` iterated `workflow.steps` in `sortOrder` with sequential `step.sleepUntil`. After Step 1's sleep ended at 3 PM, Step 2's scheduled time (2 PM) was already in the past → past-guard fired immediately. New `lib/workflows/order-steps-for-execution.ts` pure helper sorts RELATIVE_TO_EVENT steps by ascending `sendAt` before the loop. Inngest step keys (`step-${sortOrder}-${stepType}`) are immutable per step, so reordering iteration doesn't drift idempotency keys.
+- **BUG-MAY6-2** (Notion: [3598c45d…8165](https://www.notion.so/3598c45dd82981658cddc67c70c1aee3)) — "Post-Event Coach Survey Sequence" did not auto-attach on approval. Root cause: `auto-build-service.ts:assignWorkflow` had three issues. (1) Asymmetric WHERE — `workshopFormat` was `OR null` wildcard, but `categoryId` was hard equality when workshop had a category, so the seeded wildcard-category workflow never matched a categoried workshop. (2) `orderBy: { workshopFormat: "desc" }` actually puts NULL **first** under Postgres default null-ordering, so wildcard beat specific (Codex catch). (3) No `isTemplate: true` filter — admin-cloned customizations could shadow templates. Replaced inline `findFirst` with new `lib/workflows/find-auto-attach-workflow.ts` pure ranker: filter eligible candidates in code (category-compatible + format-compatible), then rank by specificity (categoryId 2pts + workshopFormat 1pt, tiebreak `updatedAt`). DB query is now `findMany` filtered to `isActive: true` AND `isTemplate: true` AND matching `workflowPhase`. Verified prod DB has the workflow with correct shape (was always there; matcher just couldn't see it).
+- **BUG-MAY6-3** (Notion: [3598c45d…81ab](https://www.notion.so/3598c45dd82981abbce9c584b79ecae7)) — `calculateSendDate` declared a `timezone` param but never used it. `sendTimeOfDay: "09:00"` called `setHours(9, 0, 0, 0)` which on Vercel's UTC server set UTC 09:00, not workshop-local 09:00. Post-Event Step 1 ("1 day after at 9 AM") would fire at 4–5 AM Eastern. New `setWallClockInTimezone(date, timezone, hours, minutes)` exported helper in `lib/workflows/resolve-event-start-moment.ts` reuses the existing `Intl.DateTimeFormat` offset pattern. `calculateSendDate` now uses it when `timezone` is provided; falls back to `setUTCHours` when no timezone (production code always passes a timezone). The `offsetHours` path is unchanged.
+- 964 tests passing (up from 951) — 3 new RED→GREEN test files: `order-steps-for-execution.test.ts` (5 tests), `find-auto-attach-workflow.test.ts` (8 tests), `calculate-send-date-timezone.test.ts` (5 tests). Updated `auto-build-service.test.ts` (mock `findMany` instead of `findFirst`) and `workflow-service.test.ts` (3 assertions switched from `setHours` → `setUTCHours` for the no-timezone branch — they were latently TZ-dependent and only passed on UTC servers; production unchanged).
+- Tech debt note (Codex): the right long-term shape is per-step Inngest fan-out (one event per step → independent function with `sleepUntil`), creating SCHEDULED rows up-front and isolating 1-day/30-day post-event sleeps. Filed as follow-on: hotfix scope only.
+- Plan: `~/.claude/plans/workflow-bugs-elegant-curry.md`. Sprint ledger: `plans/JEFF_MAY6_SPRINT.md`.
+
+### 2026-05-05 — Jeff May 4 Meeting Bugs — Complete (May 5 2026, merged in two PRs #12 + #13): <!-- ENTRY_ISO:2026-05-05 ENTRY_SLUG:jeff-may4-meeting-bugs -->
+
+**Jeff May 4 Meeting Bugs** — Complete (May 5 2026, merged in two PRs #12 + #13):
+- BUG-MAY4-1a (timing): `Workshop.eventDate` stored as midnight UTC; `eventTime` ("16:00 - 18:00") and `timezone` ("America/New_York") were never combined when computing `scheduledFor`. New `lib/workflows/resolve-event-start-moment.ts` helper converts wall-clock + IANA zone → true UTC start moment via `Intl.DateTimeFormat` offset math (no new deps, handles DST). `execute-workflow.ts` now feeds `resolveEventStartMoment(workshop)` into `calculateSendDate` instead of raw `new Date(workshop.eventDate)`. Fixes the 20-hour skew that made all steps fire immediately at workflow assignment.
+- BUG-MAY4-1b (false-SENT): `EMAIL_ATTENDEES` always wrote `status="SENT"` even with 0 registrants. Fixed to `sentEmails.size > 0 ? "SENT" : "SKIPPED"` with `error: "No recipients at scheduled time"`. `SEND_SURVEY_LINK` already used `sentCount`-based status; `SEND_FILE_LINK` already had an early-exit guard.
+- BUG-MAY4-2 (duplicate email): `runAutoBuild` called concurrently from GET email-link + POST dashboard approval handlers, both calling `sendWorkshopBuiltEmail`. Fixed with atomic `db.workshop.updateMany({ where: { workshopBuiltEmailSentAt: null } })` claim — only the first concurrent caller wins. New `Workshop.workshopBuiltEmailSentAt DateTime?` column (migration `20260505100000_add_workshop_built_email_sent_at`). Also added `id: "workshop-approved-${workshopId}-${approvalId}"` to all 3 `inngest.send("workshop/approved")` calls for Inngest-level dedup keyed to approvalId.
+- BUG-MAY4-3 (misleading badges): Per-step SENT/SKIPPED/FAILED badges removed from workshop detail Workflow Status card and workflow editor Execution Status tab. A step fires per-recipient — a single badge across N attendees is meaningless.
+- **Follow-on PR #15 (May 6 2026, commit `07c58a8`):** three residual fixes surfaced during May 5 production manual test:
+  - SEND_SURVEY_LINK 0-recipients message: `execute-workflow.ts` now early-exits before the survey loop and writes `error: "No recipients at scheduled time"` (was misleading `"No survey link could be generated"`). Existing `sentCount === 0` fallback preserved for genuine link-gen failures (regression-guarded).
+  - SEND_FILE_LINK false-SENT: `execute-workflow.ts` SEND_FILE_LINK handler now tracks `fileEmailsSent` and writes `status: "SENT"` only if at least one email went out. With files attached AND 0 registrants the row was previously written as SENT — same shape as the EMAIL_ATTENDEES bug fixed in BUG-MAY4-1b.
+  - Trigger Now midnight-UTC body context: `trigger-workflow-step.ts:109` now feeds `resolveEventStartMoment({ eventDate, eventTime, timezone })` into the email body interpolation context. Was using raw `new Date(workshop.eventDate)` (midnight UTC) so `{{workshopDate}}` / `{{workshopTime}}` substitutions landed on the wrong day for workshops where the local-zone moment differs from midnight UTC. Same swap `execute-workflow.ts` got in BUG-MAY4-1a.
+- 936 tests passing (up from 933) — 3 new RED→GREEN guards (SEND_SURVEY_LINK error msg, SEND_FILE_LINK files-with-0-recipients, trigger-workflow-step `workshopDate` uses `resolveEventStartMoment`)
+- **Direct-push gap fix (May 6 2026, commit `47f7073`):** during PR #15 production verification, found that `trigger-workflow-step.ts` (the manual Trigger Now path) had IDENTICAL twin bugs PR #15 didn't touch — its SEND_SURVEY_LINK handler at line 425 wrote `"No survey link could be generated"` for 0 recipients, and its SEND_FILE_LINK handler at line 582 wrote unconditional `status: "SENT"`. Both fixed with the same shape PR #15 used: early-exit before survey loop with `errorMessage: "No recipients at scheduled time"`, and `fileEmailsSent` counter for file-link terminal status. Direct push to main per Alpha-mode deploy rule. 939 tests passing (up from 936).
+
+### 2026-05-06 — Vimeo Embed Bug — Complete (May 6 2026, commit `22ec4f7`, direct push to main): <!-- ENTRY_ISO:2026-05-06 ENTRY_SLUG:vimeo-embed-bug -->
+
+**Vimeo Embed Bug** — Complete (May 6 2026, commit `22ec4f7`, direct push to main):
+- Source: Jeff email May 5 5:53 PM — pasting bare Vimeo URLs (no embed HTML) failed to render. Confirmed via production trace + read of `normalizeVideoUrl()` in `lib/templates/landing-page-overlay.ts`.
+- Two root causes:
+  1. **Regex undercount.** Old regex `/(?:vimeo\.com\/)(\d+(?:\/[a-f0-9]+)?)/` ignored Vimeo's `?h=HASH` query-string share URLs (the modern share form for unlisted videos) — the hash was silently dropped, so unlisted videos served a privacy-blocked player. Path-form `/HASH` was preserved verbatim, but `player.vimeo.com/video/ID/HASH` 410s on the player domain — Vimeo's canonical embed URL is query-form `?h=HASH`. Fix: regex now captures both path-form `/HASH` and query-form `?h=HASH` and emits canonical query form for both.
+  2. **Editor preview / template-content-editor / thank-you preview** rendered raw `formData.videoUrl` straight into the iframe `src` — `normalizeVideoUrl` was only called on the public `/workshop/[slug]` route. Fix: moved the normalize call inside `solo-landing-page-template.tsx` and `thank-you-page-template.tsx` so all 4 broken render paths benefit at once (idempotent for already-canonical URLs).
+- Production verification on the live editor preview: all 4 supported input forms produce canonical iframe src (`vimeo.com/ID` → `player.vimeo.com/video/ID`; `vimeo.com/ID/HASH` → `player.vimeo.com/video/ID?h=HASH`; `vimeo.com/ID?h=HASH` → unchanged player form; `player.vimeo.com/video/ID?h=HASH` → idempotent). Vimeo's player domain returns 200 on the canonical URL.
+- 946 tests passing (up from 939) — 7 new RED→GREEN guards: 3 normalizeVideoUrl unit tests + 4 template component tests asserting iframe src is normalized.
+- CSP `frame-src` is currently Stripe-only and report-only (not enforced) — not the root cause here, but tightening it (allowlist `player.vimeo.com` + `youtube.com`) is queued as a defense-in-depth follow-on if/when CSP gets enforced.
+
+### 2026-05-04 — Jeff Apr 30 Sprint — Complete (May 4 2026, all 12 items on main): <!-- ENTRY_ISO:2026-05-04 ENTRY_SLUG:jeff-apr30-sprint -->
+
+**Jeff Apr 30 Sprint** — Complete (May 4 2026, all 12 items on main):
+- BUG-01 (commit b139380): password-reset welcome email link no longer 404s — dropped `/auth/` prefix from `api/coaches/route.ts:142` + `api/coaches/[id]/send-password-reset/route.ts:34`
+- CHG-02 (commit e00139e): `CERTIFICATION_CONFIDENCE_THRESHOLD` raised 85→101 — every workshop now hits Suzanne. Dead branch preserved as re-enable point
+- BUG-03 + BUG-04 + BUG-10 (commit f5bb323): coach detail "Open ↗" button alongside copy-URL; "View Registrations" gated to PRE_EVENT/POST_EVENT/COMPLETED only; workflow editor help tooltip lists `{{surveyUrl}}` + `{{fileLinks}}`
+- BUG-02 + ENH-01 + ENH-02 (commit 603b6f9): coach My Workshops "Pricing" column split into Workshop Type + Cost (with isFree-aware render rules); admin Create Workshop wizard label "Workshop Price *" → "Workshop Type *"
+- BUG-05 (commit 2f2fc0f): date-format sweep on "Oct 1, 2026" (`dateStyle: "medium"`) + utility renames `formatDate→formatTimestamp`, `formatEventDate→formatEventDateUTC`, `formatDateTime→formatTimestampDateTime`. Five sites switched from zoned → UTC for event dates (workshops list, registration success, financials, admin coach detail, notifications)
+- BUG-05-followup (commit 80e7df6): caught during May 4 prod verification — coach workshop detail still rendered `8/12/2026` from inline `.toLocaleDateString()` shims that pre-dated the sprint and weren't part of the original sweep's named-utility scope. Fixed 17 sites across 12 files (coach workshop detail + admin approvals/workflows + invite section + file manager + approval thread + workshop list filters + workflow editor + activate-template modal + Step2Logistics + approvals route email body). New regression guard at `src/__tests__/lint/no-inline-tolocaledatestring.test.ts` flags zero-arg / timezone-only / numeric-month patterns; CI will fail any future reintroduction
+- BUG-02-admin-followup (commit 3bc65fb): caught during May 4 transcript-grounded re-verification — admin `/workshops` list still showed only `Cost + Format` columns; the half-day/full-day pricing-tier label only appeared as a subtitle under the workshop title. Original BUG-02 (commit 603b6f9) fixed the coach side but missed the admin dashboard, which was Jeff's literal Apr 30 ask (transcript 1:13–2:11). Added `pricingTier: true` to the admin Prisma include, inserted a new `Workshop Type` header + cell rendering `pricingTier?.name` with em-dash fallback. Regression guard at `src/__tests__/admin/workshops-list-columns.test.ts` asserts both `Cost` + `Workshop Type` headers + the `pricingTier: true` include remain in source
+- CHG-01 (commit 0c8ae69): edit-and-resubmit flow removed entirely — `api/workshops/[id]/resubmit/route.ts` deleted; `resubmit-workshop.tsx` pruned to info_requested-only; DENIED + CANCELED workshops show "Submit a new request" CTA → `/portal/request`. INFO_RESPONSE post body fixed to include `action: "INFO_RESPONSE"` (was silently rejected by route handler)
+- BUG-09 (commit db9245d): WorkflowStepExecution `scheduledFor` now preserved end-to-end. New helpers `scheduleWorkflowExecution()` + `recordWorkflowExecution()`. RELATIVE_TO_EVENT future sends now create a SCHEDULED row pre-sleep so the portal Workflow Status card shows the planned fire time. Cancel cleanup broadened from `status: "PENDING"` to `status: { in: ["PENDING", "SCHEDULED"] }`
+- BUG-06–08 (commit 6941e64): every approval mutation now appends a thread message — initial coach REQUEST (Prisma nested write), admin INFO_REQUEST/COUNTER_OFFER/APPROVED/DENIED (POST + email-link GET), coach INFO_RESPONSE/COUNTER_ACCEPT/COUNTER_DECLINE/COUNTER_COUNTER (with COUNTER_COUNTER newly wrapped in `$transaction`). Helper at `lib/approvals/approval-thread.ts`. New `ApprovalMessage.synthetic` column with index for clean backfill rollback. One-time backfill at `scripts/backfill-approval-messages.ts` with mandatory `--dry-run` + dup-check on `synthetic = true` AND text shape
+- CHG-03 (commit ef9fb39): iDev affiliate pixel now driven by admin-pasted `LandingPage.customCode` instead of `IDEV_SCRIPT_URL` env var. New `LandingPage.customCode` column + `Registration.@@index([stripeSessionId])`. parse5-based `validateCustomCode()` (img-only, https-only, host pinned to scalingup.idevaffiliate.com, no scripts/event handlers/style/data:/javascript:) at both save-time AND render-time. `interpolateCustomCode()` substitutes `{{saleAmount}}`, `{{orderNumber}}`, `{{email}}`, `{{currency}}` URL-encoded then HTML-escaped. Shared `<CustomCodeRenderer>` mounted at both `/workshop/[slug]?session_id=` (THANK_YOU LandingPage path) and `/registration/success` (fallback). `IdevTracking` component + `IDEV_SCRIPT_URL` env var deleted. customCode never accepted from request bodies on coach-accessible routes
+- 914 tests passing (up from 861) — adds the `no-inline-tolocaledatestring` regression guard from BUG-05-followup + the `workshops-list-columns` guard from BUG-02-admin-followup
+
+### 2026-04-29 — Jeff Apr 28 Sprint — Complete (commit 229faee on main, Apr 29 2026): <!-- ENTRY_ISO:2026-04-29 ENTRY_SLUG:jeff-apr28-sprint -->
+
+**Jeff Apr 28 Sprint** — Complete (commit 229faee on main, Apr 29 2026):
+- `formatStepLabel()` helper strips `{{tokens}}`, falls back to STEP_TYPE_LABELS
+- Workflow Status card: step names now visible (flex min-w-0 layout fix)
+- Trigger Now: auto-refreshes page after fire; SENT steps re-triggerable via `forceResend=true` flag
+- `SEND_SURVEY_LINK` step now fires: passes `surveyTemplateId` to `getOrCreateSurveyLink`; PRE_WORKSHOP template seeded to prod
+- CSV export `GET /api/registrations/export` (RFC 4180, injection-safe, confirmed-only)
+- Contacts page: h1 → "Contacts", Export All button
+- 861 tests passing (up from 847)
+
+### 2026-02-15 — Sprint 0 (Schema Foundation) — Complete <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:sprint-0-schema-foundation -->
+
+**Sprint 0** (Schema Foundation) — Complete
+### 2026-02-15 — Sprint 1 (Security + Auth + Critical Bug Fixes) — Complete <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:sprint-1-security-auth -->
+
+**Sprint 1** (Security + Auth + Critical Bug Fixes) — Complete
+### 2026-02-15 — Sprint 2 (Workshop Wizard & UI) — Complete (15/15 tasks) <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:sprint-2-wizard-ui -->
+
+**Sprint 2** (Workshop Wizard & UI) — Complete (15/15 tasks)
+### 2026-02-15 — Sprint 3 (Dashboards + Notifications + Polish) — Complete (11/11 tasks) <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:sprint-3-dashboards -->
+
+**Sprint 3** (Dashboards + Notifications + Polish) — Complete (11/11 tasks)
+### 2026-02-15 — Sprint 4 Track D (ICS Calendar Files) — Complete (3/3 tasks) <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:sprint-4-d-ics -->
+
+**Sprint 4 Track D** (ICS Calendar Files) — Complete (3/3 tasks)
+### 2026-02-15 — Sprint 4 Track A (Workflow Editor) — Complete (6/6 tasks) <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:sprint-4-a-workflow-editor -->
+
+**Sprint 4 Track A** (Workflow Editor) — Complete (6/6 tasks)
+### 2026-02-15 — Sprint 4 Track C (Survey System) — Complete (6/6 tasks) <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:sprint-4-c-surveys -->
+
+**Sprint 4 Track C** (Survey System) — Complete (6/6 tasks)
+### 2026-02-15 — Sprint 4 Track B (File Attachments) — Complete (4/4 tasks) <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:sprint-4-b-files -->
+
+**Sprint 4 Track B** (File Attachments) — Complete (4/4 tasks)
+### 2026-02-15 — QA Sprint (Visual QA & Blocker Fixes) — Complete (6/6: mobile nav, follow-up form, settings save, search cleanup, error boundaries, quick actions) <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:qa-sprint-visual -->
+
+**QA Sprint** (Visual QA & Blocker Fixes) — Complete (6/6: mobile nav, follow-up form, settings save, search cleanup, error boundaries, quick actions)
+### 2026-02-15 — JV Gap Fixes (Admin Create Workshop Form) — Complete (3/3: dynamic categories, pricing tier dropdown, terms checkbox) <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:jv-gap-fixes -->
+
+**JV Gap Fixes** (Admin Create Workshop Form) — Complete (3/3: dynamic categories, pricing tier dropdown, terms checkbox)
+### 2026-02-20 — Production Readiness — Complete (7/7 gaps fixed): <!-- ENTRY_ISO:2026-02-20 ENTRY_SLUG:production-readiness -->
+
+**Production Readiness** — Complete (7/7 gaps fixed):
+- Category + PricingTier seed data added to `prisma/seed.ts`
+- Approvals route now wires `categoryId`/`pricingTierId` into Workshop create
+- Survey submission rate limiting (20 req/min via Redis)
+- File upload filename sanitization (path traversal prevention)
+- File DELETE ownership check (only uploader or admin/staff can delete)
+- INNGEST env vars added to `.env.example`
+### 2026-02-20 — UI/UX Overhaul Phase 1 — Complete (via UI/UX Pro Max Skill): <!-- ENTRY_ISO:2026-02-20 ENTRY_SLUG:ui-ux-overhaul-phase-1 -->
+
+**UI/UX Overhaul Phase 1** — Complete (via UI/UX Pro Max Skill):
+- Design system generated: Trust & Authority style, data-dense dashboard palette
+- Font: Plus Jakarta Sans (replaced Geist Sans) — professional, SaaS-friendly
+- Primary color deepened to #1D4ED8 (Blue 700) for trust/authority
+- Extended CSS tokens: success/warning/info semantics, shadow depth scale, animation tokens
+- `prefers-reduced-motion` support added globally
+- 7 upgraded components: Button (success/warning variants, hover lift, active press), Card (hover shadow), Input (focus animation), Badge (rounded-full, semantic colors), Table (header bg, uppercase tracking), StatusPill (pulse on active), ConfirmationModal (polish)
+- 9 new components: Skeleton, Tooltip, Popover, Progress, Avatar, Separator, Alert (5 variants), EmptyState, PageHeader
+- 4 Radix dependencies added: tooltip, popover, progress, separator
+- Framer Motion installed + `src/lib/animations.ts` with reusable variants
+- Admin layout: sticky nav with backdrop blur, avatar, semantic tokens
+- Coach layout: polished sidebar with primary-colored avatar
+- Design system persisted: `design-system/scaling-up-platform/MASTER.md` + page overrides
+- DB tables confirmed in sync via `prisma db push` (no migration needed)
+
+### 2026-02-25 — UI/UX Phase 2+ (Animations + Dark Mode) — Complete: <!-- ENTRY_ISO:2026-02-25 ENTRY_SLUG:ui-ux-phase-2-dark-mode -->
+
+**UI/UX Phase 2+ (Animations + Dark Mode)** — Complete:
+- Framer Motion animations added to 15+ pages (FadeUp, StaggerContainer, StaggerItem wrappers)
+- Dark mode: next-themes integration, ThemeProvider, ThemeToggle in all 3 layouts
+- `.dark` CSS variable overrides in globals.css
+
+### 2026-02-25 — Dark Mode Color Migration — Complete: <!-- ENTRY_ISO:2026-02-25 ENTRY_SLUG:dark-mode-color-migration -->
+
+**Dark Mode Color Migration** — Complete:
+- 1,000+ hardcoded gray Tailwind classes replaced across 80 files
+- Replacements: text-gray-* → text-foreground/text-muted-foreground, bg-white → bg-card, bg-gray-50 → bg-muted, border-gray-* → border-border, divide-gray-* → divide-border, hover:bg-gray-* → hover:bg-accent
+- Admin approvals page rewritten from inline JSX styles to Tailwind classes
+- Semantic status colors (green, red, yellow, orange, blue) intentionally preserved
+- Commit: `edfc722`
+
+### 2026-02-25 — Phase F: Defensive Code Fixes — Complete (3/3): <!-- ENTRY_ISO:2026-02-25 ENTRY_SLUG:phase-f-defensive -->
+
+**Phase F: Defensive Code Fixes** — Complete (3/3):
+- HubSpot: Lazy client init via Proxy, `isHubSpotConfigured()` guard on all 8 exported functions — returns no-op when `HUBSPOT_ACCESS_TOKEN` missing
+- Circle.so: `getCircleProfileByEmail()` returns `null` when `CIRCLE_API_KEY` missing (verifyCertification already handled)
+- Inngest: Startup warnings when `INNGEST_EVENT_KEY` or `INNGEST_SIGNING_KEY` missing
+
+### 2026-02-20 — CIO Revision Audit Pass (Feb 20, 2026) — Complete (P0 updates): <!-- ENTRY_ISO:2026-02-20 ENTRY_SLUG:cio-audit-feb20 -->
+
+**CIO Revision Audit Pass (Feb 20, 2026)** — Complete (P0 updates):
+- Navigation clarity: `All Workshops` naming restored in admin IA
+- Added direct `Bio` nav route and `Financials` nav route in admin header
+- Workshop Editor scope tightened to workshop pages (removed BIO page from template picker)
+- Admin Create Workshop: removed visible Workshop Type field (category-first flow)
+- Paid workshops now require approved pricing tier selection (manual fallback removed)
+- Free registration path now syncs to HubSpot (paid sync already handled by Stripe webhook)
+
+### 2026-02-26 — Context Bloat Cleanup (Feb 26, 2026) — Complete: <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:context-bloat-cleanup -->
+
+**Context Bloat Cleanup (Feb 26, 2026)** — Complete:
+- Deleted 6 dead code files (~800 lines): animations.ts, cache.ts, api-handler.ts, logger.ts, landing-page-auto-populate.ts, workshop-generator.ts
+- Fixed toast dismiss bug in `use-toast.ts` L109 (`onsubmit` → `toastId`)
+- Removed unused `bullmq` dependency (12 sub-packages)
+- Consolidated 3 duplicate SMTP transports into shared `lib/smtp-transport.ts`
+- Merged dual admin layouts: moved 6 pages from standalone `/admin/` into `(dashboard)/admin/`
+- npm audit fix: 1 fixed, 3 low-severity cookie vulns deferred (next-auth breaking change)
+- All verified: 0 type errors, 226/226 tests pass, build succeeds
+
+### 2026-02-27 — Security Hardening S1-S8 (Feb 27, 2026) — Complete (commit `3a685ca`): <!-- ENTRY_ISO:2026-02-27 ENTRY_SLUG:security-hardening-s1-s8 -->
+
+**Security Hardening S1-S8 (Feb 27, 2026)** — Complete (commit `3a685ca`):
+- S1: Nonce added to password reset tokens (`lib/auth/password-reset.ts`)
+- S2: Webhook secret enforcement in production (Typeform + Stripe)
+- S3: Question-to-survey template validation (`lib/surveys/survey-service.ts`)
+- S4: JSON.parse try-catch in forgot-password route
+- S5: Error handlers on 3 API routes (workflow assign, survey submit, survey endpoint)
+- S6: 15-second AbortController timeouts on external APIs (Stripe, Circle, HubSpot)
+- S7: Auto-build idempotency guard (prevents duplicate builds on Inngest retry)
+- S8: Email attendee deduplication via Set in workflow execution
+- S9 (Mar 2): Auto-build idempotency guard returns structured `{ skip, pageCount, status }` (replaces bare boolean for debuggability)
+
+### 2026-02-27 — Test Coverage Push T1-T10 (Feb 27, 2026) — Complete: <!-- ENTRY_ISO:2026-02-27 ENTRY_SLUG:test-coverage-t1-t10 -->
+
+**Test Coverage Push T1-T10 (Feb 27, 2026)** — Complete:
+- 37 test suites / 415 tests total (up from 28/269)
+- 9 new test files: auto-build, execute-workflow, workshop-status, surveys, auth, files, workshop-resubmit, completion-summary, typeform-webhook
+- All critical paths now covered: Inngest functions, auth routes, status transitions, file upload, webhooks
+- 8 Playwright E2E spec files covering 40+ automatable checks across 12 rounds
+- 12 remaining manual checks require email inbox / external service access (see `plans/MANUAL_VERIFICATION_REMAINING_CHECKS.md`)
+- Production launch guide: `plans/PRODUCTION_LAUNCH_GUIDE.md`
+
+### 2026-03-02 — Phase 4 Smoke Test (Mar 2, 2026) — Complete (12/12 checks passed): <!-- ENTRY_ISO:2026-03-02 ENTRY_SLUG:phase-4-smoke-test -->
+
+**Phase 4 Smoke Test (Mar 2, 2026)** — Complete (12/12 checks passed):
+- Tests #1-6: Image upload, emails (requested/approved/denied), auto-status, landing pages
+- Test #7: Auto-build pipeline verified end-to-end (7 Inngest steps, status → PRE_EVENT)
+- Test #8: Workflows — code correct, no workflows configured yet (content dependency)
+- Tests #9-10: No broken placeholders, registration flow works
+- Test #11: Stripe payment (verified in Phase 3)
+- Test #12: Inngest running (5 functions registered)
+- Fix 8 deployed: Structured idempotency logging in auto-build (`{ skip, pageCount, status }` instead of bare boolean)
+- Content gaps identified: No active landing page templates, no workflows configured (data setup, not code bugs)
+- Production launch assessment: `plans/PRODUCTION_LAUNCH_GUIDE.md` (Steps 1-3, 5, 8 still pending)
+
+### 2026-03-03 — Production Configuration (Mar 3, 2026) — Complete (Steps 1-10): <!-- ENTRY_ISO:2026-03-03 ENTRY_SLUG:production-configuration -->
+
+**Production Configuration (Mar 3, 2026)** — Complete (Steps 1-10):
+- 35 env vars pushed to Vercel via `scripts/push-env-to-vercel.mjs` (with production overrides for NEXTAUTH_URL, APP_URL, LANDING_PAGE_BASE_URL, DEMO_MODE)
+- Stripe webhook configured (3 events: checkout.session.completed, payment_intent.succeeded, payment_intent.payment_failed)
+- Inngest verified: 5 functions active (auto-build-workshop, check-stale-approvals, execute-workflow, schedule-email-sequence, workshop-completion-summary)
+- "Standard Pre-Event Sequence" workflow created (Phase=Pre-Event, 1 email step: 1 day before event)
+- Snake_case variable aliases added to `interpolateTemplate()` — both `{{workshop_title}}` and `{{workshopTitle}}` now work
+- `workshopFormat` variable added to workflow context
+- Production smoke test passed (5/5 tests): workshop create, approve, auto-build, Inngest runs, landing page render
+- Vercel Analytics + Speed Insights installed (`@vercel/analytics`, `@vercel/speed-insights` in root layout)
+- Go-live checklist: `plans/GO_LIVE_CHECKLIST.md`
+- Handoff document: `plans/PRODUCTION_HANDOFF_MARCH_2026.md`
+- Commits: `c0c002d` (variable aliases), pending commit (analytics + handoff docs)
+
+### 2026-03-10 — Admin Capabilities (Mar 6-10, 2026) — Complete: <!-- ENTRY_ISO:2026-03-10 ENTRY_SLUG:admin-capabilities -->
+
+**Admin Capabilities (Mar 6-10, 2026)** — Complete:
+- Workshop permanent delete: `POST /api/workshops/[id]/delete` (ADMIN-only, CANCELED/COMPLETED only, title confirmation)
+- Coach delete fix: CASCADE on Workshop/ApprovalQueue/FollowUpReport FKs, transaction deletes Coach + User, cascade counts in audit log
+- Admin invite system: `AdminInvite` model, crypto token (7-day TTL), accept-invite page, bcrypt(12) passwords
+- Auth modification: `src/lib/auth/auth.ts` — non-canonical ADMIN emails checked against AdminInvite (must have acceptedAt set)
+- New files: `delete-workshop-dialog.tsx`, `delete-coach-button.tsx`, `invite-admin-section.tsx`, `accept-invite/page.tsx`
+- New API routes: `/api/workshops/[id]/delete`, `/api/admin/invite`, `/api/admin/invite/[id]`, `/api/auth/accept-invite`
+
+### 2026-03-10 — Verification Hardening (Mar 10, 2026) — Complete: <!-- ENTRY_ISO:2026-03-10 ENTRY_SLUG:verification-hardening -->
+
+**Verification Hardening (Mar 10, 2026)** — Complete:
+- MR-28: Auto-build logs warning + returns `noTemplatesAvailable` flag when no active templates exist
+- MR-37: Workflow tooltip replaced with Radix `<Tooltip>` (accessible, keyboard-navigable, aria-label)
+- Coach delete: audit trail counts inside transaction, `hasActiveWorkshops` uses dedicated count query (not limited by `take: 10`)
+- Coach delete UI: uses `useToast` instead of `alert()`, confirmation mentions approvals + follow-up reports
+- Security: `isCanonicalAdminEmail` now fails closed (returns false when `ADMIN_EMAIL` unset)
+- Security: accept-invite token comparison uses `crypto.timingSafeEqual` (timing-safe)
+- Security: admin invite API routes properly return 401 for unauthenticated (not 403)
+- Invite UI: loading state prevents false "No invitations yet" flash during initial fetch
+- March audit state: 36 PASS, 10 CONCERN (5 resolved by design, 2 fixed, 1 need manual proof, 2 flagged for Jeff), 0 GAP
+
+### 2026-03-18 — Figma Revisions Batch (Mar 17–18, 2026) — ALL 11 REVISIONS COMPLETE (52 suites / 488 tests): <!-- ENTRY_ISO:2026-03-18 ENTRY_SLUG:figma-revisions-batch -->
+
+**Figma Revisions Batch (Mar 17–18, 2026)** — **ALL 11 REVISIONS COMPLETE** (52 suites / 488 tests):
+- Sprint 1 (P0 bugs): FIG-001 auto-title category reactive useEffect; FIG-010 isFree = priceCents===0 fix; FIG-003 dropdown bg-background fix
+- Sprint 2 (edit access): FIG-004 View Public Page conditional button (PRE_EVENT+); FIG-006 WorkshopInlineEditForm full field set incl. category/format
+- Sprint 3 (pricing flow): FIG-007 CUSTOM_PRICING approval flow (coach submits → admin approves → Workshop.priceCents updated, no auto-build); FIG-008 customPricingNotes in emails; FIG-009 ResubmitWorkshop `variant="info_requested"` — full edit + pricing read-only
+- Sprint 4 (validation + templates): FIG-011 virtualLink required server+client; FIG-005 LandingPage.categoryId + per-category template matching in auto-build
+- PRE-3: Deleted `coach-respond/route.ts` duplicate; canonical is `coach-response/route.ts` (added rate limiting)
+- Key new capability: PATCH `/api/workshops/[id]` expanded for COACH role with `COACH_EDITABLE_FIELDS` allowlist; pricing fields create CUSTOM_PRICING approval instead of direct update
+- Key new email: `sendCustomPriceChangeEmail()` — old/new price comparison + custom notes
+- Lead-time bypass: `isCoach && existing.status === "INFO_REQUESTED"` skips 14-day date validation
+- E&V templates seeded via `prisma/seed-ev-templates.ts` (inactive — admin must activate at `/templates`)
+- Branch: `figma-revisions-mar2026` — PR open at github.com/jcbdelo26/Scaling-up-platform-v2/compare/figma-revisions-mar2026
+- Parsed revisions: `plans/FIGMA_REVISIONS_PARSED.md` | Sprint plan: `plans/FIGMA_REVISIONS_SPRINT_PLAN_MAR2026.md`
+
+### 2026-03-18 — New API Routes (Figma Batch): <!-- ENTRY_ISO:2026-03-18 ENTRY_SLUG:figma-batch-api-routes -->
+
+**New API Routes (Figma Batch):**
+- `PATCH /api/workshops/[id]` — Expanded: COACH role now allowed with `COACH_EDITABLE_FIELDS` allowlist; pricing fields intercepted → CUSTOM_PRICING approval
+- `POST /api/approvals/[id]/coach-response` — Coach respond to INFO_REQUESTED (canonical; `coach-respond` deleted)
+- CUSTOM_PRICING approval type fully handled in `approvals/[id]/respond/route.ts` — updates priceCents/isFree/pricingTierId, returns early (no auto-build)
+
+### 2026-03-18 — Schema Changes (Figma Batch): <!-- ENTRY_ISO:2026-03-18 ENTRY_SLUG:figma-batch-schema -->
+
+**Schema Changes (Figma Batch):**
+- `LandingPage.categoryId` (String?, FK→Category) — per-category template matching in auto-build
+- Migration: `add_landing_page_category`
+
+### 2026-03-11 — MR-21 Coupon/Checkout Fix (Mar 11, 2026) — Complete (commits `0556da5`, `5abcda2`): <!-- ENTRY_ISO:2026-03-11 ENTRY_SLUG:mr-21-coupon-checkout -->
+
+**MR-21 Coupon/Checkout Fix (Mar 11, 2026)** — Complete (commits `0556da5`, `5abcda2`):
+- Stripe `allow_promotion_codes` and `discounts` are mutually exclusive — conditional spread in `services/stripe.ts:148`
+- `/api/checkout` added to middleware public routes (both `authorized` callback and middleware function)
+- `registration-form.tsx` — defensive content-type check before `.json()` parsing, Zod error array formatting
+- TDD tests added: `stripe.test.ts` (allow_promotion_codes exclusion), `checkout.test.ts` (discount forwarding + StripeDiscountCodeError), `template-interpolation.test.ts` (10 tests)
+- Test totals: 51 suites / 488 tests (up from 50/473); Figma batch brought to 52 suites / 488 tests
+
+### 2026-03-11 — MR-30 Paid Attendee Removal Verified (Mar 11, 2026): <!-- ENTRY_ISO:2026-03-11 ENTRY_SLUG:mr-30-paid-attendee-removal -->
+
+**MR-30 Paid Attendee Removal Verified (Mar 11, 2026):**
+- Coach unregister on paid attendee → routes to approval queue (not direct delete)
+- Admin email: "[ACTION REQUIRED] Cancellation Request" with "REFUND REQUIRED", attendee name, $199.50
+- CANCELLATION approval in admin queue with Approve/Deny
+- Refund is manual via Stripe dashboard — by design
+- Verified via fake paid registration seeded in Neon SQL (no real payment)
+- Known gap: approval respond route treats CANCELLATION same as WORKSHOP_REQUEST (advances status to PRE_EVENT, sends workshop-approved email) — needs CANCELLATION-specific branch
+
+### 2026-02-27 — Design Token Consolidation + Color Sweep (Feb 27, 2026) — Complete: <!-- ENTRY_ISO:2026-02-27 ENTRY_SLUG:design-token-consolidation -->
+
+**Design Token Consolidation + Color Sweep (Feb 27, 2026)** — Complete:
+- Single source of truth: `globals.css` (`brand-tokens.css` deleted — had zero imports)
+- Added `--status-*` tokens (requested/awaiting/active/post/completed/canceled) with light+dark
+- Added `--sidebar-*` tokens (sidebar/foreground/muted/border) for coach portal
+- Swept ~1,087 hardcoded Tailwind colors → semantic tokens across ~80 files
+- Foundation components fixed: utils, status-pill, badge, alert, confirmation-modal, checkbox
+- Workflow/survey components fixed: timeline, editor, executions, template-editor, template-toggle
+- Coach sidebar fixed: portal layout + mobile nav use `--sidebar-*` tokens
+- Bulk page sweep: dashboard, portal, public, components all tokenized
+- `MASTER.md` updated to match actual implementation
+
+### 2026-02-26 — Feb 25 Call Revisions (Feb 26-27, 2026) — ALL 7 SPRINTS COMPLETE (65/65 tasks): <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-call-revisions -->
+
+**Feb 25 Call Revisions (Feb 26-27, 2026)** — **ALL 7 SPRINTS COMPLETE** (65/65 tasks):
+- Source: 64-min walkthrough by Jeff Verdun + Suzanne Krygier (Feb 24, 2026)
+- 42 revisions + 5 gap fixes identified, organized into 7 sprints
+- 24 video frames extracted and analyzed for visual context
+- Sprint 1 complete: Form cleanup (HYBRID, virtualPlatform, early bird removed; free-form pricing, venue instructions, T&C link)
+- Sprint 2 complete: Schema migration (Category defaults, Workshop geo/excluded, Registration attendance/marketing); auto-title/description; category admin editor
+- Sprint 3 complete: Coach portal enhancements (unregister API + UI, attendance tracking, survey results page, workflow status on coach + admin detail, rejection/edit/resubmit flow)
+- Sprint 4 complete: Coach profile + notification emails (Circle.so cleanup, image upload, LinkedIn URL, CTA toggle, 3 notification emails wired)
+- Sprint 5 complete: Auto-Build on Approval (flagship) — Inngest function, template toggle, workflow auto-assign, variable interpolation, status automation, built email
+- Sprint 6 complete: Financials filters (coach/category/date range), workshop completion summary Inngest function, registration form (phone+company required, marketing opt-in)
+- Sprint 7 complete: Aggregated survey results page, cross-workshop API mode, coach post-workshop + 30-day follow-up survey seeds, post-event coach survey workflow seed
+
+### 2026-02-26 — New API Routes (Sprints 3-5): <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-api-routes -->
+
+**New API Routes (Sprints 3-5):**
+- `DELETE /api/registrations/[id]` — Direct unregister (coach-scoped, Stripe refund)
+- `PATCH /api/registrations/[id]` — Toggle attendance (attended + attendedAt)
+- `POST /api/workshops/[id]/resubmit` — Resubmit denied workshop for approval
+- `POST /api/portal/profile/image` — Coach profile image upload (Vercel Blob, 5MB max)
+- `PATCH /api/landing-pages/[id]` — Update landing page properties (isActiveTemplate toggle)
+
+### 2026-02-26 — New Pages (Sprint 3): <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-new-pages -->
+
+**New Pages (Sprint 3):**
+- `/portal/workshops/[id]/surveys` — Coach survey results (grouped by template)
+
+### 2026-02-26 — New Components (Sprints 3 + 5): <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-new-components -->
+
+**New Components (Sprints 3 + 5):**
+- `components/workshops/resubmit-workshop.tsx` — Rejection reason + edit + resubmit client component
+- `components/templates/active-template-toggle.tsx` — Toggle "Set as Active Template" for auto-build
+
+### 2026-02-26 — Schema Changes (Sprint 4): <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-schema-sprint-4 -->
+
+**Schema Changes (Sprint 4):**
+- `Coach.linkedinUrl` (String?) — LinkedIn profile URL
+- `Coach.showBookCallCta` (Boolean, default true) — Toggle CTA on bio page
+- Migration: `20260227000000_feb25_coach_profile_fields`
+
+### 2026-02-26 — Schema Changes (Sprint 5): <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-schema-sprint-5 -->
+
+**Schema Changes (Sprint 5):**
+- `LandingPage.isActiveTemplate` (Boolean, default false) — Marks page as template for auto-build cloning
+- `Workflow.categoryId` (String?, FK→Category) — Auto-assign by category
+- `Workflow.workshopFormat` (String?) — "IN_PERSON" or "VIRTUAL", null = any
+- `Workflow.workflowPhase` (String?) — "PRE_EVENT" or "POST_EVENT"
+- Migration: `20260227100000_feb25_sprint5_auto_build_fields`
+
+### 2026-02-26 — Notification Emails (Sprints 4 + 5): <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-notification-emails -->
+
+**Notification Emails (Sprints 4 + 5):**
+- `sendWorkshopRequestedEmail()` — To coach + admin on workshop submit
+- `sendWorkshopApprovedEmail()` — To coach when workshop approved
+- `sendWorkshopDeniedEmail()` — To coach when workshop denied (includes reason + resubmit link)
+- `sendWorkshopBuiltEmail()` — To coach after auto-build (pages created, workflows assigned)
+
+### 2026-02-26 — Auto-Build on Approval (Sprint 5 - Flagship): <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-auto-build -->
+
+**Auto-Build on Approval (Sprint 5 - Flagship):**
+- `inngest/functions/auto-build-workshop.ts` — Triggered by `workshop/approved` event
+- Copies active landing page templates with variable interpolation (20+ variables)
+- Auto-assigns PRE_EVENT + POST_EVENT workflows by category/format match
+- Advances workshop status AWAITING_APPROVAL → PRE_EVENT
+- Emits `workflow/schedule` events for each assigned workflow
+- Sends coach notification with build summary
+
+### 2026-02-26 — Sprint 6 — Dashboard, Financials & Registration: <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-sprint-6 -->
+
+**Sprint 6 — Dashboard, Financials & Registration:**
+- `components/financials/financial-filters.tsx` — Client component: coach/category dropdowns, custom date range picker
+- `admin/financials/page.tsx` — Updated with coach/category/date filtering on all queries
+- `inngest/functions/workshop-completion-summary.ts` — Triggered by `workshop/completed` event, emails admin with attendee list + revenue total
+- `services/notifications.ts` — Added `sendWorkshopCompletionSummary()` (attendee table + revenue breakdown)
+- `api/workshops/[id]/status/route.ts` — Emits `workshop/completed` Inngest event on COMPLETED transition
+- Registration form: phone + company now required, marketing opt-in checkbox added
+- `lib/validations.ts` — `createRegistrationSchema` updated: company required, phone required, marketingOptIn field
+- `lib/registration-service.ts` — Passes `marketingOptIn` through to `db.registration.create`
+- `api/workshops/[id]/register/route.ts` — Updated Zod schema + parseRegistrationInput for new fields
+- `inngest/types.ts` — Added `workshop/completed` event type
+- `api/inngest/route.ts` — Registered `workshopCompletionSummary` function
+### 2026-02-26 — Sprint 7 — Aggregated Surveys & Coach Surveys: <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-sprint-7 -->
+
+**Sprint 7 — Aggregated Surveys & Coach Surveys:**
+- `admin/surveys/aggregate/page.tsx` — Cross-workshop aggregated survey results page (template selector tabs, summary cards, per-question distribution bars, per-workshop breakdown table)
+- `api/survey-templates/[id]/results/route.ts` — Added `workshopId=all` support (passes undefined for cross-workshop aggregation)
+- `admin/surveys/page.tsx` — Added "Aggregated Results" link button
+- `prisma/seed.ts` — Added "Coach Post-Workshop Survey" template (5 questions), "Coach 30-Day Follow-Up Survey" template (5 questions), "Post-Event Coach Survey Sequence" workflow (2 steps: 1-day + 30-day)
+
+### 2026-02-26 — Status Automation (Sprint 5): <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-status-automation -->
+
+**Status Automation (Sprint 5):**
+- Manual "Move to" buttons removed from workshop-actions (kept Cancel + POST_EVENT/COMPLETED)
+- "Send Reminder Email" button removed from quick-actions (handled by workflows)
+
+### 2026-02-26 — Circle.so Cleanup (Sprint 4): <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-circle-cleanup -->
+
+**Circle.so Cleanup (Sprint 4):**
+- Removed Circle sync button from `coaches/[id]/page.tsx`
+- Removed Circle import from `bio/[id]/page.tsx`
+- Removed Circle populate from `workshops/[id]/landing-pages/bio-page/page.tsx`
+- Removed "imported from Circle.so" text from `coach-profile-form.tsx`
+
+### 2026-02-26 — Feb 25 Roadmap: `D:\The CTO Project\plans\FEB25_CALL_REVISIONS_IMPLEMENTATION_ROADMAP.md` <!-- ENTRY_ISO:2026-02-26 ENTRY_SLUG:feb25-roadmap-pointers -->
+
+**Feb 25 Roadmap:** `D:\The CTO Project\plans\FEB25_CALL_REVISIONS_IMPLEMENTATION_ROADMAP.md`
+**Feb 25 Task Tracker:** `D:\The CTO Project\plans\FEB25_IMPLEMENTATION_TASKS.md` (65/65 tasks — ALL SPRINTS COMPLETE)
+**Feb 25 Video Frames:** `docs/Context Building Call Transcripts/Feb 25/frames/` (24 frames, 7 sprint folders)
+
+### 2026-02-15 — Previous Plans: <!-- ENTRY_ISO:2026-02-15 ENTRY_SLUG:previous-plans-pointers -->
+
+**Previous Plans:**
+- Production Readiness: `plans/PRODUCTION_READINESS_ROADMAP.md` + `plans/PRODUCTION_READINESS_TASKS.md`
+- JV Revisions (Feb 15): `plans/JEFF_VERDUN_REVISIONS_IMPLEMENTATION_ROADMAP.md` + `plans/JEFF_VERDUN_REVISION_TASKS.md`
+- CIO Audit (Feb 20): `plans/CIO_WORD_FOR_WORD_REVISION_AUDIT_AND_IMPLEMENTATION_PLAN_FEB20_2026.md`
+- Figma Revisions (Mar 17): `plans/FIGMA_REVISIONS_SPRINT_PLAN_MAR2026.md` (11 revisions, 4 sprints — COMPLETE)
+
