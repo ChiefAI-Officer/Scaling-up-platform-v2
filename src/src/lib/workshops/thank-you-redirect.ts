@@ -42,3 +42,12 @@ export async function resolveRegistrationSuccessUrl(params: {
   }
   return `${appUrl}/registration/success?id=${key.registrationId}`;
 }
+
+/**
+ * Returns the public application URL, with a localhost fallback for dev.
+ * Matches the pattern used in sibling routes (workshops/[id]/register, checkout)
+ * so all THANK_YOU redirect call sites resolve URLs consistently.
+ */
+export function getAppUrl(): string {
+  return process.env.APP_URL || "http://localhost:3000";
+}

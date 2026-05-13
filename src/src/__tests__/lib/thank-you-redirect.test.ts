@@ -18,7 +18,7 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
-import { resolveRegistrationSuccessUrl } from "@/lib/workshops/thank-you-redirect";
+import { getAppUrl, resolveRegistrationSuccessUrl } from "@/lib/workshops/thank-you-redirect";
 import { db } from "@/lib/db";
 
 const mockFindFirst = db.landingPage.findFirst as jest.Mock;
@@ -82,5 +82,22 @@ describe("resolveRegistrationSuccessUrl (BUG-MAY13-3 Task A1)", () => {
     });
 
     expect(url).toBe(`${APP_URL}/registration/success?session_id={CHECKOUT_SESSION_ID}`);
+  });
+});
+
+describe("getAppUrl", () => {
+  const originalAppUrl = process.env.APP_URL;
+  afterEach(() => {
+    process.env.APP_URL = originalAppUrl;
+  });
+
+  it("returns process.env.APP_URL when set", () => {
+    process.env.APP_URL = "https://example.com";
+    expect(getAppUrl()).toBe("https://example.com");
+  });
+
+  it("falls back to http://localhost:3000 when APP_URL is unset", () => {
+    delete process.env.APP_URL;
+    expect(getAppUrl()).toBe("http://localhost:3000");
   });
 });
