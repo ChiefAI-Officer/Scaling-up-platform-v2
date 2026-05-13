@@ -9,7 +9,7 @@ import { ThankYouPageTemplate, ThankYouContent, ThankYouWorkshopData } from "@/c
 
 jest.mock("@/lib/ics-generator", () => ({
   buildGoogleCalendarUrl: () => "https://calendar.google.com/test-url",
-  parseDurationHours: () => 8,
+  parseDurationHoursFromEvent: () => 8,
   buildLocationString: () => "Virtual Workshop",
 }));
 

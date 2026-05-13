@@ -4,7 +4,7 @@ import { stripPlaceholders } from "@/lib/templates/template-utils";
 import { normalizeVideoUrl } from "@/lib/templates/landing-page-overlay";
 import {
   buildGoogleCalendarUrl,
-  parseDurationHours,
+  parseDurationHoursFromEvent,
   buildLocationString,
 } from "@/lib/ics-generator";
 
@@ -93,7 +93,7 @@ export function ThankYouPageTemplate({
         eventDate: new Date(workshop.eventDate),
         eventTime: workshop.eventTime,
         timezone: workshop.timezone,
-        durationHours: parseDurationHours(workshop.duration),
+        durationHours: parseDurationHoursFromEvent(workshop.duration, workshop.eventTime),
         location: buildLocationString(workshop),
       });
 

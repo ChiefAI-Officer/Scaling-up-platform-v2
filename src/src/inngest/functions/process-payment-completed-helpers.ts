@@ -12,7 +12,6 @@ import { createOrUpdateContact } from "@/services/hubspot";
 import { sendPaidRegistrationNotificationStrict } from "@/services/notifications";
 import {
     generateIcsContent,
-    parseDurationHours,
     parseDurationHoursFromEvent,
     buildLocationString,
 } from "@/lib/ics-generator";

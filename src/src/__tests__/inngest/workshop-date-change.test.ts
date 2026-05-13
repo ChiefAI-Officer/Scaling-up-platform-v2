@@ -27,7 +27,7 @@ jest.mock("@/services/notifications", () => ({
 }));
 
 jest.mock("@/lib/ics-generator", () => ({
-  parseDurationHours: jest.fn().mockReturnValue(8),
+  parseDurationHoursFromEvent: jest.fn().mockReturnValue(8),
 }));
 
 import { db } from "@/lib/db";

@@ -9,7 +9,6 @@ import { sendCustomPriceChangeEmail } from "@/services/notifications";
 import { formatApprovalMessage } from "@/lib/approvals/approval-thread";
 import { parseStoredWorkshopCoupons, parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 import { inngest } from "@/inngest/client";
-import { parseDurationHours } from "@/lib/ics-generator";
 import { cancelWorkflowExecutions } from "@/lib/workflows/workflow-service";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;

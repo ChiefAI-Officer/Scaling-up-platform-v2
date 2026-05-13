@@ -5,7 +5,7 @@ import { formatEventDateUTC, parseJsonField, VenueAddress } from "@/lib/utils";
 import { retrieveCheckoutSession } from "@/services/stripe";
 import {
   buildGoogleCalendarUrl,
-  parseDurationHours,
+  parseDurationHoursFromEvent,
   buildLocationString,
 } from "@/lib/ics-generator";
 import { resolveCustomCodeRenderer } from "@/lib/templates/resolve-custom-code-renderer";
@@ -291,7 +291,7 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
                           eventDate: registration.workshop.eventDate,
                           eventTime: registration.workshop.eventTime,
                           timezone: registration.workshop.timezone,
-                          durationHours: parseDurationHours(registration.workshop.duration),
+                          durationHours: parseDurationHoursFromEvent(registration.workshop.duration, registration.workshop.eventTime),
                           location: buildLocationString(registration.workshop),
                         })}
                         target="_blank"

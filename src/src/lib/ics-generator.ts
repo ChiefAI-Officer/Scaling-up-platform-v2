@@ -20,27 +20,47 @@ export interface IcsEventData {
 
 /**
  * Parse a workshop duration string into hours.
+ * Falls back to 2h (a typical virtual workshop) when the string is absent or
+ * unrecognised.  Explicit numeric prefix takes priority over keyword matching.
  */
 export function parseDurationHours(duration: string | null | undefined): number {
-  if (!duration) return 8;
-  const lower = duration.toLowerCase();
+  if (!duration) return 2;
+  const lower = duration.toLowerCase().trim();
+  // Numeric prefix: "2 hours", "3 hours", "4.5 hours", etc.
+  const hoursMatch = lower.match(/^(\d+(?:\.\d+)?)\s*hours?/);
+  if (hoursMatch) return parseFloat(hoursMatch[1]);
+  // Legacy seed strings: "8hr", "4hr", "virtual-2hr", "2-hour"
+  if (lower.includes("8hr")) return 8;
+  if (lower.includes("4hr")) return 4;
   if (lower.includes("2hr") || lower.includes("2-hour")) return 2;
+  // Keyword descriptors
+  if (lower.includes("full")) return 8;
   if (lower.includes("half")) return 4;
-  return 8; // full-day default
+  return 2; // safe default (short workshop)
 }
 
 /**
- * Parse duration hours from a workshop, with eventTime as a future hint for
- * end-time calculation (Wave 13-B will flesh this out to parse "HH:MM - HH:MM"
- * ranges from eventTime). For now delegates to parseDurationHours.
+ * Derive the event duration in hours from the workshop's eventTime range
+ * ("HH:MM - HH:MM" or "HH:MM – HH:MM") when available.
+ * Falls back to parseDurationHours(duration) for legacy/unstructured strings.
  */
 export function parseDurationHoursFromEvent(
   duration: string | null | undefined,
   eventTime: string | null | undefined,
 ): number {
-  // Wave 13-B will implement eventTime-based range parsing ("09:00 - 17:00").
-  // This stub preserves existing behaviour while the import is wired.
-  void eventTime;
+  if (eventTime) {
+    // Matches both hyphen (-) and en-dash (–) separators
+    const rangeMatch = eventTime.match(
+      /^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/
+    );
+    if (rangeMatch) {
+      const startMins =
+        parseInt(rangeMatch[1]) * 60 + parseInt(rangeMatch[2]);
+      const endMins =
+        parseInt(rangeMatch[3]) * 60 + parseInt(rangeMatch[4]);
+      if (endMins > startMins) return (endMins - startMins) / 60;
+    }
+  }
   return parseDurationHours(duration);
 }
 
