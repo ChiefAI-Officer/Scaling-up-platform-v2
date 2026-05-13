@@ -140,6 +140,10 @@ function formatIcsUtcNow(): string {
   );
 }
 
+function parseStartTime(eventTime: string): string {
+  return eventTime.split(/\s*[-–]\s*/)[0];
+}
+
 /**
  * Generate ICS calendar content for a workshop event.
  */
@@ -147,7 +151,7 @@ export function generateIcsContent(event: IcsEventData): string {
   // Build start date from eventDate + eventTime
   const start = new Date(event.eventDate);
   if (event.eventTime) {
-    const [hours, minutes] = event.eventTime.split(":").map(Number);
+    const [hours, minutes] = parseStartTime(event.eventTime).split(":").map(Number);
     if (!isNaN(hours)) start.setHours(hours);
     if (!isNaN(minutes)) start.setMinutes(minutes);
   } else {
@@ -210,7 +214,7 @@ export function generateIcsContent(event: IcsEventData): string {
 export function buildGoogleCalendarUrl(event: IcsEventData): string {
   const start = new Date(event.eventDate);
   if (event.eventTime) {
-    const [hours, minutes] = event.eventTime.split(":").map(Number);
+    const [hours, minutes] = parseStartTime(event.eventTime).split(":").map(Number);
     if (!isNaN(hours)) start.setHours(hours);
     if (!isNaN(minutes)) start.setMinutes(minutes);
   } else {

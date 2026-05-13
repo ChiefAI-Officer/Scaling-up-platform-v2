@@ -1,4 +1,5 @@
 import {
+  buildGoogleCalendarUrl,
   generateIcsContent,
   IcsEventData,
   parseDurationHours,
@@ -30,6 +31,39 @@ describe("ics-generator", () => {
     const withRequest = generateIcsContent({ ...baseData, method: "REQUEST" });
     expect(withPublish).toContain("SEQUENCE:0");
     expect(withRequest).toContain("SEQUENCE:0");
+  });
+
+  it("parses minutes from eventTime range (HH:MM - HH:MM) for DTSTART/DTEND", () => {
+    const content = generateIcsContent({
+      ...baseData,
+      eventTime: "14:30 - 16:00",
+      durationHours: 1.5,
+    });
+    expect(content).toMatch(/DTSTART;TZID=America\/New_York:\d{8}T143000/);
+    expect(content).toMatch(/DTEND;TZID=America\/New_York:\d{8}T160000/);
+  });
+
+  it("buildGoogleCalendarUrl parses minutes from eventTime range", () => {
+    const url = buildGoogleCalendarUrl({
+      ...baseData,
+      eventTime: "14:30 - 16:00",
+      durationHours: 1.5,
+    });
+    const parsed = new URL(url);
+    const dates = parsed.searchParams.get("dates");
+    expect(dates).not.toBeNull();
+    const [startSegment] = (dates ?? "").split("/");
+    expect(startSegment).toMatch(/\d{8}T143000/);
+  });
+
+  it("handles zero-minute eventTime range (regression)", () => {
+    const content = generateIcsContent({
+      ...baseData,
+      eventTime: "09:00 - 17:00",
+      durationHours: 8,
+    });
+    expect(content).toMatch(/DTSTART;TZID=America\/New_York:\d{8}T090000/);
+    expect(content).toMatch(/DTEND;TZID=America\/New_York:\d{8}T170000/);
   });
 });
 
