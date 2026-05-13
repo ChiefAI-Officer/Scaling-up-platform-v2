@@ -11,7 +11,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/authorization";
 import { getSurveyResults } from "@/lib/surveys/survey-service";
-import { SURVEY_TYPE_LABELS } from "@/lib/surveys/survey-types";
+import { SURVEY_TYPE_LABELS, parseSurveyDateRange } from "@/lib/surveys/survey-types";
 import type { SurveyType } from "@/lib/surveys/survey-types";
 import { FadeUp } from "@/components/ui/animated";
 import { SurveyFilters } from "@/components/surveys/survey-filters";
@@ -34,9 +34,9 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
   await requireAdmin();
   const sp = await searchParams;
 
-  // ENH-MAY6-9: parse + sanitize filter params into the shape getSurveyResults expects.
-  const startDate = sp.startDate ? new Date(sp.startDate) : undefined;
-  const endDate = sp.endDate ? new Date(sp.endDate) : undefined;
+  // ENH-MAY6-9 + Round 15 Wave 2: thread raw YYYY-MM-DD strings to
+  // getSurveyResults so the service-layer parseSurveyDateRange helper applies
+  // the inclusive-of-day end-date fix (no more excluded same-day responses).
   const validGroupBy: Set<GroupByOpt> = new Set([
     "coach",
     "category",
@@ -80,8 +80,8 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
         coachId: sp.coachId,
         categoryId: sp.categoryId,
         workshopFormat,
-        startDate,
-        endDate,
+        startDate: sp.startDate,
+        endDate: sp.endDate,
         groupBy,
       })
     : null;
@@ -99,13 +99,20 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
     // Round 2 M7: the side breakdown query MUST receive the same filters as
     // the main getSurveyResults query, otherwise summary cards and per-
     // workshop breakdown disagree on totals.
+    // Round 15 Wave 2: use the shared parseSurveyDateRange helper so the
+    // breakdown query gets the same inclusive-of-day endDate semantics as
+    // getSurveyResults (`lt` exclusive next-day, not `lte` midnight).
     const workshopSubFilter: Record<string, unknown> = {};
     if (sp.coachId) workshopSubFilter.coachId = sp.coachId;
     if (sp.categoryId) workshopSubFilter.categoryId = sp.categoryId;
     if (workshopFormat) workshopSubFilter.format = workshopFormat;
+    const range = parseSurveyDateRange({
+      startDate: sp.startDate,
+      endDate: sp.endDate,
+    });
     const completedAtBoundary: Record<string, unknown> = { not: null };
-    if (startDate) completedAtBoundary.gte = startDate;
-    if (endDate) completedAtBoundary.lte = endDate;
+    if (range.startDate) completedAtBoundary.gte = range.startDate;
+    if (range.endDateExclusive) completedAtBoundary.lt = range.endDateExclusive;
 
     const surveys = await db.survey.findMany({
       where: {

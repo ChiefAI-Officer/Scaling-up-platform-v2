@@ -56,12 +56,27 @@ describe("getSurveyResults — filters (ENH-MAY6-9)", () => {
     expect(call.where.workshop).toMatchObject({ coachId: "c1", categoryId: "cat-ai" });
   });
 
-  it("threads startDate + endDate as completedAt range", async () => {
+  // Round 15 Wave 2: endDate semantics changed from `lte` (exclude same-day
+  // responses after 00:00 UTC) to `lt` (exclusive upper bound). Date-object
+  // callers like this one are now passed through as exact moments — the
+  // inclusive-of-day shift only applies to string-form callers via
+  // parseSurveyDateRange. Both flavors use `lt` for the upper bound.
+  it("threads startDate + endDate as completedAt range (Date objects → gte/lt)", async () => {
     const start = new Date("2026-04-01");
     const end = new Date("2026-05-01");
     await getSurveyResults("t1", { startDate: start, endDate: end });
     const call = (db.survey.findMany as jest.Mock).mock.calls[0][0];
-    expect(call.where.completedAt).toMatchObject({ gte: start, lte: end });
+    expect(call.where.completedAt).toMatchObject({ gte: start, lt: end });
+  });
+
+  it("threads YYYY-MM-DD string endDate as inclusive-of-day (Round 15 Wave 2)", async () => {
+    // endDate "2026-05-13" should produce an exclusive bound of 2026-05-14 00:00 UTC
+    // so a survey completed at 2026-05-13T14:32Z is correctly included.
+    await getSurveyResults("t1", { startDate: "2026-05-10", endDate: "2026-05-13" });
+    const call = (db.survey.findMany as jest.Mock).mock.calls[0][0];
+    expect(call.where.completedAt.gte.toISOString()).toBe("2026-05-10T00:00:00.000Z");
+    expect(call.where.completedAt.lt.toISOString()).toBe("2026-05-14T00:00:00.000Z");
+    expect(call.where.completedAt.lte).toBeUndefined();
   });
 
   it("preserves the legacy single-workshop filter via workshopId option", async () => {

@@ -7,6 +7,7 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { QuestionType, SurveyType } from "@/lib/surveys/survey-types";
+import { parseSurveyDateRange } from "@/lib/surveys/survey-types";
 
 // ============================================
 // Types
@@ -252,8 +253,12 @@ export interface SurveyResultsFilters {
   coachId?: string;
   categoryId?: string;
   workshopFormat?: string;
-  startDate?: Date;
-  endDate?: Date;
+  // Round 15 Wave 2: accept YYYY-MM-DD strings (preferred — parsed via
+  // parseSurveyDateRange so endDate is inclusive-of-day) or raw Date objects
+  // (back-compat: treated as exact moments → `lt` exclusive upper bound).
+  // Callers should prefer strings to get the same-day-inclusive semantics.
+  startDate?: Date | string;
+  endDate?: Date | string;
   groupBy?: "coach" | "category" | "format" | "workshopType";
 }
 
@@ -275,9 +280,20 @@ export async function getSurveyResults(
   if (filters.categoryId) workshopFilter.categoryId = filters.categoryId;
   if (filters.workshopFormat) workshopFilter.format = filters.workshopFormat;
 
+  // Round 15 Wave 2: route date params through parseSurveyDateRange so
+  // "endDate=2026-05-13" includes the entire day (was excluding everything
+  // after 00:00 UTC). String inputs get the inclusive-of-day shift; Date
+  // objects are passed through as-is for back-compat (treated as exact
+  // moments with `lt` exclusive upper bound).
   const completedAtFilter: Prisma.DateTimeNullableFilter = { not: null };
-  if (filters.startDate) completedAtFilter.gte = filters.startDate;
-  if (filters.endDate) completedAtFilter.lte = filters.endDate;
+  const stringRange = parseSurveyDateRange({
+    startDate: typeof filters.startDate === "string" ? filters.startDate : undefined,
+    endDate: typeof filters.endDate === "string" ? filters.endDate : undefined,
+  });
+  if (stringRange.startDate) completedAtFilter.gte = stringRange.startDate;
+  if (stringRange.endDateExclusive) completedAtFilter.lt = stringRange.endDateExclusive;
+  if (filters.startDate instanceof Date) completedAtFilter.gte = filters.startDate;
+  if (filters.endDate instanceof Date) completedAtFilter.lt = filters.endDate;
 
   const where: Prisma.SurveyWhereInput = {
     templateId,

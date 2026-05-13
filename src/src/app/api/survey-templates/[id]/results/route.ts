@@ -22,14 +22,21 @@ const surveyResultsParamsSchema = z.object({
   id: z.string().min(1, "Template id is required"),
 });
 
+// Round 15 Wave 2: accept dates as YYYY-MM-DD strings (not coerced Dates) so
+// the service-layer parseSurveyDateRange helper applies the inclusive-of-day
+// end-date fix. Lexicographic comparison works for ISO date strings.
+const isoDateString = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/u, "Expected YYYY-MM-DD");
+
 const surveyResultsQuerySchema = z
   .object({
     workshopId: z.string().min(1).optional(), // "all" handled below
     coachId: z.string().min(1).optional(),
     categoryId: z.string().min(1).optional(),
     workshopFormat: z.enum(["VIRTUAL", "IN_PERSON", "HYBRID"]).optional(),
-    startDate: z.coerce.date().optional(),
-    endDate: z.coerce.date().optional(),
+    startDate: isoDateString.optional(),
+    endDate: isoDateString.optional(),
     groupBy: z.enum(["coach", "category", "format", "workshopType"]).optional(),
   })
   .refine(
