@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>14 — Admin Templates List (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome (mirrors WF11/WF12/WF13) ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ---------- Admin shell (sidebar + main, mirrored from WF11/WF12/WF13) ---------- */
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 0.875rem;
+    }
+    .wf-sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .wf-sidebar-brand-sub {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-sidebar-link-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.6;
+    }
+
+    .wf-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-breadcrumb {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb a:hover { color: hsl(var(--foreground)); text-decoration: underline; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page {
+      padding: 2rem;
+      width: 100%;
+    }
+
+    /* ---------- Page header row ---------- */
+    .wf-page-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .wf-page-subtitle-strong {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.9375rem;
+      margin: 0.125rem 0 0;
+      font-weight: 500;
+      max-width: 640px;
+      line-height: 1.5;
+    }
+    .wf-cta-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.375rem;
+    }
+    .wf-cta-helper {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-style: italic;
+      max-width: 280px;
+      text-align: right;
+    }
+    .wf-btn-primary[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .wf-version-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.375rem;
+      margin-left: 0.5rem;
+      border-radius: 4px;
+      background: hsl(var(--warning) / 0.18);
+      color: hsl(var(--warning-foreground));
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- Stats row (4 cards) — mirrored from WF13 ---------- */
+    .wf-stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .wf-stat-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+    .wf-stat-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-stat-value {
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: hsl(var(--foreground));
+      line-height: 1;
+    }
+
+    /* ---------- Table (mirrored from WF11/WF12/WF13) ---------- */
+    .wf-table-wrap { overflow: hidden; border-radius: var(--radius); border: 1px solid hsl(var(--border)); }
+    .wf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      background: hsl(var(--card));
+    }
+    .wf-table thead { background: hsl(var(--muted)); }
+    .wf-table th {
+      text-align: left;
+      padding: 0.625rem 1rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      border-bottom: 1px solid hsl(var(--border));
+      white-space: nowrap;
+    }
+    .wf-table td {
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid hsl(var(--border));
+      vertical-align: middle;
+      color: hsl(var(--foreground));
+    }
+    .wf-table tbody tr:last-child td { border-bottom: none; }
+    .wf-table tbody tr:hover { background: hsl(var(--muted) / 0.4); }
+
+    .wf-table-name {
+      font-weight: 600;
+      color: hsl(var(--foreground));
+    }
+    .wf-table-meta {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      white-space: nowrap;
+    }
+    .wf-table-caption {
+      display: block;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      font-style: italic;
+      margin-top: 0.125rem;
+    }
+
+    /* ---------- Action links (inline · separated) ---------- */
+    .wf-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      white-space: nowrap;
+    }
+    .wf-action-link {
+      color: hsl(var(--primary));
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.8125rem;
+    }
+    .wf-action-link:hover { text-decoration: underline; }
+    .wf-action-sep {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      opacity: 0.6;
+    }
+    .wf-action-disabled {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ---------- Pills (access mode + aggregation mode) ---------- */
+    .wf-pill-access-invited {
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+    }
+    .wf-pill-access-invited::before { background: hsl(var(--primary)); }
+
+    /* v7.5 PUBLIC mode — token not in _shared.css, scoped local */
+    .wf-pill-access-public {
+      background: hsl(280 80% 95%); /* purple-50 — exception: no token for PUBLIC */
+      color: hsl(280 50% 35%);      /* purple-700 — exception: no token for PUBLIC */
+    }
+    .wf-pill-access-public::before { background: hsl(280 50% 45%); /* exception */ }
+
+    .wf-pill-agg-full {
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-pill-agg-full::before { background: hsl(var(--muted-foreground)); }
+    .wf-pill-agg-ceo {
+      background: hsl(var(--warning) / 0.15);
+      color: hsl(var(--warning-foreground));
+    }
+    .wf-pill-agg-ceo::before { background: hsl(var(--warning)); }
+
+    /* Status pills */
+    .wf-pill-status-active {
+      background: hsl(var(--success) / 0.12);
+      color: hsl(var(--success));
+    }
+    .wf-pill-status-active::before { background: hsl(var(--success)); }
+    .wf-pill-status-pending {
+      background: hsl(var(--warning) / 0.15);
+      color: hsl(var(--warning-foreground));
+    }
+    .wf-pill-status-pending::before { background: hsl(var(--warning)); }
+
+    /* ---------- v1.5 preview card (dashed) ---------- */
+    .wf-preview-card {
+      margin-top: 1.5rem;
+      padding: 1.25rem 1.5rem;
+      background: hsl(var(--card));
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+    }
+    .wf-preview-card-head {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0 0 0.5rem;
+    }
+    .wf-preview-card-title {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+    .wf-preview-card-subtitle {
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 0.875rem;
+      line-height: 1.5;
+    }
+    .wf-preview-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .wf-preview-list li {
+      font-size: 0.8125rem;
+      color: hsl(var(--foreground));
+      line-height: 1.5;
+      padding-left: 1rem;
+      position: relative;
+    }
+    .wf-preview-list li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: hsl(var(--primary));
+      font-weight: 700;
+    }
+    .wf-preview-list code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(var(--muted));
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      color: hsl(var(--foreground));
+    }
+
+    /* ---------- End-of-page note (mirrored from WF13) ---------- */
+    .wf-end-note {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: hsl(var(--muted) / 0.5);
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      line-height: 1.55;
+    }
+
+    /* Crown icon inline */
+    .wf-crown {
+      display: inline-block;
+      margin-right: 0.25rem;
+      font-size: 0.875rem;
+      line-height: 1;
+      vertical-align: -0.05em;
+    }
+
+    /* Responsive: collapse stats grid on narrow viewports */
+    @media (max-width: 900px) {
+      .wf-stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Yellow wireframe banner -->
+  <div class="wf-banner">
+    <div>
+      <strong>WIREFRAME — Not functional.</strong>
+      v7.5 spec reference: Wave 2 Task 4 (Admin Templates list, entry point for authoring + per-coach access).
+      v1 ships 4 INVITED default templates + Website Assessment (PUBLIC, hardcoded).
+      SunHub Quick Quiz deferred to v1.5 per Codex co-validate.
+      Template authoring UI (Tasks 6/7/8) targets v1.5; this list ships v1 as a read-only catalogue.
+    </div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page heading (outside the shell, mirrors WF11/WF12/WF13 pattern) -->
+  <div class="page-head">
+    <h1>14 — Admin: Assessment Templates</h1>
+    <p>Catalogue of templates available for campaign creation. Entry point to template authoring (v1.5) + per-coach access management (Task 5).</p>
+  </div>
+
+  <!-- Admin shell: sidebar + main -->
+  <div class="wf-shell">
+    <!-- Sidebar (Templates active) -->
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">S</span>
+        <span class="wf-sidebar-brand-text">
+          <span>Scaling Up</span>
+          <span class="wf-sidebar-brand-sub">Admin</span>
+        </span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Manage</div>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Dashboard
+        </a>
+        <a class="wf-sidebar-link" href="11-admin-users-list.html">
+          <span class="wf-sidebar-link-dot"></span>Users
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Organizations
+        </a>
+        <a class="wf-sidebar-link is-active" href="#" aria-current="page">
+          <span class="wf-sidebar-link-dot"></span>Templates
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Assessments
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Public Quizzes
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="wf-main">
+      <!-- Top bar with breadcrumb -->
+      <div class="wf-topbar">
+        <div class="wf-breadcrumb">
+          <a href="#">Admin</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Templates</span>
+        </div>
+      </div>
+
+      <!-- Page body -->
+      <div class="wf-page">
+        <!-- Page header + primary CTA -->
+        <div class="wf-page-header-row">
+          <div>
+            <h2 class="wf-page-title">Assessment Templates</h2>
+            <p class="wf-page-subtitle-strong">
+              Catalogue of templates available for campaign creation.
+              Per-coach access managed at <em>Admin &rsaquo; Templates &rsaquo; Access</em> (Task 5).
+            </p>
+          </div>
+          <div class="wf-cta-stack">
+            <button type="button" class="wf-btn wf-btn-primary" disabled aria-disabled="true">
+              + Create Template
+              <span class="wf-version-badge">v1.5</span>
+            </button>
+            <span class="wf-cta-helper">Template authoring lands in v1.5 (Wave 2 Tasks 6&ndash;8).</span>
+          </div>
+        </div>
+
+        <!-- Stats row (4 cards) -->
+        <div class="wf-stats-row">
+          <div class="wf-stat-card">
+            <span class="wf-stat-label">Total Templates</span>
+            <span class="wf-stat-value">5</span>
+          </div>
+          <div class="wf-stat-card">
+            <span class="wf-stat-label">INVITED (active)</span>
+            <span class="wf-stat-value">4</span>
+          </div>
+          <div class="wf-stat-card">
+            <span class="wf-stat-label">PUBLIC (active)</span>
+            <span class="wf-stat-value">1</span>
+          </div>
+          <div class="wf-stat-card">
+            <span class="wf-stat-label">Drafts (v1.5)</span>
+            <span class="wf-stat-value">0</span>
+          </div>
+        </div>
+
+        <!-- Templates table -->
+        <div class="wf-table-wrap">
+          <table class="wf-table">
+            <thead>
+              <tr>
+                <th>Template Name</th>
+                <th>Access Mode</th>
+                <th>Aggregation</th>
+                <th>Versions</th>
+                <th>Active Version Published</th>
+                <th>Status</th>
+                <th style="text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 1. Rockefeller Habits Checklist -->
+              <tr>
+                <td><span class="wf-table-name">Rockefeller Habits Checklist</span></td>
+                <td><span class="wf-pill wf-pill-access-invited">INVITED</span></td>
+                <td><span class="wf-pill wf-pill-agg-full">FULL_VISIBILITY</span></td>
+                <td><span class="wf-table-meta">v1 (1 total)</span></td>
+                <td><span class="wf-table-meta">May 5 2026</span></td>
+                <td><span class="wf-pill wf-pill-status-active">&bull; Active</span></td>
+                <td style="text-align: right;">
+                  <span class="wf-actions">
+                    <a href="#" class="wf-action-link">View</a>
+                    <span class="wf-action-sep">&middot;</span>
+                    <a href="#" class="wf-action-link">Access &nearr;</a>
+                    <span class="wf-action-sep">&middot;</span>
+                    <a href="#" class="wf-action-link">Edit</a>
+                  </span>
+                </td>
+              </tr>
+
+              <!-- 2. Leadership Vision Alignment -->
+              <tr>
+                <td><span class="wf-table-name">Leadership Vision Alignment</span></td>
+                <td><span class="wf-pill wf-pill-access-invited">INVITED</span></td>
+                <td><span class="wf-pill wf-pill-agg-full">FULL_VISIBILITY</span></td>
+                <td><span class="wf-table-meta">v1 (1 total)</span></td>
+                <td><span class="wf-table-meta">May 8 2026</span></td>
+                <td><span class="wf-pill wf-pill-status-active">&bull; Active</span></td>
+                <td style="text-align: right;">
+                  <span class="wf-actions">
+                    <a href="#" class="wf-action-link">View</a>
+                    <span class="wf-action-sep">&middot;</span>
+                    <a href="#" class="wf-action-link">Access</a>
+                    <span class="wf-action-sep">&middot;</span>
+                    <a href="#" class="wf-action-link">Edit</a>
+                  </span>
+                </td>
+              </tr>
+
+              <!-- 3. Quarterly Session Prep v2 -->
+              <tr>
+                <td><span class="wf-table-name">Quarterly Session Prep v2</span></td>
+                <td><span class="wf-pill wf-pill-access-invited">INVITED</span></td>
+                <td><span class="wf-pill wf-pill-agg-full">FULL_VISIBILITY</span></td>
+                <td><span class="wf-table-meta">v1 (1 total)</span></td>
+                <td><span class="wf-table-meta">May 8 2026</span></td>
+                <td><span class="wf-pill wf-pill-status-active">&bull; Active</span></td>
+                <td style="text-align: right;">
+                  <span class="wf-actions">
+                    <a href="#" class="wf-action-link">View</a>
+                    <span class="wf-action-sep">&middot;</span>
+                    <a href="#" class="wf-action-link">Access</a>
+                    <span class="wf-action-sep">&middot;</span>
+                    <a href="#" class="wf-action-link">Edit</a>
+                  </span>
+                </td>
+              </tr>
+
+              <!-- 4. Scaling Up Assessment (CEO_ONLY, Pending) -->
+              <tr>
+                <td><span class="wf-table-name">Scaling Up Assessment</span></td>
+                <td><span class="wf-pill wf-pill-access-invited">INVITED</span></td>
+                <td>
+                  <span class="wf-pill wf-pill-agg-ceo">
+                    <span class="wf-crown" aria-hidden="true">&#128081;</span>CEO_ONLY
+                  </span>
+                </td>
+                <td><span class="wf-table-meta">v1 (1 total)</span></td>
+                <td>
+                  <span class="wf-table-meta">(pending &mdash; June 1 target)</span>
+                </td>
+                <td><span class="wf-pill wf-pill-status-pending">&#9203; Pending</span></td>
+                <td style="text-align: right;">
+                  <span class="wf-actions">
+                    <a href="#" class="wf-action-link">View</a>
+                    <span class="wf-action-sep">&middot;</span>
+                    <a href="#" class="wf-action-link">Access</a>
+                    <span class="wf-action-sep">&middot;</span>
+                    <a href="#" class="wf-action-link">Edit</a>
+                  </span>
+                </td>
+              </tr>
+
+              <!-- 5. Website Assessment (PUBLIC, no Access action) -->
+              <tr>
+                <td><span class="wf-table-name">Website Assessment</span></td>
+                <td><span class="wf-pill wf-pill-access-public">PUBLIC</span></td>
+                <td><span class="wf-pill wf-pill-agg-full">FULL_VISIBILITY</span></td>
+                <td><span class="wf-table-meta">v1 (1 total)</span></td>
+                <td>
+                  <span class="wf-table-meta">(content flag-gated; placeholder shipping June 15)</span>
+                </td>
+                <td>
+                  <span class="wf-pill wf-pill-status-active">&bull; Active</span>
+                  <span class="wf-table-caption">content flag-gated</span>
+                </td>
+                <td style="text-align: right;">
+                  <span class="wf-actions">
+                    <a href="#" class="wf-action-link">View</a>
+                    <span class="wf-action-sep">&middot;</span>
+                    <span class="wf-action-disabled" title="PUBLIC templates aren't grantable to coaches">&mdash;</span>
+                    <span class="wf-action-sep">&middot;</span>
+                    <a href="#" class="wf-action-link">Edit</a>
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- v1.5 preview card -->
+        <section class="wf-preview-card">
+          <div class="wf-preview-card-head">
+            <h3 class="wf-preview-card-title">Coming in v1.5 &mdash; Template Authoring</h3>
+            <span class="wf-version-badge">v1.5</span>
+          </div>
+          <p class="wf-preview-card-subtitle">
+            These editor surfaces (Tasks 6&ndash;8) will be reachable from the &ldquo;+ Create Template&rdquo; CTA above
+            and from the per-row &ldquo;Edit&rdquo; action in v1.5. Shipping v1 read-only keeps the catalogue stable
+            while authoring tooling matures.
+          </p>
+          <ul class="wf-preview-list">
+            <li>Metadata + Sections editor &rarr; Task 6 wireframe</li>
+            <li>
+              Questions editor (6 types: <code>SLIDER_LIKERT</code> + <code>NUMBER</code> + <code>MULTI_CHOICE</code>
+              active in v1; <code>TEXT</code> + <code>TEXTAREA</code> + <code>COMPOUND</code> ship v1.5)
+              &rarr; Task 7 wireframe
+            </li>
+            <li>Scoring + Tiers editor &rarr; Task 8 wireframe</li>
+            <li>
+              <strong><code>conditionalSections</code> + <code>peerBenchmarks</code> editor (Codex-trimmed deferred to v1.5)</strong>
+              &mdash; Scaling Up Assessment's dynamic logic engine UI
+            </li>
+          </ul>
+        </section>
+
+        <!-- Wireframe end note -->
+        <div class="wf-end-note">
+          <strong>Wireframe end note.</strong>
+          PUBLIC templates (Website Assessment, future SunHub) are admin-managed at the platform level &mdash;
+          they don't appear in the per-coach Template Access screen (Task 5).
+          Coach grants apply to INVITED templates only.
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

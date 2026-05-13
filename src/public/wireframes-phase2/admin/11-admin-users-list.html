@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>11 — Admin Users list (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome (mirrors wireframe 04) ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ---------- Admin shell (sidebar + main, mirrored from WF04) ---------- */
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 0.875rem;
+    }
+    .wf-sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .wf-sidebar-brand-sub {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-sidebar-link-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.6;
+    }
+
+    .wf-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-breadcrumb {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page {
+      padding: 2rem;
+      width: 100%;
+    }
+    .wf-page-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* ---------- Filter row ---------- */
+    .wf-filter-row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+    .wf-filter-search {
+      flex: 1;
+      min-width: 240px;
+      position: relative;
+    }
+    .wf-filter-search input {
+      width: 100%;
+      padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--card));
+      font-size: 0.875rem;
+      color: hsl(var(--foreground));
+      font-family: inherit;
+    }
+    .wf-filter-search input::placeholder { color: hsl(var(--muted-foreground)); }
+    .wf-filter-search-icon {
+      position: absolute;
+      left: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.875rem;
+      pointer-events: none;
+    }
+    .wf-filter-select {
+      padding: 0.5rem 2rem 0.5rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--card));
+      font-size: 0.875rem;
+      color: hsl(var(--foreground));
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, hsl(var(--muted-foreground)) 50%),
+                        linear-gradient(135deg, hsl(var(--muted-foreground)) 50%, transparent 50%);
+      background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+    }
+
+    /* ---------- Table ---------- */
+    .wf-table-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-xs);
+      overflow: hidden;
+    }
+    .wf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .wf-table thead {
+      background: hsl(var(--muted));
+    }
+    .wf-table th {
+      text-align: left;
+      padding: 0.625rem 1rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      border-bottom: 1px solid hsl(var(--border));
+      white-space: nowrap;
+    }
+    .wf-table td {
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid hsl(var(--border));
+      vertical-align: middle;
+      color: hsl(var(--foreground));
+    }
+    .wf-table tbody tr:last-child td { border-bottom: none; }
+    .wf-table tbody tr:hover { background: hsl(var(--muted) / 0.4); }
+    .wf-table tbody tr.is-disabled { opacity: 0.6; }
+
+    .wf-table-name {
+      font-weight: 600;
+      color: hsl(var(--foreground));
+    }
+    .wf-table-email {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+    }
+    .wf-table-meta {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      white-space: nowrap;
+    }
+
+    /* ---------- Avatar ---------- */
+    .wf-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+    .wf-avatar--admin { background: hsl(var(--primary)); }
+    .wf-avatar--staff { background: hsl(var(--muted-foreground)); }
+    .wf-avatar--coach { background: hsl(var(--success)); }
+
+    /* ---------- Pills (role + status) ---------- */
+    /* Role pills */
+    .wf-pill-role-admin {
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+    }
+    .wf-pill-role-admin::before { background: hsl(var(--primary)); }
+    .wf-pill-role-staff {
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-pill-role-staff::before { background: hsl(var(--muted-foreground)); }
+    .wf-pill-role-coach {
+      background: hsl(var(--success) / 0.12);
+      color: hsl(var(--success));
+    }
+    .wf-pill-role-coach::before { background: hsl(var(--success)); }
+
+    /* Status pills */
+    .wf-pill-status-active {
+      background: hsl(var(--success) / 0.12);
+      color: hsl(var(--success));
+    }
+    .wf-pill-status-active::before { background: hsl(var(--success)); }
+    .wf-pill-status-pending {
+      background: hsl(var(--warning) / 0.15);
+      color: hsl(var(--warning-foreground));
+    }
+    .wf-pill-status-pending::before { background: hsl(var(--warning)); }
+    .wf-pill-status-disabled {
+      background: hsl(var(--destructive) / 0.1);
+      color: hsl(var(--destructive));
+    }
+    .wf-pill-status-disabled::before { background: hsl(var(--destructive)); }
+
+    /* ---------- Actions column ---------- */
+    .wf-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8125rem;
+    }
+    .wf-actions a {
+      color: hsl(var(--primary));
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .wf-actions a:hover { text-decoration: underline; }
+    .wf-actions-sep {
+      color: hsl(var(--muted-foreground));
+      opacity: 0.6;
+    }
+
+    /* ---------- Pagination ---------- */
+    .wf-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.875rem 1rem;
+      border-top: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+    }
+    .wf-pagination-info {
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-pagination-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    /* Inline user cell layout */
+    .wf-user-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Yellow wireframe banner -->
+  <div class="wf-banner">
+    <div>
+      <strong>WIREFRAME — Not functional.</strong>
+      v7.5 spec reference: Wave 2 Task 1 (Admin Users list, establishes admin chrome conventions per Jeff Figma May 12 + v7.2 floor #5). First admin-lane wireframe; subsequent Wave 2 tasks mirror this chrome.
+    </div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page heading (outside the shell, mirrors WF04 pattern) -->
+  <div class="page-head">
+    <h1>11 — Admin: Users list</h1>
+    <p>Admin lane. Search + filter directory of platform users. Establishes the sidebar + breadcrumb chrome reused across Wave 2.</p>
+  </div>
+
+  <!-- Admin shell: sidebar + main -->
+  <div class="wf-shell">
+    <!-- Sidebar -->
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">S</span>
+        <span class="wf-sidebar-brand-text">
+          <span>Scaling Up</span>
+          <span class="wf-sidebar-brand-sub">Admin</span>
+        </span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Manage</div>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Dashboard
+        </a>
+        <a class="wf-sidebar-link is-active" href="#" aria-current="page">
+          <span class="wf-sidebar-link-dot"></span>Users
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Organizations
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Templates
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Assessments
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Public Quizzes
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="wf-main">
+      <!-- Top bar with breadcrumb -->
+      <div class="wf-topbar">
+        <div class="wf-breadcrumb">
+          <a href="#">Admin</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Users</span>
+        </div>
+      </div>
+
+      <!-- Page body -->
+      <div class="wf-page">
+        <!-- Page header + primary CTA -->
+        <div class="wf-page-header-row">
+          <div>
+            <h2 class="wf-page-title">Users</h2>
+            <p class="wf-page-subtitle">Platform-wide directory. Invite new users, manage roles, and disable access.</p>
+          </div>
+          <button type="button" class="wf-btn wf-btn-primary">+ Invite User</button>
+        </div>
+
+        <!-- Filter row -->
+        <div class="wf-filter-row">
+          <div class="wf-filter-search">
+            <span class="wf-filter-search-icon" aria-hidden="true">&#9906;</span>
+            <input type="search" placeholder="Search by name or email&hellip;" aria-label="Search users">
+          </div>
+          <select class="wf-filter-select" aria-label="Filter by role">
+            <option>All roles</option>
+            <option>Admin</option>
+            <option>Staff</option>
+            <option>Coach</option>
+          </select>
+          <select class="wf-filter-select" aria-label="Filter by status">
+            <option>All statuses</option>
+            <option>Active</option>
+            <option>Pending Invite</option>
+            <option>Disabled</option>
+          </select>
+        </div>
+
+        <!-- Users table -->
+        <div class="wf-table-card">
+          <table class="wf-table">
+            <thead>
+              <tr>
+                <th style="width: 56px;"></th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Last Login</th>
+                <th>Status</th>
+                <th style="text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 1. Suzanne Krygier -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--admin">SK</span></td>
+                <td><span class="wf-table-name">Suzanne Krygier</span></td>
+                <td><span class="wf-table-email">suzanne@scalingup.com</span></td>
+                <td><span class="wf-pill wf-pill-role-admin">Admin</span></td>
+                <td><span class="wf-table-meta">Today 9:42 AM</span></td>
+                <td><span class="wf-pill wf-pill-status-active">Active</span></td>
+                <td>
+                  <div class="wf-actions" style="justify-content: flex-end;">
+                    <a href="#">View</a>
+                    <span class="wf-actions-sep">&middot;</span>
+                    <a href="#">Edit</a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 2. Jeff Verdun -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--staff">JV</span></td>
+                <td><span class="wf-table-name">Jeff Verdun</span></td>
+                <td><span class="wf-table-email">jeff@scalingup.com</span></td>
+                <td><span class="wf-pill wf-pill-role-staff">Staff</span></td>
+                <td><span class="wf-table-meta">Today 8:15 AM</span></td>
+                <td><span class="wf-pill wf-pill-status-active">Active</span></td>
+                <td>
+                  <div class="wf-actions" style="justify-content: flex-end;">
+                    <a href="#">View</a>
+                    <span class="wf-actions-sep">&middot;</span>
+                    <a href="#">Edit</a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 3. Sarah Mitchell -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--coach">SM</span></td>
+                <td><span class="wf-table-name">Sarah Mitchell</span></td>
+                <td><span class="wf-table-email">sarah@coachfirm.com</span></td>
+                <td><span class="wf-pill wf-pill-role-coach">Coach</span></td>
+                <td><span class="wf-table-meta">Yesterday 4:30 PM</span></td>
+                <td><span class="wf-pill wf-pill-status-active">Active</span></td>
+                <td>
+                  <div class="wf-actions" style="justify-content: flex-end;">
+                    <a href="#">View</a>
+                    <span class="wf-actions-sep">&middot;</span>
+                    <a href="#">Edit</a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 4. Bob Chen -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--coach">BC</span></td>
+                <td><span class="wf-table-name">Bob Chen</span></td>
+                <td><span class="wf-table-email">bob@bcadvisory.com</span></td>
+                <td><span class="wf-pill wf-pill-role-coach">Coach</span></td>
+                <td><span class="wf-table-meta">May 11, 2026</span></td>
+                <td><span class="wf-pill wf-pill-status-active">Active</span></td>
+                <td>
+                  <div class="wf-actions" style="justify-content: flex-end;">
+                    <a href="#">View</a>
+                    <span class="wf-actions-sep">&middot;</span>
+                    <a href="#">Edit</a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 5. Alice Rodriguez -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--coach">AR</span></td>
+                <td><span class="wf-table-name">Alice Rodriguez</span></td>
+                <td><span class="wf-table-email">alice@arcoaching.com</span></td>
+                <td><span class="wf-pill wf-pill-role-coach">Coach</span></td>
+                <td><span class="wf-table-meta">May 8, 2026</span></td>
+                <td><span class="wf-pill wf-pill-status-active">Active</span></td>
+                <td>
+                  <div class="wf-actions" style="justify-content: flex-end;">
+                    <a href="#">View</a>
+                    <span class="wf-actions-sep">&middot;</span>
+                    <a href="#">Edit</a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 6. Mike Patel -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--coach">MP</span></td>
+                <td><span class="wf-table-name">Mike Patel</span></td>
+                <td><span class="wf-table-email">mike@mpconsult.com</span></td>
+                <td><span class="wf-pill wf-pill-role-coach">Coach</span></td>
+                <td><span class="wf-table-meta">May 4, 2026</span></td>
+                <td><span class="wf-pill wf-pill-status-active">Active</span></td>
+                <td>
+                  <div class="wf-actions" style="justify-content: flex-end;">
+                    <a href="#">View</a>
+                    <span class="wf-actions-sep">&middot;</span>
+                    <a href="#">Edit</a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 7. David Thomas (pending invite) -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--coach">DT</span></td>
+                <td><span class="wf-table-name">David Thomas</span></td>
+                <td><span class="wf-table-email">david@dtcoaching.com</span></td>
+                <td><span class="wf-pill wf-pill-role-coach">Coach</span></td>
+                <td><span class="wf-table-meta">&mdash; never</span></td>
+                <td><span class="wf-pill wf-pill-status-pending">Pending Invite</span></td>
+                <td>
+                  <div class="wf-actions" style="justify-content: flex-end;">
+                    <a href="#">View</a>
+                    <span class="wf-actions-sep">&middot;</span>
+                    <a href="#">Edit</a>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- 8. Karen Lee (disabled) -->
+              <tr class="is-disabled">
+                <td><span class="wf-avatar wf-avatar--coach">KL</span></td>
+                <td><span class="wf-table-name">Karen Lee</span></td>
+                <td><span class="wf-table-email">karen@oldemail.com</span></td>
+                <td><span class="wf-pill wf-pill-role-coach">Coach</span></td>
+                <td><span class="wf-table-meta">Jan 14, 2026</span></td>
+                <td><span class="wf-pill wf-pill-status-disabled">Disabled</span></td>
+                <td>
+                  <div class="wf-actions" style="justify-content: flex-end;">
+                    <a href="#">View</a>
+                    <span class="wf-actions-sep">&middot;</span>
+                    <a href="#">Edit</a>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Pagination footer -->
+          <div class="wf-pagination">
+            <span class="wf-pagination-info">1&ndash;8 of 8</span>
+            <div class="wf-pagination-controls">
+              <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm" disabled>Previous</button>
+              <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm" disabled>Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

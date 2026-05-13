@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>12 — Admin User detail (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome (mirrors WF11) ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ---------- Admin shell (sidebar + main, mirrored from WF11) ---------- */
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 0.875rem;
+    }
+    .wf-sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .wf-sidebar-brand-sub {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-sidebar-link-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.6;
+    }
+
+    .wf-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-breadcrumb {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb a:hover { color: hsl(var(--foreground)); text-decoration: underline; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page {
+      padding: 2rem;
+      width: 100%;
+    }
+
+    /* ---------- Page header row (user identity + actions) ---------- */
+    .wf-detail-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .wf-detail-identity {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .wf-detail-name {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin: 0;
+      color: hsl(var(--foreground));
+    }
+    .wf-detail-name-row {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      flex-wrap: wrap;
+    }
+    .wf-detail-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    /* ---------- Avatar (48px variant for detail header) ---------- */
+    .wf-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+    .wf-avatar--lg {
+      width: 48px; height: 48px;
+      font-size: 0.9375rem;
+    }
+    .wf-avatar--admin { background: hsl(var(--primary)); }
+    .wf-avatar--staff { background: hsl(var(--muted-foreground)); }
+    .wf-avatar--coach { background: hsl(var(--success)); }
+
+    /* ---------- Pills (mirrored from WF11) ---------- */
+    .wf-pill-role-admin {
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+    }
+    .wf-pill-role-admin::before { background: hsl(var(--primary)); }
+    .wf-pill-role-staff {
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-pill-role-staff::before { background: hsl(var(--muted-foreground)); }
+    .wf-pill-role-coach {
+      background: hsl(var(--success) / 0.12);
+      color: hsl(var(--success));
+    }
+    .wf-pill-role-coach::before { background: hsl(var(--success)); }
+
+    .wf-pill-status-active {
+      background: hsl(var(--success) / 0.12);
+      color: hsl(var(--success));
+    }
+    .wf-pill-status-active::before { background: hsl(var(--success)); }
+    .wf-pill-status-pending {
+      background: hsl(var(--warning) / 0.15);
+      color: hsl(var(--warning-foreground));
+    }
+    .wf-pill-status-pending::before { background: hsl(var(--warning)); }
+    .wf-pill-status-disabled {
+      background: hsl(var(--destructive) / 0.1);
+      color: hsl(var(--destructive));
+    }
+    .wf-pill-status-disabled::before { background: hsl(var(--destructive)); }
+
+    /* Membership accept pills */
+    .wf-pill-accepted {
+      background: hsl(var(--success) / 0.12);
+      color: hsl(var(--success));
+    }
+    .wf-pill-accepted::before { background: hsl(var(--success)); }
+    .wf-pill-pending-accept {
+      background: hsl(var(--warning) / 0.15);
+      color: hsl(var(--warning-foreground));
+    }
+    .wf-pill-pending-accept::before { background: hsl(var(--warning)); }
+
+    /* Template type pill (small, neutral) */
+    .wf-pill-template-type {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .wf-pill-template-type--invited {
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+    }
+    .wf-pill-template-type--public {
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+    }
+
+    /* ---------- Destructive button accent ---------- */
+    .wf-btn-destructive {
+      background: hsl(var(--card));
+      color: hsl(var(--destructive));
+      border-color: hsl(var(--destructive) / 0.4);
+    }
+    .wf-btn-destructive:hover {
+      background: hsl(var(--destructive) / 0.08);
+      border-color: hsl(var(--destructive));
+    }
+
+    /* ---------- Card grid layout ---------- */
+    .wf-card-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* ---------- User Details 2-column grid ---------- */
+    .wf-details-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.25rem 2rem;
+    }
+    .wf-details-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+    .wf-details-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-details-value {
+      font-size: 0.9375rem;
+      color: hsl(var(--foreground));
+      font-weight: 500;
+    }
+    .wf-details-value--muted {
+      color: hsl(var(--muted-foreground));
+      font-weight: 400;
+    }
+
+    /* ---------- Inline form controls ---------- */
+    .wf-select {
+      padding: 0.5rem 2rem 0.5rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--card));
+      font-size: 0.875rem;
+      color: hsl(var(--foreground));
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, hsl(var(--muted-foreground)) 50%),
+                        linear-gradient(135deg, hsl(var(--muted-foreground)) 50%, transparent 50%);
+      background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+    }
+    .wf-select-sm {
+      padding: 0.3125rem 1.75rem 0.3125rem 0.625rem;
+      font-size: 0.8125rem;
+    }
+
+    /* ---------- Table (mirrored from WF11) ---------- */
+    .wf-table-wrap { overflow: hidden; border-radius: var(--radius); border: 1px solid hsl(var(--border)); }
+    .wf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      background: hsl(var(--card));
+    }
+    .wf-table thead { background: hsl(var(--muted)); }
+    .wf-table th {
+      text-align: left;
+      padding: 0.625rem 1rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      border-bottom: 1px solid hsl(var(--border));
+      white-space: nowrap;
+    }
+    .wf-table td {
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid hsl(var(--border));
+      vertical-align: middle;
+      color: hsl(var(--foreground));
+    }
+    .wf-table tbody tr:last-child td { border-bottom: none; }
+    .wf-table tbody tr:hover { background: hsl(var(--muted) / 0.4); }
+
+    .wf-table-link-destructive {
+      color: hsl(var(--destructive));
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.8125rem;
+    }
+    .wf-table-link-destructive:hover { text-decoration: underline; }
+
+    /* ---------- Amber info banner inside Memberships card ---------- */
+    .wf-info-banner {
+      background: hsl(38 92% 95%);
+      border: 1px solid hsl(38 92% 80%);
+      color: hsl(26 83% 25%);
+      border-radius: 6px;
+      padding: 0.75rem 0.875rem;
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      margin-bottom: 1rem;
+    }
+    .wf-info-banner code {
+      background: hsl(38 92% 88%);
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+    }
+
+    /* ---------- Card header helper subtext ---------- */
+    .wf-card-helper {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      margin-top: 0.25rem;
+    }
+
+    /* ---------- Below-table Grant Membership row ---------- */
+    .wf-card-action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    .wf-caption {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-style: italic;
+    }
+
+    /* ---------- Template chip grid ---------- */
+    .wf-chip-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+    .wf-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+      padding: 0.875rem 1rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      background: hsl(var(--card));
+    }
+    .wf-chip.is-disabled {
+      opacity: 0.6;
+      background: hsl(var(--muted) / 0.4);
+    }
+    .wf-chip-body {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .wf-chip-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      line-height: 1.3;
+    }
+    .wf-chip-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .wf-chip-state {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .wf-chip-state--granted { color: hsl(var(--success)); font-weight: 600; }
+    .wf-chip-state--off { color: hsl(var(--muted-foreground)); }
+
+    /* ---------- Toggle switch (presentational only) ---------- */
+    .wf-toggle {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .wf-toggle-track {
+      position: absolute;
+      inset: 0;
+      background: hsl(var(--muted-foreground) / 0.35);
+      border-radius: 9999px;
+      transition: background 150ms;
+    }
+    .wf-toggle-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background: hsl(var(--card));
+      border-radius: 50%;
+      box-shadow: var(--shadow-sm);
+      transition: transform 150ms;
+    }
+    .wf-toggle.is-on .wf-toggle-track { background: hsl(var(--success)); }
+    .wf-toggle.is-on .wf-toggle-thumb { transform: translateX(16px); }
+    .wf-toggle.is-disabled .wf-toggle-track {
+      background: hsl(var(--muted-foreground) / 0.2);
+    }
+
+    /* ---------- End-of-page note ---------- */
+    .wf-end-note {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: hsl(var(--muted) / 0.5);
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      line-height: 1.55;
+    }
+
+    /* Responsive: collapse details grid on narrow viewports */
+    @media (max-width: 900px) {
+      .wf-details-grid { grid-template-columns: 1fr; }
+      .wf-chip-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Yellow wireframe banner -->
+  <div class="wf-banner">
+    <div>
+      <strong>WIREFRAME — Not functional.</strong>
+      v7.5 spec reference: Wave 2 Task 2 (Admin User detail + memberships, drives coach role activation testing per v7.2 floor #5).
+    </div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page heading (outside the shell, mirrors WF11 pattern) -->
+  <div class="page-head">
+    <h1>12 — Admin: User detail</h1>
+    <p>Single-user view. Edits role, manages org memberships, and curates assessment template access grants.</p>
+  </div>
+
+  <!-- Admin shell: sidebar + main -->
+  <div class="wf-shell">
+    <!-- Sidebar (mirrors WF11; Users still active) -->
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">S</span>
+        <span class="wf-sidebar-brand-text">
+          <span>Scaling Up</span>
+          <span class="wf-sidebar-brand-sub">Admin</span>
+        </span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Manage</div>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Dashboard
+        </a>
+        <a class="wf-sidebar-link is-active" href="11-admin-users-list.html" aria-current="page">
+          <span class="wf-sidebar-link-dot"></span>Users
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Organizations
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Templates
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Assessments
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Public Quizzes
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="wf-main">
+      <!-- Top bar with breadcrumb -->
+      <div class="wf-topbar">
+        <div class="wf-breadcrumb">
+          <a href="#">Admin</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="11-admin-users-list.html">Users</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Sarah Mitchell</span>
+        </div>
+      </div>
+
+      <!-- Page body -->
+      <div class="wf-page">
+        <!-- Detail header: identity left, actions right -->
+        <div class="wf-detail-header">
+          <div class="wf-detail-identity">
+            <span class="wf-avatar wf-avatar--lg wf-avatar--coach">SM</span>
+            <div>
+              <div class="wf-detail-name-row">
+                <h2 class="wf-detail-name">Sarah Mitchell</h2>
+                <span class="wf-pill wf-pill-role-coach">Coach</span>
+                <span class="wf-pill wf-pill-status-active">Active</span>
+              </div>
+            </div>
+          </div>
+          <div class="wf-detail-actions">
+            <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm">Send Password Reset</button>
+            <button type="button" class="wf-btn wf-btn-destructive wf-btn-sm">Disable User</button>
+            <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm">Revoke All Sessions</button>
+          </div>
+        </div>
+
+        <div class="wf-card-grid">
+
+          <!-- Card 1: User Details -->
+          <section class="wf-card">
+            <header class="wf-card-header">
+              <h3 class="wf-card-title">User Details</h3>
+              <p class="wf-card-description">Read-only profile. Role changes are admin-only and persisted immediately on save.</p>
+            </header>
+            <div class="wf-card-body">
+              <div class="wf-details-grid">
+                <div class="wf-details-field">
+                  <span class="wf-details-label">Name</span>
+                  <span class="wf-details-value">Sarah Mitchell</span>
+                </div>
+                <div class="wf-details-field">
+                  <span class="wf-details-label">Email</span>
+                  <span class="wf-details-value">sarah@coachfirm.com</span>
+                </div>
+                <div class="wf-details-field">
+                  <span class="wf-details-label">Role</span>
+                  <select class="wf-select" aria-label="User role">
+                    <option>Admin</option>
+                    <option>Staff</option>
+                    <option selected>Coach</option>
+                  </select>
+                </div>
+                <div class="wf-details-field">
+                  <span class="wf-details-label">Phone</span>
+                  <span class="wf-details-value">+1 (415) 555-2031</span>
+                </div>
+                <div class="wf-details-field">
+                  <span class="wf-details-label">Created</span>
+                  <span class="wf-details-value wf-details-value--muted">Mar 12 2025</span>
+                </div>
+                <div class="wf-details-field">
+                  <span class="wf-details-label">Last Login</span>
+                  <span class="wf-details-value wf-details-value--muted">Yesterday 4:30 PM</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Card 2: Memberships -->
+          <section class="wf-card">
+            <header class="wf-card-header">
+              <h3 class="wf-card-title">Memberships</h3>
+              <p class="wf-card-helper">Organizations this user has access to. Drives coach access in v1.</p>
+            </header>
+            <div class="wf-card-body">
+              <!-- Amber info banner about v1 acceptedAt semantics -->
+              <div class="wf-info-banner">
+                <strong>Wireframe note:</strong>
+                Memberships drive coach access. <code>ORG_ADMIN</code> with <code>acceptedAt</code> set = full read+write to that org's assessment data. v1 sets <code>acceptedAt=now()</code> on grant; v2 invite flow leaves null until acceptance.
+              </div>
+
+              <div class="wf-table-wrap">
+                <table class="wf-table">
+                  <thead>
+                    <tr>
+                      <th>Organization</th>
+                      <th>Role</th>
+                      <th>Granted At</th>
+                      <th>Granted By</th>
+                      <th>Acceptance</th>
+                      <th style="text-align: right;">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><span class="wf-font-semibold">Acme Corporation</span></td>
+                      <td>
+                        <select class="wf-select wf-select-sm" aria-label="Membership role for Acme Corporation">
+                          <option selected>ORG_ADMIN</option>
+                          <option>ORG_VIEWER</option>
+                        </select>
+                      </td>
+                      <td><span class="wf-text-xs wf-text-muted">Mar 14 2025</span></td>
+                      <td><span class="wf-text-xs wf-text-muted">Suzanne K.</span></td>
+                      <td><span class="wf-pill wf-pill-accepted">&#10003; Accepted</span></td>
+                      <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
+                    </tr>
+                    <tr>
+                      <td><span class="wf-font-semibold">BetaCo Holdings</span></td>
+                      <td>
+                        <select class="wf-select wf-select-sm" aria-label="Membership role for BetaCo Holdings">
+                          <option>ORG_ADMIN</option>
+                          <option selected>ORG_VIEWER</option>
+                        </select>
+                      </td>
+                      <td><span class="wf-text-xs wf-text-muted">Apr 02 2025</span></td>
+                      <td><span class="wf-text-xs wf-text-muted">Suzanne K.</span></td>
+                      <td><span class="wf-pill wf-pill-accepted">&#10003; Accepted</span></td>
+                      <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
+                    </tr>
+                    <tr>
+                      <td><span class="wf-font-semibold">Gamma Inc</span></td>
+                      <td>
+                        <select class="wf-select wf-select-sm" aria-label="Membership role for Gamma Inc">
+                          <option selected>ORG_ADMIN</option>
+                          <option>ORG_VIEWER</option>
+                        </select>
+                      </td>
+                      <td><span class="wf-text-xs wf-text-muted">May 11 2026</span></td>
+                      <td><span class="wf-text-xs wf-text-muted">Jeff V.</span></td>
+                      <td><span class="wf-pill wf-pill-pending-accept">&#8987; Pending</span></td>
+                      <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="wf-card-action-row">
+                <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm">+ Grant Membership</button>
+                <span class="wf-caption">Opens modal (see Wave 2 Task 3 — Memberships management — for full modal layout).</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- Card 3: Template Access Grants (v7.5 NEW) -->
+          <section class="wf-card">
+            <header class="wf-card-header">
+              <h3 class="wf-card-title">Assessment Template Access</h3>
+              <p class="wf-card-helper">
+                Which assessment templates this coach can select when creating campaigns.
+                v7.5: 4 default INVITED templates auto-granted on coach creation; admin curates exceptions here.
+                PUBLIC quizzes are admin-created at platform level &mdash; not grantable to coaches.
+              </p>
+            </header>
+            <div class="wf-card-body">
+              <div class="wf-chip-grid">
+                <!-- Chip 1: Rockefeller Habits -->
+                <div class="wf-chip">
+                  <div class="wf-chip-body">
+                    <span class="wf-chip-title">Rockefeller Habits Checklist</span>
+                    <div class="wf-chip-meta">
+                      <span class="wf-pill-template-type wf-pill-template-type--invited">INVITED</span>
+                      <span class="wf-chip-state wf-chip-state--granted">&#10003; Granted</span>
+                    </div>
+                  </div>
+                  <span class="wf-toggle is-on" role="img" aria-label="Granted">
+                    <span class="wf-toggle-track"></span>
+                    <span class="wf-toggle-thumb"></span>
+                  </span>
+                </div>
+
+                <!-- Chip 2: Leadership Vision Alignment -->
+                <div class="wf-chip">
+                  <div class="wf-chip-body">
+                    <span class="wf-chip-title">Leadership Vision Alignment</span>
+                    <div class="wf-chip-meta">
+                      <span class="wf-pill-template-type wf-pill-template-type--invited">INVITED</span>
+                      <span class="wf-chip-state wf-chip-state--granted">&#10003; Granted</span>
+                    </div>
+                  </div>
+                  <span class="wf-toggle is-on" role="img" aria-label="Granted">
+                    <span class="wf-toggle-track"></span>
+                    <span class="wf-toggle-thumb"></span>
+                  </span>
+                </div>
+
+                <!-- Chip 3: Quarterly Session Prep v2 -->
+                <div class="wf-chip">
+                  <div class="wf-chip-body">
+                    <span class="wf-chip-title">Quarterly Session Prep v2</span>
+                    <div class="wf-chip-meta">
+                      <span class="wf-pill-template-type wf-pill-template-type--invited">INVITED</span>
+                      <span class="wf-chip-state wf-chip-state--granted">&#10003; Granted</span>
+                    </div>
+                  </div>
+                  <span class="wf-toggle is-on" role="img" aria-label="Granted">
+                    <span class="wf-toggle-track"></span>
+                    <span class="wf-toggle-thumb"></span>
+                  </span>
+                </div>
+
+                <!-- Chip 4: Scaling Up Assessment -->
+                <div class="wf-chip">
+                  <div class="wf-chip-body">
+                    <span class="wf-chip-title">Scaling Up Assessment</span>
+                    <div class="wf-chip-meta">
+                      <span class="wf-pill-template-type wf-pill-template-type--invited">INVITED</span>
+                      <span class="wf-chip-state wf-chip-state--granted">&#10003; Granted</span>
+                    </div>
+                  </div>
+                  <span class="wf-toggle is-on" role="img" aria-label="Granted">
+                    <span class="wf-toggle-track"></span>
+                    <span class="wf-toggle-thumb"></span>
+                  </span>
+                </div>
+
+                <!-- Chip 5: Website Assessment (PUBLIC, not grantable) -->
+                <div class="wf-chip is-disabled">
+                  <div class="wf-chip-body">
+                    <span class="wf-chip-title">Website Assessment</span>
+                    <div class="wf-chip-meta">
+                      <span class="wf-pill-template-type wf-pill-template-type--public">PUBLIC</span>
+                      <span class="wf-chip-state wf-chip-state--off">&mdash; Not grantable</span>
+                    </div>
+                  </div>
+                  <span class="wf-toggle is-disabled" role="img" aria-label="Not grantable (PUBLIC quiz)">
+                    <span class="wf-toggle-track"></span>
+                    <span class="wf-toggle-thumb"></span>
+                  </span>
+                </div>
+              </div>
+
+              <p class="wf-caption" style="margin-top: 1rem;">
+                Full per-coach access management UI on Wave 2 Task 5 &mdash; Admin Template Access Management.
+              </p>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- End-of-page note -->
+        <div class="wf-end-note">
+          <strong>Modal previews out of scope.</strong>
+          Send Password Reset, Disable User, Revoke All Sessions, + Grant Membership, and Revoke Membership modals are not rendered here.
+          The Memberships management screen (Wave 2 Task 3) covers per-org grant modals; the Template Access screen (Task 5) covers per-coach template grant modals.
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

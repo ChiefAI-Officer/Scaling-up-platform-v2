@@ -287,6 +287,43 @@
     }
     .selected-pill-x:hover { color: hsl(var(--destructive)); }
 
+    /* ---------- CEO toggle (v7.5 — Scaling Up Assessment anonymity model) ---------- */
+    .selected-pill-ceo {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3125rem;
+      padding: 0.1875rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: hsl(var(--muted-foreground));
+      background: transparent;
+      border: 1px solid hsl(var(--border));
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .selected-pill-ceo input[type="radio"] {
+      margin: 0;
+      cursor: pointer;
+    }
+    .selected-pill-ceo.is-ceo {
+      background: hsl(45 100% 95%);
+      border-color: hsl(45 80% 55%);
+      color: hsl(40 70% 30%);
+      font-weight: 600;
+    }
+    .ceo-note {
+      margin: 0 0 0.75rem;
+      padding: 0.625rem 0.875rem;
+      background: hsl(45 100% 97%);
+      border: 1px solid hsl(45 80% 80%);
+      border-left: 3px solid hsl(45 80% 55%);
+      border-radius: 6px;
+      font-size: 0.75rem;
+      color: hsl(40 50% 25%);
+      line-height: 1.5;
+    }
+
     /* ---------- Hint banner (replaces the removed ad-hoc form) ---------- */
     .hint-banner {
       margin-top: 1rem;
@@ -370,7 +407,7 @@
 <body>
   <!-- Wireframe banner -->
   <div class="wf-banner">
-    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 2 (revised 02, Step 2 assign-only per Jeff May 8).</span>
+    <span><strong>WIREFRAME</strong> — Not functional. v7.5 spec reference: Wave 1 Task 2 (revised 02, Step 2 assign-only per Jeff May 8) + W1.5-T2-CEO polish (CEO toggle column per May 12 standing call).</span>
     <a href="../index.html">← Back to Phase 2 index</a>
   </div>
 
@@ -379,7 +416,7 @@
     <h1>Revised 02 — Wizard Step 2: Participants (assign-only)</h1>
     <p>
       Step 2 only appears for <strong>INVITED</strong> templates. Member creation is admin-side; this step assigns existing members to the campaign.
-      Deltas vs Phase 1: the "Add ad-hoc member" form is removed and replaced with a hint banner pointing to the admin User Setup page.
+      Deltas vs Phase 1: the "Add ad-hoc member" form is removed and replaced with a hint banner pointing to the admin User Setup page. <strong>v7.5 add</strong>: each selected member can be designated CEO (one per campaign) — drives the Scaling Up Assessment <code>aggregationMode=CEO_ONLY</code> anonymity behavior.
     </p>
   </div>
 
@@ -555,6 +592,15 @@
               <button class="wf-btn wf-btn-ghost wf-text-xs">Clear all</button>
             </div>
             <div class="wf-card-body">
+
+              <!-- CEO note (v7.5 — pulls CEO anonymity model into v1 per May 12 Jeff standing call) -->
+              <div class="ceo-note">
+                <strong>👑 CEO designation</strong> (v7.5) — for templates with <code>aggregationMode=CEO_ONLY</code> (e.g.,
+                Scaling Up Assessment) one participant must be designated CEO. The CEO sees their own responses + team aggregate
+                only; non-CEO respondents see their own row only. Coaches debriefing in-person see full data regardless of mode.
+                Re-toggling CEO on a different member un-sets the prior CEO in the same transaction.
+              </div>
+
               <div style="display:flex; flex-direction:column; gap:0.5rem; max-height: 460px; overflow-y:auto;">
 
                 <div class="selected-pill">
@@ -562,6 +608,10 @@
                     <div class="selected-pill-name">John Smith</div>
                     <div class="selected-pill-meta">john@acme.com · Engineering › Platform</div>
                   </div>
+                  <label class="selected-pill-ceo is-ceo" title="Designated CEO — sees own answers + team aggregate">
+                    <input type="radio" name="ceo" checked />
+                    👑 CEO
+                  </label>
                   <span class="selected-pill-x">×</span>
                 </div>
                 <div class="selected-pill">
@@ -569,6 +619,10 @@
                     <div class="selected-pill-name">Sarah Lee</div>
                     <div class="selected-pill-meta">sarah@acme.com · Engineering › Platform</div>
                   </div>
+                  <label class="selected-pill-ceo" title="Designate as CEO (only one per campaign)">
+                    <input type="radio" name="ceo" />
+                    👑 CEO
+                  </label>
                   <span class="selected-pill-x">×</span>
                 </div>
                 <div class="selected-pill">
@@ -576,6 +630,10 @@
                     <div class="selected-pill-name">Mike Chen</div>
                     <div class="selected-pill-meta">mike@acme.com · Engineering › Backend</div>
                   </div>
+                  <label class="selected-pill-ceo" title="Designate as CEO (only one per campaign)">
+                    <input type="radio" name="ceo" />
+                    👑 CEO
+                  </label>
                   <span class="selected-pill-x">×</span>
                 </div>
                 <div class="selected-pill">
@@ -583,6 +641,10 @@
                     <div class="selected-pill-name">Priya Krishnan</div>
                     <div class="selected-pill-meta">priya@acme.com · Engineering › Platform</div>
                   </div>
+                  <label class="selected-pill-ceo" title="Designate as CEO (only one per campaign)">
+                    <input type="radio" name="ceo" />
+                    👑 CEO
+                  </label>
                   <span class="selected-pill-x">×</span>
                 </div>
                 <div class="selected-pill">
@@ -590,6 +652,10 @@
                     <div class="selected-pill-name">Marcus Rivera</div>
                     <div class="selected-pill-meta">marcus@acme.com · Engineering › Platform</div>
                   </div>
+                  <label class="selected-pill-ceo" title="Designate as CEO (only one per campaign)">
+                    <input type="radio" name="ceo" />
+                    👑 CEO
+                  </label>
                   <span class="selected-pill-x">×</span>
                 </div>
                 <div class="selected-pill">
@@ -597,6 +663,10 @@
                     <div class="selected-pill-name">Tasha Whitfield</div>
                     <div class="selected-pill-meta">tasha@acme.com · Engineering › Platform</div>
                   </div>
+                  <label class="selected-pill-ceo" title="Designate as CEO (only one per campaign)">
+                    <input type="radio" name="ceo" />
+                    👑 CEO
+                  </label>
                   <span class="selected-pill-x">×</span>
                 </div>
                 <div class="selected-pill">
@@ -604,6 +674,10 @@
                     <div class="selected-pill-name">Jordan Park</div>
                     <div class="selected-pill-meta">jordan@acme.com · Engineering › Platform</div>
                   </div>
+                  <label class="selected-pill-ceo" title="Designate as CEO (only one per campaign)">
+                    <input type="radio" name="ceo" />
+                    👑 CEO
+                  </label>
                   <span class="selected-pill-x">×</span>
                 </div>
                 <div style="text-align:center; padding:0.5rem; color: hsl(var(--muted-foreground)); font-size:0.8125rem;">

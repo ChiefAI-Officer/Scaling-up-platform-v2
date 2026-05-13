@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>13 — Admin Memberships (per-org grant) (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome (mirrors WF11/WF12) ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ---------- Admin shell (sidebar + main, mirrored from WF11/WF12) ---------- */
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 0.875rem;
+    }
+    .wf-sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .wf-sidebar-brand-sub {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-sidebar-link-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.6;
+    }
+
+    .wf-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-breadcrumb {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb a:hover { color: hsl(var(--foreground)); text-decoration: underline; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page {
+      padding: 2rem;
+      width: 100%;
+    }
+
+    /* ---------- Page header row ---------- */
+    .wf-page-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .wf-page-subtitle-strong {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.9375rem;
+      margin: 0.125rem 0 0;
+      font-weight: 500;
+    }
+
+    /* ---------- Stats row (4 cards) — net-new component ---------- */
+    .wf-stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .wf-stat-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+    }
+    .wf-stat-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-stat-value {
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: hsl(var(--foreground));
+      line-height: 1;
+    }
+
+    /* ---------- Avatar (mirrors WF11/WF12) ---------- */
+    .wf-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+    .wf-avatar--admin { background: hsl(var(--primary)); }
+    .wf-avatar--staff { background: hsl(var(--muted-foreground)); }
+    .wf-avatar--coach { background: hsl(var(--success)); }
+
+    /* ---------- Pills (mirrored from WF11/WF12) ---------- */
+    .wf-pill-accepted {
+      background: hsl(var(--success) / 0.12);
+      color: hsl(var(--success));
+    }
+    .wf-pill-accepted::before { background: hsl(var(--success)); }
+    .wf-pill-pending-accept {
+      background: hsl(var(--warning) / 0.15);
+      color: hsl(var(--warning-foreground));
+    }
+    .wf-pill-pending-accept::before { background: hsl(var(--warning)); }
+
+    /* ---------- Inline form controls (mirrors WF12) ---------- */
+    .wf-select {
+      padding: 0.5rem 2rem 0.5rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--card));
+      font-size: 0.875rem;
+      color: hsl(var(--foreground));
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, hsl(var(--muted-foreground)) 50%),
+                        linear-gradient(135deg, hsl(var(--muted-foreground)) 50%, transparent 50%);
+      background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+    }
+    .wf-select-sm {
+      padding: 0.3125rem 1.75rem 0.3125rem 0.625rem;
+      font-size: 0.8125rem;
+    }
+
+    /* ---------- Table (mirrored from WF11/WF12) ---------- */
+    .wf-table-wrap { overflow: hidden; border-radius: var(--radius); border: 1px solid hsl(var(--border)); }
+    .wf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      background: hsl(var(--card));
+    }
+    .wf-table thead { background: hsl(var(--muted)); }
+    .wf-table th {
+      text-align: left;
+      padding: 0.625rem 1rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      border-bottom: 1px solid hsl(var(--border));
+      white-space: nowrap;
+    }
+    .wf-table td {
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid hsl(var(--border));
+      vertical-align: middle;
+      color: hsl(var(--foreground));
+    }
+    .wf-table tbody tr:last-child td { border-bottom: none; }
+    .wf-table tbody tr:hover { background: hsl(var(--muted) / 0.4); }
+    .wf-table tbody tr.is-dormant {
+      opacity: 0.55;
+      background: hsl(var(--muted) / 0.25);
+    }
+    .wf-table tbody tr.is-dormant:hover { background: hsl(var(--muted) / 0.4); }
+
+    .wf-table-name {
+      font-weight: 600;
+      color: hsl(var(--foreground));
+    }
+    .wf-table-email {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+    }
+    .wf-table-meta {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      white-space: nowrap;
+    }
+    .wf-table-link-destructive {
+      color: hsl(var(--destructive));
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.8125rem;
+    }
+    .wf-table-link-destructive:hover { text-decoration: underline; }
+
+    /* Inline user cell layout */
+    .wf-user-cell {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    /* Dormant caption under disabled user's email */
+    .wf-dormant-caption {
+      display: block;
+      font-size: 0.6875rem;
+      color: hsl(var(--destructive));
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-top: 0.125rem;
+    }
+    /* Helper-text row for dormant explanation (tooltip-style inline note) */
+    .wf-dormant-helper {
+      background: hsl(var(--destructive) / 0.06);
+      border-top: 1px solid hsl(var(--destructive) / 0.18);
+      border-bottom: 1px solid hsl(var(--destructive) / 0.18);
+    }
+    .wf-dormant-helper td {
+      padding: 0.625rem 1rem;
+      font-size: 0.75rem;
+      color: hsl(var(--destructive));
+      font-style: italic;
+      border-bottom: 1px solid hsl(var(--destructive) / 0.18);
+    }
+
+    /* Accepted-with-note inline mark */
+    .wf-acceptance-note {
+      display: block;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      font-style: italic;
+      margin-top: 0.125rem;
+    }
+
+    /* ---------- Modal preview card (net-new component) ---------- */
+    .wf-modal-section-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-xs);
+      margin-top: 1.5rem;
+    }
+    .wf-modal-section-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .wf-modal-section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 0.125rem;
+      color: hsl(var(--foreground));
+    }
+    .wf-modal-section-subtitle {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      margin: 0;
+      line-height: 1.5;
+    }
+    .wf-modal-stage {
+      padding: 2rem 1.5rem;
+      background: hsl(var(--muted) / 0.4);
+      display: flex;
+      justify-content: center;
+    }
+    .wf-modal-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 10px;
+      box-shadow: var(--shadow-md);
+      width: 100%;
+      max-width: 480px;
+      overflow: hidden;
+    }
+    .wf-modal-header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .wf-modal-title {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      margin: 0;
+      color: hsl(var(--foreground));
+      letter-spacing: -0.01em;
+    }
+    .wf-modal-body {
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.125rem;
+    }
+    .wf-modal-field-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin-bottom: 0.375rem;
+      display: block;
+    }
+    .wf-modal-input {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--card));
+      font-size: 0.875rem;
+      color: hsl(var(--foreground));
+      font-family: inherit;
+    }
+    .wf-modal-input::placeholder { color: hsl(var(--muted-foreground)); }
+
+    .wf-radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .wf-radio-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.625rem;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      cursor: pointer;
+      background: hsl(var(--card));
+    }
+    .wf-radio-option.is-checked {
+      border-color: hsl(var(--primary));
+      background: hsl(var(--primary) / 0.04);
+    }
+    .wf-radio-input {
+      margin-top: 0.1875rem;
+      accent-color: hsl(var(--primary));
+      flex-shrink: 0;
+    }
+    .wf-radio-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+      min-width: 0;
+    }
+    .wf-radio-title {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      letter-spacing: 0.01em;
+    }
+    .wf-radio-desc {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.45;
+    }
+
+    .wf-modal-helper-text {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.5;
+      margin: 0;
+      padding: 0.625rem 0.75rem;
+      background: hsl(var(--muted) / 0.6);
+      border-radius: 6px;
+      border-left: 3px solid hsl(var(--warning));
+    }
+    .wf-modal-helper-text code {
+      background: hsl(38 92% 92%);
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.7rem;
+      color: hsl(26 83% 25%);
+    }
+
+    .wf-modal-footer {
+      padding: 0.875rem 1.25rem;
+      border-top: 1px solid hsl(var(--border));
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      background: hsl(var(--muted) / 0.3);
+    }
+
+    /* ---------- End-of-page note ---------- */
+    .wf-end-note {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: hsl(var(--muted) / 0.5);
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      line-height: 1.55;
+    }
+
+    /* Responsive: collapse stats grid on narrow viewports */
+    @media (max-width: 900px) {
+      .wf-stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Yellow wireframe banner -->
+  <div class="wf-banner">
+    <div>
+      <strong>WIREFRAME — Not functional.</strong>
+      v7.5 spec reference: Wave 2 Task 3 (Admin Memberships per-org grant, inverse lens of Task 2 per v7.2 floor #5). v1: admin grants memberships explicitly. v2: invite flow with email-acceptance ships and acceptedAt may be null until acceptance.
+    </div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page heading (outside the shell, mirrors WF11/WF12 pattern) -->
+  <div class="page-head">
+    <h1>13 — Admin: Memberships (per-org grant)</h1>
+    <p>Per-org view of memberships. Inverse lens of Task 2 (per-user view). Admin grants users access to a specific organization's assessment data.</p>
+  </div>
+
+  <!-- Admin shell: sidebar + main -->
+  <div class="wf-shell">
+    <!-- Sidebar (Organizations active — this page is a sub-route of Organizations) -->
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">S</span>
+        <span class="wf-sidebar-brand-text">
+          <span>Scaling Up</span>
+          <span class="wf-sidebar-brand-sub">Admin</span>
+        </span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Manage</div>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Dashboard
+        </a>
+        <a class="wf-sidebar-link" href="11-admin-users-list.html">
+          <span class="wf-sidebar-link-dot"></span>Users
+        </a>
+        <a class="wf-sidebar-link is-active" href="#" aria-current="page">
+          <span class="wf-sidebar-link-dot"></span>Organizations
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Templates
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Assessments
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Public Quizzes
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="wf-main">
+      <!-- Top bar with breadcrumb -->
+      <div class="wf-topbar">
+        <div class="wf-breadcrumb">
+          <a href="#">Admin</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Organizations</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Acme Corporation</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Memberships</span>
+        </div>
+      </div>
+
+      <!-- Page body -->
+      <div class="wf-page">
+        <!-- Page header + primary CTA -->
+        <div class="wf-page-header-row">
+          <div>
+            <h2 class="wf-page-title">Memberships</h2>
+            <p class="wf-page-subtitle-strong">Acme Corporation</p>
+          </div>
+          <button type="button" class="wf-btn wf-btn-primary">+ Grant Membership</button>
+        </div>
+
+        <!-- Stats row (4 cards) -->
+        <div class="wf-stats-row">
+          <div class="wf-stat-card">
+            <span class="wf-stat-label">Total Members</span>
+            <span class="wf-stat-value">5</span>
+          </div>
+          <div class="wf-stat-card">
+            <span class="wf-stat-label">Admins (ORG_ADMIN)</span>
+            <span class="wf-stat-value">3</span>
+          </div>
+          <div class="wf-stat-card">
+            <span class="wf-stat-label">Leaders (ORG_LEADER)</span>
+            <span class="wf-stat-value">0</span>
+          </div>
+          <div class="wf-stat-card">
+            <span class="wf-stat-label">Viewers (ORG_VIEWER)</span>
+            <span class="wf-stat-value">1</span>
+          </div>
+        </div>
+
+        <!-- Memberships table -->
+        <div class="wf-table-wrap">
+          <table class="wf-table">
+            <thead>
+              <tr>
+                <th style="width: 56px;"></th>
+                <th>User Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Granted At</th>
+                <th>Acceptance</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 1. Sarah Mitchell — ORG_ADMIN, Accepted -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--coach">SM</span></td>
+                <td><span class="wf-table-name">Sarah Mitchell</span></td>
+                <td><span class="wf-table-email">sarah@coachfirm.com</span></td>
+                <td>
+                  <select class="wf-select wf-select-sm" aria-label="Membership role for Sarah Mitchell">
+                    <option selected>ORG_ADMIN</option>
+                    <option>ORG_LEADER</option>
+                    <option>ORG_VIEWER</option>
+                  </select>
+                </td>
+                <td><span class="wf-table-meta">Mar 14 2025</span></td>
+                <td><span class="wf-pill wf-pill-accepted">&#10003; Accepted</span></td>
+                <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
+              </tr>
+
+              <!-- 2. Bob Chen — ORG_ADMIN, Accepted -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--coach">BC</span></td>
+                <td><span class="wf-table-name">Bob Chen</span></td>
+                <td><span class="wf-table-email">bob@bcadvisory.com</span></td>
+                <td>
+                  <select class="wf-select wf-select-sm" aria-label="Membership role for Bob Chen">
+                    <option selected>ORG_ADMIN</option>
+                    <option>ORG_LEADER</option>
+                    <option>ORG_VIEWER</option>
+                  </select>
+                </td>
+                <td><span class="wf-table-meta">Apr 02 2025</span></td>
+                <td><span class="wf-pill wf-pill-accepted">&#10003; Accepted</span></td>
+                <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
+              </tr>
+
+              <!-- 3. Alice Rodriguez — ORG_VIEWER, Accepted -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--coach">AR</span></td>
+                <td><span class="wf-table-name">Alice Rodriguez</span></td>
+                <td><span class="wf-table-email">alice@arcoaching.com</span></td>
+                <td>
+                  <select class="wf-select wf-select-sm" aria-label="Membership role for Alice Rodriguez">
+                    <option>ORG_ADMIN</option>
+                    <option>ORG_LEADER</option>
+                    <option selected>ORG_VIEWER</option>
+                  </select>
+                </td>
+                <td><span class="wf-table-meta">May 08 2025</span></td>
+                <td><span class="wf-pill wf-pill-accepted">&#10003; Accepted</span></td>
+                <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
+              </tr>
+
+              <!-- 4. David Thomas — ORG_ADMIN, Pending -->
+              <tr>
+                <td><span class="wf-avatar wf-avatar--coach">DT</span></td>
+                <td><span class="wf-table-name">David Thomas</span></td>
+                <td><span class="wf-table-email">david@dtcoaching.com</span></td>
+                <td>
+                  <select class="wf-select wf-select-sm" aria-label="Membership role for David Thomas">
+                    <option selected>ORG_ADMIN</option>
+                    <option>ORG_LEADER</option>
+                    <option>ORG_VIEWER</option>
+                  </select>
+                </td>
+                <td><span class="wf-table-meta">May 11 2026</span></td>
+                <td><span class="wf-pill wf-pill-pending-accept">&#8987; Pending</span></td>
+                <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
+              </tr>
+
+              <!-- 5. Karen Lee — ORG_ADMIN, Accepted, but user is platform-disabled (dormant) -->
+              <tr class="is-dormant" title="User is platform-disabled — membership exists but user can't sign in">
+                <td><span class="wf-avatar wf-avatar--coach">KL</span></td>
+                <td><span class="wf-table-name">Karen Lee</span></td>
+                <td>
+                  <span class="wf-table-email">karen@oldemail.com</span>
+                  <span class="wf-dormant-caption">(account disabled)</span>
+                </td>
+                <td>
+                  <select class="wf-select wf-select-sm" aria-label="Membership role for Karen Lee">
+                    <option selected>ORG_ADMIN</option>
+                    <option>ORG_LEADER</option>
+                    <option>ORG_VIEWER</option>
+                  </select>
+                </td>
+                <td><span class="wf-table-meta">Jan 14 2026</span></td>
+                <td>
+                  <span class="wf-pill wf-pill-accepted">&#10003; Accepted</span>
+                  <span class="wf-acceptance-note">User disabled</span>
+                </td>
+                <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
+              </tr>
+              <!-- Inline helper row for the disabled user, mimicking tooltip behavior statically -->
+              <tr class="wf-dormant-helper">
+                <td colspan="7">
+                  &#9888; User is platform-disabled &mdash; membership exists but Karen can't sign in. Revoking is optional; the row is effectively dormant either way.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Modal preview card -->
+        <section class="wf-modal-section-card">
+          <header class="wf-modal-section-header">
+            <h3 class="wf-modal-section-title">Modal preview &mdash; Grant Membership</h3>
+            <p class="wf-modal-section-subtitle">
+              Rendered statically here so reviewers can comment on the copy + field layout.
+              In production this is a click-through from the &ldquo;+ Grant Membership&rdquo; button.
+            </p>
+          </header>
+          <div class="wf-modal-stage">
+            <div class="wf-modal-card" role="presentation">
+              <div class="wf-modal-header">
+                <h4 class="wf-modal-title">Grant Membership &mdash; Acme Corporation</h4>
+              </div>
+              <div class="wf-modal-body">
+
+                <!-- Field 1: Select user -->
+                <div>
+                  <label class="wf-modal-field-label" for="grant-user">Select user</label>
+                  <input id="grant-user" type="search" class="wf-modal-input" placeholder="Search platform users&hellip;" aria-label="Search platform users">
+                </div>
+
+                <!-- Field 2: Role -->
+                <div>
+                  <span class="wf-modal-field-label">Role</span>
+                  <div class="wf-radio-group">
+                    <label class="wf-radio-option is-checked">
+                      <input type="radio" name="grant-role" class="wf-radio-input" checked>
+                      <span class="wf-radio-body">
+                        <span class="wf-radio-title">ORG_ADMIN</span>
+                        <span class="wf-radio-desc">Full read + write to org's assessment data</span>
+                      </span>
+                    </label>
+                    <label class="wf-radio-option">
+                      <input type="radio" name="grant-role" class="wf-radio-input">
+                      <span class="wf-radio-body">
+                        <span class="wf-radio-title">ORG_LEADER</span>
+                        <span class="wf-radio-desc">Read-only access + can view aggregates</span>
+                      </span>
+                    </label>
+                    <label class="wf-radio-option">
+                      <input type="radio" name="grant-role" class="wf-radio-input">
+                      <span class="wf-radio-body">
+                        <span class="wf-radio-title">ORG_VIEWER</span>
+                        <span class="wf-radio-desc">Read-only access to own data only</span>
+                      </span>
+                    </label>
+                  </div>
+                  <p class="wf-modal-helper-text" style="margin-top: 0.625rem;">
+                    v1 sets <code>acceptedAt=now()</code> immediately; v2 invite-flow leaves <code>acceptedAt=null</code> until user accepts via email.
+                  </p>
+                </div>
+
+              </div>
+              <div class="wf-modal-footer">
+                <button type="button" class="wf-btn wf-btn-ghost wf-btn-sm">Cancel</button>
+                <button type="button" class="wf-btn wf-btn-primary wf-btn-sm">Grant Membership</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Wireframe end note -->
+        <div class="wf-end-note">
+          <strong>Wireframe end note.</strong>
+          Revoke action is a destructive operation &mdash; opens a confirmation dialog (also out of scope for this wireframe).
+          Karen Lee's row shows the visual treatment for memberships belonging to platform-disabled users.
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

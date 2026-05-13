@@ -144,7 +144,7 @@
 </head>
 <body>
   <div class="wf-banner">
-    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Phase 2 Wave 1.</span>
+    <span><strong>WIREFRAME</strong> — Not functional. v7.5 spec reference: Phase 2 Waves 1 + 2 (Codex co-validated May 12 2026).</span>
     <a href="../wireframes/index.html">← Phase 1 wireframes</a>
   </div>
 
@@ -153,12 +153,13 @@
       <div class="top-banner-flex">
         <div>
           <h1>Scaling Up Assessment Tool — Phase 2 Wireframes</h1>
-          <p>Revisions + new screens per Jeff's May 8 email + May 12 scope-lock + Codex v7.4 rescope (hardcoded Website Assessment, sliders only, content-flagged Esperto-derived copy).</p>
+          <p>Wave 1 (revisions + INVITED + PUBLIC participant flows) shipped May 12; Wave 2 (admin lane) shipped May 13 per Jeff's standing-call ask. v7.5 spec includes CEO anonymity model, INVITED results-emailed-back, conditional logic engine renderer, 4 default INVITED templates (SunHub deferred to v1.5 per Codex co-validate), `TemplateAccessGrant`, NUMBER + MULTI_CHOICE restored.</p>
         </div>
       </div>
       <div class="hero-meta">
-        <span><strong>Plan version:</strong> v7.4 (May 12, 2026)</span>
-        <span><strong>Wave 1 scope:</strong> 9 screens</span>
+        <span><strong>Plan version:</strong> v7.5 (Codex-co-validated, May 12 2026)</span>
+        <span><strong>Wave 1:</strong> 10 screens (shipped May 12)</span>
+        <span><strong>Wave 2:</strong> 9 admin-lane screens (shipped May 13)</span>
         <span><strong>Stakeholder:</strong> Jeff Verdun</span>
       </div>
     </div>
@@ -166,7 +167,7 @@
 
   <main class="container">
     <div class="legend">
-      <strong>What's new in Phase 2.</strong> Phase 1 covered the Coach-side wizard + campaign detail (10 desktop-only wireframes). Phase 2 revises three of those (per Jeff's May 8 per-screen feedback) and adds six new INVITED + PUBLIC participant flows. Several Phase 2 wireframes render mobile + desktop side-by-side because participant + leader-facing surfaces will be viewed on phones. Admin-side wireframes (User Setup) were dropped at v7.4 — those go straight to code.
+      <strong>What's new in Phase 2.</strong> Phase 1 covered the Coach-side wizard + campaign detail (10 desktop-only wireframes). Phase 2 revises three of those (per Jeff's May 8 per-screen feedback) and adds INVITED + PUBLIC participant flows (Wave 1, May 12) and the full admin lane (Wave 2, May 13). Several participant + leader-facing wireframes render mobile + desktop side-by-side. v7.4 had dropped admin User Setup to "code only"; the May 12 standing call (Jeff's Figma overview, Admin Tasks lane gap) reversed that — Wave 2 is the result. Codex co-validate (May 12) trimmed the `conditionalSections` admin UI on Task 8 (renderer ships v1, admin UI ships v1.5).
     </div>
 
     <div class="section-title">Wave 1 — Revisions</div>
@@ -269,8 +270,94 @@
 
     </div>
 
+    <div class="section-title">Wave 2 — Admin lane (shipped May 13 2026, Codex co-validated)</div>
+    <div class="grid">
+
+      <a class="wf-link" href="admin/11-admin-users-list.html">
+        <div class="wf-link-num">W2<br>T1</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — Users list</div>
+          <div class="wf-link-desc">Smallest admin screen; establishes the Wave 2 chrome conventions (sidebar / breadcrumb / table / pills) reused by Tasks 2–9. 8 mock users (Admin / Staff / Coach) with role + status pills, search + dual filter dropdowns, pagination. v1 surface — drives coach role activation testing per v7.2 floor #5.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/12-admin-user-detail.html">
+        <div class="wf-link-num">W2<br>T2</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — User detail (+ memberships + template access)</div>
+          <div class="wf-link-desc">Per-user view: read-only details, action buttons (password reset / disable / revoke sessions), 3 org memberships table (accept/pending state), 4 INVITED + 1 PUBLIC (disabled) template access chips reflecting v7.5 TemplateAccessGrant.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/13-admin-memberships.html">
+        <div class="wf-link-num">W2<br>T3</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — Memberships (per-org grant)</div>
+          <div class="wf-link-desc">Inverse lens of Task 2 — view memberships from the Acme Corporation side. 4 stat cards + 5 mock memberships (incl. one disabled-user row at opacity 0.55). Modal preview for "+ Grant Membership" rendered statically as a card-within-card so Jeff can comment on the modal copy/layout without click-through.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/14-admin-templates-list.html">
+        <div class="wf-link-num">W2<br>T4</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — Templates list</div>
+          <div class="wf-link-desc">Catalogue of 5 templates (4 INVITED + 1 PUBLIC). Scaling Up Assessment marked CEO_ONLY 👑; Website Assessment marked PUBLIC with no Access action (PUBLIC not grantable to coaches). "+ Create Template" disabled with v1.5 badge — authoring UI ships v1.5. Entry point for Tasks 5/6/7/8.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/15-admin-template-access.html">
+        <div class="wf-link-num">W2<br>T5</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — Template Access Management (per-coach grants)</div>
+          <div class="wf-link-desc">Coach × Template matrix. 6 coaches × 4 INVITED templates. Cell states: Granted / Auto / Revoked / Pending. PUBLIC templates excluded from columns (SunHub + Website Assessment are platform-managed). v7.5 API surface card shows the 3 endpoints driving the TemplateAccessGrant model.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/16-admin-template-editor-meta.html">
+        <div class="wf-link-num">W2<br>T6</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — Template editor: Metadata + Sections</div>
+          <div class="wf-link-desc">Template authoring shell (v1.5 surface). 7-tab nav (Metadata active; Conditional Logic disabled with v1.5 badge). Metadata + invitation email + results email (v7.5 INVITED-results-emailed-back, content-flag gated) forms + sections list with all 10 Rockefeller sections + version history strip.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/17-admin-template-editor-questions.html">
+        <div class="wf-link-num">W2<br>T7</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — Template editor: Questions (6 types)</div>
+          <div class="wf-link-desc">3-column layout: Section nav (S2 selected) / 4 question cards (Q2_1 focused) / per-question config form. Question type dropdown shows 3 active in v1 (SLIDER_LIKERT + NUMBER + MULTI_CHOICE) and 3 v1.5-deferred (TEXT + TEXTAREA + COMPOUND). Per-type config previews + v1.5-deferred panel.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/18-admin-template-editor-logic.html">
+        <div class="wf-link-num">W2<br>T8</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — Template editor: Scoring + Tiers <strong>(Codex-trimmed)</strong></div>
+          <div class="wf-link-desc">Active editor: tierMetric + passThreshold + tiers table (3 Rockefeller mock rows, verbatim Low / OK / Great messages). <strong>conditionalSections + peerBenchmarks editors deferred to v1.5</strong> per Codex co-validate — rendered as ghosted "Coming in v1.5" placeholder cards with example JSON so Jeff sees the future shape. Renderer-side evaluation still ships v1.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/20-admin-public-wizard-flow.html">
+        <div class="wf-link-num">W2<br>T9</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — PUBLIC wizard chrome (at-a-glance)</div>
+          <div class="wf-link-desc">All 4 admin PUBLIC wizard steps in one screen: Template (SunHub selected) → Schedule (open-ended evergreen) → Public Config (Lead Capture + Results Routing + CTA Buttons sub-cards) → Review (with embed iframe code block). v1.5 surface — v1 ships Website Assessment hardcoded route only.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+    </div>
+
     <p class="wf-text-xs wf-text-muted" style="margin-top: 2rem; text-align: center;">
-      More cards will be added by subsequent Wave 1 tasks. See <a href="README.md" style="color: hsl(var(--primary));">README</a> for the full Wave 1 task list.
+      Waves 1 + 2 complete (19 wireframes). Wave 3 (output / report wireframes, ~6 screens) deferred until Jeff's Wave 2 feedback lands. See <a href="README.md" style="color: hsl(var(--primary));">README</a> for the full task list + status.
     </p>
   </main>
 </body>

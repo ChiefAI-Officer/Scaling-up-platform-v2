@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>20 — Admin Public Quiz wizard flow (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome (mirrors wireframe 11) ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ---------- Admin shell (sidebar + main) ---------- */
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 0.875rem;
+    }
+    .wf-sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .wf-sidebar-brand-sub {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-sidebar-link-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.6;
+    }
+
+    .wf-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-breadcrumb {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page {
+      padding: 2rem;
+      width: 100%;
+    }
+    .wf-page-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .wf-page-header-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    /* ---------- v7.5 PUBLIC mode — token not in _shared.css, scoped local ---------- */
+    .wf-pill-access-public {
+      background: hsl(280 80% 95%); /* purple-50 — exception: no token for PUBLIC */
+      color: hsl(280 50% 35%);      /* purple-700 — exception: no token for PUBLIC */
+    }
+    .wf-pill-access-public::before { background: hsl(280 50% 45%); /* exception */ }
+
+    /* Amber "version" pill — uses warning token */
+    .wf-pill-version {
+      background: hsl(var(--warning) / 0.15);
+      color: hsl(var(--warning-foreground));
+    }
+    .wf-pill-version::before { background: hsl(var(--warning)); }
+
+    /* ---------- Wizard step indicator ---------- */
+    .wf-stepper {
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      padding: 1.25rem 1.5rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-xs);
+      margin-bottom: 1.5rem;
+    }
+    .wf-stepper-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      position: relative;
+    }
+    .wf-stepper-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+      font-weight: 700;
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+      border: 2px solid hsl(var(--border));
+      z-index: 1;
+    }
+    .wf-stepper-item.is-active .wf-stepper-circle {
+      background: hsl(var(--primary));
+      color: white;
+      border-color: hsl(var(--primary));
+    }
+    .wf-stepper-label {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-stepper-item.is-active .wf-stepper-label {
+      color: hsl(var(--foreground));
+      font-weight: 600;
+    }
+    .wf-stepper-sublabel {
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 600;
+    }
+    /* Connecting line between steps (horizontal) */
+    .wf-stepper-item:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 18px;
+      left: calc(50% + 18px);
+      right: calc(-50% + 18px);
+      height: 2px;
+      background: hsl(var(--border));
+      z-index: 0;
+    }
+
+    /* ---------- Step preview cards (compact) ---------- */
+    .wf-step-preview {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-xs);
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .wf-step-preview-header {
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid hsl(var(--border));
+      background: hsl(var(--muted) / 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .wf-step-preview-title {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-step-preview-caption {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-style: italic;
+    }
+    .wf-step-preview-body {
+      padding: 1rem 1.25rem;
+    }
+
+    /* ---------- Radio + checkbox option list ---------- */
+    .wf-option-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .wf-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.625rem;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--card));
+      font-size: 0.8125rem;
+    }
+    .wf-option.is-selected {
+      border-color: hsl(var(--primary));
+      background: hsl(var(--primary) / 0.04);
+    }
+    .wf-option.is-disabled {
+      opacity: 0.55;
+      background: hsl(var(--muted) / 0.4);
+    }
+    .wf-option-marker {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid hsl(var(--border));
+      flex-shrink: 0;
+      margin-top: 2px;
+      position: relative;
+    }
+    .wf-option.is-selected .wf-option-marker {
+      border-color: hsl(var(--primary));
+    }
+    .wf-option.is-selected .wf-option-marker::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: hsl(var(--primary));
+    }
+    .wf-option-marker--check {
+      border-radius: 4px;
+    }
+    .wf-option-marker--check.is-checked {
+      background: hsl(var(--primary));
+      border-color: hsl(var(--primary));
+    }
+    .wf-option-marker--check.is-checked::after {
+      content: "✓";
+      color: white;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wf-option-marker--check.is-locked {
+      background: hsl(var(--muted-foreground));
+      border-color: hsl(var(--muted-foreground));
+    }
+    .wf-option-marker--check.is-locked::after {
+      content: "🔒";
+      font-size: 0.5625rem;
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      filter: grayscale(1) brightness(2);
+    }
+    .wf-option-body { flex: 1; min-width: 0; }
+    .wf-option-title {
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .wf-option-meta {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.75rem;
+      margin-top: 0.125rem;
+    }
+
+    /* ---------- Form inputs (compact) ---------- */
+    .wf-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin-bottom: 0.875rem;
+    }
+    .wf-field-label {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+    }
+    .wf-field-helper {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-input,
+    .wf-textarea {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--card));
+      font-size: 0.875rem;
+      color: hsl(var(--foreground));
+      font-family: inherit;
+    }
+    .wf-input:disabled {
+      background: hsl(var(--muted) / 0.5);
+      color: hsl(var(--muted-foreground));
+      cursor: not-allowed;
+    }
+
+    /* ---------- Sub-cards (used in Step 3) ---------- */
+    .wf-subcard {
+      background: hsl(var(--muted) / 0.3);
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      padding: 0.875rem 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .wf-subcard:last-child { margin-bottom: 0; }
+    .wf-subcard-title {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 0.625rem;
+    }
+
+    /* ---------- Checkbox grid (Step 3 Lead Capture) ---------- */
+    .wf-checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.375rem 1rem;
+    }
+    .wf-checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8125rem;
+      color: hsl(var(--foreground));
+    }
+    .wf-checkbox-row .wf-option-marker {
+      margin-top: 0;
+    }
+
+    /* ---------- Summary block (Step 4) ---------- */
+    .wf-summary-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .wf-summary-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      font-size: 0.8125rem;
+    }
+    .wf-summary-key {
+      flex: 0 0 130px;
+      font-weight: 600;
+      color: hsl(var(--muted-foreground));
+      text-transform: uppercase;
+      font-size: 0.6875rem;
+      letter-spacing: 0.04em;
+      padding-top: 1px;
+    }
+    .wf-summary-value {
+      flex: 1;
+      color: hsl(var(--foreground));
+    }
+
+    /* Embed code block */
+    .wf-embed-block {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      border-radius: 6px;
+      padding: 0.75rem 0.875rem;
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      overflow-x: auto;
+      white-space: nowrap;
+      margin-bottom: 0.5rem;
+    }
+
+    /* CTA list row */
+    .wf-cta-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.625rem;
+      padding: 0.625rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--card));
+      font-size: 0.8125rem;
+      margin-bottom: 0.5rem;
+    }
+    .wf-cta-badge {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.125rem 0.375rem;
+      border-radius: 4px;
+      background: hsl(var(--primary) / 0.12);
+      color: hsl(var(--primary));
+      flex-shrink: 0;
+    }
+    .wf-cta-body { flex: 1; min-width: 0; }
+    .wf-cta-label {
+      font-weight: 600;
+      color: hsl(var(--foreground));
+    }
+    .wf-cta-url {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      word-break: break-all;
+      margin-top: 0.125rem;
+    }
+
+    /* Helper-blue card (Codex co-validate) */
+    .wf-helper-blue {
+      background: hsl(var(--info) / 0.08);
+      border: 1px solid hsl(var(--info) / 0.3);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-top: 1rem;
+    }
+    .wf-helper-blue-title {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: hsl(var(--info));
+      margin: 0 0 0.375rem;
+    }
+    .wf-helper-blue-body {
+      font-size: 0.8125rem;
+      color: hsl(var(--foreground));
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    /* Yellow-banner-style inline note */
+    .wf-inline-note {
+      background: hsl(38 92% 95%);
+      border: 1px solid hsl(38 92% 80%);
+      color: hsl(26 83% 25%);
+      border-radius: var(--radius);
+      padding: 0.875rem 1.125rem;
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      margin-top: 1rem;
+    }
+    .wf-inline-note strong { font-weight: 700; }
+
+    /* Final gray small end note */
+    .wf-end-note {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      text-align: center;
+      margin-top: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    /* Add CTA button */
+    .wf-add-cta {
+      font-size: 0.75rem;
+      color: hsl(var(--primary));
+      font-weight: 500;
+      background: none;
+      border: 1px dashed hsl(var(--border));
+      border-radius: 6px;
+      padding: 0.375rem 0.625rem;
+      cursor: pointer;
+    }
+    .wf-add-cta:hover {
+      background: hsl(var(--primary) / 0.04);
+      border-color: hsl(var(--primary));
+    }
+  </style>
+</head>
+<body>
+  <!-- Yellow wireframe banner -->
+  <div class="wf-banner">
+    <div>
+      <strong>WIREFRAME — Not functional.</strong>
+      v7.5 spec reference: Wave 2 Task 9 (Admin PUBLIC wizard chrome — at-a-glance preview, v7.3 Task 13 carried).
+      <strong>v1</strong>: Website Assessment is hardcoded — no generalized admin PUBLIC wizard yet.
+      <strong>v1.5</strong>: this wizard ships for SunHub Quick Quiz + any future PUBLIC templates.
+      Each step's full detail lives in: Step 1 &rarr; Wireframe 01 (template select); Step 3 &rarr; Wireframe 04 revised (Public Config card).
+    </div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page heading (outside the shell, mirrors WF11 pattern) -->
+  <div class="page-head">
+    <h1>20 — Admin: Public Quiz wizard (at-a-glance)</h1>
+    <p>Admin lane. Full 4-step PUBLIC quiz wizard previewed in one screen so reviewers see the overall flow. v1.5 surface — v1 hardcodes Website Assessment.</p>
+  </div>
+
+  <!-- Admin shell: sidebar + main -->
+  <div class="wf-shell">
+    <!-- Sidebar -->
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">S</span>
+        <span class="wf-sidebar-brand-text">
+          <span>Scaling Up</span>
+          <span class="wf-sidebar-brand-sub">Admin</span>
+        </span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Manage</div>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Dashboard
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Users
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Organizations
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Templates
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Assessments
+        </a>
+        <a class="wf-sidebar-link is-active" href="#" aria-current="page">
+          <span class="wf-sidebar-link-dot"></span>Public Quizzes
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="wf-main">
+      <!-- Top bar with breadcrumb -->
+      <div class="wf-topbar">
+        <div class="wf-breadcrumb">
+          <a href="#">Admin</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Public Quizzes</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">New Quiz</span>
+        </div>
+      </div>
+
+      <!-- Page body -->
+      <div class="wf-page">
+        <!-- Page header + actions -->
+        <div class="wf-page-header-row">
+          <div>
+            <h2 class="wf-page-title">Create Public Quiz</h2>
+            <p class="wf-page-subtitle">Configure a new PUBLIC-mode assessment campaign. v1.5 surface — for v1, Website Assessment is hardcoded; SunHub Quick Quiz joins v1.5.</p>
+          </div>
+          <div class="wf-page-header-actions">
+            <button type="button" class="wf-btn wf-btn-ghost">Cancel</button>
+            <button type="button" class="wf-btn wf-btn-secondary" disabled title="Step 1 incomplete">Save Draft</button>
+          </div>
+        </div>
+
+        <!-- Wizard step indicator -->
+        <div class="wf-stepper" role="list" aria-label="Wizard progress">
+          <div class="wf-stepper-item is-active" role="listitem" aria-current="step">
+            <div class="wf-stepper-circle">1</div>
+            <div class="wf-stepper-label">Template</div>
+            <div class="wf-stepper-sublabel">Step 1</div>
+          </div>
+          <div class="wf-stepper-item" role="listitem">
+            <div class="wf-stepper-circle">2</div>
+            <div class="wf-stepper-label">Schedule</div>
+            <div class="wf-stepper-sublabel">Step 2</div>
+          </div>
+          <div class="wf-stepper-item" role="listitem">
+            <div class="wf-stepper-circle">3</div>
+            <div class="wf-stepper-label">Public Config</div>
+            <div class="wf-stepper-sublabel">Step 3</div>
+          </div>
+          <div class="wf-stepper-item" role="listitem">
+            <div class="wf-stepper-circle">4</div>
+            <div class="wf-stepper-label">Review</div>
+            <div class="wf-stepper-sublabel">Step 4</div>
+          </div>
+        </div>
+
+        <!-- ============================================================
+             Step 1 preview — Template
+             ============================================================ -->
+        <section class="wf-step-preview">
+          <div class="wf-step-preview-header">
+            <h3 class="wf-step-preview-title">
+              Step 1 — Template
+              <span class="wf-pill wf-pill-version">v1.5 surface</span>
+            </h3>
+            <span class="wf-step-preview-caption">Full layout: Wireframe 01 (Template select, Phase 1)</span>
+          </div>
+          <div class="wf-step-preview-body">
+            <div class="wf-option-list">
+              <!-- Website Assessment (not selected) -->
+              <label class="wf-option">
+                <span class="wf-option-marker" aria-hidden="true"></span>
+                <span class="wf-option-body">
+                  <span class="wf-option-title">
+                    Website Assessment
+                    <span class="wf-pill wf-pill-access-public">PUBLIC</span>
+                  </span>
+                  <span class="wf-option-meta">32 Q &times; 0&ndash;10 slider &middot; v1 hardcoded route at <code>/quiz/website-assessment</code></span>
+                </span>
+              </label>
+
+              <!-- SunHub Quick Quiz (selected) -->
+              <label class="wf-option is-selected">
+                <span class="wf-option-marker" aria-hidden="true"></span>
+                <span class="wf-option-body">
+                  <span class="wf-option-title">
+                    SunHub Quick Quiz
+                    <span class="wf-pill wf-pill-access-public">PUBLIC</span>
+                    <span class="wf-pill wf-pill-version">v1.5</span>
+                  </span>
+                  <span class="wf-option-meta">8 Q &times; 0&ndash;5 slider &middot; shares <code>&lt;PublicQuizResultsView&gt;</code> renderer with Website Assessment</span>
+                </span>
+              </label>
+
+              <!-- Future placeholder -->
+              <label class="wf-option is-disabled">
+                <span class="wf-option-marker" aria-hidden="true"></span>
+                <span class="wf-option-body">
+                  <span class="wf-option-title">[Future PUBLIC templates appear here]</span>
+                  <span class="wf-option-meta">Additional admin-managed PUBLIC campaigns join this list as they ship.</span>
+                </span>
+              </label>
+            </div>
+            <p class="wf-field-helper" style="margin-top: 0.75rem;">
+              <strong>INVITED templates filtered out</strong> — INVITED templates not shown. Use the Coach wizard to create INVITED campaigns.
+            </p>
+            <p class="wf-field-helper" style="margin-top: 0.375rem;">
+              PUBLIC templates are admin-managed at the platform level. v1 ships Website Assessment hardcoded; SunHub joins v1.5.
+            </p>
+          </div>
+        </section>
+
+        <!-- ============================================================
+             Step 2 preview — Schedule
+             ============================================================ -->
+        <section class="wf-step-preview">
+          <div class="wf-step-preview-header">
+            <h3 class="wf-step-preview-title">Step 2 — Schedule</h3>
+            <span class="wf-step-preview-caption">Full layout: Wireframe 03 (Schedule, Phase 1)</span>
+          </div>
+          <div class="wf-step-preview-body">
+            <div class="wf-field">
+              <label class="wf-field-label" for="campaign-name">Campaign Name</label>
+              <input class="wf-input" id="campaign-name" type="text" value="SunHub Quick Quiz — Evergreen 2026" readonly>
+            </div>
+            <div class="wf-field">
+              <label class="wf-field-label" for="open-at">Open At</label>
+              <input class="wf-input" id="open-at" type="date" value="2026-06-22" readonly>
+              <span class="wf-field-helper">Defaults to now.</span>
+            </div>
+            <div class="wf-field">
+              <span class="wf-field-label">End Mode</span>
+              <div class="wf-option-list" style="margin-top: 0.25rem;">
+                <label class="wf-option is-selected">
+                  <span class="wf-option-marker" aria-hidden="true"></span>
+                  <span class="wf-option-body">
+                    <span class="wf-option-title">Open-ended (no close date)</span>
+                    <span class="wf-option-meta">Recommended for evergreen PUBLIC quizzes.</span>
+                  </span>
+                </label>
+                <label class="wf-option">
+                  <span class="wf-option-marker" aria-hidden="true"></span>
+                  <span class="wf-option-body">
+                    <span class="wf-option-title">Ends after specific date</span>
+                  </span>
+                </label>
+              </div>
+            </div>
+            <div class="wf-field">
+              <label class="wf-field-label" for="close-at">Close At</label>
+              <input class="wf-input" id="close-at" type="date" disabled>
+              <span class="wf-field-helper">Disabled — Open-ended is selected.</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================
+             Step 3 preview — Public Config
+             ============================================================ -->
+        <section class="wf-step-preview">
+          <div class="wf-step-preview-header">
+            <h3 class="wf-step-preview-title">Step 3 — Public Config</h3>
+            <span class="wf-step-preview-caption">Full layout in Wireframe 04 revised — admin lane</span>
+          </div>
+          <div class="wf-step-preview-body">
+
+            <!-- Sub-card a: Lead Capture -->
+            <div class="wf-subcard">
+              <h4 class="wf-subcard-title">a. Lead Capture</h4>
+              <div class="wf-checkbox-grid">
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check is-locked" aria-hidden="true"></span>
+                  <span>Email <em class="wf-text-muted wf-text-xs">(required, locked on)</em></span>
+                </div>
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check is-checked" aria-hidden="true"></span>
+                  <span>First name</span>
+                </div>
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check is-checked" aria-hidden="true"></span>
+                  <span>Last name</span>
+                </div>
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check" aria-hidden="true"></span>
+                  <span>Phone</span>
+                </div>
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check is-checked" aria-hidden="true"></span>
+                  <span>Title</span>
+                </div>
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check is-checked" aria-hidden="true"></span>
+                  <span>Company</span>
+                </div>
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check is-checked" aria-hidden="true"></span>
+                  <span>Number of employees</span>
+                </div>
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check is-checked" aria-hidden="true"></span>
+                  <span>City / State / Country</span>
+                </div>
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check is-checked" aria-hidden="true"></span>
+                  <span>Referring coach email <em class="wf-text-muted wf-text-xs">(optional)</em></span>
+                </div>
+              </div>
+              <p class="wf-field-helper" style="margin-top: 0.625rem;">
+                End-loaded per Esperto pattern: quiz first, then contact form, then results.
+              </p>
+            </div>
+
+            <!-- Sub-card b: Results Routing -->
+            <div class="wf-subcard">
+              <h4 class="wf-subcard-title">b. Results Routing</h4>
+              <div class="wf-checkbox-grid" style="grid-template-columns: 1fr;">
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check is-locked" aria-hidden="true"></span>
+                  <span>Send results to taker <em class="wf-text-muted wf-text-xs">(locked on)</em></span>
+                </div>
+                <div class="wf-checkbox-row">
+                  <span class="wf-option-marker wf-option-marker--check is-checked" aria-hidden="true"></span>
+                  <span>Send to referring coach <em class="wf-text-muted wf-text-xs">(if entered + matched to <code>Coach.email</code>)</em></span>
+                </div>
+              </div>
+              <div class="wf-field" style="margin-top: 0.75rem; margin-bottom: 0;">
+                <label class="wf-field-label" for="cc-emails">Always-CC emails</label>
+                <input class="wf-input" id="cc-emails" type="text" value="coach@scalingup.com" readonly>
+                <span class="wf-field-helper">
+                  Referring coach email validated against <code>Coach.email</code> allowlist at submit time. Unmatched emails stored but NOT in SMTP fan-out (privacy gate per v7.1).
+                </span>
+              </div>
+            </div>
+
+            <!-- Sub-card c: CTA Buttons -->
+            <div class="wf-subcard">
+              <h4 class="wf-subcard-title">c. CTA Buttons</h4>
+              <div class="wf-cta-row">
+                <span class="wf-cta-badge">Primary</span>
+                <span class="wf-cta-body">
+                  <span class="wf-cta-label">YES! I WOULD LIKE A COMPLIMENTARY FOLLOW-UP</span>
+                  <div class="wf-cta-url">https://coaches.scalingup.com/coach-match-after-assessment-form</div>
+                  <span class="wf-field-helper">No tier gating.</span>
+                </span>
+              </div>
+              <button type="button" class="wf-add-cta">+ Add CTA</button>
+              <p class="wf-field-helper" style="margin-top: 0.625rem;">
+                Tier gating optional via <code>conditionTier</code>. Renderer reads <code>publicConfig.ctaButtons</code> at results-page render time.
+              </p>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ============================================================
+             Step 4 preview — Review
+             ============================================================ -->
+        <section class="wf-step-preview">
+          <div class="wf-step-preview-header">
+            <h3 class="wf-step-preview-title">Step 4 — Review</h3>
+            <span class="wf-step-preview-caption">Full layout: Wireframe 05 (Review, Phase 1)</span>
+          </div>
+          <div class="wf-step-preview-body">
+            <div class="wf-summary-list">
+              <div class="wf-summary-row">
+                <span class="wf-summary-key">Template</span>
+                <span class="wf-summary-value">
+                  SunHub Quick Quiz <span class="wf-pill wf-pill-access-public">PUBLIC</span>
+                  <span class="wf-text-muted wf-text-xs">&middot; 8 Q &times; 0&ndash;5 slider &middot; v1.5</span>
+                </span>
+              </div>
+              <div class="wf-summary-row">
+                <span class="wf-summary-key">Campaign</span>
+                <span class="wf-summary-value">SunHub Quick Quiz — Evergreen 2026</span>
+              </div>
+              <div class="wf-summary-row">
+                <span class="wf-summary-key">Open</span>
+                <span class="wf-summary-value">2026-06-22 &middot; <strong>End:</strong> Open-ended</span>
+              </div>
+              <div class="wf-summary-row">
+                <span class="wf-summary-key">Lead capture</span>
+                <span class="wf-summary-value">8 / 10 fields enabled</span>
+              </div>
+              <div class="wf-summary-row">
+                <span class="wf-summary-key">Always-CC</span>
+                <span class="wf-summary-value">coach@scalingup.com</span>
+              </div>
+              <div class="wf-summary-row">
+                <span class="wf-summary-key">CTAs</span>
+                <span class="wf-summary-value">1 (primary conversion)</span>
+              </div>
+            </div>
+
+            <div class="wf-field">
+              <label class="wf-field-label">Embed code</label>
+              <div class="wf-embed-block" role="textbox" aria-readonly="true">&lt;iframe src="https://app.scalingup.com/quiz/sunhub-quick-quiz" width="100%" height="800" frameborder="0"&gt;&lt;/iframe&gt;</div>
+              <span class="wf-field-helper">Embed-friendly for scalingup.com + SunHub. CSP + CORS configured per v7.3.</span>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+              <button type="button" class="wf-btn wf-btn-primary" disabled title="Complete Step 1 first">Publish Campaign</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================
+             Wireframe note (yellow inline)
+             ============================================================ -->
+        <div class="wf-inline-note">
+          This screen is a chrome-only at-a-glance preview of the admin PUBLIC wizard.
+          <strong>Each step's full layout is rendered in detail in</strong>: Wireframe 01 (Template select — Phase 1),
+          Wireframe 04 revised (Public Config — admin lane), Wireframe 03 (Schedule — Phase 1), Wireframe 05 (Review — Phase 1).
+          Same components, admin chrome instead of coach chrome.
+        </div>
+
+        <!-- ============================================================
+             Codex co-validate clarification (helper-blue)
+             ============================================================ -->
+        <div class="wf-helper-blue">
+          <h4 class="wf-helper-blue-title">v1 vs v1.5 PUBLIC engine</h4>
+          <p class="wf-helper-blue-body">
+            Per Codex co-validate (May 12 2026), v1 ships Website Assessment as a hardcoded route + seed + content flag &mdash;
+            <strong>NO generalized PUBLIC wizard</strong>. Admins cannot author new PUBLIC campaigns in v1.
+            This wizard ships in v1.5 alongside SunHub Quick Quiz.
+            The schema (<code>AssessmentCampaign.accessMode</code> enum + <code>publicConfig Json?</code> field) is still present in v1
+            for forward-compat &mdash; only the rendering + wizard UI is hardcoded.
+          </p>
+        </div>
+
+        <!-- Final gray end note -->
+        <p class="wf-end-note">No mobile responsive needed (admin desktop-only per v7.3).</p>
+
+      </div>
+    </main>
+  </div>
+</body>
+</html>

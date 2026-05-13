@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>18 — Admin Template Editor: Scoring &amp; Tiers (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome (mirrors WF16/WF17 verbatim) ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ---------- Admin shell ---------- */
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 0.875rem;
+    }
+    .wf-sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .wf-sidebar-brand-sub {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-sidebar-link-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.6;
+    }
+
+    .wf-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-breadcrumb {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      flex-wrap: wrap;
+    }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb a:hover { color: hsl(var(--foreground)); text-decoration: underline; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page {
+      padding: 2rem;
+      width: 100%;
+    }
+
+    /* ---------- Page header row ---------- */
+    .wf-page-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .wf-page-title-block h2 {
+      font-size: 1.375rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0;
+      color: hsl(var(--foreground));
+    }
+    .wf-page-pill-row {
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-version-pill-draft {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.5rem;
+      border-radius: 999px;
+      background: hsl(var(--warning) / 0.18);
+      color: hsl(var(--warning-foreground));
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .wf-page-caption {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-style: italic;
+    }
+    .wf-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .wf-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.5rem 0.875rem;
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background 0.12s ease, color 0.12s ease;
+      white-space: nowrap;
+    }
+    .wf-btn-ghost {
+      background: transparent;
+      color: hsl(var(--foreground));
+      border-color: hsl(var(--border));
+    }
+    .wf-btn-ghost:hover { background: hsl(var(--muted)); }
+    .wf-btn-secondary {
+      background: hsl(var(--card));
+      color: hsl(var(--foreground));
+      border-color: hsl(var(--border));
+    }
+    .wf-btn-secondary:hover { background: hsl(var(--muted)); }
+    .wf-btn-primary {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-btn-primary:hover { background: hsl(var(--primary) / 0.92); }
+    .wf-btn-primary[disabled],
+    .wf-btn-primary[aria-disabled="true"] {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .wf-btn-destructive {
+      background: transparent;
+      color: hsl(var(--destructive));
+      border-color: hsl(var(--destructive) / 0.4);
+    }
+    .wf-btn-destructive:hover { background: hsl(var(--destructive) / 0.08); }
+    .wf-btn-xs {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.6875rem;
+    }
+
+    /* ---------- Pills (reused from WF16) ---------- */
+    .wf-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .wf-pill::before {
+      content: "";
+      width: 6px; height: 6px;
+      border-radius: 999px;
+    }
+    .wf-pill-access-invited {
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+    }
+    .wf-pill-access-invited::before { background: hsl(var(--primary)); }
+    .wf-pill-agg-full {
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-pill-agg-full::before { background: hsl(var(--muted-foreground)); }
+
+    /* ---------- Sub-nav tabs ---------- */
+    .wf-tabnav {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      border-bottom: 1px solid hsl(var(--border));
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+    }
+    .wf-tab {
+      padding: 0.625rem 0.125rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: hsl(var(--muted-foreground));
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .wf-tab:hover { color: hsl(var(--foreground)); }
+    .wf-tab.is-active {
+      color: hsl(var(--primary));
+      font-weight: 600;
+      border-bottom-color: hsl(var(--primary));
+    }
+    .wf-tab.is-disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .wf-tab-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.0625rem 0.3125rem;
+      border-radius: 4px;
+      background: hsl(var(--warning) / 0.18);
+      color: hsl(var(--warning-foreground));
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- Cards ---------- */
+    .wf-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 1.25rem 1.25rem 1.375rem;
+      margin-bottom: 1.25rem;
+    }
+    .wf-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .wf-card-title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1875rem;
+      min-width: 0;
+    }
+    .wf-card-title {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+      letter-spacing: -0.01em;
+      margin: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-card-subtitle {
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.5;
+      margin: 0;
+    }
+    .wf-card-caption {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-style: italic;
+      margin: 0 0 0.875rem;
+      line-height: 1.5;
+    }
+
+    /* ---------- Form ---------- */
+    .wf-field { margin-bottom: 1rem; }
+    .wf-field:last-child { margin-bottom: 0; }
+    .wf-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin-bottom: 0.375rem;
+    }
+    .wf-input,
+    .wf-textarea,
+    .wf-select {
+      display: block;
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      font-family: inherit;
+      font-size: 0.875rem;
+      line-height: 1.4;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+    .wf-input:focus,
+    .wf-textarea:focus,
+    .wf-select:focus {
+      outline: none;
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+    }
+    .wf-textarea {
+      resize: vertical;
+      min-height: 4rem;
+      font-family: inherit;
+    }
+    .wf-helper {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.45;
+    }
+
+    /* ---------- Two-column form grid for tierMetric + passThreshold ---------- */
+    .wf-form-grid-2 {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1rem;
+    }
+    @media (max-width: 720px) {
+      .wf-form-grid-2 { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    /* ---------- Tiers table ---------- */
+    .wf-table-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin: 0.5rem 0 0.5rem;
+    }
+    .wf-table-title-block { display: flex; flex-direction: column; gap: 0.1875rem; }
+    .wf-table-title {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+      margin: 0;
+    }
+    .wf-table-subtitle {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.5;
+      margin: 0;
+    }
+    .wf-table-wrap {
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      overflow: hidden;
+      background: hsl(var(--background));
+    }
+    .wf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+    }
+    .wf-table thead th {
+      background: hsl(var(--muted) / 0.6);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid hsl(var(--border));
+      white-space: nowrap;
+    }
+    .wf-table tbody td {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid hsl(var(--border));
+      vertical-align: middle;
+    }
+    .wf-table tbody tr:last-child td { border-bottom: none; }
+    .wf-table tbody tr:hover { background: hsl(var(--muted) / 0.4); }
+    .wf-table .wf-input {
+      padding: 0.3125rem 0.5rem;
+      font-size: 0.8125rem;
+    }
+    .wf-col-order { width: 56px; }
+    .wf-col-num { width: 96px; }
+    .wf-col-label { width: 140px; }
+    .wf-col-action { width: 110px; text-align: right; white-space: nowrap; }
+    .wf-order-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .wf-table-foot {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 0.5rem;
+      padding: 0.625rem 0.25rem 0;
+    }
+
+    /* ---------- Tier preview pills (mirrors --tier-* tokens) ---------- */
+    .wf-tier-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .wf-tier-low {
+      background: hsl(var(--tier-low) / 0.12);
+      color: hsl(var(--tier-low));
+    }
+    .wf-tier-ok {
+      background: hsl(var(--tier-ok) / 0.18);
+      color: hsl(var(--warning-foreground));
+    }
+    .wf-tier-great {
+      background: hsl(var(--tier-great) / 0.12);
+      color: hsl(var(--tier-great));
+    }
+
+    /* ---------- Helper "validation rules" panel ---------- */
+    .wf-helper-card {
+      margin-top: 1rem;
+      padding: 0.875rem 1rem;
+      background: hsl(var(--info) / 0.08);
+      border: 1px solid hsl(var(--info) / 0.3);
+      border-radius: 6px;
+      color: hsl(var(--foreground));
+      font-size: 0.8125rem;
+      line-height: 1.55;
+    }
+    .wf-helper-card-title {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--info));
+      margin: 0 0 0.5rem;
+    }
+    .wf-helper-list {
+      margin: 0;
+      padding-left: 1.125rem;
+      color: hsl(var(--foreground));
+    }
+    .wf-helper-list li { margin-bottom: 0.25rem; }
+    .wf-helper-list li:last-child { margin-bottom: 0; }
+    .wf-helper-list code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.7rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      padding: 0.0625rem 0.3125rem;
+      border-radius: 3px;
+    }
+
+    /* ---------- Preview card ---------- */
+    .wf-preview-card {
+      margin-top: 1rem;
+      padding: 0.875rem 1rem;
+      background: hsl(var(--muted) / 0.5);
+      border: 1px dashed hsl(var(--border));
+      border-radius: 6px;
+    }
+    .wf-preview-title {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 0.5rem;
+    }
+    .wf-preview-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      gap: 0.75rem;
+      font-size: 0.8125rem;
+      color: hsl(var(--foreground));
+      line-height: 1.5;
+    }
+    .wf-preview-label {
+      color: hsl(var(--muted-foreground));
+      font-weight: 600;
+    }
+    .wf-preview-caption {
+      margin-top: 0.625rem;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      font-style: italic;
+      line-height: 1.5;
+    }
+
+    /* ---------- Deferred placeholders (Codex-trimmed) ---------- */
+    .wf-deferred-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+    }
+    @media (max-width: 960px) {
+      .wf-deferred-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+    .wf-card-deferred {
+      background: hsl(var(--card));
+      border: 1px dashed hsl(var(--warning) / 0.6);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.25rem 1.375rem;
+      opacity: 0.85;
+      filter: saturate(0.85);
+      position: relative;
+    }
+    .wf-card-deferred .wf-card-head { margin-bottom: 0.75rem; }
+    .wf-deferred-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.5rem;
+      border-radius: 999px;
+      background: hsl(var(--warning) / 0.18);
+      color: hsl(var(--warning-foreground));
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .wf-ghosted {
+      pointer-events: none;
+      opacity: 0.6;
+    }
+    .wf-ghosted .wf-input,
+    .wf-ghosted .wf-select,
+    .wf-ghosted .wf-textarea,
+    .wf-ghosted .wf-btn {
+      background: hsl(var(--muted) / 0.5);
+    }
+
+    /* When-clause builder mock row */
+    .wf-when-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr);
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    /* JSON preview block */
+    .wf-json-block {
+      margin-top: 0.75rem;
+      padding: 0.75rem 0.875rem;
+      background: hsl(220 14% 12%);
+      color: hsl(210 40% 92%);
+      border-radius: 6px;
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.6875rem;
+      line-height: 1.55;
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .wf-json-key { color: hsl(199 89% 75%); }
+    .wf-json-str { color: hsl(160 60% 75%); }
+    .wf-json-num { color: hsl(38 92% 75%); }
+
+    /* Bottom info banner inside deferred cards */
+    .wf-deferred-info {
+      margin-top: 0.75rem;
+      padding: 0.625rem 0.75rem;
+      background: hsl(var(--warning) / 0.08);
+      border-left: 3px solid hsl(var(--warning));
+      border-radius: 4px;
+      font-size: 0.75rem;
+      line-height: 1.55;
+      color: hsl(var(--foreground));
+    }
+
+    /* Benchmark mini table inside deferred card */
+    .wf-bench-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      overflow: hidden;
+      font-size: 0.8125rem;
+    }
+    .wf-bench-table thead th {
+      background: hsl(var(--muted) / 0.6);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: 0.4375rem 0.75rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .wf-bench-table tbody td {
+      padding: 0.4375rem 0.75rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .wf-bench-table tbody tr:last-child td { border-bottom: none; }
+    .wf-bench-key {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      color: hsl(var(--foreground));
+    }
+
+    /* ---------- Codex co-validate explanation card ---------- */
+    .wf-explain-card {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-left: 4px solid hsl(var(--primary));
+      border-radius: var(--radius);
+    }
+    .wf-explain-title {
+      font-size: 0.875rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.5rem;
+      color: hsl(var(--foreground));
+    }
+    .wf-explain-body {
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      color: hsl(var(--foreground));
+      margin: 0;
+    }
+
+    /* ---------- Wireframe end note ---------- */
+    .wf-end-note {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: hsl(var(--muted) / 0.5);
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      line-height: 1.55;
+    }
+  </style>
+</head>
+<body>
+  <!-- Yellow wireframe banner -->
+  <div class="wf-banner">
+    <div>
+      <strong>WIREFRAME — Not functional.</strong>
+      v7.5 spec reference: Wave 2 Task 8 (Admin Template Editor — Scoring + Tiers).
+      <strong>Codex-trimmed</strong>: <code style="font-family: ui-monospace, monospace;">conditionalSections</code> (when-clause builder) and <code style="font-family: ui-monospace, monospace;">peerBenchmarks</code> value editors deferred to v1.5 per May 12 co-validate.
+      Renderer-side evaluation ships v1 reading seeded JSON; admin authoring UI lands v1.5.
+      This wireframe shows the Scoring + Tiers active editor + placeholder &ldquo;Coming in v1.5&rdquo; panels for the deferred logic engine.
+    </div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page heading -->
+  <div class="page-head">
+    <h1>18 — Admin: Template Editor (Scoring &amp; Tiers)</h1>
+    <p>Third of three editor surfaces (Tasks 6/7/8). Scoring + Tiers editor active; Conditional Logic engine deferred to v1.5.</p>
+  </div>
+
+  <!-- Admin shell: sidebar + main -->
+  <div class="wf-shell">
+    <!-- Sidebar (Templates active) -->
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">S</span>
+        <span class="wf-sidebar-brand-text">
+          <span>Scaling Up</span>
+          <span class="wf-sidebar-brand-sub">Admin</span>
+        </span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Manage</div>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Dashboard
+        </a>
+        <a class="wf-sidebar-link" href="11-admin-users-list.html">
+          <span class="wf-sidebar-link-dot"></span>Users
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Organizations
+        </a>
+        <a class="wf-sidebar-link is-active" href="14-admin-templates-list.html" aria-current="page">
+          <span class="wf-sidebar-link-dot"></span>Templates
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Assessments
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Public Quizzes
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="wf-main">
+      <!-- Top bar with breadcrumb -->
+      <div class="wf-topbar">
+        <div class="wf-breadcrumb">
+          <a href="#">Admin</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="14-admin-templates-list.html">Templates</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Rockefeller Habits Checklist</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="16-admin-template-editor-meta.html">Edit</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Scoring &amp; Tiers</span>
+        </div>
+      </div>
+
+      <!-- Page body -->
+      <div class="wf-page">
+        <!-- Page header row -->
+        <div class="wf-page-header-row">
+          <div class="wf-page-title-block">
+            <h2>Rockefeller Habits Checklist</h2>
+            <div class="wf-page-pill-row">
+              <span class="wf-version-pill-draft">v2 (draft)</span>
+              <span class="wf-pill wf-pill-access-invited">INVITED</span>
+              <span class="wf-pill wf-pill-agg-full">FULL_VISIBILITY</span>
+              <span class="wf-page-caption">Published v1 active since May 5 2026</span>
+            </div>
+          </div>
+          <div class="wf-header-actions">
+            <button type="button" class="wf-btn wf-btn-ghost">Preview as Respondent</button>
+            <button type="button" class="wf-btn wf-btn-secondary">Save Draft</button>
+            <button
+              type="button"
+              class="wf-btn wf-btn-primary"
+              disabled
+              aria-disabled="true"
+              title="Complete all tabs before publishing"
+            >
+              Publish v2 &rarr;
+            </button>
+          </div>
+        </div>
+
+        <!-- Sub-nav tabs -->
+        <nav class="wf-tabnav" aria-label="Template editor tabs">
+          <a href="16-admin-template-editor-meta.html" class="wf-tab">Metadata</a>
+          <a href="#" class="wf-tab">Sections</a>
+          <a href="17-admin-template-editor-questions.html" class="wf-tab">Questions</a>
+          <a href="#" class="wf-tab is-active" aria-current="page">Scoring &amp; Tiers</a>
+          <span class="wf-tab is-disabled" aria-disabled="true" title="Available in v1.5 — conditionalSections + peerBenchmarks editors land here when the logic engine UI ships">
+            Conditional Logic
+            <span class="wf-tab-badge">v1.5</span>
+          </span>
+          <a href="#" class="wf-tab">Access</a>
+          <a href="#" class="wf-tab">Versions</a>
+        </nav>
+
+        <!-- ============================================
+             SECTION 1 — Active editor: Scoring Configuration
+             ============================================ -->
+        <section class="wf-card">
+          <div class="wf-card-head">
+            <div class="wf-card-title-block">
+              <h3 class="wf-card-title">Scoring Configuration</h3>
+              <p class="wf-card-subtitle">How responses convert into a headline metric and tier message.</p>
+            </div>
+          </div>
+
+          <!-- 2-col form: tierMetric + passThreshold -->
+          <div class="wf-form-grid-2">
+            <div class="wf-field">
+              <label class="wf-label" for="tier-metric">Tier Metric</label>
+              <select id="tier-metric" class="wf-select">
+                <option selected>countAchieved &mdash; Count of questions with score &ge; passThreshold</option>
+                <option>overallTotal &mdash; Sum of all numeric values</option>
+                <option>overallAvg &mdash; Mean of all numeric values</option>
+              </select>
+              <span class="wf-helper">Drives the headline metric the tier ranges resolve against.</span>
+            </div>
+
+            <div class="wf-field">
+              <label class="wf-label" for="pass-threshold">Pass Threshold</label>
+              <input id="pass-threshold" type="number" class="wf-input" value="2" min="0" step="1">
+              <span class="wf-helper">A question counts as &ldquo;achieved&rdquo; when its score &ge; this value. Rockefeller uses 2 (on a 0&ndash;3 scale).</span>
+            </div>
+          </div>
+
+          <!-- Tiers sub-section -->
+          <div class="wf-table-head" style="margin-top: 1.25rem;">
+            <div class="wf-table-title-block">
+              <h4 class="wf-table-title">Tiers</h4>
+              <p class="wf-table-subtitle">
+                Each tier defines a metric range + label + message shown on the results page.
+                v1: tiers must cover <code style="font-family: ui-monospace, monospace; background: hsl(var(--muted)); padding: 0 0.25rem; border-radius: 3px;">[0, maxMetric]</code>
+                with no gaps or overlaps (Zod refine enforces this on save).
+              </p>
+            </div>
+          </div>
+
+          <div class="wf-table-wrap">
+            <table class="wf-table" aria-label="Tier definitions">
+              <thead>
+                <tr>
+                  <th class="wf-col-order">Order</th>
+                  <th class="wf-col-num">minMetric</th>
+                  <th class="wf-col-num">maxMetric</th>
+                  <th class="wf-col-label">Label</th>
+                  <th>Message</th>
+                  <th class="wf-col-action">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="wf-order-badge">1</span></td>
+                  <td><input type="number" class="wf-input" value="0" min="0"></td>
+                  <td><input type="number" class="wf-input" value="16" min="0"></td>
+                  <td>
+                    <div style="display:flex; align-items:center; gap:0.4375rem;">
+                      <input type="text" class="wf-input" value="Low">
+                      <span class="wf-tier-pill wf-tier-low">Low</span>
+                    </div>
+                  </td>
+                  <td><input type="text" class="wf-input" value="That is a very low overall score."></td>
+                  <td class="wf-col-action">
+                    <button type="button" class="wf-btn wf-btn-destructive wf-btn-xs">Remove</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="wf-order-badge">2</span></td>
+                  <td><input type="number" class="wf-input" value="17" min="0"></td>
+                  <td><input type="number" class="wf-input" value="32" min="0"></td>
+                  <td>
+                    <div style="display:flex; align-items:center; gap:0.4375rem;">
+                      <input type="text" class="wf-input" value="OK">
+                      <span class="wf-tier-pill wf-tier-ok">OK</span>
+                    </div>
+                  </td>
+                  <td><input type="text" class="wf-input" value="You're doing quite okay, and have a lot to improve further upon."></td>
+                  <td class="wf-col-action">
+                    <button type="button" class="wf-btn wf-btn-destructive wf-btn-xs">Remove</button>
+                  </td>
+                </tr>
+                <tr>
+                  <td><span class="wf-order-badge">3</span></td>
+                  <td><input type="number" class="wf-input" value="33" min="0"></td>
+                  <td><input type="number" class="wf-input" value="40" min="0"></td>
+                  <td>
+                    <div style="display:flex; align-items:center; gap:0.4375rem;">
+                      <input type="text" class="wf-input" value="Great">
+                      <span class="wf-tier-pill wf-tier-great">Great</span>
+                    </div>
+                  </td>
+                  <td><input type="text" class="wf-input" value="That is a great overall score."></td>
+                  <td class="wf-col-action">
+                    <button type="button" class="wf-btn wf-btn-destructive wf-btn-xs">Remove</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="wf-table-foot">
+            <button type="button" class="wf-btn wf-btn-secondary">+ Add Tier</button>
+          </div>
+
+          <!-- Validation hint card -->
+          <div class="wf-helper-card" role="note" aria-label="Validation rules">
+            <p class="wf-helper-card-title">Validation rules (Zod refine on save)</p>
+            <ul class="wf-helper-list">
+              <li>
+                All tiers&rsquo; <code>[minMetric, maxMetric]</code> ranges must cover
+                <code>[0, maxPossibleMetric]</code> (here <code>maxPossibleMetric = 40</code> for Rockefeller&rsquo;s 40 questions &times; passThreshold).
+              </li>
+              <li>No gaps allowed between consecutive tiers.</li>
+              <li>No overlaps allowed.</li>
+              <li><code>maxMetric</code> of the last tier may be omitted (treated as infinity).</li>
+            </ul>
+          </div>
+
+          <!-- Live preview card -->
+          <div class="wf-preview-card" role="region" aria-label="Tier resolution preview">
+            <p class="wf-preview-title">Preview &mdash; Tier Resolution</p>
+            <div class="wf-preview-row">
+              <span class="wf-preview-label">Sample input</span>
+              <span>
+                <code style="font-family: ui-monospace, monospace; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); padding: 0.0625rem 0.3125rem; border-radius: 3px;">countAchieved = 27</code>
+                &nbsp;&rarr;&nbsp; resolved tier:
+                <span class="wf-tier-pill wf-tier-ok" style="margin: 0 0.25rem;">OK</span>
+                &mdash; &ldquo;You&rsquo;re doing quite okay, and have a lot to improve further upon.&rdquo;
+              </span>
+            </div>
+            <p class="wf-preview-caption">
+              Preview uses captured Rockefeller golden fixture data &mdash; see plan&rsquo;s Verification section.
+            </p>
+          </div>
+        </section>
+
+        <!-- ============================================
+             SECTION 2 — Deferred logic engine PLACEHOLDERS (Codex-trimmed)
+             ============================================ -->
+        <div class="wf-deferred-grid">
+          <!-- Placeholder A: Conditional Sections -->
+          <section class="wf-card-deferred" aria-label="Conditional Sections placeholder">
+            <div class="wf-card-head">
+              <div class="wf-card-title-block">
+                <h3 class="wf-card-title">Conditional Sections</h3>
+                <p class="wf-card-subtitle">
+                  Dynamic report copy. Each section evaluates a <code style="font-family: ui-monospace, monospace; background: hsl(var(--muted)); padding: 0 0.25rem; border-radius: 3px;">when</code> clause
+                  against the respondent&rsquo;s answers + computed result; if true, the section&rsquo;s markdown content renders in their report.
+                </p>
+              </div>
+              <span class="wf-deferred-badge">Coming in v1.5</span>
+            </div>
+
+            <!-- Ghosted preview UI -->
+            <div class="wf-ghosted" aria-hidden="true">
+              <div class="wf-field">
+                <label class="wf-label">When clause</label>
+                <div class="wf-when-row">
+                  <select class="wf-select" disabled>
+                    <option>Q_employee_count</option>
+                  </select>
+                  <select class="wf-select" disabled>
+                    <option>between</option>
+                  </select>
+                  <input type="text" class="wf-input" value="[50, 149]" disabled>
+                </div>
+              </div>
+
+              <div class="wf-field">
+                <label class="wf-label">Markdown content</label>
+                <textarea class="wf-textarea" rows="3" disabled>## Companies your size (50–149 employees)
+
+At this stage, the most common bottleneck is...</textarea>
+              </div>
+
+              <div style="display: flex; justify-content: flex-start;">
+                <button type="button" class="wf-btn wf-btn-secondary" disabled>+ Add Section</button>
+              </div>
+            </div>
+
+            <!-- Bottom info banner -->
+            <div class="wf-deferred-info">
+              For v1, admins seed <code style="font-family: ui-monospace, monospace;">conditionalSections</code> JSON via Prisma Studio.
+              Scaling Up Assessment ships placeholder sections; Jeff replaces with real content via this UI in v1.5.
+              Renderer-side evaluation (<code style="font-family: ui-monospace, monospace;">&lt;AssessmentResultView&gt;</code> reading the seeded JSON) ships in v1 &mdash; only the admin authoring UI is deferred.
+            </div>
+
+            <!-- JSON example -->
+            <div style="margin-top: 0.875rem;">
+              <p class="wf-preview-title" style="margin-bottom: 0.375rem;">Example (read-only)</p>
+<pre class="wf-json-block">{
+  <span class="wf-json-key">"stableKey"</span>: <span class="wf-json-str">"employee-count-paragraph-mid"</span>,
+  <span class="wf-json-key">"sortOrder"</span>: <span class="wf-json-num">1</span>,
+  <span class="wf-json-key">"when"</span>: { <span class="wf-json-key">"stableKey"</span>: <span class="wf-json-str">"Q_employee_count"</span>, <span class="wf-json-key">"op"</span>: <span class="wf-json-str">"between"</span>, <span class="wf-json-key">"value"</span>: [<span class="wf-json-num">50</span>, <span class="wf-json-num">149</span>] },
+  <span class="wf-json-key">"markdownContent"</span>: <span class="wf-json-str">"## Companies your size (50&ndash;149 employees)\n\nAt this stage, the most common bottleneck is..."</span>
+}</pre>
+            </div>
+          </section>
+
+          <!-- Placeholder B: Peer Benchmarks -->
+          <section class="wf-card-deferred" aria-label="Peer Benchmarks placeholder">
+            <div class="wf-card-head">
+              <div class="wf-card-title-block">
+                <h3 class="wf-card-title">Peer Benchmarks</h3>
+                <p class="wf-card-subtitle">
+                  Hardcoded benchmark values per question stableKey. Used by the report renderer to draw a &ldquo;Your peers averaged X; you&rsquo;re at Y&rdquo; panel.
+                </p>
+              </div>
+              <span class="wf-deferred-badge">Coming in v1.5</span>
+            </div>
+
+            <!-- Ghosted preview UI: benchmark mini table -->
+            <div class="wf-ghosted" aria-hidden="true">
+              <table class="wf-bench-table">
+                <thead>
+                  <tr>
+                    <th>stableKey</th>
+                    <th>Benchmark value</th>
+                    <th style="width: 80px; text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="wf-bench-key">Q3_2</span></td>
+                    <td><input type="number" class="wf-input" value="2.4" step="0.1" disabled></td>
+                    <td style="text-align: right;"><button type="button" class="wf-btn wf-btn-destructive wf-btn-xs" disabled>Remove</button></td>
+                  </tr>
+                  <tr>
+                    <td><span class="wf-bench-key">Q5_1</span></td>
+                    <td><input type="number" class="wf-input" value="1.8" step="0.1" disabled></td>
+                    <td style="text-align: right;"><button type="button" class="wf-btn wf-btn-destructive wf-btn-xs" disabled>Remove</button></td>
+                  </tr>
+                  <tr>
+                    <td><span class="wf-bench-key">Q7_3</span></td>
+                    <td><input type="number" class="wf-input" value="2.7" step="0.1" disabled></td>
+                    <td style="text-align: right;"><button type="button" class="wf-btn wf-btn-destructive wf-btn-xs" disabled>Remove</button></td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div style="margin-top: 0.75rem;">
+                <button type="button" class="wf-btn wf-btn-secondary" disabled>+ Add Benchmark</button>
+              </div>
+            </div>
+
+            <!-- Bottom info banner -->
+            <div class="wf-deferred-info">
+              v1 ships with hardcoded benchmark seeds via Prisma Studio.
+              v2 replaces hardcoded values with real-data benchmarks once enough submissions accrue.
+              Missing benchmark for a stableKey &rarr; renderer omits that question&rsquo;s panel, doesn&rsquo;t break.
+            </div>
+          </section>
+        </div>
+
+        <!-- ============================================
+             SECTION 3 — Codex co-validate explanation
+             ============================================ -->
+        <section class="wf-explain-card">
+          <h3 class="wf-explain-title">Why is this section deferred? (Codex co-validate, May 12 2026)</h3>
+          <p class="wf-explain-body">
+            The original v7.5 draft put the <code style="font-family: ui-monospace, monospace; background: hsl(var(--muted)); padding: 0 0.25rem; border-radius: 3px;">conditionalSections</code>
+            (when-clause builder) and <code style="font-family: ui-monospace, monospace; background: hsl(var(--muted)); padding: 0 0.25rem; border-radius: 3px;">peerBenchmarks</code> value editors on this
+            Scoring &amp; Tiers screen. The Codex peer review flagged the when-clause builder as the highest-complexity Wave 2 screen
+            &mdash; a mini rule-engine UI with operator selection, value-type variance, and version-aware stableKey resolution.
+            Scaling Up Assessment&rsquo;s content matrix isn&rsquo;t ready anyway (Jeff still authoring tier messages for scores 7 &amp; 10),
+            so the renderer-side evaluation lands in v1 reading seeded JSON, and the admin authoring UI ships v1.5.
+            This frees ~1&ndash;2 days off the June 15 critical path.
+          </p>
+        </section>
+
+        <!-- Wireframe end note -->
+        <div class="wf-end-note">
+          <strong>Wireframe end note.</strong>
+          Scoring + Tiers tab is the editable v1.5 surface.
+          Conditional Logic tab (currently disabled in the tab nav) becomes the dedicated home for
+          <code style="font-family: ui-monospace, monospace;">conditionalSections</code> +
+          <code style="font-family: ui-monospace, monospace;">peerBenchmarks</code> editors when they ship in v1.5.
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

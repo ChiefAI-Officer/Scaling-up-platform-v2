@@ -1,0 +1,1447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>17 — Admin Template Editor: Questions (Phase 2)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    /* ---------- Page-level chrome (mirrors WF16 verbatim) ---------- */
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    /* ---------- Admin shell (sidebar + main, mirrored from WF16) ---------- */
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 0.875rem;
+    }
+    .wf-sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .wf-sidebar-brand-sub {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-sidebar-link-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.6;
+    }
+
+    .wf-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-breadcrumb {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      flex-wrap: wrap;
+    }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb a:hover { color: hsl(var(--foreground)); text-decoration: underline; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page {
+      padding: 2rem;
+      width: 100%;
+    }
+
+    /* ---------- Page header row ---------- */
+    .wf-page-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .wf-page-title-block h2 {
+      font-size: 1.375rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0;
+      color: hsl(var(--foreground));
+    }
+    .wf-page-pill-row {
+      margin-top: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-version-pill-draft {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.5rem;
+      border-radius: 999px;
+      background: hsl(var(--warning) / 0.18);
+      color: hsl(var(--warning-foreground));
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .wf-page-caption {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-style: italic;
+    }
+    .wf-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .wf-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.5rem 0.875rem;
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background 0.12s ease, color 0.12s ease;
+      white-space: nowrap;
+    }
+    .wf-btn-ghost {
+      background: transparent;
+      color: hsl(var(--foreground));
+      border-color: hsl(var(--border));
+    }
+    .wf-btn-ghost:hover { background: hsl(var(--muted)); }
+    .wf-btn-secondary {
+      background: hsl(var(--card));
+      color: hsl(var(--foreground));
+      border-color: hsl(var(--border));
+    }
+    .wf-btn-secondary:hover { background: hsl(var(--muted)); }
+    .wf-btn-primary {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-btn-primary:hover { background: hsl(var(--primary) / 0.92); }
+    .wf-btn-primary[disabled],
+    .wf-btn-primary[aria-disabled="true"] {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .wf-btn-sm {
+      padding: 0.3125rem 0.625rem;
+      font-size: 0.75rem;
+    }
+    .wf-btn-destructive {
+      background: transparent;
+      color: hsl(var(--destructive));
+      border-color: hsl(var(--destructive) / 0.4);
+    }
+    .wf-btn-destructive:hover {
+      background: hsl(var(--destructive) / 0.08);
+    }
+
+    /* ---------- Pills (reused from WF14/WF16) ---------- */
+    .wf-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .wf-pill::before {
+      content: "";
+      width: 6px; height: 6px;
+      border-radius: 999px;
+    }
+    .wf-pill-access-invited {
+      background: hsl(var(--primary) / 0.1);
+      color: hsl(var(--primary));
+    }
+    .wf-pill-access-invited::before { background: hsl(var(--primary)); }
+    .wf-pill-agg-full {
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-pill-agg-full::before { background: hsl(var(--muted-foreground)); }
+
+    /* Question type pills */
+    .wf-pill-type {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.4375rem;
+      border-radius: 4px;
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .wf-pill-type-slider {
+      background: hsl(var(--primary) / 0.12);
+      color: hsl(var(--primary));
+    }
+    .wf-pill-type-number {
+      background: hsl(160 84% 95%);
+      color: hsl(160 84% 22%);
+    }
+    .wf-pill-type-multi {
+      background: hsl(38 92% 95%);
+      color: hsl(26 83% 25%);
+    }
+    .wf-pill-type-deferred {
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-pill-v15 {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.0625rem 0.3125rem;
+      border-radius: 3px;
+      background: hsl(var(--warning) / 0.18);
+      color: hsl(var(--warning-foreground));
+      font-size: 0.5625rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-left: 0.375rem;
+    }
+
+    /* ---------- Sub-nav tabs (verbatim from WF16) ---------- */
+    .wf-tabnav {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      border-bottom: 1px solid hsl(var(--border));
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+    }
+    .wf-tab {
+      padding: 0.625rem 0.125rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: hsl(var(--muted-foreground));
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    .wf-tab:hover { color: hsl(var(--foreground)); }
+    .wf-tab.is-active {
+      color: hsl(var(--primary));
+      font-weight: 600;
+      border-bottom-color: hsl(var(--primary));
+    }
+    .wf-tab.is-disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .wf-tab-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.0625rem 0.3125rem;
+      border-radius: 4px;
+      background: hsl(var(--warning) / 0.18);
+      color: hsl(var(--warning-foreground));
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ---------- 3-column layout ---------- */
+    .wf-q-grid {
+      display: grid;
+      grid-template-columns: 20% 50% 30%;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    @media (max-width: 1100px) {
+      .wf-q-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+    .wf-q-col-sticky {
+      position: sticky;
+      top: 1rem;
+      align-self: start;
+    }
+
+    /* ---------- Cards (shared) ---------- */
+    .wf-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 1rem 1rem 1.125rem;
+      margin-bottom: 1rem;
+    }
+    .wf-card-pad-lg { padding: 1.25rem 1.25rem 1.375rem; }
+    .wf-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.875rem;
+    }
+    .wf-card-title {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+    .wf-card-caption {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      font-style: italic;
+      margin: 0 0 0.875rem;
+      line-height: 1.5;
+    }
+
+    /* ---------- Section navigator (left col) ---------- */
+    .wf-section-nav {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .wf-section-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.625rem;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+    }
+    .wf-section-nav-item:hover {
+      background: hsl(var(--muted));
+    }
+    .wf-section-nav-item.is-selected {
+      background: hsl(var(--primary) / 0.1);
+      border-color: hsl(var(--primary) / 0.3);
+    }
+    .wf-section-nav-item.is-selected .wf-section-nav-key {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-section-nav-key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      flex-shrink: 0;
+      padding: 0.125rem 0;
+      border-radius: 4px;
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.6875rem;
+      font-weight: 700;
+    }
+    .wf-section-nav-text {
+      flex: 1;
+      min-width: 0;
+      font-size: 0.75rem;
+      line-height: 1.35;
+      color: hsl(var(--foreground));
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .wf-section-nav-count {
+      flex-shrink: 0;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+    }
+
+    /* ---------- Question list (middle col) ---------- */
+    .wf-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .wf-section-header h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+    .wf-q-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+    }
+    .wf-q-card {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: start;
+      gap: 0.75rem;
+      padding: 0.875rem 1rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      border-left: 4px solid hsl(var(--border));
+    }
+    .wf-q-card.is-focused {
+      border-left-color: hsl(var(--primary));
+      background: hsl(var(--primary) / 0.04);
+    }
+    .wf-q-drag {
+      color: hsl(var(--muted-foreground));
+      cursor: grab;
+      font-size: 1rem;
+      line-height: 1;
+      user-select: none;
+      letter-spacing: -0.05em;
+      padding-top: 0.125rem;
+    }
+    .wf-q-body { min-width: 0; }
+    .wf-q-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.4375rem;
+      margin-bottom: 0.3125rem;
+      flex-wrap: wrap;
+    }
+    .wf-stablekey {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.375rem;
+      border-radius: 4px;
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+    }
+    .wf-q-text {
+      font-size: 0.8125rem;
+      line-height: 1.45;
+      color: hsl(var(--foreground));
+    }
+    .wf-q-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.25rem;
+      flex-shrink: 0;
+    }
+    .wf-q-actions-row {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    .wf-link {
+      background: transparent;
+      border: none;
+      padding: 0.1875rem 0.4375rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: hsl(var(--muted-foreground));
+      cursor: pointer;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+    .wf-link:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+    .wf-link.is-primary { color: hsl(var(--primary)); font-weight: 600; }
+    .wf-link.is-destructive { color: hsl(var(--destructive)); }
+    .wf-link.is-destructive:hover { background: hsl(var(--destructive) / 0.08); }
+
+    /* ---------- Per-question config form (right col) ---------- */
+    .wf-field { margin-bottom: 0.875rem; }
+    .wf-field:last-child { margin-bottom: 0; }
+    .wf-label {
+      display: block;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin-bottom: 0.3125rem;
+    }
+    .wf-input,
+    .wf-textarea,
+    .wf-select {
+      display: block;
+      width: 100%;
+      padding: 0.4375rem 0.625rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--background));
+      color: hsl(var(--foreground));
+      font-family: inherit;
+      font-size: 0.8125rem;
+      line-height: 1.4;
+      transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    }
+    .wf-input:focus,
+    .wf-textarea:focus,
+    .wf-select:focus {
+      outline: none;
+      border-color: hsl(var(--primary));
+      box-shadow: 0 0 0 3px hsl(var(--primary) / 0.15);
+    }
+    .wf-input[readonly] {
+      background: hsl(var(--muted));
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      color: hsl(var(--muted-foreground));
+      cursor: default;
+    }
+    .wf-textarea {
+      resize: vertical;
+      min-height: 4rem;
+    }
+    .wf-input-sm { padding: 0.375rem 0.5rem; font-size: 0.75rem; }
+    .wf-helper {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.5;
+    }
+    .wf-helper code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      padding: 0.03125rem 0.25rem;
+      border-radius: 3px;
+      font-size: 0.625rem;
+    }
+    .wf-optgroup {
+      font-weight: 700;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.6875rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .wf-field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.625rem;
+    }
+    .wf-field-row-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+
+    /* Toggle (re-used from WF16) */
+    .wf-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.5rem 0.625rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--muted) / 0.4);
+    }
+    .wf-toggle-label {
+      font-size: 0.75rem;
+      color: hsl(var(--foreground));
+      line-height: 1.45;
+    }
+    .wf-toggle-switch {
+      width: 32px; height: 18px;
+      border-radius: 999px;
+      background: hsl(var(--border));
+      position: relative;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .wf-toggle-switch::after {
+      content: "";
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.15s ease;
+    }
+    .wf-toggle-switch.is-on { background: hsl(var(--primary)); }
+    .wf-toggle-switch.is-on::after { transform: translateX(14px); }
+    .wf-toggle-state {
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+
+    /* ---------- Per-type config block ---------- */
+    .wf-config-block {
+      margin-top: 0.625rem;
+      padding: 0.875rem;
+      border: 1px solid hsl(var(--primary) / 0.25);
+      border-radius: 6px;
+      background: hsl(var(--primary) / 0.04);
+    }
+    .wf-config-block-head {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      margin-bottom: 0.625rem;
+    }
+    .wf-config-block-title {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--primary));
+      margin: 0;
+    }
+
+    /* ---------- Per-type config preview disclosure ---------- */
+    .wf-preview-card {
+      margin-top: 0.875rem;
+      padding: 0.875rem 1rem;
+      border: 1px dashed hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--muted) / 0.4);
+    }
+    .wf-preview-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .wf-preview-title {
+      display: flex;
+      align-items: center;
+      gap: 0.4375rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+    }
+    .wf-preview-disclosure {
+      font-size: 0.625rem;
+      color: hsl(var(--muted-foreground));
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .wf-preview-body { font-size: 0.75rem; color: hsl(var(--foreground)); }
+    .wf-preview-body .wf-helper { margin-top: 0.4375rem; }
+
+    /* Option editor list (used in MULTI_CHOICE preview) */
+    .wf-option-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3125rem;
+    }
+    .wf-option-row {
+      display: flex;
+      align-items: center;
+      gap: 0.4375rem;
+      padding: 0.3125rem 0.4375rem;
+      border: 1px solid hsl(var(--border));
+      border-radius: 5px;
+      background: hsl(var(--background));
+    }
+    .wf-option-drag {
+      color: hsl(var(--muted-foreground));
+      cursor: grab;
+      font-size: 0.75rem;
+      user-select: none;
+      letter-spacing: -0.05em;
+    }
+    .wf-option-key {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.0625rem 0.3125rem;
+      border-radius: 3px;
+      background: hsl(var(--muted));
+      color: hsl(var(--muted-foreground));
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.625rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .wf-option-label {
+      flex: 1;
+      min-width: 0;
+      font-size: 0.75rem;
+      color: hsl(var(--foreground));
+    }
+    .wf-option-x {
+      color: hsl(var(--muted-foreground));
+      cursor: pointer;
+      padding: 0 0.25rem;
+      font-size: 0.875rem;
+      line-height: 1;
+    }
+
+    .wf-example-note {
+      margin-top: 0.4375rem;
+      padding: 0.4375rem 0.5625rem;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 4px;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.5;
+    }
+
+    /* ---------- v1.5-deferred types panel (full width) ---------- */
+    .wf-deferred-panel {
+      margin-top: 1.5rem;
+    }
+    .wf-deferred-banner {
+      padding: 0.75rem 1rem;
+      background: hsl(var(--warning) / 0.12);
+      border: 1px solid hsl(var(--warning) / 0.35);
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      color: hsl(var(--warning-foreground));
+      line-height: 1.5;
+      margin-bottom: 0.875rem;
+    }
+    .wf-deferred-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.875rem;
+    }
+    @media (max-width: 880px) {
+      .wf-deferred-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+    .wf-deferred-card {
+      padding: 0.875rem 1rem;
+      border: 1px dashed hsl(var(--border));
+      border-radius: 6px;
+      background: hsl(var(--muted) / 0.35);
+      opacity: 0.85;
+    }
+    .wf-deferred-card-head {
+      display: flex;
+      align-items: center;
+      gap: 0.4375rem;
+      margin-bottom: 0.5rem;
+    }
+    .wf-deferred-card-title {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+      letter-spacing: -0.01em;
+    }
+    .wf-deferred-card-body {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.55;
+    }
+    .wf-deferred-card-body code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      padding: 0.03125rem 0.25rem;
+      border-radius: 3px;
+      font-size: 0.6875rem;
+      color: hsl(var(--foreground));
+    }
+
+    /* ---------- Wireframe end note ---------- */
+    .wf-end-note {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: hsl(var(--muted) / 0.5);
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      line-height: 1.55;
+    }
+  </style>
+</head>
+<body>
+  <!-- Yellow wireframe banner -->
+  <div class="wf-banner">
+    <div>
+      <strong>WIREFRAME — Not functional.</strong>
+      v7.5 spec reference: Wave 2 Task 7 (Admin Template Editor — Questions tab, per-type config forms).
+      v1 active question types: <strong>SLIDER_LIKERT + NUMBER + MULTI_CHOICE</strong>.
+      v1.5 deferred: TEXT, TEXTAREA, COMPOUND.
+      Targets v1.5 admin authoring UI.
+    </div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <!-- Page heading (outside the shell, mirrors WF16) -->
+  <div class="page-head">
+    <h1>17 — Admin: Template Editor (Questions)</h1>
+    <p>Second of three editor surfaces (Tasks 6/7/8). Per-section question list + per-question config forms with type-specific validation.</p>
+  </div>
+
+  <!-- Admin shell: sidebar + main -->
+  <div class="wf-shell">
+    <!-- Sidebar (Templates active, verbatim from WF16) -->
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">S</span>
+        <span class="wf-sidebar-brand-text">
+          <span>Scaling Up</span>
+          <span class="wf-sidebar-brand-sub">Admin</span>
+        </span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Manage</div>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Dashboard
+        </a>
+        <a class="wf-sidebar-link" href="11-admin-users-list.html">
+          <span class="wf-sidebar-link-dot"></span>Users
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Organizations
+        </a>
+        <a class="wf-sidebar-link is-active" href="14-admin-templates-list.html" aria-current="page">
+          <span class="wf-sidebar-link-dot"></span>Templates
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Assessments
+        </a>
+        <a class="wf-sidebar-link" href="#">
+          <span class="wf-sidebar-link-dot"></span>Public Quizzes
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="wf-main">
+      <!-- Top bar with breadcrumb -->
+      <div class="wf-topbar">
+        <div class="wf-breadcrumb">
+          <a href="#">Admin</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="14-admin-templates-list.html">Templates</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="#">Rockefeller Habits Checklist</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="16-admin-template-editor-meta.html">Edit</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Questions</span>
+        </div>
+      </div>
+
+      <!-- Page body -->
+      <div class="wf-page">
+        <!-- Page header row (mirrors WF16) -->
+        <div class="wf-page-header-row">
+          <div class="wf-page-title-block">
+            <h2>Rockefeller Habits Checklist</h2>
+            <div class="wf-page-pill-row">
+              <span class="wf-version-pill-draft">v2 (draft)</span>
+              <span class="wf-pill wf-pill-access-invited">INVITED</span>
+              <span class="wf-pill wf-pill-agg-full">FULL_VISIBILITY</span>
+              <span class="wf-page-caption">Published v1 active since May 5 2026</span>
+            </div>
+          </div>
+          <div class="wf-header-actions">
+            <button type="button" class="wf-btn wf-btn-ghost">Preview as Respondent</button>
+            <button type="button" class="wf-btn wf-btn-secondary">Save Draft</button>
+            <button
+              type="button"
+              class="wf-btn wf-btn-primary"
+              disabled
+              aria-disabled="true"
+              title="Complete all tabs before publishing"
+            >
+              Publish v2 &rarr;
+            </button>
+          </div>
+        </div>
+
+        <!-- Sub-nav tabs -->
+        <nav class="wf-tabnav" aria-label="Template editor tabs">
+          <a href="16-admin-template-editor-meta.html" class="wf-tab">Metadata</a>
+          <a href="#" class="wf-tab">Sections</a>
+          <a href="#" class="wf-tab is-active" aria-current="page">Questions</a>
+          <a href="#" class="wf-tab">Scoring &amp; Tiers</a>
+          <span class="wf-tab is-disabled" aria-disabled="true" title="Available in v1.5 — for v1, admins seed conditionalSections JSON via Prisma Studio">
+            Conditional Logic
+            <span class="wf-tab-badge">v1.5</span>
+          </span>
+          <a href="#" class="wf-tab">Access</a>
+          <a href="#" class="wf-tab">Versions</a>
+        </nav>
+
+        <!-- 3-column body -->
+        <div class="wf-q-grid">
+          <!-- ===== LEFT (20%) — Section navigator ===== -->
+          <aside class="wf-q-col-sticky">
+            <section class="wf-card">
+              <div class="wf-card-head">
+                <h3 class="wf-card-title">Sections</h3>
+              </div>
+              <ul class="wf-section-nav">
+                <li>
+                  <button type="button" class="wf-section-nav-item">
+                    <span class="wf-section-nav-key">S1</span>
+                    <span class="wf-section-nav-text">The executive team is healthy and aligned.</span>
+                    <span class="wf-section-nav-count">4/4</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="wf-section-nav-item is-selected" aria-current="true">
+                    <span class="wf-section-nav-key">S2</span>
+                    <span class="wf-section-nav-text">Everyone is aligned with the #1 thing&hellip;</span>
+                    <span class="wf-section-nav-count">4/4</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="wf-section-nav-item">
+                    <span class="wf-section-nav-key">S3</span>
+                    <span class="wf-section-nav-text">Communication rhythm is established&hellip;</span>
+                    <span class="wf-section-nav-count">4/4</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="wf-section-nav-item">
+                    <span class="wf-section-nav-key">S4</span>
+                    <span class="wf-section-nav-text">Every facet has an accountable person.</span>
+                    <span class="wf-section-nav-count">4/4</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="wf-section-nav-item">
+                    <span class="wf-section-nav-key">S5</span>
+                    <span class="wf-section-nav-text">Ongoing employee input is collected.</span>
+                    <span class="wf-section-nav-count">4/4</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="wf-section-nav-item">
+                    <span class="wf-section-nav-key">S6</span>
+                    <span class="wf-section-nav-text">Customer feedback reporting cadence.</span>
+                    <span class="wf-section-nav-count">4/4</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="wf-section-nav-item">
+                    <span class="wf-section-nav-key">S7</span>
+                    <span class="wf-section-nav-text">Core Values and Purpose are &lsquo;alive&rsquo;.</span>
+                    <span class="wf-section-nav-count">4/4</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="wf-section-nav-item">
+                    <span class="wf-section-nav-key">S8</span>
+                    <span class="wf-section-nav-text">Employees articulate the strategy.</span>
+                    <span class="wf-section-nav-count">4/4</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="wf-section-nav-item">
+                    <span class="wf-section-nav-key">S9</span>
+                    <span class="wf-section-nav-text">Quantitative good day/week (Col 7).</span>
+                    <span class="wf-section-nav-count">4/4</span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="wf-section-nav-item">
+                    <span class="wf-section-nav-key">S10</span>
+                    <span class="wf-section-nav-text">Plans &amp; performance visible to all.</span>
+                    <span class="wf-section-nav-count">4/4</span>
+                  </button>
+                </li>
+              </ul>
+            </section>
+          </aside>
+
+          <!-- ===== MIDDLE (50%) — Question list for the selected section ===== -->
+          <div>
+            <section class="wf-card wf-card-pad-lg">
+              <div class="wf-section-header">
+                <h3>S2 &mdash; Everyone is aligned with the #1 thing&hellip;</h3>
+                <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm">+ Add Question</button>
+              </div>
+
+              <ul class="wf-q-list">
+                <!-- Q2_1 — focused -->
+                <li class="wf-q-card is-focused" aria-current="true">
+                  <span class="wf-q-drag" aria-hidden="true">&vellip;&vellip;</span>
+                  <div class="wf-q-body">
+                    <div class="wf-q-meta">
+                      <span class="wf-stablekey">Q2_1</span>
+                      <span class="wf-pill-type wf-pill-type-slider">SLIDER_LIKERT</span>
+                    </div>
+                    <div class="wf-q-text">
+                      The Critical Number is identified to move the company ahead this quarter.
+                    </div>
+                  </div>
+                  <div class="wf-q-actions">
+                    <div class="wf-q-actions-row">
+                      <button type="button" class="wf-link is-primary" aria-pressed="true">Edit</button>
+                      <button type="button" class="wf-link">Duplicate</button>
+                      <button type="button" class="wf-link is-destructive">Delete</button>
+                    </div>
+                  </div>
+                </li>
+
+                <!-- Q2_2 -->
+                <li class="wf-q-card">
+                  <span class="wf-q-drag" aria-hidden="true">&vellip;&vellip;</span>
+                  <div class="wf-q-body">
+                    <div class="wf-q-meta">
+                      <span class="wf-stablekey">Q2_2</span>
+                      <span class="wf-pill-type wf-pill-type-slider">SLIDER_LIKERT</span>
+                    </div>
+                    <div class="wf-q-text">
+                      3&ndash;5 Priorities (Rocks) that support the Critical Number are identified and ranked for the quarter.
+                    </div>
+                  </div>
+                  <div class="wf-q-actions">
+                    <div class="wf-q-actions-row">
+                      <button type="button" class="wf-link">Edit</button>
+                      <button type="button" class="wf-link">Duplicate</button>
+                      <button type="button" class="wf-link is-destructive">Delete</button>
+                    </div>
+                  </div>
+                </li>
+
+                <!-- Q2_3 -->
+                <li class="wf-q-card">
+                  <span class="wf-q-drag" aria-hidden="true">&vellip;&vellip;</span>
+                  <div class="wf-q-body">
+                    <div class="wf-q-meta">
+                      <span class="wf-stablekey">Q2_3</span>
+                      <span class="wf-pill-type wf-pill-type-slider">SLIDER_LIKERT</span>
+                    </div>
+                    <div class="wf-q-text">
+                      A Quarterly Theme and Celebration/Reward are announced to all employees that bring the Critical Number to life.
+                    </div>
+                  </div>
+                  <div class="wf-q-actions">
+                    <div class="wf-q-actions-row">
+                      <button type="button" class="wf-link">Edit</button>
+                      <button type="button" class="wf-link">Duplicate</button>
+                      <button type="button" class="wf-link is-destructive">Delete</button>
+                    </div>
+                  </div>
+                </li>
+
+                <!-- Q2_4 -->
+                <li class="wf-q-card">
+                  <span class="wf-q-drag" aria-hidden="true">&vellip;&vellip;</span>
+                  <div class="wf-q-body">
+                    <div class="wf-q-meta">
+                      <span class="wf-stablekey">Q2_4</span>
+                      <span class="wf-pill-type wf-pill-type-slider">SLIDER_LIKERT</span>
+                    </div>
+                    <div class="wf-q-text">
+                      Quarterly Theme/Critical Number posted throughout the company and employees are aware of the progress each week.
+                    </div>
+                  </div>
+                  <div class="wf-q-actions">
+                    <div class="wf-q-actions-row">
+                      <button type="button" class="wf-link">Edit</button>
+                      <button type="button" class="wf-link">Duplicate</button>
+                      <button type="button" class="wf-link is-destructive">Delete</button>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+
+              <p class="wf-card-caption" style="margin-top: 1rem; margin-bottom: 0;">
+                Drag rows to reorder. <code style="font-family: ui-monospace, monospace; background: hsl(var(--muted)); padding: 0.0625rem 0.25rem; border-radius: 3px;">sortOrder</code>
+                persists per-question. <code style="font-family: ui-monospace, monospace; background: hsl(var(--muted)); padding: 0.0625rem 0.25rem; border-radius: 3px;">stableKey</code> is immutable.
+              </p>
+            </section>
+          </div>
+
+          <!-- ===== RIGHT (30%) — Per-question config form ===== -->
+          <aside class="wf-q-col-sticky">
+            <section class="wf-card wf-card-pad-lg">
+              <div class="wf-card-head">
+                <h3 class="wf-card-title">Edit Question &mdash; Q2_1</h3>
+              </div>
+
+              <!-- stableKey (read-only) -->
+              <div class="wf-field">
+                <label class="wf-label" for="q-stablekey">stableKey</label>
+                <input id="q-stablekey" class="wf-input" type="text" value="Q2_1" readonly>
+                <span class="wf-helper">Immutable across versions for longitudinal comparability.</span>
+              </div>
+
+              <!-- Question Type -->
+              <div class="wf-field">
+                <label class="wf-label" for="q-type">Question Type</label>
+                <select id="q-type" class="wf-select">
+                  <optgroup label="Active in v1" class="wf-optgroup">
+                    <option value="SLIDER_LIKERT" selected>SLIDER_LIKERT</option>
+                    <option value="NUMBER">NUMBER</option>
+                    <option value="MULTI_CHOICE">MULTI_CHOICE</option>
+                  </optgroup>
+                  <optgroup label="v1.5 (deferred)" class="wf-optgroup">
+                    <option value="TEXT" disabled>TEXT &mdash; v1.5</option>
+                    <option value="TEXTAREA" disabled>TEXTAREA &mdash; v1.5</option>
+                    <option value="COMPOUND" disabled>COMPOUND &mdash; v1.5</option>
+                  </optgroup>
+                </select>
+                <span class="wf-helper">v1 active types cover all 4 default INVITED templates. v1.5 types stay disabled until QSP v2 compound questions ship.</span>
+              </div>
+
+              <!-- Label -->
+              <div class="wf-field">
+                <label class="wf-label" for="q-label">Label</label>
+                <textarea id="q-label" rows="2" class="wf-textarea">The Critical Number is identified to move the company ahead this quarter.</textarea>
+              </div>
+
+              <!-- Help text -->
+              <div class="wf-field">
+                <label class="wf-label" for="q-help">Help text</label>
+                <input id="q-help" class="wf-input" type="text" placeholder="Optional helper text shown to respondents">
+                <span class="wf-helper">Optional. Rendered below the label on the respondent form.</span>
+              </div>
+
+              <!-- Required toggle -->
+              <div class="wf-field">
+                <span class="wf-label">Required</span>
+                <div class="wf-toggle-row">
+                  <span class="wf-toggle-label">Respondent must answer to submit</span>
+                  <div style="display:flex; align-items:center; gap:0.4375rem;">
+                    <span class="wf-toggle-state">On</span>
+                    <span class="wf-toggle-switch is-on" role="switch" aria-checked="true" tabindex="0"></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sort order -->
+              <div class="wf-field">
+                <label class="wf-label" for="q-sort">Sort order within section</label>
+                <input id="q-sort" class="wf-input wf-input-sm" type="number" value="1" min="1" style="width: 5rem;">
+              </div>
+
+              <!-- Per-type config block — SLIDER_LIKERT (active) -->
+              <div class="wf-config-block">
+                <div class="wf-config-block-head">
+                  <h4 class="wf-config-block-title">SLIDER_LIKERT &mdash; config</h4>
+                </div>
+
+                <div class="wf-field-row-3">
+                  <div class="wf-field">
+                    <label class="wf-label" for="q-min">Scale min</label>
+                    <input id="q-min" class="wf-input wf-input-sm" type="number" value="0">
+                  </div>
+                  <div class="wf-field">
+                    <label class="wf-label" for="q-max">Scale max</label>
+                    <input id="q-max" class="wf-input wf-input-sm" type="number" value="3">
+                  </div>
+                  <div class="wf-field">
+                    <label class="wf-label" for="q-step">Scale step</label>
+                    <input id="q-step" class="wf-input wf-input-sm" type="number" value="1">
+                  </div>
+                </div>
+
+                <div class="wf-field-row" style="margin-top: 0.5rem;">
+                  <div class="wf-field">
+                    <label class="wf-label" for="q-anchor-min">Anchor &mdash; min</label>
+                    <input id="q-anchor-min" class="wf-input wf-input-sm" type="text" value="Not true">
+                  </div>
+                  <div class="wf-field">
+                    <label class="wf-label" for="q-anchor-max">Anchor &mdash; max</label>
+                    <input id="q-anchor-max" class="wf-input wf-input-sm" type="text" value="Completely true">
+                  </div>
+                </div>
+
+                <span class="wf-helper" style="margin-top: 0.5rem;">
+                  Slider answers stored as integers. Validation enforces value satisfies
+                  <code>(value - min) % step === 0</code>.
+                </span>
+              </div>
+
+              <!-- ===== Per-type config previews ===== -->
+
+              <!-- NUMBER preview -->
+              <div class="wf-preview-card">
+                <div class="wf-preview-head">
+                  <div class="wf-preview-title">
+                    <span class="wf-pill-type wf-pill-type-number">NUMBER</span>
+                    <span>Config preview</span>
+                  </div>
+                  <span class="wf-preview-disclosure">Open</span>
+                </div>
+                <div class="wf-preview-body">
+                  <div class="wf-field-row">
+                    <div class="wf-field">
+                      <label class="wf-label">Min (optional)</label>
+                      <input class="wf-input wf-input-sm" type="number" placeholder="—">
+                    </div>
+                    <div class="wf-field">
+                      <label class="wf-label">Max (optional)</label>
+                      <input class="wf-input wf-input-sm" type="number" placeholder="—">
+                    </div>
+                  </div>
+                  <div class="wf-field-row" style="margin-top: 0.4375rem;">
+                    <div class="wf-field">
+                      <label class="wf-label">Decimals (0&ndash;6)</label>
+                      <input class="wf-input wf-input-sm" type="number" min="0" max="6" value="0">
+                    </div>
+                    <div class="wf-field">
+                      <label class="wf-label">Unit label</label>
+                      <input class="wf-input wf-input-sm" type="text" placeholder='e.g. "USD", "employees"'>
+                    </div>
+                  </div>
+                  <span class="wf-helper" style="margin-top: 0.4375rem;">
+                    Decimals precision enforced via <code>Number.isInteger(value * 10^decimals)</code>.
+                  </span>
+                  <div class="wf-example-note">
+                    <strong>Example:</strong> Vision Alignment uses NUMBER for revenue + headcount fields.
+                  </div>
+                </div>
+              </div>
+
+              <!-- MULTI_CHOICE preview -->
+              <div class="wf-preview-card">
+                <div class="wf-preview-head">
+                  <div class="wf-preview-title">
+                    <span class="wf-pill-type wf-pill-type-multi">MULTI_CHOICE</span>
+                    <span>Config preview</span>
+                  </div>
+                  <span class="wf-preview-disclosure">Open</span>
+                </div>
+                <div class="wf-preview-body">
+                  <span class="wf-label" style="margin-bottom: 0.3125rem;">Options</span>
+                  <ul class="wf-option-list">
+                    <li class="wf-option-row">
+                      <span class="wf-option-drag" aria-hidden="true">&vellip;&vellip;</span>
+                      <span class="wf-option-key">K1</span>
+                      <span class="wf-option-label">Customer acquisition cost</span>
+                      <span class="wf-option-x" aria-label="Remove option">&times;</span>
+                    </li>
+                    <li class="wf-option-row">
+                      <span class="wf-option-drag" aria-hidden="true">&vellip;&vellip;</span>
+                      <span class="wf-option-key">K2</span>
+                      <span class="wf-option-label">Sales team capacity</span>
+                      <span class="wf-option-x" aria-label="Remove option">&times;</span>
+                    </li>
+                    <li class="wf-option-row">
+                      <span class="wf-option-drag" aria-hidden="true">&vellip;&vellip;</span>
+                      <span class="wf-option-key">K3</span>
+                      <span class="wf-option-label">Cash flow runway</span>
+                      <span class="wf-option-x" aria-label="Remove option">&times;</span>
+                    </li>
+                    <li class="wf-option-row">
+                      <span class="wf-option-drag" aria-hidden="true">&vellip;&vellip;</span>
+                      <span class="wf-option-key">K4</span>
+                      <span class="wf-option-label">Product-market fit</span>
+                      <span class="wf-option-x" aria-label="Remove option">&times;</span>
+                    </li>
+                  </ul>
+                  <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm">+ Add Option</button>
+
+                  <div class="wf-field-row" style="margin-top: 0.625rem;">
+                    <div class="wf-field">
+                      <label class="wf-label">Min selected</label>
+                      <input class="wf-input wf-input-sm" type="number" value="1">
+                    </div>
+                    <div class="wf-field">
+                      <label class="wf-label">Max selected</label>
+                      <input class="wf-input wf-input-sm" type="number" placeholder="unbounded">
+                    </div>
+                  </div>
+
+                  <span class="wf-helper" style="margin-top: 0.4375rem;">
+                    Selected values stored as <code>selectedKeys: string[]</code>. Option <code>stableKey</code>
+                    (not the free-text label) is what persists across versions.
+                  </span>
+                  <div class="wf-example-note">
+                    <strong>Example:</strong> Vision Alignment uses MULTI_CHOICE for the &ldquo;top 3 obstacles&rdquo; question.
+                  </div>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </div>
+
+        <!-- ===== v1.5-deferred types panel (full-width) ===== -->
+        <section class="wf-deferred-panel" aria-label="v1.5 question types">
+          <div class="wf-deferred-banner">
+            These types ship in <strong>v1.5</strong>. v1 active types (SLIDER_LIKERT + NUMBER + MULTI_CHOICE)
+            cover all 4 default INVITED templates. TEXT/TEXTAREA/COMPOUND join when QSP v2&rsquo;s compound questions
+            need them in production.
+          </div>
+
+          <div class="wf-card wf-card-pad-lg" style="margin-bottom: 0;">
+            <div class="wf-card-head">
+              <h3 class="wf-card-title">Question types &mdash; v1.5</h3>
+              <span class="wf-page-caption">deferred</span>
+            </div>
+
+            <div class="wf-deferred-grid">
+              <!-- TEXT -->
+              <div class="wf-deferred-card">
+                <div class="wf-deferred-card-head">
+                  <span class="wf-pill-type wf-pill-type-deferred">TEXT</span>
+                  <span class="wf-pill-v15">v1.5</span>
+                </div>
+                <div class="wf-deferred-card-body">
+                  <strong>Single-line free text.</strong>
+                  Validation: <code>maxLength</code>, optional <code>placeholder</code>.
+                  Stored as <code>{ textValue: string }</code>.
+                </div>
+              </div>
+
+              <!-- TEXTAREA -->
+              <div class="wf-deferred-card">
+                <div class="wf-deferred-card-head">
+                  <span class="wf-pill-type wf-pill-type-deferred">TEXTAREA</span>
+                  <span class="wf-pill-v15">v1.5</span>
+                </div>
+                <div class="wf-deferred-card-body">
+                  <strong>Multi-line free text.</strong>
+                  Validation: <code>maxLength</code>, optional <code>placeholder</code>, <code>rows</code>.
+                  Stored as <code>{ textValue: string }</code>.
+                </div>
+              </div>
+
+              <!-- COMPOUND -->
+              <div class="wf-deferred-card">
+                <div class="wf-deferred-card-head">
+                  <span class="wf-pill-type wf-pill-type-deferred">COMPOUND</span>
+                  <span class="wf-pill-v15">v1.5</span>
+                </div>
+                <div class="wf-deferred-card-body">
+                  <strong>Numeric + text combined.</strong>
+                  Stored as <code>{ numericValue, textValue }</code>. Used by QSP v2 &mdash; &ldquo;rate + explain&rdquo;
+                  pattern. Validation: both required when <code>isRequired</code> true.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Wireframe end note -->
+        <div class="wf-end-note">
+          <strong>Wireframe end note.</strong>
+          Question reordering, per-question audit log, and version-diff viewer ship in v1.5.
+          v1 active types alone cover Rockefeller (SLIDER_LIKERT only), Vision Alignment
+          (SLIDER_LIKERT + NUMBER + MULTI_CHOICE), Quarterly Session Prep (SLIDER_LIKERT only),
+          and Scaling Up Assessment (SLIDER_LIKERT + NUMBER required for conditional sections branching).
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
