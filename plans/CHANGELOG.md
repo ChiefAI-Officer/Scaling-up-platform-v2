@@ -6,6 +6,31 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-13 — Sprint 13 Follow-ons — DTSTART Fix, Virtual Format Defaults, ICS Directions Suppression (May 13 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-13 ENTRY_SLUG:squash-round-13-followon -->
+
+**Sprint 13 Follow-ons — DTSTART, Virtual Default, ICS Directions** (May 13 2026, direct push to main, Alpha mode):
+Source: live QA of Squash Round 13 revealed 3 new bugs. 1148 → 1169 tests (+21).
+
+**ICS DTSTART Minutes Fix** (`8583ec3`):
+- `split(":")` on range `eventTime` like `"14:30 - 16:00"` yielded NaN for minutes, silently truncating calendar invite start to 14:00.
+- `parseStartTime(eventTime: string)` helper: strips range suffix via `/\s*[-–]\s*.*/`, then splits. Used in `generateIcsContent` and `buildGoogleCalendarUrl`.
+- 7 new tests in `ics-generator.test.ts` (14 → 17 in that file, 1148 → 1155 total).
+
+**Virtual Format Default — Admin + Resubmit + Inline Forms** (`3c993e5`):
+- Wave 12-A only patched `WizardContext.tsx` (coach portal). Admin `new/page.tsx:138` had own `useState({ format: "IN_PERSON" })`. `resubmit-workshop.tsx` and `WorkshopInlineEditForm.tsx` had same `|| "IN_PERSON"` fallback.
+- 3 one-line `IN_PERSON → VIRTUAL` changes; 3 new regression test files (4 tests).
+- 1155 → 1159 tests total.
+
+**ICS LOCATION Triggers Gmail Directions Button on Virtual Workshops** (`9167b26`):
+- `buildLocationString` returned `workshop.virtualLink || "Virtual Workshop"` for VIRTUAL, populating ICS `LOCATION:` field — Gmail uses this to render a "Directions" button in calendar invite preview.
+- Fix 1: `buildLocationString` returns `""` for VIRTUAL (and HYBRID with no venue).
+- Fix 2: `buildIcsDescription(workshop)` helper appends `"\n\nJoin online: <link>"` for VIRTUAL/HYBRID; used in `handleRegistrationCreatedFree` and `process-payment-completed-helpers`.
+- 10 new tests in `ics-generator.test.ts` (17 → 27); mocks updated in 2 handler test files.
+- 1159 → 1169 tests total.
+
+**BUG-MAY13-3 filed** (not yet shipped):
+- `/registration/success` hardcoded redirect bypasses per-workshop thank-you template system. Root cause: template upload/download feature surfaced the disconnect; sprint focus shifted to email/ICS critical bugs. Fix A queued: `register/route.ts` redirect to per-workshop thank-you slug with `?regId=X`.
+
 ### 2026-05-12 — Squash Round 13 — Registration Email + ICS + Survey Pinning + Refund Hint (May 12 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-12 ENTRY_SLUG:squash-round-13 -->
 
 **Squash Round 13 — Registration Email + ICS + Survey Pinning + Refund Hint** (May 12 2026, direct push to main, Alpha mode):
