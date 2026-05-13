@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-05-12 LAST_UPDATED_SLUG:squash-round-13 --> May 12, 2026 — Squash Round 13: registration email double-send fixed, free ICS+location handler, range-aware ICS end-time, survey pinning bypass, refund hint; 1148 tests |
+| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-05-13 LAST_UPDATED_SLUG:squash-round-13-followon --> May 13, 2026 — Sprint 13 follow-ons: DTSTART minutes fix, virtual format default on admin+resubmit+inline forms, ICS Directions button suppressed for virtual (join link in DESCRIPTION); BUG-MAY13-3 filed (thank-you page redirect); 1169 tests |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status
