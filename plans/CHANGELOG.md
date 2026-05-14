@@ -6,6 +6,77 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-14 — Round 16 Wave 1 — Affiliate tracking iDev→PAP migration kickoff (cookie-script mount + CSP allowlist + tracker registry foundation, May 14 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-14 ENTRY_SLUG:round-16-wave-1-affiliate-cookie -->
+
+Source: Jeff Verdun's May 14 standing meeting (transcript: https://fathom.video/share/VEQERXhbtBM3TtoJZZRcaai1kZxc9zTi). Jeff asked to move the affiliate cookie-setting script onto the Vercel app's landing pages so direct-link visitors get attribution, and to migrate from iDev to Post Affiliate Pro (PAP) without redeploying everything. Plan written + reviewed by Codex (8 critical findings absorbed) + Superpowers code-reviewer (11 conditions absorbed) before implementation. Plan at `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Executed via SDD workflow: implementer subagent → spec compliance reviewer → code quality reviewer. 18 new tests, 1244 → 1262.
+
+**Architecture: Tracker Registry (Strangler Fig + Adapter pattern).**
+
+Research across migration literature (IREV, Acceleration Partners, Cellxpert, Martin Fowler) converged on parallel tracking during a 4–12 week reconciliation window with the new provider in shadow mode alongside the legacy provider in primary mode — NOT a hard cutover env-var pair. A small `AffiliateTracker` interface (id, mode, getCookieScriptDescriptor, getCommissionScriptDescriptor) lets each provider live in its own adapter file. Registry assembles active trackers from env vars. Modes per tracker: `primary` (live attribution), `shadow` (fires but provider-side flagged as non-payout — verified in merchant dashboard before turning on), `off` (not loaded).
+
+**ScriptDescriptor is a 3-form discriminated union** (`image | externalScript | inlineScriptGroup`) so iDev's current `<img>` pixel form, iDev's URL-based script load, and PAP's library-then-init ordered group pattern can all be represented without races. Wave 1 ships the type but only emits/handles `externalScript` for cookie-setters.
+
+**Wave 1 — Cookie-only mount.** Wave 1 ships ZERO impact on existing iDev `<img>` pixel attribution (CHG-03 path). Legacy `<CustomCodeRenderer>` on thank-you pages unchanged. `interpolateCustomCode`, `validateCustomCode`, `AFFILIATE_PIXEL_HOSTS`, `LandingPage.customCode` schema, Stripe webhook handler — all unchanged.
+
+**Files created:**
+- `src/lib/affiliate/affiliate-types.ts` — `TrackerMode`, `ScriptDescriptor` discriminated union, `AffiliateTracker` interface
+- `src/lib/affiliate/registry.ts` — `parseMode` (CASE-STRICT lowercase; typos disable rather than fire half-configured), `getActiveTrackers` (per-call env reads — explicit `// DO NOT cache` comment guards against future regression)
+- `src/lib/affiliate/idev-tracker.ts` — iDev adapter, cookie-only in Wave 1 (commission descriptor returns `null` stub — tested to guard against accidental Wave 2 leakage)
+- `src/components/affiliate/affiliate-cookie-script.tsx` — server component, `next/script` with `strategy="afterInteractive"`, key `affiliate-${t.id}-cookie`, defensive `if (d.type !== "externalScript") return null` skip for forward-prep
+- `src/app/(public)/layout.tsx` — NEW file (verified no prior layout in route group). Returns `<>{children}<AffiliateCookieScript /></>`. No `<html>`/`<body>` wrap (root layout owns those). No `metadata` export (inherits from root)
+
+**Routes covered (`(public)/` group, all unauthenticated public surfaces):** `/login`, `/register`, `/workshop/[slug]`, `/w/[slug]`, `/registration/success`, `/forgot-password`, `/reset-password`, `/accept-invite`, `/unauthorized`. **NOT covered (siblings of group):** `/` (redirects to `/login` so cookie fires on redirect target), `/survey/[id]` (post-conversion path).
+
+**Files modified:**
+- `next.config.ts` — extended `Content-Security-Policy-Report-Only` `script-src` + `connect-src` with `scalingup.idevaffiliate.com` (Wave 1 iDev) AND `*.postaffiliatepro.com` (forward-prepare Wave 3 PAP). `img-src` deliberately untouched (Wave 2 task — iDev's `image` descriptor renders `<img src>` on `scalingup.idevaffiliate.com` which needs `img-src` allowlist before that path activates).
+- `.env.example` — documented 4 new env vars: `AFFILIATE_TRACKER_IDEV_MODE` (default `off`), `AFFILIATE_TRACKER_IDEV_COOKIE_URL`, `AFFILIATE_TRACKER_PAP_MODE`, `AFFILIATE_TRACKER_PAP_COOKIE_URL`.
+
+**18 new tests (4 idev-tracker + 10 registry + 3 affiliate-cookie-script + 1 public-layout):**
+- `idev-tracker.test.ts`: cookie descriptor shape when URL set; null when URL is `undefined`; null when URL is `""` empty string (env-var unset-vs-empty deploy footgun guard); commission stub returns null.
+- `registry.test.ts`: 10 tests covering case-strict mode parsing ("Primary"/"PRIMARY"/"Shadow"/"SHADOW"/garbage → off); tracker activation by env; PAP block placeholder verified empty for Wave 3 forward-prep.
+- `affiliate-cookie-script.test.tsx`: no-trackers → renders nothing; iDev-active → renders `next/script` with correct src and key; skips non-`externalScript` descriptor types (defensive).
+- `public-layout.test.tsx`: regression guard asserting `<AffiliateCookieScript />` is mounted by `(public)/layout.tsx` output (catches future-cleanup regression).
+
+**Codex adversarial findings absorbed before code (8 critical reshapes):**
+1. `ScriptDescriptor` originally weak single-form union — fixed to 3-form to model real-world tracker shapes.
+2. Suppression rule was too aggressive (would kill non-affiliate pixels) — moved to Wave 2 only AND scoped to `primary`+configured.
+3. Original Wave 1 included commission+suppression — was hard cutover in strangler-fig costume. Reshaped Wave 1 to cookie-only.
+4. Shadow mode underspecified — explicit per-provider verification step added (PAP merchant dashboard MUST confirm non-payout before enabling against production orders).
+5. Single global URL-encoding interpolator was context-unsafe (PAP inline JS needs `JSON.stringify`, not percent-encoding). No global interpolator — adapters encode per their own context (`URLSearchParams` for URLs, `JSON.stringify` for inline JS).
+6. Coupon capture via Stripe webhook was racy + wrong field. Moved to checkout-creation-time write (Wave 2).
+7. Duplicate-fire risk on refresh/back/bookmark unaddressed. Wave 2 adds canonical commission surface per registration + stable `orderNumber = stripeSessionId` for provider dedupe + manual 5×-refresh test.
+8. iDev's current production form is `<img>` pixel — adapter originally only supported scripts (would have broken existing iDev attribution). `image` descriptor added to ScriptDescriptor; Wave 2 iDev commission emits `image`.
+
+**Code-reviewer findings absorbed (11 conditions, all signed off):**
+- `(public)/layout.tsx` corrected from "Modified" → "New" file in plan.
+- Route coverage enumeration explicit (in vs out of `(public)/` group).
+- CSP `img-src` task added to Wave 2 with explicit ordering requirement.
+- CSP header name verified `Content-Security-Policy-Report-Only` (not `Content-Security-Policy`).
+- Empty-string env-var URL test added.
+- Case-strict mode parsing test added.
+- `public-layout.test.tsx` regression guard added.
+- Ad-blocker behavior characterization (uBlock Origin baseline) added to Wave 1 manual acceptance test.
+- Authenticated-user no-exclusion note (Wave 2 may add session guard if self-referrals surface).
+- Env-var read-timing comment in `registry.ts` (locks against future caching regression).
+- "What does NOT change in Wave 1" mechanical enumeration for rollback safety.
+
+**Wave 2-4 roadmap (deferred):**
+- Wave 2: commission registry with all three descriptor forms; `Registration.appliedCouponCode` schema (captured at checkout creation, NOT webhook); iDev `image` adapter emit; suppression rule for legacy `<CustomCodeRenderer>` (only when primary+fully-configured); ~22 new tests.
+- Wave 3: PAP adapter, shadow mode. Blocked until Jeff invites user as PAP merchant user.
+- Wave 4: flip primary to PAP after 4–6 weeks PAP↔iDev variance <1%; deprecate iDev.
+- Phase 4 (long-term roadmap): server-side (S2S) postback via Stripe webhook for ad-blocker resilience (15–25% conversion-rate gain per Voluum/Tracknow/RedTrack).
+
+**Wave 1 acceptance test (manual, after deploy):**
+1. User fetches iDev cookie-setter script URL from Kajabi site-header settings (admin access granted in meeting).
+2. Set `AFFILIATE_TRACKER_IDEV_MODE=primary` + `AFFILIATE_TRACKER_IDEV_COOKIE_URL=<from-Kajabi>` in Vercel; redeploy.
+3. Visit a Vercel-hosted public page (e.g. `/login`); DevTools → Application → Cookies → confirm iDev cookie set in first-party storage.
+4. Test with uBlock Origin enabled — characterize baseline blocked-rate so post-deploy attribution-shortfall isn't a surprise (legacy `<img>` pixel has same blocker exposure today).
+5. Complete the existing register flow on a Lynn workshop URL — legacy `<img>` pixel commission tracking still fires from `LandingPage.customCode`; verify Jeff's iDev dashboard records the conversion correctly.
+
+Direct push to main per Alpha-mode deploy convention. Notion task: https://www.notion.so/3608c45dd829815f8657f7b767253d22
+
+---
+
 ### 2026-05-14 — Round 15 — Survey Data Sort/Categorize Tool (Item #5 from Jeff's 5/12 email, May 14 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-14 ENTRY_SLUG:round-15-survey-sort-categorize -->
 
 Source: Jeff Verdun, 5/12 email Item #5 — *"Create a new tool to sort and categorize survey data. Think a screen like financials that allows the sorting of survey data."* Plan written + 2-round adversarial review (Codex + independent self-review caught 5 critical + 4 missing edge cases before any code landed). Executed via SDD workflow: implementer subagent → spec compliance reviewer → code quality reviewer per wave, with targeted polish dispatches when reviewers flagged Important items. 9 commits, 52 new tests, 1192 → 1244.

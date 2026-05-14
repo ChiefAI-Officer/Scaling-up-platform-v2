@@ -14,10 +14,10 @@ const securityHeaders = [
     key: "Content-Security-Policy-Report-Only",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+      "script-src 'self' 'unsafe-inline' https://js.stripe.com https://scalingup.idevaffiliate.com https://*.postaffiliatepro.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://*.vercel-storage.com",
-      "connect-src 'self' https://*.stripe.com https://api.hubspot.com",
+      "connect-src 'self' https://*.stripe.com https://api.hubspot.com https://scalingup.idevaffiliate.com https://*.postaffiliatepro.com",
       "frame-src https://js.stripe.com",
       "font-src 'self' data:",
     ].join("; "),
