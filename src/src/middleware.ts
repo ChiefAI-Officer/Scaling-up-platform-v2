@@ -125,8 +125,7 @@ export default withAuth(
           pathname.match(/^\/api\/workshops\/[^/]+\/register$/) ||
           pathname.startsWith("/survey/") ||
           pathname.match(/^\/api\/surveys\/(?!assign|workflows)[^/]+(\/submit)?$/) ||
-          pathname.startsWith("/wireframes/") ||
-          pathname.startsWith("/wireframes-phase2/") ||
+          pathname.startsWith("/wireframes") ||
           pathname.startsWith("/_next") ||
           pathname.includes(".")
         ) {
