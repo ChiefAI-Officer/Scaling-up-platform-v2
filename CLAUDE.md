@@ -17,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
-| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-05-13 LAST_UPDATED_SLUG:squash-round-14 --> May 13, 2026 — Squash Round 14: BUG-MAY13-3 per-workshop THANK_YOU redirect (4 call sites unified through shared `resolveRegistrationSuccessUrl` + `getAppUrl` helpers); BUG-MAY13-2 survey-template editor Results tab now mounts `<SurveyResultsContent>` with workshop column (per-person RATING/NPS + structured workshop attribution); 1192 tests |
+| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-05-14 LAST_UPDATED_SLUG:round-15-survey-sort-categorize --> May 14, 2026 — Round 15: Item #5 (Survey Data Sort/Categorize Tool from Jeff's 5/12 email) — new `getSurveyResponseRows()` service helper, sortable `<SurveyResponsesTable>` component with conditional NPS/Avg-Rating/Comment columns, CSV export endpoint at `/api/survey-templates/[id]/responses/export` (admin+staff, no row cap, per-question columns + respondent + sentAt + format), shared `parseSurveyDateRange()` helper fixing the endDate midnight bug (same-day responses now included), shared `csv.ts` utilities (escape + RFC 4180 rowsToCsv) consumed by both registration export and the new survey export, Wave 2 Prisma typing leftover fixed; 1244 tests |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
 
 ## Current Status

@@ -6,6 +6,82 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-14 — Round 15 — Survey Data Sort/Categorize Tool (Item #5 from Jeff's 5/12 email, May 14 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-14 ENTRY_SLUG:round-15-survey-sort-categorize -->
+
+Source: Jeff Verdun, 5/12 email Item #5 — *"Create a new tool to sort and categorize survey data. Think a screen like financials that allows the sorting of survey data."* Plan written + 2-round adversarial review (Codex + independent self-review caught 5 critical + 4 missing edge cases before any code landed). Executed via SDD workflow: implementer subagent → spec compliance reviewer → code quality reviewer per wave, with targeted polish dispatches when reviewers flagged Important items. 9 commits, 52 new tests, 1192 → 1244.
+
+**Wave 1 — Shared CSV helpers (commit `b4477d9`):**
+- New module `src/lib/utils/csv.ts` with two exports: `escapeCsvCell(value): string` (RFC 4180 always-quoted; doubles internal `"`; prepends `'` for cells starting with `=` `+` `-` `@` `\t` `\r` per OWASP injection-defense pattern) and `rowsToCsv(headers, rows): string` (joins with `\r\n`, trailing `\r\n`).
+- Refactored `src/app/api/registrations/export/route.ts` to call `rowsToCsv` — replaced ~11 lines of inline escape logic with one helper call. Output is strictly RFC 4180 (every cell now quoted; injection prefix is `'` not `\t`); no existing tests locked the old byte shape; spreadsheet reparse is identical.
+- 6 new tests at `__tests__/lib/csv-utils.test.ts` (quote/comma/newline escape, all 6 injection chars, null/undefined → bare empty, Date stringification, RFC 4180 line endings, round-trip reparse).
+- Wave 1 code-review deferred items addressed in Wave 5: type-narrow `escapeCsvCell` param from `unknown` → exported `CsvCellInput` union (`string | number | boolean | bigint | Date | null | undefined`); JSDoc clarifying that Date is NOT pre-formatted by the helper.
+
+**Wave 2 — `parseSurveyDateRange` helper + endDate same-day bug fix (commit `cca46ff`):**
+- The aggregate page filtered `completedAt` as `lte: new Date("2026-05-13")` = midnight UTC → same-day responses with `completedAt > 00:00` were silently excluded. Fix: new `parseSurveyDateRange(params: { startDate, endDate })` at `src/lib/surveys/survey-types.ts` returns `{ startDate, endDateExclusive }` where `endDateExclusive = new Date(endDate); end.setUTCDate(end.getUTCDate() + 1)`. Query bound switched from `lte` to `lt` (exclusive). Same-day responses now correctly included; month-end (May 31 → Jun 1) + year-end (Dec 31 → Jan 1) rollover tested.
+- Migrated `getSurveyResults` in `src/lib/surveys/survey-service.ts` to use the helper. `SurveyResultsFilters.startDate/endDate` widened from `Date` to `Date | string` (back-compat shim; helper-aware string path handles inclusive-of-day correctly).
+- Updated `src/app/(dashboard)/admin/surveys/aggregate/page.tsx` to drop inline `new Date(sp.startDate)` and pass raw YYYY-MM-DD strings.
+- Bonus: `src/app/api/survey-templates/[id]/results/route.ts` Zod schema migrated from `z.coerce.date()` (which produced midnight UTC at the API surface, same bug) to YYYY-MM-DD regex string. Safe because UI input is `<input type="date">` which always emits YYYY-MM-DD.
+- 7 new tests at `__tests__/lib/parse-survey-date-range.test.ts` + 1 updated/added in `__tests__/lib/survey-service-filters.test.ts` (`lte` → `lt` rationale comment).
+- Wave 2 code-review Issue 3 (`Record<string, unknown>` → `Prisma.WorkshopWhereInput`) deferred to Wave 6 since Wave 6 rewrites that page.
+
+**Wave 3 — `getSurveyResponseRows` service helper (commits `d927268` + polish `0f2f5e5`):**
+- New exported function `getSurveyResponseRows(templateId, filters, options?: { cap?: number | null })` returning `{ template, questions, rows, totalCount, cappedAt }`. Single backbone consumed by both the new UI table (Wave 4) and the CSV export endpoint (Wave 5). Existing `getSurveyResults` UNTOUCHED (different responsibility — aggregate stats vs per-response drill-down).
+- **Codex-critical fix:** Workshop→Category relation is `workshopCategory` (Prisma `@relation`), NOT `category` (legacy `WorkshopCategory @default(AI)` enum). The plan originally used `category` and would have crashed at runtime. Test asserts `call.include.workshop.select.workshopCategory).toBeDefined()` AND `call.include.workshop.select.category).toBeUndefined()`.
+- Default cap `ROW_CAP = 500` for UI; pass `{ cap: null }` for unbounded CSV export. `cappedAt` is set ONLY when truncation actually occurred AND `totalCount > cap`.
+- Each row's `answersByQuestionId: Map<questionId, { value, numValue }>` built in-memory from the include payload for O(1) per-cell lookup in the table/CSV.
+- `coach.name`: null-safe trim of firstName+lastName; empty → `null`. `category`: from `workshopCategory` relation; `null` when workshop has no `categoryId`.
+- Throws `Error("Survey template not found: ...")` on missing template — deliberate choice over silent null-return to surface consumer bugs (stale templateIds in URLs, deleted-template races).
+- Polish commit applied 3 reviewer-flagged fixes: (1) `Promise.all([template, count, findMany])` parallel fetch (was sequential — 3 round-trips → 1); (2) `cappedAt` now uses pre-filter `surveys.length` not post-filter `rows.length` (defensive in-memory filter could have hidden a true cap); (3) `respondent: { firstName, lastName, email } | null` field added (registration-linked surveys — powers Wave 5 CSV identification).
+- 12 new tests at `__tests__/lib/survey-response-rows.test.ts` (9 in original commit + 3 in polish). Covers all 6 spec acceptance bullets + null-coach/null-category fallback + template+question ordering + parallel-fetch invariant + respondent shape.
+
+**Wave 4 — `<SurveyResponsesTable>` client component (commits `6f196b4` + polish `8a4df5e`):**
+- New `"use client"` component at `src/components/surveys/survey-responses-table.tsx`. Renders per-response rows with sortable column headers, conditional answer columns, empty state, cap banner, Export CSV button.
+- **Always-shown columns:** Workshop (Next.js `<Link>` to `/workshops/<id>`), Workshop Code, Coach, Category, Completed At.
+- **Conditional columns:** NPS Score (when `surveyType === "NPS"` OR any row has numeric NPS answer); Avg Rating (when any RATING-type `numValue` present; per-row cell = mean rounded to 1 decimal); Comment (when any TEXT/TEXTAREA non-empty value; per-row cell = first such answer truncated to 60 chars + ellipsis).
+- **Sortable:** local `useState` for `sortKey + sortDir`. Default `completedAt DESC` (matches server-side `findMany`). First click on a different column resets to ASC; subsequent clicks toggle ASC↔DESC. Stable sort via `[...rows].sort()` (V8 Array.sort is stable). Nulls last in ASC, first in DESC.
+- **Empty state:** "No responses match these filters." with widen-filters hint.
+- **Cap banner:** "Showing N of M responses — narrow filters or use Export CSV to see all." rendered above the table when `cappedAt !== null`.
+- **Anti-feature confirmed:** NO "Respondent" column — PII stays in CSV-only territory (the `respondent` field on `SurveyResponseRow` is intentionally not rendered; doc-comment at top of file explains why).
+- Polish commit applied 3 reviewer-flagged a11y fixes: (1) `aria-sort="ascending|descending|none"` on the active column `<TableHead>` (screen readers can now perceive sort state — the visual `ArrowUp`/`ArrowDown` icons are `aria-hidden`); (2) removed redundant `aria-label` shadowing visible text (was causing "Workshop, Workshop" double-read); (3) tightened fragile test selector from `/Workshop$/i` (substring-anchored) to `/^Workshop$/i` (exact match — won't break if column renamed).
+- 9 new tests at `__tests__/components/survey-responses-table.test.tsx` (workshop link href, sort toggle, NPS column hidden when no NPS answers, cap banner gating, empty state, Export CSV href, 60-char truncation, Avg Rating math, aria-sort attribute lifecycle).
+
+**Wave 5 — CSV export endpoint (commits `816e1a5` + polish `3f0048f`):**
+- New route `GET /api/survey-templates/[id]/responses/export/route.ts`. Auth chain matches `/api/registrations/export`: `getApiActor` → null → 401; `!isPrivilegedRole(actor.role)` → 403; ADMIN/STAFF → 200. (NOT ADMIN-only per Codex review.)
+- Zod-validates query params `coachId`, `categoryId`, `workshopFormat`, `startDate`, `endDate` (YYYY-MM-DD regex). Bad params → 400.
+- Internally calls `getSurveyResponseRows(templateId, filters, { cap: null })` for unbounded export. The UI table caps at 500; CSV bypasses it.
+- **CSV base columns (in order):** Workshop, Workshop Code, Coach, Category, Format, Survey Type, Respondent Name, Respondent Email, Sent At, Completed At.
+- **Per-question columns:** one per question, named after `question.label`, ordered by `sortOrder`. Per-type serialization: TEXT/TEXTAREA raw (no truncation); RATING/NPS numeric (`numValue`); SINGLE_CHOICE label (`value`); MULTI_CHOICE → JSON.parse + `"; "`-joined with comma-split fallback; YES_NO → `"Yes"`/`"No"` mapped from `true/yes/1` and `false/no/0`.
+- Filename `survey-<slug>-<YYYY-MM-DD>.csv` via Next.js `Content-Disposition: attachment` (no JS needed for download). Empty-slug fallback `"survey"`.
+- Service helper extended (additive only): `SurveyResponseRow.workshop.format: string | null` + `SurveyResponseRow.sentAt: Date | null`. Wave 4's table consumer ignores the new fields (forward-compatible).
+- Polish commit applied 3 reviewer-flagged fixes: (1) **404 not 500** on unknown template — wraps the service call in try/catch detecting `Error("Survey template not found")` and returns `404 { error: "Template not found" }` (other errors still throw to default handler); (2) **DRY slug** — replaced the local `slugifyTemplateName()` with `generateSlug` from `lib/utils.ts` (byte-identical output, single source of truth); (3) one-line comment noting `today` uses UTC and may drift up to 5h ahead of admin local time at UTC midnight.
+- **Wave 1 deferred items applied:** `escapeCsvCell` param narrowed from `unknown` to new exported `CsvCellInput` union; JSDoc warning Date is NOT pre-formatted. Existing registrations export's call sites still compile (pass only strings/numbers).
+- 14 new tests at `__tests__/api/survey-responses-export.test.ts` (13 in original commit + 1 in polish for 404 path). Covers all 8 spec acceptance bullets + per-type serialization + query threading + bad-date 400 + respondent composition + sentAt rendering + 404 on missing template.
+
+**Wave 6 — Aggregate page wiring + Wave 2 Issue 3 leftover (commit `d7ad545`):**
+- `src/app/(dashboard)/admin/surveys/aggregate/page.tsx`: added `Promise.all([getSurveyResults, getSurveyResponseRows])` parallel fetch (the row helper takes `coachId`, `categoryId`, `workshopFormat`, `startDate`, `endDate` — `groupBy` is intentionally NOT passed since the per-response view doesn't group).
+- New `<section aria-labelledby="individual-responses-heading">` rendered conditionally on `!groupBy && responseRowsData`, positioned AFTER the existing "Per-Workshop Breakdown" table. When `groupBy` is active, the existing groups table covers the categorize intent — flat response table redundant.
+- `exportHref` built via `URLSearchParams` preserving all 5 filter keys; no trailing `?` when no filters set. Single Export CSV button rendered exactly once (the table component owns it; no duplicate at section heading per plan).
+- **Wave 2 Issue 3 leftover applied:** `workshopSubFilter: Record<string, unknown>` → `Prisma.WorkshopWhereInput`; `completedAtBoundary: Record<string, unknown>` → `Prisma.DateTimeNullableFilter` (canonical types already used in `survey-service.ts:518/523`). Added `import { Prisma } from "@prisma/client"`. Prisma type-check now catches schema drift in the side-breakdown query.
+- No page-level tests (high-friction for async server components; no pre-existing tests for this page to extend; underlying pieces — table, helper, route — all already test-covered).
+
+**Test totals:** 149 suites / 1244 tests passing (was 1192 → +52). `CI=true npm run build` clean.
+
+**Scope decisions (Josh, 2026-05-13/14):**
+- Item #3 (upload web page templates) **deferred** pending Jeff scoping call — codebase has hardcoded React templates that can't accept arbitrary HTML without major refactor. Concept memo for Thursday meeting: this is "theming" in industry terms (WordPress mental model). Full memo in agent memory.
+- Plan reviewed by Codex (5 critical + 1 simplification) + independent self-review (3 issues). All 9 accepted before any code. See plan changelog at `/Users/diushianstand/.claude/plans/do-we-need-to-cryptic-swan.md`.
+
+**Open follow-ons for Beta (not blockers):**
+- Streaming CSV for huge exports (current pattern materializes in memory — ~50MB at 10K respondents × 50 questions is still well within Vercel's 1024MB limit; revisit if exports start timing out)
+- `@@index on Survey.completedAt` for performant date-range filters at scale
+- Multi-dimensional grouping (`groupBy` is single-dimension today)
+- Time-series trend chart (avg NPS per month)
+- Workshop-to-workshop comparison view
+- Response tagging/marking workflow
+- `serializeAnswer` extracted to a shared module once a second consumer appears (e.g. preview-before-download)
+- `buildExportSearchParams` extracted helper if another page reuses the same filter-preserve pattern
+
+---
+
 ### 2026-05-13 — Squash Round 14 — BUG-MAY13-3 (Thank-You Redirect) + BUG-MAY13-2 (Survey View Mismatch) (May 13 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-13 ENTRY_SLUG:squash-round-14 -->
 
 Two bugs filed during Sprint 13 verification, fixed in one push. Plan reviewed by Codex (5 findings accepted before implementation). 7 commits, 26 new tests, 1169 → 1192.
