@@ -28,6 +28,7 @@ import type { SurveyQuestion } from "@prisma/client";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { getSurveyResponseRows } from "@/lib/surveys/survey-service";
 import { rowsToCsv, type CsvCellInput } from "@/lib/utils/csv";
+import { generateSlug } from "@/lib/utils";
 
 const isoDateString = z
   .string()
@@ -44,18 +45,6 @@ const querySchema = z.object({
 const paramsSchema = z.object({
   id: z.string().min(1),
 });
-
-/**
- * Slugify a template name for the filename. Mirrors the loose convention used
- * by generateSlug() but locked inline so a CSV filename can't accidentally
- * carry shell-special characters from arbitrary admin input.
- */
-function slugifyTemplateName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
 
 /**
  * Map a single SurveyAnswer onto a CSV cell, branching on the question's type.
@@ -143,17 +132,25 @@ export async function GET(
   const { id: templateId } = paramsValidation.data;
   const q = queryValidation.data;
 
-  const result = await getSurveyResponseRows(
-    templateId,
-    {
-      coachId: q.coachId,
-      categoryId: q.categoryId,
-      workshopFormat: q.workshopFormat,
-      startDate: q.startDate,
-      endDate: q.endDate,
-    },
-    { cap: null },
-  );
+  let result;
+  try {
+    result = await getSurveyResponseRows(
+      templateId,
+      {
+        coachId: q.coachId,
+        categoryId: q.categoryId,
+        workshopFormat: q.workshopFormat,
+        startDate: q.startDate,
+        endDate: q.endDate,
+      },
+      { cap: null },
+    );
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("Survey template not found")) {
+      return NextResponse.json({ error: "Template not found" }, { status: 404 });
+    }
+    throw err;
+  }
 
   const baseHeaders = [
     "Workshop",
@@ -187,8 +184,9 @@ export async function GET(
   ]);
 
   const csv = rowsToCsv(headers, csvRows);
+  // `today` uses UTC; filename rolls over at UTC midnight, which is up to 5h ahead of US Eastern admin local time.
   const today = new Date().toISOString().slice(0, 10);
-  const slug = slugifyTemplateName(result.template.name) || "survey";
+  const slug = generateSlug(result.template.name) || "survey";
 
   return new Response(csv, {
     status: 200,

@@ -170,6 +170,18 @@ describe("GET /api/survey-templates/[id]/responses/export", () => {
     expect(getSurveyResponseRows).not.toHaveBeenCalled();
   });
 
+  it("returns 404 when the survey template does not exist", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (getSurveyResponseRows as jest.Mock).mockRejectedValue(
+      new Error("Survey template not found: bad-id"),
+    );
+
+    const res = await GET(buildReq(), ctx);
+    expect(res.status).toBe(404);
+    const body = JSON.parse(readBody(res));
+    expect(body.error).toBe("Template not found");
+  });
+
   it("returns 200 for ADMIN and STAFF", async () => {
     (getSurveyResponseRows as jest.Mock).mockResolvedValue({
       template: { id: "t1", name: "My Survey", surveyType: "POST_WORKSHOP" },
