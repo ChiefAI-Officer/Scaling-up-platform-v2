@@ -67,6 +67,9 @@ function makeSurvey(
 ) {
   return {
     id,
+    // Round 15 Wave 5: sentAt surfaced on the row shape so the CSV export
+    // can show invite-sent vs invite-completed timestamps.
+    sentAt: new Date("2026-05-12T10:00:00Z"),
     completedAt,
     workshop: {
       id: "w1",
@@ -210,6 +213,7 @@ describe("getSurveyResponseRows", () => {
       id: "w1",
       title: "Workshop One",
       workshopCode: "WS-2026-AAAA",
+      format: "VIRTUAL",
     });
     expect(row.coach).toEqual({ id: "c1", name: "Jane Doe" });
     expect(row.category).toEqual({ id: "cat-1", name: "AI" });
@@ -300,5 +304,35 @@ describe("getSurveyResponseRows", () => {
     const result = await getSurveyResponseRows("t1", {});
     // Interface contract: respondent is `null` (not `undefined`) when missing.
     expect(result.rows[0].respondent).toBeNull();
+  });
+
+  // ============================================
+  // Round 15 Wave 5: sentAt + workshop.format exposed for CSV export
+  // ============================================
+
+  it("requests workshop.format in the findMany include (powers CSV Format column)", async () => {
+    await getSurveyResponseRows("t1", {});
+    const call = (db.survey.findMany as jest.Mock).mock.calls[0][0];
+    expect(call.include.workshop.select.format).toBe(true);
+  });
+
+  it("maps survey.sentAt and workshop.format onto the row shape", async () => {
+    (db.survey.count as jest.Mock).mockResolvedValue(1);
+    (db.survey.findMany as jest.Mock).mockResolvedValue([
+      makeSurvey("s-fmt", new Date("2026-05-12T14:00:00Z"), {
+        sentAt: new Date("2026-05-10T09:00:00Z"),
+        workshop: {
+          id: "w1",
+          title: "Workshop One",
+          workshopCode: "WS-2026-AAAA",
+          format: "IN_PERSON",
+          coach: { id: "c1", firstName: "Jane", lastName: "Doe" },
+          workshopCategory: { id: "cat-1", name: "AI" },
+        },
+      }),
+    ]);
+    const result = await getSurveyResponseRows("t1", {});
+    expect(result.rows[0].sentAt?.toISOString()).toBe("2026-05-10T09:00:00.000Z");
+    expect(result.rows[0].workshop.format).toBe("IN_PERSON");
   });
 });

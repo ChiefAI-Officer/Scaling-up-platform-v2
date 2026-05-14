@@ -454,7 +454,13 @@ export async function getSurveyResults(
 
 export interface SurveyResponseRow {
   surveyId: string;
-  workshop: { id: string; title: string; workshopCode: string | null };
+  /**
+   * Round 15 Wave 5: `format` added so the CSV export can render the
+   * Workshop Format column without a second Prisma roundtrip. Sourced from
+   * Workshop.format (e.g. "VIRTUAL" / "IN_PERSON" / "HYBRID"). `null` for
+   * legacy rows with no format set.
+   */
+  workshop: { id: string; title: string; workshopCode: string | null; format: string | null };
   coach: { id: string; name: string | null } | null;
   category: { id: string; name: string } | null;
   /**
@@ -464,6 +470,13 @@ export interface SurveyResponseRow {
    * Used by the Wave 5 CSV export to expose respondent name + email per row.
    */
   respondent: { firstName: string | null; lastName: string | null; email: string | null } | null;
+  /**
+   * Round 15 Wave 5: `sentAt` exposed so the CSV export can show when the
+   * survey invitation was sent vs when the respondent completed it. Sourced
+   * from Survey.sentAt; null for surveys where the timestamp was never set
+   * (older rows or non-registration code paths).
+   */
+  sentAt: Date | null;
   completedAt: Date;
   // Map keyed by questionId → SurveyAnswer fields (value + numValue).
   answersByQuestionId: Map<string, { value: string | null; numValue: number | null }>;
@@ -532,6 +545,9 @@ export async function getSurveyResponseRows(
           id: true,
           title: true,
           workshopCode: true,
+          // Round 15 Wave 5: format is required by the CSV export's "Format"
+          // column. Direct scalar on Workshop — no extra include needed.
+          format: true,
           coach: { select: { id: true, firstName: true, lastName: true } },
           workshopCategory: { select: { id: true, name: true } },
         },
@@ -567,11 +583,13 @@ export async function getSurveyResponseRows(
 
   type SurveyShape = {
     id: string;
+    sentAt: Date | null;
     completedAt: Date | null;
     workshop: {
       id: string;
       title: string;
       workshopCode: string | null;
+      format: string | null;
       coach: { id: string; firstName: string | null; lastName: string | null } | null;
       workshopCategory: { id: string; name: string } | null;
     } | null;
@@ -596,7 +614,12 @@ export async function getSurveyResponseRows(
       }
       return {
         surveyId: s.id,
-        workshop: { id: workshop.id, title: workshop.title, workshopCode: workshop.workshopCode },
+        workshop: {
+          id: workshop.id,
+          title: workshop.title,
+          workshopCode: workshop.workshopCode,
+          format: workshop.format,
+        },
         coach: workshop.coach
           ? { id: workshop.coach.id, name: composeCoachName(workshop.coach) }
           : null,
@@ -610,6 +633,7 @@ export async function getSurveyResponseRows(
               email: s.registration.email,
             }
           : null,
+        sentAt: s.sentAt,
         completedAt: s.completedAt!,
         answersByQuestionId,
       };

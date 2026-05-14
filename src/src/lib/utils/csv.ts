@@ -13,7 +13,25 @@
 // CSV injection protection: cells starting with these get a leading single quote
 const CSV_INJECTION_CHARS = /^[=+\-@\t\r]/;
 
-export function escapeCsvCell(value: unknown): string {
+/**
+ * Cell input types accepted by the CSV emitter.
+ *
+ * Round 15 Wave 5 narrowed the input type from `unknown` to this union — every
+ * call site in the repo passes one of these primitives (or a Date that's been
+ * pre-stringified). Date is NOT pre-formatted by this helper: stringify with
+ * `.toISOString()` (or your preferred format) BEFORE passing, otherwise you
+ * get the locale-dependent output of `String(date)`.
+ */
+export type CsvCellInput =
+  | string
+  | number
+  | boolean
+  | bigint
+  | Date
+  | null
+  | undefined;
+
+export function escapeCsvCell(value: CsvCellInput): string {
   if (value === null || value === undefined) return "";
   const str = String(value);
   const needsEscape = CSV_INJECTION_CHARS.test(str);
@@ -24,7 +42,7 @@ export function escapeCsvCell(value: unknown): string {
 
 export function rowsToCsv(
   headers: string[],
-  rows: Array<Array<unknown>>
+  rows: Array<Array<CsvCellInput>>
 ): string {
   const headerLine = headers.map(escapeCsvCell).join(",");
   const bodyLines = rows.map((row) => row.map(escapeCsvCell).join(","));
