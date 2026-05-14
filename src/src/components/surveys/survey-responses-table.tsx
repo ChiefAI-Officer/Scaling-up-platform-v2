@@ -241,13 +241,27 @@ export function SurveyResponsesTable({
   // Inline renderer (NOT a nested component definition — those get re-created
   // every render, which would unmount/remount the buttons and detach cached
   // refs in tests).
+  //
+  // a11y: `aria-sort` on the <TableHead> announces the current sort state of
+  // the active column to screen readers (the visible ArrowUp/ArrowDown icons
+  // are aria-hidden). The button has no `aria-label` — the visible <span>
+  // text becomes its accessible name automatically, avoiding "Workshop,
+  // Workshop" double-read.
   const sortableHeader = (label: string, key: SortKey) => (
-    <TableHead key={key}>
+    <TableHead
+      key={key}
+      aria-sort={
+        sortKey === key
+          ? sortDir === "asc"
+            ? "ascending"
+            : "descending"
+          : "none"
+      }
+    >
       <button
         type="button"
         onClick={() => handleSort(key)}
         className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-        aria-label={label}
       >
         <span>{label}</span>
         {renderSortIndicator(key)}

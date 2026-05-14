@@ -119,7 +119,8 @@ describe("SurveyResponsesTable (Round 15 Wave 4)", () => {
     expect(within(bodyRows[0]).getByRole("link", { name: /Alpha Workshop/ })).toBeInTheDocument();
 
     // Click "Workshop" header → switch to Workshop ASC ("Alpha…" before "Beta…").
-    const workshopHeader = screen.getByRole("button", { name: /Workshop$/i });
+    // Exact-match regex (^...$) so this doesn't accidentally match "Workshop Code".
+    const workshopHeader = screen.getByRole("button", { name: /^Workshop$/i });
     fireEvent.click(workshopHeader);
     bodyRows = screen.getAllByRole("row").slice(1);
     expect(within(bodyRows[0]).getByRole("link", { name: /Alpha Workshop/ })).toBeInTheDocument();
@@ -235,6 +236,48 @@ describe("SurveyResponsesTable (Round 15 Wave 4)", () => {
     expect(screen.getByText(expected)).toBeInTheDocument();
     // The full string is NOT rendered.
     expect(screen.queryByText(longText)).not.toBeInTheDocument();
+  });
+
+  it("sets aria-sort on the active column header (Completed At descending by default, switches on header click)", () => {
+    const questions = [buildQuestion({ id: "q1", questionType: "TEXT", label: "Comment" })];
+    const rows = [
+      buildRow({
+        surveyId: "s1",
+        workshop: { id: "w1", title: "Beta Workshop", workshopCode: "WS-2026-BETA" },
+        completedAt: new Date("2026-05-10T12:00:00Z"),
+        answers: [{ questionId: "q1", value: "x" }],
+      }),
+      buildRow({
+        surveyId: "s2",
+        workshop: { id: "w2", title: "Alpha Workshop", workshopCode: "WS-2026-ALPH" },
+        completedAt: new Date("2026-05-11T12:00:00Z"),
+        answers: [{ questionId: "q1", value: "y" }],
+      }),
+    ];
+
+    render(
+      <SurveyResponsesTable
+        rows={rows}
+        questions={questions}
+        surveyType="POST_WORKSHOP"
+        totalCount={2}
+        cappedAt={null}
+        exportHref="/export"
+      />
+    );
+
+    // Initial state: Completed At header is the active sort (descending).
+    const completedHeader = screen.getByRole("columnheader", { name: /Completed At/i });
+    expect(completedHeader).toHaveAttribute("aria-sort", "descending");
+
+    // Other sortable headers should be "none".
+    const workshopColumnHeader = screen.getByRole("columnheader", { name: /^Workshop$/i });
+    expect(workshopColumnHeader).toHaveAttribute("aria-sort", "none");
+
+    // Click the Workshop header → it becomes active (ascending), Completed At resets to "none".
+    fireEvent.click(screen.getByRole("button", { name: /^Workshop$/i }));
+    expect(workshopColumnHeader).toHaveAttribute("aria-sort", "ascending");
+    expect(completedHeader).toHaveAttribute("aria-sort", "none");
   });
 
   it("computes Avg Rating across RATING-type answers, rounded to 1 decimal; em-dash when none", () => {
