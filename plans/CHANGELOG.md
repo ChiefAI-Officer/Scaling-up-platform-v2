@@ -6,6 +6,29 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Task L — post-creation participant management: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-l-participant-mgmt -->
+
+Closes a real workflow gap: coaches can now add a forgotten respondent or remove a stale one after creating a campaign, without having to discard and recreate. Builds on Task D's invitation token system + Task F's CampaignDetail UI.
+
+**API**:
+- `POST /api/assessment-campaigns/[id]/respondents` — body `{ orgRespondentId }` Zod-validated. Auth via `canManageCampaign` (404 on auth-fail). Error matrix: 409 `ALREADY_PARTICIPANT`, 422 `WRONG_ORGANIZATION`, 409 `CAMPAIGN_CLOSED`. On success: transaction creates `AssessmentCampaignParticipant` row, snapshots `teamPath` via the shared `buildTeamPath` helper, AND — only when `campaign.status === 'ACTIVE'` — mints a PENDING `AssessmentInvitation` row (token + sha256 hash via Task D's `invitation-tokens.ts` helper; SMTP send NOT triggered here — coach uses the existing Resend button). DRAFT campaigns intentionally skip invitation creation. Audit log action `'CREATE'`. Rate-limited via `RateLimits.standard`.
+- `DELETE /api/assessment-campaigns/[id]/participants/[participantId]` — auth via `canManageCampaign`. 404 on missing-participant or campaignId mismatch. 409 `ALREADY_SUBMITTED` when any `AssessmentSubmission` row exists for `(campaignId, respondentId)` — results are immutable. On success: transaction `deleteMany` on invitation rows (covers 0-or-1) then `delete` on the participant row. Audit `'DELETE'`. Returns 204. Rate-limited.
+
+**Schema cascade finding**: `AssessmentCampaignParticipant`, `AssessmentInvitation`, `AssessmentSubmission` relations have **no `onDelete: Cascade`** in `prisma/schema.prisma`. The DELETE route therefore deletes invitation rows explicitly inside a transaction; submissions are guarded by the 409 check.
+
+**UI — `CampaignDetail.tsx`**:
+- "Add Respondent" button above respondents table, hidden when `campaign.status === 'CLOSED'`.
+- Add modal: select from existing org respondents (filtering out current participants), OR inline "Create new respondent" form that posts to `/api/organizations/[orgId]/respondents` then auto-selects the new ID.
+- Per-row Trash icon hidden when `hasSubmission || invitation.status === 'SUBMITTED' || campaign.status === 'CLOSED'`. Confirm dialog → DELETE → re-fetch respondents + `router.refresh()` so the stats card updates.
+
+**Tests**: 19 new (11 in `respondents-post.test.ts` + 8 in `participants-delete.test.ts`). Full project suite **1691 / 1691 green across 202 suites** (up from 1672).
+
+**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in 55s. ESLint clean on 5 changed files. Commit `2de6786`, Vercel `ngvosvan4-chief-aio-fficer.vercel.app` ● Ready in 1m.
+
+**Concerns (deferred)**:
+- POST does NOT send SMTP — only mints a PENDING invitation. Coach uses Resend button. Keeps single-add fast and out of Vercel's 30s SMTP budget.
+- Used "submission exists" as immutability guard (schema has no `scoredAt` — spec referenced it but only `submittedAt` exists). Stricter than scoredAt-based gating, matches spirit.
+
 ### 2026-05-18 — Assessment Tool v7.6 — Task K — campaign wizard auto-save drafts: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-k-wizard-drafts -->
 
 Wizard UX gap closed: coaches who walk away mid-creation can now resume where they left off. Mirrors the existing `WorkshopDraft` pattern verbatim (same upsert contract, same `coachId`-unique gating) so future maintainers have a stable precedent.
