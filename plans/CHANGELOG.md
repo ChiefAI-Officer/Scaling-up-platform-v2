@@ -20,9 +20,13 @@ Backend for per-campaign invitation email overrides shipped earlier today. Task 
 - When expanded: token-reference hint listing the 5 supported tokens (`{{respondentFirstName}}`, `{{respondentFullName}}`, `{{campaignName}}`, `{{invitationUrl}}`, `{{closeAt}}`), subject input (200-char cap, validation mirrors backend Zod), and Markdown body textarea (5000-char cap with live count).
 - Placeholder text on both fields: `"Leave blank to use template default"` (we intentionally do NOT fetch the template default — that would require a new GET endpoint and the placeholder is sufficient signal).
 
-**Scope cut**: `CampaignDetail` post-create edit panel deferred to a separate slice. Wizard covers 90% of the use case; coaches needing to edit a DRAFT campaign's email can re-create today or wait for the detail-page edit panel. PATCH route already accepts the fields, so power users can use it via dev tools.
+**Follow-on (same day, commit `815d3d2`) — `CampaignDetail` post-create edit panel**:
+- `CampaignOverview.campaign` now surfaces `invitationSubject` + `invitationBodyMarkdown` (the `findUnique({ include })` already returned them; only the type signature needed plumbing).
+- `CampaignDetail.tsx`: new collapsible "Invitation email" card above the respondents table, hidden when status is CLOSED. Subhead reads `"Custom subject/body set for this campaign"` or `"Using template default — click to customize"`.
+- Edit form: same shape as the wizard panel (subject input 200-char + Markdown body 5000-char + 5-token reference hint + char counter). Save button is dirty-aware; Cancel reverts to last-saved.
+- Hits `PATCH /api/assessment-campaigns/[id]` (Task O backend already accepted both fields). Empty values send `null` so the campaign falls back to the template default. `router.refresh()` on success so the subhead updates.
 
-**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in 105s. Commit `cddcaa7`. Tests unaffected (17/17 in reminders + changelog-freshness suites green).
+**Build gate** (combined slice): `CI=true npx next build --turbopack` ✓ compiled in 79s (CampaignDetail run) + 105s (wizard run). 18/18 campaign-detail suite + 17/17 reminders/freshness suites green.
 
 ### 2026-05-18 — P0 fix: decouple HubSpot sync from paid registration email path: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:paid-registration-email-hubspot-decouple -->
 
