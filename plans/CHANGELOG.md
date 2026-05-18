@@ -6,6 +6,29 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — CEO designation post-creation: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-ceo-post-create -->
+
+Coaches can mark a respondent as CEO after the wizard submit — previously this required discarding the draft and re-running the wizard. Real workflow gap for the `template.aggregationMode === CEO_ONLY` reports, where one designated respondent's submission carries the campaign result.
+
+**API** — `POST /api/assessment-campaigns/[id]/ceo/route.ts`:
+- Body `{ participantId: string | null }` Zod-validated (string → set as CEO, null → clear all designation).
+- `canManageCampaign` mode `"write"` (404 on auth-fail, hidden — Task F pattern).
+- 409 `CAMPAIGN_CLOSED` for CLOSED campaigns (results immutable — no point changing CEO after close).
+- 404 if `participantId` does not belong to this campaign (cross-campaign defense).
+- Transaction: `updateMany({ where: { campaignId, isCEO: true }, data: { isCEO: false } })` first (honors the partial unique index on `campaignId WHERE isCEO=true`), then `update({ where: { id: participantId }, data: { isCEO: true } })` if non-null.
+- Audit `'UPDATE'` with `{ ceoChanged: true, previousCeoParticipantId, currentCeoParticipantId }`.
+- Rate-limited via `RateLimits.standard`.
+
+**UI** — `CampaignDetail.tsx`:
+- Per-row "Mark as CEO" button (small underlined link style) appears next to the name when row is NOT the current CEO AND campaign is not CLOSED.
+- Current CEO row shows the existing badge + a small "(clear)" link.
+- Loading state: button shows `"Setting…"` while in-flight; disabled across rows during the network call.
+- Success → toast + `refreshRespondents()` + `router.refresh()` so the badge appears/moves.
+
+**Tests** — 7 new in `ceo-post.test.ts`: 401/404/400/409 paths, 404 cross-campaign, set-and-clear-prior happy path with audit assertion, null-clears-all-without-update happy path.
+
+**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in 81s. Commit `af047f8`.
+
 ### 2026-05-18 — Ops fix: enable transactional email overrides in production (registration confirmation): <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:registration-email-overrides-enabled -->
 
 **Symptom.** Jeff reported on a 9-min Zoom that the custom registration-confirmation email he authored at `/admin/transactional-emails/REGISTRATION_CONFIRMATION` was not being delivered — registrants received an older hardcoded version with different copy and styling. He also asked how to attach the `.ics` file and how to merge in the workshop's Zoom link.
