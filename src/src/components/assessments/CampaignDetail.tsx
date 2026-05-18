@@ -174,6 +174,9 @@ export function CampaignDetail({
     useState<CampaignRespondentRow | null>(null);
   const [removing, setRemoving] = useState(false);
 
+  // Task N — Bulk reminders state.
+  const [sendingReminders, setSendingReminders] = useState(false);
+
   const campaign = overview.campaign;
   const isDraft = campaign.status === "DRAFT";
   const isClosed = campaign.status === "CLOSED";
@@ -316,6 +319,60 @@ export function CampaignDetail({
       });
     } finally {
       setResendingInvitationId(null);
+    }
+  }
+
+  // Task N — bulk send reminders to all non-submitted, non-revoked participants.
+  async function handleSendReminders() {
+    if (sendingReminders) return;
+    const pendingCount = respondents.filter(
+      (r) =>
+        r.invitation !== null &&
+        r.invitation.revokedAt === null &&
+        RESENDABLE.has(r.invitation.status),
+    ).length;
+    if (pendingCount === 0) {
+      toast({
+        title: "Nothing to send",
+        description: "No pending non-responders.",
+      });
+      return;
+    }
+    const confirmed = window.confirm(
+      `Send reminder email to ${pendingCount} pending respondent${pendingCount === 1 ? "" : "s"}?`,
+    );
+    if (!confirmed) return;
+    setSendingReminders(true);
+    try {
+      const res = await fetch(
+        `/api/assessment-campaigns/${campaign.id}/reminders`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const sent = body.sent ?? 0;
+      const skipped = body.skipped ?? 0;
+      const failed = Array.isArray(body.failed) ? body.failed.length : 0;
+      toast({
+        title: "Reminders sent",
+        description: `Sent ${sent}, skipped ${skipped}${failed > 0 ? `, failed ${failed}` : ""}.`,
+      });
+      await refreshRespondents();
+    } catch (err) {
+      toast({
+        title: "Could not send reminders",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingReminders(false);
     }
   }
 
@@ -781,6 +838,22 @@ export function CampaignDetail({
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Respondent
+              </button>
+            )}
+            {campaign.status === "ACTIVE" && (
+              <button
+                type="button"
+                onClick={handleSendReminders}
+                disabled={sendingReminders}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="send-reminders-btn"
+              >
+                {sendingReminders ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Mail className="w-3.5 h-3.5" />
+                )}
+                Send Reminders
               </button>
             )}
             <a
