@@ -404,14 +404,14 @@ async function processBulkRespondentsForCreate(
         let team = teamByParentName.get(key);
         if (!team) {
           try {
-            const createdTeam = await tx.orgTeam.create({
+            const createdTeam: TeamRow = (await tx.orgTeam.create({
               data: {
                 organizationId,
                 name: segment,
                 parentTeamId: parentId,
               },
               select: { id: true, name: true, parentTeamId: true },
-            });
+            })) as TeamRow;
             team = createdTeam;
             teamByParentName.set(key, team);
           } catch {
