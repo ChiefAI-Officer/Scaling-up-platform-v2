@@ -25,6 +25,8 @@ import {
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import type { Prisma } from "@prisma/client";
+import { splitName } from "@/lib/assessments/respondent-csv";
+import { normalizeEmail } from "@/app/api/organizations/[id]/respondents/route";
 
 const CAMPAIGN_LANGUAGE_DEFAULT = "enUS";
 
@@ -286,6 +288,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Task M — process optional bulkRespondents payload from the wizard
+    // CSV import. Best-effort: any per-row failure is recorded as an error
+    // and returned to the client; the campaign itself stays created.
+    let bulkResult: {
+      created: Array<{ id: string; email: string }>;
+      skipped: Array<{ email: string }>;
+      errors: Array<{ row: number; reason: string }>;
+    } | null = null;
+
+    if (data.bulkRespondents && data.bulkRespondents.length > 0) {
+      bulkResult = await processBulkRespondentsForCreate(
+        campaign.organizationId,
+        data.bulkRespondents,
+      );
+    }
+
     await logAudit({
       entityType: "AssessmentCampaign",
       entityId: campaign.id,
@@ -296,11 +314,18 @@ export async function POST(request: NextRequest) {
         organizationId: campaign.organizationId,
         versionId: campaign.versionId,
         alias: campaign.alias,
+        bulkRespondentsCreated: bulkResult?.created.length ?? 0,
+        bulkRespondentsSkipped: bulkResult?.skipped.length ?? 0,
+        bulkRespondentsErrors: bulkResult?.errors.length ?? 0,
       },
     });
 
     return NextResponse.json(
-      { success: true, data: campaign },
+      {
+        success: true,
+        data: campaign,
+        bulkRespondents: bulkResult,
+      },
       { status: 201 }
     );
   } catch (error) {
@@ -310,4 +335,171 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Task M — bulk-respondent helper (wizard-create path)
+// ────────────────────────────────────────────────────────────────────────
+//
+// Idempotent skip-on-conflict semantics: if an OrgRespondent already
+// exists (same org + dedupeValue), the row is reported in `skipped` and
+// left untouched. Teams in `teamPath` are auto-created if missing.
+// Errors are per-row so a single bad row never blocks the rest.
+//
+// Wrapped in a single Prisma transaction.
+
+async function processBulkRespondentsForCreate(
+  organizationId: string,
+  rows: Array<{ name: string; email: string; teamPath: string[] }>,
+): Promise<{
+  created: Array<{ id: string; email: string }>;
+  skipped: Array<{ email: string }>;
+  errors: Array<{ row: number; reason: string }>;
+}> {
+  const created: Array<{ id: string; email: string }> = [];
+  const skipped: Array<{ email: string }> = [];
+  const errors: Array<{ row: number; reason: string }> = [];
+
+  // Dedupe by lowercased email within the payload; first row wins.
+  const seen = new Set<string>();
+  const deduped: Array<{ row: number; name: string; email: string; teamPath: string[] }> = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const norm = normalizeEmail(r.email);
+    if (seen.has(norm)) {
+      errors.push({
+        row: i + 1,
+        reason: `duplicate email "${norm}" — earlier row in the payload wins`,
+      });
+      continue;
+    }
+    seen.add(norm);
+    deduped.push({ row: i + 1, name: r.name, email: r.email, teamPath: r.teamPath });
+  }
+
+  await db.$transaction(async (tx) => {
+    type TeamRow = {
+      id: string;
+      name: string;
+      parentTeamId: string | null;
+    };
+    const existingTeams = (await tx.orgTeam.findMany({
+      where: { organizationId, deletedAt: null },
+      select: { id: true, name: true, parentTeamId: true },
+    })) as TeamRow[];
+    const teamByParentName = new Map<string, TeamRow>();
+    const teamKey = (parentId: string | null, name: string) =>
+      `${parentId ?? "__root__"}::${name.toLowerCase()}`;
+    for (const t of existingTeams) {
+      teamByParentName.set(teamKey(t.parentTeamId, t.name), t);
+    }
+
+    async function resolveTeamPath(
+      path: string[],
+    ): Promise<{ ok: true; teamId: string | null } | { ok: false; reason: string }> {
+      if (path.length === 0) return { ok: true, teamId: null };
+      let parentId: string | null = null;
+      for (const segment of path) {
+        const key = teamKey(parentId, segment);
+        let team = teamByParentName.get(key);
+        if (!team) {
+          try {
+            const createdTeam = await tx.orgTeam.create({
+              data: {
+                organizationId,
+                name: segment,
+                parentTeamId: parentId,
+              },
+              select: { id: true, name: true, parentTeamId: true },
+            });
+            team = createdTeam;
+            teamByParentName.set(key, team);
+          } catch {
+            return {
+              ok: false,
+              reason: `failed to create team "${segment}"`,
+            };
+          }
+        }
+        parentId = team.id;
+      }
+      return { ok: true, teamId: parentId };
+    }
+
+    for (const r of deduped) {
+      const teamResult = await resolveTeamPath(r.teamPath);
+      if (!teamResult.ok) {
+        errors.push({ row: r.row, reason: teamResult.reason });
+        continue;
+      }
+      const teamId = teamResult.teamId;
+      const norm = normalizeEmail(r.email);
+      const dedupeSource = "email";
+      const dedupeValue = norm;
+      const existing = await tx.orgRespondent.findFirst({
+        where: { organizationId, dedupeSource, dedupeValue },
+        select: { id: true, email: true, deletedAt: true },
+      });
+      if (existing && existing.deletedAt === null) {
+        skipped.push({ email: existing.email });
+        continue;
+      }
+      const { firstName, lastName } = splitName(r.name);
+      try {
+        if (existing && existing.deletedAt !== null) {
+          // Revive soft-deleted — the wizard's "skip on conflict" semantics
+          // imply "do nothing", but a soft-deleted row is invisible to the
+          // coach, so we treat revival as the create-path behavior.
+          const revived = await tx.orgRespondent.update({
+            where: { id: existing.id },
+            data: {
+              deletedAt: null,
+              firstName,
+              lastName,
+              teamId,
+            },
+            select: { id: true, email: true },
+          });
+          created.push(revived);
+          continue;
+        }
+        const createdRow = await tx.orgRespondent.create({
+          data: {
+            organizationId,
+            teamId,
+            email: r.email,
+            normalizedEmail: norm,
+            firstName,
+            lastName,
+            jobTitle: null,
+            externalId: null,
+            dedupeSource,
+            dedupeValue,
+          },
+          select: { id: true, email: true },
+        });
+        created.push(createdRow);
+      } catch (err) {
+        const code =
+          typeof err === "object" && err !== null && "code" in err
+            ? (err as { code: string }).code
+            : "";
+        if (code === "P2002") {
+          // Race: another concurrent insert beat us. Re-read and report
+          // as skipped (consistent with idempotent semantics).
+          const post = await tx.orgRespondent.findFirst({
+            where: { organizationId, dedupeSource, dedupeValue },
+            select: { email: true },
+          });
+          if (post) {
+            skipped.push({ email: post.email });
+            continue;
+          }
+        }
+        errors.push({ row: r.row, reason: "failed to create respondent" });
+      }
+    }
+  });
+
+  return { created, skipped, errors };
 }

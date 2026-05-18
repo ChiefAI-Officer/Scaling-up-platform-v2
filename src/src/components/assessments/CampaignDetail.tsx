@@ -16,12 +16,13 @@
  *  - public/wireframes-phase2/revisions/08-revised-individual-results.html
  */
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Download,
+  FileUp,
   Loader2,
   Mail,
   Eye,
@@ -30,6 +31,7 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
+import { parseRespondentCsv } from "@/lib/assessments/respondent-csv";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Dialog,
@@ -148,6 +150,7 @@ export function CampaignDetail({
 
   // Add Respondent modal state.
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addTab, setAddTab] = useState<"single" | "bulk">("single");
   const [orgRespondents, setOrgRespondents] = useState<OrgRespondentRow[]>([]);
   const [loadingOrgRespondents, setLoadingOrgRespondents] = useState(false);
   const [selectedRespondentId, setSelectedRespondentId] = useState<string>("");
@@ -156,6 +159,15 @@ export function CampaignDetail({
   const [newRespondentLastName, setNewRespondentLastName] = useState("");
   const [newRespondentEmail, setNewRespondentEmail] = useState("");
   const [creatingRespondent, setCreatingRespondent] = useState(false);
+
+  // Task M — Bulk CSV tab state.
+  const [bulkCsvText, setBulkCsvText] = useState("");
+  const [bulkMode, setBulkMode] = useState<"skip" | "merge">("skip");
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
 
   // Remove participant confirm dialog state.
   const [removeTarget, setRemoveTarget] =
@@ -370,6 +382,10 @@ export function CampaignDetail({
     setNewRespondentFirstName("");
     setNewRespondentLastName("");
     setNewRespondentEmail("");
+    setAddTab("single");
+    setBulkCsvText("");
+    setBulkMode("skip");
+    setBulkProgress(null);
   }
 
   async function handleCreateAndAdd() {
@@ -469,6 +485,124 @@ export function CampaignDetail({
       });
     } finally {
       setAdding(false);
+    }
+  }
+
+  // Task M — Bulk CSV: live-parsed preview.
+  const bulkParsed = useMemo(
+    () =>
+      bulkCsvText.trim().length > 0
+        ? parseRespondentCsv(bulkCsvText)
+        : null,
+    [bulkCsvText],
+  );
+
+  async function handleConfirmBulkAdd() {
+    if (!bulkParsed || bulkParsed.errors.length > 0) return;
+    if (bulkParsed.rows.length === 0) return;
+    setBulkSubmitting(true);
+    setBulkProgress(null);
+    try {
+      // 1) Bulk-create org respondents (Task M's new route).
+      const createRes = await fetch(
+        `/api/organizations/${campaign.organizationId}/respondents/bulk`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            rows: bulkParsed.rows,
+            mode: bulkMode,
+          }),
+        },
+      );
+      const createBody = await createRes.json();
+      if (!createRes.ok || !createBody.success) {
+        throw new Error(
+          typeof createBody.error === "string"
+            ? createBody.error
+            : "Failed to import respondents",
+        );
+      }
+      type RefRow = { id: string; email: string };
+      const created: RefRow[] = createBody.data?.created ?? [];
+      const updated: RefRow[] = createBody.data?.updated ?? [];
+      const skipped: { email: string }[] = createBody.data?.skipped ?? [];
+      const errors: { row: number; reason: string }[] =
+        createBody.data?.errors ?? [];
+
+      // 2) For every created OR updated respondent, attach as campaign
+      // participant. Skipped respondents are NOT auto-attached because
+      // the coach may already be tracking them on another campaign — we
+      // surface them in the toast and let the coach add explicitly via
+      // the Single tab if desired.
+      const attachTargets: RefRow[] = [...created, ...updated];
+      // Filter out anyone already in the participants table to avoid the
+      // 409 ALREADY_PARTICIPANT noise.
+      const alreadyIds = new Set(respondents.map((r) => r.respondent.id));
+      const toAttach = attachTargets.filter((r) => !alreadyIds.has(r.id));
+
+      let attachedCount = 0;
+      const attachErrors: string[] = [];
+      setBulkProgress({ current: 0, total: toAttach.length });
+      for (let i = 0; i < toAttach.length; i++) {
+        const ref = toAttach[i];
+        try {
+          const res = await fetch(
+            `/api/assessment-campaigns/${campaign.id}/respondents`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orgRespondentId: ref.id }),
+            },
+          );
+          if (res.ok) {
+            attachedCount += 1;
+          } else {
+            const body = await res.json().catch(() => ({}));
+            // ALREADY_PARTICIPANT is benign — coach added them via another
+            // path between bulk-create and this attach loop.
+            if (body?.code !== "ALREADY_PARTICIPANT") {
+              attachErrors.push(`${ref.email}: ${body?.error ?? res.status}`);
+            }
+          }
+        } catch (err) {
+          attachErrors.push(
+            `${ref.email}: ${err instanceof Error ? err.message : "network error"}`,
+          );
+        }
+        setBulkProgress({ current: i + 1, total: toAttach.length });
+      }
+
+      const summary = [
+        `${created.length} created`,
+        `${updated.length} updated`,
+        `${skipped.length} skipped`,
+        `${attachedCount} added to campaign`,
+      ];
+      if (errors.length > 0 || attachErrors.length > 0) {
+        summary.push(`${errors.length + attachErrors.length} errors`);
+      }
+
+      toast({
+        title: "Bulk import complete",
+        description: summary.join(" • "),
+        variant:
+          errors.length + attachErrors.length > 0 ? "destructive" : undefined,
+      });
+
+      resetAddDialog();
+      await refreshRespondents();
+      router.refresh();
+    } catch (err) {
+      toast({
+        title: "Could not import respondents",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setBulkSubmitting(false);
+      setBulkProgress(null);
     }
   }
 
@@ -838,14 +972,54 @@ export function CampaignDetail({
           className="max-w-lg"
         >
           <DialogHeader>
-            <DialogTitle>Add a respondent to this campaign</DialogTitle>
+            <DialogTitle>Add respondents to this campaign</DialogTitle>
             <DialogDescription>
               {isDraft
-                ? "Draft campaigns: the new respondent is queued and will receive an invitation when you launch."
-                : "Active campaigns: the new respondent gets a pending invitation row. Use Resend to deliver the email."}
+                ? "Draft campaigns: new respondents are queued and will receive an invitation when you launch."
+                : "Active campaigns: new respondents get pending invitation rows. Use Resend to deliver the email."}
             </DialogDescription>
           </DialogHeader>
 
+          {/* Task M — Single vs Bulk tabs */}
+          <div
+            className="inline-flex items-center rounded-lg border border-border bg-muted/30 p-0.5 text-xs font-medium"
+            role="tablist"
+            aria-label="Add respondent mode"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={addTab === "single"}
+              onClick={() => setAddTab("single")}
+              disabled={adding || creatingRespondent || bulkSubmitting}
+              className={
+                addTab === "single"
+                  ? "px-3 py-1.5 rounded-md bg-card text-foreground shadow-sm"
+                  : "px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground"
+              }
+              data-testid="add-respondent-tab-single"
+            >
+              Single
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={addTab === "bulk"}
+              onClick={() => setAddTab("bulk")}
+              disabled={adding || creatingRespondent || bulkSubmitting}
+              className={
+                addTab === "bulk"
+                  ? "px-3 py-1.5 rounded-md bg-card text-foreground shadow-sm inline-flex items-center gap-1"
+                  : "px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              }
+              data-testid="add-respondent-tab-bulk"
+            >
+              <FileUp className="w-3.5 h-3.5" />
+              Bulk CSV
+            </button>
+          </div>
+
+          {addTab === "single" && (
           <div className="space-y-4">
             <div>
               <label
@@ -933,27 +1107,196 @@ export function CampaignDetail({
               </button>
             </div>
           </div>
+          )}
+
+          {addTab === "bulk" && (
+            <div
+              className="space-y-3"
+              data-testid="add-respondent-bulk-panel"
+            >
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Paste CSV
+                </label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Header row: <code className="font-mono">name,email,team</code>{" "}
+                  (team optional, slash-delimited). Max 500 rows.
+                </p>
+              </div>
+              <textarea
+                value={bulkCsvText}
+                onChange={(e) => setBulkCsvText(e.target.value)}
+                placeholder={`name,email,team\nAlice Example,alice@example.com,Marketing/Brand\nBob Tester,bob@example.com,`}
+                rows={6}
+                disabled={bulkSubmitting}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                data-testid="add-respondent-bulk-textarea"
+              />
+
+              <div className="space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  If a respondent already exists
+                </div>
+                <div className="flex items-center gap-4 text-xs">
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="bulk-mode"
+                      value="skip"
+                      checked={bulkMode === "skip"}
+                      onChange={() => setBulkMode("skip")}
+                      disabled={bulkSubmitting}
+                      className="accent-primary"
+                      data-testid="add-respondent-bulk-mode-skip"
+                    />
+                    Skip existing
+                  </label>
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="bulk-mode"
+                      value="merge"
+                      checked={bulkMode === "merge"}
+                      onChange={() => setBulkMode("merge")}
+                      disabled={bulkSubmitting}
+                      className="accent-primary"
+                      data-testid="add-respondent-bulk-mode-merge"
+                    />
+                    Merge existing
+                  </label>
+                </div>
+              </div>
+
+              {bulkParsed && (
+                <div
+                  className="text-xs space-y-2"
+                  data-testid="add-respondent-bulk-preview"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-foreground">
+                      {bulkParsed.rows.length} valid row
+                      {bulkParsed.rows.length === 1 ? "" : "s"}
+                    </span>
+                    {bulkParsed.errors.length > 0 && (
+                      <span className="text-destructive font-medium">
+                        {bulkParsed.errors.length} error
+                        {bulkParsed.errors.length === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </div>
+                  {bulkParsed.rows.length > 0 && (
+                    <div className="border border-border rounded-md overflow-hidden max-h-48 overflow-y-auto">
+                      <table className="w-full">
+                        <thead className="bg-muted/40 sticky top-0">
+                          <tr>
+                            <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Name
+                            </th>
+                            <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Email
+                            </th>
+                            <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Team
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {bulkParsed.rows.map((row, i) => (
+                            <tr key={`${row.email}-${i}`}>
+                              <td className="px-2 py-1 text-foreground">
+                                {row.name}
+                              </td>
+                              <td className="px-2 py-1 text-foreground font-mono">
+                                {row.email}
+                              </td>
+                              <td className="px-2 py-1 text-muted-foreground">
+                                {row.teamPath.length > 0
+                                  ? row.teamPath.join(" / ")
+                                  : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {bulkParsed.errors.length > 0 && (
+                    <ul className="border border-destructive/40 rounded-md p-2 bg-destructive/5 max-h-32 overflow-y-auto space-y-1">
+                      {bulkParsed.errors.slice(0, 20).map((e, i) => (
+                        <li key={i} className="text-destructive">
+                          Row {e.row}: {e.reason}
+                        </li>
+                      ))}
+                      {bulkParsed.errors.length > 20 && (
+                        <li className="text-destructive/80 italic">
+                          + {bulkParsed.errors.length - 20} more errors…
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {bulkProgress && (
+                <div
+                  className="text-xs text-muted-foreground"
+                  data-testid="add-respondent-bulk-progress"
+                  role="status"
+                >
+                  Adding {bulkProgress.current} of {bulkProgress.total}…
+                </div>
+              )}
+            </div>
+          )}
 
           <DialogFooter>
             <button
               type="button"
               onClick={resetAddDialog}
-              disabled={adding || creatingRespondent}
+              disabled={adding || creatingRespondent || bulkSubmitting}
               className="inline-flex items-center justify-center text-sm font-medium px-4 py-2 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               data-testid="add-respondent-cancel"
             >
               Cancel
             </button>
-            <button
-              type="button"
-              onClick={handleConfirmAdd}
-              disabled={!selectedRespondentId || adding || creatingRespondent}
-              className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              data-testid="add-respondent-confirm"
-            >
-              {adding && <Loader2 className="w-4 h-4 animate-spin" />}
-              Add to campaign
-            </button>
+            {addTab === "single" ? (
+              <button
+                type="button"
+                onClick={handleConfirmAdd}
+                disabled={
+                  !selectedRespondentId || adding || creatingRespondent
+                }
+                className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                data-testid="add-respondent-confirm"
+              >
+                {adding && <Loader2 className="w-4 h-4 animate-spin" />}
+                Add to campaign
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConfirmBulkAdd}
+                disabled={
+                  !bulkParsed ||
+                  bulkParsed.rows.length === 0 ||
+                  bulkParsed.errors.length > 0 ||
+                  bulkSubmitting
+                }
+                className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                data-testid="add-respondent-bulk-confirm"
+              >
+                {bulkSubmitting && (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                )}
+                {bulkSubmitting
+                  ? bulkProgress
+                    ? `Adding ${bulkProgress.current}/${bulkProgress.total}…`
+                    : "Importing…"
+                  : `Import ${bulkParsed?.rows.length ?? 0} respondent${
+                      bulkParsed?.rows.length === 1 ? "" : "s"
+                    }`}
+              </button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

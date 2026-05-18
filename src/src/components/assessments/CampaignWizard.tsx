@@ -23,11 +23,15 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, FileUp } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  parseRespondentCsv,
+  type ParsedRow,
+} from "@/lib/assessments/respondent-csv";
 
 const DRAFT_ENDPOINT = "/api/assessment-campaign-drafts";
 const DRAFT_DEBOUNCE_MS = 800;
@@ -81,6 +85,11 @@ interface WizardState {
   openAt: string; // datetime-local string
   endMode: EndMode;
   closeAt: string;
+  // Task M — bulk CSV import staged in the wizard. Server-side
+  // `POST /api/assessment-campaigns` accepts this alongside the singly-
+  // assigned `respondentIds` and creates OrgRespondent rows after the
+  // campaign exists. Skipped on resubmit (idempotent dedupe).
+  bulkRespondents: ParsedRow[];
 }
 
 const STEPS = [
@@ -174,6 +183,7 @@ export function CampaignWizard() {
       openAt: formatDateTimeLocal(tomorrow),
       endMode: "OPEN_END",
       closeAt: "",
+      bulkRespondents: [],
     };
   });
 
@@ -231,6 +241,9 @@ export function CampaignWizard() {
           openAt: parsed.openAt ?? state.openAt,
           endMode: parsed.endMode === "ENDS_AFTER" ? "ENDS_AFTER" : "OPEN_END",
           closeAt: parsed.closeAt ?? "",
+          bulkRespondents: Array.isArray(parsed.bulkRespondents)
+            ? (parsed.bulkRespondents as ParsedRow[])
+            : [],
         };
         if (!cancelled) {
           setPendingDraft({
@@ -269,6 +282,7 @@ export function CampaignWizard() {
             openAt: snapshot.openAt,
             endMode: snapshot.endMode,
             closeAt: snapshot.closeAt,
+            bulkRespondents: snapshot.bulkRespondents,
           },
         }),
       });
@@ -348,7 +362,8 @@ export function CampaignWizard() {
   const canActivate =
     state.organizationId &&
     state.templateId &&
-    state.respondentIds.length > 0 &&
+    (state.respondentIds.length > 0 ||
+      state.bulkRespondents.length > 0) &&
     state.name &&
     state.openAt &&
     (state.endMode === "OPEN_END" || state.closeAt);
@@ -361,7 +376,10 @@ export function CampaignWizard() {
     if (!canActivate) return;
     setSubmitting(true);
     try {
-      // 1) Create campaign.
+      // 1) Create campaign (Task M: include staged bulkRespondents so the
+      // server creates the OrgRespondent rows in the same request — they
+      // were parsed client-side from a CSV but couldn't be POSTed earlier
+      // because the wizard hasn't created the Organization yet).
       const createRes = await fetch("/api/assessment-campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -375,6 +393,10 @@ export function CampaignWizard() {
             state.endMode === "ENDS_AFTER" && state.closeAt
               ? new Date(state.closeAt).toISOString()
               : null,
+          bulkRespondents:
+            state.bulkRespondents.length > 0
+              ? state.bulkRespondents
+              : undefined,
         }),
       });
       const createBody = await createRes.json();
@@ -535,6 +557,7 @@ export function CampaignWizard() {
             organizationId={state.organizationId}
             respondentIds={state.respondentIds}
             ceoRespondentId={state.ceoRespondentId}
+            bulkRespondents={state.bulkRespondents}
             onChange={(rIds, ceoId) => {
               setState((s) => ({
                 ...s,
@@ -542,6 +565,9 @@ export function CampaignWizard() {
                 ceoRespondentId: ceoId,
               }));
             }}
+            onChangeBulk={(rows) =>
+              setState((s) => ({ ...s, bulkRespondents: rows }))
+            }
             onBack={back}
             onNext={next}
           />
@@ -874,14 +900,18 @@ function ParticipantsStep({
   organizationId,
   respondentIds,
   ceoRespondentId,
+  bulkRespondents,
   onChange,
+  onChangeBulk,
   onBack,
   onNext,
 }: {
   organizationId: string;
   respondentIds: string[];
   ceoRespondentId: string | null;
+  bulkRespondents: ParsedRow[];
   onChange: (rIds: string[], ceoId: string | null) => void;
+  onChangeBulk: (rows: ParsedRow[]) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -889,11 +919,36 @@ function ParticipantsStep({
   const [respondents, setRespondents] = useState<Respondent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [showBulk, setShowBulk] = useState(bulkRespondents.length > 0);
+  const [bulkCsvText, setBulkCsvText] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [creating, setCreating] = useState(false);
+
+  // Task M — live-parse the CSV textarea so the preview/error counters
+  // update on every keystroke.
+  const bulkParsed = useMemo(
+    () => (bulkCsvText.trim().length > 0 ? parseRespondentCsv(bulkCsvText) : null),
+    [bulkCsvText],
+  );
+
+  function applyParsedBulk() {
+    if (!bulkParsed) return;
+    if (bulkParsed.errors.length > 0) return;
+    if (bulkParsed.rows.length === 0) return;
+    onChangeBulk(bulkParsed.rows);
+    setBulkCsvText("");
+    toast({
+      title: "Staged for import",
+      description: `${bulkParsed.rows.length} respondent${bulkParsed.rows.length === 1 ? "" : "s"} will be created when you save the campaign.`,
+    });
+  }
+
+  function clearStagedBulk() {
+    onChangeBulk([]);
+  }
 
   const refresh = useCallback(async () => {
     if (!organizationId) return;
@@ -1040,13 +1095,24 @@ function ParticipantsStep({
       )}
 
       {!showCreate ? (
-        <button
-          type="button"
-          className="text-sm text-primary hover:underline"
-          onClick={() => setShowCreate(true)}
-        >
-          + New respondent
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            className="text-sm text-primary hover:underline"
+            onClick={() => setShowCreate(true)}
+          >
+            + New respondent
+          </button>
+          <button
+            type="button"
+            className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+            onClick={() => setShowBulk((v) => !v)}
+            data-testid="wizard-toggle-bulk-csv"
+          >
+            <FileUp className="w-3.5 h-3.5" />
+            {showBulk ? "Hide bulk import" : "Bulk import from CSV"}
+          </button>
+        </div>
       ) : (
         <form
           onSubmit={handleCreate}
@@ -1119,11 +1185,167 @@ function ParticipantsStep({
         </form>
       )}
 
+      {showBulk && (
+        <div
+          className="border border-border rounded-lg p-4 space-y-3 bg-muted/20"
+          data-testid="wizard-bulk-csv-panel"
+        >
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">
+              Bulk import respondents from CSV
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Paste CSV with header row{" "}
+              <code className="font-mono">name,email,team</code> (team
+              optional, slash-delimited). Rows will be created with the
+              campaign and skipped if the email already exists. Max 500
+              rows.
+            </p>
+          </div>
+
+          <textarea
+            data-testid="wizard-bulk-csv-textarea"
+            value={bulkCsvText}
+            onChange={(e) => setBulkCsvText(e.target.value)}
+            placeholder={`name,email,team\nAlice Example,alice@example.com,Marketing/Brand\nBob Tester,bob@example.com,`}
+            rows={6}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+
+          {bulkParsed && (
+            <div
+              className="text-xs space-y-2"
+              data-testid="wizard-bulk-csv-preview"
+            >
+              <div className="flex items-center gap-3">
+                <span className="font-medium text-foreground">
+                  {bulkParsed.rows.length} valid row
+                  {bulkParsed.rows.length === 1 ? "" : "s"}
+                </span>
+                {bulkParsed.errors.length > 0 && (
+                  <span className="text-destructive font-medium">
+                    {bulkParsed.errors.length} error
+                    {bulkParsed.errors.length === 1 ? "" : "s"}
+                  </span>
+                )}
+              </div>
+
+              {bulkParsed.rows.length > 0 && (
+                <div className="border border-border rounded-md overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Name
+                        </th>
+                        <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Email
+                        </th>
+                        <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Team
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {bulkParsed.rows.slice(0, 10).map((row, i) => (
+                        <tr key={`${row.email}-${i}`}>
+                          <td className="px-2 py-1 text-foreground">
+                            {row.name}
+                          </td>
+                          <td className="px-2 py-1 text-foreground font-mono">
+                            {row.email}
+                          </td>
+                          <td className="px-2 py-1 text-muted-foreground">
+                            {row.teamPath.length > 0
+                              ? row.teamPath.join(" / ")
+                              : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {bulkParsed.rows.length > 10 && (
+                    <div className="px-2 py-1 text-[10px] text-muted-foreground bg-muted/30 border-t border-border">
+                      + {bulkParsed.rows.length - 10} more rows…
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {bulkParsed.errors.length > 0 && (
+                <ul className="border border-destructive/40 rounded-md p-2 bg-destructive/5 max-h-40 overflow-y-auto space-y-1">
+                  {bulkParsed.errors.slice(0, 20).map((e, i) => (
+                    <li key={i} className="text-destructive">
+                      Row {e.row}: {e.reason}
+                    </li>
+                  ))}
+                  {bulkParsed.errors.length > 20 && (
+                    <li className="text-destructive/80 italic">
+                      + {bulkParsed.errors.length - 20} more errors…
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-1">
+            <Button
+              type="button"
+              size="sm"
+              onClick={applyParsedBulk}
+              disabled={
+                !bulkParsed ||
+                bulkParsed.rows.length === 0 ||
+                bulkParsed.errors.length > 0
+              }
+              data-testid="wizard-bulk-csv-apply"
+            >
+              Stage for import
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setBulkCsvText("")}
+              disabled={bulkCsvText.length === 0}
+            >
+              Clear textarea
+            </Button>
+          </div>
+
+          {bulkRespondents.length > 0 && (
+            <div className="border-t border-border pt-3 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-foreground">
+                  {bulkRespondents.length} respondent
+                  {bulkRespondents.length === 1 ? "" : "s"} staged for
+                  creation
+                </span>
+                <button
+                  type="button"
+                  onClick={clearStagedBulk}
+                  className="text-destructive hover:underline"
+                  data-testid="wizard-bulk-csv-clear-staged"
+                >
+                  Remove staged
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Button>
-        <Button onClick={onNext} disabled={respondentIds.length === 0}>
+        <Button
+          onClick={onNext}
+          disabled={
+            respondentIds.length === 0 && bulkRespondents.length === 0
+          }
+        >
           Next <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>

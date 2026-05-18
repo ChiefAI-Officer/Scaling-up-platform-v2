@@ -48,3 +48,73 @@ export function rowsToCsv(
   const bodyLines = rows.map((row) => row.map(escapeCsvCell).join(","));
   return [headerLine, ...bodyLines].join("\r\n") + "\r\n";
 }
+
+/**
+ * Parse a CSV text body into an array of string-row arrays. Handles:
+ *   - double-quoted fields (with embedded "" → ")
+ *   - embedded commas inside quoted fields
+ *   - embedded newlines inside quoted fields
+ *   - CRLF and LF line terminators
+ *
+ * Note: leading-single-quote injection prefixes (added by `escapeCsvCell`
+ * on write) are NOT stripped here — round-trip is intentionally lossless.
+ * Strip them at the call site if you need to.
+ */
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let current: string[] = [];
+  let field = "";
+  let inQuotes = false;
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i += 1;
+        continue;
+      }
+      field += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+      i += 1;
+      continue;
+    }
+    if (ch === ",") {
+      current.push(field);
+      field = "";
+      i += 1;
+      continue;
+    }
+    if (ch === "\r") {
+      // swallow CR; LF (or end) will close the row
+      i += 1;
+      continue;
+    }
+    if (ch === "\n") {
+      current.push(field);
+      rows.push(current);
+      current = [];
+      field = "";
+      i += 1;
+      continue;
+    }
+    field += ch;
+    i += 1;
+  }
+  // Flush final row only if it has content (avoid emitting a phantom empty
+  // row when the file ends with a trailing newline).
+  if (field.length > 0 || current.length > 0) {
+    current.push(field);
+    rows.push(current);
+  }
+  return rows;
+}

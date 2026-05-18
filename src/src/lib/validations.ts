@@ -508,6 +508,20 @@ export const createAssessmentCampaignSchema = z
         endMode: z.enum(["OPEN_END", "ENDS_AFTER"]),
         closeAt: z.string().min(1).optional().nullable(),
         description: z.string().max(2000).transform(_trim).optional().nullable(),
+        // Task M — optional bulk-respondent payload from the wizard CSV
+        // import. Server resolves teamPath to OrgTeam rows (creating any
+        // missing teams), and creates OrgRespondent rows with skip-on-conflict
+        // semantics so the wizard can retry idempotently.
+        bulkRespondents: z
+            .array(
+                z.object({
+                    name: z.string().min(1).max(400),
+                    email: z.string().email().max(320),
+                    teamPath: z.array(z.string().min(1).max(200)).max(20),
+                }),
+            )
+            .max(500)
+            .optional(),
     })
     .superRefine((data, ctx) => {
         if (data.endMode === "ENDS_AFTER") {
