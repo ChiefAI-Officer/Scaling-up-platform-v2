@@ -21,13 +21,30 @@
  *   POST /api/assessment-campaigns/[id]/activate
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+
+const DRAFT_ENDPOINT = "/api/assessment-campaign-drafts";
+const DRAFT_DEBOUNCE_MS = 800;
+
+type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+function relativeTimeFrom(d: Date): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (seconds < 5) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 type EndMode = "OPEN_END" | "ENDS_AFTER";
 
@@ -162,6 +179,152 @@ export function CampaignWizard() {
 
   const [submitting, setSubmitting] = useState(false);
 
+  // ── Auto-save drafts (Task K) ──────────────────────────────────────────
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<{
+    state: WizardState;
+    lastSavedAt: Date;
+  } | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipNextSaveRef = useRef<boolean>(false);
+
+  // Initial fetch — check for a resumable draft.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDraft() {
+      try {
+        const res = await fetch(DRAFT_ENDPOINT, { method: "GET" });
+        if (!res.ok) {
+          if (!cancelled) setDraftLoaded(true);
+          return;
+        }
+        const body = await res.json();
+        const draft = body?.data;
+        if (!draft || !draft.stepsData) {
+          if (!cancelled) setDraftLoaded(true);
+          return;
+        }
+        let parsed: Partial<WizardState> | null = null;
+        try {
+          parsed = JSON.parse(draft.stepsData);
+        } catch {
+          // Bad JSON — wipe the row and start fresh.
+          await fetch(DRAFT_ENDPOINT, { method: "DELETE" }).catch(() => {});
+          if (!cancelled) setDraftLoaded(true);
+          return;
+        }
+        if (!parsed || typeof parsed !== "object") {
+          if (!cancelled) setDraftLoaded(true);
+          return;
+        }
+        const merged: WizardState = {
+          step: typeof draft.currentStep === "number" ? draft.currentStep : 0,
+          organizationId: parsed.organizationId ?? "",
+          templateId: parsed.templateId ?? "",
+          respondentIds: Array.isArray(parsed.respondentIds)
+            ? parsed.respondentIds
+            : [],
+          ceoRespondentId: parsed.ceoRespondentId ?? null,
+          name: parsed.name ?? "",
+          openAt: parsed.openAt ?? state.openAt,
+          endMode: parsed.endMode === "ENDS_AFTER" ? "ENDS_AFTER" : "OPEN_END",
+          closeAt: parsed.closeAt ?? "",
+        };
+        if (!cancelled) {
+          setPendingDraft({
+            state: merged,
+            lastSavedAt: draft.lastSavedAt
+              ? new Date(draft.lastSavedAt)
+              : new Date(),
+          });
+          setDraftLoaded(true);
+        }
+      } catch {
+        if (!cancelled) setDraftLoaded(true);
+      }
+    }
+    void loadDraft();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const persistDraft = useCallback(async (snapshot: WizardState) => {
+    setSaveStatus("saving");
+    try {
+      const res = await fetch(DRAFT_ENDPOINT, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: snapshot.step,
+          data: {
+            organizationId: snapshot.organizationId,
+            templateId: snapshot.templateId,
+            respondentIds: snapshot.respondentIds,
+            ceoRespondentId: snapshot.ceoRespondentId,
+            name: snapshot.name,
+            openAt: snapshot.openAt,
+            endMode: snapshot.endMode,
+            closeAt: snapshot.closeAt,
+          },
+        }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      setLastSavedAt(new Date());
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+    }
+  }, []);
+
+  // Debounced auto-save: when state changes (after the draft has been
+  // loaded/handled), schedule a PUT in 800ms. Step transitions can flush
+  // immediately via flushSave().
+  useEffect(() => {
+    if (!draftLoaded || pendingDraft) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void persistDraft(state);
+    }, DRAFT_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [state, draftLoaded, pendingDraft, persistDraft]);
+
+  const flushSave = useCallback(
+    (next: WizardState) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      void persistDraft(next);
+    },
+    [persistDraft],
+  );
+
+  const resumeDraft = useCallback(() => {
+    if (!pendingDraft) return;
+    skipNextSaveRef.current = true;
+    setState(pendingDraft.state);
+    setLastSavedAt(pendingDraft.lastSavedAt);
+    setSaveStatus("saved");
+    setPendingDraft(null);
+  }, [pendingDraft]);
+
+  const discardDraft = useCallback(async () => {
+    skipNextSaveRef.current = true;
+    setPendingDraft(null);
+    try {
+      await fetch(DRAFT_ENDPOINT, { method: "DELETE" });
+    } catch {
+      // best-effort
+    }
+  }, []);
+
   const update = useCallback(
     <K extends keyof WizardState>(key: K, value: WizardState[K]) => {
       setState((s) => ({ ...s, [key]: value }));
@@ -169,8 +332,18 @@ export function CampaignWizard() {
     [],
   );
 
-  const next = () => setState((s) => ({ ...s, step: Math.min(s.step + 1, 4) }));
-  const back = () => setState((s) => ({ ...s, step: Math.max(s.step - 1, 0) }));
+  const next = () =>
+    setState((s) => {
+      const updated = { ...s, step: Math.min(s.step + 1, 4) };
+      flushSave(updated);
+      return updated;
+    });
+  const back = () =>
+    setState((s) => {
+      const updated = { ...s, step: Math.max(s.step - 1, 0) };
+      flushSave(updated);
+      return updated;
+    });
 
   const canActivate =
     state.organizationId &&
@@ -251,6 +424,14 @@ export function CampaignWizard() {
         }
       }
 
+      // Task K: clear the wizard auto-save draft now that the campaign exists.
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      try {
+        await fetch(DRAFT_ENDPOINT, { method: "DELETE" });
+      } catch {
+        // best-effort; the campaign was already created
+      }
+
       toast({
         title: activate ? "Campaign activated" : "Campaign saved",
         description: activate
@@ -269,8 +450,68 @@ export function CampaignWizard() {
     }
   }
 
+  const saveIndicator = useMemo(() => {
+    if (pendingDraft) return null;
+    if (saveStatus === "saving") {
+      return (
+        <span className="text-xs text-muted-foreground flex items-center gap-1">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          Saving…
+        </span>
+      );
+    }
+    if (saveStatus === "saved" && lastSavedAt) {
+      return (
+        <span className="text-xs text-muted-foreground">
+          Saved {relativeTimeFrom(lastSavedAt)}
+        </span>
+      );
+    }
+    if (saveStatus === "error") {
+      return (
+        <span className="text-xs text-destructive">
+          Couldn’t save draft. Will retry on next change.
+        </span>
+      );
+    }
+    return null;
+  }, [pendingDraft, saveStatus, lastSavedAt]);
+
   return (
     <div>
+      {pendingDraft && (
+        <div
+          className="mb-6 border border-primary/30 bg-primary/5 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+          role="status"
+        >
+          <div className="text-sm">
+            <div className="font-medium text-foreground">
+              Resume your draft?
+            </div>
+            <div className="text-muted-foreground">
+              Last saved {relativeTimeFrom(pendingDraft.lastSavedAt)}.
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void discardDraft()}
+            >
+              Discard
+            </Button>
+            <Button type="button" size="sm" onClick={resumeDraft}>
+              Resume
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-end mb-2 min-h-[20px]">
+        {saveIndicator}
+      </div>
+
       <StepIndicator current={state.step} />
 
       <div className="bg-card border border-border rounded-xl p-6 min-h-[400px]">

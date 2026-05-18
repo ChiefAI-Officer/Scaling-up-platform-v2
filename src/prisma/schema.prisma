@@ -110,6 +110,7 @@ model Coach {
   createdAssessmentCampaigns  AssessmentCampaign[]            @relation("AssessmentCampaignCreatedByCoach")
   orgOwnershipEventsFromCoach OrganizationOwnershipEvent[]    @relation("OrgOwnershipFromCoach")
   orgOwnershipEventsToCoach   OrganizationOwnershipEvent[]    @relation("OrgOwnershipToCoach")
+  campaignWizardDraft         CampaignWizardDraft?
 
   @@map("coaches")
 }
@@ -679,6 +680,26 @@ model WorkshopDraft {
 
   @@index([userId])
   @@map("workshop_drafts")
+}
+
+// ============================================
+// Assessment v7.6 — Campaign Wizard auto-save
+// (mirrors WorkshopDraft precedent; one row per coach)
+// ============================================
+
+model CampaignWizardDraft {
+  id           String   @id @default(cuid())
+  coachId      String   @unique
+  currentStep  Int      @default(1)
+  stepsData    String   // JSON-stringified wizard state
+  lastSavedAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  coach        Coach    @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  @@index([coachId])
+  @@map("assessment_campaign_wizard_drafts")
 }
 
 // ============================================
