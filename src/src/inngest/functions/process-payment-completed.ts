@@ -72,8 +72,20 @@ export const processPaymentCompleted = inngest.createFunction(
             },
         };
 
-        // Step 2: HubSpot sync (idempotent; skip if hubspotContactId set)
-        await step.run("hubspot-sync", () => syncHubSpotIfMissing(reg));
+        // Step 2: HubSpot sync (idempotent; skip if hubspotContactId set).
+        // HubSpot is best-effort CRM sync — never block the transactional
+        // email path on it. Swallow + log errors so step.run never throws.
+        // (Without this, HubSpot validation/network errors retry 4× then
+        // dead-letter the entire run, so the attendee never receives the
+        // confirmation email — observed 2026-05-18 with PROPERTY_DOESNT_EXIST.)
+        await step.run("hubspot-sync", async () => {
+            try {
+                return await syncHubSpotIfMissing(reg);
+            } catch (err) {
+                console.error("[process-payment-completed] HubSpot sync failed; continuing:", err);
+                return { skipped: true, error: (err as Error).message };
+            }
+        });
 
         // Step 3: Strict notification with atomic claim. Throws on SMTP
         // error → Inngest retries this step.

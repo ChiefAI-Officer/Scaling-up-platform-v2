@@ -183,6 +183,29 @@ describe("processPaymentCompleted Inngest function", () => {
     );
   });
 
+  // Regression (2026-05-18): HubSpot rejected paid registrations with
+  // PROPERTY_DOESNT_EXIST and the throw blocked the email step. HubSpot is
+  // best-effort CRM sync and MUST NOT block transactional email delivery.
+  it("HubSpot step: failure does not block email send or mark-processed", async () => {
+    (db.registration.findUnique as jest.Mock).mockResolvedValue(makeReg());
+    (createOrUpdateContact as jest.Mock).mockRejectedValue(
+      new Error("HubSpot 400 PROPERTY_DOESNT_EXIST: workshop_name")
+    );
+    (db.registration.update as jest.Mock).mockResolvedValue({});
+    (db.registration.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    (sendPaidRegistrationNotificationStrict as jest.Mock).mockResolvedValue(undefined);
+
+    await (capturedHandler as any)({ event: makeEvent(), step: mockStep });
+
+    expect(sendPaidRegistrationNotificationStrict).toHaveBeenCalled();
+    expect(db.registration.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "reg-1" },
+        data: expect.objectContaining({ paymentProcessedAt: expect.any(Date) }),
+      })
+    );
+  });
+
   it("HubSpot step: SKIPS when hubspotContactId is already set", async () => {
     (db.registration.findUnique as jest.Mock).mockResolvedValue(
       makeReg({ hubspotContactId: "hs_existing" })
