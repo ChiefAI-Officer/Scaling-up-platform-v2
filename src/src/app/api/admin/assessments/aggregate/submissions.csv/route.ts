@@ -113,6 +113,9 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   const templateId = request.nextUrl.searchParams.get("templateId");
   const versionId = request.nextUrl.searchParams.get("versionId");
+  const startDateParam = request.nextUrl.searchParams.get("startDate");
+  const endDateParam = request.nextUrl.searchParams.get("endDate");
+  const organizationId = request.nextUrl.searchParams.get("organizationId");
 
   if (!templateId) {
     return NextResponse.json(
@@ -137,7 +140,27 @@ export async function GET(request: NextRequest): Promise<Response> {
       select: { id: true, versionNumber: true, sections: true },
     }),
     db.assessmentSubmission.findMany({
-      where: { campaign: { templateId, versionId } },
+      where: (() => {
+        const startDate = startDateParam ? new Date(startDateParam) : null;
+        const endDate = endDateParam ? new Date(endDateParam) : null;
+        const campaignFilter: {
+          templateId: string;
+          versionId: string;
+          organizationId?: string;
+        } = { templateId, versionId };
+        if (organizationId) campaignFilter.organizationId = organizationId;
+        const submittedAtFilter: { gte?: Date; lte?: Date } = {};
+        if (startDate && !Number.isNaN(startDate.getTime()))
+          submittedAtFilter.gte = startDate;
+        if (endDate && !Number.isNaN(endDate.getTime()))
+          submittedAtFilter.lte = endDate;
+        return {
+          campaign: campaignFilter,
+          ...(Object.keys(submittedAtFilter).length > 0
+            ? { submittedAt: submittedAtFilter }
+            : {}),
+        };
+      })(),
       select: {
         id: true,
         campaignId: true,

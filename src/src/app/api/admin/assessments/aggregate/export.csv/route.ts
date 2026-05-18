@@ -56,6 +56,9 @@ export async function GET(request: NextRequest): Promise<Response> {
 
   const templateId = request.nextUrl.searchParams.get("templateId");
   const versionId = request.nextUrl.searchParams.get("versionId");
+  const startDateParam = request.nextUrl.searchParams.get("startDate");
+  const endDateParam = request.nextUrl.searchParams.get("endDate");
+  const organizationId = request.nextUrl.searchParams.get("organizationId");
 
   if (!templateId) {
     return NextResponse.json(
@@ -70,6 +73,9 @@ export async function GET(request: NextRequest): Promise<Response> {
     );
   }
 
+  const startDate = startDateParam ? new Date(startDateParam) : null;
+  const endDate = endDateParam ? new Date(endDateParam) : null;
+
   const [template, version, report] = await Promise.all([
     db.assessmentTemplate.findUnique({
       where: { id: templateId },
@@ -79,7 +85,11 @@ export async function GET(request: NextRequest): Promise<Response> {
       where: { id: versionId },
       select: { id: true, versionNumber: true },
     }),
-    getAggregateReport(db, templateId, versionId),
+    getAggregateReport(db, templateId, versionId, {
+      startDate: startDate && !Number.isNaN(startDate.getTime()) ? startDate : null,
+      endDate: endDate && !Number.isNaN(endDate.getTime()) ? endDate : null,
+      organizationId: organizationId || null,
+    }),
   ]);
 
   if (!template) {

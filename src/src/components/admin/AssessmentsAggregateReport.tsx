@@ -114,6 +114,37 @@ export function AssessmentsAggregateReport() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
 
+  // Filters (Decision #8 follow-on).
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const [organizations, setOrganizations] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [organizationId, setOrganizationId] = useState<string>("");
+
+  // Load organizations once for the filter selector.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/organizations");
+        if (!res.ok) return;
+        const body = (await res.json()) as {
+          success: boolean;
+          data: Array<{ id: string; name: string }>;
+        };
+        if (!cancelled && body.success) {
+          setOrganizations(body.data ?? []);
+        }
+      } catch {
+        // Best-effort — empty list just disables the filter.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Load templates once.
   useEffect(() => {
     let cancelled = false;
@@ -190,6 +221,9 @@ export function AssessmentsAggregateReport() {
       setReportError(null);
       try {
         const params = new URLSearchParams({ templateId, versionId });
+        if (startDate) params.set("startDate", startDate);
+        if (endDate) params.set("endDate", endDate);
+        if (organizationId) params.set("organizationId", organizationId);
         const res = await fetch(
           `/api/admin/assessments/aggregate?${params.toString()}`,
         );
@@ -211,7 +245,7 @@ export function AssessmentsAggregateReport() {
     return () => {
       cancelled = true;
     };
-  }, [templateId, versionId]);
+  }, [templateId, versionId, startDate, endDate, organizationId]);
 
   const selectedTemplate = useMemo(
     () => templates.find((t) => t.id === templateId) ?? null,
@@ -289,6 +323,80 @@ export function AssessmentsAggregateReport() {
             </div>
           </div>
 
+          {/* Filters (Decision #8 follow-on) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-border">
+            <div>
+              <label
+                htmlFor="filter-start-date"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
+                From (submittedAt)
+              </label>
+              <input
+                id="filter-start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                data-testid="filter-start-date"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="filter-end-date"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
+                To (submittedAt)
+              </label>
+              <input
+                id="filter-end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                data-testid="filter-end-date"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="filter-organization"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
+                Organization
+              </label>
+              <select
+                id="filter-organization"
+                value={organizationId}
+                onChange={(e) => setOrganizationId(e.target.value)}
+                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                data-testid="filter-organization"
+              >
+                <option value="">All organizations</option>
+                {organizations.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {(startDate || endDate || organizationId) && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setStartDate("");
+                  setEndDate("");
+                  setOrganizationId("");
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                data-testid="clear-filters"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
+
           {/* Operator-mode banner */}
           <div
             className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground"
@@ -314,6 +422,9 @@ export function AssessmentsAggregateReport() {
               label="Export summary (CSV)"
               templateId={templateId}
               versionId={versionId}
+              startDate={startDate}
+              endDate={endDate}
+              organizationId={organizationId}
               path="/api/admin/assessments/aggregate/export.csv"
               testId="export-aggregate-summary-csv"
             />
@@ -321,6 +432,9 @@ export function AssessmentsAggregateReport() {
               label="Export submissions (CSV)"
               templateId={templateId}
               versionId={versionId}
+              startDate={startDate}
+              endDate={endDate}
+              organizationId={organizationId}
               path="/api/admin/assessments/aggregate/submissions.csv"
               testId="export-aggregate-submissions-csv"
             />
@@ -528,12 +642,18 @@ function ExportLink({
   path,
   templateId,
   versionId,
+  startDate,
+  endDate,
+  organizationId,
   testId,
 }: {
   label: string;
   path: string;
   templateId: string;
   versionId: string;
+  startDate?: string;
+  endDate?: string;
+  organizationId?: string;
   testId: string;
 }) {
   const disabled = !templateId || !versionId;
@@ -549,7 +669,11 @@ function ExportLink({
       </button>
     );
   }
-  const qs = new URLSearchParams({ templateId, versionId }).toString();
+  const params = new URLSearchParams({ templateId, versionId });
+  if (startDate) params.set("startDate", startDate);
+  if (endDate) params.set("endDate", endDate);
+  if (organizationId) params.set("organizationId", organizationId);
+  const qs = params.toString();
   return (
     <a
       href={`${path}?${qs}`}

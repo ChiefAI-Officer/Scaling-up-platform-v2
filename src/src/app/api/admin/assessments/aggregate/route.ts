@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
 
     const templateId = request.nextUrl.searchParams.get("templateId");
     const versionId = request.nextUrl.searchParams.get("versionId");
+    const startDateParam = request.nextUrl.searchParams.get("startDate");
+    const endDateParam = request.nextUrl.searchParams.get("endDate");
+    const organizationId = request.nextUrl.searchParams.get("organizationId");
 
     if (!templateId) {
       return NextResponse.json(
@@ -48,7 +51,32 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const report = await getAggregateReport(db, templateId, versionId);
+    // Parse + validate optional date filters (YYYY-MM-DD or full ISO).
+    function parseDate(raw: string | null): Date | null {
+      if (!raw) return null;
+      const d = new Date(raw);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    const startDate = parseDate(startDateParam);
+    const endDate = parseDate(endDateParam);
+    if (startDateParam && !startDate) {
+      return NextResponse.json(
+        { success: false, error: "startDate must be a valid ISO date" },
+        { status: 400 },
+      );
+    }
+    if (endDateParam && !endDate) {
+      return NextResponse.json(
+        { success: false, error: "endDate must be a valid ISO date" },
+        { status: 400 },
+      );
+    }
+
+    const report = await getAggregateReport(db, templateId, versionId, {
+      startDate,
+      endDate,
+      organizationId: organizationId || null,
+    });
 
     return NextResponse.json({ success: true, data: report });
   } catch (error) {
