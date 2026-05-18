@@ -6,6 +6,28 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — P0 fix: decouple HubSpot sync from paid registration email path: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:paid-registration-email-hubspot-decouple -->
+
+**Symptom.** Coach reported the post-registration "you're registered" confirmation email never arrived. Production DB inspection showed both recent paid registrations (`cs_test_…` checkout sessions, Stripe test mode) with `paymentStatus=COMPLETED` but `paymentProcessedAt=NULL` and `notificationSentAt=NULL`. Across the entire DB, **zero registrations had ever had `notificationSentAt` set** — the paid path had never delivered an attendee email end-to-end.
+
+**Root cause.** `processPaymentCompleted` ([src/src/inngest/functions/process-payment-completed.ts](../src/src/inngest/functions/process-payment-completed.ts)) ran steps in order: `fetch → hubspot-sync → send-notification-strict → mark-processed`. The HubSpot step called `createOrUpdateContact` which sent `workshop_name` and `workshop_date` as Contact properties — but those custom properties don't exist on HubSpot portal `4727286`. HubSpot returned `400 PROPERTY_DOESNT_EXIST`, the step threw, Inngest retried 4× (all retries hit the same validation error), then dead-lettered the entire function run. The `send-notification-strict` step never executed.
+
+**Live replay confirmed the diagnosis.** Manually invoking `syncHubSpotIfMissing` against the most-recent stuck registration surfaced the exact `PROPERTY_DOESNT_EXIST` error; manually invoking `sendNotificationWithAtomicClaim` for the same row delivered all 3 emails (admin notification, coach notification, attendee confirmation with .ics attachment) successfully.
+
+**Recovery (operational).** For the 2 stuck rows (`cmpbklvm4000o3uf21q0t6mli`, `cmpbkvfes00103uf2pfvli03u`), ran the notification helper directly to deliver the emails and set `paymentProcessedAt` so Inngest won't replay them.
+
+**Fix (code).** Wrap the `step.run("hubspot-sync", …)` body in a try/catch that swallows + logs the error and returns `{ skipped: true, error }`. HubSpot is best-effort CRM sync and must not block transactional email delivery. Notification + mark-processed now execute even when HubSpot fails. Pattern mirrors the FREE-path HubSpot call which already uses `.catch((err) => console.error(…))` ([src/src/app/api/workshops/[id]/register/route.ts](../src/src/app/api/workshops/%5Bid%5D/register/route.ts)).
+
+**Followups (not in this change).**
+- The two missing HubSpot Contact properties (`workshop_name`, `workshop_date`) still get sent on every paid + free registration and will keep logging 400s until either (a) the properties are created in HubSpot portal `4727286` or (b) the fields are dropped from the `createOrUpdateContact` call sites. Cosmetic now that the step no longer throws, but worth cleaning up.
+- The `step.run("hubspot-sync")` ghost-success: when the inner try/catch swallows, Inngest sees the step as succeeded. If we ever want HubSpot sync to retry on transient failures (without blocking email), we'd need a separate child function with its own retry policy.
+
+**Test coverage.** Added regression test `HubSpot step: failure does not block email send or mark-processed` to [src/src/__tests__/inngest/process-payment-completed.test.ts](../src/src/__tests__/inngest/process-payment-completed.test.ts) — asserts `createOrUpdateContact` rejecting still results in `sendPaidRegistrationNotificationStrict` being called and `paymentProcessedAt` being set. Full suite: 10/10 green.
+
+**Commit.** `2d4c604` (pushed direct to main).
+
+---
+
 ### 2026-05-18 — Assessment Tool v7.6 — Task O — per-campaign invitation email overrides: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-o -->
 
 Coaches can override the default invitation subject + body on a per-campaign basis. Before today, the only way to customize was at the `AssessmentTemplate` level — a single shared default across every campaign that used the template. Task O makes the override campaign-local.
