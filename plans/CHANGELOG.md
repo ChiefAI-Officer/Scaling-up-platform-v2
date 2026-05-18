@@ -6,6 +6,35 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Task G admin AccessGroup management UI (closes ops gap; wires Wave 5 wireframes 21 + 22 to real product): <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-g-access-group-ui -->
+
+Admin can now create, edit, archive AccessGroups and add/remove coaches + templates via the app — no more manual scripts. Wires Wave 5 wireframes 21 (list) + 22 (detail with evaluateAccessChange preview) into the real product on top of Task A's service-layer transactional guard.
+
+**Backend** (9 new admin-only routes; every membership mutation routes through `evaluateAccessChange` inside `$transaction` for advisory lock + SELECT FOR UPDATE + audit):
+- `POST/GET /api/admin/access-groups` — create + list (with `?includeArchived=true` to include soft-deleted)
+- `GET/PATCH /api/admin/access-groups/[id]` — detail (with `_count` + populated joins) + name/description update
+- `POST /api/admin/access-groups/[id]/archive` — soft-delete
+- `POST/DELETE /api/admin/access-groups/[id]/coaches[/coachId]` — add/remove coach membership; DELETE returns 409 BLOCKED_ZERO_ACCESS with diff payload unless `?force=true&forceReason=…`
+- `POST/DELETE /api/admin/access-groups/[id]/templates[/templateId]` — add/remove template; same BLOCKED_ZERO_ACCESS + force pattern
+- `POST /api/admin/access-groups/[id]/preview-change` — DRY-RUN endpoint that wraps `evaluateAccessChange` in a rolled-back transaction; returns the per-coach BEFORE/AFTER diff for the UI to render in a modal BEFORE the actual mutation; writes no audit logs
+- `GET /api/admin/coaches` — autocomplete with `?search=…` + `?excludeGroupId=…`
+
+**UI**:
+- Added `Access Groups` entry to admin sidebar (adjacent to `Aggregate Report`)
+- `/admin/access-groups` — list table (Name | Description | Coach count | Template count | Updated | Manage chevron) + create dialog + show-archived toggle + INTERSECTION info banner
+- `/admin/access-groups/[id]` — detail page with metadata card, coaches table, templates table, Add buttons opening autocomplete dialogs, archive button
+- `AccessGroupPreviewModal` — two-stage flow: stage 1 shows per-coach BEFORE/AFTER effective-template diff (red-highlight coaches dropping to zero); stage 2 (only on 409 BLOCKED_ZERO_ACCESS) requires non-empty forceReason free-text and re-calls with `?force=true`
+- `CoachAutocomplete` + `TemplateAutocomplete` — reusable type-ahead pickers
+
+**Tests**: 35 new across 6 suites. Full suite: 1603 passing (was 1568), zero regressions. `CI=true npx next build --turbopack` green locally.
+
+**Deferred to v1.5** (per spec):
+- Archive/undelete/hard-delete with full evaluateAccessChange preview UX (current archive button does plain soft-delete; full preview ships when archive UX is designed)
+- Bulk-add certified coaches affordance from wireframe 22 (separate confirmation/preview flow needed)
+- Click-to-edit inline metadata (shipped as `Edit Metadata` dialog instead per shadcn idiom)
+
+---
+
 ### 2026-05-18 — Assessment Tool v7.6 — Implementation arc Tasks A–F (service layer → coach portal → INVITED flow → admin aggregate → campaign detail): <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-implementation-tasks-a-f -->
 
 Full v1 INVITED loop now operational on prod. Coach creates an organization, runs the 5-step campaign wizard, activates a Rockefeller campaign, respondents get magic-link emails, fill the 40-question survey, submit, scoring runs server-side and stores a frozen `result` JSON, coach views completion + inline results on the campaign detail page, admin sees aggregate stats across all submissions.
