@@ -19,7 +19,15 @@
 import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Mail, Eye, LineChart, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  Loader2,
+  Mail,
+  Eye,
+  LineChart,
+  XCircle,
+} from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Dialog,
@@ -391,7 +399,7 @@ export function CampaignDetail({
         className="bg-card border border-border rounded-xl overflow-hidden"
         data-testid="campaign-respondents-card"
       >
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-semibold text-foreground">
               Respondents
@@ -400,6 +408,15 @@ export function CampaignDetail({
               Track invitation delivery and view individual results.
             </p>
           </div>
+          <a
+            href={`/api/assessment-campaigns/${campaign.id}/respondents/export.csv`}
+            download
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors"
+            data-testid="export-respondents-csv"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export respondents (CSV)
+          </a>
         </div>
 
         {respondents.length === 0 ? (
@@ -502,6 +519,17 @@ export function CampaignDetail({
                               )}
                               {expanded ? "Hide results" : "View results"}
                             </button>
+                          )}
+                          {row.hasSubmission && (
+                            <a
+                              href={`/api/assessment-campaigns/${campaign.id}/respondents/${row.respondent.id}/result/export.csv`}
+                              download
+                              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted"
+                              data-testid={`download-result-csv-${row.respondent.id}`}
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Download result (CSV)
+                            </a>
                           )}
                           {canResend && (
                             <button

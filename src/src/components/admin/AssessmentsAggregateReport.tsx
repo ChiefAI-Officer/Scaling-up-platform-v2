@@ -307,6 +307,24 @@ export function AssessmentsAggregateReport() {
               gate because you are admin/staff.
             </p>
           )}
+
+          {/* CSV exports — disabled until both selectors resolve. */}
+          <div className="flex flex-wrap gap-2 pt-1" data-testid="aggregate-export-buttons">
+            <ExportLink
+              label="Export summary (CSV)"
+              templateId={templateId}
+              versionId={versionId}
+              path="/api/admin/assessments/aggregate/export.csv"
+              testId="export-aggregate-summary-csv"
+            />
+            <ExportLink
+              label="Export submissions (CSV)"
+              templateId={templateId}
+              versionId={versionId}
+              path="/api/admin/assessments/aggregate/submissions.csv"
+              testId="export-aggregate-submissions-csv"
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -502,6 +520,45 @@ export function AssessmentsAggregateReport() {
         </>
       )}
     </div>
+  );
+}
+
+function ExportLink({
+  label,
+  path,
+  templateId,
+  versionId,
+  testId,
+}: {
+  label: string;
+  path: string;
+  templateId: string;
+  versionId: string;
+  testId: string;
+}) {
+  const disabled = !templateId || !versionId;
+  if (disabled) {
+    return (
+      <button
+        type="button"
+        disabled
+        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border bg-muted text-muted-foreground opacity-60 cursor-not-allowed"
+        data-testid={testId}
+      >
+        {label}
+      </button>
+    );
+  }
+  const qs = new URLSearchParams({ templateId, versionId }).toString();
+  return (
+    <a
+      href={`${path}?${qs}`}
+      download
+      className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border bg-card text-foreground hover:bg-muted transition-colors"
+      data-testid={testId}
+    >
+      {label}
+    </a>
   );
 }
 
