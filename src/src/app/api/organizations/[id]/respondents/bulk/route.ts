@@ -200,14 +200,14 @@ export async function POST(
           let team = teamByParentName.get(key);
           if (!team) {
             try {
-              const created = await tx.orgTeam.create({
+              const created: TeamRow = (await tx.orgTeam.create({
                 data: {
                   organizationId,
                   name: segment,
                   parentTeamId: parentId,
                 },
                 select: { id: true, name: true, parentTeamId: true },
-              });
+              })) as TeamRow;
               team = created;
               teamByParentName.set(key, team);
             } catch {
