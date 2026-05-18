@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
   generateIcsContent,
-  parseDurationHours,
+  parseDurationHoursFromEvent,
   buildLocationString,
 } from "@/lib/ics-generator";
 import { z } from "zod";
@@ -76,7 +76,7 @@ export async function GET(
       eventDate: workshop.eventDate,
       eventTime: workshop.eventTime,
       timezone: workshop.timezone,
-      durationHours: parseDurationHours(workshop.duration),
+      durationHours: parseDurationHoursFromEvent(workshop.duration, workshop.eventTime),
       location: buildLocationString(workshop),
       url: workshopUrl,
       organizer: workshop.coach

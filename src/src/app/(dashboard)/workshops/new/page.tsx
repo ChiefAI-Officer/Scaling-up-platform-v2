@@ -135,7 +135,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
     categoryId: "",
     title: "",
     description: "",
-    format: "IN_PERSON",
+    format: "VIRTUAL",
     eventDate: "",
     eventTime: "",
     eventEndTime: "",

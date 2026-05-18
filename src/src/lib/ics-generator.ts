@@ -20,17 +20,61 @@ export interface IcsEventData {
 
 /**
  * Parse a workshop duration string into hours.
+ * Falls back to 2h (a typical virtual workshop) when the string is absent or
+ * unrecognised.  Explicit numeric prefix takes priority over keyword matching.
  */
 export function parseDurationHours(duration: string | null | undefined): number {
-  if (!duration) return 8;
-  const lower = duration.toLowerCase();
+  if (!duration) return 2;
+  const lower = duration.toLowerCase().trim();
+  // Numeric prefix: "2 hours", "3 hours", "4.5 hours", etc.
+  const hoursMatch = lower.match(/^(\d+(?:\.\d+)?)\s*hours?/);
+  if (hoursMatch) return parseFloat(hoursMatch[1]);
+  // Legacy seed strings: "8hr", "4hr", "virtual-2hr", "2-hour"
+  if (lower.includes("8hr")) return 8;
+  if (lower.includes("4hr")) return 4;
   if (lower.includes("2hr") || lower.includes("2-hour")) return 2;
+  // Keyword descriptors
+  if (lower.includes("full")) return 8;
   if (lower.includes("half")) return 4;
-  return 8; // full-day default
+  return 2; // safe default (short workshop)
+}
+
+/**
+ * Derive the event duration in hours from the workshop's eventTime range
+ * ("HH:MM - HH:MM" or "HH:MM – HH:MM") when available.
+ * Falls back to parseDurationHours(duration) for legacy/unstructured strings.
+ */
+export function parseDurationHoursFromEvent(
+  duration: string | null | undefined,
+  eventTime: string | null | undefined,
+): number {
+  if (eventTime) {
+    // Matches both hyphen (-) and en-dash (–) separators
+    const rangeMatch = eventTime.match(
+      /^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/
+    );
+    if (rangeMatch) {
+      const startMins =
+        parseInt(rangeMatch[1]) * 60 + parseInt(rangeMatch[2]);
+      const endMins =
+        parseInt(rangeMatch[3]) * 60 + parseInt(rangeMatch[4]);
+      if (endMins > startMins) return (endMins - startMins) / 60;
+    }
+  }
+  return parseDurationHours(duration);
 }
 
 /**
  * Build a location string from workshop venue data.
+ *
+ * VIRTUAL workshops return "" so downstream `generateIcsContent` and
+ * `buildGoogleCalendarUrl` OMIT the LOCATION field entirely. Gmail uses the
+ * ICS LOCATION value to render a "Directions" button on calendar previews,
+ * which is useless when the location is a meeting URL (BUG-MAY12).
+ *
+ * For VIRTUAL/HYBRID workshops, the join link is surfaced inside the calendar
+ * event DESCRIPTION via `buildIcsDescription` so registrants can still click
+ * through from their calendar on the day of the event.
  */
 export function buildLocationString(workshop: {
   format: string;
@@ -40,7 +84,7 @@ export function buildLocationString(workshop: {
   virtualPlatform?: string | null;
 }): string {
   if (workshop.format === "VIRTUAL") {
-    return workshop.virtualLink || "Virtual Workshop";
+    return "";
   }
 
   const parts: string[] = [];
@@ -69,6 +113,26 @@ export function buildLocationString(workshop: {
   }
 
   return parts.join(", ") || "Location TBD";
+}
+
+/**
+ * Build the ICS DESCRIPTION text for a workshop, appending the join link
+ * for virtual/hybrid workshops so registrants can find it inside the
+ * calendar event (since we no longer set LOCATION for virtuals to avoid
+ * Gmail's incorrect "Directions" button).
+ */
+export function buildIcsDescription(workshop: {
+  description?: string | null;
+  format: string;
+  virtualLink?: string | null;
+}): string {
+  const base = workshop.description?.trim() ?? "";
+  const needsJoinLink =
+    (workshop.format === "VIRTUAL" || workshop.format === "HYBRID") &&
+    workshop.virtualLink;
+  if (!needsJoinLink) return base;
+  const joinLine = `Join online: ${workshop.virtualLink}`;
+  return base ? `${base}\n\n${joinLine}` : joinLine;
 }
 
 /**
@@ -105,6 +169,10 @@ function formatIcsUtcNow(): string {
   );
 }
 
+function parseStartTime(eventTime: string): string {
+  return eventTime.split(/\s*[-–]\s*/)[0];
+}
+
 /**
  * Generate ICS calendar content for a workshop event.
  */
@@ -112,7 +180,7 @@ export function generateIcsContent(event: IcsEventData): string {
   // Build start date from eventDate + eventTime
   const start = new Date(event.eventDate);
   if (event.eventTime) {
-    const [hours, minutes] = event.eventTime.split(":").map(Number);
+    const [hours, minutes] = parseStartTime(event.eventTime).split(":").map(Number);
     if (!isNaN(hours)) start.setHours(hours);
     if (!isNaN(minutes)) start.setMinutes(minutes);
   } else {
@@ -175,7 +243,7 @@ export function generateIcsContent(event: IcsEventData): string {
 export function buildGoogleCalendarUrl(event: IcsEventData): string {
   const start = new Date(event.eventDate);
   if (event.eventTime) {
-    const [hours, minutes] = event.eventTime.split(":").map(Number);
+    const [hours, minutes] = parseStartTime(event.eventTime).split(":").map(Number);
     if (!isNaN(hours)) start.setHours(hours);
     if (!isNaN(minutes)) start.setMinutes(minutes);
   } else {

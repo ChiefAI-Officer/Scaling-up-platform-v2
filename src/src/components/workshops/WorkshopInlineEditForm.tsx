@@ -138,7 +138,7 @@ export function WorkshopInlineEditForm({
     title: title || "",
     description: description || "",
     categoryId: categoryId || "",
-    format: format || "IN_PERSON",
+    format: format || "VIRTUAL",
     eventDate: eventDate.split("T")[0],
     eventTime: eventTime || "",
     timezone: timezone || "America/New_York",

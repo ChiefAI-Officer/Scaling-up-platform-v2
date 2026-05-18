@@ -69,7 +69,7 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription || "");
   const [categoryId, setCategoryId] = useState(initialCategoryId || "");
-  const [format, setFormat] = useState(initialFormat || "IN_PERSON");
+  const [format, setFormat] = useState(initialFormat || "VIRTUAL");
   const [eventDate, setEventDate] = useState(initialEventDate.split("T")[0]);
   const [eventTime, setEventTime] = useState(initialEventTime || "");
   const [timezone, setTimezone] = useState(initialTimezone || "America/New_York");

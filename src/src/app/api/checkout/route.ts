@@ -4,6 +4,10 @@ import { createCheckoutSession, StripeDiscountCodeError } from "@/services/strip
 import { z } from "zod";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { parseStoredWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
+import {
+  getAppUrl,
+  resolveRegistrationSuccessUrl,
+} from "@/lib/workshops/thank-you-redirect";
 
 const checkoutSchema = z.object({
   registrationId: z.string().min(1, "Registration ID is required"),
@@ -74,7 +78,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const appUrl = process.env.APP_URL || "http://localhost:3000";
+    const appUrl = getAppUrl();
     const priceCents = registration.workshop.priceCents || 0;
     if (priceCents <= 0) {
       return NextResponse.json(
@@ -83,19 +87,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find the workshop's THANK_YOU landing page for post-payment redirect
-    const thankYouPage = await db.landingPage.findFirst({
-      where: { workshopId: registration.workshop.id, template: "THANK_YOU", status: "PUBLISHED" },
-      select: { slug: true },
-    });
-    // CHG-03: thread the Stripe session id through to BOTH redirect targets
-    // so the iDev pixel can fire at whichever page actually loads. The
-    // THANK_YOU LandingPage path is the normal post-launch destination;
-    // the registration/success fallback only handles workshops without a
+    // CHG-03 / BUG-MAY13-3 Task A4: thread the Stripe session id through to
+    // BOTH redirect targets via the shared THANK_YOU redirect helper so the
+    // iDev pixel can fire at whichever page actually loads. The THANK_YOU
+    // LandingPage path is the normal post-launch destination; the
+    // /registration/success fallback only handles workshops without a
     // published THANK_YOU page.
-    const successRedirect = thankYouPage
-      ? `${appUrl}/workshop/${thankYouPage.slug}?session_id={CHECKOUT_SESSION_ID}`
-      : `${appUrl}/registration/success?session_id={CHECKOUT_SESSION_ID}`;
+    const successRedirect = await resolveRegistrationSuccessUrl({
+      appUrl,
+      workshopId: registration.workshop.id,
+      key: { kind: "paid", stripeSessionToken: "{CHECKOUT_SESSION_ID}" },
+    });
 
     const session = await createCheckoutSession({
       workshopId: registration.workshop.id,

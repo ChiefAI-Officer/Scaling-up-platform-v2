@@ -14,15 +14,23 @@
  *      controlled fields can't inject markup.
  *   3. If no DB row, return hardcoded HTML defaults verbatim. Lets prod
  *      deploy with zero backfill — admin save creates the row on first edit.
+ *
+ * Wave 13-A: extended with location fields (format, virtualLink, venueName,
+ * venueAddress) so the hardcoded default shows a location block.
  */
 
 import { db } from "@/lib/db";
+import { buildLocationString } from "@/lib/ics-generator";
 
 export interface RegistrationConfirmationContext {
   workshopTitle: string;
   coachName: string;
   registrantName: string;
   registrantEmail: string;
+  format?: string | null;        // "VIRTUAL" | "IN_PERSON" | "HYBRID"
+  virtualLink?: string | null;
+  venueName?: string | null;
+  venueAddress?: string | null;  // JSON string from DB
 }
 
 export interface ComposedEmail {
@@ -52,7 +60,39 @@ function isOverrideEnabled(): boolean {
   return process.env.TRANSACTIONAL_EMAIL_OVERRIDES_ENABLED === "true";
 }
 
+/**
+ * Build a location block HTML snippet for the hardcoded email template.
+ * Rules:
+ *   VIRTUAL + virtualLink → join link (no directions)
+ *   VIRTUAL no link → generic message
+ *   IN_PERSON/HYBRID + venueName → venue + Get Directions
+ *   no format or no venueName → empty string (backwards compat)
+ */
+function buildLocationBlock(ctx: RegistrationConfirmationContext): string {
+  const { format, virtualLink, venueName, venueAddress } = ctx;
+
+  if (format === "VIRTUAL") {
+    if (virtualLink) {
+      const safeLink = virtualLink.startsWith("https://") || virtualLink.startsWith("http://") ? virtualLink : null;
+      if (safeLink) {
+        return `<p><strong>Join online:</strong> <a href="${escapeHtml(safeLink)}">${escapeHtml(safeLink)}</a></p>`;
+      }
+      // Link present but not a safe URL — fall through to generic note
+    }
+    return `<p>This is a virtual workshop. Join details will be shared by the coach.</p>`;
+  }
+
+  if ((format === "IN_PERSON" || format === "HYBRID") && venueName) {
+    const locationStr = buildLocationString({ format, venueName, venueAddress, virtualLink });
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationStr)}`;
+    return `<p><strong>Location:</strong> ${escapeHtml(venueName)}</p><p><a href="${mapsUrl}">Get Directions</a></p>`;
+  }
+
+  return "";
+}
+
 function hardcodedDefaults(ctx: RegistrationConfirmationContext): ComposedEmail {
+  const locationBlock = buildLocationBlock(ctx);
   return {
     subject: `You're Registered: ${ctx.workshopTitle}`,
     html: `
@@ -60,6 +100,7 @@ function hardcodedDefaults(ctx: RegistrationConfirmationContext): ComposedEmail 
             <p>Hi ${ctx.registrantName},</p>
             <p>You're confirmed for <strong>${ctx.workshopTitle}</strong> with ${ctx.coachName}.</p>
             <p>We've attached a calendar file (.ics) so you can add this event to your calendar.</p>
+            ${locationBlock}
             <p>See you there!</p>
             <p>— The Scaling Up Team</p>
             `,
@@ -87,6 +128,10 @@ export async function composeRegistrationConfirmationEmail(
     coachName: escapeHtml(ctx.coachName),
     registrantName: escapeHtml(ctx.registrantName),
     registrantEmail: escapeHtml(ctx.registrantEmail),
+    format: escapeHtml(ctx.format ?? ""),
+    virtualLink: escapeHtml(ctx.virtualLink ?? ""),
+    venueName: escapeHtml(ctx.venueName ?? ""),
+    venueAddress: escapeHtml(ctx.venueAddress ?? ""),
   };
 
   return {

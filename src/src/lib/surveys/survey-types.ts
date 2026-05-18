@@ -45,3 +45,42 @@ export const DEFAULT_NPS_QUESTION = {
   description: "0 = Not at all likely, 10 = Extremely likely",
   isRequired: true,
 };
+
+// ============================================
+// Date range filter (Round 15 Wave 2)
+// ============================================
+//
+// Survey date filters are surfaced as "YYYY-MM-DD" strings in the UI but Prisma
+// queries need true Date objects. The naive `new Date("YYYY-MM-DD")` for the
+// end-of-range produces 00:00 UTC of that day — which excludes same-day
+// responses (e.g. a survey completed at 2026-05-13T14:32Z is dropped when the
+// admin filters `endDate=2026-05-13`).
+//
+// `parseSurveyDateRange` normalizes this: the start date stays inclusive at
+// 00:00 UTC, and the end date becomes an EXCLUSIVE bound at 00:00 UTC of the
+// NEXT day. Callers then use `{ gte: startDate, lt: endDateExclusive }` in
+// Prisma to include the full endDate day.
+
+export interface SurveyDateRangeFilter {
+  startDate?: Date; // inclusive
+  endDateExclusive?: Date; // exclusive (start of next day)
+}
+
+export function parseSurveyDateRange(params: {
+  startDate?: string | null;
+  endDate?: string | null;
+}): SurveyDateRangeFilter {
+  const out: SurveyDateRangeFilter = {};
+  if (params.startDate) {
+    // 00:00 UTC of that day
+    out.startDate = new Date(params.startDate);
+  }
+  if (params.endDate) {
+    // Treat "2026-05-13" as inclusive-of-day → exclusive bound = 2026-05-14 00:00 UTC.
+    // setUTCDate(...+1) correctly rolls over month-ends and year-ends.
+    const end = new Date(params.endDate);
+    end.setUTCDate(end.getUTCDate() + 1);
+    out.endDateExclusive = end;
+  }
+  return out;
+}

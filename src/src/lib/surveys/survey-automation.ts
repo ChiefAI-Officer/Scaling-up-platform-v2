@@ -60,15 +60,16 @@ export async function getOrCreateSurveyLink(input: {
   /** BUG-06: Optional pinned template ID — bypasses category-based auto-matching when provided. */
   templateId?: string;
 }): Promise<{ surveyId: string; surveyUrl: string; surveyType: string } | null> {
-  // BUG-06: If a specific templateId is provided, verify it exists and is active; skip category lookup.
+  // BUG-06: If a specific templateId is provided, use it regardless of isActive status.
+  // isActive controls auto-attach only; explicit workflow step pins should always fire.
   let templateId: string | null;
   if (input.templateId) {
     const pinned = await db.surveyTemplate.findFirst({
-      where: { id: input.templateId, isActive: true },
+      where: { id: input.templateId },
       select: { id: true },
     });
     if (!pinned) {
-      console.warn(`[survey-automation] Pinned surveyTemplateId ${input.templateId} not found or inactive for workshopId ${input.workshopId} — falling back to category lookup`);
+      console.warn(`[survey-automation] Pinned surveyTemplateId ${input.templateId} not found for workshopId ${input.workshopId}`);
     }
     templateId = pinned?.id ?? null;
   } else {

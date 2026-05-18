@@ -12,7 +12,8 @@ import { createOrUpdateContact } from "@/services/hubspot";
 import { sendPaidRegistrationNotificationStrict } from "@/services/notifications";
 import {
     generateIcsContent,
-    parseDurationHours,
+    parseDurationHoursFromEvent,
+    buildIcsDescription,
     buildLocationString,
 } from "@/lib/ics-generator";
 
@@ -170,11 +171,11 @@ export async function sendNotificationWithAtomicClaim(
         const icsContent = generateIcsContent({
             uid: `workshop-${reg.workshop.id}@scaling-up-platform.com`,
             title: reg.workshop.title,
-            description: reg.workshop.description,
+            description: buildIcsDescription(reg.workshop),
             eventDate: reg.workshop.eventDate,
             eventTime: reg.workshop.eventTime,
             timezone: reg.workshop.timezone,
-            durationHours: parseDurationHours(reg.workshop.duration),
+            durationHours: parseDurationHoursFromEvent(reg.workshop.duration, reg.workshop.eventTime),
             location: buildLocationString(reg.workshop),
         });
 
@@ -192,6 +193,10 @@ export async function sendNotificationWithAtomicClaim(
             registrantName: `${reg.firstName} ${reg.lastName}`,
             registrantEmail: reg.email,
             registrantCompany: reg.company ?? undefined,
+            format: reg.workshop.format,
+            virtualLink: reg.workshop.virtualLink,
+            venueName: reg.workshop.venueName,
+            venueAddress: reg.workshop.venueAddress,
             icsAttachment: {
                 filename: `${safeTitle}.ics`,
                 content: icsContent,

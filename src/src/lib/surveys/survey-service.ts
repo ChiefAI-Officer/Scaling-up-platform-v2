@@ -4,9 +4,10 @@
  * CRUD for survey templates, questions, and response handling.
  */
 
-import { Prisma } from "@prisma/client";
+import { Prisma, type SurveyQuestion } from "@prisma/client";
 import { db } from "@/lib/db";
 import type { QuestionType, SurveyType } from "@/lib/surveys/survey-types";
+import { parseSurveyDateRange } from "@/lib/surveys/survey-types";
 
 // ============================================
 // Types
@@ -252,8 +253,12 @@ export interface SurveyResultsFilters {
   coachId?: string;
   categoryId?: string;
   workshopFormat?: string;
-  startDate?: Date;
-  endDate?: Date;
+  // Round 15 Wave 2: accept YYYY-MM-DD strings (preferred — parsed via
+  // parseSurveyDateRange so endDate is inclusive-of-day) or raw Date objects
+  // (back-compat: treated as exact moments → `lt` exclusive upper bound).
+  // Callers should prefer strings to get the same-day-inclusive semantics.
+  startDate?: Date | string;
+  endDate?: Date | string;
   groupBy?: "coach" | "category" | "format" | "workshopType";
 }
 
@@ -275,9 +280,20 @@ export async function getSurveyResults(
   if (filters.categoryId) workshopFilter.categoryId = filters.categoryId;
   if (filters.workshopFormat) workshopFilter.format = filters.workshopFormat;
 
+  // Round 15 Wave 2: route date params through parseSurveyDateRange so
+  // "endDate=2026-05-13" includes the entire day (was excluding everything
+  // after 00:00 UTC). String inputs get the inclusive-of-day shift; Date
+  // objects are passed through as-is for back-compat (treated as exact
+  // moments with `lt` exclusive upper bound).
   const completedAtFilter: Prisma.DateTimeNullableFilter = { not: null };
-  if (filters.startDate) completedAtFilter.gte = filters.startDate;
-  if (filters.endDate) completedAtFilter.lte = filters.endDate;
+  const stringRange = parseSurveyDateRange({
+    startDate: typeof filters.startDate === "string" ? filters.startDate : undefined,
+    endDate: typeof filters.endDate === "string" ? filters.endDate : undefined,
+  });
+  if (stringRange.startDate) completedAtFilter.gte = stringRange.startDate;
+  if (stringRange.endDateExclusive) completedAtFilter.lt = stringRange.endDateExclusive;
+  if (filters.startDate instanceof Date) completedAtFilter.gte = filters.startDate;
+  if (filters.endDate instanceof Date) completedAtFilter.lt = filters.endDate;
 
   const where: Prisma.SurveyWhereInput = {
     templateId,
@@ -413,5 +429,221 @@ export async function getSurveyResults(
     questionStats,
     responses: surveys,
     groups,
+  };
+}
+
+// ============================================
+// Round 15 Wave 3: per-response flat-row helper
+// ============================================
+//
+// `getSurveyResponseRows` returns one row per completed survey response,
+// shaped for the new <SurveyResponsesTable> (Wave 4) and the CSV export
+// endpoint (Wave 5). Filters mirror `getSurveyResults` (coach / category /
+// format / date range) but this helper does NOT aggregate — it returns the
+// raw rows plus the ordered question list so the consumer can lay out the
+// columns deterministically.
+//
+// Cap behavior:
+// - Default cap = 500 rows (`ROW_CAP`). The UI table uses this default so
+//   the page never tries to render thousands of rows.
+// - `cap: null` returns all rows (no `take` clause). The CSV export uses
+//   this so the operator gets the full export.
+// - `cappedAt` is set ONLY when the actual returned row count equals the
+//   cap AND the unfiltered count exceeds the cap — so the consumer can
+//   surface a "showing first N of M" notice.
+
+export interface SurveyResponseRow {
+  surveyId: string;
+  /**
+   * Round 15 Wave 5: `format` added so the CSV export can render the
+   * Workshop Format column without a second Prisma roundtrip. Sourced from
+   * Workshop.format (e.g. "VIRTUAL" / "IN_PERSON" / "HYBRID"). `null` for
+   * legacy rows with no format set.
+   */
+  workshop: { id: string; title: string; workshopCode: string | null; format: string | null };
+  coach: { id: string; name: string | null } | null;
+  category: { id: string; name: string } | null;
+  /**
+   * Round 15 Wave 3 polish: respondent identity, sourced from Survey.registration.
+   * Populated for PRE_WORKSHOP / POST_WORKSHOP surveys (registration-linked).
+   * `null` when the survey has no registration FK (anonymous / coach-survey path).
+   * Used by the Wave 5 CSV export to expose respondent name + email per row.
+   */
+  respondent: { firstName: string | null; lastName: string | null; email: string | null } | null;
+  /**
+   * Round 15 Wave 5: `sentAt` exposed so the CSV export can show when the
+   * survey invitation was sent vs when the respondent completed it. Sourced
+   * from Survey.sentAt; null for surveys where the timestamp was never set
+   * (older rows or non-registration code paths).
+   */
+  sentAt: Date | null;
+  completedAt: Date;
+  // Map keyed by questionId → SurveyAnswer fields (value + numValue).
+  answersByQuestionId: Map<string, { value: string | null; numValue: number | null }>;
+}
+
+export interface SurveyResponseRowsResult {
+  template: { id: string; name: string; surveyType: string };
+  questions: SurveyQuestion[]; // ordered by sortOrder
+  rows: SurveyResponseRow[];
+  totalCount: number; // unfiltered match count (informational)
+  cappedAt: number | null; // non-null when rows.length === cap and totalCount > cap
+}
+
+export interface AggregateFilters {
+  coachId?: string;
+  categoryId?: string;
+  workshopFormat?: string;
+  startDate?: Date | string;
+  endDate?: Date | string;
+}
+
+const ROW_CAP = 500;
+
+function composeCoachName(coach: { firstName?: string | null; lastName?: string | null } | null | undefined): string | null {
+  if (!coach) return null;
+  const name = `${coach.firstName ?? ""} ${coach.lastName ?? ""}`.trim();
+  return name.length > 0 ? name : null;
+}
+
+export async function getSurveyResponseRows(
+  templateId: string,
+  filters: AggregateFilters,
+  options?: { cap?: number | null },
+): Promise<SurveyResponseRowsResult> {
+  const cap = options?.cap === undefined ? ROW_CAP : options.cap;
+
+  // Filter shape mirrors getSurveyResults (ENH-MAY6-9): coach / category /
+  // format filter via the Workshop relation; date range applies to
+  // Survey.completedAt directly. workshopCategory (relation) NOT category (legacy enum).
+  const workshopFilter: Prisma.WorkshopWhereInput = {};
+  if (filters.coachId) workshopFilter.coachId = filters.coachId;
+  if (filters.categoryId) workshopFilter.categoryId = filters.categoryId;
+  if (filters.workshopFormat) workshopFilter.format = filters.workshopFormat;
+
+  const completedAtFilter: Prisma.DateTimeNullableFilter = { not: null };
+  const stringRange = parseSurveyDateRange({
+    startDate: typeof filters.startDate === "string" ? filters.startDate : undefined,
+    endDate: typeof filters.endDate === "string" ? filters.endDate : undefined,
+  });
+  if (stringRange.startDate) completedAtFilter.gte = stringRange.startDate;
+  if (stringRange.endDateExclusive) completedAtFilter.lt = stringRange.endDateExclusive;
+  if (filters.startDate instanceof Date) completedAtFilter.gte = filters.startDate;
+  if (filters.endDate instanceof Date) completedAtFilter.lt = filters.endDate;
+
+  const where: Prisma.SurveyWhereInput = {
+    templateId,
+    completedAt: completedAtFilter,
+  };
+  if (Object.keys(workshopFilter).length > 0) where.workshop = workshopFilter;
+
+  const findManyArgs: Prisma.SurveyFindManyArgs = {
+    where,
+    include: {
+      workshop: {
+        select: {
+          id: true,
+          title: true,
+          workshopCode: true,
+          // Round 15 Wave 5: format is required by the CSV export's "Format"
+          // column. Direct scalar on Workshop — no extra include needed.
+          format: true,
+          coach: { select: { id: true, firstName: true, lastName: true } },
+          workshopCategory: { select: { id: true, name: true } },
+        },
+      },
+      // Round 15 Wave 3 polish: registration FK exposes respondent identity
+      // (firstName / lastName / email) for the Wave 5 CSV export.
+      registration: { select: { firstName: true, lastName: true, email: true } },
+      answers: { select: { questionId: true, value: true, numValue: true } },
+    },
+    orderBy: { completedAt: "desc" },
+  };
+  if (cap !== null) {
+    findManyArgs.take = cap;
+  }
+
+  // Polish fix 1: parallelize the three independent Prisma queries. The count +
+  // findMany don't depend on the template lookup — they share the WHERE clause
+  // built above. Throwing on missing template happens AFTER the await so we
+  // don't waste a roundtrip when the template is missing, but the latency win
+  // for the common (template-exists) path is worth ~2× the previous sequential cost.
+  const [template, totalCount, surveys] = await Promise.all([
+    db.surveyTemplate.findUnique({
+      where: { id: templateId },
+      include: { questions: { orderBy: { sortOrder: "asc" } } },
+    }),
+    db.survey.count({ where }),
+    db.survey.findMany(findManyArgs),
+  ]);
+
+  if (!template) {
+    throw new Error(`Survey template not found: ${templateId}`);
+  }
+
+  type SurveyShape = {
+    id: string;
+    sentAt: Date | null;
+    completedAt: Date | null;
+    workshop: {
+      id: string;
+      title: string;
+      workshopCode: string | null;
+      format: string | null;
+      coach: { id: string; firstName: string | null; lastName: string | null } | null;
+      workshopCategory: { id: string; name: string } | null;
+    } | null;
+    registration: { firstName: string | null; lastName: string | null; email: string | null } | null;
+    answers: { questionId: string; value: string | null; numValue: number | null }[];
+  };
+
+  // Polish fix 2: cap detection must use the pre-filter Prisma result length
+  // (`surveys.length`) — NOT `rows.length` after the in-memory `.filter()`
+  // below. A surveys row dropped by the filter (no completedAt or no workshop)
+  // would otherwise make `rows.length === cap` false even when the query was
+  // truncated by `take: cap`, hiding the "showing first N of M" notice.
+  const cappedAt = cap !== null && surveys.length === cap && totalCount > cap ? cap : null;
+
+  const rows: SurveyResponseRow[] = (surveys as unknown as SurveyShape[])
+    .filter((s) => s.completedAt !== null && s.workshop !== null)
+    .map((s) => {
+      const workshop = s.workshop!;
+      const answersByQuestionId = new Map<string, { value: string | null; numValue: number | null }>();
+      for (const a of s.answers) {
+        answersByQuestionId.set(a.questionId, { value: a.value, numValue: a.numValue });
+      }
+      return {
+        surveyId: s.id,
+        workshop: {
+          id: workshop.id,
+          title: workshop.title,
+          workshopCode: workshop.workshopCode,
+          format: workshop.format,
+        },
+        coach: workshop.coach
+          ? { id: workshop.coach.id, name: composeCoachName(workshop.coach) }
+          : null,
+        category: workshop.workshopCategory
+          ? { id: workshop.workshopCategory.id, name: workshop.workshopCategory.name }
+          : null,
+        respondent: s.registration
+          ? {
+              firstName: s.registration.firstName,
+              lastName: s.registration.lastName,
+              email: s.registration.email,
+            }
+          : null,
+        sentAt: s.sentAt,
+        completedAt: s.completedAt!,
+        answersByQuestionId,
+      };
+    });
+
+  return {
+    template: { id: template.id, name: template.name, surveyType: template.surveyType },
+    questions: template.questions,
+    rows,
+    totalCount,
+    cappedAt,
   };
 }

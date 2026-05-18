@@ -8,13 +8,15 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/authorization";
-import { getSurveyResults } from "@/lib/surveys/survey-service";
-import { SURVEY_TYPE_LABELS } from "@/lib/surveys/survey-types";
+import { getSurveyResults, getSurveyResponseRows } from "@/lib/surveys/survey-service";
+import { SURVEY_TYPE_LABELS, parseSurveyDateRange } from "@/lib/surveys/survey-types";
 import type { SurveyType } from "@/lib/surveys/survey-types";
 import { FadeUp } from "@/components/ui/animated";
 import { SurveyFilters } from "@/components/surveys/survey-filters";
+import { SurveyResponsesTable } from "@/components/surveys/survey-responses-table";
 
 interface PageProps {
   searchParams: Promise<{
@@ -34,9 +36,9 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
   await requireAdmin();
   const sp = await searchParams;
 
-  // ENH-MAY6-9: parse + sanitize filter params into the shape getSurveyResults expects.
-  const startDate = sp.startDate ? new Date(sp.startDate) : undefined;
-  const endDate = sp.endDate ? new Date(sp.endDate) : undefined;
+  // ENH-MAY6-9 + Round 15 Wave 2: thread raw YYYY-MM-DD strings to
+  // getSurveyResults so the service-layer parseSurveyDateRange helper applies
+  // the inclusive-of-day end-date fix (no more excluded same-day responses).
   const validGroupBy: Set<GroupByOpt> = new Set([
     "coach",
     "category",
@@ -75,16 +77,28 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
 
   // Get aggregated results for selected template (or first with responses)
   const selectedId = sp.templateId || templates.find((t) => t._count.surveys > 0)?.id;
-  const results = selectedId
-    ? await getSurveyResults(selectedId, {
-        coachId: sp.coachId,
-        categoryId: sp.categoryId,
-        workshopFormat,
-        startDate,
-        endDate,
-        groupBy,
-      })
-    : null;
+  // Round 15 Wave 6: fetch aggregate stats AND per-response rows in parallel.
+  // `getSurveyResponseRows` does NOT accept `groupBy` (it's a flat-row helper);
+  // pass only the row-level filters. UI uses the default 500-row cap.
+  const [results, responseRowsData] = selectedId
+    ? await Promise.all([
+        getSurveyResults(selectedId, {
+          coachId: sp.coachId,
+          categoryId: sp.categoryId,
+          workshopFormat,
+          startDate: sp.startDate,
+          endDate: sp.endDate,
+          groupBy,
+        }),
+        getSurveyResponseRows(selectedId, {
+          coachId: sp.coachId,
+          categoryId: sp.categoryId,
+          workshopFormat,
+          startDate: sp.startDate,
+          endDate: sp.endDate,
+        }),
+      ])
+    : [null, null];
 
   // Get per-workshop breakdown for the selected template
   let workshopBreakdown: Array<{
@@ -99,13 +113,24 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
     // Round 2 M7: the side breakdown query MUST receive the same filters as
     // the main getSurveyResults query, otherwise summary cards and per-
     // workshop breakdown disagree on totals.
-    const workshopSubFilter: Record<string, unknown> = {};
+    // Round 15 Wave 2: use the shared parseSurveyDateRange helper so the
+    // breakdown query gets the same inclusive-of-day endDate semantics as
+    // getSurveyResults (`lt` exclusive next-day, not `lte` midnight).
+    // Round 15 Wave 6 (Wave 2 Issue 3 leftover): use Prisma types so the
+    // sub-filter is type-checked against the WorkshopWhereInput shape and
+    // the completedAt boundary against DateTimeNullableFilter — same import
+    // path as the canonical query in survey-service.ts.
+    const workshopSubFilter: Prisma.WorkshopWhereInput = {};
     if (sp.coachId) workshopSubFilter.coachId = sp.coachId;
     if (sp.categoryId) workshopSubFilter.categoryId = sp.categoryId;
     if (workshopFormat) workshopSubFilter.format = workshopFormat;
-    const completedAtBoundary: Record<string, unknown> = { not: null };
-    if (startDate) completedAtBoundary.gte = startDate;
-    if (endDate) completedAtBoundary.lte = endDate;
+    const range = parseSurveyDateRange({
+      startDate: sp.startDate,
+      endDate: sp.endDate,
+    });
+    const completedAtBoundary: Prisma.DateTimeNullableFilter = { not: null };
+    if (range.startDate) completedAtBoundary.gte = range.startDate;
+    if (range.endDateExclusive) completedAtBoundary.lt = range.endDateExclusive;
 
     const surveys = await db.survey.findMany({
       where: {
@@ -150,6 +175,20 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
   }
 
   const selectedTemplate = templates.find((t) => t.id === selectedId);
+
+  // Round 15 Wave 6: build the CSV export URL preserving current filter
+  // params. Excludes `groupBy` (the export route is flat-row only — see the
+  // service helper signature). URLSearchParams handles URL-encoding.
+  const exportParams = new URLSearchParams();
+  if (sp.coachId) exportParams.set("coachId", sp.coachId);
+  if (sp.categoryId) exportParams.set("categoryId", sp.categoryId);
+  if (workshopFormat) exportParams.set("workshopFormat", workshopFormat);
+  if (sp.startDate) exportParams.set("startDate", sp.startDate);
+  if (sp.endDate) exportParams.set("endDate", sp.endDate);
+  const exportQuery = exportParams.toString();
+  const exportHref = selectedId
+    ? `/api/survey-templates/${selectedId}/responses/export${exportQuery ? `?${exportQuery}` : ""}`
+    : "";
 
   return (
     <div className="space-y-6">
@@ -390,6 +429,33 @@ export default async function AggregateSurveyResultsPage({ searchParams }: PageP
                 </table>
               </div>
             </div>
+          )}
+
+          {/* Round 15 Wave 6: per-response browse + CSV export.
+              Hidden when groupBy is active — the groups breakdown IS the
+              categorized view, so a flat per-response table would be
+              redundant. The table component renders its own Export CSV
+              button (top right), so we only render the section heading here. */}
+          {!groupBy && responseRowsData && (
+            <section
+              className="space-y-3"
+              aria-labelledby="individual-responses-heading"
+            >
+              <h2
+                id="individual-responses-heading"
+                className="text-lg font-semibold text-foreground"
+              >
+                Individual Responses
+              </h2>
+              <SurveyResponsesTable
+                rows={responseRowsData.rows}
+                questions={responseRowsData.questions}
+                surveyType={responseRowsData.template.surveyType}
+                totalCount={responseRowsData.totalCount}
+                cappedAt={responseRowsData.cappedAt}
+                exportHref={exportHref}
+              />
+            </section>
           )}
         </>
       )}

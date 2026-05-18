@@ -107,3 +107,51 @@ describe("composeRegistrationConfirmationEmail (ENH-MAY6-11)", () => {
     expect(db.transactionalEmailTemplate.findUnique).not.toHaveBeenCalled();
   });
 });
+
+describe("composeRegistrationConfirmationEmail — location block (Wave 13-A)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Use hardcoded path (kill switch off) so no DB call needed
+    process.env.TRANSACTIONAL_EMAIL_OVERRIDES_ENABLED = "false";
+  });
+
+  afterEach(() => {
+    delete process.env.TRANSACTIONAL_EMAIL_OVERRIDES_ENABLED;
+  });
+
+  it("VIRTUAL + virtualLink → join link rendered, NO Get Directions in html", async () => {
+    const { html } = await composeRegistrationConfirmationEmail({
+      ...fixtureContext,
+      format: "VIRTUAL",
+      virtualLink: "https://zoom.us/j/123456789",
+    });
+    expect(html).toContain("Join online");
+    expect(html).toContain("https://zoom.us/j/123456789");
+    expect(html).not.toContain("Get Directions");
+    expect(html).not.toContain("maps.google");
+  });
+
+  it("IN_PERSON + venueName/venueAddress → venue shown and Get Directions link present", async () => {
+    const { html } = await composeRegistrationConfirmationEmail({
+      ...fixtureContext,
+      format: "IN_PERSON",
+      venueName: "Marriott Downtown",
+      venueAddress: '{"street":"123 Main St","city":"New York","state":"NY","zip":"10001"}',
+    });
+    expect(html).toContain("Marriott Downtown");
+    expect(html).toContain("Get Directions");
+    expect(html).toContain("google.com/maps");
+  });
+
+  it("no format field → no extra location block rendered (backwards compat)", async () => {
+    const { html } = await composeRegistrationConfirmationEmail({
+      ...fixtureContext,
+      // format intentionally omitted
+    });
+    expect(html).not.toContain("Join online");
+    expect(html).not.toContain("Get Directions");
+    // Core content still present
+    expect(html).toContain("You're confirmed for");
+    expect(html).toContain("See you there");
+  });
+});

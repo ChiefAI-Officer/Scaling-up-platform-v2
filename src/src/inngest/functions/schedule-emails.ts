@@ -30,21 +30,9 @@ export const scheduleEmailSequence = inngest.createFunction(
 
         const eventDate = new Date(workshop.eventDate);
 
-        // Step 2: Send immediate registration confirmation
-        await step.run("send-registration-email", async () => {
-            await sendEmailTemplate({
-                to: email,
-                templateId: "registration-confirmation",
-                variables: {
-                    first_name: firstName,
-                    workshop_name: workshop.title,
-                    event_date: formatTimestamp(eventDate),
-                    event_time: workshop.eventTime || "TBD",
-                    venue_name: workshop.venueName || "TBD",
-                    coach_name: `${workshop.coach.firstName} ${workshop.coach.lastName}`,
-                }
-            });
-        });
+        // Step 2: Registration confirmation email sent by dedicated handlers:
+        //   FREE → handleRegistrationCreatedFree (with ICS)
+        //   PAID → processPaymentCompleted chain (with ICS)
 
         // Step 3: Schedule "5 Days Before" email
         const fiveDaysBefore = new Date(eventDate.getTime() - 5 * 24 * 60 * 60 * 1000);

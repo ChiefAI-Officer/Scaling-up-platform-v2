@@ -13,7 +13,7 @@
 import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
 import { sendWorkshopDateChangeEmail } from "@/services/notifications";
-import { parseDurationHours } from "@/lib/ics-generator";
+import { parseDurationHoursFromEvent } from "@/lib/ics-generator";
 
 export const workshopDateChange = inngest.createFunction(
   { id: "workshop-date-change", retries: 2 },
@@ -50,7 +50,7 @@ export const workshopDateChange = inngest.createFunction(
         venueName: workshop.venueName,
         venueAddress: workshop.venueAddress,
         workshopFormat: workshop.format,
-        durationHours: parseDurationHours(workshop.duration),
+        durationHours: parseDurationHoursFromEvent(workshop.duration, workshop.eventTime),
         landingPageUrl: workshop.landingPageSlug
           ? `${appUrl}/workshop/${workshop.landingPageSlug}`
           : undefined,

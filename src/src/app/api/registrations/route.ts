@@ -8,6 +8,7 @@ import {
   createWorkshopRegistration,
   RegistrationServiceError,
 } from "@/lib/registration-service";
+import { getAppUrl, resolveRegistrationSuccessUrl } from "@/lib/workshops/thank-you-redirect";
 
 const SORT_ALLOWLIST = ["createdAt", "firstName", "lastName", "amountPaidCents"] as const;
 type SortField = (typeof SORT_ALLOWLIST)[number];
@@ -203,10 +204,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // BUG-MAY13-3 / Wave A Task A2: compute the per-workshop THANK_YOU redirect
+    // URL server-side so the client can navigate to it directly. Falls back to
+    // /registration/success?id=X when no published THANK_YOU template exists.
+    const redirectUrl = await resolveRegistrationSuccessUrl({
+      appUrl: getAppUrl(),
+      workshopId: registration.workshopId,
+      key: { kind: "free", registrationId: registration.id },
+    });
+
     return NextResponse.json(
       {
         success: true,
         data: registration,
+        redirectUrl,
         message: "Registration successful",
       },
       { status: 201, headers: rateLimit.headers }
