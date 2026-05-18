@@ -6,6 +6,34 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Task K — campaign wizard auto-save drafts: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-k-wizard-drafts -->
+
+Wizard UX gap closed: coaches who walk away mid-creation can now resume where they left off. Mirrors the existing `WorkshopDraft` pattern verbatim (same upsert contract, same `coachId`-unique gating) so future maintainers have a stable precedent.
+
+**Schema**:
+- New model `CampaignWizardDraft` (`@@map("assessment_campaign_wizard_drafts")`) with `coachId` as a unique foreign key to `coaches(id)` with `ON DELETE CASCADE`. Stores `currentStep` (Int, default 1), `stepsData` (TEXT, JSON-stringified wizard state), `lastSavedAt`, `createdAt`, `updatedAt`.
+- Back-relation `campaignWizardDraft CampaignWizardDraft?` on `Coach`.
+- Migration `20260518130000_add_campaign_wizard_draft` (raw SQL: CREATE TABLE + unique index + FK).
+
+**API — `/api/assessment-campaign-drafts/route.ts`** (153 lines):
+- `GET` — `findUnique` by coachId; returns the draft or `null`.
+- `PUT` — `{ step, data }` Zod-validated, upsert by `coachId`. Returns `{ success: true, draftId }`. Rate-limited via `RateLimits.standard`.
+- `DELETE` — `deleteMany` (no-op if no row). Returns `{ success: true }`. Rate-limited.
+- Auth pattern uses `getApiActor()` + `actor.coachId` gate (matches `assessment-campaigns/route.ts`) — deliberately NOT `requireCoach()` because that helper calls `redirect()` which is unsafe inside API routes. Returns 401 (unauthenticated) / 403 (non-coach actor).
+
+**UI — `CampaignWizard.tsx`** (+244 net lines):
+- Resume banner above wizard: `"Resume your draft? Last saved {formatDistanceToNow}. [Resume] [Discard]"`. Resume hydrates state via `JSON.parse(draft.stepsData)`, jumps to `draft.currentStep`. Discard fires `DELETE` and starts fresh.
+- Debounced 800ms auto-save during field edits. Immediate flush on step transitions (back/next).
+- Subtle "Saving…" / "Saved Xs ago" indicator in wizard header (uses `useMemo` for the timeago text).
+- Clear-on-submit: successful campaign creation fires `DELETE` so the next campaign starts blank.
+- Defensive parse: `JSON.parse` wrapped in try/catch — on failure, treats as no draft AND fires `DELETE` to clean up the corrupt row.
+
+**Tests**: 15 new cases in `src/src/__tests__/api/assessment-campaign-drafts.test.ts` (GET null/200 paths, PUT create + update + validation, DELETE idempotent, 401/403 on unauth/non-coach, corrupt-data handling). Full suite 1672/1672 passing (200 suites; up from 1657).
+
+**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in 41s. ESLint 0/0 on changed files. Deploy: commit `fbd6e94`, Vercel `crr3v4ixv-chief-aio-fficer.vercel.app` ● Ready in 57s.
+
+**Known follow-on (deferred)**: `stepsData` has no schema version. Future wizard schema changes that add new fields will load old drafts with default values for the new fields — acceptable today; a `version` field is the obvious upgrade path if step shapes start to drift incompatibly.
+
 ### 2026-05-18 — Assessment Tool v7.6 — Tasks I + J — campaign status transitions + CSV exports: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-tasks-i-j -->
 
 Two polish slices on top of the Tasks A–H arc, plus three Vercel-only hotfixes for staging-miss bugs across the session. v1 implementation now covers daily-ops + reporting.
