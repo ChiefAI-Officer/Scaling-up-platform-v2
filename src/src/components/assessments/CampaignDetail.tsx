@@ -18,7 +18,7 @@
 
 import { Fragment, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Mail, Eye } from "lucide-react";
+import { ArrowLeft, Loader2, Mail, Eye, LineChart } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { AssessmentResultView } from "./AssessmentResultView";
 import type {
@@ -207,12 +207,19 @@ export function CampaignDetail({
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      <div>
+      <div className="flex items-center justify-between gap-4">
         <Link
           href="/portal/assessments"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Assessments
+        </Link>
+        <Link
+          href={`/portal/assessments/trends?templateId=${encodeURIComponent(campaign.templateId)}&organizationId=${encodeURIComponent(campaign.organizationId)}`}
+          className="inline-flex items-center gap-2 bg-card border border-border hover:bg-muted/40 text-sm font-medium text-foreground px-3 py-1.5 rounded-lg transition-colors"
+          data-testid="campaign-detail-view-trends"
+        >
+          <LineChart className="w-4 h-4" /> View Trends
         </Link>
       </div>
 

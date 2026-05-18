@@ -66,7 +66,9 @@ export interface CampaignOverview {
     openAt: Date;
     closeAt: Date | null;
     createdAt: Date;
+    templateId: string;
     templateName: string;
+    organizationId: string;
     organizationName: string;
   };
   stats: {
@@ -247,7 +249,9 @@ export async function getCampaignOverview(
       openAt: campaign.openAt,
       closeAt: campaign.closeAt,
       createdAt: campaign.createdAt,
+      templateId: campaign.template.id,
       templateName: campaign.template.name,
+      organizationId: campaign.organization.id,
       organizationName: campaign.organization.name,
     },
     stats,
