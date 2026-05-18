@@ -177,6 +177,19 @@ export function CampaignDetail({
   // Task N — Bulk reminders state.
   const [sendingReminders, setSendingReminders] = useState(false);
 
+  // Task O UI follow-on — email overrides post-create edit panel.
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState<string>(
+    overview.campaign.invitationSubject ?? "",
+  );
+  const [emailBody, setEmailBody] = useState<string>(
+    overview.campaign.invitationBodyMarkdown ?? "",
+  );
+  const [emailSaving, setEmailSaving] = useState(false);
+  const emailDirty =
+    emailSubject !== (overview.campaign.invitationSubject ?? "") ||
+    emailBody !== (overview.campaign.invitationBodyMarkdown ?? "");
+
   const campaign = overview.campaign;
   const isDraft = campaign.status === "DRAFT";
   const isClosed = campaign.status === "CLOSED";
@@ -373,6 +386,45 @@ export function CampaignDetail({
       });
     } finally {
       setSendingReminders(false);
+    }
+  }
+
+  // Task O UI follow-on — save email overrides via PATCH /api/assessment-campaigns/[id].
+  async function handleSaveEmailOverrides() {
+    if (emailSaving) return;
+    setEmailSaving(true);
+    try {
+      const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invitationSubject: emailSubject.trim() === "" ? null : emailSubject.trim(),
+          invitationBodyMarkdown:
+            emailBody.trim() === "" ? null : emailBody.trim(),
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.success === false) {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      toast({
+        title: "Invitation email saved",
+        description:
+          emailSubject.trim() === "" && emailBody.trim() === ""
+            ? "Using template default."
+            : "New campaign overrides applied.",
+      });
+      setEmailOpen(false);
+      router.refresh();
+    } catch (err) {
+      toast({
+        title: "Could not save email overrides",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setEmailSaving(false);
     }
   }
 
@@ -813,6 +865,124 @@ export function CampaignDetail({
           />
         </div>
       </div>
+
+      {/* Task O UI follow-on — invitation email overrides edit panel.
+          Hidden when campaign is CLOSED (no further sends to customize). */}
+      {!isClosed && (
+        <div
+          className="bg-card border border-border rounded-xl"
+          data-testid="campaign-email-overrides-card"
+        >
+          <button
+            type="button"
+            onClick={() => setEmailOpen((v) => !v)}
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors"
+            data-testid="email-overrides-toggle"
+          >
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">
+                Invitation email
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {overview.campaign.invitationSubject ||
+                overview.campaign.invitationBodyMarkdown
+                  ? "Custom subject/body set for this campaign"
+                  : "Using template default — click to customize"}
+              </p>
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">
+              {emailOpen ? "Hide" : "Edit"}
+            </span>
+          </button>
+          {emailOpen && (
+            <div className="px-4 pb-4 space-y-3 border-t border-border pt-4">
+              <p className="text-xs text-muted-foreground">
+                Available tokens:{" "}
+                <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                  {"{{respondentFirstName}}"}
+                </code>
+                ,{" "}
+                <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                  {"{{respondentFullName}}"}
+                </code>
+                ,{" "}
+                <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                  {"{{campaignName}}"}
+                </code>
+                ,{" "}
+                <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                  {"{{invitationUrl}}"}
+                </code>
+                ,{" "}
+                <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                  {"{{closeAt}}"}
+                </code>
+                . Changes apply to new and reminder sends going forward.
+              </p>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  maxLength={200}
+                  placeholder="Leave blank to use template default"
+                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  data-testid="email-overrides-subject"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground">
+                  Body (Markdown)
+                </label>
+                <textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  maxLength={5000}
+                  rows={8}
+                  placeholder="Leave blank to use template default"
+                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  data-testid="email-overrides-body"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  {emailBody.length} / 5000 characters
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailSubject(overview.campaign.invitationSubject ?? "");
+                    setEmailBody(
+                      overview.campaign.invitationBodyMarkdown ?? "",
+                    );
+                    setEmailOpen(false);
+                  }}
+                  disabled={emailSaving}
+                  className="inline-flex items-center text-xs font-medium px-3 py-1.5 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"
+                  data-testid="email-overrides-cancel"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEmailOverrides}
+                  disabled={emailSaving || !emailDirty}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="email-overrides-save"
+                >
+                  {emailSaving ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : null}
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Respondents table */}
       <div
