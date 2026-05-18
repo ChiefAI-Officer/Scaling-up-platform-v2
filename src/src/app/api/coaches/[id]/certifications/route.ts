@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { CERTIFIED_STATUS, PENDING_STATUS } from "@/lib/auth/coach-status";
 
 const AddCertificationSchema = z.object({
     workshopTypeId: z.string().min(1),
@@ -39,7 +40,10 @@ export async function POST(
         const { workshopTypeId, expiresAt } = validation.data;
 
         // Verify coach exists
-        const coach = await db.coach.findUnique({ where: { id: coachId }, select: { id: true } });
+        const coach = await db.coach.findUnique({
+            where: { id: coachId },
+            select: { id: true, certificationStatus: true },
+        });
         if (!coach) {
             return NextResponse.json({ success: false, error: "Coach not found" }, { status: 404 });
         }
@@ -61,7 +65,7 @@ export async function POST(
             );
         }
 
-        const certification = await db.coachCertification.create({
+        const certCreateArgs = {
             data: {
                 coachId,
                 workshopTypeId,
@@ -69,8 +73,23 @@ export async function POST(
                 expiresAt: expiresAt ? new Date(expiresAt) : null,
             },
             include: { workshopType: true },
-        });
+        };
 
+        // Auto-promote PENDING coaches to ACTIVE on cert grant so the overall
+        // certification badge tracks the granted workshop-type certs. Only PENDING
+        // is promoted — DEACTIVATED requires explicit reactivation by an admin.
+        if (coach.certificationStatus === PENDING_STATUS) {
+            const [certification] = await db.$transaction([
+                db.coachCertification.create(certCreateArgs),
+                db.coach.update({
+                    where: { id: coachId },
+                    data: { certificationStatus: CERTIFIED_STATUS },
+                }),
+            ]);
+            return NextResponse.json({ success: true, data: certification }, { status: 201 });
+        }
+
+        const certification = await db.coachCertification.create(certCreateArgs);
         return NextResponse.json({ success: true, data: certification }, { status: 201 });
     } catch (error) {
         console.error("Error adding certification:", error);
