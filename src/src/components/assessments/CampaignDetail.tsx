@@ -16,7 +16,7 @@
  *  - public/wireframes-phase2/revisions/08-revised-individual-results.html
  */
 
-import { Fragment, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -26,6 +26,8 @@ import {
   Mail,
   Eye,
   LineChart,
+  Plus,
+  Trash2,
   XCircle,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -56,6 +58,14 @@ interface ResultPayload {
 export interface CampaignDetailProps {
   initialOverview: CampaignOverview;
   initialRespondents: CampaignRespondentRow[];
+}
+
+interface OrgRespondentRow {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  jobTitle: string | null;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -135,6 +145,22 @@ export function CampaignDetail({
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [closeReason, setCloseReason] = useState("");
   const [closing, setClosing] = useState(false);
+
+  // Add Respondent modal state.
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [orgRespondents, setOrgRespondents] = useState<OrgRespondentRow[]>([]);
+  const [loadingOrgRespondents, setLoadingOrgRespondents] = useState(false);
+  const [selectedRespondentId, setSelectedRespondentId] = useState<string>("");
+  const [adding, setAdding] = useState(false);
+  const [newRespondentFirstName, setNewRespondentFirstName] = useState("");
+  const [newRespondentLastName, setNewRespondentLastName] = useState("");
+  const [newRespondentEmail, setNewRespondentEmail] = useState("");
+  const [creatingRespondent, setCreatingRespondent] = useState(false);
+
+  // Remove participant confirm dialog state.
+  const [removeTarget, setRemoveTarget] =
+    useState<CampaignRespondentRow | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const campaign = overview.campaign;
   const isDraft = campaign.status === "DRAFT";
@@ -281,6 +307,209 @@ export function CampaignDetail({
     }
   }
 
+  // Refetch the respondents list from the server. Used after add/remove
+  // mutations so the row + stats agree by construction.
+  const refreshRespondents = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/assessment-campaigns/${campaign.id}/respondents`,
+      );
+      const body = await res.json();
+      if (res.ok && body.success && body.data?.respondents) {
+        setRespondents(body.data.respondents as CampaignRespondentRow[]);
+      }
+    } catch {
+      // Non-fatal — leave previous list in place; toast on the action itself.
+    }
+  }, [campaign.id]);
+
+  const loadOrgRespondents = useCallback(async () => {
+    setLoadingOrgRespondents(true);
+    try {
+      const res = await fetch(
+        `/api/organizations/${campaign.organizationId}/respondents`,
+      );
+      const body = await res.json();
+      if (!res.ok || !body.success) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "Failed to load respondents",
+        );
+      }
+      setOrgRespondents((body.data ?? []) as OrgRespondentRow[]);
+    } catch (err) {
+      toast({
+        title: "Could not load respondents",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingOrgRespondents(false);
+    }
+  }, [campaign.organizationId, toast]);
+
+  // Lazy-load the org respondents on first open of the Add dialog.
+  useEffect(() => {
+    if (addDialogOpen && orgRespondents.length === 0 && !loadingOrgRespondents) {
+      void loadOrgRespondents();
+    }
+  }, [addDialogOpen, orgRespondents.length, loadingOrgRespondents, loadOrgRespondents]);
+
+  const participantRespondentIds = new Set(
+    respondents.map((r) => r.respondent.id),
+  );
+  const availableRespondents = orgRespondents.filter(
+    (r) => !participantRespondentIds.has(r.id),
+  );
+
+  function resetAddDialog() {
+    setAddDialogOpen(false);
+    setSelectedRespondentId("");
+    setNewRespondentFirstName("");
+    setNewRespondentLastName("");
+    setNewRespondentEmail("");
+  }
+
+  async function handleCreateAndAdd() {
+    const firstName = newRespondentFirstName.trim();
+    const lastName = newRespondentLastName.trim();
+    const email = newRespondentEmail.trim();
+    if (!firstName || !lastName || !email) {
+      toast({
+        title: "Missing fields",
+        description: "First name, last name, and email are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setCreatingRespondent(true);
+    try {
+      const createRes = await fetch(
+        `/api/organizations/${campaign.organizationId}/respondents`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ firstName, lastName, email }),
+        },
+      );
+      const createBody = await createRes.json();
+      if (!createRes.ok || !createBody.success) {
+        throw new Error(
+          typeof createBody.error === "string"
+            ? createBody.error
+            : "Failed to create respondent",
+        );
+      }
+      const created = createBody.data as OrgRespondentRow;
+      setOrgRespondents((prev) => [...prev, created]);
+      setSelectedRespondentId(created.id);
+      setNewRespondentFirstName("");
+      setNewRespondentLastName("");
+      setNewRespondentEmail("");
+      toast({
+        title: "Respondent created",
+        description: `${created.firstName} ${created.lastName} has been added to the organization.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Could not create respondent",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingRespondent(false);
+    }
+  }
+
+  async function handleConfirmAdd() {
+    if (!selectedRespondentId || adding) return;
+    setAdding(true);
+    try {
+      const res = await fetch(
+        `/api/assessment-campaigns/${campaign.id}/respondents`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orgRespondentId: selectedRespondentId }),
+        },
+      );
+      const body = await res.json();
+      if (!res.ok || !body.success) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : body.code === "ALREADY_PARTICIPANT"
+              ? "This respondent is already a participant."
+              : body.code === "WRONG_ORGANIZATION"
+                ? "This respondent belongs to a different organization."
+                : body.code === "CAMPAIGN_CLOSED"
+                  ? "Cannot add respondents to a closed campaign."
+                  : "Failed to add respondent",
+        );
+      }
+      toast({
+        title: "Respondent added",
+        description:
+          body.data?.invitation !== null
+            ? "Participant added and a pending invitation row was created. Use Resend to deliver the link."
+            : "Participant added to this draft campaign.",
+      });
+      resetAddDialog();
+      await refreshRespondents();
+      router.refresh();
+    } catch (err) {
+      toast({
+        title: "Could not add respondent",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleConfirmRemove() {
+    if (!removeTarget || removing) return;
+    setRemoving(true);
+    try {
+      const res = await fetch(
+        `/api/assessment-campaigns/${campaign.id}/participants/${removeTarget.participantId}`,
+        { method: "DELETE" },
+      );
+      if (res.status === 204) {
+        toast({
+          title: "Respondent removed",
+          description: `${removeTarget.respondent.firstName} ${removeTarget.respondent.lastName} no longer has access to this campaign.`,
+        });
+        setRemoveTarget(null);
+        await refreshRespondents();
+        router.refresh();
+        return;
+      }
+      const body = await res.json().catch(() => ({}));
+      throw new Error(
+        typeof body.error === "string"
+          ? body.error
+          : body.code === "ALREADY_SUBMITTED"
+            ? "This respondent has already submitted — their results are locked."
+            : "Failed to remove respondent",
+      );
+    } catch (err) {
+      toast({
+        title: "Could not remove respondent",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setRemoving(false);
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between gap-4">
@@ -408,15 +637,28 @@ export function CampaignDetail({
               Track invitation delivery and view individual results.
             </p>
           </div>
-          <a
-            href={`/api/assessment-campaigns/${campaign.id}/respondents/export.csv`}
-            download
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors"
-            data-testid="export-respondents-csv"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Export respondents (CSV)
-          </a>
+          <div className="inline-flex items-center gap-2">
+            {!isClosed && (
+              <button
+                type="button"
+                onClick={() => setAddDialogOpen(true)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                data-testid="add-respondent-btn"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Respondent
+              </button>
+            )}
+            <a
+              href={`/api/assessment-campaigns/${campaign.id}/respondents/export.csv`}
+              download
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors"
+              data-testid="export-respondents-csv"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export respondents (CSV)
+            </a>
+          </div>
         </div>
 
         {respondents.length === 0 ? (
@@ -462,6 +704,10 @@ export function CampaignDetail({
                 const resending =
                   row.invitation !== null &&
                   resendingInvitationId === row.invitation.id;
+                const canRemove =
+                  !isClosed &&
+                  !row.hasSubmission &&
+                  row.invitation?.status !== "SUBMITTED";
 
                 return (
                   <Fragment key={row.participantId}>
@@ -547,6 +793,17 @@ export function CampaignDetail({
                               Resend
                             </button>
                           )}
+                          {canRemove && (
+                            <button
+                              type="button"
+                              onClick={() => setRemoveTarget(row)}
+                              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-destructive hover:bg-destructive/10"
+                              data-testid={`remove-respondent-btn-${row.respondent.id}`}
+                              aria-label={`Remove ${row.respondent.firstName} ${row.respondent.lastName}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -567,6 +824,179 @@ export function CampaignDetail({
           </table>
         )}
       </div>
+
+      <Dialog
+        open={addDialogOpen}
+        onOpenChange={(open) => {
+          if (adding || creatingRespondent) return;
+          if (!open) resetAddDialog();
+          else setAddDialogOpen(open);
+        }}
+      >
+        <DialogContent
+          data-testid="add-respondent-dialog"
+          className="max-w-lg"
+        >
+          <DialogHeader>
+            <DialogTitle>Add a respondent to this campaign</DialogTitle>
+            <DialogDescription>
+              {isDraft
+                ? "Draft campaigns: the new respondent is queued and will receive an invitation when you launch."
+                : "Active campaigns: the new respondent gets a pending invitation row. Use Resend to deliver the email."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label
+                htmlFor="add-respondent-select"
+                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                Existing respondent
+              </label>
+              <select
+                id="add-respondent-select"
+                data-testid="add-respondent-select"
+                value={selectedRespondentId}
+                onChange={(e) => setSelectedRespondentId(e.target.value)}
+                disabled={loadingOrgRespondents || adding}
+                className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              >
+                <option value="">
+                  {loadingOrgRespondents
+                    ? "Loading..."
+                    : availableRespondents.length === 0
+                      ? "No respondents available — create one below"
+                      : "Select a respondent..."}
+                </option>
+                {availableRespondents.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.firstName} {r.lastName} — {r.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="border-t border-border pt-4 space-y-3">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Or create a new respondent
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  data-testid="new-respondent-firstName"
+                  type="text"
+                  placeholder="First name"
+                  value={newRespondentFirstName}
+                  onChange={(e) =>
+                    setNewRespondentFirstName(e.target.value)
+                  }
+                  disabled={creatingRespondent}
+                  className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                />
+                <input
+                  data-testid="new-respondent-lastName"
+                  type="text"
+                  placeholder="Last name"
+                  value={newRespondentLastName}
+                  onChange={(e) =>
+                    setNewRespondentLastName(e.target.value)
+                  }
+                  disabled={creatingRespondent}
+                  className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                />
+              </div>
+              <input
+                data-testid="new-respondent-email"
+                type="email"
+                placeholder="Email"
+                value={newRespondentEmail}
+                onChange={(e) => setNewRespondentEmail(e.target.value)}
+                disabled={creatingRespondent}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={handleCreateAndAdd}
+                disabled={
+                  creatingRespondent ||
+                  !newRespondentFirstName.trim() ||
+                  !newRespondentLastName.trim() ||
+                  !newRespondentEmail.trim()
+                }
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                data-testid="create-new-respondent-btn"
+              >
+                {creatingRespondent && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                )}
+                Create & select
+              </button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={resetAddDialog}
+              disabled={adding || creatingRespondent}
+              className="inline-flex items-center justify-center text-sm font-medium px-4 py-2 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              data-testid="add-respondent-cancel"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmAdd}
+              disabled={!selectedRespondentId || adding || creatingRespondent}
+              className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              data-testid="add-respondent-confirm"
+            >
+              {adding && <Loader2 className="w-4 h-4 animate-spin" />}
+              Add to campaign
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => {
+          if (removing) return;
+          if (!open) setRemoveTarget(null);
+        }}
+      >
+        <DialogContent data-testid="remove-respondent-dialog">
+          <DialogHeader>
+            <DialogTitle>Remove this respondent?</DialogTitle>
+            <DialogDescription>
+              {removeTarget
+                ? `${removeTarget.respondent.firstName} ${removeTarget.respondent.lastName} will lose access to the survey link. This is not reversible.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setRemoveTarget(null)}
+              disabled={removing}
+              className="inline-flex items-center justify-center text-sm font-medium px-4 py-2 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              data-testid="remove-respondent-cancel"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmRemove}
+              disabled={removing}
+              className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              data-testid="remove-respondent-confirm"
+            >
+              {removing && <Loader2 className="w-4 h-4 animate-spin" />}
+              Remove
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={closeDialogOpen}
