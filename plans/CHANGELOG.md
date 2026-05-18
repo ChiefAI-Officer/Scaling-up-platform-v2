@@ -6,6 +6,86 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Implementation arc Tasks A–F (service layer → coach portal → INVITED flow → admin aggregate → campaign detail): <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-implementation-tasks-a-f -->
+
+Full v1 INVITED loop now operational on prod. Coach creates an organization, runs the 5-step campaign wizard, activates a Rockefeller campaign, respondents get magic-link emails, fill the 40-question survey, submit, scoring runs server-side and stores a frozen `result` JSON, coach views completion + inline results on the campaign detail page, admin sees aggregate stats across all submissions.
+
+**Task A — Service-layer foundation** (commit `62c7af3`):
+- `lib/auth/coach-status.ts` — `CERTIFIED_STATUS = "ACTIVE"` canonical constant + `isCertified()` helper
+- `lib/auth/access-policy-version.ts` — runtime `ACCESS_POLICY_VERSION` env reader (intersection | union | shadow-union)
+- `lib/assessments/errors.ts` — typed error classes with `code` discriminators (no HTTP coupling)
+- `lib/assessments/access-control.ts` — `canAccessTemplate` (INTERSECTION), `canAccessOrganization`, `canCreateCampaign`, `canManageCampaign`
+- `lib/assessments/evaluate-access-change.ts` — pre-save guard with `pg_advisory_xact_lock` + SELECT FOR UPDATE + BLOCKED_ZERO_ACCESS path
+- `lib/assessments/transfer-ownership.ts` — admin org transfer with cascading campaign updates + `OrganizationOwnershipEvent` audit
+- 72 new tests (5 suites)
+
+**Task B — Organization + Team + Respondent CRUD APIs** (commit `c80540c`):
+- 13 endpoints under `/api/organizations/...` (orgs + nested teams + nested respondents).
+- `POST /organizations` resolves coach from actor.coachId, sets `ownerCoachId` self. Admin/staff list all; coach lists owned only.
+- Composite dedupe for OrgRespondent via `(organizationId, dedupeSource, dedupeValue)`; P2002 → 409 with existing id.
+- Team tree-shape listing; cycle detection on PATCH parentTeamId; refuse DELETE on parents of non-deleted children.
+- `canAccessOrganization` returns 404 (not 403) on auth-fail to prevent ID enumeration.
+- 52 new tests (3 suites)
+
+**Hotfix #1** (commit `6b63783`): Prisma `Sql` arg vs tagged-template — Task A's `tx.$executeRaw(Prisma.sql\`…\`)` failed Vercel's strict Turbopack TS. Switched 5 call sites to tagged-template `tx.$executeRaw\`…\``. Test mocks hid the type error; only `next build` caught it.
+
+**Task C — Coach portal + 5-step campaign wizard** (commit `1d7e452`):
+- Added `Assessments` entry to coach portal sidebar (between My Workshops + Registrations).
+- `/portal/assessments` landing page — empty-state CTA + table of this coach's campaigns.
+- `/portal/assessments/new` — 5-step wizard (Organization → Template → Participants → Schedule → Review). Steps 0 and 2 have inline `+ New …` forms so the coach can seed org + respondents without leaving the wizard.
+- Backend: 5 new routes (`POST/GET /api/assessment-campaigns`, `GET/PATCH /api/assessment-campaigns/[id]`, `POST/DELETE /api/assessment-campaigns/[id]/participants`, `POST /api/assessment-campaigns/[id]/activate`, `GET /api/assessment-templates` INTERSECTION-filtered).
+- Step 1 template list is server-side filtered via `canAccessTemplate` — never exposes unfiltered list to client.
+- CEO uniqueness enforced via Zod (refuses 2+ in payload) + service-layer swap in same tx when re-assigning.
+- 44 new tests (5 suites)
+
+**Task D — INVITED participant magic-link flow** (commit `0820234` + hotfix `58fd1ec`):
+- Iron-session cookie auth, path-scoped to `/org-survey/${campaignAlias}`, ttl 1800s. `ASSESSMENT_SESSION_SECRET` provisioned in Vercel prod env.
+- Token helpers: random 32B base64url; sha256 stored to DB; `crypto.timingSafeEqual` compare; token in URL fragment (`#t=…`), client clears via `history.replaceState`.
+- `POST /api/assessment-campaigns/[id]/invite` — idempotent batch (cap 25); sends via existing SMTP transport; PENDING→SENT on 2xx.
+- `POST /api/assessment-campaigns/[id]/invitations/[iid]/resend` — same token (no rotation), increment resentCount.
+- 4 public routes under `/org-survey/[campaignAlias]/`: page.tsx (client) + exchange/me/submit/thank-you.
+- Lifecycle gate on every cookie-bearing route (re-fetch invitation + campaign each call; 410 on revokedAt, expired, SUBMITTED, status≠ACTIVE, time-window miss).
+- Strict v6.6 answer validation; `SELECT FOR UPDATE` on submit; 409 on double-submit; calls `scoreSubmission()` and stores frozen `result`.
+- Middleware allowlist updated at BOTH insertion points (authorized callback + body allowlist).
+- `Cache-Control: no-store` + `Referrer-Policy: no-referrer` on the survey page; no-store on the 3 JSON responses.
+- 37 new tests (5 suites)
+- Hotfix: `org-survey-client.tsx` was untracked in the initial commit; `next build --webpack` lazy-resolved it locally, Turbopack on Vercel failed fast.
+
+**Task E — Admin aggregate dashboard** (commit `bd713f2`):
+- New `Aggregate Report` nav entry in admin sidebar (between Surveys + Files).
+- `/admin/assessments/aggregate` page — template + version selectors only (MVP scope per locked decision 8; time-range / group / per-org filters deferred to v1.5).
+- Yellow info banner: "Admin bypasses CEO_ONLY anonymity in aggregate" (operator-mode bypass).
+- 4 stat cards + tier histogram (semantic-token colored bars) + per-section means table + SVG sparkline of submissions over time + empty state.
+- Reads `submission.result` (frozen at submit) — no recomputation.
+- 3 admin-only API endpoints (`/api/admin/assessments/aggregate`, `/api/admin/assessment-templates`, `/api/admin/assessment-templates/[id]/versions`).
+- Service helper `lib/assessments/aggregate-report.ts` does in-memory aggregation (fine for v1 scale).
+- 17 new tests (4 suites)
+
+**Task F — Coach campaign detail page** (commit `88c6d91`):
+- Replaced placeholder `/portal/assessments/[id]` with the real daily-ops surface.
+- Overview card (campaign name + status pill + template + org + schedule + stats: totalParticipants / invited / viewed / submitted / completionPct).
+- Respondents table — per-row participant + invitation status pill + sent/submitted timestamps + CEO badge + actions.
+- "View results" action lazy-loads `submission.result` from a new GET endpoint and inline-expands `<AssessmentResultView>` panel (tier banner + per-section table + per-question collapsible detail).
+- "Resend invite" action wires existing resend route (only enabled for PENDING/SENT/VIEWED, not revoked; double-click protected; optimistic resentCount bump).
+- Service helper `lib/assessments/campaign-detail.ts` — pure aggregation against a narrow Db interface (testable, no DB). Revoked invitations excluded from "invited" stat but still surfaced in the row for future revoke-affordance.
+- 2 new admin-only API routes (`/api/assessment-campaigns/[id]/respondents`, `/api/.../respondents/[rid]/result`) — 404 (not 403) on auth-fail to prevent campaign-ID enumeration.
+- 31 new tests (4 suites)
+
+**Tests**: 1568 passing across 184 suites (up from 1310 on the foundation-slice commit). 213 new tests added over Tasks A–F. Zero regressions.
+
+**Discipline lesson banked**: pre-push gate is now `CI=true npx next build --turbopack` (matches Vercel's pipeline). Plain `next build` can lazy-resolve missing modules via webpack and pass locally while Turbopack on Vercel fails fast. Memory entry: `feedback_turbopack_build_gate.md`.
+
+**Deferred to v1.5** (per spec):
+- Results-emailed-back to respondent (`sendAssessmentResultsEmail`) — gated on Jeff's `INVITED_RESULTS_EMAIL_COPY_APPROVED` content-flag sign-off
+- Inngest async send (v1 uses sync SMTP)
+- Admin AccessGroup management UI (Wave 5 wireframes 21 + 22)
+- PUBLIC participant flow (`/quiz/[alias]` — Website Assessment + SunHub)
+- Conditional report sections + peer benchmarks (Scaling Up Assessment)
+- Wave 3 wireframes (output/report screens) — Jeff's stated next design priority
+- Trends / longitudinal page
+
+---
+
 ### 2026-05-18 — Assessment Tool v7.6 — Foundation slice + spec library + prod DB rebuild: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-foundation-spec-library -->
 
 Assessment Tool v1 foundation (Issue #10) shipped end-to-end across two sessions (May 14 Tasks 0-4 + May 17/18 Tasks 5-9), reviewed across 6 rounds of Codex adversarial review.
