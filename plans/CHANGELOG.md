@@ -6,6 +6,52 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Ops fix: enable transactional email overrides in production (registration confirmation): <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:registration-email-overrides-enabled -->
+
+**Symptom.** Jeff reported on a 9-min Zoom that the custom registration-confirmation email he authored at `/admin/transactional-emails/REGISTRATION_CONFIRMATION` was not being delivered — registrants received an older hardcoded version with different copy and styling. He also asked how to attach the `.ics` file and how to merge in the workshop's Zoom link.
+
+**Root cause.** `composeRegistrationConfirmationEmail` ([src/src/lib/notifications/transactional-email-template.ts](../src/src/lib/notifications/transactional-email-template.ts)) opens with a Round-3 hardening kill switch:
+
+```ts
+function isOverrideEnabled() {
+  return process.env.TRANSACTIONAL_EMAIL_OVERRIDES_ENABLED === "true";
+}
+// ...
+if (!isOverrideEnabled()) {
+  return hardcodedDefaults(ctx);
+}
+```
+
+The env var was never set in Vercel production (confirmed via `vercel env ls production`), so every registration-confirmation send — paid and free — short-circuited to `hardcodedDefaults()` and the DB-stored admin template was never read. Jeff's edits were saved correctly to the `TransactionalEmailTemplate` row (verified: `subject = "You're Registered: {{workshopTitle}}"`, body 1523 chars, `updatedAt 2026-05-18T20:28:45Z`) — the read path just never reached them.
+
+**Fix.** Env-var-only change, no code:
+
+```bash
+echo "true" | npx vercel env add TRANSACTIONAL_EMAIL_OVERRIDES_ENABLED production
+npx vercel --prod --yes
+```
+
+Production deploy `pyghzkw2z` (56s build) → ● Ready. From this deploy onward, every registration confirmation reads the DB row, interpolates the supported tokens, and HTML-escapes registrant-controlled values (M3 security invariant from the original kill-switch implementation is preserved).
+
+**Verified.**
+- `vercel env ls production` shows `TRANSACTIONAL_EMAIL_OVERRIDES_ENABLED` (Encrypted, Production scope).
+- Latest two production deploys both ● Ready, post-dating the env-add timestamp.
+- DB row for `emailType = "REGISTRATION_CONFIRMATION"` exists and is populated.
+
+**Supported tokens on this template** (interpolator at [src/src/lib/notifications/transactional-email-template.ts:131-138](../src/src/lib/notifications/transactional-email-template.ts#L131-L138)): `{{workshopTitle}}`, `{{coachName}}`, `{{registrantName}}`, `{{registrantEmail}}`, `{{format}}`, `{{virtualLink}}`, `{{venueName}}`, `{{venueAddress}}`. All HTML-escaped.
+
+**ICS attachment.** Already wired and not gated by this flag. The free-registration Inngest handler ([src/src/inngest/functions/handle-registration-created-free.ts:83-97](../src/src/inngest/functions/handle-registration-created-free.ts#L83-L97)) generates the `.ics` and passes it to `sendPaidRegistrationNotificationStrict` as an attachment — independent of the template body. So Jeff's custom body now goes out **with** the calendar file attached. The paid path follows the same code path post-payment.
+
+**Open follow-ons for Jeff** (template content, not code):
+- Add `{{virtualLink}}` to the body where the Zoom paragraph should land. Auto-populates from `Workshop.virtualLink` for virtual workshops; resolves to empty string for in-person.
+- Conditional rendering ("only show this paragraph if virtual") is **not** supported by the current interpolator — it does simple `{{token}}` substitution only. If product wants a "join online" block to disappear for in-person workshops, that's a separate scope: either (a) extend the interpolator with `{{#if format=VIRTUAL}}...{{/if}}` syntax, or (b) maintain two templates and route by `workshop.format` at send-time.
+
+**Why this slipped through.** The kill switch was added in Round 3 H1 hardening with the intent to gate the admin override behind a deliberate prod flip. The flag was tested ([src/src/__tests__/lib/transactional-email-template.test.ts:94](../src/src/__tests__/lib/transactional-email-template.test.ts#L94)) but the prod-side flip was never queued as an explicit follow-on, so it stayed off indefinitely. No runbook entry pointed to it either, so when Jeff edited the template at the admin URL the system gave no feedback that the edits weren't going live.
+
+**No commit** — env-var change in Vercel only.
+
+---
+
 ### 2026-05-18 — Assessment Tool v7.6 — Task O UI follow-on — wizard email customization panel: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-o-ui -->
 
 Backend for per-campaign invitation email overrides shipped earlier today. Task O UI follow-on wires the inputs into the campaign-create wizard's Review step so non-developer coaches can actually use the feature without hitting PATCH manually.
