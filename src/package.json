@@ -89,6 +89,7 @@
     "@types/nodemailer": "^7.0.9",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.3",
     "eslint-config-next": "^16.1.6",
     "jest": "^30.2.0",

@@ -144,7 +144,7 @@
 </head>
 <body>
   <div class="wf-banner">
-    <span><strong>WIREFRAME</strong> — Not functional. v7.5 spec reference: Phase 2 Waves 1 + 2 (Codex co-validated May 12 2026).</span>
+    <span><strong>WIREFRAME</strong> — Not functional. v7.6 spec reference: Phase 2 Waves 1 + 2 (Codex co-validated May 12 2026; Wave 2 admin lane revised May 15 2026 per Jeff impromptu meeting — per-org Memberships wireframe removed, User detail + Template Access revised).</span>
     <a href="../wireframes/index.html">← Phase 1 wireframes</a>
   </div>
 
@@ -157,9 +157,9 @@
         </div>
       </div>
       <div class="hero-meta">
-        <span><strong>Plan version:</strong> v7.5 (Codex-co-validated, May 12 2026)</span>
+        <span><strong>Plan version:</strong> v7.6 (locked May 15 2026; Codex co-validated May 12)</span>
         <span><strong>Wave 1:</strong> 10 screens (shipped May 12)</span>
-        <span><strong>Wave 2:</strong> 9 admin-lane screens (shipped May 13)</span>
+        <span><strong>Wave 2:</strong> 8 admin-lane screens (shipped May 13; revised May 15 — Memberships removed)</span>
         <span><strong>Stakeholder:</strong> Jeff Verdun</span>
       </div>
     </div>
@@ -270,7 +270,7 @@
 
     </div>
 
-    <div class="section-title">Wave 2 — Admin lane (shipped May 13 2026, Codex co-validated)</div>
+    <div class="section-title">Wave 2 — Admin lane (shipped May 13 2026, Codex co-validated; v7.6 revisions May 15 2026)</div>
     <div class="grid">
 
       <a class="wf-link" href="admin/11-admin-users-list.html">
@@ -285,17 +285,8 @@
       <a class="wf-link" href="admin/12-admin-user-detail.html">
         <div class="wf-link-num">W2<br>T2</div>
         <div class="wf-link-body">
-          <div class="wf-link-title">Admin — User detail (+ memberships + template access)</div>
-          <div class="wf-link-desc">Per-user view: read-only details, action buttons (password reset / disable / revoke sessions), 3 org memberships table (accept/pending state), 4 INVITED + 1 PUBLIC (disabled) template access chips reflecting v7.5 TemplateAccessGrant.</div>
-        </div>
-        <div class="wf-link-cta">View →</div>
-      </a>
-
-      <a class="wf-link" href="admin/13-admin-memberships.html">
-        <div class="wf-link-num">W2<br>T3</div>
-        <div class="wf-link-body">
-          <div class="wf-link-title">Admin — Memberships (per-org grant)</div>
-          <div class="wf-link-desc">Inverse lens of Task 2 — view memberships from the Acme Corporation side. 4 stat cards + 5 mock memberships (incl. one disabled-user row at opacity 0.55). Modal preview for "+ Grant Membership" rendered statically as a card-within-card so Jeff can comment on the modal copy/layout without click-through.</div>
+          <div class="wf-link-title">Admin — User detail (+ owned organizations + template access)</div>
+          <div class="wf-link-desc"><strong>v7.6 revised (May 15 2026):</strong> Per-user view with read-only details, action buttons (password reset / disable / revoke sessions), <strong>Owned Organizations</strong> read-only list (replaces the v7.5 Memberships card — coaches now own their organizations directly), and 4 INVITED + 1 PUBLIC (disabled) template access chips reflecting v7.5 TemplateAccessGrant.</div>
         </div>
         <div class="wf-link-cta">View →</div>
       </a>
@@ -312,8 +303,8 @@
       <a class="wf-link" href="admin/15-admin-template-access.html">
         <div class="wf-link-num">W2<br>T5</div>
         <div class="wf-link-body">
-          <div class="wf-link-title">Admin — Template Access Management (per-coach grants)</div>
-          <div class="wf-link-desc">Coach × Template matrix. 6 coaches × 4 INVITED templates. Cell states: Granted / Auto / Revoked / Pending. PUBLIC templates excluded from columns (SunHub + Website Assessment are platform-managed). v7.5 API surface card shows the 3 endpoints driving the TemplateAccessGrant model.</div>
+          <div class="wf-link-title">Admin — Access Groups index</div>
+          <div class="wf-link-desc"><strong>v7.6 redesigned (May 15 2026):</strong> Pivoted from per-coach template grants matrix to <strong>Access Groups index</strong>. List of 4 groups with name / coach count / template count / updated / Manage chevron (incl. one Archived row). INTERSECTION semantics: a coach in multiple groups sees only templates ALL their groups grant. Controlled by ACCESS_POLICY_VERSION runtime flag (current: v1.intersection).</div>
         </div>
         <div class="wf-link-cta">View →</div>
       </a>
@@ -356,8 +347,49 @@
 
     </div>
 
+    <div class="section-title">Wave 5 — Admin lane (4 new screens, shipped May 17 2026; paired markdown specs at <code style="font-family: ui-monospace, Menlo, monospace; font-size: 0.6875rem; background: hsl(var(--muted)); padding: 0.05rem 0.3rem; border-radius: 3px;">docs/wireframes-phase2/wave5/</code>)</div>
+    <div class="grid">
+
+      <a class="wf-link" href="admin/21-admin-access-groups-list.html">
+        <div class="wf-link-num">W5<br>T21</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — Access Groups list</div>
+          <div class="wf-link-desc"><strong>v7.6 Wave 5:</strong> List of 4 mock groups (3 active + 1 archived) with Name / Description / Coach count / Template count / Updated / Manage chevron. + New Access Group button (admin-only). Yellow INTERSECTION semantics banner cites <code>ACCESS_POLICY_VERSION</code> runtime flag. Show-archived toggle. Service-layer card lists <code>canAccessTemplate</code>, <code>evaluateAccessChange</code>, archive/undelete/hard-delete lifecycle mutations.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/22-admin-access-group-detail.html">
+        <div class="wf-link-num">W5<br>T22</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — Access Group detail (with evaluateAccessChange preview)</div>
+          <div class="wf-link-desc"><strong>v7.6 Wave 5:</strong> Detail view for "Scaling Up Coaches" group. Metadata card, coaches table (4 of 12 rows incl. "Bulk add certified coaches" affordance per bootstrap policy), templates table (4 templates incl. Scaling Up Assessment 👑). <strong>evaluateAccessChange preview panel rendered STATIC</strong> so reviewers see the before/after per-coach delta + zero-access guard + force-toggle structure without click interaction.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/23-admin-aggregate-report.html">
+        <div class="wf-link-num">W5<br>T23</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Admin — Aggregate Report (per-template dashboard, v1 MVP)</div>
+          <div class="wf-link-desc"><strong>v7.6 Wave 5 (Decision 5 + Decision 8):</strong> Per-template, per-version aggregate stats across ALL submissions / ALL orgs / ALL time. <strong>TWO selectors only</strong> — Template + Version (defaults to latest published, badged CURRENT). NO time-range chip, NO group filter, NO per-org table. 5 stat cards + tier histogram (12/45/87) + per-section means (Rockefeller S1–S10) + non-interactive sparkline. "Not in v1 MVP" callout enumerates v1.5 deferrals.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+      <a class="wf-link" href="admin/24-platform-nav-assessments-entry.html">
+        <div class="wf-link-num">W5<br>T24</div>
+        <div class="wf-link-body">
+          <div class="wf-link-title">Platform Nav — Assessments entry (chrome only)</div>
+          <div class="wf-link-desc"><strong>v7.6 Wave 5:</strong> Chrome-only integration sketch per Jeff's May 15 standing call ("appear on the assessments nav bar inside the scaling app platform... moves to the sidebar"). Split BEFORE/AFTER view: workshop-platform default state (no sidebar, top nav only) vs assessments lane (sidebar revealed with Assessments-specific nav). 14-item top nav with new Assessments entry; existing 13 items preserved.</div>
+        </div>
+        <div class="wf-link-cta">View →</div>
+      </a>
+
+    </div>
+
     <p class="wf-text-xs wf-text-muted" style="margin-top: 2rem; text-align: center;">
-      Waves 1 + 2 complete (19 wireframes). Wave 3 (output / report wireframes, ~6 screens) deferred until Jeff's Wave 2 feedback lands. See <a href="README.md" style="color: hsl(var(--primary));">README</a> for the full task list + status.
+      Waves 1 + 2 + 5 complete (22 wireframes; Wave 5 added 4 admin screens with paired markdown specs on May 17 2026 ahead of the May 22 EOW target). Wave 3 (output / report wireframes) still unblocked as of May 15 2026; sequencing TBD. See <a href="README.md" style="color: hsl(var(--primary));">README</a> for the full task list + status.
     </p>
   </main>
 </body>

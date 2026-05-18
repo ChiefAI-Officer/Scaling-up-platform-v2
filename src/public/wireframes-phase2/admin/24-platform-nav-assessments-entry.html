@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>24 — Platform Nav: Assessments entry (Phase 2, Wave 5, v7.6)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem; font-weight: 700;
+      letter-spacing: -0.01em; margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem; color: hsl(var(--muted-foreground)); margin: 0;
+    }
+
+    .wf-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 2rem 2rem;
+    }
+
+    /* Blue info banner */
+    .wf-info-banner {
+      background: hsl(38 92% 95%);
+      border: 1px solid hsl(38 92% 80%);
+      color: hsl(26 83% 25%);
+      border-radius: var(--radius);
+      padding: 0.875rem 1rem 0.875rem 2.5rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.8125rem;
+      line-height: 1.55;
+      position: relative;
+    }
+    .wf-info-banner::before {
+      content: "\26A0";
+      position: absolute;
+      left: 0.875rem; top: 0.75rem;
+      color: hsl(26 83% 35%);
+      font-size: 1.125rem; font-weight: 700;
+    }
+    .wf-info-banner strong { color: hsl(26 83% 18%); font-weight: 700; }
+    .wf-info-banner code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(38 92% 88%);
+      padding: 0.05rem 0.35rem;
+      border-radius: 3px;
+      color: hsl(26 83% 22%);
+    }
+
+    /* Split view container */
+    .wf-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .wf-split-pane {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-split-pane-label {
+      background: hsl(var(--muted));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.625rem 1rem;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .wf-split-pane-label .arrow {
+      color: hsl(var(--primary));
+      font-weight: 700;
+    }
+
+    /* Top nav (mirrors the dashboard layout — 14 items with Assessments highlighted) */
+    .wf-platform-nav {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.5rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .wf-platform-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.375rem 0.625rem;
+      font-weight: 700;
+      font-size: 0.875rem;
+      color: hsl(var(--foreground));
+      flex-shrink: 0;
+    }
+    .wf-platform-brand-mark {
+      width: 22px; height: 22px;
+      background: hsl(var(--primary));
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 800; font-size: 0.75rem;
+    }
+    .wf-nav-divider {
+      width: 1px;
+      height: 22px;
+      background: hsl(var(--border));
+      margin: 0 0.25rem;
+      flex-shrink: 0;
+    }
+    .wf-nav-item {
+      padding: 0.375rem 0.625rem;
+      border-radius: 5px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: hsl(var(--muted-foreground));
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .wf-nav-item:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+    .wf-nav-item.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-nav-item.is-new {
+      background: hsl(38 92% 92%);
+      color: hsl(26 83% 25%);
+      border: 1px dashed hsl(38 92% 60%);
+      font-weight: 600;
+    }
+    .wf-nav-item.is-new::before { content: "+ "; font-weight: 700; }
+    .wf-nav-spacer { flex: 1; }
+    .wf-nav-user {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      flex-shrink: 0;
+    }
+    .wf-nav-user .avatar {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: hsl(var(--primary)); color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 0.625rem;
+    }
+
+    /* Body of each pane — sidebar + main illustration */
+    .wf-pane-body {
+      display: flex;
+      flex: 1;
+      min-height: 340px;
+    }
+    .wf-pane-sidebar {
+      width: 200px;
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      padding: 0.75rem 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.125rem;
+      flex-shrink: 0;
+    }
+    .wf-pane-sidebar-title {
+      padding: 0.5rem 0.625rem 0.5rem;
+      font-size: 0.625rem; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-pane-sidebar-item {
+      padding: 0.375rem 0.625rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: hsl(var(--sidebar-muted));
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-pane-sidebar-item .dot {
+      width: 4px; height: 4px; border-radius: 50%;
+      background: currentColor; opacity: 0.6;
+    }
+    .wf-pane-sidebar-item.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-pane-sidebar-item.is-new {
+      background: hsl(38 92% 92% / 0.15);
+      color: hsl(38 92% 80%);
+      font-weight: 600;
+      border: 1px dashed hsl(38 92% 60% / 0.5);
+    }
+
+    .wf-pane-main {
+      flex: 1;
+      padding: 1.25rem 1.5rem;
+      background: hsl(var(--background));
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .wf-pane-main-title {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+      margin: 0 0 0.125rem;
+    }
+    .wf-pane-main-desc {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.5;
+      margin: 0 0 0.625rem;
+    }
+    .wf-pane-skeleton {
+      background: hsl(var(--muted));
+      border-radius: 4px;
+      height: 8px;
+    }
+    .wf-pane-skeleton.w50 { width: 50%; }
+    .wf-pane-skeleton.w70 { width: 70%; }
+    .wf-pane-skeleton.w90 { width: 90%; }
+
+    .wf-pane-card-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .wf-pane-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 4px;
+      padding: 0.5rem 0.625rem;
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .wf-pane-card-label {
+      font-size: 0.5625rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-pane-card-num {
+      font-size: 1.125rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: hsl(var(--foreground));
+    }
+
+    .wf-arrow-row {
+      text-align: center;
+      margin: 0.5rem 0 1.5rem;
+      color: hsl(var(--muted-foreground));
+      font-size: 0.875rem;
+      font-style: italic;
+    }
+    .wf-arrow-row .arrow {
+      font-size: 1.5rem;
+      color: hsl(var(--primary));
+      font-weight: 700;
+      letter-spacing: 0.5rem;
+    }
+
+    /* Accept criteria + implementation notes card */
+    .wf-card-deferred {
+      margin-top: 0.5rem;
+      padding: 1.25rem 1.5rem;
+      background: hsl(var(--card));
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+    }
+    .wf-card-deferred h3 {
+      font-size: 0.9375rem; font-weight: 700;
+      color: hsl(var(--foreground)); letter-spacing: -0.01em;
+      margin: 0 0 0.5rem;
+    }
+    .wf-card-deferred ul {
+      list-style: none; padding: 0; margin: 0;
+      display: flex; flex-direction: column; gap: 0.625rem;
+    }
+    .wf-card-deferred li {
+      font-size: 0.8125rem; color: hsl(var(--foreground));
+      line-height: 1.55; padding-left: 1rem; position: relative;
+    }
+    .wf-card-deferred li::before {
+      content: "\2192";
+      position: absolute; left: 0;
+      color: hsl(var(--primary)); font-weight: 700;
+    }
+    .wf-card-deferred code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(var(--muted));
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      color: hsl(var(--foreground));
+    }
+
+    .wf-end-note {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: hsl(var(--muted) / 0.5);
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem; line-height: 1.55;
+    }
+    .wf-end-note code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(var(--card));
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      border: 1px solid hsl(var(--border));
+      color: hsl(var(--foreground));
+    }
+  </style>
+</head>
+<body>
+  <!-- Yellow wireframe banner -->
+  <div class="wf-banner">
+    <div>
+      <strong>WIREFRAME &mdash; 24 Platform Nav: Assessments entry</strong> (Wave 5).
+      v7.6 spec ref: <code>docs/specs/v7.6/05-wireframes-wave5.md</code>.
+      Locked May 15&ndash;17 2026. <strong>Chrome only</strong> &mdash; no mock data beyond nav labels.
+    </div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <div class="page-head">
+    <h1>24 &mdash; Platform Nav: Assessments entry</h1>
+    <p>Shows how the Assessment Tool integrates with the existing Scaling Up Platform v2 top nav + sidebar transition.</p>
+  </div>
+
+  <div class="wf-container">
+
+    <!-- Info banner -->
+    <div class="wf-info-banner">
+      <strong>Per Jeff's May 15 standing call:</strong>
+      <em>&ldquo;appear on the assessments nav bar inside the scaling app platform&hellip; moves to the sidebar.&rdquo;</em>
+      This is a NAVIGATION integration wireframe &mdash; actual implementation lands in
+      <code>src/src/app/(dashboard)/layout.tsx</code> and <code>src/src/components/nav/</code>.
+    </div>
+
+    <!-- Split view: BEFORE / AFTER (default workshop platform vs assessments lane) -->
+    <div class="wf-split">
+
+      <!-- LEFT pane: Workshop platform default -->
+      <div class="wf-split-pane">
+        <div class="wf-split-pane-label">
+          <span>Default state &mdash; workshop platform</span>
+          <span class="arrow" aria-hidden="true">&larr; existing</span>
+        </div>
+
+        <!-- Top nav with 14 items, Workshops active -->
+        <nav class="wf-platform-nav" aria-label="Workshop platform top nav (default state)">
+          <div class="wf-platform-brand">
+            <span class="wf-platform-brand-mark">S</span>
+            Scaling Up
+          </div>
+          <span class="wf-nav-divider"></span>
+          <a class="wf-nav-item" href="#">Dashboard</a>
+          <a class="wf-nav-item is-active" href="#">All Workshops</a>
+          <a class="wf-nav-item" href="#">Bio</a>
+          <a class="wf-nav-item" href="#">Templates</a>
+          <a class="wf-nav-item" href="#">Workflows</a>
+          <a class="wf-nav-item" href="#">Surveys</a>
+          <a class="wf-nav-item is-new" href="#">Assessments</a>
+          <a class="wf-nav-item" href="#">Files</a>
+          <a class="wf-nav-item" href="#">Partners</a>
+          <a class="wf-nav-item" href="#">Coaches</a>
+          <a class="wf-nav-item" href="#">Approvals</a>
+          <a class="wf-nav-item" href="#">Categories</a>
+          <a class="wf-nav-item" href="#">Pricing</a>
+          <a class="wf-nav-item" href="#">Financials</a>
+        </nav>
+
+        <!-- Body: NO sidebar; main area is the workshops list -->
+        <div class="wf-pane-body">
+          <div class="wf-pane-main" style="flex: 1;">
+            <p class="wf-pane-main-title">All Workshops</p>
+            <p class="wf-pane-main-desc">
+              Existing dashboard route. Top nav is the only chrome &mdash; no left sidebar in the workshop lane.
+            </p>
+            <div class="wf-pane-card-row">
+              <div class="wf-pane-card">
+                <span class="wf-pane-card-label">Active</span>
+                <span class="wf-pane-card-num">23</span>
+              </div>
+              <div class="wf-pane-card">
+                <span class="wf-pane-card-label">Pending</span>
+                <span class="wf-pane-card-num">4</span>
+              </div>
+              <div class="wf-pane-card">
+                <span class="wf-pane-card-label">Revenue MTD</span>
+                <span class="wf-pane-card-num">$48k</span>
+              </div>
+            </div>
+            <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.375rem;">
+              <div class="wf-pane-skeleton w90"></div>
+              <div class="wf-pane-skeleton w70"></div>
+              <div class="wf-pane-skeleton w50"></div>
+              <div class="wf-pane-skeleton w70"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT pane: After clicking Assessments -->
+      <div class="wf-split-pane">
+        <div class="wf-split-pane-label">
+          <span>After clicking Assessments &mdash; assessments lane</span>
+          <span class="arrow" aria-hidden="true">new &rarr;</span>
+        </div>
+
+        <!-- Top nav same items, Assessments now active -->
+        <nav class="wf-platform-nav" aria-label="Workshop platform top nav (assessments active)">
+          <div class="wf-platform-brand">
+            <span class="wf-platform-brand-mark">S</span>
+            Scaling Up
+          </div>
+          <span class="wf-nav-divider"></span>
+          <a class="wf-nav-item" href="#">Dashboard</a>
+          <a class="wf-nav-item" href="#">All Workshops</a>
+          <a class="wf-nav-item" href="#">Bio</a>
+          <a class="wf-nav-item" href="#">Templates</a>
+          <a class="wf-nav-item" href="#">Workflows</a>
+          <a class="wf-nav-item" href="#">Surveys</a>
+          <a class="wf-nav-item is-active" href="#">Assessments</a>
+          <a class="wf-nav-item" href="#">Files</a>
+          <a class="wf-nav-item" href="#">Partners</a>
+          <a class="wf-nav-item" href="#">Coaches</a>
+          <a class="wf-nav-item" href="#">Approvals</a>
+          <a class="wf-nav-item" href="#">Categories</a>
+          <a class="wf-nav-item" href="#">Pricing</a>
+          <a class="wf-nav-item" href="#">Financials</a>
+        </nav>
+
+        <!-- Body: sidebar appears + main area -->
+        <div class="wf-pane-body">
+          <aside class="wf-pane-sidebar" aria-label="Assessments lane sidebar">
+            <div class="wf-pane-sidebar-title">Assessments</div>
+            <div class="wf-pane-sidebar-item is-active"><span class="dot"></span>Dashboard</div>
+            <div class="wf-pane-sidebar-item"><span class="dot"></span>Organizations</div>
+            <div class="wf-pane-sidebar-item"><span class="dot"></span>Access Groups</div>
+            <div class="wf-pane-sidebar-item"><span class="dot"></span>Templates</div>
+            <div class="wf-pane-sidebar-item"><span class="dot"></span>Campaigns</div>
+            <div class="wf-pane-sidebar-item"><span class="dot"></span>Public Quizzes</div>
+            <div class="wf-pane-sidebar-item"><span class="dot"></span>Aggregate Report</div>
+            <div class="wf-pane-sidebar-title" style="margin-top: 0.5rem;">Coach lane</div>
+            <div class="wf-pane-sidebar-item"><span class="dot"></span>My Campaigns</div>
+            <div class="wf-pane-sidebar-item"><span class="dot"></span>My Organizations</div>
+          </aside>
+          <div class="wf-pane-main">
+            <p class="wf-pane-main-title">Assessments Dashboard</p>
+            <p class="wf-pane-main-desc">
+              Assessment lane has its own sidebar; existing top nav remains visible so the user can jump back to
+              Workshops / Bio / etc. at any time.
+            </p>
+            <div class="wf-pane-card-row">
+              <div class="wf-pane-card">
+                <span class="wf-pane-card-label">Active campaigns</span>
+                <span class="wf-pane-card-num">7</span>
+              </div>
+              <div class="wf-pane-card">
+                <span class="wf-pane-card-label">Templates</span>
+                <span class="wf-pane-card-num">5</span>
+              </div>
+              <div class="wf-pane-card">
+                <span class="wf-pane-card-label">Submissions MTD</span>
+                <span class="wf-pane-card-num">144</span>
+              </div>
+            </div>
+            <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.375rem;">
+              <div class="wf-pane-skeleton w90"></div>
+              <div class="wf-pane-skeleton w70"></div>
+              <div class="wf-pane-skeleton w50"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Transition arrow note -->
+    <div class="wf-arrow-row">
+      <div class="arrow" aria-hidden="true">&larr; click &ldquo;Assessments&rdquo; in top nav &rarr;</div>
+      <div>Top nav stays put. The platform pivots from no-sidebar (workshops lane) to sidebar-revealed (assessments lane).</div>
+    </div>
+
+    <!-- Acceptance + implementation card -->
+    <section class="wf-card-deferred">
+      <h3>Acceptance + implementation</h3>
+      <ul>
+        <li>
+          Top nav gains ONE new entry &mdash; <code>Assessments</code> &mdash; positioned between <code>Surveys</code>
+          and <code>Files</code> (suggested) for visual proximity to the existing form-tooling cluster. Mobile-responsive
+          via the existing <code>overflow-x-auto</code> pattern on <code>(dashboard)/layout.tsx</code>.
+        </li>
+        <li>
+          Existing 13 nav items remain unchanged: Dashboard, All Workshops, Bio, Templates, Workflows, Surveys, Files,
+          Partners, Coaches, Approvals, Categories, Pricing, Financials.
+        </li>
+        <li>
+          Click on <code>Assessments</code> &rarr; route changes to <code>/assessments</code> (or <code>/admin/assessments</code>
+          for admin contexts). The dashboard layout renders the assessment-lane sidebar via a child layout file at
+          <code>src/src/app/(dashboard)/assessments/layout.tsx</code>. Sidebar contains: Dashboard, Organizations,
+          Access Groups, Templates, Campaigns, Public Quizzes, Aggregate Report &mdash; plus a Coach-lane group below
+          (My Campaigns, My Organizations) shown when the actor is a coach.
+        </li>
+        <li>
+          Existing workshop platform routes do NOT render a sidebar; the assessments lane is the first dashboard
+          route to introduce one. Visually parallels the coach portal's <code>(portal)</code> sidebar but uses the
+          assessment-lane nav set instead.
+        </li>
+        <li>
+          Role gating: top nav <code>Assessments</code> entry visible to ADMIN + STAFF + COACH (lane content differs
+          by role); <code>Aggregate Report</code> sidebar entry visible only to ADMIN + STAFF
+          (<code>canAccessAggregateReport</code>); Coach-lane group visible only to COACH.
+        </li>
+      </ul>
+    </section>
+
+    <div class="wf-end-note">
+      <strong>Wireframe end note.</strong>
+      Chrome only &mdash; this is a NAVIGATION integration sketch, not a functional screen. Sidebar entries shown above
+      cross-link to Wireframes 21 (Access Groups list), 22 (Access Group detail), 23 (Aggregate Report) and to the
+      participant + admin wireframes shipped in Waves 1&ndash;2. Implementation files: <code>src/src/app/(dashboard)/layout.tsx</code>
+      (top nav addition), <code>src/src/app/(dashboard)/assessments/layout.tsx</code> (new sidebar shell),
+      <code>src/src/components/nav/assessments-sidebar.tsx</code> (sidebar nav component).
+    </div>
+  </div>
+</body>
+</html>

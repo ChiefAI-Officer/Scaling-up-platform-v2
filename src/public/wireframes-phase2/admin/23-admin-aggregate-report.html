@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>23 — Admin Aggregate Report (Phase 2, Wave 5, v7.6)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex; flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 800; font-size: 0.875rem;
+    }
+    .wf-sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .wf-sidebar-brand-sub {
+      font-size: 0.6875rem; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex; align-items: center;
+      gap: 0.625rem; padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem; font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active { background: hsl(var(--primary)); color: white; }
+    .wf-sidebar-link-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; }
+
+    .wf-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .wf-breadcrumb { font-size: 0.875rem; color: hsl(var(--muted-foreground)); display: flex; align-items: center; gap: 0.375rem; }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb a:hover { color: hsl(var(--foreground)); text-decoration: underline; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page { padding: 2rem; width: 100%; }
+
+    .wf-page-header-row {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap;
+    }
+    .wf-page-subtitle-strong {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.9375rem; margin: 0.125rem 0 0;
+      font-weight: 500; max-width: 640px; line-height: 1.5;
+    }
+
+    /* Anonymity / aggregation info banner */
+    .wf-intersection-banner {
+      background: hsl(38 92% 95%);
+      border: 1px solid hsl(38 92% 80%);
+      color: hsl(26 83% 25%);
+      border-radius: var(--radius);
+      padding: 0.875rem 1rem 0.875rem 2.5rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.8125rem; line-height: 1.55;
+      position: relative;
+    }
+    .wf-intersection-banner::before {
+      content: "\26A0";
+      position: absolute; left: 0.875rem; top: 0.75rem;
+      color: hsl(26 83% 35%); font-size: 1.125rem; font-weight: 700;
+    }
+    .wf-intersection-banner strong { color: hsl(26 83% 18%); font-weight: 700; }
+    .wf-intersection-banner code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(38 92% 88%);
+      padding: 0.05rem 0.35rem; border-radius: 3px;
+      color: hsl(26 83% 22%);
+    }
+
+    /* Selectors row */
+    .wf-selectors {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.5rem;
+    }
+    .wf-selector { display: flex; flex-direction: column; gap: 0.375rem; min-width: 280px; flex: 1; }
+    .wf-selector label {
+      font-size: 0.6875rem; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-selector select {
+      appearance: none;
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      padding: 0.5rem 2.25rem 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      font-family: inherit;
+      color: hsl(var(--foreground));
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 0.625rem center;
+      background-size: 14px;
+    }
+    .wf-selector select:focus { outline: 2px solid hsl(var(--primary) / 0.4); outline-offset: 1px; }
+    .wf-selector .version-hint { font-size: 0.75rem; color: hsl(var(--muted-foreground)); }
+    .wf-current-pill {
+      display: inline-block;
+      margin-left: 0.4rem;
+      padding: 0.0625rem 0.375rem;
+      border-radius: 3px;
+      font-size: 0.625rem; font-weight: 700;
+      background: hsl(160 84% 92%);
+      color: hsl(160 84% 22%);
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+    }
+
+    /* Top stats grid */
+    .wf-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.875rem;
+      margin-bottom: 1.5rem;
+    }
+    .wf-stat {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 1rem 1.125rem;
+    }
+    .wf-stat-label {
+      font-size: 0.6875rem; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 0.5rem;
+    }
+    .wf-stat-value {
+      font-size: 1.75rem; font-weight: 800;
+      color: hsl(var(--foreground)); letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.05;
+    }
+    .wf-stat-unit { font-size: 0.875rem; font-weight: 600; color: hsl(var(--muted-foreground)); margin-left: 0.2rem; }
+    .wf-stat-sub { font-size: 0.6875rem; color: hsl(var(--muted-foreground)); margin-top: 0.25rem; }
+
+    /* Two-col card grid (histogram + per-section) */
+    .wf-two-col-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .wf-card-block {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+    }
+    .wf-card-block-title {
+      font-size: 0.9375rem; font-weight: 700;
+      color: hsl(var(--foreground)); letter-spacing: -0.01em;
+      margin: 0 0 0.125rem;
+    }
+    .wf-card-block-sub {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem; margin: 0 0 1rem;
+    }
+
+    /* Tier histogram (horizontal bars, side-by-side feel inside the card) */
+    .wf-tier-row {
+      display: grid;
+      grid-template-columns: 50px 1fr 60px;
+      gap: 0.75rem;
+      align-items: center;
+      padding: 0.5rem 0;
+    }
+    .wf-tier-row + .wf-tier-row { border-top: 1px dashed hsl(var(--border)); }
+    .wf-tier-label {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .wf-tier-low .wf-tier-label { color: hsl(var(--tier-low)); }
+    .wf-tier-ok .wf-tier-label  { color: hsl(26 83% 32%); }
+    .wf-tier-great .wf-tier-label { color: hsl(var(--tier-great)); }
+    .wf-tier-bar {
+      background: hsl(var(--muted));
+      border-radius: 9999px;
+      height: 14px;
+      overflow: hidden;
+      position: relative;
+    }
+    .wf-tier-bar-fill {
+      height: 100%;
+      border-radius: 9999px;
+    }
+    .wf-tier-low .wf-tier-bar-fill { background: hsl(var(--tier-low)); }
+    .wf-tier-ok .wf-tier-bar-fill { background: hsl(var(--tier-ok)); }
+    .wf-tier-great .wf-tier-bar-fill { background: hsl(var(--tier-great)); }
+    .wf-tier-count {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      font-size: 0.875rem;
+      color: hsl(var(--foreground));
+    }
+    .wf-tier-pct {
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      font-weight: 500;
+    }
+
+    /* Per-section means table */
+    .wf-section-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+    .wf-section-table th, .wf-section-table td {
+      text-align: left;
+      padding: 0.5rem 0.5rem;
+      border-bottom: 1px solid hsl(var(--border));
+      vertical-align: middle;
+    }
+    .wf-section-table th {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-section-table .col-num { text-align: right; font-variant-numeric: tabular-nums; }
+    .wf-section-table tbody tr:last-child td { border-bottom: none; }
+    .wf-section-key {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+      margin-left: 0.4rem;
+    }
+
+    /* Sparkline / submissions-over-time */
+    .wf-sparkline-card { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 1.25rem 1.5rem; margin-bottom: 1.5rem; }
+    .wf-sparkline-svg {
+      width: 100%;
+      height: 80px;
+      display: block;
+    }
+    .wf-sparkline-foot {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      font-size: 0.6875rem;
+      color: hsl(var(--muted-foreground));
+    }
+
+    /* Service-layer surface card */
+    .wf-card-deferred {
+      margin-top: 0.5rem;
+      padding: 1.25rem 1.5rem;
+      background: hsl(var(--card));
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+    }
+    .wf-card-deferred h3 {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+      letter-spacing: -0.01em;
+      margin: 0 0 0.5rem;
+    }
+    .wf-card-deferred ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.625rem; }
+    .wf-card-deferred li {
+      font-size: 0.8125rem; color: hsl(var(--foreground));
+      line-height: 1.55; padding-left: 1rem; position: relative;
+    }
+    .wf-card-deferred li::before {
+      content: "\2192";
+      position: absolute; left: 0;
+      color: hsl(var(--primary)); font-weight: 700;
+    }
+    .wf-card-deferred code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(var(--muted));
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      color: hsl(var(--foreground));
+    }
+
+    /* "Not in v1 MVP" note */
+    .wf-mvp-note {
+      margin-top: 1rem;
+      padding: 0.875rem 1rem 0.875rem 2.25rem;
+      background: hsl(199 89% 96%);
+      border: 1px solid hsl(199 89% 80%);
+      border-radius: var(--radius);
+      color: hsl(199 89% 22%);
+      font-size: 0.8125rem; line-height: 1.55;
+      position: relative;
+    }
+    .wf-mvp-note::before {
+      content: "\2139";
+      position: absolute;
+      left: 0.875rem; top: 0.625rem;
+      color: hsl(199 89% 38%);
+      font-size: 1.125rem; font-weight: 700;
+    }
+    .wf-mvp-note strong { font-weight: 700; color: hsl(199 89% 18%); }
+    .wf-mvp-note code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(199 89% 88%);
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+    }
+
+    .wf-end-note {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: hsl(var(--muted) / 0.5);
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem; line-height: 1.55;
+    }
+    .wf-end-note code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(var(--card));
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      border: 1px solid hsl(var(--border));
+      color: hsl(var(--foreground));
+    }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <div>
+      <strong>WIREFRAME &mdash; 23 Admin Aggregate Report</strong> (Wave 5).
+      v7.6 spec ref: <code>docs/specs/v7.6/05-wireframes-wave5.md</code> &middot; <code>06-observability.md</code>.
+      Locked May 15&ndash;17 2026. <strong>v1 MVP shape:</strong> TWO selectors only (template + version). No filters. No placeholders.
+    </div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <div class="page-head">
+    <h1>23 &mdash; Admin: Aggregate Report</h1>
+    <p>Per-template &middot; per-version aggregate stats across ALL submissions, ALL organizations, ALL time. Admin-only.</p>
+  </div>
+
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">S</span>
+        <span class="wf-sidebar-brand-text">
+          <span>Scaling Up</span>
+          <span class="wf-sidebar-brand-sub">Assessments &middot; Admin</span>
+        </span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Manage</div>
+        <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Dashboard</a>
+        <a class="wf-sidebar-link" href="11-admin-users-list.html"><span class="wf-sidebar-link-dot"></span>Users</a>
+        <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Organizations</a>
+        <a class="wf-sidebar-link" href="14-admin-templates-list.html"><span class="wf-sidebar-link-dot"></span>Templates</a>
+        <a class="wf-sidebar-link" href="21-admin-access-groups-list.html"><span class="wf-sidebar-link-dot"></span>Access Groups</a>
+        <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Campaigns</a>
+        <a class="wf-sidebar-link is-active" href="#" aria-current="page"><span class="wf-sidebar-link-dot"></span>Aggregate Report</a>
+        <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Public Quizzes</a>
+      </nav>
+    </aside>
+
+    <main class="wf-main">
+      <div class="wf-topbar">
+        <div class="wf-breadcrumb">
+          <a href="#">Admin</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Aggregate Reporting</span>
+        </div>
+      </div>
+
+      <div class="wf-page">
+        <div class="wf-page-header-row">
+          <div>
+            <h2 class="wf-page-title">Aggregate Report</h2>
+            <p class="wf-page-subtitle-strong">
+              Per-template, per-version aggregate statistics across all submissions in the platform.
+              Admin-only &mdash; coaches and respondents never see this view.
+            </p>
+          </div>
+        </div>
+
+        <!-- Yellow anonymity banner -->
+        <div class="wf-intersection-banner">
+          <strong>Admin bypasses CEO_ONLY anonymity in aggregate.</strong>
+          Coaches and respondents still respect <code>aggregationMode</code>
+          (see <code>docs/specs/v7.6/02-service-layer-rules.md</code> &middot; <code>canAccessAggregateReport</code>).
+          This dashboard is gated to <code>ADMIN</code> / <code>STAFF</code> roles only.
+        </div>
+
+        <!-- Selectors — TWO only -->
+        <div class="wf-selectors">
+          <div class="wf-selector">
+            <label for="template-select">Template</label>
+            <select id="template-select" aria-label="Template">
+              <option selected>Rockefeller Habits Checklist</option>
+              <option>Vision Alignment</option>
+              <option>Quarterly Strategic Priorities v2</option>
+              <option>Scaling Up Assessment</option>
+            </select>
+          </div>
+          <div class="wf-selector">
+            <label for="version-select">Version</label>
+            <select id="version-select" aria-label="Template version">
+              <option selected>v1 (enUS) &mdash; published Apr 12, 2026 &mdash; current</option>
+              <option>v0 (enUS) &mdash; draft (no published submissions)</option>
+            </select>
+            <span class="version-hint">
+              Latest published version selected by default
+              <span class="wf-current-pill">CURRENT</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Top stat cards -->
+        <div class="wf-stats-grid">
+          <div class="wf-stat">
+            <div class="wf-stat-label">Total submissions</div>
+            <div class="wf-stat-value">144</div>
+            <div class="wf-stat-sub">Across all time</div>
+          </div>
+          <div class="wf-stat">
+            <div class="wf-stat-label">Organizations</div>
+            <div class="wf-stat-value">38</div>
+            <div class="wf-stat-sub">Distinct orgs</div>
+          </div>
+          <div class="wf-stat">
+            <div class="wf-stat-label">Avg countAchieved</div>
+            <div class="wf-stat-value">28.5<span class="wf-stat-unit">/40</span></div>
+            <div class="wf-stat-sub">Mean count of sections achieved</div>
+          </div>
+          <div class="wf-stat">
+            <div class="wf-stat-label">Avg overallTotal</div>
+            <div class="wf-stat-value">87.6<span class="wf-stat-unit">/120</span></div>
+            <div class="wf-stat-sub">Mean total score</div>
+          </div>
+          <div class="wf-stat">
+            <div class="wf-stat-label">Avg overallAverage</div>
+            <div class="wf-stat-value">2.19<span class="wf-stat-unit">/3</span></div>
+            <div class="wf-stat-sub">Mean per-question score</div>
+          </div>
+        </div>
+
+        <!-- Tier histogram + per-section means -->
+        <div class="wf-two-col-grid">
+          <div class="wf-card-block">
+            <h3 class="wf-card-block-title">Tier histogram</h3>
+            <p class="wf-card-block-sub">Final tier assigned per submission (passThreshold-based). Bars scaled to the max bucket.</p>
+            <div class="wf-tier-row wf-tier-low">
+              <span class="wf-tier-label">Low</span>
+              <div class="wf-tier-bar"><div class="wf-tier-bar-fill" style="width: 14%"></div></div>
+              <div class="wf-tier-count">12 <span class="wf-tier-pct">(8%)</span></div>
+            </div>
+            <div class="wf-tier-row wf-tier-ok">
+              <span class="wf-tier-label">OK</span>
+              <div class="wf-tier-bar"><div class="wf-tier-bar-fill" style="width: 52%"></div></div>
+              <div class="wf-tier-count">45 <span class="wf-tier-pct">(31%)</span></div>
+            </div>
+            <div class="wf-tier-row wf-tier-great">
+              <span class="wf-tier-label">Great</span>
+              <div class="wf-tier-bar"><div class="wf-tier-bar-fill" style="width: 100%"></div></div>
+              <div class="wf-tier-count">87 <span class="wf-tier-pct">(60%)</span></div>
+            </div>
+          </div>
+
+          <div class="wf-card-block">
+            <h3 class="wf-card-block-title">Per-section means</h3>
+            <p class="wf-card-block-sub">Mean score per Rockefeller section. Per-question normalized to 0&ndash;3.</p>
+            <table class="wf-section-table">
+              <thead>
+                <tr>
+                  <th>Section</th>
+                  <th class="col-num">Avg score</th>
+                  <th class="col-num">Avg / Q</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>S1 &mdash; People<span class="wf-section-key">people</span></td><td class="col-num">8.4 / 12</td><td class="col-num">2.10</td></tr>
+                <tr><td>S2 &mdash; Strategy<span class="wf-section-key">strategy</span></td><td class="col-num">7.2 / 12</td><td class="col-num">1.80</td></tr>
+                <tr><td>S3 &mdash; Execution<span class="wf-section-key">execution</span></td><td class="col-num">9.6 / 12</td><td class="col-num">2.40</td></tr>
+                <tr><td>S4 &mdash; Cash<span class="wf-section-key">cash</span></td><td class="col-num">8.0 / 12</td><td class="col-num">2.00</td></tr>
+                <tr><td>S5 &mdash; Core Values<span class="wf-section-key">core-values</span></td><td class="col-num">9.2 / 12</td><td class="col-num">2.30</td></tr>
+                <tr><td>S6 &mdash; Core Purpose<span class="wf-section-key">core-purpose</span></td><td class="col-num">8.8 / 12</td><td class="col-num">2.20</td></tr>
+                <tr><td>S7 &mdash; BHAG<span class="wf-section-key">bhag</span></td><td class="col-num">7.6 / 12</td><td class="col-num">1.90</td></tr>
+                <tr><td>S8 &mdash; Sandbox<span class="wf-section-key">sandbox</span></td><td class="col-num">8.0 / 12</td><td class="col-num">2.00</td></tr>
+                <tr><td>S9 &mdash; Brand Promise<span class="wf-section-key">brand-promise</span></td><td class="col-num">9.0 / 12</td><td class="col-num">2.25</td></tr>
+                <tr><td>S10 &mdash; KPIs<span class="wf-section-key">kpis</span></td><td class="col-num">9.8 / 12</td><td class="col-num">2.45</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Submissions over time sparkline (MVP — non-interactive trend) -->
+        <div class="wf-sparkline-card">
+          <h3 class="wf-card-block-title">Submissions over time</h3>
+          <p class="wf-card-block-sub">MVP shape &mdash; non-interactive trend. Time-range chip + filters deferred to v1.5.</p>
+          <svg class="wf-sparkline-svg" viewBox="0 0 600 80" preserveAspectRatio="none" aria-label="Submissions over time trend">
+            <defs>
+              <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="hsl(224 76% 48%)" stop-opacity="0.18"></stop>
+                <stop offset="100%" stop-color="hsl(224 76% 48%)" stop-opacity="0.02"></stop>
+              </linearGradient>
+            </defs>
+            <!-- Area fill -->
+            <path d="M0,70 L30,65 L60,60 L90,55 L120,52 L150,48 L180,40 L210,42 L240,36 L270,28 L300,30 L330,24 L360,20 L390,22 L420,18 L450,14 L480,18 L510,12 L540,10 L570,14 L600,8 L600,80 L0,80 Z"
+                  fill="url(#spark-grad)" />
+            <!-- Line -->
+            <path d="M0,70 L30,65 L60,60 L90,55 L120,52 L150,48 L180,40 L210,42 L240,36 L270,28 L300,30 L330,24 L360,20 L390,22 L420,18 L450,14 L480,18 L510,12 L540,10 L570,14 L600,8"
+                  stroke="hsl(224 76% 48%)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+            <!-- End-marker dot -->
+            <circle cx="600" cy="8" r="3.5" fill="hsl(224 76% 48%)" />
+          </svg>
+          <div class="wf-sparkline-foot">
+            <span>First submission: Apr 14, 2026</span>
+            <span>Last submission: May 16, 2026</span>
+            <span>Trend: <strong>+162% over 30 days</strong></span>
+          </div>
+        </div>
+
+        <!-- What's NOT in v1 MVP -->
+        <div class="wf-mvp-note">
+          <strong>What's NOT in v1 MVP:</strong>
+          time-range filter, AccessGroup filter, per-organization breakdown table, cross-version comparison view, peer benchmark overlays.
+          All deferred to v1.5. The current dashboard returns frozen stats from
+          <code>getAggregateReport(templateId, versionId)</code> across ALL orgs and ALL time per locked decision 8.
+        </div>
+
+        <!-- Service-layer surface card -->
+        <section class="wf-card-deferred">
+          <h3>v7.6 service-layer surface</h3>
+          <ul>
+            <li>
+              <code>getAggregateReport(templateId, versionId)</code> &rarr; returns frozen stats:
+              <code>totalSubmissions</code>, <code>distinctOrgs</code>, <code>avgCountAchieved</code>,
+              <code>avgOverallTotal</code>, <code>avgOverallAverage</code>, <code>tierHistogram</code>,
+              <code>perSectionMeans</code>, <code>submissionsOverTime</code>.
+            </li>
+            <li>
+              <code>canAccessAggregateReport(actor, templateId)</code> &rarr; <strong>admin/staff only</strong>.
+              Coach actors return false; route returns 403.
+            </li>
+            <li>
+              Version-boundary contract: <code>AssessmentTemplateVersion</code> is the aggregation unit. Per-section
+              means and <code>countAchieved</code> only compare apples-to-apples within ONE immutable version.
+              <code>compareVersions(versionA, versionB)</code> is v1.5; cross-version overlays are NOT in v1.
+            </li>
+            <li>
+              Observability gate: <code>assessment.aggregate.query.duration_ms</code> p95 &gt; 2000ms triggers a
+              paged warning per <code>docs/specs/v7.6/06-observability.md</code>. v1 scale (&lt;500 submissions /
+              template / version) stays well under that. Beyond v1.5, a materialized view backs the query.
+            </li>
+          </ul>
+        </section>
+
+        <div class="wf-end-note">
+          <strong>Wireframe end note.</strong>
+          v1 MVP shape per locked decision 8: TWO selectors (template + version), no filters, no placeholder cards
+          for v1.5 features. The version dropdown defaults to the latest published version and badges it as
+          <code>CURRENT</code>. Aggregation is per <code>AssessmentTemplateVersion</code>, NOT per template across
+          versions &mdash; this preserves the apples-to-apples invariant for per-section means. Future v1.5 enhancements
+          (group filter, time range, per-org breakdown, cross-version comparison) land on the same route; they do
+          NOT belong in v1.
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

@@ -486,6 +486,76 @@
       background: hsl(var(--muted-foreground) / 0.2);
     }
 
+    /* ---------- Owned Organizations read-only list (v7.6) ---------- */
+    .wf-owned-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: hsl(var(--card));
+    }
+    .wf-owned-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid hsl(var(--border));
+      text-decoration: none;
+      color: hsl(var(--foreground));
+      transition: background 120ms;
+    }
+    .wf-owned-row:last-child { border-bottom: none; }
+    .wf-owned-row:hover { background: hsl(var(--muted) / 0.4); }
+    .wf-owned-row-name {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      flex: 1;
+      min-width: 0;
+    }
+    .wf-owned-row-count {
+      font-size: 0.8125rem;
+      color: hsl(var(--muted-foreground));
+      white-space: nowrap;
+    }
+    .wf-owned-row-chevron {
+      color: hsl(var(--muted-foreground));
+      font-size: 1rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .wf-owned-empty {
+      padding: 1.5rem 1.25rem;
+      background: hsl(var(--muted) / 0.4);
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      line-height: 1.55;
+      text-align: center;
+      font-style: italic;
+    }
+    .wf-readonly-banner {
+      background: hsl(210 90% 96%);
+      border: 1px solid hsl(210 70% 85%);
+      color: hsl(210 50% 25%);
+      border-radius: 6px;
+      padding: 0.625rem 0.875rem;
+      font-size: 0.75rem;
+      line-height: 1.5;
+      margin-bottom: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-readonly-banner-icon {
+      font-size: 0.875rem;
+      color: hsl(210 70% 45%);
+      flex-shrink: 0;
+    }
+
     /* ---------- End-of-page note ---------- */
     .wf-end-note {
       margin-top: 1.5rem;
@@ -509,8 +579,8 @@
   <!-- Yellow wireframe banner -->
   <div class="wf-banner">
     <div>
-      <strong>WIREFRAME — Not functional.</strong>
-      v7.5 spec reference: Wave 2 Task 2 (Admin User detail + memberships, drives coach role activation testing per v7.2 floor #5).
+      <strong>WIREFRAME — admin User detail.</strong>
+      v7.6 hierarchy lock (May 15 2026): coaches now own organizations directly. The old Memberships card is removed; Owned Organizations is read-only here. Ownership transfer is a separate admin flow.
     </div>
     <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
   </div>
@@ -518,7 +588,7 @@
   <!-- Page heading (outside the shell, mirrors WF11 pattern) -->
   <div class="page-head">
     <h1>12 — Admin: User detail</h1>
-    <p>Single-user view. Edits role, manages org memberships, and curates assessment template access grants.</p>
+    <p>Single-user view. Edits role, views owned organizations (read-only), and curates assessment template access grants.</p>
   </div>
 
   <!-- Admin shell: sidebar + main -->
@@ -631,78 +701,54 @@
             </div>
           </section>
 
-          <!-- Card 2: Memberships -->
+          <!-- Card 2: Owned Organizations (v7.6 — replaces Memberships card) -->
           <section class="wf-card">
             <header class="wf-card-header">
-              <h3 class="wf-card-title">Memberships</h3>
-              <p class="wf-card-helper">Organizations this user has access to. Drives coach access in v1.</p>
+              <h3 class="wf-card-title">Owned Organizations</h3>
+              <p class="wf-card-helper">
+                Organizations this coach owns. v7.6 hierarchy lock: coaches own organizations directly &mdash;
+                admin can <strong>view</strong>, not edit.
+              </p>
             </header>
             <div class="wf-card-body">
-              <!-- Amber info banner about v1 acceptedAt semantics -->
-              <div class="wf-info-banner">
-                <strong>Wireframe note:</strong>
-                Memberships drive coach access. <code>ORG_ADMIN</code> with <code>acceptedAt</code> set = full read+write to that org's assessment data. v1 sets <code>acceptedAt=now()</code> on grant; v2 invite flow leaves null until acceptance.
+              <div class="wf-readonly-banner">
+                <span class="wf-readonly-banner-icon" aria-hidden="true">&#9432;</span>
+                <span>
+                  Read-only. Ownership transfer happens via the dedicated transfer flow (see
+                  <code>docs/specs/v7.6/02-service-layer-rules.md</code>) &mdash; not from this card.
+                </span>
               </div>
 
-              <div class="wf-table-wrap">
-                <table class="wf-table">
-                  <thead>
-                    <tr>
-                      <th>Organization</th>
-                      <th>Role</th>
-                      <th>Granted At</th>
-                      <th>Granted By</th>
-                      <th>Acceptance</th>
-                      <th style="text-align: right;">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td><span class="wf-font-semibold">Acme Corporation</span></td>
-                      <td>
-                        <select class="wf-select wf-select-sm" aria-label="Membership role for Acme Corporation">
-                          <option selected>ORG_ADMIN</option>
-                          <option>ORG_VIEWER</option>
-                        </select>
-                      </td>
-                      <td><span class="wf-text-xs wf-text-muted">Mar 14 2025</span></td>
-                      <td><span class="wf-text-xs wf-text-muted">Suzanne K.</span></td>
-                      <td><span class="wf-pill wf-pill-accepted">&#10003; Accepted</span></td>
-                      <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
-                    </tr>
-                    <tr>
-                      <td><span class="wf-font-semibold">BetaCo Holdings</span></td>
-                      <td>
-                        <select class="wf-select wf-select-sm" aria-label="Membership role for BetaCo Holdings">
-                          <option>ORG_ADMIN</option>
-                          <option selected>ORG_VIEWER</option>
-                        </select>
-                      </td>
-                      <td><span class="wf-text-xs wf-text-muted">Apr 02 2025</span></td>
-                      <td><span class="wf-text-xs wf-text-muted">Suzanne K.</span></td>
-                      <td><span class="wf-pill wf-pill-accepted">&#10003; Accepted</span></td>
-                      <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
-                    </tr>
-                    <tr>
-                      <td><span class="wf-font-semibold">Gamma Inc</span></td>
-                      <td>
-                        <select class="wf-select wf-select-sm" aria-label="Membership role for Gamma Inc">
-                          <option selected>ORG_ADMIN</option>
-                          <option>ORG_VIEWER</option>
-                        </select>
-                      </td>
-                      <td><span class="wf-text-xs wf-text-muted">May 11 2026</span></td>
-                      <td><span class="wf-text-xs wf-text-muted">Jeff V.</span></td>
-                      <td><span class="wf-pill wf-pill-pending-accept">&#8987; Pending</span></td>
-                      <td style="text-align: right;"><a href="#" class="wf-table-link-destructive">Revoke</a></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <ul class="wf-owned-list" aria-label="Organizations owned by Sarah Mitchell">
+                <li>
+                  <a class="wf-owned-row" href="#" aria-label="View Acme Corp detail">
+                    <span class="wf-owned-row-name">Acme Corp</span>
+                    <span class="wf-owned-row-count">4 active assessments</span>
+                    <span class="wf-owned-row-chevron" aria-hidden="true">&rsaquo;</span>
+                  </a>
+                </li>
+                <li>
+                  <a class="wf-owned-row" href="#" aria-label="View Beta Industries detail">
+                    <span class="wf-owned-row-name">Beta Industries</span>
+                    <span class="wf-owned-row-count">2 active assessments</span>
+                    <span class="wf-owned-row-chevron" aria-hidden="true">&rsaquo;</span>
+                  </a>
+                </li>
+                <li>
+                  <a class="wf-owned-row" href="#" aria-label="View Gamma LLC detail">
+                    <span class="wf-owned-row-name">Gamma LLC</span>
+                    <span class="wf-owned-row-count">0 active assessments</span>
+                    <span class="wf-owned-row-chevron" aria-hidden="true">&rsaquo;</span>
+                  </a>
+                </li>
+              </ul>
 
-              <div class="wf-card-action-row">
-                <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm">+ Grant Membership</button>
-                <span class="wf-caption">Opens modal (see Wave 2 Task 3 — Memberships management — for full modal layout).</span>
+              <!-- Empty-state preview (rendered as a sibling card so reviewers see both states) -->
+              <p class="wf-caption" style="margin-top: 1rem;">
+                Empty state (shown when this coach owns no organizations):
+              </p>
+              <div class="wf-owned-empty">
+                This coach owns no organizations yet. Coaches create organizations themselves via their portal.
               </div>
             </div>
           </section>
@@ -806,8 +852,10 @@
         <!-- End-of-page note -->
         <div class="wf-end-note">
           <strong>Modal previews out of scope.</strong>
-          Send Password Reset, Disable User, Revoke All Sessions, + Grant Membership, and Revoke Membership modals are not rendered here.
-          The Memberships management screen (Wave 2 Task 3) covers per-org grant modals; the Template Access screen (Task 5) covers per-coach template grant modals.
+          Send Password Reset, Disable User, and Revoke All Sessions modals are not rendered here.
+          Ownership transfer is a separate admin flow (see <code>docs/specs/v7.6/02-service-layer-rules.md</code>).
+          The Access Groups index (Task 5, redesigned v7.6) covers template-access management via groups
+          with INTERSECTION semantics; per-coach grant modals from v7.5 are deprecated.
         </div>
       </div>
     </main>

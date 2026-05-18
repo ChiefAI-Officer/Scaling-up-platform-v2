@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280, initial-scale=1">
+  <title>22 — Admin Access Group detail (Phase 2, Wave 5, v7.6)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../_shared.css">
+  <style>
+    body { background: hsl(220 14% 96%); }
+
+    .page-head {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem 0.5rem;
+    }
+    .page-head h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 0.25rem;
+    }
+    .page-head p {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      margin: 0;
+    }
+
+    .wf-shell {
+      display: flex;
+      min-height: 100vh;
+      max-width: 1280px;
+      margin: 0 auto;
+      background: hsl(var(--background));
+      border: 1px solid hsl(var(--border));
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+    }
+    .wf-sidebar {
+      background: hsl(var(--sidebar));
+      color: hsl(var(--sidebar-foreground));
+      width: 240px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .wf-sidebar-brand {
+      padding: 1.25rem 1.25rem 1rem;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      border-bottom: 1px solid hsl(var(--sidebar-border));
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-sidebar-brand-mark {
+      width: 28px; height: 28px;
+      background: hsl(var(--primary));
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 0.875rem;
+    }
+    .wf-sidebar-brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .wf-sidebar-brand-sub {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-nav { padding: 0.5rem; flex: 1; }
+    .wf-sidebar-section-title {
+      padding: 0.75rem 0.75rem 0.5rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--sidebar-muted));
+    }
+    .wf-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      color: hsl(var(--sidebar-muted));
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .wf-sidebar-link:hover { background: hsl(var(--sidebar-border)); color: hsl(var(--sidebar-foreground)); }
+    .wf-sidebar-link.is-active {
+      background: hsl(var(--primary));
+      color: white;
+    }
+    .wf-sidebar-link-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.6;
+    }
+
+    .wf-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .wf-topbar {
+      background: hsl(var(--card));
+      border-bottom: 1px solid hsl(var(--border));
+      padding: 0.875rem 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .wf-breadcrumb {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      display: flex; align-items: center; gap: 0.375rem;
+    }
+    .wf-breadcrumb a { color: hsl(var(--muted-foreground)); text-decoration: none; }
+    .wf-breadcrumb a:hover { color: hsl(var(--foreground)); text-decoration: underline; }
+    .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
+    .wf-breadcrumb-sep { opacity: 0.5; }
+
+    .wf-page { padding: 2rem; width: 100%; }
+
+    .wf-page-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+    .wf-page-title-group {
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+
+    .wf-pill-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3125rem;
+      padding: 0.125rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.625rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .wf-pill-status::before {
+      content: "";
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .wf-pill-status.is-active {
+      background: hsl(160 84% 95%);
+      color: hsl(160 84% 22%);
+    }
+
+    /* Group metadata card */
+    .wf-meta-card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .wf-meta-card h3 {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 0.875rem;
+    }
+    .wf-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.875rem 2rem;
+    }
+    .wf-meta-row { display: flex; flex-direction: column; gap: 0.125rem; }
+    .wf-meta-label {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-meta-value {
+      font-size: 0.875rem;
+      color: hsl(var(--foreground));
+      font-weight: 500;
+    }
+    .wf-meta-value code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(var(--muted));
+      padding: 0.05rem 0.35rem;
+      border-radius: 3px;
+    }
+    .wf-meta-value.is-null { color: hsl(var(--muted-foreground)); font-style: italic; }
+
+    /* Section heading + table */
+    .wf-section { margin-top: 1.5rem; }
+    .wf-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.625rem;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .wf-section-title {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+    .wf-section-sub {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      margin: 0.125rem 0 0;
+    }
+
+    .wf-table-wrap {
+      overflow: hidden;
+      border-radius: var(--radius);
+      border: 1px solid hsl(var(--border));
+      background: hsl(var(--card));
+    }
+    .wf-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      background: hsl(var(--card));
+    }
+    .wf-table thead { background: hsl(var(--muted)); }
+    .wf-table th {
+      text-align: left;
+      padding: 0.625rem 1rem;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      border-bottom: 1px solid hsl(var(--border));
+      white-space: nowrap;
+    }
+    .wf-table th.col-right { text-align: right; }
+    .wf-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid hsl(var(--border));
+      vertical-align: middle;
+      color: hsl(var(--foreground));
+    }
+    .wf-table tbody tr:last-child td { border-bottom: none; }
+    .wf-table tbody tr:hover { background: hsl(var(--muted) / 0.4); }
+    .wf-mono {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+    }
+    .wf-cell-num {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+    .wf-remove-btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.625rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: hsl(var(--destructive));
+      background: hsl(0 84% 96%);
+      border: 1px solid hsl(0 84% 88%);
+      cursor: pointer;
+    }
+    .wf-remove-btn:hover { background: hsl(0 84% 92%); }
+
+    /* evaluateAccessChange preview panel — STATIC card */
+    .wf-preview-panel {
+      margin-top: 1.5rem;
+      background: hsl(var(--card));
+      border: 2px solid hsl(38 92% 60%);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 4px 12px hsl(38 92% 60% / 0.15);
+    }
+    .wf-preview-header {
+      background: hsl(38 92% 95%);
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid hsl(38 92% 80%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .wf-preview-title {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: hsl(26 83% 18%);
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .wf-preview-title::before {
+      content: "\26A0";
+      color: hsl(26 83% 35%);
+      font-size: 1.125rem;
+    }
+    .wf-preview-trigger {
+      font-size: 0.75rem;
+      color: hsl(26 83% 25%);
+      font-style: italic;
+    }
+    .wf-preview-body { padding: 1.25rem 1.5rem; }
+    .wf-preview-context {
+      font-size: 0.8125rem;
+      color: hsl(var(--foreground));
+      line-height: 1.6;
+      margin: 0 0 1.25rem;
+      padding: 0.625rem 0.875rem;
+      background: hsl(var(--muted) / 0.5);
+      border-left: 3px solid hsl(38 92% 50%);
+      border-radius: 4px;
+    }
+    .wf-preview-context code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(var(--card));
+      padding: 0.05rem 0.35rem;
+      border-radius: 3px;
+      border: 1px solid hsl(var(--border));
+    }
+
+    .wf-preview-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid hsl(var(--border));
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .wf-preview-col {
+      padding: 1rem 1.25rem;
+      background: hsl(var(--card));
+    }
+    .wf-preview-col + .wf-preview-col {
+      border-left: 1px solid hsl(var(--border));
+    }
+    .wf-preview-col-head {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: hsl(var(--muted-foreground));
+      margin: 0 0 0.625rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .wf-preview-coach {
+      padding: 0.625rem 0;
+      border-bottom: 1px dashed hsl(var(--border));
+    }
+    .wf-preview-coach:last-child { border-bottom: none; }
+    .wf-preview-coach-name {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      margin-bottom: 0.25rem;
+    }
+    .wf-preview-coach-tpls {
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.5;
+    }
+    .wf-preview-coach-tpls .strike {
+      text-decoration: line-through;
+      opacity: 0.6;
+      color: hsl(var(--destructive));
+    }
+    .wf-preview-coach-count {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: hsl(var(--muted-foreground));
+      margin-top: 0.25rem;
+    }
+    .wf-preview-coach.is-zero .wf-preview-coach-name {
+      color: hsl(var(--destructive));
+    }
+    .wf-preview-coach.is-zero .wf-preview-coach-count {
+      color: hsl(var(--destructive));
+      font-weight: 700;
+    }
+    .wf-preview-zero-pill {
+      display: inline-block;
+      margin-left: 0.5rem;
+      padding: 0.0625rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: hsl(0 84% 92%);
+      color: hsl(0 84% 32%);
+    }
+
+    .wf-preview-summary {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: hsl(160 84% 95%);
+      border: 1px solid hsl(160 84% 80%);
+      border-radius: var(--radius);
+      font-size: 0.8125rem;
+      color: hsl(160 84% 22%);
+      line-height: 1.5;
+    }
+    .wf-preview-summary strong { font-weight: 700; }
+
+    .wf-preview-force {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: hsl(var(--muted) / 0.5);
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      display: flex;
+      align-items: flex-start;
+      gap: 0.625rem;
+    }
+    .wf-preview-force input[type="checkbox"] {
+      margin-top: 0.125rem;
+      accent-color: hsl(var(--destructive));
+    }
+    .wf-preview-force-text {
+      font-size: 0.8125rem;
+      color: hsl(var(--foreground));
+      line-height: 1.5;
+    }
+    .wf-preview-force-text strong {
+      font-weight: 700;
+      color: hsl(var(--destructive));
+    }
+    .wf-preview-force-text .note {
+      display: block;
+      font-size: 0.75rem;
+      color: hsl(var(--muted-foreground));
+      margin-top: 0.25rem;
+    }
+
+    .wf-preview-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.625rem;
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 1px solid hsl(var(--border));
+    }
+
+    .wf-card-deferred {
+      margin-top: 1.5rem;
+      padding: 1.25rem 1.5rem;
+      background: hsl(var(--card));
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+    }
+    .wf-card-deferred h3 {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: hsl(var(--foreground));
+      letter-spacing: -0.01em;
+      margin: 0 0 0.5rem;
+    }
+    .wf-card-deferred ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+    }
+    .wf-card-deferred li {
+      font-size: 0.8125rem;
+      color: hsl(var(--foreground));
+      line-height: 1.55;
+      padding-left: 1rem;
+      position: relative;
+    }
+    .wf-card-deferred li::before {
+      content: "\2192";
+      position: absolute;
+      left: 0;
+      color: hsl(var(--primary));
+      font-weight: 700;
+    }
+    .wf-card-deferred code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(var(--muted));
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      color: hsl(var(--foreground));
+    }
+
+    .wf-end-note {
+      margin-top: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: hsl(var(--muted) / 0.5);
+      border: 1px dashed hsl(var(--border));
+      border-radius: var(--radius);
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      line-height: 1.55;
+    }
+    .wf-end-note code {
+      font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+      font-size: 0.75rem;
+      background: hsl(var(--card));
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+      border: 1px solid hsl(var(--border));
+      color: hsl(var(--foreground));
+    }
+  </style>
+</head>
+<body>
+  <div class="wf-banner">
+    <div>
+      <strong>WIREFRAME &mdash; 22 Admin Access Group detail</strong> (Wave 5).
+      v7.6 spec ref: <code>docs/specs/v7.6/05-wireframes-wave5.md</code> &middot; <code>02-service-layer-rules.md</code>.
+      Locked May 15&ndash;17 2026. <code>evaluateAccessChange</code> preview rendered as STATIC content (not click-driven) so reviewers see structure.
+    </div>
+    <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
+  </div>
+
+  <div class="page-head">
+    <h1>22 &mdash; Admin: Access Group detail</h1>
+    <p>Manage group membership + templates. Every add/remove runs through the <code>evaluateAccessChange</code> guard.</p>
+  </div>
+
+  <div class="wf-shell">
+    <aside class="wf-sidebar">
+      <div class="wf-sidebar-brand">
+        <span class="wf-sidebar-brand-mark">S</span>
+        <span class="wf-sidebar-brand-text">
+          <span>Scaling Up</span>
+          <span class="wf-sidebar-brand-sub">Assessments &middot; Admin</span>
+        </span>
+      </div>
+      <nav class="wf-sidebar-nav">
+        <div class="wf-sidebar-section-title">Manage</div>
+        <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Dashboard</a>
+        <a class="wf-sidebar-link" href="11-admin-users-list.html"><span class="wf-sidebar-link-dot"></span>Users</a>
+        <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Organizations</a>
+        <a class="wf-sidebar-link" href="14-admin-templates-list.html"><span class="wf-sidebar-link-dot"></span>Templates</a>
+        <a class="wf-sidebar-link is-active" href="21-admin-access-groups-list.html" aria-current="page">
+          <span class="wf-sidebar-link-dot"></span>Access Groups
+        </a>
+        <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Campaigns</a>
+        <a class="wf-sidebar-link" href="23-admin-aggregate-report.html"><span class="wf-sidebar-link-dot"></span>Aggregate Report</a>
+        <a class="wf-sidebar-link" href="#"><span class="wf-sidebar-link-dot"></span>Public Quizzes</a>
+      </nav>
+    </aside>
+
+    <main class="wf-main">
+      <div class="wf-topbar">
+        <div class="wf-breadcrumb">
+          <a href="#">Admin</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <a href="21-admin-access-groups-list.html">Access Groups</a>
+          <span class="wf-breadcrumb-sep">/</span>
+          <span class="wf-breadcrumb-current">Scaling Up Coaches</span>
+        </div>
+      </div>
+
+      <div class="wf-page">
+        <div class="wf-page-header-row">
+          <div class="wf-page-title-group">
+            <h2 class="wf-page-title">Scaling Up Coaches</h2>
+            <span class="wf-pill-status is-active">Active</span>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm">Archive group</button>
+            <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm">Edit metadata</button>
+          </div>
+        </div>
+
+        <!-- Group metadata card -->
+        <section class="wf-meta-card">
+          <h3>Group metadata</h3>
+          <div class="wf-meta-grid">
+            <div class="wf-meta-row">
+              <span class="wf-meta-label">Name</span>
+              <span class="wf-meta-value">Scaling Up Coaches</span>
+            </div>
+            <div class="wf-meta-row">
+              <span class="wf-meta-label">ACCESS_POLICY_VERSION</span>
+              <span class="wf-meta-value"><code>v1.intersection</code></span>
+            </div>
+            <div class="wf-meta-row" style="grid-column: 1 / span 2;">
+              <span class="wf-meta-label">Description</span>
+              <span class="wf-meta-value">Default group &mdash; full INVITED suite + Scaling Up Assessment</span>
+            </div>
+            <div class="wf-meta-row">
+              <span class="wf-meta-label">Created by</span>
+              <span class="wf-meta-value">admin@scalingup.com</span>
+            </div>
+            <div class="wf-meta-row">
+              <span class="wf-meta-label">Created at</span>
+              <span class="wf-meta-value">May 16, 2026 09:14 EDT</span>
+            </div>
+            <div class="wf-meta-row">
+              <span class="wf-meta-label">Updated at</span>
+              <span class="wf-meta-value">May 15, 2026 16:42 EDT (2 days ago)</span>
+            </div>
+            <div class="wf-meta-row">
+              <span class="wf-meta-label">Archived (deletedAt)</span>
+              <span class="wf-meta-value is-null">&mdash; not archived</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Coaches in this group -->
+        <section class="wf-section">
+          <div class="wf-section-header">
+            <div>
+              <h3 class="wf-section-title">Coaches in this group</h3>
+              <p class="wf-section-sub">4 of 12 shown. Removing a coach runs the access-change guard against their remaining groups.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button type="button" class="wf-btn wf-btn-secondary wf-btn-sm">Bulk add certified coaches</button>
+              <button type="button" class="wf-btn wf-btn-primary wf-btn-sm">+ Add Coach</button>
+            </div>
+          </div>
+          <div class="wf-table-wrap">
+            <table class="wf-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Joined</th>
+                  <th class="col-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Sarah Mitchell</td>
+                  <td><span class="wf-mono">sarah.mitchell@scalingup.com</span></td>
+                  <td>May 16, 2026</td>
+                  <td style="text-align: right;"><button type="button" class="wf-remove-btn">Remove</button></td>
+                </tr>
+                <tr>
+                  <td>James Park</td>
+                  <td><span class="wf-mono">james.park@scalingup.com</span></td>
+                  <td>May 16, 2026</td>
+                  <td style="text-align: right;"><button type="button" class="wf-remove-btn">Remove</button></td>
+                </tr>
+                <tr>
+                  <td>Diane Chen</td>
+                  <td><span class="wf-mono">diane.chen@scalingup.com</span></td>
+                  <td>May 16, 2026</td>
+                  <td style="text-align: right;"><button type="button" class="wf-remove-btn">Remove</button></td>
+                </tr>
+                <tr>
+                  <td>Marcus Webb</td>
+                  <td><span class="wf-mono">marcus.webb@scalingup.com</span></td>
+                  <td>May 16, 2026</td>
+                  <td style="text-align: right;"><button type="button" class="wf-remove-btn">Remove</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Templates this group accesses -->
+        <section class="wf-section">
+          <div class="wf-section-header">
+            <div>
+              <h3 class="wf-section-title">Templates this group accesses</h3>
+              <p class="wf-section-sub">Removing a template runs the access-change guard against ALL coaches in this group.</p>
+            </div>
+            <button type="button" class="wf-btn wf-btn-primary wf-btn-sm">+ Add Template</button>
+          </div>
+          <div class="wf-table-wrap">
+            <table class="wf-table">
+              <thead>
+                <tr>
+                  <th>Template name</th>
+                  <th>Alias</th>
+                  <th class="col-right">Coaches gaining access</th>
+                  <th class="col-right">Coaches losing access if removed</th>
+                  <th class="col-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Rockefeller Habits Checklist</td>
+                  <td><span class="wf-mono">rockefeller-habits</span></td>
+                  <td class="wf-cell-num">12</td>
+                  <td class="wf-cell-num">0</td>
+                  <td style="text-align: right;"><button type="button" class="wf-remove-btn">Remove</button></td>
+                </tr>
+                <tr>
+                  <td>Vision Alignment</td>
+                  <td><span class="wf-mono">vision-alignment</span></td>
+                  <td class="wf-cell-num">12</td>
+                  <td class="wf-cell-num">12</td>
+                  <td style="text-align: right;"><button type="button" class="wf-remove-btn">Remove</button></td>
+                </tr>
+                <tr>
+                  <td>Quarterly Strategic Priorities v2</td>
+                  <td><span class="wf-mono">qsp-v2</span></td>
+                  <td class="wf-cell-num">12</td>
+                  <td class="wf-cell-num">0</td>
+                  <td style="text-align: right;"><button type="button" class="wf-remove-btn">Remove</button></td>
+                </tr>
+                <tr>
+                  <td>Scaling Up Assessment <span style="font-size: 0.75rem; margin-left: 0.25rem;">&#x1F451;</span></td>
+                  <td><span class="wf-mono">scaling-up-assessment</span></td>
+                  <td class="wf-cell-num">12</td>
+                  <td class="wf-cell-num">9</td>
+                  <td style="text-align: right;"><button type="button" class="wf-remove-btn">Remove</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- evaluateAccessChange preview panel (STATIC, demonstrates structure) -->
+        <section class="wf-preview-panel">
+          <div class="wf-preview-header">
+            <h3 class="wf-preview-title">Access change preview &mdash; review before saving</h3>
+            <span class="wf-preview-trigger">Triggered automatically when admin removes a coach or template</span>
+          </div>
+          <div class="wf-preview-body">
+            <p class="wf-preview-context">
+              <strong>Proposed change:</strong> Remove template <code>Vision Alignment</code> from group <code>Scaling Up Coaches</code>.
+              <br/>
+              The <code>evaluateAccessChange</code> guard computes per-affected-coach BEFORE / AFTER template sets at
+              SERIALIZABLE isolation level under advisory locks. Any coach whose AFTER set becomes empty AND owns
+              active campaigns or organizations triggers <code>BLOCKED_ZERO_ACCESS</code> (HTTP 409) unless force is set.
+            </p>
+
+            <div class="wf-preview-cols">
+              <!-- BEFORE column -->
+              <div class="wf-preview-col">
+                <h4 class="wf-preview-col-head">Before &mdash; 4 sample coaches</h4>
+
+                <div class="wf-preview-coach">
+                  <div class="wf-preview-coach-name">Sarah Mitchell</div>
+                  <div class="wf-preview-coach-tpls">Rockefeller, Vision Alignment, QSP v2, Scaling Up Assessment</div>
+                  <div class="wf-preview-coach-count">4 templates &middot; in 1 group</div>
+                </div>
+
+                <div class="wf-preview-coach">
+                  <div class="wf-preview-coach-name">James Park</div>
+                  <div class="wf-preview-coach-tpls">Rockefeller, Vision Alignment, QSP v2, Scaling Up Assessment</div>
+                  <div class="wf-preview-coach-count">4 templates &middot; in 1 group</div>
+                </div>
+
+                <div class="wf-preview-coach">
+                  <div class="wf-preview-coach-name">Diane Chen</div>
+                  <div class="wf-preview-coach-tpls">Rockefeller, Vision Alignment, QSP v2, Scaling Up Assessment</div>
+                  <div class="wf-preview-coach-count">4 templates &middot; in 1 group</div>
+                </div>
+
+                <div class="wf-preview-coach">
+                  <div class="wf-preview-coach-name">Marcus Webb</div>
+                  <div class="wf-preview-coach-tpls">Rockefeller, Vision Alignment, QSP v2, Scaling Up Assessment</div>
+                  <div class="wf-preview-coach-count">4 templates &middot; in 1 group</div>
+                </div>
+              </div>
+
+              <!-- AFTER column -->
+              <div class="wf-preview-col">
+                <h4 class="wf-preview-col-head">After &mdash; same 4 coaches</h4>
+
+                <div class="wf-preview-coach">
+                  <div class="wf-preview-coach-name">Sarah Mitchell</div>
+                  <div class="wf-preview-coach-tpls">
+                    Rockefeller, <span class="strike">Vision Alignment</span>, QSP v2, Scaling Up Assessment
+                  </div>
+                  <div class="wf-preview-coach-count">3 templates (-1) &middot; in 1 group</div>
+                </div>
+
+                <div class="wf-preview-coach">
+                  <div class="wf-preview-coach-name">James Park</div>
+                  <div class="wf-preview-coach-tpls">
+                    Rockefeller, <span class="strike">Vision Alignment</span>, QSP v2, Scaling Up Assessment
+                  </div>
+                  <div class="wf-preview-coach-count">3 templates (-1) &middot; in 1 group</div>
+                </div>
+
+                <div class="wf-preview-coach">
+                  <div class="wf-preview-coach-name">Diane Chen</div>
+                  <div class="wf-preview-coach-tpls">
+                    Rockefeller, <span class="strike">Vision Alignment</span>, QSP v2, Scaling Up Assessment
+                  </div>
+                  <div class="wf-preview-coach-count">3 templates (-1) &middot; in 1 group</div>
+                </div>
+
+                <div class="wf-preview-coach">
+                  <div class="wf-preview-coach-name">Marcus Webb</div>
+                  <div class="wf-preview-coach-tpls">
+                    Rockefeller, <span class="strike">Vision Alignment</span>, QSP v2, Scaling Up Assessment
+                  </div>
+                  <div class="wf-preview-coach-count">3 templates (-1) &middot; in 1 group</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Summary callout -->
+            <div class="wf-preview-summary">
+              <strong>Summary across all 12 affected coaches:</strong> all 12 drop from 4&nbsp;&rarr;&nbsp;3 effective templates.
+              <strong>Zero coaches hit zero-access</strong> &mdash; no <code style="background: hsl(160 84% 88%);">BLOCKED_ZERO_ACCESS</code>
+              409 fires. Active campaigns using <code>Vision Alignment</code> stay manageable in read-only mode per
+              <code style="background: hsl(160 84% 88%);">canManageCampaign</code> revocation rules.
+            </div>
+
+            <!-- Force-toggle (illustrative — when at least one coach would hit zero) -->
+            <div class="wf-preview-force">
+              <input type="checkbox" id="force-toggle" />
+              <label for="force-toggle" class="wf-preview-force-text">
+                <strong>Force this change anyway</strong> &mdash; admin override.
+                <span class="note">Required only when one or more coaches would drop to zero effective templates AND own active campaigns/orgs. Setting this writes an <code>AuditLog</code> row with <code>action=&quot;FORCE_ZERO&quot;</code> and admin must provide a reason in the audit metadata.</span>
+              </label>
+            </div>
+
+            <div class="wf-preview-actions">
+              <button type="button" class="wf-btn wf-btn-secondary">Cancel</button>
+              <button type="button" class="wf-btn wf-btn-primary">Confirm change</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- v7.6 service-layer surface card -->
+        <section class="wf-card-deferred">
+          <h3>v7.6 service-layer surface</h3>
+          <ul>
+            <li>
+              <code>canAccessTemplate</code> &mdash; INTERSECTION across all of the coach's non-archived group memberships.
+              Per <code>02-service-layer-rules.md</code>: zero non-archived groups &rarr; zero access; one missing template in any group &rarr; that template excluded.
+            </li>
+            <li>
+              <code>evaluateAccessChange(tx, coachId, proposedGroupIds)</code> &mdash; transactional guard. Runs in one
+              Prisma <code>$transaction</code> at SERIALIZABLE isolation; acquires <code>pg_advisory_xact_lock</code> on
+              <code>access-change:&lt;coachId&gt;</code> AND <code>access-group:&lt;groupId&gt;</code> in alphabetical
+              order; <code>SELECT &hellip; FOR UPDATE</code> on the group + every membership/template join in scope;
+              re-reads the affected-coach list inside the transaction (Round 3 H-4); writes <code>AuditLog</code>
+              transactionally via <code>tx.auditLog.create</code> (NEVER the swallowing <code>logAudit()</code> wrapper).
+            </li>
+            <li>
+              <code>archiveAccessGroup(groupId)</code> / <code>undeleteAccessGroup(groupId)</code> /
+              <code>hardDeleteAccessGroup(groupId)</code> are all gated by the same guard. Archive shrinks effective
+              access (intersection); undelete can ALSO shrink under INTERSECTION (an extra constraining group is added back).
+            </li>
+            <li>
+              <code>canManageCampaign</code> &mdash; coach who loses template access keeps READ on existing campaigns;
+              cannot invite new respondents or create new campaigns with that template. Active campaigns stay live.
+            </li>
+            <li>
+              <code>BLOCKED_ZERO_ACCESS</code> &rarr; HTTP 409. <code>force=true</code> in the request body bypasses the
+              guard and writes <code>AuditLog.action=&quot;FORCE_ZERO&quot;</code> with a mandatory <code>reason</code> field.
+            </li>
+          </ul>
+        </section>
+
+        <div class="wf-end-note">
+          <strong>Wireframe end note.</strong>
+          The preview panel above is rendered as STATIC content in this wireframe so reviewers can see the
+          structure without interaction. In production, the panel is triggered by clicking any Remove button on the
+          coaches table OR the templates table; Cancel returns to the prior state without mutation; Confirm runs
+          the transaction and emits the <code>assessment.access.change.outcome</code> metric per
+          <code>docs/specs/v7.6/06-observability.md</code>. Cross-link to Wireframe 23 for the aggregate report
+          covering the four templates this group accesses (v1.5 will add a group-scoped filter).
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

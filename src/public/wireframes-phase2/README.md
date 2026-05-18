@@ -65,10 +65,10 @@ after the May 12 standing call.
 | #  | Task                                                          | Status | v1 vs v1.5 |
 |----|---------------------------------------------------------------|--------|------------|
 | 1  | Admin — Users list (`11-admin-users-list.html`)               | [x]    | v1 surface |
-| 2  | Admin — User detail + memberships + template access (`12-admin-user-detail.html`) | [x] | v1 surface |
-| 3  | Admin — Memberships per-org grant + modal preview (`13-admin-memberships.html`) | [x] | v1 surface |
+| 2  | Admin — User detail + owned organizations + template access (`12-admin-user-detail.html`) | [x] | v1 surface (v7.6 revised May 15 2026 — Memberships card replaced with read-only "Owned Organizations") |
+| 3  | ~~Admin — Memberships per-org grant~~ **REMOVED v7.6 (May 15 2026)** — coaches own their organizations directly; no admin-level membership grants. | [removed] | — |
 | 4  | Admin — Templates list (`14-admin-templates-list.html`)       | [x]    | v1 (read-only catalogue) |
-| 5  | Admin — Template Access Management per-coach matrix (`15-admin-template-access.html`) | [x] | v1 surface |
+| 5  | Admin — Access Groups index (`15-admin-template-access.html`) | [x] | v1 surface (v7.6 redesigned May 15 2026 — pivoted from per-coach template grants to Access Groups with INTERSECTION semantics) |
 | 6  | Admin — Template editor: Metadata + Sections (`16-admin-template-editor-meta.html`) | [x] | v1.5 surface |
 | 7  | Admin — Template editor: Questions (`17-admin-template-editor-questions.html`) | [x] | v1.5 surface |
 | 8  | Admin — Template editor: Scoring + Tiers, Codex-trimmed (`18-admin-template-editor-logic.html`) | [x] | v1.5 surface |
@@ -90,6 +90,36 @@ consolidated report for Scaling Up Assessment, coach campaign detail
 honoring `aggregationMode`, team aggregate, Trends year-over-year,
 printable PDF). Not dispatched yet; sequencing TBD once Jeff's Wave 2
 feedback lands.
+
+## Wave 5 status — Admin lane add-ons (shipped May 17 2026)
+
+Wave 5 covers the v7.6 admin-lane additions for the Assessment Tool:
+Access Groups list + detail (with `evaluateAccessChange` preview),
+admin Aggregate Report (per-template / per-version, v1 MVP shape), and
+the platform-nav integration sketch. Each HTML wireframe ships with a
+paired markdown spec at `docs/wireframes-phase2/wave5/<NN>-<slug>.md`
+that future implementer subagents can load as the contract.
+
+| #  | Task                                                                                | HTML wireframe                                | Paired markdown spec                                                       | Status | v1 vs v1.5 |
+|----|-------------------------------------------------------------------------------------|-----------------------------------------------|----------------------------------------------------------------------------|--------|------------|
+| 21 | Admin — Access Groups list                                                          | `admin/21-admin-access-groups-list.html`      | `docs/wireframes-phase2/wave5/21-admin-access-groups-list.md`              | [x]    | v1         |
+| 22 | Admin — Access Group detail (with `evaluateAccessChange` STATIC preview)            | `admin/22-admin-access-group-detail.html`     | `docs/wireframes-phase2/wave5/22-admin-access-group-detail.md`             | [x]    | v1         |
+| 23 | Admin — Aggregate Report (per-template dashboard, v1 MVP shape)                     | `admin/23-admin-aggregate-report.html`        | `docs/wireframes-phase2/wave5/23-admin-aggregate-report.md`                | [x]    | v1 MVP     |
+| 24 | Platform Nav — Assessments entry (chrome only, BEFORE/AFTER split view)             | `admin/24-platform-nav-assessments-entry.html`| `docs/wireframes-phase2/wave5/24-platform-nav-assessments-entry.md`        | [x]    | v1         |
+
+**Locked rules** (per `docs/specs/v7.6/05-wireframes-wave5.md`):
+
+- Wireframe 22's `evaluateAccessChange` preview renders as STATIC
+  content (not click-driven) so reviewers see the structure without
+  interaction.
+- Wireframe 23 ships with **TWO selectors only** (template + version).
+  No time-range chip, no group filter, no per-org table on day 1 —
+  those are deferred to v1.5.
+- Wireframe 24 is chrome-only — no mock business data beyond nav
+  labels and minimal stat-card placeholders for orientation.
+- Each markdown spec opens with the standardized header (spec ref,
+  status, paired HTML, service-layer dependencies) and closes with the
+  provenance footer pointing to `plans/history/v6-v7.5-archive.md`.
 
 ## v7.5 spec reference
 
@@ -127,16 +157,31 @@ wireframes-phase2/
 │   ├── 18a-participant-public-contact-form.html
 │   └── 19-participant-public-results.html         # + W1.5-T12 SunHub share note
 │
-└── admin/                            # Wave 2 — Admin lane (shipped May 13 2026)
+└── admin/                            # Wave 2 — Admin lane (shipped May 13 2026; v7.6 revisions May 15 2026) + Wave 5 (May 17 2026)
     ├── 11-admin-users-list.html
-    ├── 12-admin-user-detail.html
-    ├── 13-admin-memberships.html
+    ├── 12-admin-user-detail.html                  # v7.6: Memberships card → Owned Organizations (read-only)
+    │                                              # (the per-org Memberships wireframe was removed v7.6 — coaches own their own orgs)
     ├── 14-admin-templates-list.html
-    ├── 15-admin-template-access.html
+    ├── 15-admin-template-access.html              # v7.6: redesigned as Access Groups index (INTERSECTION semantics)
     ├── 16-admin-template-editor-meta.html
     ├── 17-admin-template-editor-questions.html
     ├── 18-admin-template-editor-logic.html        # Codex-trimmed: Scoring + Tiers only
-    └── 20-admin-public-wizard-flow.html
+    ├── 20-admin-public-wizard-flow.html
+    ├── 21-admin-access-groups-list.html           # Wave 5 — Access Groups list
+    ├── 22-admin-access-group-detail.html          # Wave 5 — Access Group detail (with evaluateAccessChange STATIC preview)
+    ├── 23-admin-aggregate-report.html             # Wave 5 — Aggregate Report (per-template, v1 MVP: 2 selectors)
+    └── 24-platform-nav-assessments-entry.html     # Wave 5 — Platform nav integration (chrome only)
+```
+
+**Paired markdown specs** for Wave 5 live outside `src/public/` so they
+are LLM-loadable contracts for future implementer subagents:
+
+```
+docs/wireframes-phase2/wave5/
+├── 21-admin-access-groups-list.md
+├── 22-admin-access-group-detail.md
+├── 23-admin-aggregate-report.md
+└── 24-platform-nav-assessments-entry.md
 ```
 
 ## Visual conventions

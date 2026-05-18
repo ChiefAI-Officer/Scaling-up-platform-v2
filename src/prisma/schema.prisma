@@ -27,6 +27,14 @@ model User {
   sessions     Session[]
   coachProfile Coach?     // Sprint 1: User↔Coach FK
 
+  // Assessment v7.6 back-relations (compile-time only; no new DB columns on users table)
+  assessmentTemplatesCreated AssessmentTemplate[]          @relation("AssessmentTemplateCreatedBy")
+  assessmentCampaignsCreated AssessmentCampaign[]          @relation("AssessmentCampaignCreatedBy")
+  accessGroupsCreated        AccessGroup[]                 @relation("AccessGroupCreatedBy")
+  accessGroupCoachLinks      AccessGroupCoach[]            @relation("AccessGroupCoachAddedBy")
+  accessGroupTemplateLinks   AccessGroupTemplate[]         @relation("AccessGroupTemplateAddedBy")
+  organizationOwnershipEvents OrganizationOwnershipEvent[] @relation("OrgOwnershipPerformedBy")
+
   @@map("users")
 }
 
@@ -95,6 +103,13 @@ model Coach {
   certifications  CoachCertification[]
   approvals       ApprovalQueue[]
   followUpReports FollowUpReport[]
+
+  // Assessment v7.6 back-relations (compile-time only; no new DB columns on coaches table)
+  ownedOrganizations          Organization[]
+  accessGroupMemberships      AccessGroupCoach[]
+  createdAssessmentCampaigns  AssessmentCampaign[]            @relation("AssessmentCampaignCreatedByCoach")
+  orgOwnershipEventsFromCoach OrganizationOwnershipEvent[]    @relation("OrgOwnershipFromCoach")
+  orgOwnershipEventsToCoach   OrganizationOwnershipEvent[]    @relation("OrgOwnershipToCoach")
 
   @@map("coaches")
 }
@@ -1013,4 +1028,375 @@ model TransactionalEmailTemplate {
   previousBody    String?
 
   @@map("transactional_email_templates")
+}
+
+// ============================================
+// Assessment Tool v1 (v7.5) — Foundation
+// ============================================
+// Assessment Tool v7.6 — Greenfield additive: all NEW tables. The User and
+// Coach models above gain back-relation fields only (compile-time; zero new
+// DB columns on existing tables). v7.6 amends the May 14 v7.5 plan in place:
+// drops OrganizationMembership + TemplateAccessGrant; adds AccessGroup /
+// AccessGroupCoach / AccessGroupTemplate / OrganizationOwnershipEvent.
+// Organization.createdBy is replaced by Organization.ownerCoachId.
+// AssessmentCampaign gains createdByCoachId (nullable).
+//
+// Raw SQL appended to migration.sql adds:
+//   - Partial unique index on organizations.externalId WHERE NOT NULL
+//     (replaces Prisma's full unique index)
+//   - Partial unique index on assessment_submissions(campaignId, respondentId)
+//     WHERE respondentId IS NOT NULL
+//   - Partial unique index on assessment_submissions(resultsTokenHash)
+//     WHERE resultsTokenHash IS NOT NULL
+//   - Partial unique index on assessment_campaign_participants(campaignId)
+//     WHERE isCEO = true  (at most one CEO per campaign)
+//   - GIN index on assessment_campaign_participants(teamPathAtAdd) for
+//     :scopeTeamId = ANY(teamPathAtAdd) lookups
+//   - Immutability trigger on assessment_template_versions blocking
+//     UPDATE/DELETE when publishedAt IS NOT NULL
+//   - Partial unique index on access_groups.name WHERE deletedAt IS NULL
+//     (allows soft-deleted groups to coexist with a fresh active one of the
+//     same name)
+
+model Organization {
+  id            String    @id @default(cuid())
+  name          String
+  externalId    String?   @unique // Prisma full-unique dropped; replaced with partial WHERE NOT NULL via raw SQL
+  ownerCoachId  String    // v7.6: single owning coach (replaces v7.5 createdBy + OrganizationMembership)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  owner            Coach                          @relation(fields: [ownerCoachId], references: [id])
+  teams            OrgTeam[]
+  respondents      OrgRespondent[]
+  campaigns        AssessmentCampaign[]
+  ownershipEvents  OrganizationOwnershipEvent[]
+
+  @@index([ownerCoachId])
+  @@map("organizations")
+}
+
+model OrgTeam {
+  id             String    @id @default(cuid())
+  organizationId String
+  parentTeamId   String?
+  name           String
+  type           String?
+  description    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  parentTeam   OrgTeam?        @relation("TeamHierarchy", fields: [parentTeamId], references: [id])
+  childTeams   OrgTeam[]       @relation("TeamHierarchy")
+  respondents  OrgRespondent[]
+
+  @@index([organizationId, parentTeamId])
+  @@map("org_teams")
+}
+
+model OrgRespondent {
+  id              String    @id @default(cuid())
+  organizationId  String
+  teamId          String?
+  email           String
+  normalizedEmail String?   // lowercased + trimmed; for future per-org uniqueness rule
+  firstName       String
+  lastName        String
+  jobTitle        String?
+  externalId      String?
+  dedupeSource    String    // "external" | "email"
+  dedupeValue     String    // externalId value OR normalizedEmail value
+  roleType        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  organization Organization                    @relation(fields: [organizationId], references: [id])
+  team         OrgTeam?                        @relation(fields: [teamId], references: [id])
+  participants AssessmentCampaignParticipant[]
+  invitations  AssessmentInvitation[]
+  submissions  AssessmentSubmission[]
+
+  @@unique([organizationId, dedupeSource, dedupeValue])
+  @@index([organizationId, email])
+  @@index([organizationId, normalizedEmail])
+  @@index([externalId])
+  @@map("org_respondents")
+}
+
+model AssessmentTemplate {
+  id                     String                              @id @default(cuid())
+  name                   String
+  alias                  String                              @unique
+  description            String?
+  invitationSubject      String
+  invitationBodyMarkdown String
+  aggregationMode        AssessmentTemplateAggregationMode   @default(FULL_VISIBILITY)
+  createdBy              String
+  createdAt              DateTime                            @default(now())
+  updatedAt              DateTime                            @updatedAt
+  deletedAt              DateTime?
+
+  creator       User                        @relation("AssessmentTemplateCreatedBy", fields: [createdBy], references: [id])
+  versions      AssessmentTemplateVersion[]
+  campaigns     AssessmentCampaign[]
+  accessGroups  AccessGroupTemplate[]
+
+  @@map("assessment_templates")
+}
+
+model AssessmentTemplateVersion {
+  id            String    @id @default(cuid())
+  templateId    String
+  versionNumber Int
+  language      String
+  questions     Json
+  sections      Json
+  scoringConfig Json
+  reportConfig  Json?
+  contentHash   String    // sha256 of canonical JSON serialization of {questions, sections, scoringConfig, reportConfig, invitationSubject, invitationBodyMarkdown}
+  publishedAt   DateTime?
+  publishedBy   String?
+  createdAt     DateTime  @default(now())
+
+  template  AssessmentTemplate   @relation(fields: [templateId], references: [id])
+  campaigns AssessmentCampaign[]
+
+  @@unique([templateId, versionNumber, language])
+  @@index([templateId, language])
+  @@map("assessment_template_versions")
+}
+
+model AssessmentCampaign {
+  id                  String                       @id @default(cuid())
+  templateId          String
+  versionId           String
+  organizationId      String
+  language            String
+  alias               String                       @unique
+  name                String
+  description         String?
+  status              AssessmentCampaignStatus     @default(DRAFT)
+  accessMode          AssessmentCampaignAccessMode @default(INVITED)
+  publicConfig        Json?
+  openAt              DateTime
+  endMode             AssessmentCampaignEndMode
+  closeAt             DateTime?
+  notifyAdminOnSubmit Boolean                      @default(true)
+  createdBy           String
+  createdByCoachId    String?                      // v7.6: role-specific coach ownership pointer (nullable so admin PUBLIC campaigns can omit)
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+
+  template       AssessmentTemplate              @relation(fields: [templateId], references: [id])
+  version        AssessmentTemplateVersion       @relation(fields: [versionId], references: [id])
+  organization   Organization                    @relation(fields: [organizationId], references: [id])
+  creator        User                            @relation("AssessmentCampaignCreatedBy", fields: [createdBy], references: [id])
+  creatorCoach   Coach?                          @relation("AssessmentCampaignCreatedByCoach", fields: [createdByCoachId], references: [id])
+  participants   AssessmentCampaignParticipant[]
+  invitations    AssessmentInvitation[]
+  submissions    AssessmentSubmission[]
+  ownershipEvents OrganizationOwnershipEvent[]
+
+  @@index([organizationId])
+  @@index([templateId, organizationId])
+  @@index([versionId])
+  @@index([createdByCoachId])
+  @@map("assessment_campaigns")
+}
+
+model AssessmentCampaignParticipant {
+  id              String   @id @default(cuid())
+  campaignId      String
+  respondentId    String
+  isCEO           Boolean  @default(false)
+  teamPathAtAdd   String[] // IDs from root to leaf at add-time
+  teamLabelsAtAdd String[] // display names snapshot (parallel array to teamPathAtAdd)
+  addedAt         DateTime @default(now())
+
+  campaign   AssessmentCampaign @relation(fields: [campaignId], references: [id])
+  respondent OrgRespondent      @relation(fields: [respondentId], references: [id])
+
+  @@unique([campaignId, respondentId])
+  // Partial unique on (campaignId) WHERE isCEO = true added via raw SQL
+  // GIN index on teamPathAtAdd added via raw SQL
+  @@map("assessment_campaign_participants")
+}
+
+model AssessmentInvitation {
+  id           String                     @id @default(cuid())
+  campaignId   String
+  respondentId String
+  tokenHash    String                     @unique
+  status       AssessmentInvitationStatus @default(PENDING)
+  expiresAt    DateTime
+  sentAt       DateTime?
+  submittedAt  DateTime?
+  revokedAt    DateTime?
+  resentCount  Int                        @default(0)
+  lastResentAt DateTime?
+  createdAt    DateTime                   @default(now())
+
+  campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
+  respondent OrgRespondent         @relation(fields: [respondentId], references: [id])
+  submission AssessmentSubmission?
+
+  @@unique([campaignId, respondentId])
+  @@map("assessment_invitations")
+}
+
+model AssessmentSubmission {
+  id                    String    @id @default(cuid())
+  campaignId            String
+  respondentId          String? // nullable for PUBLIC submissions
+  invitationId          String?   @unique // nullable for PUBLIC submissions; Postgres treats nullable @unique as effectively partial
+  submittedAt           DateTime  @default(now())
+  answers               Json // truth — [{stableKey, value} | {stableKey, textValue} | {stableKey, selectedKeys}]
+  result                Json // frozen ScoreResult cache
+  publicTaker           Json? // {email, firstName, lastName, ...} for PUBLIC
+  referringCoachEmail   String?
+  resultsTokenHash      String?
+  resultsTokenIssuedAt  DateTime?
+  resultsTokenExpiresAt DateTime?
+  resultsTokenRevokedAt DateTime?
+  resultsTokenViewedAt  DateTime?
+
+  campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
+  respondent OrgRespondent?        @relation(fields: [respondentId], references: [id])
+  invitation AssessmentInvitation? @relation(fields: [invitationId], references: [id])
+
+  @@index([campaignId])
+  @@index([respondentId, submittedAt])
+  @@index([referringCoachEmail])
+  // Partial unique indexes added via raw SQL:
+  //   - (campaignId, respondentId) WHERE respondentId IS NOT NULL
+  //   - (resultsTokenHash) WHERE resultsTokenHash IS NOT NULL
+  @@map("assessment_submissions")
+}
+
+// v7.6: AccessGroup replaces TemplateAccessGrant. Groups grant template
+// access; coaches link to groups; templates link to groups. RBAC semantics
+// (intersection vs union) are runtime-flagged via ACCESS_POLICY_VERSION env.
+// Hard-delete cascades to the join rows via FK; soft-delete (deletedAt)
+// excludes the group from canAccessTemplate but preserves join rows.
+//
+// Raw SQL adds:
+//   - Partial unique index on access_groups.name WHERE deletedAt IS NULL.
+
+model AccessGroup {
+  id                   String    @id @default(cuid())
+  name                 String    // Partial unique enforced via raw SQL (WHERE deletedAt IS NULL)
+  description          String?
+  accessPolicyVersion  String    @default("v1.intersection")
+  createdBy            String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+
+  creator         User                   @relation("AccessGroupCreatedBy", fields: [createdBy], references: [id])
+  coachMembers    AccessGroupCoach[]
+  templateAccess  AccessGroupTemplate[]
+
+  @@index([deletedAt])
+  @@map("access_groups")
+}
+
+model AccessGroupCoach {
+  id            String   @id @default(cuid())
+  accessGroupId String
+  coachId       String
+  addedAt       DateTime @default(now())
+  addedBy       String
+
+  accessGroup AccessGroup @relation(fields: [accessGroupId], references: [id], onDelete: Cascade)
+  coach       Coach       @relation(fields: [coachId], references: [id])
+  adder       User        @relation("AccessGroupCoachAddedBy", fields: [addedBy], references: [id])
+
+  @@unique([accessGroupId, coachId])
+  @@index([coachId])
+  @@index([accessGroupId])
+  @@map("access_group_coaches")
+}
+
+model AccessGroupTemplate {
+  id            String   @id @default(cuid())
+  accessGroupId String
+  templateId    String
+  addedAt       DateTime @default(now())
+  addedBy       String
+
+  accessGroup AccessGroup        @relation(fields: [accessGroupId], references: [id], onDelete: Cascade)
+  template    AssessmentTemplate @relation(fields: [templateId], references: [id])
+  adder       User               @relation("AccessGroupTemplateAddedBy", fields: [addedBy], references: [id])
+
+  @@unique([accessGroupId, templateId])
+  @@index([templateId])
+  @@index([accessGroupId])
+  @@map("access_group_templates")
+}
+
+// v7.6: Audit-of-record for Organization ownership lifecycle. Initial
+// creation writes (fromCoachId=null, toCoachId=owner); each transfer writes
+// one row; if includeClosedCampaigns=false on a transfer, one additional
+// retained-campaign row is written per retained closed campaign.
+model OrganizationOwnershipEvent {
+  id              String   @id @default(cuid())
+  organizationId  String
+  kind            String   // CREATED | TRANSFERRED | RETAINED_CLOSED_CAMPAIGN (free-text to allow future kinds)
+  oldOwnerCoachId String?
+  newOwnerCoachId String?
+  campaignId      String?
+  performedBy     String
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  oldOwner     Coach?              @relation("OrgOwnershipFromCoach", fields: [oldOwnerCoachId], references: [id])
+  newOwner     Coach?              @relation("OrgOwnershipToCoach",   fields: [newOwnerCoachId], references: [id])
+  campaign     AssessmentCampaign? @relation(fields: [campaignId], references: [id])
+  performer    User                @relation("OrgOwnershipPerformedBy", fields: [performedBy], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@map("organization_ownership_events")
+}
+
+// ============================================
+// Assessment v7.5 — Enums
+// ============================================
+
+enum AssessmentCampaignStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum AssessmentCampaignEndMode {
+  OPEN_END
+  ENDS_AFTER
+}
+
+enum AssessmentInvitationStatus {
+  PENDING
+  SENT
+  VIEWED
+  SUBMITTED
+}
+
+enum AssessmentQuestionType {
+  SLIDER_LIKERT
+  NUMBER
+  MULTI_CHOICE
+}
+
+enum AssessmentCampaignAccessMode {
+  INVITED
+  PUBLIC
+}
+
+enum AssessmentTemplateAggregationMode {
+  FULL_VISIBILITY
+  CEO_ONLY
 }

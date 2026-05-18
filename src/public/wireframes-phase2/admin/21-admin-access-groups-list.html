@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1280, initial-scale=1">
-  <title>15 — Admin Access Groups index (Phase 2, v7.6)</title>
+  <title>21 — Admin Access Groups list (Phase 2, Wave 5, v7.6)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../_shared.css">
   <style>
-    /* ---------- Page-level chrome (mirrors WF11/WF12/WF14) ---------- */
     body { background: hsl(220 14% 96%); }
 
     .page-head {
@@ -30,7 +29,6 @@
       margin: 0;
     }
 
-    /* ---------- Admin shell (sidebar + main) ---------- */
     .wf-shell {
       display: flex;
       min-height: 100vh;
@@ -134,12 +132,8 @@
     .wf-breadcrumb-current { color: hsl(var(--foreground)); font-weight: 500; }
     .wf-breadcrumb-sep { opacity: 0.5; }
 
-    .wf-page {
-      padding: 2rem;
-      width: 100%;
-    }
+    .wf-page { padding: 2rem; width: 100%; }
 
-    /* ---------- Page header row ---------- */
     .wf-page-header-row {
       display: flex;
       align-items: flex-start;
@@ -157,7 +151,7 @@
       line-height: 1.5;
     }
 
-    /* ---------- Yellow INTERSECTION info banner ---------- */
+    /* Yellow INTERSECTION info banner */
     .wf-intersection-banner {
       background: hsl(38 92% 95%);
       border: 1px solid hsl(38 92% 80%);
@@ -188,7 +182,7 @@
       color: hsl(26 83% 22%);
     }
 
-    /* ---------- Access Groups table ---------- */
+    /* Access Groups table */
     .wf-table-wrap {
       overflow: hidden;
       border-radius: var(--radius);
@@ -213,6 +207,7 @@
       border-bottom: 1px solid hsl(var(--border));
       white-space: nowrap;
     }
+    .wf-table th.col-desc { min-width: 320px; }
     .wf-table th.col-num { text-align: right; width: 110px; }
     .wf-table th.col-updated { width: 140px; }
     .wf-table th.col-manage { width: 80px; text-align: right; }
@@ -241,6 +236,12 @@
     .wf-group-name.is-archived-name {
       font-style: italic;
       color: hsl(var(--muted-foreground));
+    }
+    .wf-group-desc {
+      color: hsl(var(--muted-foreground));
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      max-width: 420px;
     }
     .wf-archived-suffix {
       font-size: 0.75rem;
@@ -281,27 +282,32 @@
     .wf-manage-link:hover {
       background: hsl(var(--primary) / 0.1);
     }
-    .wf-manage-link.is-disabled {
-      color: hsl(var(--muted-foreground));
-      pointer-events: none;
-    }
 
-    /* ---------- Pills ---------- */
-    .wf-pill-archived {
+    .wf-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 1.25rem 0 0.75rem;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .wf-toggle {
       display: inline-flex;
       align-items: center;
-      gap: 0.3125rem;
-      padding: 0.125rem 0.5rem;
-      border-radius: 999px;
-      font-size: 0.625rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      background: hsl(var(--muted));
+      gap: 0.5rem;
+      font-size: 0.8125rem;
       color: hsl(var(--muted-foreground));
+      cursor: pointer;
+      user-select: none;
     }
+    .wf-toggle input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: hsl(var(--primary));
+    }
+    .wf-toggle.is-on { color: hsl(var(--foreground)); font-weight: 500; }
 
-    /* ---------- End-of-page note + deferred-content cards ---------- */
+    /* Service-layer surface card */
     .wf-card-deferred {
       margin-top: 1.5rem;
       padding: 1.25rem 1.5rem;
@@ -372,27 +378,27 @@
   <!-- Yellow wireframe banner -->
   <div class="wf-banner">
     <div>
-      <strong>WIREFRAME &mdash; admin Access Groups index</strong> (replaces v7.5 "Template Access Management" per-coach grants).
-      v7.6 lock (May 15 2026): admin manages template access via groups; coach inherits via group membership. INTERSECTION semantics.
+      <strong>WIREFRAME &mdash; 21 Admin Access Groups list</strong> (Wave 5).
+      v7.6 spec ref: <code>docs/specs/v7.6/05-wireframes-wave5.md</code> &middot; <code>02-service-layer-rules.md</code>.
+      Locked May 15&ndash;17 2026 (Jeff impromptu meeting + 3 rounds of Codex adversarial review).
     </div>
     <a href="../index.html" class="wf-back-to-index">&larr; Back to Phase 2 index</a>
   </div>
 
   <!-- Page heading -->
   <div class="page-head">
-    <h1>15 &mdash; Admin: Access Groups</h1>
-    <p>Group-driven template access. Detail view + management modals ship in Wave 5 (Wireframe 22).</p>
+    <h1>21 &mdash; Admin: Access Groups</h1>
+    <p>Group-driven template access. Click a group's row or chevron to manage members + templates (Wireframe 22).</p>
   </div>
 
   <!-- Admin shell: sidebar + main -->
   <div class="wf-shell">
-    <!-- Sidebar (Templates active) -->
     <aside class="wf-sidebar">
       <div class="wf-sidebar-brand">
         <span class="wf-sidebar-brand-mark">S</span>
         <span class="wf-sidebar-brand-text">
           <span>Scaling Up</span>
-          <span class="wf-sidebar-brand-sub">Admin</span>
+          <span class="wf-sidebar-brand-sub">Assessments &middot; Admin</span>
         </span>
       </div>
       <nav class="wf-sidebar-nav">
@@ -406,11 +412,17 @@
         <a class="wf-sidebar-link" href="#">
           <span class="wf-sidebar-link-dot"></span>Organizations
         </a>
-        <a class="wf-sidebar-link is-active" href="14-admin-templates-list.html" aria-current="page">
+        <a class="wf-sidebar-link" href="14-admin-templates-list.html">
           <span class="wf-sidebar-link-dot"></span>Templates
         </a>
+        <a class="wf-sidebar-link is-active" href="#" aria-current="page">
+          <span class="wf-sidebar-link-dot"></span>Access Groups
+        </a>
         <a class="wf-sidebar-link" href="#">
-          <span class="wf-sidebar-link-dot"></span>Assessments
+          <span class="wf-sidebar-link-dot"></span>Campaigns
+        </a>
+        <a class="wf-sidebar-link" href="23-admin-aggregate-report.html">
+          <span class="wf-sidebar-link-dot"></span>Aggregate Report
         </a>
         <a class="wf-sidebar-link" href="#">
           <span class="wf-sidebar-link-dot"></span>Public Quizzes
@@ -418,22 +430,16 @@
       </nav>
     </aside>
 
-    <!-- Main content -->
     <main class="wf-main">
-      <!-- Top bar with breadcrumb -->
       <div class="wf-topbar">
         <div class="wf-breadcrumb">
           <a href="#">Admin</a>
-          <span class="wf-breadcrumb-sep">/</span>
-          <a href="14-admin-templates-list.html">Templates</a>
           <span class="wf-breadcrumb-sep">/</span>
           <span class="wf-breadcrumb-current">Access Groups</span>
         </div>
       </div>
 
-      <!-- Page body -->
       <div class="wf-page">
-        <!-- Page header + + New Access Group CTA -->
         <div class="wf-page-header-row">
           <div>
             <h2 class="wf-page-title">Access Groups</h2>
@@ -445,12 +451,22 @@
           <button type="button" class="wf-btn wf-btn-primary">+ New Access Group</button>
         </div>
 
-        <!-- Yellow INTERSECTION semantics banner (above the table) -->
+        <!-- Yellow INTERSECTION semantics banner -->
         <div class="wf-intersection-banner">
           <strong>Access Groups grant template access to coaches via INTERSECTION semantics.</strong>
           A coach in multiple groups sees only templates that ALL their groups grant.
           <code>ACCESS_POLICY_VERSION</code> runtime flag controls policy (current: <code>v1.intersection</code>).
           See <code>docs/specs/v7.6/02-service-layer-rules.md</code>.
+        </div>
+
+        <div class="wf-toggle-row">
+          <label class="wf-toggle is-on">
+            <input type="checkbox" checked />
+            Show archived
+          </label>
+          <span style="font-size: 0.75rem; color: hsl(var(--muted-foreground));">
+            4 active &middot; 1 archived
+          </span>
         </div>
 
         <!-- Access Groups table -->
@@ -459,6 +475,7 @@
             <thead>
               <tr>
                 <th>Name</th>
+                <th class="col-desc">Description</th>
                 <th class="col-num">Coaches</th>
                 <th class="col-num">Templates</th>
                 <th class="col-updated">Updated</th>
@@ -469,53 +486,61 @@
               <!-- 1. Scaling Up Coaches -->
               <tr>
                 <td>
-                  <a class="wf-group-name" href="#">Scaling Up Coaches</a>
+                  <a class="wf-group-name" href="22-admin-access-group-detail.html">Scaling Up Coaches</a>
                 </td>
+                <td><span class="wf-group-desc">Default group &mdash; full INVITED suite + Scaling Up Assessment</span></td>
                 <td class="wf-num-cell">12</td>
                 <td class="wf-num-cell">4</td>
                 <td class="wf-updated-cell">2 days ago</td>
                 <td style="text-align: right;">
-                  <a class="wf-manage-link" href="#" aria-label="Manage Scaling Up Coaches group">&rsaquo;</a>
+                  <a class="wf-manage-link" href="22-admin-access-group-detail.html" aria-label="Manage Scaling Up Coaches group">&rsaquo;</a>
                 </td>
               </tr>
 
               <!-- 2. Chief AI Officer Coaches -->
               <tr>
                 <td>
-                  <a class="wf-group-name" href="#">Chief AI Officer Coaches</a>
+                  <a class="wf-group-name" href="22-admin-access-group-detail.html">Chief AI Officer Coaches</a>
                 </td>
+                <td><span class="wf-group-desc">Restricted track &mdash; Scaling Up Assessment only</span></td>
                 <td class="wf-num-cell">3</td>
                 <td class="wf-num-cell">1</td>
                 <td class="wf-updated-cell">1 week ago</td>
                 <td style="text-align: right;">
-                  <a class="wf-manage-link" href="#" aria-label="Manage Chief AI Officer Coaches group">&rsaquo;</a>
+                  <a class="wf-manage-link" href="22-admin-access-group-detail.html" aria-label="Manage Chief AI Officer Coaches group">&rsaquo;</a>
                 </td>
               </tr>
 
               <!-- 3. Beta Test Group -->
               <tr>
                 <td>
-                  <a class="wf-group-name" href="#">Beta Test Group</a>
+                  <a class="wf-group-name" href="22-admin-access-group-detail.html">Beta Test Group</a>
                 </td>
+                <td><span class="wf-group-desc">Internal-only access for QA</span></td>
                 <td class="wf-num-cell">2</td>
                 <td class="wf-num-cell">2</td>
                 <td class="wf-updated-cell">3 days ago</td>
                 <td style="text-align: right;">
-                  <a class="wf-manage-link" href="#" aria-label="Manage Beta Test Group">&rsaquo;</a>
+                  <a class="wf-manage-link" href="22-admin-access-group-detail.html" aria-label="Manage Beta Test Group">&rsaquo;</a>
                 </td>
               </tr>
 
               <!-- 4. Legacy Pilots (Archived) -->
               <tr class="is-archived">
                 <td>
-                  <a class="wf-group-name is-archived-name" href="#">Legacy Pilots</a>
+                  <a class="wf-group-name is-archived-name" href="22-admin-access-group-detail.html">Legacy Pilots</a>
                   <span class="wf-archived-suffix">(Archived)</span>
+                </td>
+                <td>
+                  <span class="wf-group-desc" style="font-style: italic;">
+                    Archived &mdash; kept for audit; coaches still in group lose intersection access
+                  </span>
                 </td>
                 <td class="wf-num-cell"><span class="wf-num-dash">&mdash;</span></td>
                 <td class="wf-num-cell"><span class="wf-num-dash">&mdash;</span></td>
                 <td class="wf-updated-cell"><span class="wf-num-dash">&mdash;</span></td>
                 <td style="text-align: right;">
-                  <a class="wf-manage-link" href="#" aria-label="Manage archived Legacy Pilots group">&rsaquo;</a>
+                  <a class="wf-manage-link" href="22-admin-access-group-detail.html" aria-label="Manage archived Legacy Pilots group">&rsaquo;</a>
                 </td>
               </tr>
             </tbody>
@@ -535,22 +560,29 @@
               group lacks the template.
             </li>
             <li>
-              <code>evaluateAccessChange(...)</code> previews before/after template sets for affected coaches when
-              admin adds/removes a coach or template from a group. Used by the Wave 5 detail-view confirmation modal.
+              <code>evaluateAccessChange(tx, coachId, proposedGroupIds)</code> previews before/after template sets
+              for affected coaches when admin adds/removes a coach or template. Used by Wireframe 22 preview modal.
+              Runs at SERIALIZABLE isolation with advisory locks (per <code>02-service-layer-rules.md</code>).
             </li>
             <li>
               Runtime flag <code>ACCESS_POLICY_VERSION</code> (current: <code>v1.intersection</code>) lets us
-              swap to UNION or hierarchical policy without code change.
+              swap to <code>shadow-union</code> (canary) or <code>union</code> (emergency revert) without a code deploy.
+            </li>
+            <li>
+              <code>archiveAccessGroup</code> / <code>undeleteAccessGroup</code> / <code>hardDeleteAccessGroup</code>
+              all gated by the same <code>evaluateAccessChange</code> guard &mdash; archiving shrinks effective access;
+              the guard intercepts shrink-to-zero unless admin passes <code>force=true</code>.
             </li>
           </ul>
         </section>
 
-        <!-- Wireframe end note -->
         <div class="wf-end-note">
           <strong>Wireframe end note.</strong>
-          Manage chevron leads to <code>admin/access-groups/&lt;id&gt;</code> detail view (Wave 5 Wireframe 22 &mdash;
-          coaches-in-group + templates-this-group-accesses tables, with <code>evaluateAccessChange</code> preview modals).
-          The v7.5 per-coach grants table is replaced entirely by this groups-based approach.
+          The <code>+ New Access Group</code> button is admin-only (checked via <code>isPrivilegedRole</code>); coaches
+          NEVER reach this page. Clicking a group's name or the &rsaquo; chevron navigates to Wireframe 22
+          (<code>admin/access-groups/&lt;id&gt;</code> detail view) which includes the membership tables AND the
+          <code>evaluateAccessChange</code> preview. Aggregate analytics across templates owned by all groups land in
+          Wireframe 23.
         </div>
       </div>
     </main>
