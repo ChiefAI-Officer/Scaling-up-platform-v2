@@ -177,6 +177,9 @@ export function CampaignDetail({
   // Task N — Bulk reminders state.
   const [sendingReminders, setSendingReminders] = useState(false);
 
+  // CEO designation post-creation — per-row toggle.
+  const [ceoSavingFor, setCeoSavingFor] = useState<string | null>(null);
+
   // Task O UI follow-on — email overrides post-create edit panel.
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailSubject, setEmailSubject] = useState<string>(
@@ -386,6 +389,43 @@ export function CampaignDetail({
       });
     } finally {
       setSendingReminders(false);
+    }
+  }
+
+  // CEO designation — set or clear via POST /api/assessment-campaigns/[id]/ceo.
+  async function handleSetCeo(
+    targetParticipantId: string | null,
+    rowName?: string,
+  ) {
+    if (ceoSavingFor !== null) return;
+    setCeoSavingFor(targetParticipantId ?? "__clear__");
+    try {
+      const res = await fetch(`/api/assessment-campaigns/${campaign.id}/ceo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participantId: targetParticipantId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.success === false) {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      toast({
+        title:
+          targetParticipantId === null
+            ? "CEO designation cleared"
+            : `CEO set to ${rowName ?? "selected respondent"}`,
+      });
+      await refreshRespondents();
+      router.refresh();
+    } catch (err) {
+      toast({
+        title: "Could not update CEO designation",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setCeoSavingFor(null);
     }
   }
 
@@ -1103,6 +1143,37 @@ export function CampaignDetail({
                           >
                             CEO
                           </span>
+                        )}
+                        {!isClosed && row.isCEO && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleSetCeo(null, undefined)
+                            }
+                            disabled={ceoSavingFor !== null}
+                            className="ml-1 text-[10px] font-medium text-muted-foreground hover:text-destructive disabled:opacity-50 underline-offset-2 hover:underline"
+                            data-testid={`clear-ceo-btn-${row.respondent.id}`}
+                          >
+                            (clear)
+                          </button>
+                        )}
+                        {!isClosed && !row.isCEO && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleSetCeo(
+                                row.participantId,
+                                `${row.respondent.firstName} ${row.respondent.lastName}`,
+                              )
+                            }
+                            disabled={ceoSavingFor !== null}
+                            className="ml-2 text-[10px] font-medium text-muted-foreground hover:text-primary disabled:opacity-50 underline-offset-2 hover:underline"
+                            data-testid={`set-ceo-btn-${row.respondent.id}`}
+                          >
+                            {ceoSavingFor === row.participantId
+                              ? "Setting…"
+                              : "Mark as CEO"}
+                          </button>
                         )}
                         {row.respondent.jobTitle && (
                           <div className="text-xs text-muted-foreground">
