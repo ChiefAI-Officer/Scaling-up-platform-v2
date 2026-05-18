@@ -6,6 +6,21 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Coach cert auto-promote — PENDING → ACTIVE on first workshop-type grant: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:coach-cert-autopromote -->
+
+Closes a long-standing gap in the coach approval flow surfaced via the admin coaches page: coaches were stuck at `certificationStatus = "PENDING"` indefinitely because nothing in the app ever wrote that field after creation. The signup route (`POST /api/auth/coach-signup`) and admin coach-create (`POST /api/coaches`) both hardcode `"PENDING"`, `updateCoachSchema = createCoachSchema.partial()` doesn't include the field, and the coach-edit UI exposes no status control. The only existing `ACTIVE` rows in prod came from seed scripts or direct SQL — every coach who joined via the canonical flow showed PENDING beside their granted workshop-type cert chips. Fix: auto-promote on first cert grant.
+
+- **Route change** — `src/src/app/api/coaches/[id]/certifications/route.ts` (POST handler): after the pre-flight duplicate check, if the loaded coach's `certificationStatus === PENDING_STATUS` (canonical constant from `lib/auth/coach-status.ts`) the cert create + a `coach.updateMany({ where: { id, certificationStatus: PENDING }, data: { certificationStatus: ACTIVE } })` flip run inside a single `db.$transaction([...])`. Non-PENDING coaches (ACTIVE / DEACTIVATED) skip the transaction and the route falls through to the plain cert create. DEACTIVATED is intentionally NOT promoted — reactivation must be explicit.
+- **Race-guard** (Codex high-severity finding): the `updateMany` predicate filters on `certificationStatus: PENDING` so a concurrent DEACTIVATE between the pre-transaction read and the transactional write produces `count: 0` (no-op) rather than silently overwriting the deactivation. `promotion.count === 1` is required to emit the status-delta in the audit log; on `count: 0` the audit row only records `certificationAdded` with no status transition claim.
+- **P2002 → 409** (Codex medium-severity finding): a concurrent grant that races past the preflight duplicate check now lands on the `@@unique([coachId, workshopTypeId])` constraint. The top-level catch detects `Prisma.PrismaClientKnownRequestError` with `code === "P2002"` and returns the same `409 "Coach already has this certification"` response shape as the preflight path — no more generic 500 on a concurrency loss.
+- **Audit log** (Codex medium-severity finding): `logAudit({ entityType: "Coach", entityId: coachId, action: "UPDATE", performedBy: actor.email, changes })` fires on every successful grant. `changes` always includes `certificationAdded: workshopTypeId`; on promotion it also includes `certificationStatus: { from: "PENDING", to: "ACTIVE" }`. Fires AFTER the transaction so a failed grant never leaves a phantom audit row.
+- **Tests** — `src/src/__tests__/api/coaches-certifications-auto-promote.test.ts` (8 cases, 246 lines): PENDING promotion happy path with sentinel-mocked `$transaction` args asserted in order, race-guard no-op when `updateMany.count === 0`, transaction-rejection returns 500 with no echoed cert and no audit row, already-ACTIVE skip, DEACTIVATED no-promote, pre-flight 409, P2002 in-catch 409 (via inline-mocked `PrismaClientKnownRequestError`), and 404 on missing coach.
+- **Commits**: `94f067f` (feature) + `152efee` (Codex hardening pass).
+- **Verification**: Turbopack build green on both commits, 8/8 auto-promote tests + 1740/1741 full suite green (the 1 fail is the known `registration-form-redirect.test.tsx` 5s timing flake — passes in isolation). Vercel deploy `rbrdxqb8w` Ready in 58s.
+- **Coach Detail / Coaches list UI** unchanged — the existing PENDING/ACTIVE badge logic already reads `coach.certificationStatus`, so the next granted cert now flips the pill automatically.
+
+---
+
 ### 2026-05-18 — Assessment Tool v7.6 — Tasks M + N — bulk CSV import + reminder emails: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-tasks-m-n -->
 
 Two follow-on slices that close real workflow gaps coaches hit at scale: roster bulk-import (so big-org coaches don't click 50× to add respondents) and a single button to re-prompt invited participants who haven't yet submitted.
