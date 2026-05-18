@@ -6,6 +6,38 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Task H coach trends/longitudinal page (Wave 1 wireframe 10 made real — year-over-year composite-score line + per-section trend table + per-question sparkline grid): <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-h-trends -->
+
+Coach picks (template, organization) at `/portal/assessments/trends` and sees year-over-year score progression across all their campaigns for that pair. Closes the v1 "year-over-year" feature gap that's the entire reason for Issue #10.
+
+**Service** (`src/lib/assessments/trends.ts`):
+- `getLongitudinalTrend(db, templateId, organizationId)` — resolves the latest published version of the template; partitions campaigns into included (latestVersion) vs excluded (older versions); builds per-campaign series + per-question sparkline series + means.
+- v1 single-version constraint enforced server-side (older-version campaigns excluded + counted; banner surfaces in UI).
+- Reads `submission.result` frozen — no recomputation.
+- Composite score per v7.1 spec: uses `tierMetricValue` (per-template metric), NOT blind mean of numeric answers.
+
+**Backend**:
+- `GET /api/assessment-templates/[id]/longitudinal?organizationId=…` — coach can query if they own the org (canAccessOrganization); admin/staff bypass. 400 if organizationId missing; 401/404/200 otherwise.
+
+**UI**:
+- `/portal/assessments/trends` server page — selectors form if templateId/organizationId not yet picked; otherwise fetches via service helper and hands off to client component.
+- `CampaignTrendsView` client component — three states:
+  - **Zero campaigns**: empty card linking to `/portal/assessments/new`.
+  - **Single campaign**: stats card + banner "Trends require 2+ campaigns for the same template + org. Run another to see comparison."
+  - **Multi-campaign (≥2)**: SVG composite-score line chart (X=campaign openAt, Y=mean countAchieved) with dots + axis labels; per-section trend table (rows S1–S10, columns = campaigns, cells color-shaded green/yellow/red by improvement vs prior campaign); collapsible per-question sparkline grid (40 mini-charts for Rockefeller).
+- "View Trends" link added to `/portal/assessments/[id]` (Task F detail page) — deep-links with prefilled templateId + organizationId.
+
+**Type addition**: `CampaignOverview.campaign` gains `templateId` + `organizationId` (purely additive; needed for the deep-link).
+
+**Tests**: 19 new across 3 suites (trends service 9 + longitudinal route 5 + CampaignTrendsView component 5). Full suite: 1622 passing (was 1603), zero regressions. `CI=true npx next build --turbopack` green locally.
+
+**Deferred to v1.5** (per spec, locked decisions):
+- Team/participant filter dropdown (team-slicing is v1.5 across all surfaces, same as aggregate report)
+- TEXT / NUMBER / COMPOUND question-type panels (only Rockefeller exists today; those types ship with Vision Alignment / QSP v2 seed when Jeff signs off content)
+- YoY / QoQ delta cards
+
+---
+
 ### 2026-05-18 — Assessment Tool v7.6 — Task G admin AccessGroup management UI (closes ops gap; wires Wave 5 wireframes 21 + 22 to real product): <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-g-access-group-ui -->
 
 Admin can now create, edit, archive AccessGroups and add/remove coaches + templates via the app — no more manual scripts. Wires Wave 5 wireframes 21 (list) + 22 (detail with evaluateAccessChange preview) into the real product on top of Task A's service-layer transactional guard.
