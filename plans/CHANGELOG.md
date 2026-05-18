@@ -6,6 +6,38 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Tasks I + J — campaign status transitions + CSV exports: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-tasks-i-j -->
+
+Two polish slices on top of the Tasks A–H arc, plus three Vercel-only hotfixes for staging-miss bugs across the session. v1 implementation now covers daily-ops + reporting.
+
+**Task I — Campaign status transitions**:
+- `POST /api/assessment-campaigns/[id]/close` — DRAFT|ACTIVE → CLOSED with optional `reason` (≤500 chars, audit-logged). `canManageCampaign` gate (404 on auth-fail). 409 if already CLOSED. Tolerant body parser (missing/empty/bad-JSON → `{}`, only well-formed schema-failing body 400s).
+- Close button on `/portal/assessments/[id]`: label adapts by status — "Discard Draft" (destructive variant) for DRAFT, "Close Campaign" (outline + destructive text) for ACTIVE, HIDDEN when CLOSED. Confirmation dialog with optional reason textarea, spinner during request, toast on success/failure.
+- Status filter pills on `/portal/assessments` landing: All / Draft / Active / Closed with per-status counts. Client-side filter, empty state when filtered to zero.
+- 18 new tests (3 suites): close-route 7 + campaign-detail-close-button 6 + portal-assessments-status-filter 5.
+
+**Task J — CSV export endpoints + UI download buttons**:
+- 4 new audit-logged, rate-limited routes:
+  - `GET /api/assessment-campaigns/[id]/respondents/export.csv` — coach/admin, per-respondent summary.
+  - `GET /api/assessment-campaigns/[id]/respondents/[rid]/result/export.csv` — coach/admin, per-question shape joined to version sections + questions.
+  - `GET /api/admin/assessments/aggregate/export.csv?templateId=&versionId=` — admin only, summary stats block + per-section means block separated by blank line.
+  - `GET /api/admin/assessments/aggregate/submissions.csv?templateId=&versionId=` — admin only, one row per submission with dynamic `Section_S{n}_Total` columns from `version.sections`. CEO joined from `AssessmentCampaignParticipant`.
+- UI wiring on `CampaignDetail.tsx` (header export + per-row download) and `AssessmentsAggregateReport.tsx` (two export buttons under selectors, disabled when selector empty). Native `<a download>` links; no JS state.
+- AuditAction extended with `'EXPORT'` (mirrors recent `'CLOSE'` addition).
+- 17 new tests (4 suites): respondents-export 4 + per-respondent result export 4 + aggregate summary export 5 + aggregate submissions export 4. Each asserts Content-Type, Content-Disposition filename pattern, and a sample data row.
+
+**Hotfixes shipped in the same window** (Vercel-only catches — local builds passed):
+1. `Prisma.sql` arg vs tagged template (Task A audit). `tx.$executeRaw(Prisma.sql\`…\`)` → `tx.$executeRaw\`…\`` across 5 call sites. Jest mocks hid the type error.
+2. Missing `org-survey-client.tsx` (Task D). Untracked new file not in the staging path list; Turbopack on Vercel fails fast on missing modules; webpack lazy-resolves.
+3. Missing `CampaignsListWithFilter.tsx` (Task I-1). Same pattern.
+4. Missing `'CLOSE'` in `AuditAction` union (Task I-2). MODIFIED existing service-layer file (`src/lib/audit.ts`), not a new file. The grep-imports rule from `feedback_turbopack_build_gate` only caught NEW untracked files; this was a modified one. Memory updated to default to `git add -A` + visual review of `git diff --cached --stat`.
+
+**Tests**: 1657 passing across 199 suites (up from 1622 after Task H). 35 new tests across 7 suites for Tasks I+J. Zero regressions.
+
+**Discipline**: pre-push gate stays `CI=true npx next build --turbopack`. Staging discipline expanded — default to `git add -A` for subagent work, review the staged diff, never rely on a hand-curated path list.
+
+---
+
 ### 2026-05-18 — Assessment Tool v7.6 — Task H coach trends/longitudinal page (Wave 1 wireframe 10 made real — year-over-year composite-score line + per-section trend table + per-question sparkline grid): <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-h-trends -->
 
 Coach picks (template, organization) at `/portal/assessments/trends` and sees year-over-year score progression across all their campaigns for that pair. Closes the v1 "year-over-year" feature gap that's the entire reason for Issue #10.
