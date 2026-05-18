@@ -508,6 +508,9 @@ export const createAssessmentCampaignSchema = z
         endMode: z.enum(["OPEN_END", "ENDS_AFTER"]),
         closeAt: z.string().min(1).optional().nullable(),
         description: z.string().max(2000).transform(_trim).optional().nullable(),
+        // Task O — per-campaign invitation email overrides (null = fall back to template defaults)
+        invitationSubject: z.string().max(200).transform(_trim).optional().nullable(),
+        invitationBodyMarkdown: z.string().max(5000).transform(_trim).optional().nullable(),
         // Task M — optional bulk-respondent payload from the wizard CSV
         // import. Server resolves teamPath to OrgTeam rows (creating any
         // missing teams), and creates OrgRespondent rows with skip-on-conflict
@@ -559,6 +562,9 @@ export const updateAssessmentCampaignSchema = z.object({
     openAt: z.string().min(1).optional(),
     endMode: z.enum(["OPEN_END", "ENDS_AFTER"]).optional(),
     closeAt: z.string().min(1).nullable().optional(),
+    // Task O — per-campaign invitation email overrides
+    invitationSubject: z.string().max(200).transform(_trim).nullable().optional(),
+    invitationBodyMarkdown: z.string().max(5000).transform(_trim).nullable().optional(),
 });
 
 export const assignCampaignParticipantsSchema = z

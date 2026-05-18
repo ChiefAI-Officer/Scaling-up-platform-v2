@@ -159,10 +159,16 @@ export async function PATCH(
       openAt?: Date;
       endMode?: "OPEN_END" | "ENDS_AFTER";
       closeAt?: Date | null;
+      invitationSubject?: string | null;
+      invitationBodyMarkdown?: string | null;
     } = {};
 
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
+    if (data.invitationSubject !== undefined)
+      updateData.invitationSubject = data.invitationSubject;
+    if (data.invitationBodyMarkdown !== undefined)
+      updateData.invitationBodyMarkdown = data.invitationBodyMarkdown;
     if (data.openAt !== undefined) {
       const d = new Date(data.openAt);
       if (Number.isNaN(d.getTime())) {

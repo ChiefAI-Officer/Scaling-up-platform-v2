@@ -343,4 +343,65 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     expect(body.data.failed).toHaveLength(0);
     expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
   });
+
+  // Task O — per-campaign invitation email overrides
+  it("Task O — campaign overrides take precedence over template defaults", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    const customCampaign = {
+      ...baseCampaign,
+      invitationSubject: "Custom subject here",
+      invitationBodyMarkdown: "Custom body for {{respondentFirstName}}",
+    };
+    (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation(
+      (args) => {
+        if (args?.include) {
+          return Promise.resolve({
+            ...customCampaign,
+            participants: ACTIVE_PARTICIPANTS,
+          });
+        }
+        return Promise.resolve(customCampaign);
+      },
+    );
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(200);
+    const calls = (sendAssessmentInvitationEmail as jest.Mock).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[0][0].template.invitationSubject).toBe(
+      "Custom subject here",
+    );
+    expect(calls[0][0].template.invitationBodyMarkdown).toBe(
+      "Custom body for {{respondentFirstName}}",
+    );
+  });
+
+  it("Task O — null overrides fall back to template defaults", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    const nullCampaign = {
+      ...baseCampaign,
+      invitationSubject: null,
+      invitationBodyMarkdown: null,
+    };
+    (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation(
+      (args) => {
+        if (args?.include) {
+          return Promise.resolve({
+            ...nullCampaign,
+            participants: ACTIVE_PARTICIPANTS,
+          });
+        }
+        return Promise.resolve(nullCampaign);
+      },
+    );
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(200);
+    const calls = (sendAssessmentInvitationEmail as jest.Mock).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[0][0].template.invitationSubject).toBe(
+      "Take the assessment",
+    );
+    expect(calls[0][0].template.invitationBodyMarkdown).toBe(
+      "Hi {{respondentFirstName}}",
+    );
+  });
 });

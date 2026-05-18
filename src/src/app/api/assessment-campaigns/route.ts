@@ -252,6 +252,8 @@ export async function POST(request: NextRequest) {
           openAt: openAtDate,
           endMode: data.endMode,
           closeAt: closeAtDate,
+          invitationSubject: data.invitationSubject ?? null,
+          invitationBodyMarkdown: data.invitationBodyMarkdown ?? null,
           createdBy: actor.userId,
           createdByCoachId: actor.coachId,
         },

@@ -1207,6 +1207,9 @@ model AssessmentCampaign {
   endMode             AssessmentCampaignEndMode
   closeAt             DateTime?
   notifyAdminOnSubmit Boolean                      @default(true)
+  // Task O — per-campaign invitation email overrides (null = fall back to template defaults)
+  invitationSubject       String?
+  invitationBodyMarkdown  String?
   createdBy           String
   createdByCoachId    String?                      // v7.6: role-specific coach ownership pointer (nullable so admin PUBLIC campaigns can omit)
   createdAt           DateTime                     @default(now())

@@ -248,7 +248,13 @@ export async function POST(
             alias: campaign.alias,
             closeAt: campaign.closeAt,
           },
-          template: campaign.template,
+          template: {
+            invitationSubject:
+              campaign.invitationSubject ?? campaign.template.invitationSubject,
+            invitationBodyMarkdown:
+              campaign.invitationBodyMarkdown ??
+              campaign.template.invitationBodyMarkdown,
+          },
           rawToken,
           baseUrl: appUrl,
         });
