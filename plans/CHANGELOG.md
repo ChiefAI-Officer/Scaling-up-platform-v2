@@ -6,6 +6,41 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Task O — per-campaign invitation email overrides: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-o -->
+
+Coaches can override the default invitation subject + body on a per-campaign basis. Before today, the only way to customize was at the `AssessmentTemplate` level — a single shared default across every campaign that used the template. Task O makes the override campaign-local.
+
+**Schema**:
+- `AssessmentCampaign.invitationSubject String?`, `AssessmentCampaign.invitationBodyMarkdown String?` (both nullable; `null` = use template default).
+- Migration `20260518160000_add_campaign_invitation_overrides`.
+
+**Validation**:
+- `createAssessmentCampaignSchema`: accepts optional `invitationSubject` (≤200 chars) + `invitationBodyMarkdown` (≤5000 chars), both nullable.
+- `updateAssessmentCampaignSchema`: same fields for PATCH (any-status — does not require DRAFT, since editing the reminder email body should be allowed on ACTIVE campaigns too).
+
+**Route changes**:
+- Campaign-create route persists both fields (defaults to `null`).
+- Campaign PATCH route writes both fields when present.
+- `invite` route and `reminders` route at the email call site:
+  ```ts
+  template: {
+    invitationSubject:
+      campaign.invitationSubject ?? campaign.template.invitationSubject,
+    invitationBodyMarkdown:
+      campaign.invitationBodyMarkdown ??
+      campaign.template.invitationBodyMarkdown,
+  }
+  ```
+  (Both routes already used `findUnique({ include })` so the new scalar fields flow through automatically without changing the query shape.)
+
+**Tests**: 2 new in `reminders-post.test.ts` — `"Task O — campaign overrides take precedence over template defaults"` and `"Task O — null overrides fall back to template defaults"`. 13/13 suite green.
+
+**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in 4.2min. Commit `3fee453`.
+
+**Deferred**:
+- **Wizard UI for editing overrides** — backend + fallback ship now. Coaches can edit via PATCH today (e.g. from a future detail-page form). The wizard "Review" step should grow a small textarea pair in a follow-up slice.
+- **No Markdown preview in the UI** when added — the existing helper does minimal HTML escaping + paragraph splitting. If product wants WYSIWYG, that's a separate scope.
+
 ### 2026-05-18 — Coach cert auto-promote — PENDING → ACTIVE on first workshop-type grant: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:coach-cert-autopromote -->
 
 Closes a long-standing gap in the coach approval flow surfaced via the admin coaches page: coaches were stuck at `certificationStatus = "PENDING"` indefinitely because nothing in the app ever wrote that field after creation. The signup route (`POST /api/auth/coach-signup`) and admin coach-create (`POST /api/coaches`) both hardcode `"PENDING"`, `updateCoachSchema = createCoachSchema.partial()` doesn't include the field, and the coach-edit UI exposes no status control. The only existing `ACTIVE` rows in prod came from seed scripts or direct SQL — every coach who joined via the canonical flow showed PENDING beside their granted workshop-type cert chips. Fix: auto-promote on first cert grant.
