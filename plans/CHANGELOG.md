@@ -6,6 +6,30 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Admin aggregate dashboard filters (Decision #8 MVP): <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-aggregate-filters -->
+
+Decision #8 reserved this filter scope for day 1 but explicitly deferred it from the v1 MVP shape (template + version selector only). Now landed.
+
+**Service** — `getAggregateReport(db, templateId, versionId, filters?)`:
+- New optional 4th arg: `{ startDate?: Date | null, endDate?: Date | null, organizationId?: string | null }`.
+- `organizationId` → added to `campaign` sub-where (`{ templateId, versionId, organizationId }`).
+- `startDate` / `endDate` → built into a `submittedAt: { gte?, lte? }` clause on the top-level submission query. Only emitted when at least one is set, so the unfiltered call shape stays unchanged (existing 21 tests still green).
+
+**API** — `GET /api/admin/assessments/aggregate?templateId=...&versionId=...&startDate=...&endDate=...&organizationId=...`:
+- Date parsing accepts both `YYYY-MM-DD` and full ISO. 400 if a date param is present but invalid.
+- Same params honored by `export.csv` and `submissions.csv` so CSV exports respect the current filter.
+
+**UI** — `AssessmentsAggregateReport.tsx`:
+- 3-column filter row below the existing template + version selectors: From date / To date / Organization select.
+- Organizations sourced from `GET /api/organizations` (admin sees all). Best-effort; empty list just disables the dropdown.
+- "Clear filters" link appears when any filter is set.
+- ExportLink components forward `startDate` / `endDate` / `organizationId` into the CSV download URL.
+- Report re-fetches on any filter change (added to the existing useEffect deps).
+
+**Tests** — 3 new in `aggregate-report.test.ts`: organizationId WHERE plumbing, startDate+endDate `submittedAt` range, no-filter shape unchanged. 9/9 service-layer suite green; 21/21 across the 4 aggregate suites still green.
+
+**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in 64s. Commit `bf099c0`.
+
 ### 2026-05-18 — Assessment Tool v7.6 — CEO designation post-creation: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-ceo-post-create -->
 
 Coaches can mark a respondent as CEO after the wizard submit — previously this required discarding the draft and re-running the wizard. Real workflow gap for the `template.aggregationMode === CEO_ONLY` reports, where one designated respondent's submission carries the campaign result.
