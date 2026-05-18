@@ -6,6 +6,53 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Foundation slice + spec library + prod DB rebuild: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-foundation-spec-library -->
+
+Assessment Tool v1 foundation (Issue #10) shipped end-to-end across two sessions (May 14 Tasks 0-4 + May 17/18 Tasks 5-9), reviewed across 6 rounds of Codex adversarial review.
+
+**Spec library** (NEW at `docs/specs/v7.6/`, ~795 lines): 01-schema, 02-service-layer-rules (INTERSECTION RBAC, `evaluateAccessChange`, `canCreateCampaign`, ownership transfer, `ACCESS_POLICY_VERSION` env flag), 03-seed-rockefeller (`resolveSystemUser`, advisory lock, 6 states), 04-deploy-runbook (mandatory `dotenv-cli`, DB fingerprint, `prisma migrate diff` baselining, PITR), 05-wireframes-wave5 (Wave 2 revisions + Wave 5 deliverables), 06-observability (7 metrics, 6 alerts, `/admin/observability`), 07-bootstrap-runbook, operator-task-9-steps.
+
+**PLAN.md** restructured from a 3,200-line monolith into a 70-line hub. Pre-v7.6 history archived to `plans/history/v6-v7.5-archive.md` (2,541 lines). Discipline: future spec revisions land in the appropriate spec file under `docs/specs/v7.6/`, NOT in PLAN.md.
+
+**Schema migration** `20260514230000_add_assessment_infrastructure_v7_5` (amended in place v7.5 → v7.6) — 13 new tables, greenfield additive (zero new columns on existing tables):
+- `Organization` (+ `ownerCoachId` NOT NULL per Jeff May 15 hierarchy flip — coaches own organizations directly)
+- `OrgTeam` (recursive), `OrgRespondent`
+- `AssessmentTemplate`, `AssessmentTemplateVersion` (immutable via Postgres trigger), `AssessmentCampaign` (+ `createdByCoachId` for transfer history), `AssessmentCampaignParticipant`, `AssessmentInvitation`, `AssessmentSubmission`
+- **`AccessGroup` + `AccessGroupCoach` + `AccessGroupTemplate`** (replaces dropped `TemplateAccessGrant`; INTERSECTION semantics — coach effective access = templates that ALL their groups grant; `ACCESS_POLICY_VERSION` env flag for runtime policy flip / shadow-union mode)
+- `OrganizationOwnershipEvent` (audit history for ownership transfers)
+- Partial unique indexes (externalId, results-token-hash, single-CEO, access-group-name-where-not-deleted, campaign-respondent-where-respondent-not-null)
+- GIN index on `AssessmentCampaignParticipant.teamPathAtAdd`
+- **DROPPED** from May 14 v7.5: `OrganizationMembership`, `TemplateAccessGrant`, `OrgMembershipRole` enum (per Jeff May 15 — admins don't manage org memberships; coaches own their orgs)
+
+**Pure scoring function** at `src/src/lib/assessments/scoring.ts` — Zod-typed config, no DB coupling, typed `ScoringValidationError` codes (no HTTP coupling). 25/25 tests green including Rockefeller golden fixture (`countAchieved=37`, `overallTotal=85`, `overallAverage=2.125`, tier="Great").
+
+**Seed** at `src/prisma/seed-rockefeller-assessment.ts` — transactional, advisory-locked, fail-on-mismatch. 6 states (A nothing/B match/C mismatch/D heal/E orphan/F multi). Helpers: `resolveSystemUser`, `ensureAccessGroupAndTemplateLink` (runs on all 3 success paths A/B/D so the "Scaling Up Coaches" → Rockefeller link is idempotent).
+
+**Wave 2 wireframe revisions** (per Jeff May 15 impromptu meeting):
+- DELETED `admin/13-admin-memberships.html`
+- REVISED `admin/12-admin-user-detail.html` (Memberships card → read-only Owned Organizations list)
+- REWROTE `admin/15-admin-template-access.html` (per-coach grants table → Access Groups index with INTERSECTION banner)
+
+**Wave 5 wireframes** (NEW — 4 admin screens, paired markdown spec each):
+- `admin/21-admin-access-groups-list.html` + markdown
+- `admin/22-admin-access-group-detail.html` (evaluateAccessChange before/after preview, BLOCKED_ZERO_ACCESS path) + markdown
+- `admin/23-admin-aggregate-report.html` (MVP: template + version selectors only, no filters on day 1) + markdown
+- `admin/24-platform-nav-assessments-entry.html` (Scaling Up top-nav + sidebar transition into Assessments lane) + markdown
+
+**Deploy-safety scripts**: `src/scripts/db-fingerprint.ts` (fails-closed preflight; verifies `ASSESSMENT_PROD_EXPECTED_HOST` matches connected DATABASE_URL host; exit 0 match, 1 config error, 2 mismatch rollback-blocking). `dotenv-cli@^11` added to devDependencies (mandatory env injector; `source`/`set -a` forbidden per spec).
+
+**Production DB rebuilt** (May 18 03:30–04:40 UTC): Free-tier Neon DB was found wiped to a Jan 2026 16-table snapshot (no `_prisma_migrations`, no users, no workshops). Recovery plan: `prisma db push --force-reset` against the empty DB to apply v7.6 schema directly, raw SQL appendix executed via `prisma db execute` (partial unique indexes + GIN index + immutability trigger + function), all 26 historical migrations baselined via `prisma migrate resolve --applied`, full seed cascade (seed.ts → seed-real-data.ts → seed-templates.ts → seed-ev-templates.ts → seed-pre-workshop-survey-template.ts → seed-rockefeller-assessment.ts). End state: 47 tables, 26 migrations baselined, 1 Rockefeller template (alias `RockHabits`, v1 enUS, published, contentHash `46b14e8e…`), 1 AccessGroup (`Scaling Up Coaches` → Rockefeller). Admin login verified via NextAuth (302 → `/admin/dashboard`, session cookie set).
+
+**Tests**: 1310 total passing (up from 1262 on origin/main and 1121 on the May 14 baseline). 48 new lib/assessments tests across 3 suites (scoring, schema-presence, migration-verification — now fully green since prod schema applied).
+
+**Discipline rule (persistent memory)**: `feedback_assessment_spec_library.md` — future Assessment Tool spec revisions land in `docs/specs/v7.6/<NN>-*.md`, never appended to PLAN.md. PLAN.md stays a thin hub.
+
+**Operator notes**:
+- Local `.env` was never modified during deploy; `.env.production.local` (gitignored) handles prod commands via `npx dotenv-cli -e .env.production.local -- <cmd>`.
+- Neon Free tier is unsafe for production data (6h PITR window; this incident lost ~60 days of test workshops/registrations because no external backups existed). Recommend Pro tier with 7+ day PITR before next deploy.
+
+---
+
 ### 2026-05-14 — Round 16 Wave 1 — Affiliate tracking iDev→PAP migration kickoff (cookie-script mount + CSP allowlist + tracker registry foundation, May 14 2026, direct push to main, Alpha mode): <!-- ENTRY_ISO:2026-05-14 ENTRY_SLUG:round-16-wave-1-affiliate-cookie -->
 
 Source: Jeff Verdun's May 14 standing meeting (transcript: https://fathom.video/share/VEQERXhbtBM3TtoJZZRcaai1kZxc9zTi). Jeff asked to move the affiliate cookie-setting script onto the Vercel app's landing pages so direct-link visitors get attribution, and to migrate from iDev to Post Affiliate Pro (PAP) without redeploying everything. Plan written + reviewed by Codex (8 critical findings absorbed) + Superpowers code-reviewer (11 conditions absorbed) before implementation. Plan at `~/.claude/plans/do-we-need-to-cryptic-swan.md`. Executed via SDD workflow: implementer subagent → spec compliance reviewer → code quality reviewer. 18 new tests, 1244 → 1262.
