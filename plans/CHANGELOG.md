@@ -6,6 +6,37 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Tasks M + N — bulk CSV import + reminder emails: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-tasks-m-n -->
+
+Two follow-on slices that close real workflow gaps coaches hit at scale: roster bulk-import (so big-org coaches don't click 50× to add respondents) and a single button to re-prompt invited participants who haven't yet submitted.
+
+**Task M — Bulk respondent CSV import**
+
+Pure parser, idempotent route, two UI surfaces (wizard + post-create modal).
+
+- **Parser** — `src/src/lib/assessments/respondent-csv.ts` (194 lines): headers required (`name,email[,team]`, case-insensitive), Zod email validation per row, `/`-delimited team path, dedupe-on-email (first occurrence wins), 500-row cap with truncation errors emitted for rows 501+, RFC-friendly CSV parsing (handles quoted fields with embedded commas). Pure function returning `{ rows, errors }` — no I/O.
+- **API** — `POST /api/organizations/[id]/respondents/bulk/route.ts` (399 lines): body `{ rows, mode: 'skip' | 'merge' }` Zod-validated, ownership gate (`organization.ownerCoachId === actor.coachId`), 500-row server-side cap (422 if exceeded). Wraps the batch in a single Prisma transaction. Returns ARRAYS `{ created: [{id, email}], updated: [{id, email}], skipped: [{email}], errors }` rather than bare counts — caller needs IDs to chain participant-add calls. Audit `'CREATE'` with summary counts. Rate-limited `RateLimits.standard`.
+- **Campaign-create route extension** — accepts optional `bulkRespondents: Array<{name, email, teamPath}>` field. Server-side processes alongside the existing single-respondent list; same skip-on-email-conflict semantics. Teams auto-created via `buildTeamPath`.
+- **UI 1 (CampaignDetail Add modal)**: new "Bulk CSV" tab next to "Single". Paste textarea OR live-preview table OR per-row error highlight (`text-destructive`). Conflict-mode radio (Skip / Merge, default Skip). Submit chains bulk-create → loop participant-add (Task L's `POST /respondents`) with `"Adding N of M…"` progress text. Final toast + modal close + respondents refetch.
+- **UI 2 (CampaignWizard respondents step)**: inline panel (not modal — wizard) for paste-preview-submit. Rows stored in wizard state's `bulkRespondents` field; processed at final wizard submit by the extended campaign-create route.
+- **Tests**: 36 new across 2 suites (`respondent-csv.test.ts` 25 cases, `respondents-bulk-post.test.ts` 11 cases).
+- **Vercel-only TS hotfixes** (`fb42efc` + `0c84b24`): the `(await tx.orgTeam.create(...)) as TeamRow` pattern triggers `'implicitly has type any because it is referenced directly or indirectly in its own initializer'` under Vercel's strict tsc but passes the local turbopack build. Fix: explicit annotation `const created: TeamRow = (await ...) as TeamRow`. Applied in both `assessment-campaigns/route.ts:407` and `respondents/bulk/route.ts:203`.
+
+**Task N — Reminder emails for non-responders**
+
+Reuses Task D's invitation infrastructure; adds a single-click bulk action.
+
+- **API** — `POST /api/assessment-campaigns/[id]/reminders/route.ts` (340 lines): body `{ participantIds?: string[] }` — omitted means "all pending non-submitted, non-revoked, non-soft-deleted participants". `canManageCampaign` gate (404 on auth-fail). 409 `CAMPAIGN_NOT_ACTIVE` on DRAFT/CLOSED. **Token rotation**: reuses the existing invitation row id and `expiresAt`/status, but rotates the cryptographic token (mirrors `/resend` route's security model — `tokenHash` is one-way, so the prior raw token is invalidated). Per-participant skips logged in audit; SMTP failure on one participant does NOT 500 the batch. Returns `{ sent, skipped, failed: Array<{participantId, reason}> }`. Audit action `'INVITE'`. Rate-limited.
+- **UI** — `CampaignDetail.tsx`: new "Send Reminders" header button (visible only when `campaign.status === 'ACTIVE'`). Click → `window.confirm` with pending-count → POST → toast `"Sent X, skipped Y, failed Z"` + respondents refetch. Per-row Resend button already shipped in Task D — Task N adds the bulk action only.
+- **Tests**: 11 new in `reminders-post.test.ts` covering bulk + single + skip-submitted + skip-no-invitation + skip-revoked + 409-not-active + auth + SMTP-failure-continues + all-skipped happy path.
+
+**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in ~5min. Task M deploy `rbrdxqb8w-chief-aio-fficer.vercel.app` ● Ready in 58s; Task N deploy `41f259f` pending. 1738 / 1738 tests green across 204 suites (up from 1691).
+
+**Concerns (deferred)**:
+- Task M wizard preview has no inline-edit (typos require re-paste). Gold-plate skipped.
+- Task N reminder email body uses the Task D template verbatim — no "Reminder:" prefix differentiation yet. Acceptable for v1; product can iterate.
+- A parallel session shipped unrelated coach-cert-autopromote work (`94f067f`) and repeatedly stashed Task M files mid-session as "park unrelated changes". Recovered via `git stash` reflog (`stash@{0}^3` for untracked, `stash@{0}` for tracked). No data lost.
+
 ### 2026-05-18 — Assessment Tool v7.6 — Task L — post-creation participant management: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-l-participant-mgmt -->
 
 Closes a real workflow gap: coaches can now add a forgotten respondent or remove a stale one after creating a campaign, without having to discard and recreate. Builds on Task D's invitation token system + Task F's CampaignDetail UI.
