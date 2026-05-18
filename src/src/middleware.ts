@@ -81,7 +81,9 @@ export default withAuth(
         pathname.match(/^\/api\/workshops\/[^/]+\/register$/) ||
         // Survey fetch and submit are public (survey links in workflow emails must work unauthenticated)
         // Negative lookahead excludes /api/surveys/assign and /api/surveys/workflows (stay protected)
-        pathname.match(/^\/api\/surveys\/(?!assign|workflows)[^/]+(\/submit)?$/)
+        pathname.match(/^\/api\/surveys\/(?!assign|workflows)[^/]+(\/submit)?$/) ||
+        // Assessment v7.6 — INVITED-mode survey page + cookie routes (Task D)
+        pathname.startsWith("/org-survey/")
       ) {
         return withRateLimitHeaders(NextResponse.next(), rateLimitHeaders);
       }
@@ -125,6 +127,8 @@ export default withAuth(
           pathname.match(/^\/api\/workshops\/[^/]+\/register$/) ||
           pathname.startsWith("/survey/") ||
           pathname.match(/^\/api\/surveys\/(?!assign|workflows)[^/]+(\/submit)?$/) ||
+          // Assessment v7.6 — INVITED-mode survey page + cookie routes (Task D)
+          pathname.startsWith("/org-survey/") ||
           pathname.startsWith("/wireframes") ||
           pathname.startsWith("/_next") ||
           pathname.includes(".")

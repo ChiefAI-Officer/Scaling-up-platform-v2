@@ -1063,6 +1063,99 @@ export async function sendCoachDeclinedCounterEmail(data: {
 }
 
 // ============================================
+// Assessment v7.6 — Invitation Email
+// ============================================
+
+/**
+ * Send an INVITED-mode assessment invitation email.
+ *
+ * Template variables substituted in `subject` + `bodyMarkdown`:
+ *   {{respondentFirstName}}, {{respondentLastName}}, {{respondentFullName}},
+ *   {{campaignName}}, {{invitationUrl}}, {{closeAt}}
+ *
+ * The raw token lives only in the URL fragment (`#t=...`). The hash is what
+ * the database stores. Caller is responsible for hashing + persistence; this
+ * helper just sends the email.
+ *
+ * Throws on SMTP failure so the caller (the invite route) can mark the
+ * invitation row as send-failed instead of optimistically flipping to SENT.
+ */
+export async function sendAssessmentInvitationEmail(data: {
+    invitation: { id: string; expiresAt: Date };
+    respondent: { id: string; firstName: string; lastName: string; email: string };
+    campaign: { id: string; name: string; alias: string; closeAt: Date | null };
+    template: { invitationSubject: string; invitationBodyMarkdown: string };
+    rawToken: string;
+    baseUrl: string;
+}): Promise<void> {
+    const trimmedBase = data.baseUrl.replace(/\/+$/, "");
+    const invitationUrl = `${trimmedBase}/org-survey/${data.campaign.alias}#t=${data.rawToken}`;
+    const closeAtFormatted = data.campaign.closeAt
+        ? data.campaign.closeAt.toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+              timeZone: "UTC",
+          })
+        : "ongoing";
+    const fullName = `${data.respondent.firstName} ${data.respondent.lastName}`.trim();
+
+    const substitute = (input: string): string =>
+        input
+            .replace(/\{\{respondentFirstName\}\}/g, data.respondent.firstName)
+            .replace(/\{\{respondentLastName\}\}/g, data.respondent.lastName)
+            .replace(/\{\{respondentFullName\}\}/g, fullName)
+            .replace(/\{\{campaignName\}\}/g, data.campaign.name)
+            .replace(/\{\{invitationUrl\}\}/g, invitationUrl)
+            .replace(/\{\{closeAt\}\}/g, closeAtFormatted);
+
+    const subject = substitute(data.template.invitationSubject);
+    const bodyText = substitute(data.template.invitationBodyMarkdown);
+    // Minimal Markdown → HTML: paragraph breaks on blank lines, escape HTML
+    // first. Heavy Markdown rendering is intentionally out of scope.
+    const escaped = escapeHtml(bodyText);
+    const paragraphs = escaped
+        .split(/\n\s*\n/)
+        .map((p) => `<p style="margin:0 0 12px;color:#374151;">${p.replace(/\n/g, "<br/>")}</p>`)
+        .join("");
+    const html = `
+    <div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">
+      ${paragraphs}
+      <br/>
+      <div style="text-align:center;">
+        <a href="${invitationUrl}"
+           style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">
+          Start the assessment
+        </a>
+      </div>
+      <p style="color:#9ca3af;font-size:13px;margin-top:24px;">
+        If the button doesn't work, paste this link into your browser:<br/>
+        <span style="word-break:break-all;color:#6b7280;">${invitationUrl}</span>
+      </p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+      <p style="color:#9ca3af;font-size:12px;">&mdash; Scaling Up Platform</p>
+    </div>
+    `;
+
+    // STRICT: failures propagate. The invite route catches and marks the
+    // invitation row as send-failed instead of optimistically flipping SENT.
+    await sendEmailViaSMTP({
+        to: data.respondent.email,
+        subject,
+        html,
+        telemetry: {
+            recipientRole: "CUSTOM",
+            metadata: {
+                type: "assessment_invitation",
+                campaignId: data.campaign.id,
+                invitationId: data.invitation.id,
+                respondentId: data.respondent.id,
+            },
+        },
+    });
+}
+
+// ============================================
 // Internal Helpers
 // ============================================
 
