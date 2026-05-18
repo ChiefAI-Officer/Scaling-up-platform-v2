@@ -570,10 +570,17 @@ describe("evaluateAccessChange — advisory locks", () => {
     });
 
     // Find the order in which coach lock keys appear in the executeRaw calls.
+    // Tagged-template invocation: args[0] is the TemplateStringsArray,
+    // args[1..N] are the interpolated values (coach IDs). Flatten both.
     const calls = tx._mocks.executeRaw.mock.calls.map((args) => {
       const first = args[0];
-      if (typeof first === "string") return first;
-      if (Array.isArray(first)) return first.join(" ");
+      const restValues = args.slice(1).map(String).join(" ");
+      if (typeof first === "string") {
+        return first + (restValues ? " " + restValues : "");
+      }
+      if (Array.isArray(first)) {
+        return first.join(" ") + (restValues ? " " + restValues : "");
+      }
       if (first && typeof first === "object") {
         const f = first as { strings?: string[]; values?: unknown[]; sql?: string };
         const parts: string[] = [];

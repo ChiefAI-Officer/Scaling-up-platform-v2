@@ -494,3 +494,86 @@ export const updateRespondentSchema = z.object({
     jobTitle: z.string().max(200).transform(_trim).nullable().optional(),
     teamId: z.string().min(1).nullable().optional(),
 });
+
+// ---------------------------------------------------------------------
+// Assessment v7.6 — Campaign + Participant validation
+// ---------------------------------------------------------------------
+
+export const createAssessmentCampaignSchema = z
+    .object({
+        name: z.string().min(1, "Campaign name is required").max(200).transform(_trim),
+        templateId: z.string().min(1, "templateId is required"),
+        organizationId: z.string().min(1, "organizationId is required"),
+        openAt: z.string().min(1, "openAt is required"),
+        endMode: z.enum(["OPEN_END", "ENDS_AFTER"]),
+        closeAt: z.string().min(1).optional().nullable(),
+        description: z.string().max(2000).transform(_trim).optional().nullable(),
+    })
+    .superRefine((data, ctx) => {
+        if (data.endMode === "ENDS_AFTER") {
+            if (!data.closeAt) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "closeAt is required when endMode is ENDS_AFTER",
+                    path: ["closeAt"],
+                });
+                return;
+            }
+            const openMs = Date.parse(data.openAt);
+            const closeMs = Date.parse(data.closeAt);
+            if (Number.isNaN(openMs) || Number.isNaN(closeMs)) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "openAt and closeAt must be valid ISO dates",
+                    path: ["closeAt"],
+                });
+                return;
+            }
+            if (closeMs <= openMs) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "closeAt must be after openAt",
+                    path: ["closeAt"],
+                });
+            }
+        }
+    });
+
+export const updateAssessmentCampaignSchema = z.object({
+    name: z.string().min(1).max(200).transform(_trim).optional(),
+    description: z.string().max(2000).transform(_trim).nullable().optional(),
+    openAt: z.string().min(1).optional(),
+    endMode: z.enum(["OPEN_END", "ENDS_AFTER"]).optional(),
+    closeAt: z.string().min(1).nullable().optional(),
+});
+
+export const assignCampaignParticipantsSchema = z
+    .object({
+        respondentIds: z
+            .array(z.string().min(1))
+            .min(1, "At least one respondent is required")
+            .max(500),
+        ceoRespondentId: z.string().min(1).optional().nullable(),
+    })
+    .superRefine((data, ctx) => {
+        if (data.ceoRespondentId && !data.respondentIds.includes(data.ceoRespondentId)) {
+            ctx.addIssue({
+                code: "custom",
+                message: "ceoRespondentId must be present in respondentIds",
+                path: ["ceoRespondentId"],
+            });
+        }
+        // CEO uniqueness — respondentIds array has no duplicates.
+        const ids = new Set<string>();
+        for (const id of data.respondentIds) {
+            if (ids.has(id)) {
+                ctx.addIssue({
+                    code: "custom",
+                    message: "respondentIds must be unique",
+                    path: ["respondentIds"],
+                });
+                return;
+            }
+            ids.add(id);
+        }
+    });

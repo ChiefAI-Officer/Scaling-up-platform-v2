@@ -5,6 +5,7 @@ describe("coach navigation config", () => {
     expect(coachPrimaryNavItems.map((item) => item.href)).toEqual([
       "/portal/home",
       "/portal/workshops",
+      "/portal/assessments",
       "/portal/registrations",
       "/portal/request",
     ]);

@@ -275,8 +275,16 @@ function flattenRawCalls(
 ): string[] {
   return calls.map((args) => {
     const first = args[0];
-    if (typeof first === "string") return first;
-    if (Array.isArray(first)) return first.join(" ");
+    // Tagged-template invocation: args[0] is the TemplateStringsArray,
+    // args[1..N] are the interpolated values. Flatten both.
+    if (Array.isArray(first)) {
+      const restValues = args.slice(1).map(String).join(" ");
+      return first.join(" ") + (restValues ? " " + restValues : "");
+    }
+    if (typeof first === "string") {
+      const restValues = args.slice(1).map(String).join(" ");
+      return first + (restValues ? " " + restValues : "");
+    }
     if (first && typeof first === "object") {
       const f = first as { strings?: string[]; values?: unknown[]; sql?: string };
       const parts: string[] = [];
