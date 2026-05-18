@@ -176,17 +176,13 @@ export async function transferOrganizationOwnership(
     `org-transfer:${request.organizationId}`,
   ].sort();
   for (const key of lockKeys) {
-    await tx.$executeRaw(
-      Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${key}))`,
-    );
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
   }
 
   // ── Step 2: SELECT FOR UPDATE on the Organization row ──
   // Lock the row before reading any mutable state so concurrent writers
   // serialize. We then re-read via the typed delegate for the columns.
-  await tx.$executeRaw(
-    Prisma.sql`SELECT id FROM organizations WHERE id = ${request.organizationId} FOR UPDATE`,
-  );
+  await tx.$executeRaw`SELECT id FROM organizations WHERE id = ${request.organizationId} FOR UPDATE`;
 
   const org = await tx.organization.findUnique({
     where: { id: request.organizationId },
@@ -232,9 +228,7 @@ export async function transferOrganizationOwnership(
   }
 
   // ── Step 4: lock + read the org's campaigns ──
-  await tx.$executeRaw(
-    Prisma.sql`SELECT id FROM assessment_campaigns WHERE "organizationId" = ${request.organizationId} FOR UPDATE`,
-  );
+  await tx.$executeRaw`SELECT id FROM assessment_campaigns WHERE "organizationId" = ${request.organizationId} FOR UPDATE`;
 
   const allCampaigns = await tx.assessmentCampaign.findMany({
     where: { organizationId: request.organizationId },

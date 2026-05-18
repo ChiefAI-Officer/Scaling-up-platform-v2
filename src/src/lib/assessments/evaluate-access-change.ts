@@ -285,15 +285,11 @@ export async function evaluateAccessChange(
     const key = `access-change:${cid}`;
     // Tagged template so Prisma binds the param safely. The hashtext()
     // call lives in SQL — we cannot precompute it client-side.
-    await tx.$executeRaw(
-      Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${key}))`,
-    );
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
   }
   {
     const groupKey = `access-group:${change.accessGroupId}`;
-    await tx.$executeRaw(
-      Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${groupKey}))`,
-    );
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${groupKey}))`;
   }
 
   // ── Step 3: snapshot current state (post-lock) ──
