@@ -90,6 +90,9 @@ interface WizardState {
   // assigned `respondentIds` and creates OrgRespondent rows after the
   // campaign exists. Skipped on resubmit (idempotent dedupe).
   bulkRespondents: ParsedRow[];
+  // Task O UI — per-campaign invitation email overrides. Null/empty = fall back to template default.
+  invitationSubject: string;
+  invitationBodyMarkdown: string;
 }
 
 const STEPS = [
@@ -184,6 +187,8 @@ export function CampaignWizard() {
       endMode: "OPEN_END",
       closeAt: "",
       bulkRespondents: [],
+      invitationSubject: "",
+      invitationBodyMarkdown: "",
     };
   });
 
@@ -244,6 +249,14 @@ export function CampaignWizard() {
           bulkRespondents: Array.isArray(parsed.bulkRespondents)
             ? (parsed.bulkRespondents as ParsedRow[])
             : [],
+          invitationSubject:
+            typeof parsed.invitationSubject === "string"
+              ? parsed.invitationSubject
+              : "",
+          invitationBodyMarkdown:
+            typeof parsed.invitationBodyMarkdown === "string"
+              ? parsed.invitationBodyMarkdown
+              : "",
         };
         if (!cancelled) {
           setPendingDraft({
@@ -396,6 +409,14 @@ export function CampaignWizard() {
           bulkRespondents:
             state.bulkRespondents.length > 0
               ? state.bulkRespondents
+              : undefined,
+          invitationSubject:
+            state.invitationSubject.trim() !== ""
+              ? state.invitationSubject.trim()
+              : undefined,
+          invitationBodyMarkdown:
+            state.invitationBodyMarkdown.trim() !== ""
+              ? state.invitationBodyMarkdown.trim()
               : undefined,
         }),
       });
@@ -591,6 +612,7 @@ export function CampaignWizard() {
             onSaveDraft={() => saveCampaign({ activate: false })}
             onActivate={() => saveCampaign({ activate: true })}
             canActivate={Boolean(canActivate)}
+            onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
         )}
       </div>
@@ -1483,6 +1505,7 @@ function ReviewStep({
   onBack,
   onSaveDraft,
   onActivate,
+  onChange,
 }: {
   state: WizardState;
   submitting: boolean;
@@ -1490,10 +1513,12 @@ function ReviewStep({
   onBack: () => void;
   onSaveDraft: () => void;
   onActivate: () => void;
+  onChange: (patch: Partial<WizardState>) => void;
 }) {
   const [orgName, setOrgName] = useState<string>("");
   const [templateName, setTemplateName] = useState<string>("");
   const [respondents, setRespondents] = useState<Respondent[]>([]);
+  const [emailPanelOpen, setEmailPanelOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -1574,6 +1599,93 @@ function ReviewStep({
             {state.endMode === "OPEN_END" ? "Open-ended" : state.closeAt}
           </span>
         </div>
+      </div>
+
+      {/* Task O UI — per-campaign invitation email overrides */}
+      <div className="border border-border rounded-lg">
+        <button
+          type="button"
+          onClick={() => setEmailPanelOpen((v) => !v)}
+          className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors"
+          data-testid="email-overrides-toggle"
+        >
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">
+              Customize invitation email
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {state.invitationSubject.trim() ||
+              state.invitationBodyMarkdown.trim()
+                ? "Custom subject/body set for this campaign"
+                : "Optional — leave blank to use the template default"}
+            </p>
+          </div>
+          <span className="text-xs font-medium text-muted-foreground">
+            {emailPanelOpen ? "Hide" : "Edit"}
+          </span>
+        </button>
+        {emailPanelOpen && (
+          <div className="px-4 pb-4 space-y-3 border-t border-border pt-4">
+            <p className="text-xs text-muted-foreground">
+              Available tokens:{" "}
+              <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                {"{{respondentFirstName}}"}
+              </code>
+              ,{" "}
+              <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                {"{{respondentFullName}}"}
+              </code>
+              ,{" "}
+              <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                {"{{campaignName}}"}
+              </code>
+              ,{" "}
+              <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                {"{{invitationUrl}}"}
+              </code>
+              ,{" "}
+              <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                {"{{closeAt}}"}
+              </code>
+              .
+            </p>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-foreground">
+                Subject
+              </label>
+              <input
+                type="text"
+                value={state.invitationSubject}
+                onChange={(e) =>
+                  onChange({ invitationSubject: e.target.value })
+                }
+                maxLength={200}
+                placeholder="Leave blank to use template default"
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                data-testid="invitation-subject-input"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-foreground">
+                Body (Markdown)
+              </label>
+              <textarea
+                value={state.invitationBodyMarkdown}
+                onChange={(e) =>
+                  onChange({ invitationBodyMarkdown: e.target.value })
+                }
+                maxLength={5000}
+                rows={8}
+                placeholder="Leave blank to use template default"
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                data-testid="invitation-body-input"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {state.invitationBodyMarkdown.length} / 5000 characters
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between pt-4">
