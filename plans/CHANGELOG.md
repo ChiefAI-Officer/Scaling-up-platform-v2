@@ -6,6 +6,40 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Admin template editor MVP: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-template-editor-mvp -->
+
+Closes the largest remaining gap in the Assessment Tool v7.6 arc. Before today, admins had to ask a developer to write a seed script every time they wanted to launch a new assessment template. With this MVP, admins can name + describe + paste-JSON-content a new template, see it in a versions list, edit metadata, and publish a draft version — all from the in-app admin UI. The full form-builder (question editor, scoring tier editor, drag-to-reorder sections) is a separate future slice.
+
+**Routes**:
+- `POST /api/admin/assessment-templates` — atomic transaction creates `AssessmentTemplate` + first `AssessmentTemplateVersion` (versionNumber=1, language="en" default, `publishedAt=null` draft). Canonical `contentHash` via the new shared helper. 409 on alias collision (caught from Prisma P2002 in the catch). 400 on Zod validation. Audit `'CREATE'`.
+- `PATCH /api/admin/assessment-templates/[id]` — edit metadata only (name, description, invitationSubject, invitationBodyMarkdown, aggregationMode). **alias is intentionally immutable** (URL-stability invariant); content is version-locked. Audit `'UPDATE'`.
+- `DELETE /api/admin/assessment-templates/[id]` — soft-delete via `deletedAt`. 409 `TEMPLATE_HAS_ACTIVE_CAMPAIGNS` if any DRAFT or ACTIVE campaign references the template (CLOSED campaigns are fine — historical data). Audit `'DELETE'`.
+- `POST /api/admin/assessment-templates/[id]/versions/[versionId]/publish` — sets `publishedAt` + `publishedBy`. 409 `ALREADY_PUBLISHED` (idempotent at the route boundary). 404 if version is on a different template. Audit `'UPDATE'` on the version.
+
+**Shared helper** — `src/lib/assessments/template-content-hash.ts`: pulled out of the seed script so the admin POST route and the seed script produce byte-identical `contentHash` values for the same canonical content. Fixed key order: `{ questions, sections, scoringConfig, reportConfig, invitationSubject, invitationBodyMarkdown }` → `JSON.stringify` → sha256 → hex. DO NOT pretty-print, sort, or add whitespace.
+
+**UI**:
+- `/admin/assessment-templates` — list page with table (name / alias / aggregation / per-row delete). "New Template" button (top-right). Soft-delete uses a window.confirm; 409 surfaces as a friendly toast ("Close all active campaigns on this template first").
+- `/admin/assessment-templates/new` — single-form-page create flow. Metadata fields (name, alias with regex hint, description, language, aggregationMode, invitation subject + body) + 4 paste-JSON textareas (questions, sections, scoringConfig, reportConfig optional). Client-side `JSON.parse` per field with inline error banner before submit.
+- `/admin/assessment-templates/[id]` — detail page with metadata view + inline edit panel (Save / Cancel-reverts), versions table (versionNumber / language / Draft|Published pill / contentHash prefix / per-row Publish button on drafts).
+- Nav entry "Assessment Templates" added to the dashboard layout under "Aggregate Report".
+
+**Prisma JsonNull**: the create route uses `Prisma.JsonNull` for the optional `reportConfig` field — Prisma's `InputJsonValue` rejects plain JS `null` for nullable Json columns under strict tsc. Caught by Vercel's TS pass, not local turbopack.
+
+**Tests**: 14 new in `templates-crud.test.ts`:
+- POST: 401 unauth, 403 non-admin, 400 zod, 409 alias collision (P2002), 201 happy path asserting both rows created + audit
+- PATCH: 404 missing, 200 happy path with audit + correct fields written
+- DELETE: 404 missing, 409 active-campaigns, 200 soft-delete + audit
+- Publish: 404 missing, 404 cross-template, 409 already-published, 200 happy path with publishedAt/publishedBy + audit
+
+**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in 41s. Commit `b9fe0ab`.
+
+**Deferred (separate slices)**:
+- Form builder for questions/sections/scoringConfig/reportConfig (paste-JSON for now).
+- Adding new draft versions to an existing template (today the create flow always creates version 1; producing version 2+ needs a "duplicate version" action).
+- Multi-language version forks.
+- Translation workflow.
+
 ### 2026-05-18 — Assessment Tool v7.6 — Admin aggregate dashboard filters (Decision #8 MVP): <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-aggregate-filters -->
 
 Decision #8 reserved this filter scope for day 1 but explicitly deferred it from the v1 MVP shape (template + version selector only). Now landed.
