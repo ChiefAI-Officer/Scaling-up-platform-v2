@@ -437,3 +437,60 @@ export function getCoachBioMissingFields(coach: {
     if (result.success) return [];
     return result.error.issues.map((i) => i.message);
 }
+
+// ---------------------------------------------------------------------
+// Assessment v7.6 — Organization / Team / Respondent validation
+// ---------------------------------------------------------------------
+
+const _trim = (s: string) => s.trim();
+
+export const createOrganizationSchema = z.object({
+    name: z.string().min(1, "Name is required").max(200).transform(_trim),
+    externalId: z
+        .string()
+        .min(1)
+        .max(200)
+        .transform(_trim)
+        .optional()
+        .nullable(),
+});
+
+export const updateOrganizationSchema = z.object({
+    name: z.string().min(1).max(200).transform(_trim).optional(),
+    externalId: z
+        .string()
+        .max(200)
+        .transform(_trim)
+        .nullable()
+        .optional(),
+});
+
+export const createTeamSchema = z.object({
+    name: z.string().min(1, "Team name is required").max(200).transform(_trim),
+    type: z.string().max(100).transform(_trim).nullable().optional(),
+    description: z.string().max(2000).transform(_trim).nullable().optional(),
+    parentTeamId: z.string().min(1).nullable().optional(),
+});
+
+export const updateTeamSchema = z.object({
+    name: z.string().min(1).max(200).transform(_trim).optional(),
+    type: z.string().max(100).transform(_trim).nullable().optional(),
+    description: z.string().max(2000).transform(_trim).nullable().optional(),
+    parentTeamId: z.string().min(1).nullable().optional(),
+});
+
+export const createRespondentSchema = z.object({
+    email: z.string().email("Valid email is required").max(320).transform(_trim),
+    firstName: z.string().min(1, "First name is required").max(200).transform(_trim),
+    lastName: z.string().min(1, "Last name is required").max(200).transform(_trim),
+    jobTitle: z.string().max(200).transform(_trim).nullable().optional(),
+    teamId: z.string().min(1).nullable().optional(),
+    externalId: z.string().min(1).max(200).transform(_trim).nullable().optional(),
+});
+
+export const updateRespondentSchema = z.object({
+    firstName: z.string().min(1).max(200).transform(_trim).optional(),
+    lastName: z.string().min(1).max(200).transform(_trim).optional(),
+    jobTitle: z.string().max(200).transform(_trim).nullable().optional(),
+    teamId: z.string().min(1).nullable().optional(),
+});

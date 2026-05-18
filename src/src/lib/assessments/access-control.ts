@@ -264,3 +264,13 @@ export async function canManageCampaign(
 
   return canAccessTemplate(db, actor, campaign.templateId);
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// asAccessDb — production helper to bridge the real Prisma client
+// into the narrow AccessControlDb interface. The narrow interface is for
+// test stubbing; in app code, the actual Prisma client is a superset.
+// ────────────────────────────────────────────────────────────────────────
+
+export function asAccessDb(prisma: unknown): AccessControlDb {
+  return prisma as AccessControlDb;
+}
