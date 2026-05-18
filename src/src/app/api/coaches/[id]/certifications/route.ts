@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { CERTIFIED_STATUS, PENDING_STATUS } from "@/lib/auth/coach-status";
+import { logAudit } from "@/lib/audit";
 
 const AddCertificationSchema = z.object({
     workshopTypeId: z.string().min(1),
@@ -78,20 +80,46 @@ export async function POST(
         // Auto-promote PENDING coaches to ACTIVE on cert grant so the overall
         // certification badge tracks the granted workshop-type certs. Only PENDING
         // is promoted — DEACTIVATED requires explicit reactivation by an admin.
+        // updateMany predicate guards against a concurrent DEACTIVATED write
+        // landing between the read above and the write inside the transaction.
         if (coach.certificationStatus === PENDING_STATUS) {
-            const [certification] = await db.$transaction([
+            const [certification, promotion] = await db.$transaction([
                 db.coachCertification.create(certCreateArgs),
-                db.coach.update({
-                    where: { id: coachId },
+                db.coach.updateMany({
+                    where: { id: coachId, certificationStatus: PENDING_STATUS },
                     data: { certificationStatus: CERTIFIED_STATUS },
                 }),
             ]);
+            const auditChanges: Record<string, unknown> = { certificationAdded: workshopTypeId };
+            if (promotion.count === 1) {
+                auditChanges.certificationStatus = { from: PENDING_STATUS, to: CERTIFIED_STATUS };
+            }
+            await logAudit({
+                entityType: "Coach",
+                entityId: coachId,
+                action: "UPDATE",
+                performedBy: actor.email,
+                changes: auditChanges,
+            });
             return NextResponse.json({ success: true, data: certification }, { status: 201 });
         }
 
         const certification = await db.coachCertification.create(certCreateArgs);
+        await logAudit({
+            entityType: "Coach",
+            entityId: coachId,
+            action: "UPDATE",
+            performedBy: actor.email,
+            changes: { certificationAdded: workshopTypeId },
+        });
         return NextResponse.json({ success: true, data: certification }, { status: 201 });
     } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+            return NextResponse.json(
+                { success: false, error: "Coach already has this certification" },
+                { status: 409 }
+            );
+        }
         console.error("Error adding certification:", error);
         return NextResponse.json({ success: false, error: "Failed to add certification" }, { status: 500 });
     }
