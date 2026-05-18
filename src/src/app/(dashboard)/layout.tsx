@@ -15,6 +15,7 @@ const navLinks = [
   { href: "/admin/workflows", label: "Workflows" },
   { href: "/admin/surveys", label: "Surveys" },
   { href: "/admin/assessments/aggregate", label: "Aggregate Report" },
+  { href: "/admin/assessment-templates", label: "Assessment Templates" },
   { href: "/admin/access-groups", label: "Access Groups" },
   { href: "/admin/files", label: "Files" },
   { href: "/partners", label: "Partners" },
