@@ -6,6 +6,24 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-18 — Assessment Tool v7.6 — Task O UI follow-on — wizard email customization panel: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-task-o-ui -->
+
+Backend for per-campaign invitation email overrides shipped earlier today. Task O UI follow-on wires the inputs into the campaign-create wizard's Review step so non-developer coaches can actually use the feature without hitting PATCH manually.
+
+**Wizard state**:
+- `WizardState` gains `invitationSubject: string` + `invitationBodyMarkdown: string` (empty string default → omitted from payload → backend null → fallback to template default).
+- Auto-save resume path (`Task K`) merges both fields when present in stored `stepsData`.
+- Campaign-create POST sends `invitationSubject` / `invitationBodyMarkdown` only when trimmed value is non-empty; otherwise the keys are omitted entirely (matches the schema's `.optional().nullable()` shape).
+
+**UI** (`ReviewStep`):
+- New collapsible "Customize invitation email" panel sits between the campaign summary and the action buttons. Closed by default; the subhead text reads `"Custom subject/body set for this campaign"` when either field is set, or `"Optional — leave blank to use the template default"` otherwise.
+- When expanded: token-reference hint listing the 5 supported tokens (`{{respondentFirstName}}`, `{{respondentFullName}}`, `{{campaignName}}`, `{{invitationUrl}}`, `{{closeAt}}`), subject input (200-char cap, validation mirrors backend Zod), and Markdown body textarea (5000-char cap with live count).
+- Placeholder text on both fields: `"Leave blank to use template default"` (we intentionally do NOT fetch the template default — that would require a new GET endpoint and the placeholder is sufficient signal).
+
+**Scope cut**: `CampaignDetail` post-create edit panel deferred to a separate slice. Wizard covers 90% of the use case; coaches needing to edit a DRAFT campaign's email can re-create today or wait for the detail-page edit panel. PATCH route already accepts the fields, so power users can use it via dev tools.
+
+**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in 105s. Commit `cddcaa7`. Tests unaffected (17/17 in reminders + changelog-freshness suites green).
+
 ### 2026-05-18 — P0 fix: decouple HubSpot sync from paid registration email path: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:paid-registration-email-hubspot-decouple -->
 
 **Symptom.** Coach reported the post-registration "you're registered" confirmation email never arrived. Production DB inspection showed both recent paid registrations (`cs_test_…` checkout sessions, Stripe test mode) with `paymentStatus=COMPLETED` but `paymentProcessedAt=NULL` and `notificationSentAt=NULL`. Across the entire DB, **zero registrations had ever had `notificationSentAt` set** — the paid path had never delivered an attendee email end-to-end.
