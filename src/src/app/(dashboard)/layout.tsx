@@ -14,6 +14,7 @@ const navLinks = [
   { href: "/templates", label: "Templates" },
   { href: "/admin/workflows", label: "Workflows" },
   { href: "/admin/surveys", label: "Surveys" },
+  { href: "/admin/assessments/aggregate", label: "Aggregate Report" },
   { href: "/admin/files", label: "Files" },
   { href: "/partners", label: "Partners" },
   { href: "/coaches", label: "Coaches" },
