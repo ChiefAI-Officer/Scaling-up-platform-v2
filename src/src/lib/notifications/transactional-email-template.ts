@@ -11,7 +11,11 @@
  *      in Vercel + redeploy and registration emails immediately revert.
  *   2. If a DB row exists, interpolate {{token}}s in subject + body and
  *      return that. Token VALUES are HTML-escaped (Round 2 M3) so registrant-
- *      controlled fields can't inject markup.
+ *      controlled fields can't inject markup. The location block
+ *      (`buildLocationBlock`) is then appended to the rendered body with an
+ *      <hr> separator so virtual/in-person details always reach the recipient
+ *      even when the admin-edited template body omits them. Subject is NOT
+ *      modified — URLs in subjects hurt inbox UX and deliverability.
  *   3. If no DB row, return hardcoded HTML defaults verbatim. Lets prod
  *      deploy with zero backfill — admin save creates the row on first edit.
  *
@@ -134,8 +138,12 @@ export async function composeRegistrationConfirmationEmail(
     venueAddress: escapeHtml(ctx.venueAddress ?? ""),
   };
 
-  return {
-    subject: interpolateTokens(row.subject, escapedTokens),
-    html: interpolateTokens(row.body, escapedTokens),
-  };
+  const subject = interpolateTokens(row.subject, escapedTokens);
+  const bodyInterpolated = interpolateTokens(row.body, escapedTokens);
+  const locationBlock = buildLocationBlock(ctx);
+  const html = locationBlock
+    ? `${bodyInterpolated}\n<hr>\n${locationBlock}`
+    : bodyInterpolated;
+
+  return { subject, html };
 }
