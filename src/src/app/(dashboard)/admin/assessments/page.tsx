@@ -44,19 +44,25 @@ export default async function AdminAssessmentsLandingPage() {
           />
         </div>
 
-        <aside className="bg-card border border-border rounded-xl p-5 space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">
-            Getting Started
-          </h2>
-          <ol className="space-y-2 text-sm text-muted-foreground list-decimal pl-5">
-            <li>Create or edit a template under Templates.</li>
-            <li>Publish a version.</li>
+        <aside className="rounded-xl border border-border bg-card p-5 space-y-3">
+          <h2 className="text-sm font-semibold text-foreground">Getting Started</h2>
+          <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
             <li>
-              Add the template to an Access Group containing your coaches.
+              Create or edit a template under{" "}
+              <a href="/admin/assessments/templates" className="text-primary hover:underline font-medium">
+                Templates
+              </a>
+              .
             </li>
+            <li>Publish a version of that template.</li>
             <li>
-              Coaches with that group can launch campaigns via the wizard.
+              Add the template to an{" "}
+              <a href="/admin/assessments/access-groups" className="text-primary hover:underline font-medium">
+                Access Group
+              </a>{" "}
+              containing your coaches.
             </li>
+            <li>Coaches in that group can now launch campaigns via the campaign wizard.</li>
           </ol>
         </aside>
       </div>

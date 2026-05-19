@@ -307,7 +307,8 @@ async function ensureAccessGroupAndTemplateLink(
   tx: Parameters<Parameters<typeof db.$transaction>[0]>[0],
   templateId: string,
   groupName: string,
-  systemUserId: string
+  systemUserId: string,
+  defaultCoachEmail = "coach@example.com"
 ): Promise<void> {
   const existingGroup = await tx.accessGroup.findFirst({
     where: { name: groupName },
@@ -355,6 +356,31 @@ async function ensureAccessGroupAndTemplateLink(
     },
     update: {},
   });
+
+  // Add the default dev coach as a member of the access group so the
+  // end-to-end flow works on a fresh DB (coach@example.com is seeded by
+  // seed.ts). Skip silently if that Coach row doesn't exist (production DBs
+  // won't have the dev coach; real coaches are added via the admin UI).
+  const defaultCoach = await tx.coach.findUnique({
+    where: { email: defaultCoachEmail },
+    select: { id: true },
+  });
+  if (defaultCoach) {
+    await tx.accessGroupCoach.upsert({
+      where: {
+        accessGroupId_coachId: {
+          accessGroupId: groupId,
+          coachId: defaultCoach.id,
+        },
+      },
+      create: {
+        accessGroupId: groupId,
+        coachId: defaultCoach.id,
+        addedBy: systemUserId,
+      },
+      update: {},
+    });
+  }
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────

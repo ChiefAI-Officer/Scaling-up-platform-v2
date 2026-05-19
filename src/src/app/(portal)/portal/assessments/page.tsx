@@ -5,7 +5,7 @@
  */
 
 import Link from "next/link";
-import { ClipboardList, PlusCircle } from "lucide-react";
+import { PlusCircle } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireCoach } from "@/lib/auth/authorization";
 import { FadeUp } from "@/components/ui/animated";
@@ -57,22 +57,18 @@ export default async function CoachAssessmentsPage() {
 
       <FadeUp delay={0.1}>
         {items.length === 0 ? (
-          <div className="bg-card border border-border rounded-xl p-12 text-center">
-            <ClipboardList className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              No campaigns yet
-            </h3>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Click <span className="font-medium">+ New Campaign</span> to get
-              started. You can pick a template, an organization, and the
-              people who should participate.
+          <div className="rounded-xl border border-border bg-card p-6 text-center space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Your admin hasn&apos;t given you access to any published templates yet.
+              If you&apos;ve been added to an Access Group with at least one published template,
+              click <strong>+ New Campaign</strong> to start.
             </p>
-            <Link
+            <a
               href="/portal/assessments/new"
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
-              <PlusCircle className="w-5 h-5" /> New Campaign
-            </Link>
+              + New Campaign
+            </a>
           </div>
         ) : (
           <CampaignsListWithFilter campaigns={items} />
