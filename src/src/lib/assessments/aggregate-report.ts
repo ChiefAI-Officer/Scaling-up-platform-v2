@@ -165,17 +165,10 @@ function toIsoDate(d: Date): string {
 // Public entry point
 // ────────────────────────────────────────────────────────────────────────
 
-export interface AggregateReportFilters {
-  startDate?: Date | null;
-  endDate?: Date | null;
-  organizationId?: string | null;
-}
-
 export async function getAggregateReport(
   db: AggregateReportDb,
   templateId: string,
   versionId: string,
-  filters: AggregateReportFilters = {},
 ): Promise<AggregateReport> {
   const version = await db.assessmentTemplateVersion.findUnique({
     where: { id: versionId },
@@ -185,27 +178,9 @@ export async function getAggregateReport(
   const sectionDefs = version ? safeSections(version.sections) : [];
   const tierDefs = version ? safeTiers(version.scoringConfig) : [];
 
-  // Build the campaign-level filter from the optional organizationId.
-  const campaignFilter: { templateId: string; versionId: string; organizationId?: string } = {
-    templateId,
-    versionId,
-  };
-  if (filters.organizationId) {
-    campaignFilter.organizationId = filters.organizationId;
-  }
-
-  // Build the submission-level date range filter. submittedAt is the
-  // canonical event time. Inclusive on both ends; null/undefined → unbounded.
-  const submittedAtFilter: { gte?: Date; lte?: Date } = {};
-  if (filters.startDate) submittedAtFilter.gte = filters.startDate;
-  if (filters.endDate) submittedAtFilter.lte = filters.endDate;
-
   const rows = await db.assessmentSubmission.findMany({
     where: {
-      campaign: campaignFilter,
-      ...(Object.keys(submittedAtFilter).length > 0
-        ? { submittedAt: submittedAtFilter }
-        : {}),
+      campaign: { templateId, versionId },
     },
     select: {
       submittedAt: true,
