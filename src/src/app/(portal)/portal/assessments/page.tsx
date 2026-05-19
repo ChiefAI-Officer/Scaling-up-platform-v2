@@ -63,12 +63,12 @@ export default async function CoachAssessmentsPage() {
               If you&apos;ve been added to an Access Group with at least one published template,
               click <strong>+ New Campaign</strong> to start.
             </p>
-            <a
+            <Link
               href="/portal/assessments/new"
               className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               + New Campaign
-            </a>
+            </Link>
           </div>
         ) : (
           <CampaignsListWithFilter campaigns={items} />
