@@ -6,6 +6,32 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-19 — Assessment Tool v7.6 — Public quiz mode (Decision #4 MVP): <!-- ENTRY_ISO:2026-05-19 ENTRY_SLUG:assessment-v7-6-public-quiz-mode -->
+
+Anonymous self-assessment flow for templates configured as PUBLIC. Closes Decision #4 from the v7.6 spec lock. Anyone with the campaign alias can land on `/quiz/[alias]`, enter name + email, answer the questions, and submit. Scoring runs server-side using the same engine as INVITED. Marketing-funnel surface, indexable by design.
+
+**Routes**:
+- `/quiz/[campaignAlias]` — server-rendered landing. Reads `campaign + first published version` server-side, computes the open/closed window inline, hands to the client funnel. Indexable; per-campaign de-indexing can land via `publicConfig` in a future slice.
+- `/quiz/[campaignAlias]/thank-you` — generic confirmation. Public results delivery via a `resultsToken` email is a follow-on slice (schema columns already exist on `AssessmentSubmission`: `resultsTokenHash` / `resultsTokenIssuedAt` / `…ExpiresAt` / `…RevokedAt` / `…ViewedAt`).
+- `POST /api/quiz/[campaignAlias]/submit` — Zod-validated body `{ publicTaker: {firstName, lastName, email}, answers, referringCoachEmail? }`. Outcomes: 404 `CAMPAIGN_NOT_FOUND` (unknown alias or unpublished version), 403 `NOT_PUBLIC` (INVITED-only campaign), 410 `NOT_OPEN` (DRAFT/CLOSED/before-openAt/past-closeAt), 400 surfaces `ScoringValidationError` codes verbatim. Creates submission with `respondentId=null` + `invitationId=null` + `publicTaker` JSON. Rate-limited via `RateLimits.standard`.
+
+**UI** (`public-quiz-client.tsx`):
+- 3-step funnel: intro card (with question count + time estimate) → info-capture form → grouped-by-section question list with sticky progress header.
+- SLIDER_LIKERT renders as a row of value buttons + anchor labels at min/max.
+- Required-question gate on submit; inline error banner on submission failure; redirect to thank-you on 200.
+
+**Middleware**: `/quiz/*` and `/api/quiz/*` added to both auth-bypass blocks (mirrors the existing `/org-survey/*` pattern for INVITED).
+
+**Tests**: 6 new in `submit-post.test.ts` covering Zod 400, 404 unknown alias, 403 INVITED, 410 DRAFT, 410 past-closeAt, 200 happy path with `publicTaker` written + null FK fields.
+
+**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in 27.1s. Commit `a8ac8b5`.
+
+**Deferred**:
+- Admin UI to flip a campaign's `accessMode` to PUBLIC + edit `publicConfig`. Today admin uses the API directly via dev tools.
+- Cookie-tracked dedup of repeat submissions from the same browser. The schema accepts multiple submissions today.
+- `publicConfig`-driven feature flags (e.g., require-email-only / require-full-name / de-index toggle).
+- Public results page via `resultsToken` (the schema columns exist; the route + page do not).
+
 ### 2026-05-19 — Assessment Tool v7.6 — Template content form builder + multi-version forks: <!-- ENTRY_ISO:2026-05-19 ENTRY_SLUG:assessment-v7-6-form-builder-multi-version -->
 
 Two complementary slices that complete the in-app template-authoring story. Together they replace the May 18 paste-JSON MVP with a real authoring workflow: structured form fields for everything in the scoring engine's input shape, plus the ability to evolve a published template by duplicating its latest version into a fresh editable draft.
