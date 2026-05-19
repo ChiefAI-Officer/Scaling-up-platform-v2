@@ -221,7 +221,7 @@ export function AssessmentVersionEditor({
     setLoadError(null);
     try {
       const res = await fetch(
-        `/api/admin/assessments/templates/${templateId}/versions/${versionId}`,
+        `/api/admin/assessment-templates/${templateId}/versions/${versionId}`,
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as {
@@ -382,7 +382,7 @@ export function AssessmentVersionEditor({
     setSubmitting(true);
     try {
       const res = await fetch(
-        `/api/admin/assessments/templates/${templateId}/versions/${versionId}`,
+        `/api/admin/assessment-templates/${templateId}/versions/${versionId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

@@ -29,6 +29,12 @@ interface SidebarEntry {
   href: string;
   label: string;
   exact?: boolean;
+  /**
+   * When true, the entry renders as a "Coming soon" placeholder: dimmed,
+   * non-competing for active state. The Link still navigates (lands on
+   * /portal/assessments) so the row is not a dead end.
+   */
+  placeholder?: boolean;
 }
 
 const ADMIN_ENTRIES: SidebarEntry[] = [
@@ -43,8 +49,15 @@ const ADMIN_ENTRIES: SidebarEntry[] = [
 
 const COACH_ENTRIES: SidebarEntry[] = [
   { href: "/portal/assessments", label: "My Campaigns", exact: true },
-  // Placeholder href until a dedicated org-list portal page lands.
-  { href: "/portal/assessments", label: "My Organizations" },
+  // Placeholder until a dedicated org-list portal page lands. Uses a
+  // sentinel query string so it never matches the My Campaigns active
+  // state on /portal/assessments. Still navigates (Next.js strips the
+  // query at render, so the campaigns page renders normally).
+  {
+    href: "/portal/assessments?tab=organizations",
+    label: "My Organizations",
+    placeholder: true,
+  },
 ];
 
 export function AssessmentsSidebar({ session }: AssessmentsSidebarProps) {
@@ -93,6 +106,7 @@ export function AssessmentsSidebar({ session }: AssessmentsSidebarProps) {
                 href={entry.href}
                 label={entry.label}
                 exact={entry.exact}
+                placeholder={entry.placeholder}
               />
             ))}
           </div>

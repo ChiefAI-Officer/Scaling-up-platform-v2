@@ -122,7 +122,7 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
     setError(null);
     try {
       const res = await fetch(
-        `/api/admin/assessments/access-groups/${encodeURIComponent(accessGroupId)}?includeArchived=true`,
+        `/api/admin/access-groups/${encodeURIComponent(accessGroupId)}?includeArchived=true`,
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as {
@@ -160,7 +160,7 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
     setEditError(null);
     try {
       const res = await fetch(
-        `/api/admin/assessments/access-groups/${encodeURIComponent(accessGroupId)}`,
+        `/api/admin/access-groups/${encodeURIComponent(accessGroupId)}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -190,7 +190,7 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
   async function handleAddCoach(coachId: string) {
     try {
       const res = await fetch(
-        `/api/admin/assessments/access-groups/${encodeURIComponent(accessGroupId)}/coaches`,
+        `/api/admin/access-groups/${encodeURIComponent(accessGroupId)}/coaches`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -219,7 +219,7 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
   async function handleAddTemplate(templateId: string) {
     try {
       const res = await fetch(
-        `/api/admin/assessments/access-groups/${encodeURIComponent(accessGroupId)}/templates`,
+        `/api/admin/access-groups/${encodeURIComponent(accessGroupId)}/templates`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -250,7 +250,7 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
     setArchiveError(null);
     try {
       const res = await fetch(
-        `/api/admin/assessments/access-groups/${encodeURIComponent(accessGroupId)}/archive`,
+        `/api/admin/access-groups/${encodeURIComponent(accessGroupId)}/archive`,
         { method: "POST" },
       );
       const body = (await res.json()) as {

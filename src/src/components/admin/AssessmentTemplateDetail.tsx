@@ -49,7 +49,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/assessments/templates/${templateId}`);
+      const res = await fetch(`/api/admin/assessment-templates/${templateId}`);
       if (!res.ok) {
         if (res.status === 404) throw new Error("Template not found");
         throw new Error(`HTTP ${res.status}`);
@@ -76,7 +76,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
     if (saving) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/assessments/templates/${templateId}`, {
+      const res = await fetch(`/api/admin/assessment-templates/${templateId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -110,7 +110,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
     setDuplicatingVersionId(sourceVersionId);
     try {
       const res = await fetch(
-        `/api/admin/assessments/templates/${templateId}/versions/${sourceVersionId}/duplicate`,
+        `/api/admin/assessment-templates/${templateId}/versions/${sourceVersionId}/duplicate`,
         { method: "POST" },
       );
       const body = await res.json().catch(() => ({}));
@@ -141,7 +141,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
     setPublishingVersionId(versionId);
     try {
       const res = await fetch(
-        `/api/admin/assessments/templates/${templateId}/versions/${versionId}/publish`,
+        `/api/admin/assessment-templates/${templateId}/versions/${versionId}/publish`,
         { method: "POST" },
       );
       const body = await res.json().catch(() => ({}));

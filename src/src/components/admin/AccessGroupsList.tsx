@@ -81,7 +81,7 @@ export function AccessGroupsList() {
     setError(null);
     try {
       const qs = showArchived ? "?includeArchived=true" : "";
-      const res = await fetch(`/api/admin/assessments/access-groups${qs}`);
+      const res = await fetch(`/api/admin/access-groups${qs}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as {
         success: boolean;
@@ -114,7 +114,7 @@ export function AccessGroupsList() {
     setCreateSubmitting(true);
     setCreateError(null);
     try {
-      const res = await fetch("/api/admin/assessments/access-groups", {
+      const res = await fetch("/api/admin/access-groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

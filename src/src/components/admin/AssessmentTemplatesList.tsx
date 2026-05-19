@@ -23,7 +23,7 @@ export function AssessmentTemplatesList() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/assessments/templates");
+      const res = await fetch("/api/admin/assessment-templates");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as { success: boolean; data: TemplateRow[] };
       setRows(body.data ?? []);
@@ -45,7 +45,7 @@ export function AssessmentTemplatesList() {
     if (!confirmed) return;
     setDeletingId(row.id);
     try {
-      const res = await fetch(`/api/admin/assessments/templates/${row.id}`, {
+      const res = await fetch(`/api/admin/assessment-templates/${row.id}`, {
         method: "DELETE",
       });
       const body = await res.json().catch(() => ({}));

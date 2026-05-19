@@ -23,17 +23,26 @@ interface AssessmentsNavLinkProps {
    * does not also light up the Dashboard row.
    */
   exact?: boolean;
+  /**
+   * When true, the entry renders as a "Coming soon" placeholder: dimmed,
+   * never active, and labeled as such for screen readers. The Link still
+   * navigates so the row is not a dead end.
+   */
+  placeholder?: boolean;
 }
 
 export function AssessmentsNavLink({
   href,
   label,
   exact = false,
+  placeholder = false,
 }: AssessmentsNavLinkProps) {
   const pathname = usePathname();
-  const isActive = exact
-    ? pathname === href
-    : isNavLinkActive(pathname, href);
+  const isActive = placeholder
+    ? false
+    : exact
+      ? pathname === href
+      : isNavLinkActive(pathname, href);
 
   return (
     <Link
@@ -43,10 +52,17 @@ export function AssessmentsNavLink({
         isActive
           ? "bg-primary/10 text-primary font-semibold"
           : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+        placeholder && "opacity-60",
       )}
       aria-current={isActive ? "page" : undefined}
+      aria-disabled={placeholder || undefined}
     >
       {label}
+      {placeholder && (
+        <span className="ml-2 text-xs italic text-muted-foreground/70">
+          (coming soon)
+        </span>
+      )}
     </Link>
   );
 }

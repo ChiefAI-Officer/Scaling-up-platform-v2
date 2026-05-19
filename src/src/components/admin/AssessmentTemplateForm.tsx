@@ -259,7 +259,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
     if (!payload) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/admin/assessments/templates", {
+      const res = await fetch("/api/admin/assessment-templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
