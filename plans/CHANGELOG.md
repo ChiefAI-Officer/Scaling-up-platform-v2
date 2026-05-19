@@ -6,6 +6,33 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-19 — Assessment Tool v7.6 — Observability dashboard v1 (DB-derived counters): <!-- ENTRY_ISO:2026-05-19 ENTRY_SLUG:assessment-v7-6-observability-dashboard-v1 -->
+
+Honest v1 of the observability dashboard spec'd in `docs/specs/v7.6/06-observability.md`. The spec calls for 7 Vercel/Inngest-backed metrics + 6 alert gates configured via the existing SMTP path — that's deploy/infra work outside this codebase. v1 ships a DB-derived dashboard that gives operators a usable live signal without the time-series backend. v1.5 swaps for real metrics.
+
+**Route** — `GET /api/admin/observability` (admin-only, 403 otherwise):
+- Coaches by certification status (`ACTIVE` / `PENDING` / `DEACTIVATED`).
+- Organizations: total + with-campaigns (any).
+- Assessment templates: total + published-version count + draft-version count.
+- Campaigns: by status (`DRAFT` / `ACTIVE` / `CLOSED`) + by accessMode (`INVITED` / `PUBLIC`).
+- Submissions: total + last 24h + last 7d + public + invited.
+- AuditLog: last-24h count + per-action breakdown (sorted descending).
+
+**UI** — `/admin/observability`:
+- Stat-card grids per section (responsive 2/3/5-column).
+- Per-action audit log table sorted by count desc.
+- Manual refresh button re-fetches without a page reload.
+- Nav entry under "Access Groups".
+
+**Tests**: 3 new in `observability-route.test.ts` (401 unauth, 403 non-admin, 200 happy path asserting documented shape).
+
+**Build gate**: `CI=true npx next build --turbopack` ✓ compiled in 24.9s. Commit `6b35556`.
+
+**v1.5 work explicitly deferred** (from spec 06):
+- 7 Vercel Analytics / Inngest event counters (access.evaluate.outcome, access.change.outcome, org.transfer.outcome, seed.duration_ms, seed.result, fingerprint.outcome, aggregate.query.duration_ms).
+- 6 SMTP-paged alert gates (audit-fail, fingerprint-mismatch, seed-error, intersection-empty sustained, certified-zero-template-count, aggregate p95 > 2s).
+- The `certified_zero_effective_template_count` gauge refreshed by Inngest cron.
+
 ### 2026-05-19 — Assessment Tool v7.6 — Public quiz mode (Decision #4 MVP): <!-- ENTRY_ISO:2026-05-19 ENTRY_SLUG:assessment-v7-6-public-quiz-mode -->
 
 Anonymous self-assessment flow for templates configured as PUBLIC. Closes Decision #4 from the v7.6 spec lock. Anyone with the campaign alias can land on `/quiz/[alias]`, enter name + email, answer the questions, and submit. Scoring runs server-side using the same engine as INVITED. Marketing-funnel surface, indexable by design.
