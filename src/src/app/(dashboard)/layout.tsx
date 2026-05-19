@@ -17,6 +17,7 @@ const navLinks = [
   { href: "/admin/assessments/aggregate", label: "Aggregate Report" },
   { href: "/admin/assessment-templates", label: "Assessment Templates" },
   { href: "/admin/access-groups", label: "Access Groups" },
+  { href: "/admin/observability", label: "Observability" },
   { href: "/admin/files", label: "Files" },
   { href: "/partners", label: "Partners" },
   { href: "/coaches", label: "Coaches" },
