@@ -506,3 +506,61 @@ describe("scoreSubmission — edge cases & tier boundaries", () => {
     expect(result.tier?.label).toBe("Low");
   });
 });
+
+// ─── QSP scoring integration (regression guard for field-name drift) ─────
+//
+// Anchors the QSP seeds to the engine's scoringConfig contract. The QSP seeds
+// shipped with `minScore` / `maxScore` / `tierMetric: "average"` — names the
+// engine doesn't accept. Any submission against a QSP template would have
+// thrown at the Zod validation step. This test scores a synthetic answer set
+// through `scoreSubmission` end-to-end so future field-name drift fails CI
+// instead of slipping into a runtime crash.
+
+import { buildTemplateContent as buildQspV1Content } from "../../../../prisma/seed-qsp-v1-assessment";
+import { buildTemplateContent as buildQspV2Content } from "../../../../prisma/seed-qsp-v2-assessment";
+
+describe("QSP scoring integration (regression guard for field-name drift)", () => {
+  it("scores a QSP v1 template with a synthetic answer set without throwing", () => {
+    const { sections, questions, scoringConfig } = buildQspV1Content();
+    // Cast through unknown — the seed's `scoringConfig` is `as const` (readonly
+    // literal type) plus a wrapper `scale` field the engine ignores. The
+    // engine validates the runtime shape via Zod, not the TS type.
+    const version: TemplateVersionForScoring = {
+      sections,
+      questions,
+      scoringConfig: scoringConfig as unknown as TemplateVersionForScoring["scoringConfig"],
+    };
+    // Synthetic answers: alternate 7 and 8 across all questions → avg 7.5.
+    const answers: Answer[] = questions.map((q, idx) => ({
+      stableKey: q.stableKey,
+      value: idx % 2 === 0 ? 7 : 8,
+    }));
+
+    expect(() => scoreSubmission(version, answers)).not.toThrow();
+
+    const result = scoreSubmission(version, answers);
+    expect(result.tier).not.toBeNull();
+    expect(result.overallAverage).toBeGreaterThanOrEqual(1);
+    expect(result.overallAverage).toBeLessThanOrEqual(10);
+  });
+
+  it("scores a QSP v2 template (SLIDER_LIKERT subset) without throwing", () => {
+    const { sections, questions, scoringConfig } = buildQspV2Content();
+    const version: TemplateVersionForScoring = {
+      sections,
+      questions,
+      scoringConfig: scoringConfig as unknown as TemplateVersionForScoring["scoringConfig"],
+    };
+    const answers: Answer[] = questions.map((q) => ({
+      stableKey: q.stableKey,
+      value: 6,
+    }));
+
+    expect(() => scoreSubmission(version, answers)).not.toThrow();
+
+    const result = scoreSubmission(version, answers);
+    expect(result.tier).not.toBeNull();
+    expect(result.overallAverage).toBeGreaterThanOrEqual(1);
+    expect(result.overallAverage).toBeLessThanOrEqual(10);
+  });
+});

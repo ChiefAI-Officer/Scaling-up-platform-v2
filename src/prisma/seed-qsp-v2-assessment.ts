@@ -117,16 +117,45 @@ const SECTIONS: SectionDef[] = [
 ];
 
 // Scoring config — only SLIDER_LIKERT questions contribute to the score.
-// TEXT questions are excluded by the scoring engine which handles mixed-type templates.
+// TEXT questions are filtered out before passing to scoreSubmission (the engine
+// is SLIDER_LIKERT-only in v1).
+//
+// Engine contract: tierMetric must be one of "countAchieved" | "overallTotal"
+// | "overallAvg"; tier ranges use minMetric/maxMetric, top tier omits maxMetric
+// for open-ended above; fractional domains require touching tiers (b.minMetric
+// === a.maxMetric).
 const SCORING_CONFIG = {
-  tierMetric: "average",
+  tierMetric: "overallAvg",
   passThreshold: 7,
   scale: { min: 1, max: 10 },
   tiers: [
-    { label: "Strong", minScore: 9, maxScore: null },
-    { label: "On Track", minScore: 7, maxScore: 8.99 },
-    { label: "Needs Work", minScore: 5, maxScore: 6.99 },
-    { label: "At Risk", minScore: 1, maxScore: 4.99 },
+    {
+      label: "At Risk",
+      minMetric: 1,
+      maxMetric: 5,
+      message:
+        "Your quarterly performance signals real strain. Use this session to align on the most pressing fixes.",
+    },
+    {
+      label: "Needs Work",
+      minMetric: 5,
+      maxMetric: 7,
+      message:
+        "Pockets of weakness are pulling your quarter down. Identify two or three high-leverage corrections.",
+    },
+    {
+      label: "On Track",
+      minMetric: 7,
+      maxMetric: 9,
+      message:
+        "Solid quarter overall. Use the session to lock in what worked and tune the gaps.",
+    },
+    {
+      label: "Strong",
+      minMetric: 9,
+      message:
+        "Excellent quarter. Use the session to compound the wins and set bolder priorities.",
+    },
   ],
 } as const;
 
@@ -151,6 +180,8 @@ interface QuestionPayload {
     min: 1;
     max: 10;
     step: 1;
+    anchorMin: string;
+    anchorMax: string;
   };
 }
 
@@ -188,7 +219,13 @@ function buildSectionsAndQuestions(): {
 
       // Only attach scale for SLIDER_LIKERT questions.
       if (q.type === "SLIDER_LIKERT") {
-        questionPayload.scale = { min: 1, max: 10, step: 1 };
+        questionPayload.scale = {
+          min: 1,
+          max: 10,
+          step: 1,
+          anchorMin: "Strongly disagree",
+          anchorMax: "Strongly agree",
+        };
       }
 
       questions.push(questionPayload);
@@ -196,6 +233,37 @@ function buildSectionsAndQuestions(): {
   });
 
   return { sections, questions };
+}
+
+// ─── Engine-shaped template content (exported for tests) ─────────────────
+//
+// Returns the SLIDER_LIKERT-only structure that `scoreSubmission` accepts. TEXT
+// questions are stored on the AssessmentTemplateVersion but are filtered here
+// because the scoring engine is SLIDER_LIKERT-only in v1.
+export function buildTemplateContent(): {
+  sections: SectionPayload[];
+  questions: Array<
+    Omit<QuestionPayload, "type" | "scale"> & {
+      type: "SLIDER_LIKERT";
+      scale: NonNullable<QuestionPayload["scale"]>;
+    }
+  >;
+  scoringConfig: typeof SCORING_CONFIG;
+} {
+  const { sections, questions } = buildSectionsAndQuestions();
+  const sliderQuestions = questions
+    .filter(
+      (q): q is QuestionPayload & {
+        type: "SLIDER_LIKERT";
+        scale: NonNullable<QuestionPayload["scale"]>;
+      } => q.type === "SLIDER_LIKERT" && q.scale !== undefined
+    )
+    .map((q, idx) => ({
+      ...q,
+      // Re-number sortOrder so the SLIDER_LIKERT-only subset is contiguous.
+      sortOrder: idx + 1,
+    }));
+  return { sections, questions: sliderQuestions, scoringConfig: SCORING_CONFIG };
 }
 
 // ─── Content hash ────────────────────────────────────────────────────────
