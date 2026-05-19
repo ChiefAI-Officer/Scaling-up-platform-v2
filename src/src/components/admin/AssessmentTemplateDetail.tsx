@@ -43,6 +43,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
   >("FULL_VISIBILITY");
   const [saving, setSaving] = useState(false);
   const [publishingVersionId, setPublishingVersionId] = useState<string | null>(null);
+  const [duplicatingVersionId, setDuplicatingVersionId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,6 +102,33 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDuplicate(sourceVersionId: string) {
+    if (duplicatingVersionId) return;
+    setDuplicatingVersionId(sourceVersionId);
+    try {
+      const res = await fetch(
+        `/api/admin/assessment-templates/${templateId}/versions/${sourceVersionId}/duplicate`,
+        { method: "POST" },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.success === false) {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      toast({
+        title: "New draft created",
+        description: `v${body.data.versionNumber} — opening editor…`,
+      });
+      window.location.href = `/admin/assessment-templates/${templateId}/versions/${body.data.newVersionId}/edit`;
+    } catch (e) {
+      toast({
+        title: "Could not duplicate version",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+      setDuplicatingVersionId(null);
     }
   }
 
@@ -382,20 +410,43 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
                     {v.contentHash.slice(0, 12)}…
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {!v.publishedAt && (
+                    <div className="inline-flex items-center gap-2">
+                      {!v.publishedAt && (
+                        <Link
+                          href={`/admin/assessment-templates/${templateId}/versions/${v.id}/edit`}
+                          className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted"
+                          data-testid={`edit-version-${v.id}`}
+                        >
+                          Edit
+                        </Link>
+                      )}
                       <button
                         type="button"
-                        onClick={() => handlePublish(v.id)}
-                        disabled={publishingVersionId !== null}
-                        className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                        data-testid={`publish-version-${v.id}`}
+                        onClick={() => handleDuplicate(v.id)}
+                        disabled={duplicatingVersionId !== null}
+                        className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50"
+                        data-testid={`duplicate-version-${v.id}`}
                       >
-                        {publishingVersionId === v.id ? (
+                        {duplicatingVersionId === v.id ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : null}
-                        Publish
+                        Duplicate
                       </button>
-                    )}
+                      {!v.publishedAt && (
+                        <button
+                          type="button"
+                          onClick={() => handlePublish(v.id)}
+                          disabled={publishingVersionId !== null}
+                          className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                          data-testid={`publish-version-${v.id}`}
+                        >
+                          {publishingVersionId === v.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : null}
+                          Publish
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
