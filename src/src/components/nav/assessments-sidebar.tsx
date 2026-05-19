@@ -39,11 +39,27 @@ interface SidebarEntry {
 
 const ADMIN_ENTRIES: SidebarEntry[] = [
   { href: "/admin/assessments", label: "Dashboard", exact: true },
-  { href: "/admin/assessments/organizations", label: "Organizations" },
+  // Organizations / Campaigns / Public Quizzes are placeholders until the
+  // dedicated admin pages land — the routes don't have page files yet.
+  // The Link still navigates (lands on a 404 in dev, which is the desired
+  // visual signal alongside the dimmed "(coming soon)" treatment).
+  {
+    href: "/admin/assessments/organizations",
+    label: "Organizations",
+    placeholder: true,
+  },
   { href: "/admin/assessments/access-groups", label: "Access Groups" },
   { href: "/admin/assessments/templates", label: "Templates" },
-  { href: "/admin/assessments/campaigns", label: "Campaigns" },
-  { href: "/admin/assessments/public-quizzes", label: "Public Quizzes" },
+  {
+    href: "/admin/assessments/campaigns",
+    label: "Campaigns",
+    placeholder: true,
+  },
+  {
+    href: "/admin/assessments/public-quizzes",
+    label: "Public Quizzes",
+    placeholder: true,
+  },
   { href: "/admin/assessments/aggregate", label: "Aggregate Report" },
 ];
 
@@ -90,6 +106,7 @@ export function AssessmentsSidebar({ session }: AssessmentsSidebarProps) {
                 href={entry.href}
                 label={entry.label}
                 exact={entry.exact}
+                placeholder={entry.placeholder}
               />
             ))}
           </div>

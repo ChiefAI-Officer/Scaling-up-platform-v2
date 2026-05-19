@@ -99,4 +99,66 @@ describe("AssessmentsSidebar", () => {
     expect(screen.getByText("Organizations")).toBeInTheDocument();
     expect(screen.getByText("Aggregate Report")).toBeInTheDocument();
   });
+
+  // ---------------------------------------------------------------------------
+  // Placeholder rendering — unbuilt routes should render dimmed + aria-disabled
+  // ---------------------------------------------------------------------------
+
+  describe("placeholder rendering", () => {
+    /**
+     * The rendered anchor is the *closest link* enclosing the label text.
+     * Using `closest("a")` keeps the test resilient to span-vs-anchor markup
+     * changes inside AssessmentsNavLink.
+     */
+    function anchorFor(label: string): HTMLAnchorElement {
+      const node = screen.getByText(label).closest("a");
+      expect(node).not.toBeNull();
+      return node as HTMLAnchorElement;
+    }
+
+    it("marks Organizations / Campaigns / Public Quizzes as placeholders for ADMIN", () => {
+      render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
+
+      for (const label of ["Organizations", "Campaigns", "Public Quizzes"]) {
+        const anchor = anchorFor(label);
+        expect(anchor).toHaveAttribute("aria-disabled", "true");
+        expect(anchor.className).toMatch(/opacity-60/);
+      }
+
+      // Three "(coming soon)" markers on the admin side (one per placeholder row).
+      const comingSoon = screen.getAllByText(/coming soon/i);
+      expect(comingSoon.length).toBe(3);
+    });
+
+    it("does NOT mark Dashboard / Access Groups / Templates / Aggregate Report as placeholders for ADMIN", () => {
+      render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
+
+      for (const label of [
+        "Dashboard",
+        "Access Groups",
+        "Templates",
+        "Aggregate Report",
+      ]) {
+        const anchor = anchorFor(label);
+        expect(anchor).not.toHaveAttribute("aria-disabled");
+        expect(anchor.className).not.toMatch(/opacity-60/);
+      }
+    });
+
+    it("marks My Organizations as a placeholder for COACH (but NOT My Campaigns)", () => {
+      render(<AssessmentsSidebar session={makeSession("COACH")} />);
+
+      const orgAnchor = anchorFor("My Organizations");
+      expect(orgAnchor).toHaveAttribute("aria-disabled", "true");
+      expect(orgAnchor.className).toMatch(/opacity-60/);
+
+      const campaignsAnchor = anchorFor("My Campaigns");
+      expect(campaignsAnchor).not.toHaveAttribute("aria-disabled");
+      expect(campaignsAnchor.className).not.toMatch(/opacity-60/);
+
+      // Exactly one "(coming soon)" marker on the coach lane.
+      const comingSoon = screen.getAllByText(/coming soon/i);
+      expect(comingSoon.length).toBe(1);
+    });
+  });
 });
