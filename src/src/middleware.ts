@@ -83,7 +83,10 @@ export default withAuth(
         // Negative lookahead excludes /api/surveys/assign and /api/surveys/workflows (stay protected)
         pathname.match(/^\/api\/surveys\/(?!assign|workflows)[^/]+(\/submit)?$/) ||
         // Assessment v7.6 — INVITED-mode survey page + cookie routes (Task D)
-        pathname.startsWith("/org-survey/")
+        pathname.startsWith("/org-survey/") ||
+        // Assessment v7.6 — PUBLIC-mode quiz page + submit route
+        pathname.startsWith("/quiz/") ||
+        pathname.startsWith("/api/quiz/")
       ) {
         return withRateLimitHeaders(NextResponse.next(), rateLimitHeaders);
       }
@@ -129,6 +132,8 @@ export default withAuth(
           pathname.match(/^\/api\/surveys\/(?!assign|workflows)[^/]+(\/submit)?$/) ||
           // Assessment v7.6 — INVITED-mode survey page + cookie routes (Task D)
           pathname.startsWith("/org-survey/") ||
+          pathname.startsWith("/quiz/") ||
+          pathname.startsWith("/api/quiz/") ||
           pathname.startsWith("/wireframes") ||
           pathname.startsWith("/_next") ||
           pathname.includes(".")
