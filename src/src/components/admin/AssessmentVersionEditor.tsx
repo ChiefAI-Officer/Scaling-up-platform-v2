@@ -221,7 +221,7 @@ export function AssessmentVersionEditor({
     setLoadError(null);
     try {
       const res = await fetch(
-        `/api/admin/assessment-templates/${templateId}/versions/${versionId}`,
+        `/api/admin/assessments/templates/${templateId}/versions/${versionId}`,
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as {
@@ -382,7 +382,7 @@ export function AssessmentVersionEditor({
     setSubmitting(true);
     try {
       const res = await fetch(
-        `/api/admin/assessment-templates/${templateId}/versions/${versionId}`,
+        `/api/admin/assessments/templates/${templateId}/versions/${versionId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -402,7 +402,7 @@ export function AssessmentVersionEditor({
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       toast({ title: "Version saved" });
-      router.push(`/admin/assessment-templates/${templateId}`);
+      router.push(`/admin/assessments/templates/${templateId}`);
     } catch (e) {
       toast({
         title: "Could not save version",
@@ -425,7 +425,7 @@ export function AssessmentVersionEditor({
     return (
       <div className="space-y-4">
         <Link
-          href={`/admin/assessment-templates/${templateId}`}
+          href={`/admin/assessments/templates/${templateId}`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" /> Back
@@ -440,7 +440,7 @@ export function AssessmentVersionEditor({
   return (
     <div className="space-y-6">
       <Link
-        href={`/admin/assessment-templates/${templateId}`}
+        href={`/admin/assessments/templates/${templateId}`}
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="w-4 h-4" /> Template
@@ -985,7 +985,7 @@ export function AssessmentVersionEditor({
           <button
             type="button"
             onClick={() =>
-              router.push(`/admin/assessment-templates/${templateId}`)
+              router.push(`/admin/assessments/templates/${templateId}`)
             }
             disabled={submitting}
             className="inline-flex items-center text-sm font-medium px-3 py-2 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"

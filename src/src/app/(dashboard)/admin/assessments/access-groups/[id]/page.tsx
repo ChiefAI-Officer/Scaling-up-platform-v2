@@ -39,7 +39,7 @@ export default async function AdminAccessGroupDetailPage({ params }: Props) {
           Admin
         </Link>{" "}
         ·{" "}
-        <Link href="/admin/access-groups" className="hover:underline">
+        <Link href="/admin/assessments/access-groups" className="hover:underline">
           Access Groups
         </Link>{" "}
         · <span className="text-foreground">Detail</span>

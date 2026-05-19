@@ -81,7 +81,7 @@ export function AccessGroupsList() {
     setError(null);
     try {
       const qs = showArchived ? "?includeArchived=true" : "";
-      const res = await fetch(`/api/admin/access-groups${qs}`);
+      const res = await fetch(`/api/admin/assessments/access-groups${qs}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as {
         success: boolean;
@@ -114,7 +114,7 @@ export function AccessGroupsList() {
     setCreateSubmitting(true);
     setCreateError(null);
     try {
-      const res = await fetch("/api/admin/access-groups", {
+      const res = await fetch("/api/admin/assessments/access-groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -137,7 +137,7 @@ export function AccessGroupsList() {
       setCreateOpen(false);
       setCreateName("");
       setCreateDescription("");
-      router.push(`/admin/access-groups/${body.data.id}`);
+      router.push(`/admin/assessments/access-groups/${body.data.id}`);
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : "Failed to create");
     } finally {
@@ -223,7 +223,7 @@ export function AccessGroupsList() {
               <TableRow key={g.id} className={archived ? "opacity-60" : ""}>
                 <TableCell>
                   <Link
-                    href={`/admin/access-groups/${g.id}`}
+                    href={`/admin/assessments/access-groups/${g.id}`}
                     className={`text-primary hover:underline ${
                       archived ? "italic" : ""
                     }`}
@@ -246,7 +246,7 @@ export function AccessGroupsList() {
                 </TableCell>
                 <TableCell className="text-right">
                   <Link
-                    href={`/admin/access-groups/${g.id}`}
+                    href={`/admin/assessments/access-groups/${g.id}`}
                     className="text-primary hover:underline"
                     aria-label={`Manage ${g.name}`}
                   >

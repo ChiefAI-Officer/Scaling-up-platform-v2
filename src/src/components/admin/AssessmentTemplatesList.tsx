@@ -23,7 +23,7 @@ export function AssessmentTemplatesList() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/assessment-templates");
+      const res = await fetch("/api/admin/assessments/templates");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as { success: boolean; data: TemplateRow[] };
       setRows(body.data ?? []);
@@ -45,7 +45,7 @@ export function AssessmentTemplatesList() {
     if (!confirmed) return;
     setDeletingId(row.id);
     try {
-      const res = await fetch(`/api/admin/assessment-templates/${row.id}`, {
+      const res = await fetch(`/api/admin/assessments/templates/${row.id}`, {
         method: "DELETE",
       });
       const body = await res.json().catch(() => ({}));
@@ -77,7 +77,7 @@ export function AssessmentTemplatesList() {
     <div className="space-y-4">
       <div className="flex justify-end">
         <Link
-          href="/admin/assessment-templates/new"
+          href="/admin/assessments/templates/new"
           className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           data-testid="new-template-btn"
         >
@@ -126,7 +126,7 @@ export function AssessmentTemplatesList() {
                 >
                   <td className="px-4 py-3 text-sm">
                     <Link
-                      href={`/admin/assessment-templates/${row.id}`}
+                      href={`/admin/assessments/templates/${row.id}`}
                       className="font-medium text-foreground hover:underline"
                     >
                       {row.name}

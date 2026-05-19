@@ -33,6 +33,51 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      // Assessment Tool Phase A IA refactor — collapse 4 top-level admin
+      // sections into a single /admin/assessments lane (wireframe 24).
+      // 308 = permanent + method-preserving (so any prefetch / POST in flight
+      // is also redirected without method downgrade).
+      {
+        source: "/admin/assessment-templates",
+        destination: "/admin/assessments/templates",
+        permanent: true,
+      },
+      {
+        source: "/admin/assessment-templates/new",
+        destination: "/admin/assessments/templates/new",
+        permanent: true,
+      },
+      {
+        source: "/admin/assessment-templates/:id",
+        destination: "/admin/assessments/templates/:id",
+        permanent: true,
+      },
+      {
+        source:
+          "/admin/assessment-templates/:id/versions/:versionId/edit",
+        destination:
+          "/admin/assessments/templates/:id/versions/:versionId/edit",
+        permanent: true,
+      },
+      {
+        source: "/admin/access-groups",
+        destination: "/admin/assessments/access-groups",
+        permanent: true,
+      },
+      {
+        source: "/admin/access-groups/:id",
+        destination: "/admin/assessments/access-groups/:id",
+        permanent: true,
+      },
+      {
+        source: "/admin/observability",
+        destination: "/admin/assessments/observability",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

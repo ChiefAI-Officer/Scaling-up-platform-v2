@@ -259,7 +259,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
     if (!payload) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/admin/assessment-templates", {
+      const res = await fetch("/api/admin/assessments/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -294,7 +294,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       toast({ title: "Template created" });
-      router.push(`/admin/assessment-templates/${body.data.id}`);
+      router.push(`/admin/assessments/templates/${body.data.id}`);
     } catch (err) {
       toast({
         title: "Could not create template",
@@ -905,7 +905,7 @@ export function AssessmentTemplateForm({ mode: _mode }: AssessmentTemplateFormPr
       <div className="flex justify-end gap-2">
         <button
           type="button"
-          onClick={() => router.push("/admin/assessment-templates")}
+          onClick={() => router.push("/admin/assessments/templates")}
           disabled={submitting}
           className="inline-flex items-center text-sm font-medium px-3 py-2 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"
         >

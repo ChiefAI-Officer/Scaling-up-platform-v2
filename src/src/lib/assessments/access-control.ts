@@ -266,6 +266,19 @@ export async function canManageCampaign(
 }
 
 // ────────────────────────────────────────────────────────────────────────
+// canAccessAggregateReport — admin/staff-only gate for the aggregate
+// dashboard surface (sidebar entry + route + CSV exports). Coaches get a
+// per-org / per-campaign view; the cross-org aggregate is restricted to
+// privileged roles. Spec: docs/specs/v7.6/02-service-layer-rules.md.
+// ────────────────────────────────────────────────────────────────────────
+
+export function canAccessAggregateReport(actor: {
+  role: ApiActor["role"];
+}): boolean {
+  return isPrivilegedRole(actor.role);
+}
+
+// ────────────────────────────────────────────────────────────────────────
 // asAccessDb — production helper to bridge the real Prisma client
 // into the narrow AccessControlDb interface. The narrow interface is for
 // test stubbing; in app code, the actual Prisma client is a superset.

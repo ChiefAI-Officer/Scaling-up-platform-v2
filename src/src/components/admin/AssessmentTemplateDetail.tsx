@@ -49,7 +49,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/assessment-templates/${templateId}`);
+      const res = await fetch(`/api/admin/assessments/templates/${templateId}`);
       if (!res.ok) {
         if (res.status === 404) throw new Error("Template not found");
         throw new Error(`HTTP ${res.status}`);
@@ -76,7 +76,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
     if (saving) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/assessment-templates/${templateId}`, {
+      const res = await fetch(`/api/admin/assessments/templates/${templateId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -110,7 +110,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
     setDuplicatingVersionId(sourceVersionId);
     try {
       const res = await fetch(
-        `/api/admin/assessment-templates/${templateId}/versions/${sourceVersionId}/duplicate`,
+        `/api/admin/assessments/templates/${templateId}/versions/${sourceVersionId}/duplicate`,
         { method: "POST" },
       );
       const body = await res.json().catch(() => ({}));
@@ -121,7 +121,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
         title: "New draft created",
         description: `v${body.data.versionNumber} — opening editor…`,
       });
-      window.location.href = `/admin/assessment-templates/${templateId}/versions/${body.data.newVersionId}/edit`;
+      window.location.href = `/admin/assessments/templates/${templateId}/versions/${body.data.newVersionId}/edit`;
     } catch (e) {
       toast({
         title: "Could not duplicate version",
@@ -141,7 +141,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
     setPublishingVersionId(versionId);
     try {
       const res = await fetch(
-        `/api/admin/assessment-templates/${templateId}/versions/${versionId}/publish`,
+        `/api/admin/assessments/templates/${templateId}/versions/${versionId}/publish`,
         { method: "POST" },
       );
       const body = await res.json().catch(() => ({}));
@@ -180,7 +180,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
     return (
       <div className="space-y-4">
         <Link
-          href="/admin/assessment-templates"
+          href="/admin/assessments/templates"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" /> Back
@@ -195,7 +195,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
   return (
     <div className="space-y-6">
       <Link
-        href="/admin/assessment-templates"
+        href="/admin/assessments/templates"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="w-4 h-4" /> Templates
@@ -413,7 +413,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
                     <div className="inline-flex items-center gap-2">
                       {!v.publishedAt && (
                         <Link
-                          href={`/admin/assessment-templates/${templateId}/versions/${v.id}/edit`}
+                          href={`/admin/assessments/templates/${templateId}/versions/${v.id}/edit`}
                           className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted"
                           data-testid={`edit-version-${v.id}`}
                         >
