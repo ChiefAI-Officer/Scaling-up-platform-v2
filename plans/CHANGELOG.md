@@ -6,6 +6,33 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-19 — Assessment Tool v7.6 — Template content form builder + multi-version forks: <!-- ENTRY_ISO:2026-05-19 ENTRY_SLUG:assessment-v7-6-form-builder-multi-version -->
+
+Two complementary slices that complete the in-app template-authoring story. Together they replace the May 18 paste-JSON MVP with a real authoring workflow: structured form fields for everything in the scoring engine's input shape, plus the ability to evolve a published template by duplicating its latest version into a fresh editable draft.
+
+**Form builder** (commit `72a3b6e`) — replaces the new-template paste-JSON textareas with structured inputs:
+- Sections editor — name + description + partLabel + reorder buttons + add/remove. Removing a section also drops its questions (FK-like behavior in component state).
+- Questions editor — label + helpText + section selector + required toggle + 5-field scale (min/max/step/anchorMin/anchorMax). All questions today are `SLIDER_LIKERT` — matches the runtime scoring engine.
+- Scoring editor — `tierMetric` enum + `passThreshold` + tiers array with min / max-blank-for-unbounded / label / message. Reorder.
+- `stableKey` auto-generated from order (`S1`, `S2`; `S1_Q1`, `S1_Q2`, `S2_Q1`, with counter resetting per section). No hand-coded identifiers in the UI.
+- Submit-time validation: every section needs a name; every question needs a label + section + valid scale; every tier needs a label + message. Inline red banner gates the network call.
+- `reportConfig` kept as paste-JSON for now (not part of scoring engine; advanced field).
+
+**Multi-version forks** (commit `9d101e0`) — admins can evolve a published template without losing audit history:
+- `POST /api/admin/assessment-templates/[id]/versions/[versionId]/duplicate` — copies all content + reportConfig into a new row with `publishedAt=null`. `versionNumber = max(existing for template+language) + 1`. Returns new id; UI redirects to the editor.
+- `GET /api/admin/assessment-templates/[id]/versions/[versionId]` — fetches version + parent template (hydrates the editor form).
+- `PATCH /api/admin/assessment-templates/[id]/versions/[versionId]` — edits content on a draft only. **409 `ALREADY_PUBLISHED`** on published versions (content is immutable post-publish). Recomputes `contentHash` from the canonical helper so the audit trail stays valid.
+- New page `/admin/assessment-templates/[id]/versions/[versionId]/edit` hosts `AssessmentVersionEditor.tsx` — a content-only twin of the new-template form. Hydrates server JSON tolerantly (anything missing falls back to defaults). Renders read-only when published (with a banner explaining the workflow).
+- Template detail page rows gain Edit (draft only) + Duplicate (any) + Publish (draft only) buttons.
+
+**Tests**: 6 new in `versions-edit-duplicate.test.ts` — GET cross-template 404, PATCH 409 on published, PATCH happy path with `contentHash` recompute + audit, POST duplicate 404 cross-template, POST duplicate happy path with `versionNumber` bump + audit. Combined with the prior 14 template CRUD tests, the admin template surface is now 20 tests covered. Full suite still green.
+
+**Build gates**: both slices passed `CI=true npx next build --turbopack` (26.6s + 26.1s).
+
+**Deferred**:
+- Multi-language version forks (today the duplicate copies the source language; admins can't fork to a new language from the UI).
+- Per-question type extensions (TEXT, MULTI_SELECT, etc.) — scoring engine only handles `SLIDER_LIKERT` today.
+
 ### 2026-05-18 — Assessment Tool v7.6 — Admin template editor MVP: <!-- ENTRY_ISO:2026-05-18 ENTRY_SLUG:assessment-v7-6-template-editor-mvp -->
 
 Closes the largest remaining gap in the Assessment Tool v7.6 arc. Before today, admins had to ask a developer to write a seed script every time they wanted to launch a new assessment template. With this MVP, admins can name + describe + paste-JSON-content a new template, see it in a versions list, edit metadata, and publish a draft version — all from the in-app admin UI. The full form-builder (question editor, scoring tier editor, drag-to-reorder sections) is a separate future slice.
