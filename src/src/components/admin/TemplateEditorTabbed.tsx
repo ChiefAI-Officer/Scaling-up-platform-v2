@@ -51,6 +51,12 @@ import {
   PublishFailureModal,
   type PublishFailureIssue,
 } from "@/components/admin/PublishFailureModal";
+import {
+  MetadataTab,
+  type MetadataTabValues,
+} from "@/components/admin/template-editor/MetadataTab";
+import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
+import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -92,6 +98,16 @@ export interface TemplateEditorTabbedTemplate {
   id: string;
   name: string;
   alias: string;
+  // F2 (Checkpoint 1b) — the editor needs the full template metadata
+  // surface so MetadataTab can render the Template Metadata + Invitation
+  // Email + Results Email cards. All three Results Email fields land
+  // here via F0 migration.
+  description?: string | null;
+  invitationSubject?: string;
+  invitationBodyMarkdown?: string;
+  resultsEmailSubject?: string | null;
+  resultsEmailBodyMarkdown?: string | null;
+  resultsEmailContentApproved?: boolean;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
   accessMode?: "INVITED" | "PUBLIC";
 }
@@ -102,6 +118,13 @@ export interface TemplateEditorTabbedVersion {
   language: string;
   publishedAt: string | null;
   contentHash: string;
+  // F2 — version content surfaces. Sections/Questions/Scoring are
+  // version-locked + version-PATCHed. Optional so test fixtures that
+  // only exercise the chrome stay byte-compatible.
+  questions?: unknown;
+  sections?: unknown;
+  scoringConfig?: unknown;
+  reportConfig?: unknown;
 }
 
 export interface TemplateEditorTabbedVersionMeta {
@@ -137,6 +160,50 @@ function resolveTabFromUrl(param: string | null): TabId {
     return param as TabId;
   }
   return "metadata";
+}
+
+function genUid(): string {
+  return `u${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Hydrate the version.sections JSON payload into UI-editable SectionDraft
+ * rows. Tolerant of partial / unknown shapes per the canonical pattern in
+ * AssessmentVersionEditor.
+ */
+function hydrateSectionsFromJson(raw: unknown): SectionDraft[] {
+  const arr = Array.isArray(raw) ? raw : [];
+  return arr.map((s, idx) => {
+    const r = s as { stableKey?: unknown; name?: unknown };
+    return {
+      uid: genUid(),
+      stableKey:
+        typeof r.stableKey === "string" && r.stableKey.length > 0
+          ? r.stableKey
+          : `S${idx + 1}`,
+      name: typeof r.name === "string" ? r.name : "",
+    };
+  });
+}
+
+/**
+ * Count questions grouped by their sectionStableKey. The version PATCH
+ * payload's questions array is opaque to this surface — we only count.
+ */
+function buildQuestionCountByStableKey(
+  raw: unknown,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  const arr = Array.isArray(raw) ? raw : [];
+  for (const q of arr) {
+    if (q && typeof q === "object") {
+      const ssk = (q as { sectionStableKey?: unknown }).sectionStableKey;
+      if (typeof ssk === "string") {
+        out[ssk] = (out[ssk] ?? 0) + 1;
+      }
+    }
+  }
+  return out;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -191,6 +258,141 @@ export function TemplateEditorTabbed({
     [dirtyFlags],
   );
 
+  // ─── Editable state — F2 (Checkpoint 1b) ──────────────────────────────
+  // Template-level editable fields. Hydrate from props; flip `metadata`
+  // dirty on any edit. Save Draft serializes these into a single
+  // template PATCH.
+  const [templateValues, setTemplateValues] = useState({
+    name: template.name,
+    alias: template.alias,
+    description: template.description ?? "",
+    invitationSubject: template.invitationSubject ?? "",
+    invitationBodyMarkdown: template.invitationBodyMarkdown ?? "",
+    resultsEmailSubject: template.resultsEmailSubject ?? "",
+    resultsEmailBodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
+    resultsEmailContentApproved:
+      template.resultsEmailContentApproved ?? false,
+    aggregationMode: template.aggregationMode,
+  });
+
+  // Version-level editable fields (language only, in this checkpoint).
+  const [versionValues, setVersionValues] = useState({
+    language: version.language,
+  });
+
+  // Sections — hydrated from version.sections JSON. Dirty flag fires on
+  // any add/rename/reorder/delete. Save Draft hits the version PATCH
+  // with current questions/scoringConfig pass-through.
+  const [sections, setSections] = useState<SectionDraft[]>(() =>
+    hydrateSectionsFromJson(version.sections),
+  );
+
+  // Stable references for questions/scoringConfig so version PATCH can
+  // round-trip them unchanged when only sections were edited.
+  const questionsRef = React.useRef<unknown>(version.questions ?? []);
+  const scoringConfigRef = React.useRef<unknown>(version.scoringConfig ?? {});
+  const reportConfigRef = React.useRef<unknown>(version.reportConfig ?? null);
+
+  // Derived: question count per section stableKey (for the Sections card
+  // count badge). In F2 the editor is route-keyed on versionId, so a
+  // mount-time hydration is sufficient — `version.questions` does not
+  // change for a given mounted editor instance.
+  const questionCountByStableKey = useMemo(
+    () => buildQuestionCountByStableKey(version.questions),
+    [version.questions],
+  );
+
+  // ─── Setters that auto-dirty the right surface ────────────────────────
+  const setMetadataDirty = useCallback(() => {
+    setDirtyFlags((prev) =>
+      prev.metadata ? prev : { ...prev, metadata: true },
+    );
+  }, []);
+  const setVersionDirty = useCallback(() => {
+    setDirtyFlags((prev) =>
+      prev.version ? prev : { ...prev, version: true },
+    );
+  }, []);
+  const setSectionsDirty = useCallback(() => {
+    setDirtyFlags((prev) =>
+      prev.sections ? prev : { ...prev, sections: true },
+    );
+  }, []);
+
+  const handleTemplateFieldChange = useCallback(
+    (patch: Partial<Omit<MetadataTabValues, "language">>) => {
+      setTemplateValues((prev) => ({ ...prev, ...patch }));
+      setMetadataDirty();
+    },
+    [setMetadataDirty],
+  );
+  const handleVersionFieldChange = useCallback(
+    (patch: { language?: string }) => {
+      setVersionValues((prev) => ({ ...prev, ...patch }));
+      setVersionDirty();
+    },
+    [setVersionDirty],
+  );
+
+  // Section operations — F2 / F2b.
+  const handleSectionsAdd = useCallback(() => {
+    setSections((prev) => [
+      ...prev,
+      {
+        uid: genUid(),
+        stableKey: `S${prev.length + 1}`,
+        name: "",
+      },
+    ]);
+    setSectionsDirty();
+  }, [setSectionsDirty]);
+
+  const handleSectionsRename = useCallback(
+    (uid: string, name: string) => {
+      setSections((prev) =>
+        prev.map((s) => (s.uid === uid ? { ...s, name } : s)),
+      );
+      setSectionsDirty();
+    },
+    [setSectionsDirty],
+  );
+
+  const handleSectionsDelete = useCallback(
+    (uid: string) => {
+      setSections((prev) => prev.filter((s) => s.uid !== uid));
+      setSectionsDirty();
+    },
+    [setSectionsDirty],
+  );
+
+  const handleSectionsMoveUp = useCallback(
+    (uid: string) => {
+      setSections((prev) => {
+        const idx = prev.findIndex((s) => s.uid === uid);
+        if (idx <= 0) return prev;
+        const next = [...prev];
+        [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+        return next;
+      });
+      setSectionsDirty();
+    },
+    [setSectionsDirty],
+  );
+
+  const handleSectionsMoveDown = useCallback(
+    (uid: string) => {
+      setSections((prev) => {
+        const idx = prev.findIndex((s) => s.uid === uid);
+        if (idx < 0 || idx >= prev.length - 1) return prev;
+        const next = [...prev];
+        [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+        return next;
+      });
+      setSectionsDirty();
+    },
+    [setSectionsDirty],
+  );
+
   useEffect(() => {
     if (!isAnyDirty) return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -210,17 +412,128 @@ export function TemplateEditorTabbed({
   const [savingDraft, setSavingDraft] = useState(false);
   const handleSaveDraft = useCallback(async () => {
     if (isPublished || savingDraft) return;
+    if (!isAnyDirty) return;
     setSavingDraft(true);
     try {
+      // F2: per-surface PATCH dispatch.
+      // Template-level dirty (metadata) → PATCH /api/admin/assessment-templates/{id}
+      // Version-level dirty (version + sections) → PATCH /api/admin/.../versions/{versionId}
+      const ops: Array<Promise<{ ok: boolean; status: number; surface: string }>> = [];
+
+      if (dirtyFlags.metadata) {
+        const body: Record<string, unknown> = {
+          name: templateValues.name,
+          description:
+            templateValues.description.length > 0
+              ? templateValues.description
+              : null,
+          invitationSubject: templateValues.invitationSubject,
+          invitationBodyMarkdown: templateValues.invitationBodyMarkdown,
+          aggregationMode: templateValues.aggregationMode,
+          resultsEmailSubject:
+            templateValues.resultsEmailSubject.length > 0
+              ? templateValues.resultsEmailSubject
+              : null,
+          resultsEmailBodyMarkdown:
+            templateValues.resultsEmailBodyMarkdown.length > 0
+              ? templateValues.resultsEmailBodyMarkdown
+              : null,
+          resultsEmailContentApproved:
+            templateValues.resultsEmailContentApproved,
+        };
+        ops.push(
+          fetch(`/api/admin/assessment-templates/${template.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }).then((r) => ({
+            ok: r.ok,
+            status: r.status,
+            surface: "metadata",
+          })),
+        );
+      }
+
+      const needsVersionPatch =
+        Boolean(dirtyFlags.version) ||
+        Boolean(dirtyFlags.sections) ||
+        Boolean(dirtyFlags.questions) ||
+        Boolean(dirtyFlags.scoringConfig);
+
+      if (needsVersionPatch) {
+        const sectionsPayload = sections.map((s, idx) => ({
+          stableKey:
+            s.stableKey && s.stableKey.length > 0
+              ? s.stableKey
+              : `S${idx + 1}`,
+          name: s.name,
+        }));
+        const body: Record<string, unknown> = {
+          questions: questionsRef.current,
+          sections: sectionsPayload,
+          scoringConfig: scoringConfigRef.current,
+          reportConfig: reportConfigRef.current,
+        };
+        if (dirtyFlags.version) {
+          body.language = versionValues.language;
+        }
+        ops.push(
+          fetch(
+            `/api/admin/assessment-templates/${template.id}/versions/${version.id}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+          ).then((r) => ({
+            ok: r.ok,
+            status: r.status,
+            surface: "version",
+          })),
+        );
+      }
+
+      const results = await Promise.all(ops);
+      const failed = results.find((r) => !r.ok);
+      if (failed) {
+        toast({
+          title: "Could not save draft",
+          description: `Save failed (${failed.surface}). Please try again.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Optional test/observability hook.
       await onSaveDraft?.();
-      // F1: actual save logic is plumbed by tab components in F2+.
-      // For now, clear dirty flags as a no-op shape the future
-      // implementation will preserve.
+
+      // Clear dirty flags on success.
       setDirtyFlags({});
+      toast({ title: "Draft saved" });
+      router.refresh();
+    } catch (e) {
+      toast({
+        title: "Could not save draft",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setSavingDraft(false);
     }
-  }, [isPublished, onSaveDraft, savingDraft]);
+  }, [
+    dirtyFlags,
+    isAnyDirty,
+    isPublished,
+    onSaveDraft,
+    router,
+    savingDraft,
+    sections,
+    template.id,
+    templateValues,
+    toast,
+    version.id,
+    versionValues,
+  ]);
 
   // ─── Publish (mirrors AssessmentTemplateDetail.handlePublish) ─────────
   const [publishing, setPublishing] = useState(false);
@@ -358,7 +671,7 @@ export function TemplateEditorTabbed({
           <button
             type="button"
             onClick={handleSaveDraft}
-            disabled={isPublished || savingDraft}
+            disabled={isPublished || savingDraft || !isAnyDirty}
             className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="template-editor-save-draft-btn"
           >
@@ -443,21 +756,52 @@ export function TemplateEditorTabbed({
           </TabsTrigger>
         </TabsList>
 
-        {/* Placeholder panels — real content lands in F2+. */}
+        {/* F2 — Metadata tab (WF16). */}
         <TabsContent value="metadata">
-          <div
-            data-testid="tab-panel-metadata"
-            className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-12 text-center text-sm text-muted-foreground"
-          >
-            Metadata tab (F2)
+          <div data-testid="tab-panel-metadata">
+            <MetadataTab
+              values={{
+                name: templateValues.name,
+                alias: templateValues.alias,
+                description: templateValues.description,
+                invitationSubject: templateValues.invitationSubject,
+                invitationBodyMarkdown: templateValues.invitationBodyMarkdown,
+                resultsEmailSubject: templateValues.resultsEmailSubject,
+                resultsEmailBodyMarkdown:
+                  templateValues.resultsEmailBodyMarkdown,
+                resultsEmailContentApproved:
+                  templateValues.resultsEmailContentApproved,
+                aggregationMode: templateValues.aggregationMode,
+                language: versionValues.language,
+              }}
+              onTemplateFieldChange={handleTemplateFieldChange}
+              onVersionFieldChange={handleVersionFieldChange}
+              sections={sections}
+              questionCountByStableKey={questionCountByStableKey}
+              onSectionsAdd={handleSectionsAdd}
+              onSectionsRename={handleSectionsRename}
+              onSectionsDelete={handleSectionsDelete}
+              onSectionsMoveUp={handleSectionsMoveUp}
+              onSectionsMoveDown={handleSectionsMoveDown}
+              allVersions={allVersions}
+              currentVersionId={version.id}
+              isReadOnly={isPublished}
+            />
           </div>
         </TabsContent>
+        {/* F2b — Sections tab (standalone, full-width). */}
         <TabsContent value="sections">
-          <div
-            data-testid="tab-panel-sections"
-            className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-12 text-center text-sm text-muted-foreground"
-          >
-            Sections tab (F2)
+          <div data-testid="tab-panel-sections">
+            <SectionsTab
+              sections={sections}
+              questionCountByStableKey={questionCountByStableKey}
+              onSectionsAdd={handleSectionsAdd}
+              onSectionsRename={handleSectionsRename}
+              onSectionsDelete={handleSectionsDelete}
+              onSectionsMoveUp={handleSectionsMoveUp}
+              onSectionsMoveDown={handleSectionsMoveDown}
+              isReadOnly={isPublished}
+            />
           </div>
         </TabsContent>
         <TabsContent value="questions">

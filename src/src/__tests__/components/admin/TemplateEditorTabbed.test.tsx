@@ -299,7 +299,17 @@ describe("TemplateEditorTabbed — F1 chrome", () => {
       expect(btn).toHaveAttribute("title", "Coming in v1.5");
     });
 
-    it("Save Draft button calls onSaveDraft callback", async () => {
+    it("Save Draft button calls onSaveDraft callback (when a surface is dirty)", async () => {
+      // F2 (Checkpoint 1b): Save Draft is now disabled unless at least
+      // one surface is dirty. Inject a dirty flag via the test-only
+      // initialDirtyFlags prop so the button is enabled.
+      global.fetch = jest.fn(async () => ({
+        ok: true,
+        status: 200,
+        async json() {
+          return { success: true };
+        },
+      })) as unknown as typeof fetch;
       const onSaveDraft = jest.fn();
       render(
         <TemplateEditorTabbed
@@ -307,6 +317,7 @@ describe("TemplateEditorTabbed — F1 chrome", () => {
           version={draftVersion}
           allVersions={allVersions}
           onSaveDraft={onSaveDraft}
+          initialDirtyFlags={{ metadata: true }}
         />,
       );
 

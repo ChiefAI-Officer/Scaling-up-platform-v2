@@ -40,6 +40,13 @@ export default async function AdminAssessmentVersionEditPage({
         id: true,
         name: true,
         alias: true,
+        description: true,
+        invitationSubject: true,
+        invitationBodyMarkdown: true,
+        // F0 — Results Email card fields (Checkpoint 1b).
+        resultsEmailSubject: true,
+        resultsEmailBodyMarkdown: true,
+        resultsEmailContentApproved: true,
         aggregationMode: true,
       },
     }),
@@ -50,6 +57,12 @@ export default async function AdminAssessmentVersionEditPage({
         templateId: true,
         versionNumber: true,
         language: true,
+        // Content surfaces needed by the Sections card (F2) + future
+        // Questions / Scoring tabs (F3/F4).
+        questions: true,
+        sections: true,
+        scoringConfig: true,
+        reportConfig: true,
         publishedAt: true,
         contentHash: true,
       },
@@ -77,6 +90,12 @@ export default async function AdminAssessmentVersionEditPage({
           id: template.id,
           name: template.name,
           alias: template.alias,
+          description: template.description,
+          invitationSubject: template.invitationSubject,
+          invitationBodyMarkdown: template.invitationBodyMarkdown,
+          resultsEmailSubject: template.resultsEmailSubject,
+          resultsEmailBodyMarkdown: template.resultsEmailBodyMarkdown,
+          resultsEmailContentApproved: template.resultsEmailContentApproved,
           aggregationMode: template.aggregationMode,
           // accessMode is a campaign-level concept; templates default to INVITED
           // (v1 PUBLIC mode is hardcoded for Website Assessment per WF16 spec).
@@ -86,6 +105,10 @@ export default async function AdminAssessmentVersionEditPage({
           id: version.id,
           versionNumber: version.versionNumber,
           language: version.language,
+          questions: version.questions,
+          sections: version.sections,
+          scoringConfig: version.scoringConfig,
+          reportConfig: version.reportConfig,
           publishedAt:
             version.publishedAt instanceof Date
               ? version.publishedAt.toISOString()
