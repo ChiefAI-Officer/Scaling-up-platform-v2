@@ -145,6 +145,10 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
       "Publish this version? Once published, content is immutable.",
     );
     if (!confirmed) return;
+    // Clear any stale modal state from a previous attempt so the success
+    // path (or a different version's failure) doesn't leave the modal
+    // mounted over the wrong row.
+    setPublishIssues(null);
     setPublishingVersionId(versionId);
     try {
       const res = await fetch(
@@ -153,11 +157,22 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // E1.2: narrow modal scope — only publish-validation 422s open the
-        // modal. 409 ALREADY_PUBLISHED gets a dedicated toast. Everything
-        // else (500s, 401/403, 422-without-issues) falls through to the
-        // generic toast.
-        if (res.status === 422 && Array.isArray(body?.issues)) {
+        // E1.2: narrow modal scope — only publish-validation 422s with a
+        // well-shaped issues array open the modal. 409 ALREADY_PUBLISHED
+        // gets a dedicated toast. Everything else (500s, 401/403,
+        // 422-without-issues, 422-with-malformed-issues) falls through to
+        // the generic toast.
+        if (
+          res.status === 422 &&
+          Array.isArray(body?.issues) &&
+          body.issues.every(
+            (i: unknown) =>
+              i !== null &&
+              typeof i === "object" &&
+              Array.isArray((i as { path?: unknown }).path) &&
+              typeof (i as { message?: unknown }).message === "string",
+          )
+        ) {
           setPublishIssues(body.issues as PublishFailureIssue[]);
           return;
         }

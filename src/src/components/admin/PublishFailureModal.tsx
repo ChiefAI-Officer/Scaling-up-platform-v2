@@ -93,8 +93,10 @@ export function PublishFailureModal({
  * If the path begins with a numeric segment (degenerate), it renders as
  * "[N]" on its own.
  */
-export function formatIssuePath(path: (string | number)[]): string {
-  if (path.length === 0) return "(root)";
+export function formatIssuePath(
+  path: (string | number)[] | null | undefined,
+): string {
+  if (!Array.isArray(path) || path.length === 0) return "(root)";
   const parts: string[] = [];
   for (const segment of path) {
     if (typeof segment === "number") {
@@ -103,9 +105,10 @@ export function formatIssuePath(path: (string | number)[]): string {
       } else {
         parts[parts.length - 1] = `${parts[parts.length - 1]}[${segment}]`;
       }
-    } else {
+    } else if (typeof segment === "string") {
       parts.push(segment);
     }
+    // Drop any other segment type silently — better than crashing render.
   }
-  return parts.join(" → ");
+  return parts.length === 0 ? "(root)" : parts.join(" → ");
 }

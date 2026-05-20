@@ -293,4 +293,32 @@ describe("AssessmentTemplateDetail — publish failure handling", () => {
       ).not.toBeInTheDocument();
     });
   });
+
+  // E1.2 follow-on (code-review Important): malformed 422 (issues array
+  // present but elements lack `path` / `message`) must NOT open the
+  // modal — it would crash render. Fall through to the generic toast.
+  it("422 with malformed issues array falls through to the generic toast", async () => {
+    mountWithPublishResponse(
+      makeJsonResponse(
+        {
+          success: false,
+          error: "PUBLISH_VALIDATION_FAILED",
+          issues: [{ code: "custom" }, { message: "missing path" }],
+        },
+        422,
+      ),
+    );
+    await renderAndWaitForLoad();
+    await clickPublish();
+
+    await waitFor(() => {
+      const calls = toastMock.mock.calls.filter(
+        ([arg]) => arg?.title === "Could not publish",
+      );
+      expect(calls.length).toBe(1);
+    });
+    expect(
+      screen.queryByTestId("publish-failure-modal"),
+    ).not.toBeInTheDocument();
+  });
 });
