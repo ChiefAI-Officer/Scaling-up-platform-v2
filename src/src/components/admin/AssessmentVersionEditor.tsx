@@ -10,6 +10,11 @@ import { useToast } from "@/components/ui/use-toast";
 // Local draft shapes — same as AssessmentTemplateForm. Kept duplicated for
 // now since the wire shape that goes to the API is built per-flow (create
 // template vs edit version).
+//
+// Phase E1.1: see Step 0 raw-object preservation comments below — the
+// editable surfaces (sections/questions/scoringConfig) round-trip via a
+// dirty-tracked spread + overlay so unknown / unedited fields are never
+// dropped. SectionDraft / QuestionDraft hold ONLY the UI-editable subset.
 // ────────────────────────────────────────────────────────────────────────
 
 interface SectionDraft {
@@ -43,6 +48,16 @@ interface TierDraft {
 
 type TierMetric = "countAchieved" | "overallTotal" | "overallAvg";
 
+// E1.1 — D2 metadata refs held alongside raw scoringConfig so the read-only
+// context panel + per-domain editor can render. NOT editable.
+interface DomainMeta {
+  key: string;
+  label: string;
+}
+type RollupOverall = "meanOfQuestions" | "meanOfSections" | "meanOfDomains";
+
+type DomainTiersDraft = Record<string, TierDraft[]>;
+
 interface FetchedVersion {
   version: {
     id: string;
@@ -61,8 +76,27 @@ function genUid(): string {
   return `u${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function rollupLabel(overall: RollupOverall): string {
+  switch (overall) {
+    case "meanOfQuestions":
+      return "Mean of question values";
+    case "meanOfSections":
+      return "Mean of section means";
+    case "meanOfDomains":
+      return "Mean of domain means";
+    default:
+      return overall;
+  }
+}
+
 // Hydrate existing JSON content into the draft shape. Tolerant of partial /
 // unfamiliar JSON — anything missing falls back to a sensible default.
+//
+// E1.1 — ALSO returns the raw server JSON for sections/questions/scoringConfig/
+// reportConfig so buildPayload() can spread + overlay only the UI-editable
+// fields and preserve everything else (stableKey, sortOrder, section.domain,
+// question.recommendations[], scoringConfig.rollup / domains / scaleUpScore,
+// any unknown future fields).
 function hydrateFromServer(version: FetchedVersion["version"]): {
   sections: SectionDraft[];
   questions: QuestionDraft[];
@@ -70,16 +104,24 @@ function hydrateFromServer(version: FetchedVersion["version"]): {
   passThreshold: number;
   tiers: TierDraft[];
   reportConfigJson: string;
+  rawSections: unknown[];
+  rawQuestions: unknown[];
+  rawScoringConfig: Record<string, unknown>;
+  rawReportConfig: unknown;
+  domainsMeta: DomainMeta[];
+  rollupOverall: RollupOverall | null;
+  scaleUpScoreEnabled: boolean;
+  domainTiers: DomainTiersDraft;
 } {
   // Sections.
-  const rawSections = Array.isArray(version.sections) ? version.sections : [];
+  const rawSectionsArr = Array.isArray(version.sections) ? version.sections : [];
   type RawSec = {
     stableKey?: unknown;
     name?: unknown;
     description?: unknown;
     partLabel?: unknown;
   };
-  const sections: SectionDraft[] = rawSections.map((raw, idx) => {
+  const sections: SectionDraft[] = rawSectionsArr.map((raw, idx) => {
     const s = raw as RawSec;
     return {
       uid: genUid(),
@@ -120,8 +162,8 @@ function hydrateFromServer(version: FetchedVersion["version"]): {
     isRequired?: unknown;
     scale?: RawScale;
   };
-  const rawQuestions = Array.isArray(version.questions) ? version.questions : [];
-  const questions: QuestionDraft[] = rawQuestions.map((raw) => {
+  const rawQuestionsArr = Array.isArray(version.questions) ? version.questions : [];
+  const questions: QuestionDraft[] = rawQuestionsArr.map((raw) => {
     const q = raw as RawQ;
     const sectionStableKey =
       typeof q.sectionStableKey === "string" ? q.sectionStableKey : "";
@@ -150,20 +192,36 @@ function hydrateFromServer(version: FetchedVersion["version"]): {
     label?: unknown;
     message?: unknown;
   };
+  type RawDomain = {
+    key?: unknown;
+    label?: unknown;
+    tiers?: unknown;
+  };
+  type RawRollup = { overall?: unknown };
   type RawScoring = {
     tierMetric?: unknown;
     passThreshold?: unknown;
     tiers?: unknown;
+    domains?: unknown;
+    rollup?: RawRollup;
+    scaleUpScore?: unknown;
   };
-  const rawScoring = (version.scoringConfig ?? {}) as RawScoring;
-  const tierMetricRaw = rawScoring.tierMetric;
+  const rawScoringObj = (version.scoringConfig ?? {}) as RawScoring;
+  const rawScoringRecord = (
+    version.scoringConfig && typeof version.scoringConfig === "object"
+      ? (version.scoringConfig as Record<string, unknown>)
+      : {}
+  );
+  const tierMetricRaw = rawScoringObj.tierMetric;
   const tierMetric: TierMetric =
     tierMetricRaw === "overallTotal" || tierMetricRaw === "overallAvg"
       ? tierMetricRaw
       : "countAchieved";
   const passThreshold =
-    typeof rawScoring.passThreshold === "number" ? rawScoring.passThreshold : 0;
-  const rawTiers = Array.isArray(rawScoring.tiers) ? rawScoring.tiers : [];
+    typeof rawScoringObj.passThreshold === "number"
+      ? rawScoringObj.passThreshold
+      : 0;
+  const rawTiers = Array.isArray(rawScoringObj.tiers) ? rawScoringObj.tiers : [];
   const tiers: TierDraft[] = rawTiers.map((raw) => {
     const t = raw as RawTier;
     return {
@@ -184,12 +242,312 @@ function hydrateFromServer(version: FetchedVersion["version"]): {
     });
   }
 
+  // D2 metadata — domains + rollup + scaleUpScore. These are NOT editable
+  // in the editor (set at seed time), but the per-domain tier editor needs
+  // to know their structure to render.
+  const rawDomainsArr = Array.isArray(rawScoringObj.domains)
+    ? (rawScoringObj.domains as RawDomain[])
+    : [];
+  const domainsMeta: DomainMeta[] = rawDomainsArr.map((d) => ({
+    key: typeof d.key === "string" ? d.key : "",
+    label: typeof d.label === "string" ? d.label : "",
+  }));
+  const domainTiers: DomainTiersDraft = {};
+  for (const d of rawDomainsArr) {
+    const key = typeof d.key === "string" ? d.key : "";
+    if (!key) continue;
+    const dTiers = Array.isArray(d.tiers) ? (d.tiers as RawTier[]) : [];
+    domainTiers[key] = dTiers.map((raw) => ({
+      uid: genUid(),
+      minMetric: typeof raw.minMetric === "number" ? raw.minMetric : 0,
+      maxMetric: typeof raw.maxMetric === "number" ? String(raw.maxMetric) : "",
+      label: typeof raw.label === "string" ? raw.label : "",
+      message: typeof raw.message === "string" ? raw.message : "",
+    }));
+    if (domainTiers[key].length === 0) {
+      domainTiers[key].push({
+        uid: genUid(),
+        minMetric: 0,
+        maxMetric: "",
+        label: "",
+        message: "",
+      });
+    }
+  }
+
+  const rollupOverallRaw = rawScoringObj.rollup?.overall;
+  const rollupOverall: RollupOverall | null =
+    rollupOverallRaw === "meanOfQuestions" ||
+    rollupOverallRaw === "meanOfSections" ||
+    rollupOverallRaw === "meanOfDomains"
+      ? rollupOverallRaw
+      : null;
+  const scaleUpScoreEnabled = rawScoringObj.scaleUpScore === true;
+
   const reportConfigJson =
     version.reportConfig === null || version.reportConfig === undefined
       ? ""
       : JSON.stringify(version.reportConfig, null, 2);
 
-  return { sections, questions, tierMetric, passThreshold, tiers, reportConfigJson };
+  return {
+    sections,
+    questions,
+    tierMetric,
+    passThreshold,
+    tiers,
+    reportConfigJson,
+    rawSections: rawSectionsArr,
+    rawQuestions: rawQuestionsArr,
+    rawScoringConfig: rawScoringRecord,
+    rawReportConfig: version.reportConfig ?? null,
+    domainsMeta,
+    rollupOverall,
+    scaleUpScoreEnabled,
+    domainTiers,
+  };
+}
+
+// E1.1 — metric mode for tier-tile validation. Per the plan:
+//   Integer mode: legacy tierMetric === "countAchieved" OR "overallTotal"
+//     AND no rollup.overall (Rockefeller / QSP integer-domain semantics).
+//   Fractional mode: any rollup.overall is set OR tierMetric === "overallAvg"
+//     OR (always) per-domain tier sets.
+function getGlobalMetricMode(opts: {
+  tierMetric: TierMetric;
+  rollupOverall: RollupOverall | null;
+}): "integer" | "fractional" {
+  if (opts.rollupOverall !== null) return "fractional";
+  if (opts.tierMetric === "overallAvg") return "fractional";
+  return "integer";
+}
+
+interface TierTilingError {
+  message: string;
+}
+
+function validateTierTilingClient(
+  tiers: TierDraft[],
+  mode: "integer" | "fractional",
+  surfaceLabel: string,
+): TierTilingError | null {
+  if (tiers.length === 0) {
+    return { message: `${surfaceLabel}: add at least one tier.` };
+  }
+  for (const t of tiers) {
+    if (!t.label.trim() || !t.message.trim()) {
+      return {
+        message: `${surfaceLabel}: every tier needs a label and a message.`,
+      };
+    }
+    const maxNum = t.maxMetric.trim() === "" ? undefined : Number(t.maxMetric);
+    if (maxNum !== undefined && Number.isNaN(maxNum)) {
+      return {
+        message: `${surfaceLabel}: tier "${t.label}" has a non-numeric max.`,
+      };
+    }
+    if (maxNum !== undefined && maxNum < t.minMetric) {
+      return {
+        message: `${surfaceLabel}: tier "${t.label}" max (${maxNum}) is less than min (${t.minMetric}).`,
+      };
+    }
+  }
+  // Tile-touching check.
+  // Sort by minMetric; we deliberately KEEP the operator's authoring order
+  // for the error message but compute adjacency on sorted order.
+  const sorted = [...tiers]
+    .map((t, idx) => ({
+      idx,
+      minMetric: t.minMetric,
+      maxMetric:
+        t.maxMetric.trim() === "" ? undefined : Number(t.maxMetric),
+      label: t.label,
+    }))
+    .sort((a, b) => a.minMetric - b.minMetric);
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
+    if (a.maxMetric === undefined) {
+      return {
+        message: `${surfaceLabel}: only the highest tier may omit max (open-ended).`,
+      };
+    }
+    const expected = mode === "integer" ? a.maxMetric + 1 : a.maxMetric;
+    if (b.minMetric !== expected) {
+      if (mode === "integer") {
+        return {
+          message: `${surfaceLabel}: tier "${a.label}" ends at ${a.maxMetric}; tier "${b.label}" must start at ${expected} (no gap, no overlap).`,
+        };
+      }
+      // Fractional
+      return {
+        message:
+          b.minMetric > expected
+            ? `${surfaceLabel}: gap between tier "${a.label}" (max ${a.maxMetric}) and tier "${b.label}" (min ${b.minMetric}) — tiers must touch (try setting "${b.label}" min to ${a.maxMetric}).`
+            : `${surfaceLabel}: overlap between tier "${a.label}" (max ${a.maxMetric}) and tier "${b.label}" (min ${b.minMetric}) — tiers must touch (try setting "${b.label}" min to ${a.maxMetric}).`,
+      };
+    }
+  }
+  return null;
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Reusable tier-list editor. Used both by the global tier editor and by
+// each per-domain card.
+// ────────────────────────────────────────────────────────────────────────
+function TierListEditor({
+  title,
+  description,
+  tiers,
+  onChange,
+  disabled,
+  testIdPrefix = "tier",
+}: {
+  title: string;
+  description?: string;
+  tiers: TierDraft[];
+  onChange: (next: TierDraft[]) => void;
+  disabled: boolean;
+  testIdPrefix?: string;
+}) {
+  function addRow() {
+    onChange([
+      ...tiers,
+      {
+        uid: genUid(),
+        minMetric: 0,
+        maxMetric: "",
+        label: "",
+        message: "",
+      },
+    ]);
+  }
+  function moveRow(idx: number, dir: -1 | 1) {
+    const next = [...tiers];
+    const t = idx + dir;
+    if (t < 0 || t >= next.length) return;
+    [next[idx], next[t]] = [next[t], next[idx]];
+    onChange(next);
+  }
+  function removeRow(idx: number) {
+    if (tiers.length === 1) return;
+    onChange(tiers.filter((_, i) => i !== idx));
+  }
+  function updateRow(idx: number, patch: Partial<TierDraft>) {
+    onChange(
+      tiers.map((row, i) => (i === idx ? { ...row, ...patch } : row)),
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <h3 className="text-xs font-semibold text-foreground">{title}</h3>
+          {description && (
+            <p className="text-[11px] text-muted-foreground">{description}</p>
+          )}
+        </div>
+        {!disabled && (
+          <button
+            type="button"
+            onClick={addRow}
+            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border border-border bg-card text-foreground hover:bg-muted"
+            data-testid={`${testIdPrefix}-add`}
+          >
+            <Plus className="w-3.5 h-3.5" /> Tier
+          </button>
+        )}
+      </div>
+      {tiers.map((t, idx) => (
+        <div
+          key={t.uid}
+          className="border border-border rounded-md p-3 space-y-2"
+          data-testid={`${testIdPrefix}-row-${idx}`}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+            <NumInput
+              label="min"
+              value={t.minMetric}
+              disabled={disabled}
+              onChange={(v) => updateRow(idx, { minMetric: v })}
+              className="sm:col-span-2"
+              testId={`${testIdPrefix}-min-${idx}`}
+            />
+            <div className="sm:col-span-2">
+              <label className="block text-[10px] text-muted-foreground mb-0.5">
+                max (blank = unbounded)
+              </label>
+              <input
+                type="text"
+                value={t.maxMetric}
+                onChange={(e) => updateRow(idx, { maxMetric: e.target.value })}
+                disabled={disabled}
+                data-testid={`${testIdPrefix}-max-${idx}`}
+                className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+              />
+            </div>
+            <div className="sm:col-span-3">
+              <label className="block text-[10px] text-muted-foreground mb-0.5">
+                label
+              </label>
+              <input
+                type="text"
+                value={t.label}
+                onChange={(e) => updateRow(idx, { label: e.target.value })}
+                disabled={disabled}
+                data-testid={`${testIdPrefix}-label-${idx}`}
+                className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+              />
+            </div>
+            <div className="sm:col-span-4">
+              <label className="block text-[10px] text-muted-foreground mb-0.5">
+                message
+              </label>
+              <input
+                type="text"
+                value={t.message}
+                onChange={(e) => updateRow(idx, { message: e.target.value })}
+                disabled={disabled}
+                data-testid={`${testIdPrefix}-message-${idx}`}
+                className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+              />
+            </div>
+            <div className="sm:col-span-1 flex items-end justify-end gap-1">
+              {!disabled && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => moveRow(idx, -1)}
+                    disabled={idx === 0}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveRow(idx, 1)}
+                    disabled={idx === tiers.length - 1}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeRow(idx)}
+                    disabled={tiers.length === 1}
+                    data-testid={`${testIdPrefix}-delete-${idx}`}
+                    className="text-destructive hover:text-destructive/80 disabled:opacity-30"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function AssessmentVersionEditor({
@@ -206,15 +564,63 @@ export function AssessmentVersionEditor({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [meta, setMeta] = useState<FetchedVersion | null>(null);
 
-  const [sections, setSections] = useState<SectionDraft[]>([]);
-  const [questions, setQuestions] = useState<QuestionDraft[]>([]);
+  const [sections, setSectionsState] = useState<SectionDraft[]>([]);
+  const [questions, setQuestionsState] = useState<QuestionDraft[]>([]);
   const [tierMetric, setTierMetric] = useState<TierMetric>("countAchieved");
   const [passThreshold, setPassThreshold] = useState<number>(0);
   const [tiers, setTiers] = useState<TierDraft[]>([]);
-  const [reportConfigJson, setReportConfigJson] = useState("");
+  const [reportConfigJson, setReportConfigJsonState] = useState("");
+
+  // E1.1 — Raw server JSON refs. Used by buildPayload to pass through
+  // unedited surfaces opaquely, preserving every unknown / unedited field.
+  const [rawSections, setRawSections] = useState<unknown[]>([]);
+  const [rawQuestions, setRawQuestions] = useState<unknown[]>([]);
+  const [rawScoringConfig, setRawScoringConfig] = useState<
+    Record<string, unknown>
+  >({});
+  const [rawReportConfig, setRawReportConfig] = useState<unknown>(null);
+
+  // E1.1 — Dirty tracking. Each editable surface defaults to false; any
+  // UI mutation flips its flag, and buildPayload uses raw pass-through
+  // for non-dirty surfaces.
+  const [sectionsDirty, setSectionsDirty] = useState(false);
+  const [questionsDirty, setQuestionsDirty] = useState(false);
+  const [reportConfigDirty, setReportConfigDirty] = useState(false);
+
+  // E1.1 — D2 metadata (read-only) + per-domain tier drafts.
+  const [domainsMeta, setDomainsMeta] = useState<DomainMeta[]>([]);
+  const [rollupOverall, setRollupOverall] = useState<RollupOverall | null>(
+    null,
+  );
+  const [scaleUpScoreEnabled, setScaleUpScoreEnabled] = useState(false);
+  const [domainTiers, setDomainTiers] = useState<DomainTiersDraft>({});
 
   const [submitting, setSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Wrapped setters that also flip dirty flags. Used by all UI inputs so
+  // structural and field-level edits both trigger the overlay path in
+  // buildPayload.
+  const setSections = useCallback(
+    (next: SectionDraft[] | ((cur: SectionDraft[]) => SectionDraft[])) => {
+      setSectionsDirty(true);
+      setSectionsState(next);
+    },
+    [],
+  );
+  const setQuestions = useCallback(
+    (
+      next: QuestionDraft[] | ((cur: QuestionDraft[]) => QuestionDraft[]),
+    ) => {
+      setQuestionsDirty(true);
+      setQuestionsState(next);
+    },
+    [],
+  );
+  const setReportConfigJson = useCallback((next: string) => {
+    setReportConfigDirty(true);
+    setReportConfigJsonState(next);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -230,12 +636,26 @@ export function AssessmentVersionEditor({
       };
       const hydrated = hydrateFromServer(body.data.version);
       setMeta(body.data);
-      setSections(hydrated.sections);
-      setQuestions(hydrated.questions);
+      // hydrated state — use the underlying state setters to avoid
+      // flipping dirty flags on initial load.
+      setSectionsState(hydrated.sections);
+      setQuestionsState(hydrated.questions);
       setTierMetric(hydrated.tierMetric);
       setPassThreshold(hydrated.passThreshold);
       setTiers(hydrated.tiers);
-      setReportConfigJson(hydrated.reportConfigJson);
+      setReportConfigJsonState(hydrated.reportConfigJson);
+      setRawSections(hydrated.rawSections);
+      setRawQuestions(hydrated.rawQuestions);
+      setRawScoringConfig(hydrated.rawScoringConfig);
+      setRawReportConfig(hydrated.rawReportConfig);
+      setDomainsMeta(hydrated.domainsMeta);
+      setRollupOverall(hydrated.rollupOverall);
+      setScaleUpScoreEnabled(hydrated.scaleUpScoreEnabled);
+      setDomainTiers(hydrated.domainTiers);
+      // Reset dirty flags after hydration completes.
+      setSectionsDirty(false);
+      setQuestionsDirty(false);
+      setReportConfigDirty(false);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -248,6 +668,7 @@ export function AssessmentVersionEditor({
   }, [load]);
 
   const isPublished = meta?.version.publishedAt !== null;
+  const showD2Panel = rollupOverall !== null || scaleUpScoreEnabled;
 
   const sectionStableKeyByUid = useMemo(() => {
     const out: Record<string, string> = {};
@@ -271,108 +692,237 @@ export function AssessmentVersionEditor({
     [next[idx], next[t]] = [next[t], next[idx]];
     setQuestions(next);
   }
-  function moveTier(idx: number, dir: -1 | 1) {
-    const next = [...tiers];
-    const t = idx + dir;
-    if (t < 0 || t >= next.length) return;
-    [next[idx], next[t]] = [next[t], next[idx]];
-    setTiers(next);
-  }
-
   function buildPayload(): {
     questions: unknown[];
     sections: unknown[];
     scoringConfig: unknown;
     reportConfig: unknown;
   } | null {
-    if (sections.some((s) => !s.name.trim())) {
-      setValidationError("Every section needs a name.");
-      return null;
+    // Basic UI-editable shape checks.
+    if (sectionsDirty) {
+      if (sections.some((s) => !s.name.trim())) {
+        setValidationError("Every section needs a name.");
+        return null;
+      }
     }
     if (questions.length === 0) {
       setValidationError("Add at least one question.");
       return null;
     }
-    if (questions.some((q) => !q.label.trim() || !q.sectionUid)) {
-      setValidationError("Every question needs a label and a section.");
-      return null;
-    }
-    if (questions.some((q) => q.scaleMax <= q.scaleMin || q.scaleStep <= 0)) {
-      setValidationError("Question scale: max > min and step > 0 required.");
-      return null;
-    }
-    if (tiers.length === 0 || tiers.some((t) => !t.label.trim() || !t.message.trim())) {
-      setValidationError("Every tier needs a label and a message.");
-      return null;
-    }
-
-    const perSectionCounter: Record<string, number> = {};
-    const questionsOut: unknown[] = [];
-    questions.forEach((q, idx) => {
-      const sectionStableKey = sectionStableKeyByUid[q.sectionUid];
-      perSectionCounter[sectionStableKey] =
-        (perSectionCounter[sectionStableKey] ?? 0) + 1;
-      const stableKey = `${sectionStableKey}_Q${perSectionCounter[sectionStableKey]}`;
-      questionsOut.push({
-        stableKey,
-        sortOrder: idx + 1,
-        type: "SLIDER_LIKERT",
-        label: q.label.trim(),
-        ...(q.helpText.trim() ? { helpText: q.helpText.trim() } : {}),
-        sectionStableKey,
-        isRequired: q.isRequired,
-        scale: {
-          min: q.scaleMin,
-          max: q.scaleMax,
-          step: q.scaleStep,
-          anchorMin: q.anchorMin,
-          anchorMax: q.anchorMax,
-        },
-      });
-    });
-
-    const sectionsOut = sections.map((s, i) => ({
-      stableKey: `S${i + 1}`,
-      sortOrder: i + 1,
-      name: s.name.trim(),
-      ...(s.description.trim() ? { description: s.description.trim() } : {}),
-      ...(s.partLabel.trim() ? { partLabel: s.partLabel.trim() } : {}),
-    }));
-
-    const tiersOut = tiers.map((t) => {
-      const maxNum = t.maxMetric.trim() === "" ? undefined : Number(t.maxMetric);
-      return {
-        minMetric: Number(t.minMetric),
-        ...(maxNum !== undefined && !Number.isNaN(maxNum)
-          ? { maxMetric: maxNum }
-          : {}),
-        label: t.label.trim(),
-        message: t.message.trim(),
-      };
-    });
-
-    const scoringConfig = {
-      tierMetric,
-      passThreshold: Number(passThreshold),
-      tiers: tiersOut,
-    };
-
-    let reportConfig: unknown = null;
-    if (reportConfigJson.trim()) {
-      try {
-        reportConfig = JSON.parse(reportConfigJson);
-      } catch (e) {
-        setValidationError(
-          `reportConfig: invalid JSON — ${
-            e instanceof Error ? e.message : "parse error"
-          }`,
-        );
+    if (questionsDirty) {
+      if (questions.some((q) => !q.label.trim() || !q.sectionUid)) {
+        setValidationError("Every question needs a label and a section.");
+        return null;
+      }
+      if (
+        questions.some((q) => q.scaleMax <= q.scaleMin || q.scaleStep <= 0)
+      ) {
+        setValidationError("Question scale: max > min and step > 0 required.");
         return null;
       }
     }
 
+    // E1.1 — Validate the global tier editor (always; this catches the
+    // case where the operator only edits tiers + nothing else).
+    const globalMode = getGlobalMetricMode({ tierMetric, rollupOverall });
+    const globalErr = validateTierTilingClient(
+      tiers,
+      globalMode,
+      "Global tiers",
+    );
+    if (globalErr) {
+      setValidationError(globalErr.message);
+      return null;
+    }
+
+    // E1.1 — Validate every per-domain tier set (always fractional mode).
+    for (const meta of domainsMeta) {
+      const dt = domainTiers[meta.key] ?? [];
+      const err = validateTierTilingClient(
+        dt,
+        "fractional",
+        `Domain "${meta.label}" tiers`,
+      );
+      if (err) {
+        setValidationError(err.message);
+        return null;
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // E1.1 — Raw pass-through OR overlay-from-draft per surface.
+    //
+    // Sections / questions / reportConfig: opaque raw pass-through when
+    // not dirty; overlay-from-draft when dirty. Per Codex round-3 #1:
+    // treat all non-tier JSON as opaque unless the operator actually
+    // edited it.
+    //
+    // ScoringConfig: ALWAYS surgically rebuilt (tier editing is E1's
+    // whole point). Tier rows + domain rows are themselves spread to
+    // preserve unknown row-level fields (Codex round-4).
+    // ──────────────────────────────────────────────────────────────────
+
+    let questionsOut: unknown[];
+    if (questionsDirty) {
+      const perSectionCounter: Record<string, number> = {};
+      questionsOut = questions.map((q, idx) => {
+        const raw = (rawQuestions[idx] as Record<string, unknown>) ?? {};
+        const sectionStableKey = sectionStableKeyByUid[q.sectionUid];
+        perSectionCounter[sectionStableKey] =
+          (perSectionCounter[sectionStableKey] ?? 0) + 1;
+        // Preserve the stableKey from raw if it exists; only regenerate
+        // for newly-added questions (no raw entry at this index).
+        const stableKey =
+          typeof raw.stableKey === "string"
+            ? raw.stableKey
+            : `${sectionStableKey}_Q${perSectionCounter[sectionStableKey]}`;
+        return {
+          ...raw,
+          stableKey,
+          sortOrder: idx + 1,
+          type: typeof raw.type === "string" ? raw.type : "SLIDER_LIKERT",
+          label: q.label.trim(),
+          ...(q.helpText.trim() ? { helpText: q.helpText.trim() } : {}),
+          sectionStableKey,
+          isRequired: q.isRequired,
+          scale: {
+            ...((raw.scale && typeof raw.scale === "object"
+              ? raw.scale
+              : {}) as Record<string, unknown>),
+            min: q.scaleMin,
+            max: q.scaleMax,
+            step: q.scaleStep,
+            anchorMin: q.anchorMin,
+            anchorMax: q.anchorMax,
+          },
+        };
+      });
+    } else {
+      questionsOut = rawQuestions;
+    }
+
+    let sectionsOut: unknown[];
+    if (sectionsDirty) {
+      sectionsOut = sections.map((s, i) => {
+        const raw = (rawSections[i] as Record<string, unknown>) ?? {};
+        const stableKey =
+          typeof raw.stableKey === "string" ? raw.stableKey : `S${i + 1}`;
+        return {
+          ...raw,
+          stableKey,
+          sortOrder: i + 1,
+          name: s.name.trim(),
+          ...(s.description.trim()
+            ? { description: s.description.trim() }
+            : {}),
+          ...(s.partLabel.trim() ? { partLabel: s.partLabel.trim() } : {}),
+        };
+      });
+    } else {
+      sectionsOut = rawSections;
+    }
+
+    // Global tier rows — spread raw row to preserve unknown fields.
+    const rawGlobalTiers = (rawScoringConfig.tiers as
+      | Array<Record<string, unknown>>
+      | undefined) ?? [];
+    const tiersOut = tiers.map((t, idx) => {
+      const rawRow = rawGlobalTiers[idx] ?? {};
+      const maxNum = t.maxMetric.trim() === "" ? undefined : Number(t.maxMetric);
+      const minMetric = Number(t.minMetric);
+      const base: Record<string, unknown> = {
+        ...rawRow,
+        minMetric,
+        label: t.label.trim(),
+        message: t.message.trim(),
+      };
+      if (maxNum !== undefined && !Number.isNaN(maxNum)) {
+        base.maxMetric = maxNum;
+      } else {
+        // Operator cleared the max field → top tier open-ended; remove
+        // any pre-existing maxMetric from the raw row.
+        delete base.maxMetric;
+      }
+      return base;
+    });
+
+    // Domains — spread raw domain + overlay tiers per key.
+    const rawDomains = (rawScoringConfig.domains as
+      | Array<Record<string, unknown>>
+      | undefined) ?? [];
+    let updatedDomains: Array<Record<string, unknown>> | undefined;
+    if (rawDomains.length > 0) {
+      updatedDomains = rawDomains.map((rawDomain) => {
+        const key =
+          typeof rawDomain.key === "string" ? (rawDomain.key as string) : "";
+        const rawDomainTiers = (rawDomain.tiers as
+          | Array<Record<string, unknown>>
+          | undefined) ?? [];
+        const dts = domainTiers[key] ?? [];
+        const editedTiers = dts.map((draftTier, idx) => {
+          const rawRow = rawDomainTiers[idx] ?? {};
+          const maxNum =
+            draftTier.maxMetric.trim() === ""
+              ? undefined
+              : Number(draftTier.maxMetric);
+          const out: Record<string, unknown> = {
+            ...rawRow,
+            minMetric: Number(draftTier.minMetric),
+            label: draftTier.label.trim(),
+            message: draftTier.message.trim(),
+          };
+          if (maxNum !== undefined && !Number.isNaN(maxNum)) {
+            out.maxMetric = maxNum;
+          } else {
+            delete out.maxMetric;
+          }
+          return out;
+        });
+        return {
+          ...rawDomain,
+          tiers: editedTiers,
+        };
+      });
+    }
+
+    const scoringConfigOut: Record<string, unknown> = {
+      ...rawScoringConfig,
+      tierMetric,
+      passThreshold: Number(passThreshold),
+      tiers: tiersOut,
+    };
+    if (updatedDomains) {
+      scoringConfigOut.domains = updatedDomains;
+    }
+
+    // Report config — opaque pass-through unless edited.
+    let reportConfigOut: unknown;
+    if (reportConfigDirty) {
+      if (reportConfigJson.trim()) {
+        try {
+          reportConfigOut = JSON.parse(reportConfigJson);
+        } catch (e) {
+          setValidationError(
+            `reportConfig: invalid JSON — ${
+              e instanceof Error ? e.message : "parse error"
+            }`,
+          );
+          return null;
+        }
+      } else {
+        reportConfigOut = null;
+      }
+    } else {
+      reportConfigOut = rawReportConfig;
+    }
+
     setValidationError(null);
-    return { questions: questionsOut, sections: sectionsOut, scoringConfig, reportConfig };
+    return {
+      questions: questionsOut,
+      sections: sectionsOut,
+      scoringConfig: scoringConfigOut,
+      reportConfig: reportConfigOut,
+    };
   }
 
   async function handleSave() {
@@ -795,6 +1345,34 @@ export function AssessmentVersionEditor({
       {/* Scoring */}
       <div className="bg-card border border-border rounded-xl p-6 space-y-3">
         <h2 className="text-sm font-semibold text-foreground">Scoring</h2>
+
+        {/* E1.1 — Read-only D2 context panel. Renders ONLY when rollup
+            or scaleUpScore is present on the raw scoringConfig. Legacy
+            templates render nothing here. */}
+        {showD2Panel && (
+          <div
+            className="rounded-md border border-border bg-muted/30 p-3 text-sm space-y-1"
+            data-testid="d2-context-panel"
+          >
+            {rollupOverall && (
+              <div>
+                <span className="text-muted-foreground">Overall rollup:</span>{" "}
+                <span className="font-medium">
+                  {rollupLabel(rollupOverall)}
+                </span>
+              </div>
+            )}
+            {scaleUpScoreEnabled && (
+              <div>
+                <span className="text-muted-foreground">
+                  ScaleUp Score (0-100):
+                </span>{" "}
+                <span className="font-medium">enabled</span>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-foreground mb-1">
@@ -824,140 +1402,57 @@ export function AssessmentVersionEditor({
             />
           </div>
         </div>
-        <div className="flex items-center justify-between pt-2">
-          <h3 className="text-xs font-semibold text-foreground">Tiers</h3>
-          {!isPublished && (
-            <button
-              type="button"
-              onClick={() =>
-                setTiers((t) => [
-                  ...t,
-                  {
-                    uid: genUid(),
-                    minMetric: 0,
-                    maxMetric: "",
-                    label: "",
-                    message: "",
-                  },
-                ])
-              }
-              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md border border-border bg-card text-foreground hover:bg-muted"
-              data-testid="add-tier"
-            >
-              <Plus className="w-3.5 h-3.5" /> Tier
-            </button>
-          )}
+
+        {/* E1.1 — Global tier editor uses the shared TierListEditor. */}
+        <div className="pt-2">
+          <TierListEditor
+            title="Global tiers"
+            description={
+              rollupOverall
+                ? `Resolved against the overall canonical metric (${rollupLabel(rollupOverall).toLowerCase()}).`
+                : "Resolved against the configured tier metric."
+            }
+            tiers={tiers}
+            onChange={setTiers}
+            disabled={isPublished}
+            testIdPrefix="tier"
+          />
         </div>
-        {tiers.map((t, idx) => (
-          <div
-            key={t.uid}
-            className="border border-border rounded-md p-3 space-y-2"
-            data-testid={`tier-row-${idx}`}
-          >
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
-              <NumInput
-                label="min"
-                value={t.minMetric}
-                disabled={isPublished}
-                onChange={(v) =>
-                  setTiers((cur) =>
-                    cur.map((row, i) =>
-                      i === idx ? { ...row, minMetric: v } : row,
-                    ),
-                  )
-                }
-                className="sm:col-span-2"
-              />
-              <div className="sm:col-span-2">
-                <label className="block text-[10px] text-muted-foreground mb-0.5">
-                  max (blank = unbounded)
-                </label>
-                <input
-                  type="text"
-                  value={t.maxMetric}
-                  onChange={(e) =>
-                    setTiers((cur) =>
-                      cur.map((row, i) =>
-                        i === idx ? { ...row, maxMetric: e.target.value } : row,
-                      ),
-                    )
-                  }
-                  disabled={isPublished}
-                  className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
-                />
-              </div>
-              <div className="sm:col-span-3">
-                <label className="block text-[10px] text-muted-foreground mb-0.5">
-                  label
-                </label>
-                <input
-                  type="text"
-                  value={t.label}
-                  onChange={(e) =>
-                    setTiers((cur) =>
-                      cur.map((row, i) =>
-                        i === idx ? { ...row, label: e.target.value } : row,
-                      ),
-                    )
-                  }
-                  disabled={isPublished}
-                  className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
-                />
-              </div>
-              <div className="sm:col-span-4">
-                <label className="block text-[10px] text-muted-foreground mb-0.5">
-                  message
-                </label>
-                <input
-                  type="text"
-                  value={t.message}
-                  onChange={(e) =>
-                    setTiers((cur) =>
-                      cur.map((row, i) =>
-                        i === idx ? { ...row, message: e.target.value } : row,
-                      ),
-                    )
-                  }
-                  disabled={isPublished}
-                  className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
-                />
-              </div>
-              <div className="sm:col-span-1 flex items-end justify-end gap-1">
-                {!isPublished && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => moveTier(idx, -1)}
-                      disabled={idx === 0}
-                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                    >
-                      <ArrowUp className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveTier(idx, 1)}
-                      disabled={idx === tiers.length - 1}
-                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                    >
-                      <ArrowDown className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setTiers((cur) => cur.filter((_, i) => i !== idx))
-                      }
-                      disabled={tiers.length === 1}
-                      className="text-destructive hover:text-destructive/80 disabled:opacity-30"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
       </div>
+
+      {/* E1.1 — Per-domain tier editor stack. Renders one Card per domain
+          when scoringConfig.domains[] is set on the raw config. Vertical
+          stack, default open, no collapse. */}
+      {domainsMeta.length > 0 && (
+        <div className="space-y-4" data-testid="per-domain-cards">
+          {domainsMeta.map((domain) => (
+            <div
+              key={domain.key}
+              className="bg-card border border-border rounded-xl p-6 space-y-3"
+              data-testid={`domain-card-${domain.key}`}
+            >
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-sm font-semibold text-foreground">
+                  {domain.label}
+                </h2>
+                <span className="text-xs font-normal text-muted-foreground">
+                  ({domain.key})
+                </span>
+              </div>
+              <TierListEditor
+                title={`${domain.label} tiers`}
+                description={`Resolved against the average score across ${domain.label} sections.`}
+                tiers={domainTiers[domain.key] ?? []}
+                onChange={(next) =>
+                  setDomainTiers((cur) => ({ ...cur, [domain.key]: next }))
+                }
+                disabled={isPublished}
+                testIdPrefix={`domain-${domain.key}-tier`}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Report config */}
       <div className="bg-card border border-border rounded-xl p-6 space-y-2">
@@ -975,7 +1470,10 @@ export function AssessmentVersionEditor({
       </div>
 
       {validationError && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm px-4 py-2 rounded-md">
+        <div
+          className="bg-destructive/10 border border-destructive/20 text-destructive text-sm px-4 py-2 rounded-md"
+          data-testid="validation-error"
+        >
           {validationError}
         </div>
       )}
@@ -1004,6 +1502,7 @@ export function AssessmentVersionEditor({
           </button>
         </div>
       )}
+
     </div>
   );
 }
@@ -1014,12 +1513,14 @@ function NumInput({
   onChange,
   className,
   disabled,
+  testId,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   className?: string;
   disabled?: boolean;
+  testId?: string;
 }) {
   return (
     <div className={className}>
@@ -1031,6 +1532,7 @@ function NumInput({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         disabled={disabled}
+        data-testid={testId}
         className="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
       />
     </div>

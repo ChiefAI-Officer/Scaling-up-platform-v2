@@ -322,7 +322,71 @@ export const TemplateVersionForPublishSchema =
   TemplateVersionForScoringSchema.superRefine((data, ctx) => {
     checkRecommendationsPublish(data.questions, ctx);
     checkDomainAssignment(data.sections, data.scoringConfig, ctx);
+    checkPerDomainTierTiling(data.sections, data.questions, data.scoringConfig, ctx);
   });
+
+/**
+ * D2 (E1.1) — publish-time per-domain tier-tiling check. Iterates
+ * scoringConfig.domains[], computes each domain's metric range from the
+ * questions in its sections, and runs `validateTierTiling` in fractional
+ * mode. Surfaces issues via ctx.addIssue with full paths so the publish
+ * failure modal can route them.
+ */
+function checkPerDomainTierTiling(
+  sections: Array<z.infer<typeof SectionBase>>,
+  questions: Array<z.infer<typeof QuestionBase>>,
+  cfg: z.infer<typeof ScoringConfigBase>,
+  ctx: z.RefinementCtx,
+): void {
+  if (!cfg.domains || cfg.domains.length === 0) return;
+  let ctxs;
+  try {
+    ctxs = computePerDomainTierContexts(
+      sections,
+      questions,
+      cfg.domains.map((d) => d.key),
+    );
+  } catch (err) {
+    if (err instanceof ScoringValidationError) {
+      const domainKey =
+        typeof err.details.domainKey === "string" ? err.details.domainKey : "";
+      const domainIdx = cfg.domains.findIndex((d) => d.key === domainKey);
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [
+          "scoringConfig",
+          "domains",
+          domainIdx >= 0 ? domainIdx : 0,
+        ],
+        message: err.message,
+      });
+      return;
+    }
+    throw err;
+  }
+  const byKey = new Map(ctxs.map((c) => [c.domainKey, c.domain]));
+  for (let di = 0; di < cfg.domains.length; di++) {
+    const d = cfg.domains[di];
+    const domain = byKey.get(d.key);
+    if (!domain) continue;
+    if (!Number.isFinite(domain.max)) {
+      // No questions yet for this domain — publish-time we still require
+      // at least one question per domain (sections-without-questions is
+      // a separate publish-time failure mode handled elsewhere). Skip
+      // tile-touching here; structural emptiness will be flagged when
+      // the operator actually publishes a template with empty domains.
+      continue;
+    }
+    const issues = validateTierTiling(d.tiers, domain);
+    for (const issue of issues) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scoringConfig", "domains", di, "tiers", ...issue.path],
+        message: issue.message,
+      });
+    }
+  }
+}
 
 export const AnswerSchema = z.object({
   stableKey: z.string(),
@@ -524,43 +588,77 @@ function computeRollupTierDomain(questions: Question[]): TierDomain {
  *       fractional     → b.minMetric === a.maxMetric (touching)
  *     a.maxMetric must be defined (only the LAST tier may omit it)
  *   - last tier's maxMetric is either undefined (open-ended above) or === domain.max
+ *
+ * D2 (E1.1) — returns structured issues rather than throwing, so the same
+ * helper can power both the runtime engine (where issues become a thrown
+ * ScoringValidationError) and the publish-time Zod schema (where issues
+ * are routed via ctx.addIssue). Empty array === valid tiling.
  */
-function validateTierTiling(tiers: Tier[], domain: TierDomain): void {
-  const sorted = [...tiers].sort((a, b) => a.minMetric - b.minMetric);
+export interface TierTilingIssue {
+  path: (string | number)[];
+  message: string;
+  details: Record<string, unknown>;
+}
 
-  if (sorted[0].minMetric !== domain.min) {
-    throw new ScoringValidationError(
-      "INVALID_SCORING_CONFIG",
-      {
+export function validateTierTiling(
+  tiers: Tier[],
+  domain: TierDomain,
+  pathPrefix: (string | number)[] = []
+): TierTilingIssue[] {
+  const issues: TierTilingIssue[] = [];
+  if (tiers.length === 0) {
+    issues.push({
+      path: [...pathPrefix],
+      message: "tiers must contain at least one entry",
+      details: { reason: "empty tiers" },
+    });
+    return issues;
+  }
+
+  const sorted = [...tiers]
+    .map((t, idx) => ({ t, idx }))
+    .sort((a, b) => a.t.minMetric - b.t.minMetric);
+
+  if (sorted[0].t.minMetric !== domain.min) {
+    issues.push({
+      path: [...pathPrefix, sorted[0].idx, "minMetric"],
+      message: `first tier minMetric must equal domain min (${domain.min}); got ${sorted[0].t.minMetric}`,
+      details: {
         reason: "first tier minMetric must equal domain min",
         domainMin: domain.min,
-        firstTierMin: sorted[0].minMetric,
-      }
-    );
+        firstTierMin: sorted[0].t.minMetric,
+      },
+    });
   }
 
   for (let i = 0; i < sorted.length - 1; i++) {
-    const a = sorted[i];
-    const b = sorted[i + 1];
+    const a = sorted[i].t;
+    const b = sorted[i + 1].t;
 
     if (a.maxMetric === undefined) {
       // Only the last tier may have undefined maxMetric.
-      throw new ScoringValidationError(
-        "INVALID_SCORING_CONFIG",
-        {
+      issues.push({
+        path: [...pathPrefix, sorted[i].idx, "maxMetric"],
+        message: "only the highest tier may omit maxMetric (open-ended above)",
+        details: {
           reason:
             "only the highest tier may omit maxMetric (open-ended above)",
           tierLabel: a.label,
-          tierIndex: i,
-        }
-      );
+          tierIndex: sorted[i].idx,
+        },
+      });
+      continue;
     }
 
     const expectedNextMin = domain.isInteger ? a.maxMetric + 1 : a.maxMetric;
     if (b.minMetric !== expectedNextMin) {
-      throw new ScoringValidationError(
-        "INVALID_SCORING_CONFIG",
-        {
+      issues.push({
+        path: [...pathPrefix, sorted[i + 1].idx, "minMetric"],
+        message:
+          b.minMetric > expectedNextMin
+            ? `gap between tiers: tier "${a.label}" ends at ${a.maxMetric}; tier "${b.label}" must start at ${expectedNextMin} (no gap)`
+            : `overlap between tiers: tier "${a.label}" ends at ${a.maxMetric}; tier "${b.label}" starts at ${b.minMetric} (overlap)`,
+        details: {
           reason:
             b.minMetric > expectedNextMin
               ? "gap between tiers"
@@ -570,24 +668,127 @@ function validateTierTiling(tiers: Tier[], domain: TierDomain): void {
           aMax: a.maxMetric,
           bMin: b.minMetric,
           expectedNextMin,
-        }
-      );
+        },
+      });
     }
   }
 
-  const last = sorted[sorted.length - 1];
+  const last = sorted[sorted.length - 1].t;
   if (last.maxMetric !== undefined && last.maxMetric !== domain.max) {
-    throw new ScoringValidationError(
-      "INVALID_SCORING_CONFIG",
-      {
+    issues.push({
+      path: [...pathPrefix, sorted[sorted.length - 1].idx, "maxMetric"],
+      message: `last tier maxMetric must equal domain max (${domain.max}) or be omitted (open-ended); got ${last.maxMetric}`,
+      details: {
         reason:
           "last tier maxMetric must equal domain max or be omitted (open-ended)",
         lastTierLabel: last.label,
         lastTierMax: last.maxMetric,
         domainMax: domain.max,
-      }
-    );
+      },
+    });
   }
+
+  return issues;
+}
+
+/**
+ * Throw-on-error wrapper around `validateTierTiling`. Preserves the
+ * runtime engine's pre-E1 behavior — `scoreSubmission` calls this so any
+ * tiling defect becomes a ScoringValidationError("INVALID_SCORING_CONFIG").
+ */
+function assertTierTiling(tiers: Tier[], domain: TierDomain): void {
+  const issues = validateTierTiling(tiers, domain);
+  if (issues.length === 0) return;
+  // Surface the first issue as the canonical message but include all
+  // structured issues in `details` so callers can drill in.
+  const first = issues[0];
+  throw new ScoringValidationError(
+    "INVALID_SCORING_CONFIG",
+    { ...first.details, issues },
+    first.message,
+  );
+}
+
+/**
+ * D2 (E1.1) — compute the per-domain tier metric range for a domain key.
+ *
+ * For each domain, find the sections whose `section.domain === domain.key`,
+ * then collect the questions in those sections. The metric range is
+ * `[min(question.scale.min), max(question.scale.max)]`. Per-domain tier
+ * resolution always uses fractional touching semantics because section
+ * means (and means-of-section-means) are not integer-aligned.
+ *
+ * Throws "mixed scales" when questions within the same domain have
+ * different scale ranges (the average would span an ambiguous metric).
+ */
+type Section = z.infer<typeof SectionBase>;
+
+interface PerDomainTierContext {
+  domainKey: string;
+  domain: TierDomain; // isInteger always false (per-domain tiers are fractional)
+}
+
+export function computePerDomainTierContexts(
+  sections: Section[],
+  questions: Question[],
+  domainKeys: string[],
+): PerDomainTierContext[] {
+  const sectionsByDomain = new Map<string, Section[]>();
+  for (const s of sections) {
+    if (!s.domain) continue;
+    const arr = sectionsByDomain.get(s.domain) ?? [];
+    arr.push(s);
+    sectionsByDomain.set(s.domain, arr);
+  }
+  const questionsBySectionKey = new Map<string, Question[]>();
+  for (const q of questions) {
+    if (!q.sectionStableKey) continue;
+    const arr = questionsBySectionKey.get(q.sectionStableKey) ?? [];
+    arr.push(q);
+    questionsBySectionKey.set(q.sectionStableKey, arr);
+  }
+
+  const contexts: PerDomainTierContext[] = [];
+  for (const key of domainKeys) {
+    const domainSections = sectionsByDomain.get(key) ?? [];
+    const domainQuestions: Question[] = [];
+    for (const s of domainSections) {
+      const qs = questionsBySectionKey.get(s.stableKey) ?? [];
+      domainQuestions.push(...qs);
+    }
+    if (domainQuestions.length === 0) {
+      // No questions yet for this domain — can't validate; emit a synthetic
+      // open range so the per-domain tier validator simply checks structure.
+      contexts.push({
+        domainKey: key,
+        domain: { min: 0, max: Number.POSITIVE_INFINITY, isInteger: false },
+      });
+      continue;
+    }
+    const first = domainQuestions[0].scale;
+    const allMatch = domainQuestions.every(
+      (q) =>
+        q.scale.min === first.min &&
+        q.scale.max === first.max &&
+        q.scale.step === first.step,
+    );
+    if (!allMatch) {
+      throw new ScoringValidationError(
+        "INVALID_SCORING_CONFIG",
+        {
+          reason:
+            "Per-domain mixed scales — domain averages are ambiguous",
+          domainKey: key,
+        },
+        `Domain "${key}" has mixed question scales — averages are ambiguous`,
+      );
+    }
+    contexts.push({
+      domainKey: key,
+      domain: { min: first.min, max: first.max, isInteger: false },
+    });
+  }
+  return contexts;
 }
 
 /**
@@ -633,13 +834,46 @@ export function scoreSubmission(
   //    being constrained by the legacy domain math.
   if (v.scoringConfig.rollup) {
     const rollupDomain = computeRollupTierDomain(v.questions);
-    validateTierTiling(v.scoringConfig.tiers, rollupDomain);
+    assertTierTiling(v.scoringConfig.tiers, rollupDomain);
   } else {
     const domain = computeTierDomain(
       v.questions,
       v.scoringConfig.tierMetric
     );
-    validateTierTiling(v.scoringConfig.tiers, domain);
+    assertTierTiling(v.scoringConfig.tiers, domain);
+  }
+
+  // D2 (E1.1) — belt-and-suspenders runtime validation for per-domain
+  // tiers. Pre-E1.1 prod data may have malformed domain tiers (manually
+  // seeded, edited outside the admin UI, etc.). Reject at scoring time
+  // rather than silently returning null tier resolution.
+  if (
+    v.scoringConfig.domains &&
+    v.scoringConfig.domains.length > 0
+  ) {
+    const ctxs = computePerDomainTierContexts(
+      v.sections,
+      v.questions,
+      v.scoringConfig.domains.map((d) => d.key),
+    );
+    const byKey = new Map(ctxs.map((c) => [c.domainKey, c.domain]));
+    for (const d of v.scoringConfig.domains) {
+      const domain = byKey.get(d.key);
+      if (!domain) continue;
+      // Skip the tile-touching check when we synthesised an "infinite"
+      // range (no questions for this domain) — the structure check
+      // inside validateTierTiling still runs on empty + ordering.
+      if (!Number.isFinite(domain.max)) continue;
+      const issues = validateTierTiling(d.tiers, domain);
+      if (issues.length > 0) {
+        const first = issues[0];
+        throw new ScoringValidationError(
+          "INVALID_SCORING_CONFIG",
+          { ...first.details, domainKey: d.key, issues },
+          `Domain "${d.key}" tier issue: ${first.message}`,
+        );
+      }
+    }
   }
 
   // 3) Reject empty answers payload.
