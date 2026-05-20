@@ -54,7 +54,7 @@ Steps:
 3. Find the currently Published version row.
 4. Click **Duplicate**. This creates a new DRAFT version with the next version number (e.g., v2 if the published version was v1). The content is copied byte-for-byte from the published version.
 5. You are now on (or can navigate to) `/admin/assessments/templates/<template-id>/versions/<new-draft-id>/edit`.
-6. Open the relevant tier card. For per-domain thresholds, open the collapsible domain section. For global thresholds, use the global tiers list at the bottom of scoring config.
+6. Scroll to the relevant tier list. Per-domain thresholds live in the per-domain cards (one card per domain, all expanded by default — no need to click to open). Global thresholds live in the global tiers list at the bottom of scoring config.
 7. Enter Jeff's new values into the affected tier(s). Pay attention to:
    - `minMetric` / `maxMetric` must touch (no gap, no overlap) across tiers
    - Tier `label` must not be empty
@@ -103,7 +103,7 @@ The publish modal lists each problem with a **path** (where in the data the prob
 
 Common cases and what they mean:
 
-- **"Domain 'X' has a gap between tiers"** — Two adjacent tiers in domain X don't touch. Example: tier A is `0-3`, tier B is `4-6`. There's a gap at the boundary. Fix: adjust `minMetric`/`maxMetric` so the boundary aligns (e.g., A is `0-3`, B is `3-6`, with the engine handling the boundary).
+- **"Domain 'X' has a gap between tiers"** — Two adjacent tiers in domain X don't touch. Example: tier A is `0-3`, tier B is `4-6`. There's a gap at the boundary. Fix: adjust `minMetric`/`maxMetric` so the boundary aligns. Per-domain tiers use **touching** semantics (the average score is fractional), so A is `0-3`, B is `3-6` — B's `minMetric` equals A's `maxMetric`. The global tier list for some legacy templates (Rockefeller) uses integer semantics instead (B's `minMetric` is A's `maxMetric + 1`); the editor's inline error tells you which mode applies if it blocks Save.
 - **"Recommendation band overlaps"** — Two recommendation bands on the same question cover the same score. Fix: adjust the edges of the affected bands so they don't overlap.
 - **"Section 'Y' references domain 'Z' which is not defined"** — A section has a `domain` key that doesn't match any key in `scoringConfig.domains`. Fix: either rename/remove the domain reference on the section, OR ensure the domain exists in scoring config. **Adding a domain to `scoringConfig.domains` is not in the admin UI scope** — escalate to engineering.
 - **"Tier missing label" / "Tier missing message"** — A tier label or message is blank. Fix: enter the text Jeff confirmed.
@@ -130,12 +130,11 @@ Step-by-step:
 4. Click **Edit** on v1. You will land on `/admin/assessments/templates/<su-full-id>/versions/<v1-id>/edit`.
 5. In the editor, confirm you can see:
    - The read-only panel showing "Overall rollup: Mean of domain means" and "ScaleUp Score (0-100): enabled"
-   - Five collapsible domain sections (People, Strategy, Execution, Cash, You) each with their own tier list
+   - Five domain cards (People, Strategy, Execution, Cash, You) each with their own tier list, all expanded by default
    - The global tiers list under scoring config
-6. For each of the five domain sections:
-   - Expand the section
+6. For each of the five domain cards:
    - Enter the four tier values (`minMetric`, `maxMetric`, `label`, `message`) from Jeff's sign-off
-   - Confirm no gap or overlap between adjacent tiers
+   - Confirm no gap or overlap between adjacent tiers (the editor blocks Save with an inline error if they don't touch)
 7. Enter the four global tier values into the global tiers list.
 8. Click **Save**. Wait for the toast.
 9. Navigate back to the template detail page.
