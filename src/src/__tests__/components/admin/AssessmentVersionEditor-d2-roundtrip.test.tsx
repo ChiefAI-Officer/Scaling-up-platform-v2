@@ -443,4 +443,82 @@ describe("AssessmentVersionEditor — D2 round-trip", () => {
       SU_FULL_SERVER_JSON.scoringConfig.domains[1].tiers,
     );
   });
+
+  // Regression for code-review Important #1: positional rawQuestions[idx]
+  // lookup would misalign recommendations / unknown fields after reorder.
+  // The Map-by-stableKey lookup keeps each question's payload bound to its
+  // own stableKey regardless of position.
+  it("reorder a question on SU Full → recommendations follow stableKey, not index", async () => {
+    // Custom fixture with per-question identifiable recommendations text.
+    const FIXTURE = {
+      ...SU_FULL_SERVER_JSON,
+      questions: [
+        {
+          stableKey: "Q01",
+          sortOrder: 1,
+          type: "SLIDER_LIKERT",
+          label: "Effective recruitment process",
+          sectionStableKey: "S_PEOPLE_YE",
+          isRequired: true,
+          scale: { min: 0, max: 10, step: 1, anchorMin: "a", anchorMax: "b" },
+          recommendations: [
+            { minScore: 0, maxScore: 3, text: "Q01-LOW" },
+            { minScore: 4, maxScore: 7, text: "Q01-MED" },
+            { minScore: 8, maxScore: 10, text: "Q01-HIGH" },
+          ],
+        },
+        {
+          stableKey: "Q02",
+          sortOrder: 2,
+          type: "SLIDER_LIKERT",
+          label: "Long-term goals",
+          sectionStableKey: "S_STRATEGY",
+          isRequired: true,
+          scale: { min: 0, max: 10, step: 1, anchorMin: "a", anchorMax: "b" },
+          recommendations: [
+            { minScore: 0, maxScore: 3, text: "Q02-LOW" },
+            { minScore: 4, maxScore: 7, text: "Q02-MED" },
+            { minScore: 8, maxScore: 10, text: "Q02-HIGH" },
+          ],
+        },
+      ],
+    };
+    const calls = mountWithServerJson(FIXTURE);
+    await renderAndWaitForLoad();
+
+    // Reorder: move first question down so Q01 moves to position 1, Q02
+    // to position 0. The down-arrow on row 0 is the 2nd icon button in
+    // that row (up disabled, then down, then delete).
+    const row0 = await screen.findByTestId("question-row-0");
+    const buttons = row0.querySelectorAll("button");
+    // Find the down arrow — it's the button containing the ArrowDown svg.
+    let downBtn: HTMLButtonElement | null = null;
+    for (const b of Array.from(buttons)) {
+      if (b.querySelector(".lucide-arrow-down")) {
+        downBtn = b as HTMLButtonElement;
+        break;
+      }
+    }
+    if (!downBtn) throw new Error("could not locate down-arrow button on row 0");
+    await act(async () => {
+      fireEvent.click(downBtn!);
+    });
+
+    await clickSave();
+    await waitFor(() => {
+      expect(calls.patchCallCount).toBe(1);
+    });
+    const body = calls.patchBody as Record<string, unknown>;
+    const qs = body.questions as Array<Record<string, unknown>>;
+    expect(qs).toHaveLength(2);
+    // Q02 now at position 0, Q01 at position 1.
+    expect(qs[0].stableKey).toBe("Q02");
+    expect(qs[1].stableKey).toBe("Q01");
+    // CRITICAL: recommendations must follow stableKey, not array index.
+    expect((qs[0].recommendations as Array<{ text: string }>)[0].text).toBe("Q02-LOW");
+    expect((qs[1].recommendations as Array<{ text: string }>)[0].text).toBe("Q01-LOW");
+    // sectionStableKey, label also follow the moved question.
+    expect(qs[0].sectionStableKey).toBe("S_STRATEGY");
+    expect(qs[0].label).toBe("Long-term goals");
+  });
 });

@@ -27,6 +27,7 @@ interface SectionDraft {
 
 interface QuestionDraft {
   uid: string;
+  stableKey: string;
   sectionUid: string;
   label: string;
   helpText: string;
@@ -156,6 +157,7 @@ function hydrateFromServer(version: FetchedVersion["version"]): {
     anchorMax?: unknown;
   };
   type RawQ = {
+    stableKey?: unknown;
     label?: unknown;
     helpText?: unknown;
     sectionStableKey?: unknown;
@@ -163,15 +165,23 @@ function hydrateFromServer(version: FetchedVersion["version"]): {
     scale?: RawScale;
   };
   const rawQuestionsArr = Array.isArray(version.questions) ? version.questions : [];
-  const questions: QuestionDraft[] = rawQuestionsArr.map((raw) => {
+  const questions: QuestionDraft[] = rawQuestionsArr.map((raw, idx) => {
     const q = raw as RawQ;
     const sectionStableKey =
       typeof q.sectionStableKey === "string" ? q.sectionStableKey : "";
     const sectionUid =
       sectionUidByStableKey[sectionStableKey] ?? sections[0].uid;
     const scale = q.scale ?? {};
+    // Preserve canonical stableKey from server (e.g. SU Full's "Q01") so
+    // raw-by-stableKey lookup in buildPayload survives reorder/add/delete
+    // without misaligning recommendations / unknown fields.
+    const stableKey =
+      typeof q.stableKey === "string" && q.stableKey.length > 0
+        ? q.stableKey
+        : `${sectionStableKey || "S?"}_Q${idx + 1}`;
     return {
       uid: genUid(),
+      stableKey,
       sectionUid,
       label: typeof q.label === "string" ? q.label : "",
       helpText: typeof q.helpText === "string" ? q.helpText : "",
@@ -672,8 +682,8 @@ export function AssessmentVersionEditor({
 
   const sectionStableKeyByUid = useMemo(() => {
     const out: Record<string, string> = {};
-    sections.forEach((s, i) => {
-      out[s.uid] = `S${i + 1}`;
+    sections.forEach((s) => {
+      out[s.uid] = s.stableKey;
     });
     return out;
   }, [sections]);
@@ -762,23 +772,32 @@ export function AssessmentVersionEditor({
     // preserve unknown row-level fields (Codex round-4).
     // ──────────────────────────────────────────────────────────────────
 
+    // Look raw rows up by stableKey, not by index. After reorder / move /
+    // add / delete, positional alignment between raw[] and drafts[] is
+    // broken — pairing the wrong raw with a draft would corrupt unknown
+    // fields (e.g. SU Full's question.recommendations would get rebound
+    // to a different question).
+    const rawSectionByStableKey = new Map<string, Record<string, unknown>>();
+    for (const r of rawSections) {
+      const row = r as Record<string, unknown>;
+      if (typeof row.stableKey === "string")
+        rawSectionByStableKey.set(row.stableKey, row);
+    }
+    const rawQuestionByStableKey = new Map<string, Record<string, unknown>>();
+    for (const r of rawQuestions) {
+      const row = r as Record<string, unknown>;
+      if (typeof row.stableKey === "string")
+        rawQuestionByStableKey.set(row.stableKey, row);
+    }
+
     let questionsOut: unknown[];
     if (questionsDirty) {
-      const perSectionCounter: Record<string, number> = {};
       questionsOut = questions.map((q, idx) => {
-        const raw = (rawQuestions[idx] as Record<string, unknown>) ?? {};
+        const raw = rawQuestionByStableKey.get(q.stableKey) ?? {};
         const sectionStableKey = sectionStableKeyByUid[q.sectionUid];
-        perSectionCounter[sectionStableKey] =
-          (perSectionCounter[sectionStableKey] ?? 0) + 1;
-        // Preserve the stableKey from raw if it exists; only regenerate
-        // for newly-added questions (no raw entry at this index).
-        const stableKey =
-          typeof raw.stableKey === "string"
-            ? raw.stableKey
-            : `${sectionStableKey}_Q${perSectionCounter[sectionStableKey]}`;
         return {
           ...raw,
-          stableKey,
+          stableKey: q.stableKey,
           sortOrder: idx + 1,
           type: typeof raw.type === "string" ? raw.type : "SLIDER_LIKERT",
           label: q.label.trim(),
@@ -804,12 +823,10 @@ export function AssessmentVersionEditor({
     let sectionsOut: unknown[];
     if (sectionsDirty) {
       sectionsOut = sections.map((s, i) => {
-        const raw = (rawSections[i] as Record<string, unknown>) ?? {};
-        const stableKey =
-          typeof raw.stableKey === "string" ? raw.stableKey : `S${i + 1}`;
+        const raw = rawSectionByStableKey.get(s.stableKey) ?? {};
         return {
           ...raw,
-          stableKey,
+          stableKey: s.stableKey,
           sortOrder: i + 1,
           name: s.name.trim(),
           ...(s.description.trim()
@@ -1028,7 +1045,7 @@ export function AssessmentVersionEditor({
                   ...s,
                   {
                     uid: genUid(),
-                    stableKey: `S${s.length + 1}`,
+                    stableKey: `S_NEW_${genUid()}`,
                     name: "",
                     description: "",
                     partLabel: "",
@@ -1146,6 +1163,7 @@ export function AssessmentVersionEditor({
                   ...q,
                   {
                     uid: genUid(),
+                    stableKey: `Q_NEW_${genUid()}`,
                     sectionUid: sections[0]?.uid ?? "",
                     label: "",
                     helpText: "",
@@ -1473,6 +1491,7 @@ export function AssessmentVersionEditor({
         <div
           className="bg-destructive/10 border border-destructive/20 text-destructive text-sm px-4 py-2 rounded-md"
           data-testid="validation-error"
+          role="alert"
         >
           {validationError}
         </div>
