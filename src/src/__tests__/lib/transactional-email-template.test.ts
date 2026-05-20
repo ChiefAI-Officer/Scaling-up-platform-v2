@@ -155,3 +155,85 @@ describe("composeRegistrationConfirmationEmail — location block (Wave 13-A)", 
     expect(html).toContain("See you there");
   });
 });
+
+describe("composeRegistrationConfirmationEmail — DB-template path appends location block", () => {
+  const ORIGINAL_FLAG = process.env.TRANSACTIONAL_EMAIL_OVERRIDES_ENABLED;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.TRANSACTIONAL_EMAIL_OVERRIDES_ENABLED = "true";
+    (db.transactionalEmailTemplate.findUnique as jest.Mock).mockResolvedValue({
+      emailType: "REGISTRATION_CONFIRMATION",
+      subject: "You're Registered: {{workshopTitle}}",
+      body: "<p>Hi {{registrantName}}, thanks for joining {{workshopTitle}}.</p>",
+      version: 1,
+    });
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_FLAG === undefined) {
+      delete process.env.TRANSACTIONAL_EMAIL_OVERRIDES_ENABLED;
+    } else {
+      process.env.TRANSACTIONAL_EMAIL_OVERRIDES_ENABLED = ORIGINAL_FLAG;
+    }
+  });
+
+  it("VIRTUAL + virtualLink → custom body followed by <hr> + Join online link", async () => {
+    const { subject, html } = await composeRegistrationConfirmationEmail({
+      ...fixtureContext,
+      format: "VIRTUAL",
+      virtualLink: "https://zoom.us/j/123456789",
+    });
+    // Custom body interpolated
+    expect(html).toContain("thanks for joining Scaling Up Master Class");
+    // Location block appended after the body
+    expect(html).toContain("<hr>");
+    expect(html).toContain("Join online");
+    expect(html).toContain("https://zoom.us/j/123456789");
+    // hr must come AFTER the interpolated body, BEFORE the location block
+    const hrIdx = html.indexOf("<hr>");
+    expect(html.indexOf("thanks for joining")).toBeLessThan(hrIdx);
+    expect(hrIdx).toBeLessThan(html.indexOf("Join online"));
+    // Subject is NOT modified — no location info smuggled into it
+    expect(subject).toBe("You're Registered: Scaling Up Master Class");
+    expect(subject).not.toContain("zoom.us");
+    expect(subject).not.toContain("Join online");
+  });
+
+  it("VIRTUAL + no virtualLink → custom body + generic 'join details shared by coach' note", async () => {
+    const { html } = await composeRegistrationConfirmationEmail({
+      ...fixtureContext,
+      format: "VIRTUAL",
+      virtualLink: null,
+    });
+    expect(html).toContain("thanks for joining");
+    expect(html).toContain("<hr>");
+    expect(html).toContain("This is a virtual workshop");
+    expect(html).toContain("Join details will be shared by the coach");
+  });
+
+  it("IN_PERSON + venue → custom body + venue name + Get Directions link", async () => {
+    const { html } = await composeRegistrationConfirmationEmail({
+      ...fixtureContext,
+      format: "IN_PERSON",
+      venueName: "Marriott Downtown",
+      venueAddress: '{"street":"123 Main St","city":"New York","state":"NY","zip":"10001"}',
+    });
+    expect(html).toContain("thanks for joining");
+    expect(html).toContain("<hr>");
+    expect(html).toContain("Marriott Downtown");
+    expect(html).toContain("Get Directions");
+    expect(html).toContain("google.com/maps");
+  });
+
+  it("no format set → no <hr> and no location block appended (backwards compat)", async () => {
+    const { html } = await composeRegistrationConfirmationEmail({
+      ...fixtureContext,
+      // format intentionally omitted
+    });
+    expect(html).toBe("<p>Hi Gabriel Test, thanks for joining Scaling Up Master Class.</p>");
+    expect(html).not.toContain("<hr>");
+    expect(html).not.toContain("Join online");
+    expect(html).not.toContain("Get Directions");
+  });
+});

@@ -6,6 +6,46 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-19 — Registration email: append location block to admin-template body: <!-- ENTRY_ISO:2026-05-19 ENTRY_SLUG:registration-email-location-block-append -->
+
+**Symptom.** Per the May 19 morning Zoom (recording: `fathom.video/share/MxkvcUW9QvAHzxe_nqVgm5dAs1TJj1mN`), after yesterday's kill-switch flip made the admin-edited registration confirmation template go live, Jeff confirmed his custom body was reaching registrants — but **without the Zoom link for virtual workshops or the venue address for in-person**. The old hardcoded email had auto-rendered a location block at the bottom; the admin-edited template body doesn't include `{{virtualLink}}` (or `{{venueName}}`/`{{venueAddress}}`) by default, and coaches aren't expected to know the token list.
+
+**Decision.** Always-append the location block at the bottom of the rendered body, on the DB-template path. Decision rationale: meeting transcript explicitly said "just put the connection information at the bottom" — auto-append is simpler than a per-template "include location?" toggle and removes a foot-gun (coach forgets to add the token, registrants get no link).
+
+**Fix.** In `composeRegistrationConfirmationEmail` ([src/src/lib/notifications/transactional-email-template.ts](../src/src/lib/notifications/transactional-email-template.ts)), after token interpolation:
+
+```ts
+const subject = interpolateTokens(row.subject, escapedTokens);
+const bodyInterpolated = interpolateTokens(row.body, escapedTokens);
+const locationBlock = buildLocationBlock(ctx);
+const html = locationBlock
+  ? `${bodyInterpolated}\n<hr>\n${locationBlock}`
+  : bodyInterpolated;
+return { subject, html };
+```
+
+`buildLocationBlock(ctx)` already existed for the hardcoded fallback path — it handles all four branches (`VIRTUAL + virtualLink → Join online: <a>`, `VIRTUAL + no link → "Join details will be shared by the coach"`, `IN_PERSON/HYBRID + venueName → venue + Get Directions map link`, `no format/no venue → ""`). Empty string short-circuits the `<hr>` so non-physical/non-virtual workshops don't get a stray separator.
+
+**Subject deliberately not modified.** Stuffing `Join online: https://zoom.us/j/…` into the subject would (a) push the workshop title past Gmail's inbox-preview truncation, and (b) raise spam-filter heuristics around URLs in subject lines. Body-only matches the meeting ask.
+
+**Hardcoded fallback path** ([transactional-email-template.ts:94](../src/src/lib/notifications/transactional-email-template.ts#L94)) untouched — it already inlines `buildLocationBlock(ctx)` in its HTML template.
+
+**Tests.** 4 new cases in a third `describe` block of [transactional-email-template.test.ts](../src/src/__tests__/lib/transactional-email-template.test.ts) exercising the DB-template path (kill switch on, mock DB row returns custom subject + body) across each format branch:
+- VIRTUAL + virtualLink → interpolated body comes first, then `<hr>`, then `Join online: <a href=...>` (and subject **lacks** the URL).
+- VIRTUAL + no virtualLink → fallback "Join details will be shared by the coach" appended.
+- IN_PERSON + venue/address → venue name + Get Directions map link appended.
+- no `format` field → no `<hr>`, no location block, body unchanged (backwards compat).
+
+11/11 in the suite green. Existing 7 tests (4 fundamentals + 3 hardcoded-path location tests) untouched.
+
+**Build gate.** `CI=true npx next build --turbopack` → ✓ Compiled successfully in 42s. Worktree-isolated build (parallel session was actively editing main workspace).
+
+**Commit.** `4c026b5` (pushed direct to main).
+
+**Open coach-facing follow-on.** The 4 location tokens (`{{virtualLink}}`, `{{venueName}}`, `{{venueAddress}}`, `{{format}}`) are still individually interpolatable in the template body — a coach can still write `<p>Join via Zoom: {{virtualLink}}</p>` inside their custom body. They'd then get the link rendered twice (once where they put it, once at the auto-appended bottom). Not breaking — the auto-append is the safety net, the inline token is the deliberate placement. If anyone hits this, the fix is to either remove the inline token OR suppress the auto-append when the body already contains the token (string match). Not implementing today.
+
+---
+
 ### 2026-05-19 — Assessment Tool v7.6 — Observability dashboard v1 (DB-derived counters): <!-- ENTRY_ISO:2026-05-19 ENTRY_SLUG:assessment-v7-6-observability-dashboard-v1 -->
 
 Honest v1 of the observability dashboard spec'd in `docs/specs/v7.6/06-observability.md`. The spec calls for 7 Vercel/Inngest-backed metrics + 6 alert gates configured via the existing SMTP path — that's deploy/infra work outside this codebase. v1 ships a DB-derived dashboard that gives operators a usable live signal without the time-series backend. v1.5 swaps for real metrics.
