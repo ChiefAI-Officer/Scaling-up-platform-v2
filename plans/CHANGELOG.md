@@ -6,6 +6,110 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-20 — Assessment Tool v7.6 Phase D2 — engine extension + Scaling Up Full seed (DRAFT) <!-- ENTRY_ISO:2026-05-20 ENTRY_SLUG:assessment-v7-6-d2-engine-extension-su-full-seed -->
+
+**Context.** D1 shipped the QSP v1/v2 seeds + the Rockefeller engine path. Phase D2 extends the scoring engine to support Jeff's flagship product — the Scaling Up Full assessment, which has 5 domains (People / Strategy / Execution / Cash / You), 10 nested sections, ~65 questions on a 0–10 SLIDER_LIKERT scale, per-question score-band narratives, and a 0–100 ScaleUp Score on the profile page. The engine pre-D2 only supported flat per-section scoring with template-level tier resolution; the D1 QSP seeds also had a runtime-breaking `scoringConfig` field-name drift that would throw on any submission scoring attempt.
+
+**3 commits on `feat/assessment-d2-engine` → merged to main via `b3bbcb4` (merge commit).**
+
+#### D2.0 — QSP v1/v2 scoringConfig hotfix (commit `bb6c2d3`)
+
+D1's seeds shipped with five defects that would throw at Zod validation:
+1. `scoringConfig.tiers[].minScore`/`maxScore` → renamed to `minMetric`/`maxMetric` (engine canonical names)
+2. `scoringConfig.tierMetric: "average"` → `"overallAvg"` (the engine's valid enum value)
+3. Tier tiles had fractional gaps (`{1–4.99}, {5–6.99}, {7–8.99}, {9–null}`) — engine's `validateTierTiling` requires touching boundaries on fractional domains. Retiled to `{1–5}, {5–7}, {7–9}, {9–open}` with first-match-wins.
+4. Top tier had `maxScore: null` (Zod expects `number | undefined`, not null) — dropped the field on the open-ended tier
+5. Every tier was missing `message: string` (Zod required) — added coach-facing prose per tier
+6. Question scales missing `anchorMin`/`anchorMax` strings — added "Strongly disagree" / "Strongly agree" defaults
+7. QSP v2's TEXT questions can't be scored by the v1 engine — `buildTemplateContent()` filters to SLIDER_LIKERT-only + re-numbers `sortOrder` contiguously for the scoring path; DB still stores all questions (TEXT visible in the questionnaire UI)
+
+Added end-to-end regression test in `scoring.test.ts`: scores a QSP template with synthetic answers, asserts no throw + tier resolution. Locks the engine contract so future field-name drift fails CI.
+
+**ContentHash changes for both QSP versions.** Operator note in the commit: any env with QSP v1/v2 already seeded will hit State C drift on re-seed. Resolution: (a) bump `versionNumber` to 2 for next deploy, or (b) `prisma migrate resolve` existing rows + re-seed. Recommend (a) for production.
+
+#### D2.1 — Engine extension (commit `7bc8ebd`)
+
+**New question/section/config shapes (Zod, all backwards-compatible)**:
+- `Question.recommendations?: Array<{minScore, maxScore, text}>` — optional per-question score-band narratives. Bands inclusive, no overlap, full-scale coverage required at publish time but gaps tolerated at runtime (returns `undefined` recommendation).
+- `Section.domain?: string` — optional domain key. If set, must match a key in `scoringConfig.domains[]`. Domain lives on Section (not Question) — single source of truth for the section↔domain relationship.
+- `ScoringConfig.rollup?: { overall: "meanOfQuestions" | "meanOfSections" | "meanOfDomains" }` — canonical overall rollup contract. When set, replaces legacy `tierMetric` for global tier resolution. When omitted, engine runs legacy `tierMetric` switch byte-for-byte unchanged (BC preserved per Codex round 2 #1).
+- `ScoringConfig.domains?: Array<{key, label, tiers}>` — per-domain tier definitions. Required when any section has a `domain` field.
+- `ScoringConfig.scaleUpScore?: boolean` — opt-in for 0–100 score emission. Requires `rollup.overall` set + all questions on 0–10 scale (Codex round 2 #5).
+
+**New ScoreResult fields (all optional)**:
+- `perQuestion[].recommendation?: string` — matched band text or undefined
+- `perDomain?: Array<{key, label, averagePoints: number | null, answeredSectionCount, totalSectionCount, tier}>` — emitted when `scoringConfig.domains` set. Zero-answer domains return `averagePoints: null` (Codex round 1 #1 — never conflate "no data" with "scored 0"). `answeredSectionCount` / `totalSectionCount` let the report distinguish.
+- `scaleUpScore?: number` — `round(overallMetric * 10)` when opted-in
+
+**Two Zod schemas built via shared base components + `.superRefine()` composition** (Codex round 3 #5 — single source of truth, no drift between runtime and publish):
+- `TemplateVersionForScoringSchema` — runtime permissive. Accepts existing template shapes; allows recommendation gaps (returns undefined at runtime); rejects `scaleUpScore: true` without `rollup.overall` (no BC risk — `scaleUpScore` is new).
+- `TemplateVersionForPublishSchema = TemplateVersionForScoringSchema.superRefine(...)` — publish-strict. Adds: full-scale band coverage required, sentinel text (`TODO`, `PLACEHOLDER`, `Lorem`) rejected, domains assignment complete when `rollup.overall === "meanOfDomains"`.
+
+**Server-side gates (Codex round 2 #3 + round 3 #1)**:
+- Publish endpoint at `/api/admin/assessment-templates/[id]/versions/[versionId]/publish` runs strict schema before flipping `publishedAt`. Returns `422 PUBLISH_VALIDATION_FAILED` with Zod issues on failure.
+- Campaign-create flow extracted into `src/src/lib/assessments/campaign-create-service.ts` → `resolvePublishedTemplateVersion` throws `CampaignCreateError("TEMPLATE_VERSION_NOT_PUBLISHED")` if the target version is draft. Route maps to `422`. Server-side enforcement in the service layer (not just route wrapper), so future callers can't bypass.
+
+**Backwards compatibility — Rockefeller scoring locked via SHA-256 snapshot test**: `scoring-bc-snapshot.test.ts` computes Rockefeller's `ScoreResult` for a deterministic answer set and asserts SHA `b5997e68bf0379f149b16e14056bb4807fad491e161c5d3cb10c183a7379fc50`. Snapshot is committed-as-fixture; any future engine change that drifts the SHA fails CI. Snapshot was locked BEFORE any engine edit (Codex final guardrail #3).
+
+**21 new scoring tests + null-domain consumer tests** (JSON serialization + React component render via `formatNullableNumber` helper that returns "—" for null/undefined/NaN/Infinity). Existing campaigns-route + templates-crud tests updated to reflect new schema-validation behavior (1 test updated 409→422 for the new service-layer error code).
+
+#### D2.2 — Scaling Up Full seed (commit `dec05ce`)
+
+**Created** `src/prisma/seed-scaling-up-full-assessment.ts` mirroring the Rockefeller scaffold (`resolveSystemUser` + advisory lock + 6-state safety model + `computeContentHash` + `ensureAccessGroupAndTemplateLink` + `require.main === module` guard + `buildTemplateContent` export).
+
+**61 questions across 5 domains, 10 sections** — extracted via Bash + unzip + Python from Jeff's source materials:
+| Domain | Sections | Question count |
+|---|---|---|
+| People | Your Employees, Company Culture | 13 |
+| Strategy | Strategy (flat) | 7 |
+| Execution | Leadership Team, Operational Processes, Sales and Marketing, Scalability/Innovation/Technology | 20 |
+| Cash | Cash (flat) | 5 |
+| You | Your Leadership, Internal Communication | 13 |
+
+Question labels + LOW-band narratives from `matrix.xlsx` (133 sharedStrings; 61 question/narrative pairs). MEDIUM-band narratives from the all-5s sample PDF. HIGH-band narratives from the all-7s sample PDF (chose 7s over 10s — the [7,10] band wants a voice that works near the lower edge of "Strong"). **100% narrative coverage** — zero `[PLACEHOLDER]` markers shipped. No XLSX runtime dep added to `package.json`; the seed file ships with inline hardcoded data.
+
+**Scoring config**: `tierMetric: "overallAvg"` (legacy field for BC), `rollup.overall: "meanOfDomains"`, `scaleUpScore: true`, 4 global tiers (Critical 0–3, At Risk 3–5, On Track 5–7, Strong 7–10) with touching boundaries, 5 domains in `scoringConfig.domains[]` each using the same 4-tier shape.
+
+**DRAFT only** (`publishedAt: null` on insert) per Codex round 1 #4: tier thresholds are placeholders pending Jeff's confirmation, and the strict publish schema actually passes outright on the seed's content. Operators verify+publish via the admin editor when content is reviewed. Application-layer enforcement, not schema-layer (the schema is publish-ready).
+
+**Pre-write extraction audit** (Codex final guardrail #4): `runExtractionAudit()` runs BEFORE `runSeed`'s DB transaction. Asserts 5 domains, 10 sections, every section has a domain, every domain has ≥1 section, ~50–70 questions, all SLIDER_LIKERT scale 0–10, 3 recommendation bands each. Fails fast with no DB writes if structure drifts. New strengthening beyond Rockefeller/QSP's seed pattern; worth back-porting later.
+
+**13 smoke tests** in `src/src/__tests__/seed/scaling-up-full.test.ts`: State A creates DRAFT version, State B is idempotent, State C throws on hash drift, cross-seed hash uniqueness, extraction audit assertions, runtime schema passes, publish schema either passes or fails only on text content.
+
+**npm script alias**: `seed:scaling-up-full` added to `src/package.json` alongside `seed:rockefeller`, `seed:qsp-v1`, `seed:qsp-v2`.
+
+#### Plan + adversarial review trail
+
+Full plan at `~/.claude/plans/yes-we-were-in-cosmic-jellyfish.md` includes 14 user-locked decisions + 4 rounds of Codex adversarial review. Major plan refinements driven by Codex:
+- Round 1 #1: Zero-answer domains return null not 0; add `answeredSectionCount` + `totalSectionCount`
+- Round 1 #2: ScaleUp Score derives from canonical rollup, not `overallAverage * 10` (avoids weighting question-rich domains)
+- Round 1 #5: QSP hotfix ships as separate first commit with own verify cycle
+- Round 1 #6: Canonical rollup contract replaces ad-hoc `perDomainAverage` tier metric
+- Round 2 #1: Legacy `tierMetric` code path preserved byte-for-byte, NOT mapped to `meanOfQuestions`
+- Round 2 #2: Two Zod schemas (runtime vs publish) — split strict-validation from runtime-scoring
+- Round 2 #4: Null-domain consumer tests for JSON serialization + report rendering
+- Round 3 #1: Publish/campaign gates as explicit scope, not "verify later"
+- Round 3 #4: Band boundaries explicit (inclusive integer, no overlap, full coverage)
+- Round 3 #5: Schemas built from shared base via `.superRefine()` composition
+
+#### Test totals
+
+245 tests across 30 suites green at the final review checkpoint. Build gate `CI=true npx next build --turbopack` passes in ~22–53s. One unrelated pre-existing test failure (`no-inline-tolocaledatestring` in `public-quiz-client.tsx`) flagged but not introduced by D2.
+
+#### Phases A–D1 (also landed via this merge)
+
+The IA refactor commits from `feat/assessment-ia-refactor-phase-a` (10 commits, May 19) rolled in with the D2 merge:
+- Phase A: top-nav consolidated from 4 separate assessment entries into single "Assessments" entry; new sidebar layout at `/admin/assessments/*` with 7 admin entries + 2 coach-lane entries; 308 redirects for old URLs (`/admin/assessment-templates` → `/admin/assessments/templates`, `/admin/access-groups` → `/admin/assessments/access-groups`, `/admin/observability` → `/admin/assessments/observability`); new admin landing page with 3 stat cards + Getting Started panel
+- Phase B: aggregate dashboard reverted to wireframe 23 v1 contract (removed `startDate`/`endDate`/`organizationId` filters that violated the locked spec); dropped 4th `filters` arg from `getAggregateReport` service signature
+- Phase C: coach empty-state CTA + Getting Started 4-step panel on admin landing; Rockefeller seed now wires default coach to AccessGroup so end-to-end flow works on fresh DB
+- Phase D1: QSP v1 + QSP v2 seeds (later hotfixed in D2.0)
+
+#### What's deferred
+
+MULTI_CHOICE / TEXT / NUMBER question types (Vision Alignment seed needs these), question weights, ScaleUp Score "bonus points" layer (ambition/growth multipliers), Vision Alignment seed, SunHub Quiz seed (D3), per-domain authoring UI in the admin form-builder, peer comparison / team averaging / benchmarking on the report side.
+
+---
+
 ### 2026-05-19 — Registration email: append location block to admin-template body: <!-- ENTRY_ISO:2026-05-19 ENTRY_SLUG:registration-email-location-block-append -->
 
 **Symptom.** Per the May 19 morning Zoom (recording: `fathom.video/share/MxkvcUW9QvAHzxe_nqVgm5dAs1TJj1mN`), after yesterday's kill-switch flip made the admin-edited registration confirmation template go live, Jeff confirmed his custom body was reaching registrants — but **without the Zoom link for virtual workshops or the venue address for in-person**. The old hardcoded email had auto-rendered a location block at the bottom; the admin-edited template body doesn't include `{{virtualLink}}` (or `{{venueName}}`/`{{venueAddress}}`) by default, and coaches aren't expected to know the token list.
