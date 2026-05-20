@@ -210,11 +210,13 @@ describe("POST /api/assessment-campaigns", () => {
     expect(res.status).toBe(403);
   });
 
-  it("409 when no published version", async () => {
+  it("422 TEMPLATE_VERSION_NOT_PUBLISHED when no published version (D2.1 service-layer gate)", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue(null);
     const res = await POST(jsonReq(validBody) as never);
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.error).toBe("TEMPLATE_VERSION_NOT_PUBLISHED");
   });
 
   it("happy path creates DRAFT campaign with coach ownership", async () => {

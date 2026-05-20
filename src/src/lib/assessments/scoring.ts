@@ -33,7 +33,18 @@ export const SliderLikertScaleSchema = z.object({
   anchorMax: z.string(),
 });
 
-export const QuestionSchema = z.object({
+// D2 — per-question recommendation band. minScore/maxScore inclusive.
+// Coverage / overlap / scale-fit checks are applied at the template level
+// in superRefine() blocks below; this base only enforces shape.
+export const RecommendationBandSchema = z.object({
+  minScore: z.number(),
+  maxScore: z.number(),
+  text: z.string(),
+});
+
+// QuestionBase: shape common to runtime + publish. D2 adds the optional
+// `recommendations` array.
+const QuestionBase = z.object({
   stableKey: z.string(),
   sortOrder: z.number().int(),
   type: z.literal("SLIDER_LIKERT"),
@@ -42,15 +53,23 @@ export const QuestionSchema = z.object({
   sectionStableKey: z.string().optional(),
   isRequired: z.boolean(),
   scale: SliderLikertScaleSchema,
+  recommendations: z.array(RecommendationBandSchema).optional(),
 });
 
-export const SectionSchema = z.object({
+export const QuestionSchema = QuestionBase;
+
+// SectionBase: D2 adds the optional `domain` key. When set, every used
+// domain key must appear in scoringConfig.domains[] (publish-time check).
+const SectionBase = z.object({
   stableKey: z.string(),
   sortOrder: z.number().int(),
   name: z.string(),
   description: z.string().optional(),
   partLabel: z.string().optional(),
+  domain: z.string().optional(),
 });
+
+export const SectionSchema = SectionBase;
 
 export const TierSchema = z.object({
   minMetric: z.number(),
@@ -59,21 +78,251 @@ export const TierSchema = z.object({
   message: z.string(),
 });
 
-export const ScoringConfigSchema = z.object({
-  tierMetric: z.enum(["countAchieved", "overallTotal", "overallAvg"]),
-  passThreshold: z.number(),
+// D2 — domain definition. `tiers[]` here are domain-scoped (resolved
+// against the domain's averagePoints).
+const DomainDefSchema = z.object({
+  key: z.string(),
+  label: z.string(),
   tiers: z.array(TierSchema).min(1),
 });
 
-export const TemplateVersionForScoringSchema = z.object({
-  questions: z.array(QuestionSchema),
-  sections: z.array(SectionSchema),
-  scoringConfig: ScoringConfigSchema,
+// D2 — overall-rollup contract. When set, replaces legacy tierMetric for
+// the GLOBAL tier + ScaleUp Score. When omitted, engine runs the legacy
+// tierMetric code path byte-for-byte unchanged (Rockefeller/QSP).
+const RollupSchema = z.object({
+  overall: z.enum(["meanOfQuestions", "meanOfSections", "meanOfDomains"]),
 });
+
+const ScoringConfigBase = z.object({
+  tierMetric: z.enum(["countAchieved", "overallTotal", "overallAvg"]),
+  passThreshold: z.number(),
+  tiers: z.array(TierSchema).min(1),
+  rollup: RollupSchema.optional(),
+  domains: z.array(DomainDefSchema).optional(),
+  scaleUpScore: z.boolean().optional(),
+});
+
+export const ScoringConfigSchema = ScoringConfigBase;
+
+// ─── Shared validation helpers (used by both runtime + publish schemas) ─
+//
+// Each helper attaches issues via ctx.addIssue. Centralising the checks
+// here keeps the runtime + publish schemas in lock-step.
+
+const PLACEHOLDER_SENTINELS = ["TODO", "PLACEHOLDER", "Lorem"] as const;
+
+function checkRecommendationsRuntime(
+  questions: Array<z.infer<typeof QuestionBase>>,
+  ctx: z.RefinementCtx
+): void {
+  for (let qi = 0; qi < questions.length; qi++) {
+    const q = questions[qi];
+    if (!q.recommendations || q.recommendations.length === 0) continue;
+    const bands = q.recommendations;
+
+    // 1) Each band: maxScore >= minScore; within scale bounds.
+    for (let bi = 0; bi < bands.length; bi++) {
+      const b = bands[bi];
+      if (b.maxScore < b.minScore) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", qi, "recommendations", bi],
+          message: `Recommendation band ${bi}: maxScore < minScore`,
+        });
+      }
+      if (b.minScore < q.scale.min || b.maxScore > q.scale.max) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", qi, "recommendations", bi],
+          message: `Recommendation band ${bi} falls outside scale [${q.scale.min}, ${q.scale.max}]`,
+        });
+      }
+    }
+
+    // 2) No overlap between bands. Sort by minScore, check adjacent.
+    const sorted = [...bands]
+      .map((b, i) => ({ ...b, _origIdx: i }))
+      .sort((a, b) => a.minScore - b.minScore);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i];
+      const b = sorted[i + 1];
+      if (b.minScore <= a.maxScore) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", qi, "recommendations"],
+          message: `Recommendation bands overlap: [${a.minScore}, ${a.maxScore}] and [${b.minScore}, ${b.maxScore}]`,
+        });
+      }
+    }
+  }
+}
+
+function checkRecommendationsPublish(
+  questions: Array<z.infer<typeof QuestionBase>>,
+  ctx: z.RefinementCtx
+): void {
+  for (let qi = 0; qi < questions.length; qi++) {
+    const q = questions[qi];
+    if (!q.recommendations || q.recommendations.length === 0) continue;
+    const bands = q.recommendations;
+
+    // 1) Full-scale coverage (integer scales: every integer in
+    //    [scale.min, scale.max] must be in exactly one band; for
+    //    fractional scales, the union of bands must equal [min, max]
+    //    with no gaps).
+    const sorted = [...bands].sort((a, b) => a.minScore - b.minScore);
+    if (sorted[0].minScore !== q.scale.min) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["questions", qi, "recommendations"],
+        message: `First band must start at scale.min (${q.scale.min}); got ${sorted[0].minScore}`,
+      });
+    }
+    if (sorted[sorted.length - 1].maxScore !== q.scale.max) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["questions", qi, "recommendations"],
+        message: `Last band must end at scale.max (${q.scale.max}); got ${sorted[sorted.length - 1].maxScore}`,
+      });
+    }
+    const isInteger = q.scale.step === 1;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i];
+      const b = sorted[i + 1];
+      const expectedNext = isInteger ? a.maxScore + 1 : a.maxScore;
+      if (b.minScore !== expectedNext) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", qi, "recommendations"],
+          message:
+            b.minScore > expectedNext
+              ? `Gap between bands at value ${expectedNext} (next band starts at ${b.minScore})`
+              : `Overlap or step misalignment between bands at ${a.maxScore} / ${b.minScore}`,
+        });
+      }
+    }
+
+    // 2) Sentinel-text rejection.
+    for (let bi = 0; bi < bands.length; bi++) {
+      const txt = bands[bi].text ?? "";
+      for (const sentinel of PLACEHOLDER_SENTINELS) {
+        if (txt.includes(sentinel)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["questions", qi, "recommendations", bi, "text"],
+            message: `Band text contains placeholder sentinel "${sentinel}"`,
+          });
+          break;
+        }
+      }
+    }
+  }
+}
+
+function checkScaleUpScoreOptIn(
+  cfg: z.infer<typeof ScoringConfigBase>,
+  questions: Array<z.infer<typeof QuestionBase>>,
+  ctx: z.RefinementCtx
+): void {
+  if (cfg.scaleUpScore !== true) return;
+  // Requires rollup.overall to be set.
+  if (!cfg.rollup) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scoringConfig", "scaleUpScore"],
+      message:
+        "scaleUpScore opt-in requires scoringConfig.rollup.overall to be set",
+    });
+    return;
+  }
+  // Requires EVERY question on a 0-10 scale.
+  for (let qi = 0; qi < questions.length; qi++) {
+    const s = questions[qi].scale;
+    if (s.min !== 0 || s.max !== 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["questions", qi, "scale"],
+        message: `scaleUpScore requires every question on a 0-10 scale; got [${s.min}, ${s.max}]`,
+      });
+      return;
+    }
+  }
+}
+
+function checkDomainAssignment(
+  sections: Array<z.infer<typeof SectionBase>>,
+  cfg: z.infer<typeof ScoringConfigBase>,
+  ctx: z.RefinementCtx
+): void {
+  const usedDomainKeys = new Set<string>();
+  for (const s of sections) {
+    if (s.domain !== undefined) usedDomainKeys.add(s.domain);
+  }
+
+  // (a) If any section has a domain, scoringConfig.domains must be defined
+  //     AND every used key must appear in domains[].
+  if (usedDomainKeys.size > 0) {
+    const defined = new Set((cfg.domains ?? []).map((d) => d.key));
+    if (!cfg.domains || cfg.domains.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scoringConfig", "domains"],
+        message:
+          "scoringConfig.domains[] is required when any section has a `domain` field",
+      });
+    } else {
+      for (const k of usedDomainKeys) {
+        if (!defined.has(k)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["scoringConfig", "domains"],
+            message: `Used domain key "${k}" is missing from scoringConfig.domains[]`,
+          });
+        }
+      }
+    }
+  }
+
+  // (b) When rollup.overall === "meanOfDomains", EVERY section must have a
+  //     domain field (guardrail #2 from the plan).
+  if (cfg.rollup?.overall === "meanOfDomains") {
+    for (let si = 0; si < sections.length; si++) {
+      if (sections[si].domain === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["sections", si, "domain"],
+          message:
+            "rollup.overall='meanOfDomains' requires every section to have a `domain` field",
+        });
+      }
+    }
+  }
+}
+
+// Runtime schema — permissive on band coverage (BC for existing seeds) but
+// strict on new opt-ins (scaleUpScore requires rollup.overall + 0-10 scale).
+export const TemplateVersionForScoringSchema = z
+  .object({
+    questions: z.array(QuestionBase),
+    sections: z.array(SectionBase),
+    scoringConfig: ScoringConfigBase,
+  })
+  .superRefine((data, ctx) => {
+    checkRecommendationsRuntime(data.questions, ctx);
+    checkScaleUpScoreOptIn(data.scoringConfig, data.questions, ctx);
+  });
 
 export type TemplateVersionForScoring = z.infer<
   typeof TemplateVersionForScoringSchema
 >;
+
+// Publish schema — strict superset of runtime. Adds full-scale band
+// coverage, sentinel-text rejection, and domain-assignment completeness.
+export const TemplateVersionForPublishSchema =
+  TemplateVersionForScoringSchema.superRefine((data, ctx) => {
+    checkRecommendationsPublish(data.questions, ctx);
+    checkDomainAssignment(data.sections, data.scoringConfig, ctx);
+  });
 
 export const AnswerSchema = z.object({
   stableKey: z.string(),
@@ -116,6 +365,9 @@ export interface PerQuestionResult {
   stableKey: string;
   value: number;
   achieved: boolean;
+  /** D2 — matched recommendation band text; undefined when no band matches or
+   *  the question defines no `recommendations`. Runtime is lenient on gaps. */
+  recommendation?: string;
 }
 
 export interface PerSectionResult {
@@ -132,14 +384,31 @@ export interface TierResolution {
   message: string;
 }
 
+/** D2 — per-domain rollup row. Only emitted when scoringConfig.domains[] is set. */
+export interface PerDomainResult {
+  key: string;
+  label: string;
+  /** Mean of NON-NULL section means. `null` when no sections in this domain
+   *  have any answered question (Codex round 2 #1 — distinguish "no data"
+   *  from "scored 0"). */
+  averagePoints: number | null;
+  answeredSectionCount: number;
+  totalSectionCount: number;
+  tier: TierResolution | null;
+}
+
 export interface ScoreResult {
   perQuestion: PerQuestionResult[];
   perSection: PerSectionResult[];
+  /** D2 — only emitted when scoringConfig.domains[] is set. */
+  perDomain?: PerDomainResult[];
   overallTotal: number;
   overallAverage: number;
   countAchieved: number;
   tier: TierResolution | null;
   tierMetricValue: number;
+  /** D2 — 0-100 score. Emitted only when scoringConfig.scaleUpScore === true. */
+  scaleUpScore?: number;
   unansweredKeys: string[];
 }
 
@@ -205,6 +474,44 @@ function computeTierDomain(
       "Cannot derive a tier domain for overallAvg when questions use different scales"
     );
   }
+  return { min: first.min, max: first.max, isInteger: false };
+}
+
+/**
+ * D2 — compute the tier domain for the canonical rollup metric.
+ *
+ * When `scoringConfig.rollup.overall` is set, the global tier resolves against
+ * a mean (of questions / sections / domains). Means are always in the range
+ * `[scale.min, scale.max]` of the underlying question scale (assumed uniform).
+ *
+ * Throws INVALID_SCORING_CONFIG when scales are mixed (ambiguous; the rollup
+ * mean would span a non-uniform range).
+ */
+function computeRollupTierDomain(questions: Question[]): TierDomain {
+  if (questions.length === 0) {
+    throw new ScoringValidationError(
+      "INVALID_SCORING_CONFIG",
+      { reason: "rollup with zero questions" },
+      "rollup requires at least one question"
+    );
+  }
+  const first = questions[0].scale;
+  const allMatch = questions.every(
+    (q) =>
+      q.scale.min === first.min &&
+      q.scale.max === first.max &&
+      q.scale.step === first.step
+  );
+  if (!allMatch) {
+    throw new ScoringValidationError(
+      "INVALID_SCORING_CONFIG",
+      { reason: "rollup with mixed scales is ambiguous; use a uniform scale" },
+      "Cannot derive a tier domain for rollup when questions use different scales"
+    );
+  }
+  // Means may be fractional even on integer-step scales; mark as non-integer
+  // so the tiling check uses the touching-boundary semantics, not the
+  // +1-gap semantics.
   return { min: first.min, max: first.max, isInteger: false };
 }
 
@@ -314,10 +621,26 @@ export function scoreSubmission(
   }
   const v = parsed.data;
 
-  // 2) Dynamic tier-domain validation. Compute the implied metric domain and
-  //    confirm the configured tiers tile it exactly.
-  const domain = computeTierDomain(v.questions, v.scoringConfig.tierMetric);
-  validateTierTiling(v.scoringConfig.tiers, domain);
+  // 2) Dynamic tier-domain validation.
+  //    Legacy path (rollup unset): compute the implied metric domain from
+  //    tierMetric and confirm the configured tiers tile it exactly. This is
+  //    the byte-for-byte preserved Rockefeller/QSP behavior.
+  //    D2 rollup path (rollup set): the global tiers resolve against the
+  //    rollup metric scale ([scale.min, scale.max] when uniform). We validate
+  //    that the scales are uniform and that tiers tile that domain. The
+  //    legacy tierMetric path is skipped entirely so D2 templates can ship
+  //    with tier shapes that match the rollup metric (e.g., 0-10) without
+  //    being constrained by the legacy domain math.
+  if (v.scoringConfig.rollup) {
+    const rollupDomain = computeRollupTierDomain(v.questions);
+    validateTierTiling(v.scoringConfig.tiers, rollupDomain);
+  } else {
+    const domain = computeTierDomain(
+      v.questions,
+      v.scoringConfig.tierMetric
+    );
+    validateTierTiling(v.scoringConfig.tiers, domain);
+  }
 
   // 3) Reject empty answers payload.
   if (answers.length === 0) {
@@ -437,7 +760,18 @@ export function scoreSubmission(
     const achieved = value >= v.scoringConfig.passThreshold;
     if (achieved) countAchieved += 1;
     overallTotal += value;
-    perQuestion.push({ stableKey: q.stableKey, value, achieved });
+    const row: PerQuestionResult = { stableKey: q.stableKey, value, achieved };
+    // D2 — recommendation band resolution. Runtime is lenient on gaps:
+    // when no band matches, simply omit `recommendation` (no throw).
+    if (q.recommendations && q.recommendations.length > 0) {
+      for (const band of q.recommendations) {
+        if (value >= band.minScore && value <= band.maxScore) {
+          row.recommendation = band.text;
+          break;
+        }
+      }
+    }
+    perQuestion.push(row);
   }
 
   const overallAverage =
@@ -486,31 +820,126 @@ export function scoreSubmission(
   }
 
   const perSection: PerSectionResult[] = [];
+  // Also keep a map of section average (or null if zero answered) for the
+  // D2 per-domain + rollup passes below. We track null sections too — they
+  // are excluded from per-domain averages but counted as totalSectionCount.
+  const sectionAverageByKey = new Map<string, number | null>();
   for (const s of sortedSections) {
     const b = sectionBuckets.get(s.stableKey);
-    if (!b || b.totalCount === 0) continue;
+    if (!b) continue;
+    if (b.totalCount === 0) {
+      sectionAverageByKey.set(s.stableKey, null);
+      continue;
+    }
+    const avg = b.totalPoints / b.totalCount;
+    sectionAverageByKey.set(s.stableKey, avg);
     perSection.push({
       stableKey: b.stableKey,
       name: b.name,
       totalPoints: b.totalPoints,
-      averagePoints: b.totalPoints / b.totalCount,
+      averagePoints: avg,
       achievedCount: b.achievedCount,
       totalCount: b.totalCount,
     });
   }
 
-  // Resolve tier metric value + tier.
+  // D2 — per-domain rollup. Only emitted when scoringConfig.domains[] is set.
+  // Group sections by their `domain` field; compute mean of NON-NULL section
+  // means; resolve domain tier from `scoringConfig.domains[].tiers[]`.
+  const domainsCfg = v.scoringConfig.domains;
+  let perDomain: PerDomainResult[] | undefined;
+  if (domainsCfg && domainsCfg.length > 0) {
+    perDomain = [];
+    for (const domainDef of domainsCfg) {
+      const sectionsInDomain = sortedSections.filter(
+        (s) => s.domain === domainDef.key
+      );
+      const totalSectionCount = sectionsInDomain.length;
+      const nonNullMeans: number[] = [];
+      for (const s of sectionsInDomain) {
+        const avg = sectionAverageByKey.get(s.stableKey);
+        if (avg !== null && avg !== undefined) nonNullMeans.push(avg);
+      }
+      const answeredSectionCount = nonNullMeans.length;
+      let averagePoints: number | null;
+      let tier: TierResolution | null;
+      if (answeredSectionCount === 0) {
+        averagePoints = null;
+        tier = null;
+      } else {
+        averagePoints =
+          nonNullMeans.reduce((acc, x) => acc + x, 0) / nonNullMeans.length;
+        const matched = resolveTier(domainDef.tiers, averagePoints);
+        tier = matched
+          ? { label: matched.label, message: matched.message }
+          : null;
+      }
+      perDomain.push({
+        key: domainDef.key,
+        label: domainDef.label,
+        averagePoints,
+        answeredSectionCount,
+        totalSectionCount,
+        tier,
+      });
+    }
+  }
+
+  // Resolve tier metric value + global tier.
+  // Legacy path (rollup unset): tierMetric switch — byte-for-byte preserved.
+  // D2 canonical rollup path: tierMetricValue = the configured rollup metric.
   let tierMetricValue: number;
-  switch (v.scoringConfig.tierMetric) {
-    case "countAchieved":
-      tierMetricValue = countAchieved;
-      break;
-    case "overallTotal":
-      tierMetricValue = overallTotal;
-      break;
-    case "overallAvg":
-      tierMetricValue = overallAverage;
-      break;
+  if (v.scoringConfig.rollup) {
+    switch (v.scoringConfig.rollup.overall) {
+      case "meanOfQuestions": {
+        // Mean of answered question values.
+        const vals = perQuestion.map((q) => q.value);
+        tierMetricValue =
+          vals.length > 0
+            ? vals.reduce((acc, x) => acc + x, 0) / vals.length
+            : 0;
+        break;
+      }
+      case "meanOfSections": {
+        // Mean of non-null section means.
+        const vals: number[] = [];
+        for (const s of sortedSections) {
+          const avg = sectionAverageByKey.get(s.stableKey);
+          if (avg !== null && avg !== undefined) vals.push(avg);
+        }
+        tierMetricValue =
+          vals.length > 0
+            ? vals.reduce((acc, x) => acc + x, 0) / vals.length
+            : 0;
+        break;
+      }
+      case "meanOfDomains": {
+        // Mean of non-null domain means (perDomain[] required by domain
+        // assignment rule but defensively handle missing).
+        const vals: number[] = [];
+        for (const d of perDomain ?? []) {
+          if (d.averagePoints !== null) vals.push(d.averagePoints);
+        }
+        tierMetricValue =
+          vals.length > 0
+            ? vals.reduce((acc, x) => acc + x, 0) / vals.length
+            : 0;
+        break;
+      }
+    }
+  } else {
+    // LEGACY PATH — byte-for-byte preserved.
+    switch (v.scoringConfig.tierMetric) {
+      case "countAchieved":
+        tierMetricValue = countAchieved;
+        break;
+      case "overallTotal":
+        tierMetricValue = overallTotal;
+        break;
+      case "overallAvg":
+        tierMetricValue = overallAverage;
+        break;
+    }
   }
 
   const matchedTier = resolveTier(v.scoringConfig.tiers, tierMetricValue);
@@ -518,7 +947,18 @@ export function scoreSubmission(
     ? { label: matchedTier.label, message: matchedTier.message }
     : null;
 
-  return {
+  // D2 — ScaleUp Score 0-100. Opt-in via scoringConfig.scaleUpScore === true.
+  // Requires rollup.overall to be set (enforced at schema time too). Scaling
+  // assumes a 0-10 underlying scale (enforced at schema time).
+  let scaleUpScore: number | undefined;
+  if (
+    v.scoringConfig.scaleUpScore === true &&
+    v.scoringConfig.rollup !== undefined
+  ) {
+    scaleUpScore = Math.round(tierMetricValue * 10);
+  }
+
+  const result: ScoreResult = {
     perQuestion,
     perSection,
     overallTotal,
@@ -528,4 +968,7 @@ export function scoreSubmission(
     tierMetricValue,
     unansweredKeys,
   };
+  if (perDomain !== undefined) result.perDomain = perDomain;
+  if (scaleUpScore !== undefined) result.scaleUpScore = scaleUpScore;
+  return result;
 }

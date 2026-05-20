@@ -80,6 +80,29 @@ function formatNumber(n: number): string {
   return n.toFixed(2);
 }
 
+/**
+ * D2.1 — null-safe number formatter for per-domain `averagePoints`.
+ *
+ * The scoring engine emits `averagePoints: null` when a domain has zero
+ * answered sections (Codex round 2 #1 — distinguish "no data" from
+ * "scored 0"). Whenever this report begins rendering `perDomain[]` rows,
+ * the renderer MUST use this helper (or equivalent null-aware logic) to
+ * avoid showing "0" or "NaN" for empty domains.
+ *
+ * Exported for unit testing + future per-domain UI work.
+ */
+export function formatNullableNumber(n: number | null | undefined): string {
+  if (n === null || n === undefined) return "—";
+  if (!Number.isFinite(n)) return "—";
+  if (Number.isInteger(n)) return n.toString();
+  return n.toFixed(2);
+}
+
+// TODO (D2 follow-on): the aggregate report does not yet render per-domain
+// rows. When that lands, every cell that displays `perDomain[i].averagePoints`
+// MUST route through `formatNullableNumber` to gracefully render the null
+// case as "—" instead of "0" / "NaN".
+
 function buildSparklinePoints(
   series: Array<{ date: string; count: number }>,
   width: number,

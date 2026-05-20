@@ -285,11 +285,31 @@ describe("POST /api/admin/assessment-templates/[id]/versions/[versionId]/publish
 
   it("happy path: sets publishedAt + publishedBy + audit", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    // D2.1 strict publish-time validation now runs against the full content;
+    // mock must include passable questions/sections/scoringConfig (no D2
+    // opt-ins so legacy schema rules apply).
     (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue({
       id: "ver-1",
       templateId: "tpl-1",
       publishedAt: null,
       versionNumber: 1,
+      questions: [
+        {
+          stableKey: "Q1",
+          sortOrder: 1,
+          type: "SLIDER_LIKERT",
+          label: "Q1",
+          isRequired: true,
+          sectionStableKey: "S1",
+          scale: { min: 0, max: 3, step: 1, anchorMin: "L", anchorMax: "H" },
+        },
+      ],
+      sections: [{ stableKey: "S1", sortOrder: 1, name: "S1" }],
+      scoringConfig: {
+        tierMetric: "overallTotal",
+        passThreshold: 2,
+        tiers: [{ minMetric: 0, maxMetric: 3, label: "X", message: "x" }],
+      },
     });
     (db.assessmentTemplateVersion.update as jest.Mock).mockResolvedValue({});
     const res = await publishPOST(pubReq() as never, publishParams);
@@ -299,5 +319,41 @@ describe("POST /api/admin/assessment-templates/[id]/versions/[versionId]/publish
     expect(updateArgs.data.publishedAt).toBeInstanceOf(Date);
     expect(updateArgs.data.publishedBy).toBe("u1");
     expect(db.auditLog.create).toHaveBeenCalled();
+  });
+
+  it("422 PUBLISH_VALIDATION_FAILED when content has placeholder sentinel (D2.1)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue({
+      id: "ver-1",
+      templateId: "tpl-1",
+      publishedAt: null,
+      versionNumber: 1,
+      questions: [
+        {
+          stableKey: "Q1",
+          sortOrder: 1,
+          type: "SLIDER_LIKERT",
+          label: "Q1",
+          isRequired: true,
+          sectionStableKey: "S1",
+          scale: { min: 0, max: 10, step: 1, anchorMin: "L", anchorMax: "H" },
+          recommendations: [
+            { minScore: 0, maxScore: 3, text: "TODO low copy" },
+            { minScore: 4, maxScore: 7, text: "mid copy" },
+            { minScore: 8, maxScore: 10, text: "high copy" },
+          ],
+        },
+      ],
+      sections: [{ stableKey: "S1", sortOrder: 1, name: "S1" }],
+      scoringConfig: {
+        tierMetric: "overallTotal",
+        passThreshold: 7,
+        tiers: [{ minMetric: 0, maxMetric: 10, label: "X", message: "x" }],
+      },
+    });
+    const res = await publishPOST(pubReq() as never, publishParams);
+    expect(res.status).toBe(422);
+    const body = await res.json();
+    expect(body.error).toBe("PUBLISH_VALIDATION_FAILED");
   });
 });

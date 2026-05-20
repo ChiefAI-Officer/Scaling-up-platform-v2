@@ -238,6 +238,20 @@ function buildSectionsAndQuestions(): {
   return { sections, questions };
 }
 
+// ─── Public content builder (for tests + cross-file reuse) ───────────────
+//
+// Returns the same structure the seed writes to AssessmentTemplateVersion.
+// Used by the BC snapshot test so any future engine change can be regressed
+// against the byte-identical pre-D2 Rockefeller ScoreResult output.
+export function buildTemplateContent(): {
+  sections: SectionPayload[];
+  questions: QuestionPayload[];
+  scoringConfig: typeof SCORING_CONFIG;
+} {
+  const { sections, questions } = buildSectionsAndQuestions();
+  return { sections, questions, scoringConfig: SCORING_CONFIG };
+}
+
 // ─── Content hash ────────────────────────────────────────────────────────
 // Deterministic across runs: build the input object with a fixed key order,
 // serialize without whitespace, sha256, hex.
@@ -617,11 +631,16 @@ async function main(): Promise<void> {
   );
 }
 
-main()
-  .catch((err) => {
-    console.error("[seed-rockefeller-assessment] FAILED:", err);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await db.$disconnect();
-  });
+// Only run when executed directly (not when imported by tests).
+// Mirrors the QSP seed pattern so `import { buildTemplateContent }` from
+// scoring tests does not trigger the seed main() against the live DB.
+if (require.main === module) {
+  main()
+    .catch((err) => {
+      console.error("[seed-rockefeller-assessment] FAILED:", err);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await db.$disconnect();
+    });
+}

@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { TemplateVersionForPublishSchema } from "@/lib/assessments/scoring";
 
 export async function POST(
   request: NextRequest,
@@ -42,7 +43,15 @@ export async function POST(
 
     const version = await db.assessmentTemplateVersion.findUnique({
       where: { id: versionId },
-      select: { id: true, templateId: true, publishedAt: true, versionNumber: true },
+      select: {
+        id: true,
+        templateId: true,
+        publishedAt: true,
+        versionNumber: true,
+        questions: true,
+        sections: true,
+        scoringConfig: true,
+      },
     });
     if (!version || version.templateId !== templateId) {
       return NextResponse.json(
@@ -54,6 +63,26 @@ export async function POST(
       return NextResponse.json(
         { success: false, error: "ALREADY_PUBLISHED" },
         { status: 409 },
+      );
+    }
+
+    // D2.1 strict publish-time validation: bands fully cover the scale,
+    // sentinel text rejected, domain assignment complete. Existing
+    // Rockefeller/QSP templates pass because they don't opt into the new
+    // fields; new D2 templates (SU Full) must pass before publishedAt flips.
+    const publishParse = TemplateVersionForPublishSchema.safeParse({
+      questions: version.questions,
+      sections: version.sections,
+      scoringConfig: version.scoringConfig,
+    });
+    if (!publishParse.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "PUBLISH_VALIDATION_FAILED",
+          issues: publishParse.error.issues,
+        },
+        { status: 422 },
       );
     }
 

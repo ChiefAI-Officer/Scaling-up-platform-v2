@@ -25,6 +25,10 @@ import {
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import type { Prisma } from "@prisma/client";
+import {
+  CampaignCreateError,
+  resolvePublishedTemplateVersion,
+} from "@/lib/assessments/campaign-create-service";
 import { splitName } from "@/lib/assessments/respondent-csv";
 import { normalizeEmail } from "@/app/api/organizations/[id]/respondents/route";
 
@@ -172,22 +176,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Resolve latest published version for templateId + language.
-    const version = await db.assessmentTemplateVersion.findFirst({
-      where: {
-        templateId: data.templateId,
-        language: CAMPAIGN_LANGUAGE_DEFAULT,
-        publishedAt: { not: null },
-      },
-      orderBy: { versionNumber: "desc" },
-    });
-    if (!version) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "No published version found for this template/language",
-        },
-        { status: 409 }
+    // D2.1 (Codex round 4 guardrail #1): the draft-version block lives in
+    // the service-layer helper. Maps the CampaignCreateError code →
+    // HTTP 422 with explicit `TEMPLATE_VERSION_NOT_PUBLISHED` error code.
+    let version: Awaited<
+      ReturnType<typeof resolvePublishedTemplateVersion>
+    >;
+    try {
+      version = await resolvePublishedTemplateVersion(
+        db,
+        data.templateId,
+        CAMPAIGN_LANGUAGE_DEFAULT,
       );
+    } catch (err) {
+      if (
+        err instanceof CampaignCreateError &&
+        err.code === "TEMPLATE_VERSION_NOT_PUBLISHED"
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "TEMPLATE_VERSION_NOT_PUBLISHED",
+            details: err.details,
+          },
+          { status: 422 },
+        );
+      }
+      throw err;
     }
 
     const template = await db.assessmentTemplate.findUnique({
