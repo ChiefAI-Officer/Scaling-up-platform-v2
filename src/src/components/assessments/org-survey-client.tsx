@@ -74,7 +74,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
 
         if (tokenMatch) {
           const token = tokenMatch[1];
-          const exchangeRes = await fetch("./exchange", {
+          const exchangeRes = await fetch(`/org-survey/${campaignAlias}/exchange`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
@@ -103,7 +103,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         if (cancelled) return;
         setPhase({ kind: "loading" });
 
-        const meRes = await fetch("./me", {
+        const meRes = await fetch(`/org-survey/${campaignAlias}/me`, {
           method: "GET",
           credentials: "include",
           cache: "no-store",
@@ -177,7 +177,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     setPhase({ kind: "submitting", data: phase.data });
 
     try {
-      const submitRes = await fetch("./submit", {
+      const submitRes = await fetch(`/org-survey/${campaignAlias}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -194,7 +194,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         setPhase({ kind: "error", message });
         return;
       }
-      router.push("./thank-you");
+      router.push(`/org-survey/${campaignAlias}/thank-you`);
     } catch (err) {
       console.error("[org-survey] submit failed", err);
       setPhase({
