@@ -127,9 +127,9 @@ export async function PATCH(
         { status: 404 }
       );
     }
-    if (campaign.status !== "DRAFT") {
+    if (campaign.status === "CLOSED") {
       return NextResponse.json(
-        { success: false, error: "Campaign can only be edited in DRAFT status" },
+        { success: false, error: "Closed campaigns cannot be edited" },
         { status: 409 }
       );
     }
