@@ -27,17 +27,36 @@ export default async function AdminAggregateReportPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold text-foreground">
-          Assessment Aggregate Report
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Roll-up across all submissions for a single template + version.
-          v1 MVP per spec — deeper slicers (time-range, group, per-org) are
-          deferred to v1.5.
-        </p>
-      </header>
+    <div>
+      {/* Breadcrumb — WF23 */}
+      <div className="wf-breadcrumb">
+        <a href="/admin/dashboard">Admin</a>
+        <span className="wf-breadcrumb-sep">/</span>
+        <a href="/admin/assessments">Assessments</a>
+        <span className="wf-breadcrumb-sep">/</span>
+        <span className="wf-breadcrumb-current">Aggregate Report</span>
+      </div>
+
+      {/* Page header — WF23 */}
+      <div className="wf-page-header-row">
+        <div>
+          <h2 className="wf-page-title">Aggregate Report</h2>
+          <p className="wf-page-subtitle-strong">
+            Per-template, per-version aggregate statistics across all
+            submissions in the platform. Admin-only — coaches and
+            respondents never see this view.
+          </p>
+        </div>
+      </div>
+
+      {/* Anonymity banner — WF23 */}
+      <div className="wf-intersection-banner">
+        <strong>Admin bypasses CEO_ONLY anonymity in aggregate.</strong>{" "}
+        Coaches and respondents still respect <code>aggregationMode</code>{" "}
+        (see <code>canAccessAggregateReport</code> service-layer rule).
+        This dashboard is gated to <code>ADMIN</code> / <code>STAFF</code>{" "}
+        roles only.
+      </div>
 
       <AssessmentsAggregateReport />
     </div>

@@ -707,6 +707,137 @@
 }
 
 /* ===========================================================
+   WF23 — Aggregate report specifics
+   =========================================================== */
+.wf-scope .wf-intersection-banner {
+  background: hsl(38 92% 95%);
+  border: 1px solid hsl(38 92% 80%);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  color: hsl(26 83% 25%);
+  margin-bottom: 1.5rem;
+}
+.wf-scope .wf-intersection-banner strong { font-weight: 700; }
+.wf-scope .wf-intersection-banner code {
+  background: hsl(38 92% 90%);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 3px;
+  font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+}
+.wf-scope .wf-selectors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.wf-scope .wf-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.wf-scope .wf-selector label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+.wf-scope .wf-selector select {
+  width: 100%;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: hsl(var(--foreground));
+}
+.wf-scope .version-hint {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.wf-scope .wf-current-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 4px;
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.wf-scope .wf-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.wf-scope .wf-stat {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.wf-scope .wf-stat-label {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.wf-scope .wf-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.wf-scope .wf-stat-unit {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  margin-left: 0.125rem;
+}
+.wf-scope .wf-stat-sub {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.wf-scope .wf-two-col-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+@media (min-width: 1024px) {
+  .wf-scope .wf-two-col-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.wf-scope .wf-card-block {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-xs);
+}
+.wf-scope .wf-card-block-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+.wf-scope .wf-card-block-sub {
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0 0 1rem;
+}
+
+/* ===========================================================
    Score bar (used on revised individual results)
    =========================================================== */
 .wf-scope .score-bar {
