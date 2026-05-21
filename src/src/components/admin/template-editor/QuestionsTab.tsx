@@ -283,7 +283,8 @@ function QuestionConfigForm({
   if (!question) {
     return (
       <section
-        className="rounded-lg border border-border bg-card p-5"
+        className="wf-card"
+        style={{ padding: "1.25rem" }}
         data-testid="questions-config-form"
       >
         <p className="text-xs italic text-muted-foreground text-center py-8">
@@ -295,11 +296,12 @@ function QuestionConfigForm({
 
   return (
     <section
-      className="rounded-lg border border-border bg-card p-5 space-y-4"
+      className="wf-card space-y-4"
+      style={{ padding: "1.25rem" }}
       data-testid="questions-config-form"
     >
       <header className="border-b border-border pb-3">
-        <h3 className="text-base font-semibold text-foreground">
+        <h3 className="wf-card-title">
           Edit Question — {question.stableKey}
         </h3>
       </header>
@@ -307,7 +309,7 @@ function QuestionConfigForm({
       {/* stableKey (read-only) */}
       <div className="space-y-1">
         <label
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
           htmlFor={`q-stablekey-${question.uid}`}
         >
           stableKey
@@ -317,7 +319,8 @@ function QuestionConfigForm({
           type="text"
           value={question.stableKey}
           readOnly
-          className="w-full px-2 py-1 text-sm border border-border rounded bg-muted/40 text-foreground"
+          className="wf-input"
+          style={{ background: "hsl(var(--muted) / 0.4)" }}
         />
         <span className="block text-[0.6875rem] italic text-muted-foreground">
           Immutable across versions for longitudinal comparability.
@@ -327,7 +330,7 @@ function QuestionConfigForm({
       {/* Question Type */}
       <div className="space-y-1">
         <label
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
           htmlFor={`q-type-${question.uid}`}
         >
           Question Type
@@ -337,7 +340,7 @@ function QuestionConfigForm({
           value={question.type}
           onChange={(e) => onUpdate({ type: e.target.value })}
           disabled={isReadOnly}
-          className="w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+          className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
         >
           <optgroup label="Active in v1">
             <option value="SLIDER_LIKERT">SLIDER_LIKERT</option>
@@ -370,7 +373,7 @@ function QuestionConfigForm({
       {/* Label */}
       <div className="space-y-1">
         <label
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
           htmlFor={`q-label-${question.uid}`}
         >
           Label
@@ -381,14 +384,14 @@ function QuestionConfigForm({
           value={question.label}
           onChange={(e) => onUpdate({ label: e.target.value })}
           disabled={isReadOnly}
-          className="w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+          className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
         />
       </div>
 
       {/* Help text */}
       <div className="space-y-1">
         <label
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
           htmlFor={`q-help-${question.uid}`}
         >
           Help text
@@ -400,7 +403,7 @@ function QuestionConfigForm({
           onChange={(e) => onUpdate({ helpText: e.target.value })}
           disabled={isReadOnly}
           placeholder="Optional helper text shown to respondents"
-          className="w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+          className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
         />
         <span className="block text-[0.6875rem] italic text-muted-foreground">
           Optional. Rendered below the label on the respondent form.
@@ -430,7 +433,7 @@ function QuestionConfigForm({
       {/* Sort order */}
       <div className="space-y-1">
         <label
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
           htmlFor={`q-sort-${question.uid}`}
         >
           Sort order within section
@@ -471,7 +474,7 @@ function QuestionConfigForm({
                 onUpdate({ scaleMin: Number(e.target.value) })
               }
               disabled={isReadOnly}
-              className="w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+              className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
           <div className="space-y-1">
@@ -489,7 +492,7 @@ function QuestionConfigForm({
                 onUpdate({ scaleMax: Number(e.target.value) })
               }
               disabled={isReadOnly}
-              className="w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+              className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
           <div className="space-y-1">
@@ -507,7 +510,7 @@ function QuestionConfigForm({
                 onUpdate({ scaleStep: Number(e.target.value) })
               }
               disabled={isReadOnly}
-              className="w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+              className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
         </div>
@@ -526,7 +529,7 @@ function QuestionConfigForm({
               value={question.anchorMin}
               onChange={(e) => onUpdate({ anchorMin: e.target.value })}
               disabled={isReadOnly}
-              className="w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+              className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
           <div className="space-y-1">
@@ -542,7 +545,7 @@ function QuestionConfigForm({
               value={question.anchorMax}
               onChange={(e) => onUpdate({ anchorMax: e.target.value })}
               disabled={isReadOnly}
-              className="w-full px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+              className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
         </div>
@@ -857,10 +860,11 @@ export function QuestionsTab({
         {/* LEFT — Section navigator */}
         <aside className="lg:sticky lg:top-4 lg:self-start">
           <section
-            className="rounded-lg border border-border bg-card p-4 space-y-2"
+            className="wf-card space-y-2"
+            style={{ padding: "1rem" }}
             data-testid="questions-section-nav"
           >
-            <h3 className="text-base font-semibold text-foreground">
+            <h3 className="wf-card-title">
               Sections
             </h3>
             <ul className="space-y-1">
@@ -914,11 +918,12 @@ export function QuestionsTab({
 
         {/* MIDDLE — Question list for selected section */}
         <section
-          className="rounded-lg border border-border bg-card p-4 space-y-3"
+          className="wf-card space-y-3"
+          style={{ padding: "1rem" }}
           data-testid="questions-question-list"
         >
           <header className="flex items-center justify-between gap-2">
-            <h3 className="text-base font-semibold text-foreground">
+            <h3 className="wf-card-title">
               {selectedSection
                 ? `${selectedSection.stableKey} — ${
                     selectedSection.name || "(no name)"
@@ -932,7 +937,7 @@ export function QuestionsTab({
                 onAddQuestion(selectedSectionStableKey);
               }}
               disabled={isReadOnly || !selectedSectionStableKey}
-              className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+              className="wf-btn wf-btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               + Add Question
             </button>
@@ -999,7 +1004,8 @@ export function QuestionsTab({
 
       {/* v1.5 informational cards */}
       <section
-        className="rounded-lg border border-border bg-muted/10 p-5 space-y-3"
+        className="wf-card space-y-3"
+        style={{ padding: "1.25rem", background: "hsl(var(--muted) / 0.1)" }}
         data-testid="v15-deferred-panel"
         aria-label="v1.5 question types"
       >
