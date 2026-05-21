@@ -28,16 +28,22 @@ export default async function AdminAccessGroupsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-foreground">Access Groups</h1>
-          <p className="text-sm text-muted-foreground">
+      <nav className="wf-breadcrumb" aria-label="Breadcrumb">
+        <a href="/admin/assessments">Assessments</a>
+        <span className="wf-breadcrumb-sep">›</span>
+        <span>Access Groups</span>
+      </nav>
+
+      <div className="wf-page-header-row">
+        <div>
+          <h2 className="wf-page-title">Access Groups</h2>
+          <p className="wf-page-subtitle-strong">
             Grant template access to coaches via group membership. A coach in
             multiple groups sees only templates that ALL their groups grant
             (INTERSECTION).
           </p>
         </div>
-      </header>
+      </div>
 
       <AccessGroupsList />
     </div>

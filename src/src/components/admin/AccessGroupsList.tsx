@@ -147,24 +147,24 @@ export function AccessGroupsList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button onClick={() => setCreateOpen(true)}>+ New Access Group</Button>
+      <div className="wf-page-action-row">
+        <button
+          type="button"
+          onClick={() => setCreateOpen(true)}
+          className="wf-btn wf-btn-primary"
+        >
+          + New Access Group
+        </button>
       </div>
 
       {/* INTERSECTION info banner */}
-      <div className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm text-foreground">
+      <div className="wf-intersection-banner">
         <p>
           <strong>Access Groups</strong> grant template access to coaches via
           INTERSECTION semantics. A coach in multiple groups sees only
           templates that <strong>ALL</strong> their groups grant.{" "}
-          <code className="rounded bg-background/60 px-1 py-0.5 text-xs">
-            ACCESS_POLICY_VERSION
-          </code>{" "}
-          runtime flag controls policy (current default:{" "}
-          <code className="rounded bg-background/60 px-1 py-0.5 text-xs">
-            v1.intersection
-          </code>
-          ).
+          <code>ACCESS_POLICY_VERSION</code> runtime flag controls policy
+          (current default: <code>v1.intersection</code>).
         </p>
       </div>
 
