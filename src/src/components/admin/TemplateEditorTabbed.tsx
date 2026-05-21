@@ -63,6 +63,10 @@ import {
   genNewQuestionStableKey,
   type QuestionDraft,
 } from "@/components/admin/template-editor/QuestionsTab";
+import {
+  ScoringTiersTab,
+  type ScoringConfigShape,
+} from "@/components/admin/template-editor/ScoringTiersTab";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -291,6 +295,18 @@ export function TemplateEditorTabbed({
   const scoringConfigRef = React.useRef<unknown>(version.scoringConfig ?? {});
   const reportConfigRef = React.useRef<unknown>(version.reportConfig ?? null);
 
+  // F4 — Scoring & Tiers tab state. Hydrate from version.scoringConfig.
+  // On any edit, update scoringConfigRef.current (so Save Draft serializes
+  // it via version PATCH) and flip the scoringConfig dirty flag.
+  const [scoringConfigState, setScoringConfigState] = useState<
+    Record<string, unknown>
+  >(
+    () =>
+      (version.scoringConfig && typeof version.scoringConfig === "object"
+        ? (version.scoringConfig as Record<string, unknown>)
+        : {}),
+  );
+
   // Derived: question count per section stableKey (for the Sections card
   // count badge — used by MetadataTab right column + SectionsTab).
   const questionCountByStableKey = useMemo(() => {
@@ -322,6 +338,19 @@ export function TemplateEditorTabbed({
       prev.questions ? prev : { ...prev, questions: true },
     );
   }, []);
+  const setScoringConfigDirty = useCallback(() => {
+    setDirtyFlags((prev) =>
+      prev.scoringConfig ? prev : { ...prev, scoringConfig: true },
+    );
+  }, []);
+  const handleScoringConfigChange = useCallback(
+    (next: Record<string, unknown>) => {
+      setScoringConfigState(next);
+      scoringConfigRef.current = next;
+      setScoringConfigDirty();
+    },
+    [setScoringConfigDirty],
+  );
 
   const handleTemplateFieldChange = useCallback(
     (patch: Partial<Omit<MetadataTabValues, "language">>) => {
@@ -988,11 +1017,34 @@ export function TemplateEditorTabbed({
           </div>
         </TabsContent>
         <TabsContent value="scoring">
-          <div
-            data-testid="tab-panel-scoring"
-            className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-12 text-center text-sm text-muted-foreground"
-          >
-            Scoring &amp; Tiers tab (F4)
+          <div data-testid="tab-panel-scoring">
+            <ScoringTiersTab
+              sections={sections.map((s, idx) => ({
+                stableKey: s.stableKey,
+                sortOrder: idx + 1,
+                name: s.name,
+              }))}
+              questions={questions.map((q) => ({
+                stableKey: q.stableKey,
+                sortOrder: q.sortOrder,
+                sectionStableKey: q.sectionStableKey,
+                type: "SLIDER_LIKERT" as const,
+                label: q.label,
+                isRequired: q.isRequired,
+                scale: {
+                  min: q.scaleMin,
+                  max: q.scaleMax,
+                  step: q.scaleStep,
+                  anchorMin: q.anchorMin,
+                  anchorMax: q.anchorMax,
+                },
+              }))}
+              scoringConfig={scoringConfigState as ScoringConfigShape}
+              isReadOnly={isPublished}
+              onScoringConfigChange={(next) =>
+                handleScoringConfigChange(next as Record<string, unknown>)
+              }
+            />
           </div>
         </TabsContent>
         <TabsContent value="versions">
