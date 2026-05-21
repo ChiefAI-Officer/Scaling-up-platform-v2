@@ -6,7 +6,13 @@
  * snapshot).
  *
  * Usage:
- *   cd src && npx tsx scripts/restore-from-snapshot.ts <snapshot-file> [--table=<TableName>]
+ *   cd src && npm run restore:from-snapshot -- <snapshot-file> [--table=<TableName>]
+ *
+ * Env resolution order (same as snapshot script):
+ *   1. process.env.DATABASE_URL (if already set in shell)
+ *   2. .env.production.local    (preferred — `vercel env pull` writes this)
+ *   3. .env.local
+ *   4. .env
  *
  * Defaults:
  *   - If --table is omitted, restores ALL tables from the snapshot
@@ -18,6 +24,16 @@
  * For a true point-in-time restore (including deletions), use Neon's
  * PITR via the Neon dashboard — see docs/runbooks/database-protection.md.
  */
+
+import { config as loadEnv } from "dotenv";
+import { join } from "node:path";
+
+// Load env files BEFORE importing PrismaClient. dotenv.config() does not
+// overwrite already-set env vars.
+const SRC_DIR = join(__dirname, "..");
+loadEnv({ path: join(SRC_DIR, ".env.production.local") });
+loadEnv({ path: join(SRC_DIR, ".env.local") });
+loadEnv({ path: join(SRC_DIR, ".env") });
 
 import { PrismaClient } from "@prisma/client";
 import { readFile } from "node:fs/promises";

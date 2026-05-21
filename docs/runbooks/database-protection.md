@@ -24,8 +24,14 @@ Run these in order:
 ```bash
 cd src
 
+# 0) (One-time per shell session) Pull live production env to a local file.
+#    Required because the snapshot script needs the prod DATABASE_URL.
+#    Vercel writes .env.production.local, which is already gitignored.
+npx vercel env pull .env.production.local --environment=production --yes
+
 # 1) Snapshot critical tables (Surveys / Workflows / Coaches / Templates / etc.)
-DATABASE_URL=$PROD_DATABASE_URL npm run snapshot:prod
+npm run snapshot:prod
+# → snapshot script auto-loads .env.production.local; no env-var prefix needed
 # → writes src/.snapshots/snapshot-YYYY-MM-DD-HHmmss.json
 
 # 2) Verify the new migration has no unapproved destructive ops
@@ -37,6 +43,12 @@ CI=true npx next build --turbopack
 ```
 
 Only push the branch after all three pass. The pre-deploy snapshot is your emergency rollback fixture if anything goes sideways at deploy time — even if Neon PITR also covers you.
+
+**Env resolution priority** in `snapshot:prod` and `restore:from-snapshot`:
+1. `process.env.DATABASE_URL` (already exported in shell)
+2. `.env.production.local` (what `vercel env pull` writes — preferred)
+3. `.env.local` (Next.js local override convention)
+4. `.env` (default — usually dev DB)
 
 ---
 
