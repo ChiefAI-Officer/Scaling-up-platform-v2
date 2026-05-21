@@ -22,6 +22,7 @@ export interface SectionsTabProps {
   onSectionsDelete: (uid: string) => void;
   onSectionsMoveUp: (uid: string) => void;
   onSectionsMoveDown: (uid: string) => void;
+  onSectionsReorder?: (newOrderUids: string[]) => void;
   isReadOnly: boolean;
 }
 
@@ -33,6 +34,7 @@ export function SectionsTab({
   onSectionsDelete,
   onSectionsMoveUp,
   onSectionsMoveDown,
+  onSectionsReorder,
   isReadOnly,
 }: SectionsTabProps) {
   return (
@@ -45,6 +47,7 @@ export function SectionsTab({
         onDelete={onSectionsDelete}
         onMoveUp={onSectionsMoveUp}
         onMoveDown={onSectionsMoveDown}
+        onReorder={onSectionsReorder}
         isReadOnly={isReadOnly}
         layout="wide"
       />

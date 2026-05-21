@@ -75,6 +75,7 @@ export interface MetadataTabProps {
   onSectionsDelete: (uid: string) => void;
   onSectionsMoveUp: (uid: string) => void;
   onSectionsMoveDown: (uid: string) => void;
+  onSectionsReorder?: (newOrderUids: string[]) => void;
   allVersions: MetadataTabVersionMeta[];
   currentVersionId: string;
   isReadOnly: boolean;
@@ -94,6 +95,7 @@ export function MetadataTab({
   onSectionsDelete,
   onSectionsMoveUp,
   onSectionsMoveDown,
+  onSectionsReorder,
   allVersions,
   currentVersionId,
   isReadOnly,
@@ -151,6 +153,7 @@ export function MetadataTab({
             onDelete={onSectionsDelete}
             onMoveUp={onSectionsMoveUp}
             onMoveDown={onSectionsMoveDown}
+            onReorder={onSectionsReorder}
             isReadOnly={isReadOnly}
             layout="compact"
           />

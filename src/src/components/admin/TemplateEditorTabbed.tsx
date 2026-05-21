@@ -57,6 +57,12 @@ import {
 } from "@/components/admin/template-editor/MetadataTab";
 import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
+import {
+  QuestionsTab,
+  hydrateQuestionsFromJson,
+  genNewQuestionStableKey,
+  type QuestionDraft,
+} from "@/components/admin/template-editor/QuestionsTab";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -186,26 +192,6 @@ function hydrateSectionsFromJson(raw: unknown): SectionDraft[] {
   });
 }
 
-/**
- * Count questions grouped by their sectionStableKey. The version PATCH
- * payload's questions array is opaque to this surface — we only count.
- */
-function buildQuestionCountByStableKey(
-  raw: unknown,
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  const arr = Array.isArray(raw) ? raw : [];
-  for (const q of arr) {
-    if (q && typeof q === "object") {
-      const ssk = (q as { sectionStableKey?: unknown }).sectionStableKey;
-      if (typeof ssk === "string") {
-        out[ssk] = (out[ssk] ?? 0) + 1;
-      }
-    }
-  }
-  return out;
-}
-
 // ────────────────────────────────────────────────────────────────────────
 // Component
 // ────────────────────────────────────────────────────────────────────────
@@ -287,20 +273,33 @@ export function TemplateEditorTabbed({
     hydrateSectionsFromJson(version.sections),
   );
 
-  // Stable references for questions/scoringConfig so version PATCH can
-  // round-trip them unchanged when only sections were edited.
-  const questionsRef = React.useRef<unknown>(version.questions ?? []);
+  // F3 — Questions state hydrated from version.questions JSON. Dirty flag
+  // fires on any add/edit/reorder/delete. Save Draft serializes these
+  // into the version PATCH's questions[] (raw rows are preserved via
+  // rawQuestionByStableKey lookup so unknown fields survive).
+  const [questions, setQuestions] = useState<QuestionDraft[]>(() =>
+    hydrateQuestionsFromJson(version.questions),
+  );
+
+  // Stable references for scoringConfig / reportConfig so version PATCH
+  // can round-trip them unchanged when only sections/questions were
+  // edited. Questions raw pass-through is kept here for stableKey lookup
+  // during serialization (matches AssessmentVersionEditor's pattern).
+  const rawQuestionsRef = React.useRef<unknown[]>(
+    Array.isArray(version.questions) ? (version.questions as unknown[]) : [],
+  );
   const scoringConfigRef = React.useRef<unknown>(version.scoringConfig ?? {});
   const reportConfigRef = React.useRef<unknown>(version.reportConfig ?? null);
 
   // Derived: question count per section stableKey (for the Sections card
-  // count badge). In F2 the editor is route-keyed on versionId, so a
-  // mount-time hydration is sufficient — `version.questions` does not
-  // change for a given mounted editor instance.
-  const questionCountByStableKey = useMemo(
-    () => buildQuestionCountByStableKey(version.questions),
-    [version.questions],
-  );
+  // count badge — used by MetadataTab right column + SectionsTab).
+  const questionCountByStableKey = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const q of questions) {
+      out[q.sectionStableKey] = (out[q.sectionStableKey] ?? 0) + 1;
+    }
+    return out;
+  }, [questions]);
 
   // ─── Setters that auto-dirty the right surface ────────────────────────
   const setMetadataDirty = useCallback(() => {
@@ -316,6 +315,11 @@ export function TemplateEditorTabbed({
   const setSectionsDirty = useCallback(() => {
     setDirtyFlags((prev) =>
       prev.sections ? prev : { ...prev, sections: true },
+    );
+  }, []);
+  const setQuestionsDirty = useCallback(() => {
+    setDirtyFlags((prev) =>
+      prev.questions ? prev : { ...prev, questions: true },
     );
   }, []);
 
@@ -393,6 +397,123 @@ export function TemplateEditorTabbed({
     [setSectionsDirty],
   );
 
+  // F3 retrofit — drag-reorder via @dnd-kit. Receives the new uid order
+  // from SectionsCard's DndContext and re-sorts the sections array to
+  // match (preserves uid identity + stableKey across moves).
+  const handleSectionsReorder = useCallback(
+    (newOrderUids: string[]) => {
+      setSections((prev) => {
+        const byUid = new Map(prev.map((s) => [s.uid, s]));
+        const next: SectionDraft[] = [];
+        for (const uid of newOrderUids) {
+          const found = byUid.get(uid);
+          if (found) next.push(found);
+        }
+        // Any rows not present in newOrderUids fall through at the end
+        // to keep this defensive against partial lists.
+        for (const s of prev) {
+          if (!newOrderUids.includes(s.uid)) next.push(s);
+        }
+        return next;
+      });
+      setSectionsDirty();
+    },
+    [setSectionsDirty],
+  );
+
+  // ─── Question operations — F3 ─────────────────────────────────────────
+  const handleAddQuestion = useCallback(
+    (sectionStableKey: string) => {
+      setQuestions((prev) => {
+        const inSection = prev.filter(
+          (q) => q.sectionStableKey === sectionStableKey,
+        );
+        const nextSort =
+          inSection.reduce((max, q) => Math.max(max, q.sortOrder), 0) + 1;
+        return [
+          ...prev,
+          {
+            uid: genUid(),
+            stableKey: genNewQuestionStableKey(),
+            sectionStableKey,
+            label: "",
+            helpText: "",
+            isRequired: true,
+            type: "SLIDER_LIKERT",
+            sortOrder: nextSort,
+            scaleMin: 0,
+            scaleMax: 3,
+            scaleStep: 1,
+            anchorMin: "Not true",
+            anchorMax: "Completely true",
+          },
+        ];
+      });
+      setQuestionsDirty();
+    },
+    [setQuestionsDirty],
+  );
+
+  const handleUpdateQuestion = useCallback(
+    (uid: string, patch: Partial<QuestionDraft>) => {
+      setQuestions((prev) =>
+        prev.map((q) => (q.uid === uid ? { ...q, ...patch } : q)),
+      );
+      setQuestionsDirty();
+    },
+    [setQuestionsDirty],
+  );
+
+  const handleDeleteQuestion = useCallback(
+    (uid: string) => {
+      setQuestions((prev) => prev.filter((q) => q.uid !== uid));
+      setQuestionsDirty();
+    },
+    [setQuestionsDirty],
+  );
+
+  const handleDuplicateQuestion = useCallback(
+    (uid: string) => {
+      setQuestions((prev) => {
+        const src = prev.find((q) => q.uid === uid);
+        if (!src) return prev;
+        const inSection = prev.filter(
+          (q) => q.sectionStableKey === src.sectionStableKey,
+        );
+        const nextSort =
+          inSection.reduce((max, q) => Math.max(max, q.sortOrder), 0) + 1;
+        return [
+          ...prev,
+          {
+            ...src,
+            uid: genUid(),
+            stableKey: genNewQuestionStableKey(),
+            sortOrder: nextSort,
+          },
+        ];
+      });
+      setQuestionsDirty();
+    },
+    [setQuestionsDirty],
+  );
+
+  const handleReorderQuestions = useCallback(
+    (sectionStableKey: string, newOrderUids: string[]) => {
+      setQuestions((prev) => {
+        // Build a sortOrder map from newOrderUids: position-in-array → sortOrder.
+        const order = new Map<string, number>();
+        newOrderUids.forEach((uid, idx) => order.set(uid, idx + 1));
+        return prev.map((q) =>
+          q.sectionStableKey === sectionStableKey && order.has(q.uid)
+            ? { ...q, sortOrder: order.get(q.uid)! }
+            : q,
+        );
+      });
+      setQuestionsDirty();
+    },
+    [setQuestionsDirty],
+  );
+
   useEffect(() => {
     if (!isAnyDirty) return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -468,8 +589,53 @@ export function TemplateEditorTabbed({
               : `S${idx + 1}`,
           name: s.name,
         }));
+
+        // F3 — Serialize questions. When questions are dirty, rebuild
+        // each row from the draft, looking up the raw row by stableKey
+        // (preserves recommendations[], unknown future fields, etc.).
+        // When not dirty, pass through rawQuestionsRef byte-for-byte.
+        let questionsPayload: unknown;
+        if (dirtyFlags.questions) {
+          const rawByStableKey = new Map<string, Record<string, unknown>>();
+          for (const r of rawQuestionsRef.current) {
+            if (r && typeof r === "object") {
+              const row = r as Record<string, unknown>;
+              if (typeof row.stableKey === "string") {
+                rawByStableKey.set(row.stableKey, row);
+              }
+            }
+          }
+          questionsPayload = questions.map((q) => {
+            const raw = rawByStableKey.get(q.stableKey) ?? {};
+            const rawScale =
+              raw.scale && typeof raw.scale === "object"
+                ? (raw.scale as Record<string, unknown>)
+                : {};
+            return {
+              ...raw,
+              stableKey: q.stableKey,
+              sectionStableKey: q.sectionStableKey,
+              sortOrder: q.sortOrder,
+              type: q.type,
+              label: q.label,
+              ...(q.helpText.trim() ? { helpText: q.helpText } : {}),
+              isRequired: q.isRequired,
+              scale: {
+                ...rawScale,
+                min: q.scaleMin,
+                max: q.scaleMax,
+                step: q.scaleStep,
+                anchorMin: q.anchorMin,
+                anchorMax: q.anchorMax,
+              },
+            };
+          });
+        } else {
+          questionsPayload = rawQuestionsRef.current;
+        }
+
         const body: Record<string, unknown> = {
-          questions: questionsRef.current,
+          questions: questionsPayload,
           sections: sectionsPayload,
           scoringConfig: scoringConfigRef.current,
           reportConfig: reportConfigRef.current,
@@ -525,6 +691,7 @@ export function TemplateEditorTabbed({
     isAnyDirty,
     isPublished,
     onSaveDraft,
+    questions,
     router,
     savingDraft,
     sections,
@@ -783,6 +950,7 @@ export function TemplateEditorTabbed({
               onSectionsDelete={handleSectionsDelete}
               onSectionsMoveUp={handleSectionsMoveUp}
               onSectionsMoveDown={handleSectionsMoveDown}
+              onSectionsReorder={handleSectionsReorder}
               allVersions={allVersions}
               currentVersionId={version.id}
               isReadOnly={isPublished}
@@ -800,16 +968,23 @@ export function TemplateEditorTabbed({
               onSectionsDelete={handleSectionsDelete}
               onSectionsMoveUp={handleSectionsMoveUp}
               onSectionsMoveDown={handleSectionsMoveDown}
+              onSectionsReorder={handleSectionsReorder}
               isReadOnly={isPublished}
             />
           </div>
         </TabsContent>
         <TabsContent value="questions">
-          <div
-            data-testid="tab-panel-questions"
-            className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-12 text-center text-sm text-muted-foreground"
-          >
-            Questions tab (F3)
+          <div data-testid="tab-panel-questions">
+            <QuestionsTab
+              sections={sections}
+              questions={questions}
+              onAddQuestion={handleAddQuestion}
+              onUpdateQuestion={handleUpdateQuestion}
+              onDeleteQuestion={handleDeleteQuestion}
+              onDuplicateQuestion={handleDuplicateQuestion}
+              onReorderQuestions={handleReorderQuestions}
+              isReadOnly={isPublished}
+            />
           </div>
         </TabsContent>
         <TabsContent value="scoring">
