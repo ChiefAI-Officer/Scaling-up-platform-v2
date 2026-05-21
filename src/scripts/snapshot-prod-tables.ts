@@ -6,19 +6,36 @@
  * net on top of Neon's continuous backups (PITR).
  *
  * Usage:
- *   cd src && npm run snapshot:prod
+ *   cd src && npm run snapshot:prod        (auto-loads .env.production.local)
+ *
+ * Env resolution order:
+ *   1. process.env.DATABASE_URL (if already set in shell)
+ *   2. .env.production.local    (what `vercel env pull` writes — preferred)
+ *   3. .env.local               (Next.js local override convention)
+ *   4. .env                     (default — usually dev DB)
  *
  * Output: src/.snapshots/snapshot-YYYY-MM-DD-HHmmss.json
  *
  * Restore: see scripts/restore-from-snapshot.ts
  */
 
+import { config as loadEnv } from "dotenv";
+import { join } from "node:path";
+
+// Load env files BEFORE importing PrismaClient — Prisma reads
+// process.env.DATABASE_URL on import. dotenv.config() does not overwrite
+// already-set env vars, so process.env wins if DATABASE_URL is exported
+// in the shell.
+const SRC_DIR = join(__dirname, "..");
+loadEnv({ path: join(SRC_DIR, ".env.production.local") });
+loadEnv({ path: join(SRC_DIR, ".env.local") });
+loadEnv({ path: join(SRC_DIR, ".env") });
+
 import { PrismaClient } from "@prisma/client";
 import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
 
-const SNAPSHOT_DIR = join(__dirname, "..", ".snapshots");
+const SNAPSHOT_DIR = join(SRC_DIR, ".snapshots");
 
 // Tables that hold operator-configured data Jeff/Suzanne set up by hand.
 // Add to this list if more high-cost tables get configured manually.
