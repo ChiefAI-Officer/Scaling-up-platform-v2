@@ -177,6 +177,12 @@ export function CampaignDetail({
   // Task N — Bulk reminders state.
   const [sendingReminders, setSendingReminders] = useState(false);
 
+  // Send Initial Invitations — fires /invite endpoint to first-send emails
+  // for respondents who don't have an invitation row yet (or have a PENDING
+  // one with no SMTP delivery). Closes the activation → email gap that
+  // makes "Send Reminders" skip never-invited people.
+  const [sendingInvitations, setSendingInvitations] = useState(false);
+
   // CEO designation post-creation — per-row toggle.
   const [ceoSavingFor, setCeoSavingFor] = useState<string | null>(null);
 
@@ -339,6 +345,74 @@ export function CampaignDetail({
   }
 
   // Task N — bulk send reminders to all non-submitted, non-revoked participants.
+  // Send Initial Invitations — closes the gap where campaign activation
+  // doesn't auto-send emails. Targets respondents with no invitation row
+  // OR an existing PENDING row (the /invite endpoint creates or refreshes
+  // either case and dispatches SMTP).
+  async function handleSendInvitations() {
+    if (sendingInvitations) return;
+    const targetable = respondents.filter(
+      (r) =>
+        r.invitation === null ||
+        (r.invitation.revokedAt === null &&
+          r.invitation.status === "PENDING"),
+    );
+    if (targetable.length === 0) {
+      toast({
+        title: "Nothing to send",
+        description:
+          "Every respondent already has an invitation. Use Send Reminders to nudge non-responders.",
+      });
+      return;
+    }
+    const confirmed = window.confirm(
+      `Send initial invitation email to ${targetable.length} respondent${targetable.length === 1 ? "" : "s"}?`,
+    );
+    if (!confirmed) return;
+    setSendingInvitations(true);
+    try {
+      const res = await fetch(
+        `/api/assessment-campaigns/${campaign.id}/invite`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            respondentIds: targetable.map((r) => r.respondent.id),
+          }),
+        },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      const results = Array.isArray(body.data?.results)
+        ? body.data.results
+        : [];
+      const sent = results.filter((r: { status: string }) => r.status === "sent").length;
+      const alreadyInvited = results.filter(
+        (r: { status: string }) => r.status === "already-invited",
+      ).length;
+      const failed = results.filter(
+        (r: { status: string }) => r.status === "send-failed",
+      ).length;
+      toast({
+        title: "Invitations sent",
+        description: `Sent ${sent}${alreadyInvited > 0 ? `, already invited ${alreadyInvited}` : ""}${failed > 0 ? `, failed ${failed}` : ""}.`,
+        variant: failed > 0 ? "destructive" : undefined,
+      });
+      await refreshRespondents();
+    } catch (err) {
+      toast({
+        title: "Could not send invitations",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingInvitations(false);
+    }
+  }
+
   async function handleSendReminders() {
     if (sendingReminders) return;
     const pendingCount = respondents.filter(
@@ -1051,20 +1125,38 @@ export function CampaignDetail({
               </button>
             )}
             {campaign.status === "ACTIVE" && (
-              <button
-                type="button"
-                onClick={handleSendReminders}
-                disabled={sendingReminders}
-                className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="send-reminders-btn"
-              >
-                {sendingReminders ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Mail className="w-3.5 h-3.5" />
-                )}
-                Send Reminders
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleSendInvitations}
+                  disabled={sendingInvitations}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="send-invitations-btn"
+                  title="Fire the initial invitation email to respondents who haven't been invited yet"
+                >
+                  {sendingInvitations ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Mail className="w-3.5 h-3.5" />
+                  )}
+                  Send Invitations
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendReminders}
+                  disabled={sendingReminders}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="send-reminders-btn"
+                  title="Nudge respondents who were already invited but haven't submitted"
+                >
+                  {sendingReminders ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Mail className="w-3.5 h-3.5" />
+                  )}
+                  Send Reminders
+                </button>
+              </>
             )}
             <a
               href={`/api/assessment-campaigns/${campaign.id}/respondents/export.csv`}
