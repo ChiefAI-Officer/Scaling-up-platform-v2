@@ -109,19 +109,29 @@ export function PublicQuizClient({
 
   if (!isOpen || step === "error") {
     return (
-      <div className="bg-card border border-border rounded-xl p-8 text-center space-y-3">
-        <h1 className="text-2xl font-bold text-foreground">{campaignName}</h1>
-        <p className="text-sm text-muted-foreground">
-          {status === "DRAFT"
-            ? "This assessment is not yet open."
-            : status === "CLOSED"
-              ? "This assessment is closed."
-              : new Date(openAtIso) > new Date()
-                ? `This assessment opens ${new Date(openAtIso).toLocaleDateString()}.`
-                : closeAtIso
-                  ? `This assessment closed on ${new Date(closeAtIso).toLocaleDateString()}.`
-                  : "This assessment is not currently accepting submissions."}
-        </p>
+      <div className="ty-page">
+        <header className="ty-header">
+          <span className="ty-brand">Scaling Up</span>
+          <span>Quiz unavailable</span>
+        </header>
+        <main className="ty-body">
+          <section className="ty-card">
+            <span className="hero-eyebrow">Notice</span>
+            <h1 className="ty-title">{campaignName}</h1>
+            <p className="ty-lede">
+              {status === "DRAFT"
+                ? "This assessment is not yet open."
+                : status === "CLOSED"
+                  ? "This assessment is closed."
+                  : new Date(openAtIso) > new Date()
+                    ? `This assessment opens ${new Date(openAtIso).toLocaleDateString()}.`
+                    : closeAtIso
+                      ? `This assessment closed on ${new Date(closeAtIso).toLocaleDateString()}.`
+                      : "This assessment is not currently accepting submissions."}
+            </p>
+          </section>
+        </main>
+        <footer className="ty-footer">Powered by Scaling Up</footer>
       </div>
     );
   }
@@ -187,84 +197,98 @@ export function PublicQuizClient({
 
   if (step === "info") {
     return (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (
-            firstName.trim() === "" ||
-            lastName.trim() === "" ||
-            email.trim() === ""
-          )
-            return;
-          setStep("form");
-        }}
-        className="bg-card border border-border rounded-xl p-8 space-y-4"
-      >
-        <h2 className="text-lg font-semibold text-foreground">About you</h2>
-        <p className="text-xs text-muted-foreground">
-          We&apos;ll send your results to this email.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-foreground mb-1">
-              First name
-            </label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              required
-              maxLength={100}
-              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              data-testid="quiz-first-name"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-foreground mb-1">
-              Last name
-            </label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              required
-              maxLength={100}
-              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              data-testid="quiz-last-name"
-            />
-          </div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-foreground mb-1">
-            Email
-          </label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            maxLength={320}
-            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-            data-testid="quiz-email"
-          />
-        </div>
-        <div className="flex justify-between pt-2">
-          <button
-            type="button"
-            onClick={() => setStep("intro")}
-            className="text-sm font-medium px-3 py-2 rounded-md border border-border bg-card text-foreground hover:bg-muted"
+      <div className="ty-page">
+        <header className="ty-header">
+          <span className="ty-brand">Scaling Up</span>
+          <span>Tell us about you</span>
+        </header>
+        <main className="ty-body">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (
+                firstName.trim() === "" ||
+                lastName.trim() === "" ||
+                email.trim() === ""
+              )
+                return;
+              setStep("form");
+            }}
+            className="ty-card"
+            aria-labelledby="quiz-info-title"
           >
-            Back
-          </button>
-          <button
-            type="submit"
-            className="text-sm font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-            data-testid="quiz-info-next"
-          >
-            Continue
-          </button>
-        </div>
-      </form>
+            <span className="hero-eyebrow">About you</span>
+            <h1 className="ty-title" id="quiz-info-title">
+              Tell us where to send your results
+            </h1>
+            <p className="ty-sub">
+              We&apos;ll email your scoring summary as soon as you submit.
+            </p>
+            <div className="survey-question">
+              <label className="wf-label" htmlFor="quiz-first-name-input">
+                First name
+              </label>
+              <input
+                id="quiz-first-name-input"
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+                maxLength={100}
+                className="wf-input"
+                data-testid="quiz-first-name"
+              />
+            </div>
+            <div className="survey-question">
+              <label className="wf-label" htmlFor="quiz-last-name-input">
+                Last name
+              </label>
+              <input
+                id="quiz-last-name-input"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+                maxLength={100}
+                className="wf-input"
+                data-testid="quiz-last-name"
+              />
+            </div>
+            <div className="survey-question">
+              <label className="wf-label" htmlFor="quiz-email-input">
+                Email
+              </label>
+              <input
+                id="quiz-email-input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                maxLength={320}
+                className="wf-input"
+                data-testid="quiz-email"
+              />
+            </div>
+            <div className="hero-cta-row" style={{ justifyContent: "space-between" }}>
+              <button
+                type="button"
+                onClick={() => setStep("intro")}
+                className="wf-btn wf-btn-secondary"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                className="wf-btn wf-btn-primary"
+                data-testid="quiz-info-next"
+              >
+                Continue
+              </button>
+            </div>
+          </form>
+        </main>
+        <footer className="ty-footer">Powered by Scaling Up</footer>
+      </div>
     );
   }
 
@@ -321,95 +345,110 @@ export function PublicQuizClient({
   const unsectioned = sortedQuestions.filter((q) => !q.sectionStableKey);
 
   return (
-    <div className="space-y-4">
-      <div className="bg-card border border-border rounded-xl p-6 sticky top-0 z-10">
-        <h1 className="text-lg font-semibold text-foreground">{campaignName}</h1>
-        <p className="text-xs text-muted-foreground">
+    <div className="ty-page">
+      <header className="ty-header">
+        <span className="ty-brand">Scaling Up</span>
+        <span>
           {Object.keys(answers).length} of {sortedQuestions.length} answered
           {missingRequired.length > 0
             ? ` · ${missingRequired.length} required remaining`
             : ""}
-        </p>
-      </div>
+        </span>
+      </header>
+      <main className="survey-body">
+        <div className="survey-form">
+          <section className="ty-card">
+            <span className="hero-eyebrow">Quiz</span>
+            <h1 className="ty-title">{campaignName}</h1>
+          </section>
 
-      {groups.map(({ section, questions: qs }) => (
-        <section
-          key={section.stableKey}
-          className="bg-card border border-border rounded-xl p-6 space-y-4"
-          data-testid={`quiz-section-${section.stableKey}`}
-        >
-          <div>
-            {section.partLabel && (
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                {section.partLabel}
-              </p>
-            )}
-            <h2 className="text-lg font-semibold text-foreground">{section.name}</h2>
-            {section.description && (
-              <p className="text-sm text-muted-foreground mt-1">
-                {section.description}
-              </p>
-            )}
+          {groups.map(({ section, questions: qs }) => (
+            <section
+              key={section.stableKey}
+              className="ty-card survey-section"
+              data-testid={`quiz-section-${section.stableKey}`}
+            >
+              {section.partLabel && (
+                <span className="hero-eyebrow">{section.partLabel}</span>
+              )}
+              <h2 className="survey-section-title">{section.name}</h2>
+              {section.description && (
+                <p className="survey-section-desc">{section.description}</p>
+              )}
+              {qs.map((q) => (
+                <QuestionRow
+                  key={q.stableKey}
+                  question={q}
+                  value={answers[q.stableKey]}
+                  onChange={(v) => setAnswer(q.stableKey, v)}
+                />
+              ))}
+            </section>
+          ))}
+
+          {unsectioned.length > 0 && (
+            <section className="ty-card survey-section">
+              {unsectioned.map((q) => (
+                <QuestionRow
+                  key={q.stableKey}
+                  question={q}
+                  value={answers[q.stableKey]}
+                  onChange={(v) => setAnswer(q.stableKey, v)}
+                />
+              ))}
+            </section>
+          )}
+
+          {submitError && (
+            <div className="wf-intersection-banner" style={{ background: "hsl(var(--destructive) / 0.1)", borderColor: "hsl(var(--destructive) / 0.3)", color: "hsl(var(--destructive))" }}>
+              {submitError}
+            </div>
+          )}
+
+          <div className="hero-cta-row" style={{ justifyContent: "space-between" }}>
+            <button
+              type="button"
+              onClick={() => setStep("info")}
+              disabled={submitting}
+              className="wf-btn wf-btn-secondary"
+              style={{ opacity: submitting ? 0.5 : 1 }}
+            >
+              Back
+            </button>
+        <button
+          type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit || submitting}
+              className="wf-btn wf-btn-primary"
+              style={{
+                opacity: !canSubmit || submitting ? 0.5 : 1,
+                cursor: !canSubmit || submitting ? "not-allowed" : "pointer",
+              }}
+              data-testid="quiz-submit"
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Submit
+            </button>
           </div>
-          {qs.map((q) => (
-            <QuestionRow
-              key={q.stableKey}
-              question={q}
-              value={answers[q.stableKey]}
-              onChange={(v) => setAnswer(q.stableKey, v)}
-            />
-          ))}
-        </section>
-      ))}
 
-      {unsectioned.length > 0 && (
-        <section className="bg-card border border-border rounded-xl p-6 space-y-4">
-          {unsectioned.map((q) => (
-            <QuestionRow
-              key={q.stableKey}
-              question={q}
-              value={answers[q.stableKey]}
-              onChange={(v) => setAnswer(q.stableKey, v)}
-            />
-          ))}
-        </section>
-      )}
+          {!canSubmit && (
+            <p
+              style={{
+                fontSize: "0.75rem",
+                color: "hsl(var(--muted-foreground))",
+                textAlign: "center",
+                margin: 0,
+              }}
+            >
+              Please answer all required questions before submitting.
+            </p>
+          )}
 
-      {submitError && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm px-4 py-2 rounded-md">
-          {submitError}
+          {/* Keep a hidden anchor of section names so the template name is reachable */}
+          <span className="sr-only">{sectionByKey ? "" : ""}</span>
         </div>
-      )}
-
-      <div className="flex justify-between">
-        <button
-          type="button"
-          onClick={() => setStep("info")}
-          disabled={submitting}
-          className="text-sm font-medium px-3 py-2 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!canSubmit || submitting}
-          className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          data-testid="quiz-submit"
-        >
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Submit
-        </button>
-      </div>
-
-      {!canSubmit && (
-        <p className="text-xs text-muted-foreground text-center">
-          Please answer all required questions before submitting.
-        </p>
-      )}
-
-      {/* Keep a hidden anchor of section names so the template name is reachable */}
-      <span className="sr-only">{sectionByKey ? "" : ""}</span>
+      </main>
+      <footer className="ty-footer">Powered by Scaling Up</footer>
     </div>
   );
 }
