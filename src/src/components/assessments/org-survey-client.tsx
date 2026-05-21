@@ -389,6 +389,18 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
 }
 
 async function readError(res: Response, fallback: string): Promise<string> {
+  if (res.status === 425) {
+    try {
+      const body = (await res.json()) as { error?: string; openAt?: string };
+      if (typeof body?.error === "string") return body.error;
+      if (body?.openAt) {
+        return `This survey hasn't opened yet. It opens ${new Date(body.openAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.`;
+      }
+    } catch {
+      /* fall through */
+    }
+    return "This survey hasn't opened yet.";
+  }
   if (res.status === 410) return "This survey has closed.";
   if (res.status === 404) return "Invalid link.";
   if (res.status === 401) return "Your session expired. Open the link from your email again.";

@@ -35,6 +35,18 @@ function gateFailed(): NextResponse {
   );
 }
 
+function gateNotYetOpen(openAt: Date): NextResponse {
+  return NextResponse.json(
+    {
+      success: false,
+      code: "NOT_YET_OPEN",
+      openAt: openAt.toISOString(),
+      error: `This survey hasn't opened yet. It opens ${openAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.`,
+    },
+    { status: 425, headers: NO_STORE_HEADERS }
+  );
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ campaignAlias: string }> }
@@ -89,7 +101,8 @@ export async function POST(
     if (now >= invitation.expiresAt) return gateFailed();
     if (invitation.status === "SUBMITTED") return gateFailed();
     if (invitation.campaign.status !== "ACTIVE") return gateFailed();
-    if (now < invitation.campaign.openAt) return gateFailed();
+    if (now < invitation.campaign.openAt)
+      return gateNotYetOpen(invitation.campaign.openAt);
     if (
       invitation.campaign.closeAt !== null &&
       now >= invitation.campaign.closeAt
