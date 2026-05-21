@@ -979,3 +979,79 @@
 .wf-scope .score-bar--low .score-bar__fill {
   background: hsl(var(--status-pending));
 }
+
+/* ===========================================================
+   Participant — survey form (org-survey invited flow, WF15/WF18)
+   =========================================================== */
+.wf-scope .survey-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 1.25rem;
+}
+.wf-scope .survey-form {
+  width: 100%;
+  max-width: 40rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.wf-scope .survey-section {
+  gap: 1rem;
+}
+.wf-scope .survey-section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  color: hsl(var(--foreground));
+}
+.wf-scope .survey-section-desc {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+}
+.wf-scope .survey-question-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.wf-scope .survey-question {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.wf-scope .survey-question-label {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+.wf-scope .survey-required {
+  color: hsl(var(--destructive));
+}
+.wf-scope .survey-question-help {
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+}
+.wf-scope .survey-slider {
+  width: 100%;
+}
+.wf-scope .survey-slider-anchors {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.wf-scope .survey-slider-value {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.wf-scope .survey-submit-row {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.5rem;
+}
