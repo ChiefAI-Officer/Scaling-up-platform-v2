@@ -875,41 +875,37 @@ export function TemplateEditorTabbed({
 
   return (
     <div className="space-y-6">
-      {/* ───────── Header ───────── */}
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">
-            {template.name}
-          </h2>
-          <div className="flex flex-wrap items-center gap-2">
+      {/* ───────── Header (WF16/17/18 page-header-row) ───────── */}
+      <header className="wf-page-header-row">
+        <div className="wf-page-title-block">
+          <h2 className="wf-page-title">{template.name}</h2>
+          <div className="wf-page-pill-row">
             <span
               data-testid="template-editor-version-pill"
               className={
                 isPublished
-                  ? "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-success/10 text-success ring-1 ring-success/20"
-                  : "inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-semibold bg-warning/10 text-warning ring-1 ring-warning/20"
+                  ? "wf-version-pill-published"
+                  : "wf-version-pill-draft"
               }
             >
               v{version.versionNumber} ({isPublished ? "published" : "draft"})
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+            <span className="wf-pill wf-pill-access-invited">
               {template.accessMode ?? "INVITED"}
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+            <span className="wf-pill wf-pill-agg-full">
               {template.aggregationMode}
             </span>
-            <span className="text-xs italic text-muted-foreground">
-              {caption}
-            </span>
+            <span style={{ fontStyle: "italic" }}>{caption}</span>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="wf-page-action-row">
           <button
             type="button"
             disabled
             title="Coming in v1.5"
-            className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+            className="wf-btn wf-btn-ghost wf-btn-sm"
           >
             Preview as Respondent
           </button>
@@ -917,7 +913,7 @@ export function TemplateEditorTabbed({
             type="button"
             onClick={handleSaveDraft}
             disabled={isPublished || savingDraft || !isAnyDirty}
-            className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+            className="wf-btn wf-btn-secondary wf-btn-sm"
             data-testid="template-editor-save-draft-btn"
           >
             {savingDraft ? (
@@ -930,7 +926,7 @@ export function TemplateEditorTabbed({
             onClick={handlePublish}
             disabled={isPublished || publishing}
             data-testid="template-editor-publish-btn"
-            className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded border border-primary bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="wf-btn wf-btn-primary wf-btn-sm"
           >
             {publishing ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -940,9 +936,20 @@ export function TemplateEditorTabbed({
         </div>
       </header>
 
-      {/* Read-only banner (matches AssessmentVersionEditor copy). */}
+      {/* Read-only banner. */}
       {isPublished && (
-        <div className="rounded-md border border-border bg-muted/40 px-4 py-3 text-xs italic text-muted-foreground">
+        <div
+          style={{
+            borderRadius: "6px",
+            border: "1px solid hsl(var(--border))",
+            background: "hsl(var(--muted) / 0.4)",
+            padding: "0.75rem 1rem",
+            fontSize: "0.75rem",
+            fontStyle: "italic",
+            color: "hsl(var(--muted-foreground))",
+            marginBottom: "1.5rem",
+          }}
+        >
           Published versions are read-only. Duplicate this version into a
           new draft from the template detail page to evolve the content.
         </div>
