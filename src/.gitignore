@@ -46,3 +46,4 @@ next-env.d.ts
 # prisma local dev databases
 prisma/*.db
 prisma/*.db-journal
+.snapshots/
