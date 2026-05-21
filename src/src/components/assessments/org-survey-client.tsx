@@ -206,20 +206,39 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
 
   if (phase.kind === "exchanging" || phase.kind === "loading") {
     return (
-      <main className="max-w-2xl mx-auto px-6 py-16">
-        <p className="text-slate-500">Loading your survey…</p>
-      </main>
+      <div className="ty-page">
+        <header className="ty-header">
+          <span className="ty-brand">Scaling Up</span>
+          <span>Loading…</span>
+        </header>
+        <main className="ty-body">
+          <section className="ty-card">
+            <span className="hero-eyebrow">Loading</span>
+            <h1 className="ty-title">Opening your survey…</h1>
+            <p className="ty-lede">One moment while we verify your link.</p>
+          </section>
+        </main>
+        <footer className="ty-footer">Powered by Scaling Up</footer>
+      </div>
     );
   }
 
   if (phase.kind === "error") {
     return (
-      <main className="max-w-2xl mx-auto px-6 py-16">
-        <h1 className="text-2xl font-semibold text-slate-900 mb-2">
-          We can&apos;t open this survey
-        </h1>
-        <p className="text-slate-700">{phase.message}</p>
-      </main>
+      <div className="ty-page">
+        <header className="ty-header">
+          <span className="ty-brand">Scaling Up</span>
+          <span>Survey link error</span>
+        </header>
+        <main className="ty-body">
+          <section className="ty-card">
+            <span className="hero-eyebrow">Notice</span>
+            <h1 className="ty-title">We can&apos;t open this survey</h1>
+            <p className="ty-lede">{phase.message}</p>
+          </section>
+        </main>
+        <footer className="ty-footer">Powered by Scaling Up</footer>
+      </div>
     );
   }
 
@@ -227,83 +246,97 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   const data = phase.data;
 
   return (
-    <main className="max-w-2xl mx-auto px-6 py-12">
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold text-slate-900">
-          {data.campaign.name}
-        </h1>
-        <p className="text-slate-600 mt-2 text-sm">
-          Please rate each item below and submit when you&apos;re done.
-        </p>
+    <div className="ty-page">
+      <header className="ty-header">
+        <span className="ty-brand">Scaling Up</span>
+        <span>{data.campaign.name}</span>
       </header>
-      <form onSubmit={handleSubmit} className="space-y-10">
-        {sortedSections.map((section) => {
-          const list = questionsBySection.get(section.stableKey) ?? [];
-          if (list.length === 0) return null;
-          return (
-            <section key={section.stableKey} className="space-y-4">
-              <h2 className="text-lg font-medium text-slate-900">
-                {section.partLabel ? `${section.partLabel}: ` : ""}
-                {section.name}
-              </h2>
-              {section.description ? (
-                <p className="text-sm text-slate-600">{section.description}</p>
-              ) : null}
-              <ul className="space-y-6">
-                {list.map((q) => (
-                  <li key={q.stableKey} className="space-y-2">
-                    <label
-                      htmlFor={`q-${q.stableKey}`}
-                      className="block text-sm font-medium text-slate-800"
-                    >
-                      {q.label}
-                      {q.isRequired ? <span className="text-rose-500"> *</span> : null}
-                    </label>
-                    {q.helpText ? (
-                      <p className="text-xs text-slate-500">{q.helpText}</p>
-                    ) : null}
-                    <input
-                      id={`q-${q.stableKey}`}
-                      type="range"
-                      min={q.scale.min}
-                      max={q.scale.max}
-                      step={q.scale.step}
-                      value={answers[q.stableKey] ?? q.scale.min}
-                      onChange={(e) =>
-                        setAnswers((prev) => ({
-                          ...prev,
-                          [q.stableKey]: Number(e.target.value),
-                        }))
-                      }
-                      className="w-full"
-                      aria-valuemin={q.scale.min}
-                      aria-valuemax={q.scale.max}
-                      aria-valuenow={answers[q.stableKey] ?? q.scale.min}
-                    />
-                    <div className="flex justify-between text-xs text-slate-500">
-                      <span>{q.scale.anchorMin}</span>
-                      <span className="font-medium text-slate-700">
-                        {answers[q.stableKey] !== undefined
-                          ? answers[q.stableKey]
-                          : "—"}
-                      </span>
-                      <span>{q.scale.anchorMax}</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          );
-        })}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="inline-flex items-center justify-center rounded-md bg-blue-700 px-6 py-3 text-white font-medium hover:bg-blue-800 disabled:bg-slate-400"
-        >
-          {submitting ? "Submitting…" : "Submit"}
-        </button>
-      </form>
-    </main>
+      <main className="survey-body">
+        <form onSubmit={handleSubmit} className="survey-form">
+          <section className="ty-card" aria-labelledby="survey-title">
+            <span className="hero-eyebrow">Survey</span>
+            <h1 className="ty-title" id="survey-title">
+              {data.campaign.name}
+            </h1>
+            <p className="ty-lede">
+              Please rate each item below and submit when you&apos;re done.
+            </p>
+          </section>
+
+          {sortedSections.map((section) => {
+            const list = questionsBySection.get(section.stableKey) ?? [];
+            if (list.length === 0) return null;
+            return (
+              <section key={section.stableKey} className="ty-card survey-section">
+                <h2 className="survey-section-title">
+                  {section.partLabel ? `${section.partLabel}: ` : ""}
+                  {section.name}
+                </h2>
+                {section.description ? (
+                  <p className="survey-section-desc">{section.description}</p>
+                ) : null}
+                <ul className="survey-question-list">
+                  {list.map((q) => (
+                    <li key={q.stableKey} className="survey-question">
+                      <label
+                        htmlFor={`q-${q.stableKey}`}
+                        className="survey-question-label"
+                      >
+                        {q.label}
+                        {q.isRequired ? (
+                          <span className="survey-required"> *</span>
+                        ) : null}
+                      </label>
+                      {q.helpText ? (
+                        <p className="survey-question-help">{q.helpText}</p>
+                      ) : null}
+                      <input
+                        id={`q-${q.stableKey}`}
+                        type="range"
+                        min={q.scale.min}
+                        max={q.scale.max}
+                        step={q.scale.step}
+                        value={answers[q.stableKey] ?? q.scale.min}
+                        onChange={(e) =>
+                          setAnswers((prev) => ({
+                            ...prev,
+                            [q.stableKey]: Number(e.target.value),
+                          }))
+                        }
+                        className="survey-slider"
+                        aria-valuemin={q.scale.min}
+                        aria-valuemax={q.scale.max}
+                        aria-valuenow={answers[q.stableKey] ?? q.scale.min}
+                      />
+                      <div className="survey-slider-anchors">
+                        <span>{q.scale.anchorMin}</span>
+                        <span className="survey-slider-value">
+                          {answers[q.stableKey] !== undefined
+                            ? answers[q.stableKey]
+                            : "—"}
+                        </span>
+                        <span>{q.scale.anchorMax}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+
+          <div className="survey-submit-row">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="wf-btn wf-btn-primary"
+            >
+              {submitting ? "Submitting…" : "Submit"}
+            </button>
+          </div>
+        </form>
+      </main>
+      <footer className="ty-footer">Powered by Scaling Up</footer>
+    </div>
   );
 }
 
