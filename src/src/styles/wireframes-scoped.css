@@ -1055,3 +1055,70 @@
   justify-content: center;
   padding-top: 0.5rem;
 }
+
+/* ===========================================================
+   Wizard stepper (WF20 admin public quiz wizard + campaign wizard)
+   =========================================================== */
+.wf-scope .wf-stepper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: 1.25rem 1.5rem;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+  margin-bottom: 1.5rem;
+}
+.wf-scope .wf-stepper-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+.wf-scope .wf-stepper-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  border: 2px solid hsl(var(--border));
+  z-index: 1;
+}
+.wf-scope .wf-stepper-item.is-active .wf-stepper-circle,
+.wf-scope .wf-stepper-item.is-done .wf-stepper-circle {
+  background: hsl(var(--primary));
+  color: white;
+  border-color: hsl(var(--primary));
+}
+.wf-scope .wf-stepper-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+}
+.wf-scope .wf-stepper-item.is-active .wf-stepper-label,
+.wf-scope .wf-stepper-item.is-done .wf-stepper-label {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+.wf-scope .wf-stepper-item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 18px;
+  left: calc(50% + 18px);
+  right: calc(-50% + 18px);
+  height: 2px;
+  background: hsl(var(--border));
+  z-index: 0;
+}
+.wf-scope .wf-stepper-item.is-done:not(:last-child)::after {
+  background: hsl(var(--primary));
+}

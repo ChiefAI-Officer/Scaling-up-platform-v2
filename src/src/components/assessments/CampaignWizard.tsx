@@ -105,52 +105,23 @@ const STEPS = [
 
 function StepIndicator({ current }: { current: number }) {
   return (
-    <div className="mb-8">
-      <ol className="flex items-center w-full">
-        {STEPS.map((s, i) => {
-          const done = current > s.id;
-          const active = current === s.id;
-          return (
-            <li
-              key={s.id}
-              className={`flex items-center ${
-                i < STEPS.length - 1 ? "flex-1" : ""
-              }`}
-            >
-              <div
-                className={`flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-semibold transition-colors ${
-                  done
-                    ? "bg-primary border-primary text-primary-foreground"
-                    : active
-                      ? "bg-card border-primary text-primary"
-                      : "bg-card border-border text-muted-foreground"
-                }`}
-              >
-                {done ? <Check className="w-4 h-4" /> : s.id + 1}
-              </div>
-              <span
-                className={`ml-2 text-xs font-medium hidden sm:inline ${
-                  active
-                    ? "text-primary"
-                    : done
-                      ? "text-foreground"
-                      : "text-muted-foreground"
-                }`}
-              >
-                {s.title}
-              </span>
-              {i < STEPS.length - 1 && (
-                <div
-                  className={`flex-1 h-0.5 mx-2 ${
-                    done ? "bg-primary" : "bg-border"
-                  }`}
-                />
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+    <ol className="wf-stepper">
+      {STEPS.map((s) => {
+        const done = current > s.id;
+        const active = current === s.id;
+        const itemCls = `wf-stepper-item${active ? " is-active" : ""}${
+          done ? " is-done" : ""
+        }`;
+        return (
+          <li key={s.id} className={itemCls}>
+            <div className="wf-stepper-circle">
+              {done ? <Check className="w-4 h-4" /> : s.id + 1}
+            </div>
+            <span className="wf-stepper-label">{s.title}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
