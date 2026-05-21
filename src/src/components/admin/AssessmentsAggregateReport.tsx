@@ -314,7 +314,8 @@ export function AssessmentsAggregateReport() {
 
           {/* Operator-mode banner */}
           <div
-            className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning-foreground"
+            className="wf-intersection-banner"
+            style={{ padding: "0.5rem 0.75rem", fontSize: "0.875rem" }}
             role="status"
           >
             <strong className="font-semibold">Admin operator mode.</strong>{" "}
@@ -565,7 +566,8 @@ function ExportLink({
       <button
         type="button"
         disabled
-        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border bg-muted text-muted-foreground opacity-60 cursor-not-allowed"
+        className="wf-btn wf-btn-secondary"
+        style={{ opacity: 0.6, cursor: "not-allowed" }}
         data-testid={testId}
       >
         {label}
@@ -578,7 +580,7 @@ function ExportLink({
     <a
       href={`${path}?${qs}`}
       download
-      className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border bg-card text-foreground hover:bg-muted transition-colors"
+      className="wf-btn wf-btn-secondary"
       data-testid={testId}
     >
       {label}
@@ -594,15 +596,9 @@ function StatCard({
   value: string | number;
 }) {
   return (
-    <Card>
-      <CardContent className="py-4">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-1 text-2xl font-bold text-foreground tabular-nums">
-          {value}
-        </p>
-      </CardContent>
-    </Card>
+    <div className="wf-stat-card">
+      <div className="wf-stat-label">{label}</div>
+      <div className="wf-stat-value tabular-nums">{value}</div>
+    </div>
   );
 }
