@@ -6,6 +6,87 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-21 — Admin template editor wireframe rebuild + production data protection scaffold <!-- ENTRY_ISO:2026-05-21 ENTRY_SLUG:assessment-editor-wireframe-rebuild-plus-data-protection -->
+
+**Single squash commit on main:** `35ee73b` (36 files changed, +8620/−1146). Replaces 19 commits on `feat/assessment-e1-tier-editor` (E1 foundation 6 commits + 12 wireframe rebuild + 1 data protection).
+
+#### Why this rebuild
+
+Phase E1 (May 20) shipped per-domain tier UI + publish failure modal as an extension to the existing single-page `AssessmentVersionEditor.tsx`. User review on May 20 PM revealed the existing editor did not match Jeff-approved wireframes WF16/17/18 (May 15 approval). Wireframes were in the repo the whole time but were not opened during E1 planning. New process rule saved to memory: `feedback_wireframes_are_the_spec.md` — before scoping any admin/portal UI work, open `src/public/wireframes-phase2/admin/*.html` first. The wireframe IS the spec; current implementation is irrelevant as a baseline.
+
+#### Editor rebuild
+
+New 7-tab editor under `src/src/components/admin/`:
+- `TemplateEditorTabbed.tsx` — editor shell (persistent header + 7-tab nav + URL `?tab=` persistence)
+- `template-editor/MetadataTab.tsx` — WF16 2-column body
+- `template-editor/SectionsTab.tsx` + `SectionsCard.tsx` — Sections (shared card between Metadata right column + standalone Sections tab)
+- `template-editor/QuestionsTab.tsx` — WF17 3-column layout
+- `template-editor/ScoringTiersTab.tsx` — WF18 tier table + per-domain extension (Gap D)
+- `template-editor/VersionsTab.tsx` — version history with per-row Edit/Duplicate/Publish
+- `ui/tabs.tsx` — shadcn tabs primitive, Tailwind-restyled to WF16 `wf-tab` bottom-border-on-active pattern
+
+**Tab order (verbatim from WF16 lines 805–815):**
+Metadata · Sections · Questions · Scoring & Tiers · Conditional Logic [v1.5 disabled] · Access [nav-link to `/admin/assessments/access-groups`] · Versions
+
+**WF16 Metadata tab** — 2-column body (60/40 on `lg:`+): Template Metadata + Invitation Email + Results Email cards left, Sections card right, Version History strip below.
+
+**WF17 Questions tab** — 3-column sticky layout (20% / 50% / 30%): section navigator / question list (drag-sortable via @dnd-kit) / per-question config form with SLIDER_LIKERT editable; NUMBER + MULTI_CHOICE accordions ghosted with v1.5 badges (Question Type dropdown HTML-disables them per grill Q9); v1.5 informational cards (TEXT/TEXTAREA/COMPOUND) below the grid.
+
+**WF18 Scoring & Tiers tab:** Scoring Configuration card (Tier Metric select + Pass Threshold) + Tiers table (Order/minMetric/maxMetric/Label/Message/Action) + 4-bullet validation hint card + inline alert on gap/overlap (metric-mode-aware) + live midpoint-answer preview via existing `scoreSubmission` engine + **per-domain tiers sub-section (Gap D, D2 extension)** when `scoringConfig.domains[]` is present (SU Full only) + deferred Conditional Sections + Peer Benchmarks ghost cards + explanation card verbatim.
+
+**Versions tab:** version-history table (newest first) with per-row Edit (draft only) / Duplicate / Publish (draft only); Publish handler lifted to shell, same E1.2 `PublishFailureModal` wiring; current draft highlighted with `(you are here)` caption.
+
+**Schema additive only** (migration `20260520180000_add_results_email_to_template`): 3 nullable fields on `AssessmentTemplate` — `resultsEmailSubject`, `resultsEmailBodyMarkdown`, `resultsEmailContentApproved`.
+
+**Detail-route redirect** (F6 + grill Q6): `/admin/assessments/templates/[id]/page.tsx` redirects to `.../versions/{latestVersionId}/edit?tab=versions`.
+
+**E1 engine work preserved byte-for-byte:** `validateTierTiling`, `assertTierTiling`, `computePerDomainTierContexts`, `TemplateVersionForPublishSchema` per-domain refine, runtime `scoreSubmission` per-domain check, `PublishFailureModal.tsx`.
+
+**Live app nav UNTOUCHED.** No nav/sidebar/layout files modified in the rebuild commits. Editor mounts inside the existing `AssessmentsSidebar` lane (shipped pre-E1 per WF24). Wireframe chrome (dark "Scaling Up" sidebar, custom breadcrumbs) is mockup-only — NOT replicated in production per explicit user constraint.
+
+**Process:** 10 grill-locked decisions (Results Email schema / explicit Save Draft / shadcn tabs + restyle / Access nav-link / Sections own tab / detail URL redirect / live midpoint preview / @dnd-kit drag / NUMBER+MULTI_CHOICE disabled / per-tab checkpoints) + 5 per-tab Codex review checkpoints (1a → 1b → 2 → 3 → 4 → F7 cleanup) all wireframe-fidelity reviewer-approved with minor deviations explicitly accepted (current-draft ring uses primary not warning to avoid amber-on-amber collision; section name editable input vs WF plain text per plan F2; live preview replaces static fixture; Required toggle native checkbox vs WF custom switch for a11y; drag handles + up/down arrow a11y fallback retained on Sections).
+
+**TDD inside SDD** — implementer subagent writes failing tests first, watches them fail, then makes green; wireframe-fidelity reviewer subagent verifies WF-verbatim labels/layouts + TDD process. ~100 new tests across 6 tab-component test suites.
+
+**Codex adversarial plan review** (May 20): 8 findings, 7 accepted (Access tab consistency, Sections tab explicit deliverable, save-strategy cleanup, F6 defers delete to F7, checkpoint 1 split into 1a + 1b, subagent simplification, no-blind-shadcn pre-flight, test-rewrite vs delete). 1 override with rationale (Results Email schema field stays on Template not Version — invitation precedent + schema consistency).
+
+**F7 cleanup** — deleted deprecated `AssessmentVersionEditor.tsx` (1,586 LOC) + 3 E1 test files whose behavior is replicated by new tab-component tests.
+
+**Playwright verification** (May 21): logged in via admin → navigated to `/admin/assessments/templates/{rockefellerId}` → confirmed F6 redirect to `.../edit?tab=versions` → screenshots of Versions tab + Metadata tab match WF16 content with live-app top nav + AssessmentsSidebar lane intact.
+
+#### Production data protection scaffold
+
+Five layered protections so manually-configured prod data (Surveys / Workflows / Coaches / Assessment Templates / etc.) survives future schema changes:
+
+1. **Pre-deploy snapshot** — `npm run snapshot:prod` (`src/scripts/snapshot-prod-tables.ts`) exports 22 critical tables to `.snapshots/snapshot-YYYY-MM-DD-HHmmss.json`. Belt-and-suspenders alongside Neon's continuous backups (point-in-time recovery). `.snapshots/` added to `.gitignore` (PII; local-only).
+
+2. **Restore tool** — `npm run restore:from-snapshot <file> [--table=<TableName>]` (`src/scripts/restore-from-snapshot.ts`). Upsert-by-id so additive prod activity isn't blown away. For true point-in-time recovery (including row reverts), use Neon PITR via dashboard.
+
+3. **Migration safety gate** — `npm run db:check-migrations` (`src/scripts/check-migration-safety.mjs`) greps every migration.sql for `DROP TABLE` / `DROP COLUMN` / `TRUNCATE` / `DELETE FROM` / `ALTER COLUMN ... DROP`. Fails (exit 1) on any unapproved destructive op. Escape hatch: `-- @approved: <reason>` comment immediately preceding the destructive SQL. macOS `/var` → `/private/var` realpath fix on the CLI entrypoint check. 7 unit tests via `execFileSync` against tmp migration dirs. **One legacy destructive op retroactively approved**: `20260401000000_add_workshop_cascade_deletes` step 1 (`DELETE FROM workflow_step_executions WHERE workshopId NOT IN ...`) — orphan cleanup required before adding the FK CASCADE in step 2; targets only orphans, no operator data at risk.
+
+4. **`db:push` env-guard** — `src/scripts/guard-db-push.mjs` wraps `npm run db:push` and blocks Neon-host DATABASE_URLs (`prisma db push` skips the migrations table and can drop columns on schema divergence). Override: `npm run db:push -- --i-know-this-is-prod`.
+
+5. **Runbook** — [docs/runbooks/database-protection.md](docs/runbooks/database-protection.md) covering layered-protections table, pre-deploy checklist, Neon PITR restore procedure, snapshot restore, destructive-migration approval workflow, snapshot PII housekeeping.
+
+#### Build + test gates
+
+- `CI=true npx next build --turbopack` ✓
+- 494/494 tests across 49 suites green
+- Migration safety check ran against all 29 migrations on main — 0 unapproved destructive ops after the legacy approval
+
+#### Known follow-ons (deferred)
+
+- Create flow at `/admin/assessments/templates/new` still uses old flat `AssessmentTemplateForm.tsx` (out of scope per pre-grill). Convert to tabbed editor in "create mode" as separate phase if needed.
+- Conditional Sections + Peer Benchmarks editors (deferred placeholders only per WF18 — v1.5)
+- NUMBER / MULTI_CHOICE / TEXT / TEXTAREA / COMPOUND question type editors (ghosted per WF17 — v1.5)
+- Results Email content-approval toggle persists per-template Boolean; env-var content gate (`INVITED_RESULTS_EMAIL_COPY_APPROVED`) NOT used (per Gap B decision)
+- Results Email fields on Template not Version — flagged by Codex as schema smell; precedent-consistent with invitation fields. Known follow-on if Jeff wants version-scoped email copy.
+- Coach-side wireframes don't exist in Phase 2 (admin + participant only); coach portal changes are separate scope
+
+Plan: `~/.claude/plans/yes-we-were-in-cosmic-jellyfish.md`
+
+---
+
 ### 2026-05-20 — Assessment Tool v7.6 Phase D2 — engine extension + Scaling Up Full seed (DRAFT) <!-- ENTRY_ISO:2026-05-20 ENTRY_SLUG:assessment-v7-6-d2-engine-extension-su-full-seed -->
 
 **Context.** D1 shipped the QSP v1/v2 seeds + the Rockefeller engine path. Phase D2 extends the scoring engine to support Jeff's flagship product — the Scaling Up Full assessment, which has 5 domains (People / Strategy / Execution / Cash / You), 10 nested sections, ~65 questions on a 0–10 SLIDER_LIKERT scale, per-question score-band narratives, and a 0–100 ScaleUp Score on the profile page. The engine pre-D2 only supported flat per-section scoring with template-level tier resolution; the D1 QSP seeds also had a runtime-breaking `scoringConfig` field-name drift that would throw on any submission scoring attempt.
