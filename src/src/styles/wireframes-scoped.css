@@ -1,0 +1,981 @@
+/* ===========================================================
+   wireframes-scoped.css
+   Copied verbatim from src/public/wireframes-phase2/_shared.css
+   and scoped under .wf-scope so wireframe styles only apply
+   inside the assessment-lane wrapper. Tokens in :root are
+   stripped (redundant with globals.css HSL values).
+   =========================================================== */
+
+/* Plus Jakarta Sans — used by all wireframes */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* Scoped base — applies only inside .wf-scope */
+.wf-scope {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv11", "ss01";
+}
+
+.wf-scope * {
+  box-sizing: border-box;
+  border-color: hsl(var(--border));
+}
+
+/* ===========================================================
+   Wireframe banner — yellow alert at top (not used in app)
+   =========================================================== */
+.wf-scope .wf-banner {
+  background: hsl(38 92% 95%);
+  border-bottom: 1px solid hsl(38 92% 80%);
+  color: hsl(26 83% 25%);
+  padding: 0.5rem 1.5rem;
+  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.wf-scope .wf-banner strong { font-weight: 700; }
+.wf-scope .wf-banner a {
+  color: hsl(26 83% 25%);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+/* ===========================================================
+   Back-to-index link
+   =========================================================== */
+.wf-scope .wf-back-to-index {
+  font-size: 0.8125rem;
+  color: hsl(var(--primary));
+  text-decoration: none;
+  font-weight: 500;
+}
+.wf-scope .wf-back-to-index:hover { text-decoration: underline; }
+
+/* ===========================================================
+   Page header
+   =========================================================== */
+.wf-scope .wf-page-header {
+  margin-bottom: 1.5rem;
+}
+.wf-scope .wf-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.25rem;
+}
+.wf-scope .wf-page-subtitle {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9375rem;
+  margin: 0;
+}
+
+/* Page-header row used on editor screens — title block + pills + actions */
+.wf-scope .wf-page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.wf-scope .wf-page-title-block h2,
+.wf-scope .wf-page-title-block .wf-page-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: hsl(var(--foreground));
+}
+.wf-scope .wf-page-pill-row {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+}
+.wf-scope .wf-page-action-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* ===========================================================
+   Card
+   =========================================================== */
+.wf-scope .wf-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
+}
+.wf-scope .wf-card-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.wf-scope .wf-card-head {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.wf-scope .wf-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.125rem;
+}
+.wf-scope .wf-card-subtitle,
+.wf-scope .wf-card-description {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  margin: 0;
+}
+.wf-scope .wf-card-body { padding: 1.5rem; }
+.wf-scope .wf-card-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid hsl(var(--border));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* ===========================================================
+   Buttons
+   =========================================================== */
+.wf-scope .wf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 150ms;
+  white-space: nowrap;
+}
+.wf-scope .wf-btn-primary {
+  background: hsl(var(--primary));
+  color: white;
+}
+.wf-scope .wf-btn-primary:hover {
+  background: hsl(224 76% 42%);
+  box-shadow: var(--shadow-sm);
+}
+.wf-scope .wf-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.wf-scope .wf-btn-secondary {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+.wf-scope .wf-btn-secondary:hover { background: hsl(var(--muted)); }
+.wf-scope .wf-btn-ghost {
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}
+.wf-scope .wf-btn-ghost:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+.wf-scope .wf-btn-destructive {
+  background: transparent;
+  color: hsl(var(--destructive));
+  border-color: transparent;
+}
+.wf-scope .wf-btn-destructive:hover {
+  background: hsl(var(--destructive) / 0.1);
+}
+
+/* Compact (sm) variant for header buttons */
+.wf-scope .wf-btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem;
+}
+/* Extra small */
+.wf-scope .wf-btn-xs {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* ===========================================================
+   Status pills
+   =========================================================== */
+.wf-scope .wf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.wf-scope .wf-pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.wf-scope .wf-pill-pending { background: hsl(0 0% 95%); color: hsl(0 0% 30%); }
+.wf-scope .wf-pill-pending::before { background: hsl(var(--status-pending)); }
+.wf-scope .wf-pill-sent { background: hsl(224 76% 95%); color: hsl(224 76% 35%); }
+.wf-scope .wf-pill-sent::before { background: hsl(var(--status-sent)); }
+.wf-scope .wf-pill-viewed { background: hsl(38 92% 95%); color: hsl(26 83% 25%); }
+.wf-scope .wf-pill-viewed::before { background: hsl(var(--status-viewed)); }
+.wf-scope .wf-pill-submitted { background: hsl(160 84% 95%); color: hsl(160 84% 22%); }
+.wf-scope .wf-pill-submitted::before { background: hsl(var(--status-submitted)); }
+.wf-scope .wf-pill-revoked { background: hsl(0 84% 95%); color: hsl(0 84% 30%); }
+.wf-scope .wf-pill-revoked::before { background: hsl(var(--status-revoked)); }
+
+/* Tier pills */
+.wf-scope .wf-pill-tier-low { background: hsl(0 84% 95%); color: hsl(0 84% 30%); }
+.wf-scope .wf-pill-tier-low::before { background: hsl(var(--tier-low)); }
+.wf-scope .wf-pill-tier-ok { background: hsl(38 92% 95%); color: hsl(26 83% 25%); }
+.wf-scope .wf-pill-tier-ok::before { background: hsl(var(--tier-ok)); }
+.wf-scope .wf-pill-tier-great { background: hsl(160 84% 95%); color: hsl(160 84% 22%); }
+.wf-scope .wf-pill-tier-great::before { background: hsl(var(--tier-great)); }
+
+/* Access pills */
+.wf-scope .wf-pill-access-invited { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); }
+.wf-scope .wf-pill-access-invited::before { background: hsl(var(--primary)); }
+.wf-scope .wf-pill-access-public { background: hsl(280 80% 95%); color: hsl(280 50% 35%); }
+.wf-scope .wf-pill-access-public::before { background: hsl(280 50% 45%); }
+
+/* Aggregation pills */
+.wf-scope .wf-pill-agg-full { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+.wf-scope .wf-pill-agg-full::before { background: hsl(var(--muted-foreground)); }
+.wf-scope .wf-pill-agg-ceo { background: hsl(280 80% 95%); color: hsl(280 50% 35%); }
+.wf-scope .wf-pill-agg-ceo::before { background: hsl(280 50% 45%); }
+
+/* Version pills */
+.wf-scope .wf-version-pill-draft {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: hsl(var(--warning) / 0.18);
+  color: hsl(var(--warning-foreground));
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.wf-scope .wf-version-pill-published {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: hsl(var(--success) / 0.15);
+  color: hsl(160 84% 22%);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ===========================================================
+   Table
+   =========================================================== */
+.wf-scope .wf-table-wrap {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.wf-scope .wf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.wf-scope .wf-table thead {
+  background: hsl(var(--muted) / 0.5);
+}
+.wf-scope .wf-table th {
+  text-align: left;
+  padding: 0.625rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: hsl(var(--muted-foreground));
+  border-bottom: 1px solid hsl(var(--border));
+}
+.wf-scope .wf-table td {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid hsl(var(--border));
+  vertical-align: middle;
+}
+.wf-scope .wf-table tbody tr:hover {
+  background: hsl(var(--muted) / 0.3);
+}
+.wf-scope .wf-table-head {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid hsl(var(--border));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.wf-scope .wf-table-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0 0 0.125rem;
+}
+.wf-scope .wf-table-subtitle {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+/* ===========================================================
+   Inputs / labels
+   =========================================================== */
+.wf-scope .wf-field { margin-bottom: 1rem; }
+.wf-scope .wf-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  margin-bottom: 0.375rem;
+}
+.wf-scope .wf-label-helper {
+  font-weight: 400;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+}
+.wf-scope .wf-input,
+.wf-scope .wf-textarea,
+.wf-scope .wf-select {
+  width: 100%;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: hsl(var(--foreground));
+}
+.wf-scope .wf-input:focus,
+.wf-scope .wf-textarea:focus,
+.wf-scope .wf-select:focus {
+  outline: 2px solid hsl(var(--primary) / 0.4);
+  outline-offset: -1px;
+  border-color: hsl(var(--primary));
+}
+.wf-scope .wf-textarea { resize: vertical; min-height: 5rem; }
+.wf-scope .wf-helper-text {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.375rem;
+}
+
+/* ===========================================================
+   Breadcrumb
+   =========================================================== */
+.wf-scope .wf-breadcrumb {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.wf-scope .wf-breadcrumb a {
+  color: hsl(var(--muted-foreground));
+  text-decoration: none;
+}
+.wf-scope .wf-breadcrumb a:hover {
+  color: hsl(var(--foreground));
+  text-decoration: underline;
+}
+.wf-scope .wf-breadcrumb-current {
+  color: hsl(var(--foreground));
+  font-weight: 500;
+}
+.wf-scope .wf-breadcrumb-sep { opacity: 0.5; }
+
+/* ===========================================================
+   Helper utilities (verbatim from _shared.css)
+   =========================================================== */
+.wf-scope .wf-text-sm { font-size: 0.875rem; }
+.wf-scope .wf-text-xs { font-size: 0.75rem; }
+.wf-scope .wf-text-muted { color: hsl(var(--muted-foreground)); }
+.wf-scope .wf-text-primary { color: hsl(var(--primary)); }
+.wf-scope .wf-font-medium { font-weight: 500; }
+.wf-scope .wf-font-semibold { font-weight: 600; }
+.wf-scope .wf-font-bold { font-weight: 700; }
+.wf-scope .wf-mb-1 { margin-bottom: 0.5rem; }
+.wf-scope .wf-mb-2 { margin-bottom: 1rem; }
+.wf-scope .wf-mb-3 { margin-bottom: 1.5rem; }
+.wf-scope .wf-mb-4 { margin-bottom: 2rem; }
+
+/* ===========================================================
+   WF16/17/18 — Tab nav (template editor sub-nav)
+   =========================================================== */
+.wf-scope .wf-tabnav {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  border-bottom: 1px solid hsl(var(--border));
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+}
+.wf-scope .wf-tab {
+  padding: 0.625rem 0.125rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: transparent;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.wf-scope .wf-tab:hover { color: hsl(var(--foreground)); }
+.wf-scope .wf-tab.is-active,
+.wf-scope .wf-tab[data-state="active"] {
+  color: hsl(var(--primary));
+  font-weight: 600;
+  border-bottom-color: hsl(var(--primary));
+}
+.wf-scope .wf-tab.is-disabled,
+.wf-scope .wf-tab[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.wf-scope .wf-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.0625rem 0.3125rem;
+  border-radius: 4px;
+  background: hsl(var(--warning) / 0.18);
+  color: hsl(var(--warning-foreground));
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+/* ===========================================================
+   WF16 — Metadata + Sections specifics
+   =========================================================== */
+.wf-scope .wf-grid-60-40 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+@media (min-width: 1024px) {
+  .wf-scope .wf-grid-60-40 {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+.wf-scope .wf-radio-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+.wf-scope .wf-radio-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--background));
+  cursor: pointer;
+}
+.wf-scope .wf-radio-option.is-selected {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.04);
+}
+.wf-scope .wf-radio-option.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.wf-scope .wf-radio-option-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  font-size: 0.875rem;
+}
+.wf-scope .wf-radio-option-caption {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.wf-scope .wf-vars-panel {
+  margin-top: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  background: hsl(var(--muted) / 0.4);
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.wf-scope .wf-var-token {
+  font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--card));
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  border: 1px solid hsl(var(--border));
+}
+.wf-scope .wf-vars-label {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  font-weight: 600;
+  width: 100%;
+  margin-bottom: 0.125rem;
+}
+.wf-scope .wf-version-history-strip {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+}
+.wf-scope .wf-version-card {
+  padding: 0.625rem 0.875rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--card));
+  font-size: 0.75rem;
+  min-width: 14rem;
+}
+.wf-scope .wf-version-card.is-current {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15);
+}
+.wf-scope .wf-section-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.wf-scope .wf-section-row:last-child { border-bottom: none; }
+.wf-scope .wf-section-key-badge {
+  font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+.wf-scope .wf-section-count-badge {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+}
+.wf-scope .wf-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+/* ===========================================================
+   WF14 — Templates list specifics
+   =========================================================== */
+.wf-scope .wf-page-subtitle-strong {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9375rem;
+  margin: 0.25rem 0 0;
+  max-width: 56rem;
+}
+.wf-scope .wf-cta-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.375rem;
+}
+.wf-scope .wf-cta-helper {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.wf-scope .wf-version-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.0625rem 0.3125rem;
+  border-radius: 4px;
+  background: hsl(var(--warning) / 0.18);
+  color: hsl(var(--warning-foreground));
+  font-size: 0.625rem;
+  font-weight: 700;
+  margin-left: 0.375rem;
+}
+.wf-scope .wf-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+.wf-scope .wf-stat-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.wf-scope .wf-stat-label {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.wf-scope .wf-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.wf-scope .wf-table-name {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.wf-scope .wf-table-meta {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.8125rem;
+}
+.wf-scope .wf-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+.wf-scope .wf-action-link {
+  color: hsl(var(--primary));
+  text-decoration: none;
+  font-weight: 500;
+}
+.wf-scope .wf-action-link:hover { text-decoration: underline; }
+.wf-scope .wf-action-link-destructive {
+  color: hsl(var(--destructive));
+  text-decoration: none;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+.wf-scope .wf-action-link-destructive:hover { text-decoration: underline; }
+.wf-scope .wf-action-link-destructive:disabled { opacity: 0.5; cursor: not-allowed; }
+.wf-scope .wf-action-sep {
+  color: hsl(var(--muted-foreground));
+  opacity: 0.5;
+}
+.wf-scope .wf-pill-status-active {
+  background: hsl(160 84% 95%);
+  color: hsl(160 84% 22%);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.wf-scope .wf-pill-status-pending {
+  background: hsl(38 92% 95%);
+  color: hsl(26 83% 25%);
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* ===========================================================
+   WF23 — Aggregate report specifics
+   =========================================================== */
+.wf-scope .wf-intersection-banner {
+  background: hsl(38 92% 95%);
+  border: 1px solid hsl(38 92% 80%);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  color: hsl(26 83% 25%);
+  margin-bottom: 1.5rem;
+}
+.wf-scope .wf-intersection-banner strong { font-weight: 700; }
+.wf-scope .wf-intersection-banner code {
+  background: hsl(38 92% 90%);
+  padding: 0.0625rem 0.25rem;
+  border-radius: 3px;
+  font-family: ui-monospace, "Geist Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+}
+.wf-scope .wf-selectors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.wf-scope .wf-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.wf-scope .wf-selector label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+}
+.wf-scope .wf-selector select {
+  width: 100%;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: hsl(var(--foreground));
+}
+.wf-scope .version-hint {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.wf-scope .wf-current-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 4px;
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.wf-scope .wf-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.wf-scope .wf-stat {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.wf-scope .wf-stat-label {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.wf-scope .wf-stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.wf-scope .wf-stat-unit {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  margin-left: 0.125rem;
+}
+.wf-scope .wf-stat-sub {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.wf-scope .wf-two-col-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+@media (min-width: 1024px) {
+  .wf-scope .wf-two-col-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.wf-scope .wf-card-block {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-xs);
+}
+.wf-scope .wf-card-block-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem;
+}
+.wf-scope .wf-card-block-sub {
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0 0 1rem;
+}
+
+/* ===========================================================
+   Participant — magic-link / public quiz landing hero
+   =========================================================== */
+.wf-scope .landing-page,
+.wf-scope .ty-page {
+  min-height: 100vh;
+  background: hsl(var(--background));
+  display: flex;
+  flex-direction: column;
+}
+.wf-scope .landing-header,
+.wf-scope .ty-header {
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  padding: 0.875rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+}
+.wf-scope .landing-brand,
+.wf-scope .ty-brand {
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  font-size: 1rem;
+}
+.wf-scope .landing-body,
+.wf-scope .ty-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+}
+.wf-scope .hero-card,
+.wf-scope .ty-card {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  padding: 2.5rem;
+  max-width: 32rem;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+.wf-scope .hero-eyebrow,
+.wf-scope .ty-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: hsl(var(--primary));
+}
+.wf-scope .hero-title,
+.wf-scope .ty-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: hsl(var(--foreground));
+}
+.wf-scope .hero-lede,
+.wf-scope .ty-lede {
+  font-size: 1rem;
+  color: hsl(var(--foreground));
+  margin: 0;
+  line-height: 1.5;
+}
+.wf-scope .hero-sub,
+.wf-scope .ty-sub {
+  font-size: 0.9375rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+  line-height: 1.55;
+}
+.wf-scope .hero-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+  padding: 0.375rem 0.75rem;
+  background: hsl(var(--muted) / 0.6);
+  border-radius: 9999px;
+  align-self: flex-start;
+}
+.wf-scope .hero-stats strong { color: hsl(var(--foreground)); }
+.wf-scope .hero-stats__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: hsl(var(--muted-foreground));
+  opacity: 0.5;
+}
+.wf-scope .hero-cta-row {
+  display: flex;
+  margin-top: 0.5rem;
+}
+.wf-scope .hero-cta {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+}
+.wf-scope .hero-fine {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0;
+  font-style: italic;
+}
+.wf-scope .landing-footer,
+.wf-scope .ty-footer {
+  padding: 1.25rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* ===========================================================
+   Score bar (used on revised individual results)
+   =========================================================== */
+.wf-scope .score-bar {
+  position: relative;
+  background: hsl(var(--muted));
+  border-radius: 9999px;
+  height: 8px;
+  width: 100%;
+  overflow: hidden;
+}
+.wf-scope .score-bar__fill {
+  height: 100%;
+  background: hsl(var(--success));
+  border-radius: 9999px;
+  transition: width 300ms ease;
+}
+.wf-scope .score-bar--low .score-bar__fill {
+  background: hsl(var(--status-pending));
+}

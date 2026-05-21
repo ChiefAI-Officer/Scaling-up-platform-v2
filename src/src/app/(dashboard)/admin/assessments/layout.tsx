@@ -14,6 +14,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { AssessmentsSidebar } from "@/components/nav/assessments-sidebar";
+import "@/styles/wireframes-scoped.css";
 
 export default async function AdminAssessmentsLayout({
   children,
@@ -32,7 +33,7 @@ export default async function AdminAssessmentsLayout({
   return (
     <div className="flex flex-col md:flex-row md:items-stretch md:min-h-[calc(100vh-4rem)] -mx-4 sm:-mx-6 lg:-mx-8 -my-6">
       <AssessmentsSidebar session={session} />
-      <div className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6">
+      <div className="wf-scope flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-6">
         {children}
       </div>
     </div>

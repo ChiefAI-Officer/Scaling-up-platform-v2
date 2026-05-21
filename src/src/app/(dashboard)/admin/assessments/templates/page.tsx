@@ -23,17 +23,15 @@ export default async function AdminAssessmentTemplatesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-foreground">Assessment Templates</h1>
-          <p className="text-sm text-muted-foreground">
-            Create and publish assessment templates. Coaches launch campaigns
-            against published versions; content is version-locked once
-            published.
-          </p>
-        </div>
-      </header>
+    <div>
+      {/* Breadcrumb — WF14 */}
+      <div className="wf-breadcrumb">
+        <a href="/admin/dashboard">Admin</a>
+        <span className="wf-breadcrumb-sep">/</span>
+        <a href="/admin/assessments">Assessments</a>
+        <span className="wf-breadcrumb-sep">/</span>
+        <span className="wf-breadcrumb-current">Templates</span>
+      </div>
 
       <AssessmentTemplatesList />
     </div>

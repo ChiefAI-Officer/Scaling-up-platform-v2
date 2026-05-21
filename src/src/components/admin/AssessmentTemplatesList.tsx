@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+/**
+ * Admin assessment templates list.
+ *
+ * WF14 restyle (May 21 2026): paste-and-swap from
+ * src/public/wireframes-phase2/admin/14-admin-templates-list.html
+ * Real data fetch + delete handler preserved from prior version.
+ * All classNames use the .wf-scope CSS (imported in the lane layout).
+ */
+
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 interface TemplateRow {
@@ -10,6 +18,12 @@ interface TemplateRow {
   name: string;
   alias: string;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
+  // Optional extra fields the wireframe shows — fall back to safe defaults
+  // when not present in the API response.
+  accessMode?: "INVITED" | "PUBLIC";
+  versionCount?: number;
+  activeVersionPublishedAt?: string | null;
+  status?: "ACTIVE" | "PENDING" | "DRAFT";
 }
 
 export function AssessmentTemplatesList() {
@@ -73,91 +87,188 @@ export function AssessmentTemplatesList() {
     }
   }
 
+  // Stats computed from rows
+  const stats = useMemo(() => {
+    const invitedActive = rows.filter(
+      (r) => (r.accessMode ?? "INVITED") === "INVITED" && (r.status ?? "ACTIVE") === "ACTIVE",
+    ).length;
+    const publicActive = rows.filter(
+      (r) => r.accessMode === "PUBLIC" && (r.status ?? "ACTIVE") === "ACTIVE",
+    ).length;
+    const drafts = rows.filter((r) => r.status === "DRAFT").length;
+    return {
+      total: rows.length,
+      invitedActive,
+      publicActive,
+      drafts,
+    };
+  }, [rows]);
+
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <Link
-          href="/admin/assessments/templates/new"
-          className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          data-testid="new-template-btn"
-        >
-          <Plus className="w-4 h-4" />
-          New Template
-        </Link>
+    <>
+      {/* Page header + primary CTA — WF14 lines 482-498 */}
+      <div className="wf-page-header-row">
+        <div>
+          <h2 className="wf-page-title">Assessment Templates</h2>
+          <p className="wf-page-subtitle-strong">
+            Catalogue of templates available for campaign creation. Per-coach
+            access managed at <em>Admin › Assessments › Access Groups</em>.
+          </p>
+        </div>
+        <div className="wf-cta-stack">
+          <Link
+            href="/admin/assessments/templates/new"
+            className="wf-btn wf-btn-primary"
+            data-testid="new-template-btn"
+          >
+            + Create Template
+          </Link>
+        </div>
       </div>
 
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
+      {/* Stats row — WF14 lines 501-518 */}
+      <div className="wf-stats-row">
+        <div className="wf-stat-card">
+          <span className="wf-stat-label">Total Templates</span>
+          <span className="wf-stat-value">{loading ? "…" : stats.total}</span>
+        </div>
+        <div className="wf-stat-card">
+          <span className="wf-stat-label">INVITED (active)</span>
+          <span className="wf-stat-value">{loading ? "…" : stats.invitedActive}</span>
+        </div>
+        <div className="wf-stat-card">
+          <span className="wf-stat-label">PUBLIC (active)</span>
+          <span className="wf-stat-value">{loading ? "…" : stats.publicActive}</span>
+        </div>
+        <div className="wf-stat-card">
+          <span className="wf-stat-label">Drafts</span>
+          <span className="wf-stat-value">{loading ? "…" : stats.drafts}</span>
+        </div>
+      </div>
+
+      {/* Templates table — WF14 lines 521-635 */}
+      <div className="wf-table-wrap">
         {loading ? (
-          <div className="px-6 py-12 text-center text-sm text-muted-foreground">
+          <div style={{ padding: "3rem 1.5rem", textAlign: "center" }} className="wf-text-muted wf-text-sm">
             Loading templates…
           </div>
         ) : error ? (
-          <div className="px-6 py-12 text-center text-sm text-destructive">
+          <div style={{ padding: "3rem 1.5rem", textAlign: "center", color: "hsl(var(--destructive))" }} className="wf-text-sm">
             {error}
           </div>
         ) : rows.length === 0 ? (
-          <div className="px-6 py-12 text-center text-sm text-muted-foreground">
-            No templates yet. Click <strong>New Template</strong> to create one.
+          <div style={{ padding: "3rem 1.5rem", textAlign: "center" }} className="wf-text-muted wf-text-sm">
+            No templates yet. Click <strong>Create Template</strong> to add one.
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-muted/40 border-b border-border">
+          <table className="wf-table">
+            <thead>
               <tr>
-                <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Name
-                </th>
-                <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Alias
-                </th>
-                <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Aggregation
-                </th>
-                <th className="text-right px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Actions
-                </th>
+                <th>Template Name</th>
+                <th>Access Mode</th>
+                <th>Aggregation</th>
+                <th>Versions</th>
+                <th>Active Version Published</th>
+                <th>Status</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="hover:bg-muted/30 transition-colors"
-                  data-testid={`template-row-${row.id}`}
-                >
-                  <td className="px-4 py-3 text-sm">
-                    <Link
-                      href={`/admin/assessments/templates/${row.id}`}
-                      className="font-medium text-foreground hover:underline"
-                    >
-                      {row.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground font-mono">
-                    {row.alias}
-                  </td>
-                  <td className="px-4 py-3 text-xs">
-                    <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                      {row.aggregationMode}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(row)}
-                      disabled={deletingId !== null}
-                      className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                      data-testid={`delete-template-${row.id}`}
-                      aria-label={`Soft-delete ${row.name}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+            <tbody>
+              {rows.map((row) => {
+                const accessMode = row.accessMode ?? "INVITED";
+                const status = row.status ?? "ACTIVE";
+                const versionCount = row.versionCount ?? 1;
+                const publishedAt = row.activeVersionPublishedAt
+                  ? new Date(row.activeVersionPublishedAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "—";
+                return (
+                  <tr key={row.id} data-testid={`template-row-${row.id}`}>
+                    <td>
+                      <Link
+                        href={`/admin/assessments/templates/${row.id}`}
+                        className="wf-table-name wf-action-link"
+                        style={{ textDecoration: "none" }}
+                      >
+                        {row.name}
+                      </Link>
+                    </td>
+                    <td>
+                      {accessMode === "PUBLIC" ? (
+                        <span className="wf-pill wf-pill-access-public">PUBLIC</span>
+                      ) : (
+                        <span className="wf-pill wf-pill-access-invited">INVITED</span>
+                      )}
+                    </td>
+                    <td>
+                      {row.aggregationMode === "CEO_ONLY" ? (
+                        <span className="wf-pill wf-pill-agg-ceo">CEO_ONLY</span>
+                      ) : (
+                        <span className="wf-pill wf-pill-agg-full">FULL_VISIBILITY</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="wf-table-meta">
+                        v{versionCount} ({versionCount} total)
+                      </span>
+                    </td>
+                    <td>
+                      <span className="wf-table-meta">{publishedAt}</span>
+                    </td>
+                    <td>
+                      {status === "PENDING" ? (
+                        <span className="wf-pill-status-pending">⏳ Pending</span>
+                      ) : status === "DRAFT" ? (
+                        <span className="wf-version-pill-draft">Draft</span>
+                      ) : (
+                        <span className="wf-pill-status-active">● Active</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <span className="wf-actions">
+                        <Link
+                          href={`/admin/assessments/templates/${row.id}`}
+                          className="wf-action-link"
+                        >
+                          View
+                        </Link>
+                        <span className="wf-action-sep">·</span>
+                        <Link
+                          href={`/admin/assessments/access-groups`}
+                          className="wf-action-link"
+                        >
+                          Access ↗
+                        </Link>
+                        <span className="wf-action-sep">·</span>
+                        <Link
+                          href={`/admin/assessments/templates/${row.id}`}
+                          className="wf-action-link"
+                        >
+                          Edit
+                        </Link>
+                        <span className="wf-action-sep">·</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(row)}
+                          disabled={deletingId !== null}
+                          className="wf-action-link-destructive"
+                          data-testid={`delete-template-${row.id}`}
+                          aria-label={`Soft-delete ${row.name}`}
+                        >
+                          Delete
+                        </button>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
-    </div>
+    </>
   );
 }

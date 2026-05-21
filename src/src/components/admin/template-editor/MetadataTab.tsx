@@ -188,14 +188,14 @@ function TemplateMetadataCard({
   isReadOnly,
 }: TemplateMetadataCardProps) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5 space-y-4">
-      <h3 className="text-base font-semibold text-foreground">
+    <section className="wf-card" style={{ padding: "1.5rem" }}>
+      <h3 className="wf-card-title" style={{ marginBottom: "1rem" }}>
         Template Metadata
       </h3>
       <div className="space-y-1.5">
         <label
           htmlFor="tpl-name"
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
         >
           Name
         </label>
@@ -211,7 +211,7 @@ function TemplateMetadataCard({
       <div className="space-y-1.5">
         <label
           htmlFor="tpl-alias"
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
         >
           Alias
         </label>
@@ -230,7 +230,7 @@ function TemplateMetadataCard({
       <div className="space-y-1.5">
         <label
           htmlFor="tpl-description"
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
         >
           Description
         </label>
@@ -248,7 +248,7 @@ function TemplateMetadataCard({
       <div className="space-y-1.5">
         <label
           htmlFor="tpl-language"
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
         >
           Language (this version)
         </label>
@@ -444,14 +444,14 @@ function InvitationEmailCard({
   isReadOnly: boolean;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5 space-y-4">
-      <h3 className="text-base font-semibold text-foreground">
+    <section className="wf-card" style={{ padding: "1.5rem" }}>
+      <h3 className="wf-card-title" style={{ marginBottom: "1rem" }}>
         Invitation Email
       </h3>
       <div className="space-y-1.5">
         <label
           htmlFor="inv-subject"
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
         >
           Subject
         </label>
@@ -467,7 +467,7 @@ function InvitationEmailCard({
       <div className="space-y-1.5">
         <label
           htmlFor="inv-body"
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
         >
           Body (Markdown)
         </label>
@@ -524,9 +524,9 @@ function ResultsEmailCard({
   isReadOnly: boolean;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5 space-y-4">
+    <section className="wf-card" style={{ padding: "1.5rem" }}>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-base font-semibold text-foreground">
+        <h3 className="wf-card-title" style={{ marginBottom: "1rem" }}>
           Results Email
         </h3>
         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[0.625rem] font-bold uppercase tracking-wider bg-warning/20 text-warning">
@@ -545,7 +545,7 @@ function ResultsEmailCard({
       <div className="space-y-1.5">
         <label
           htmlFor="res-subject"
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
         >
           Subject
         </label>
@@ -562,7 +562,7 @@ function ResultsEmailCard({
       <div className="space-y-1.5">
         <label
           htmlFor="res-body"
-          className="block text-xs font-medium text-foreground"
+          className="wf-label"
         >
           Body (Markdown)
         </label>
@@ -695,9 +695,6 @@ function VersionHistoryStrip({
 // Shared input classes — local to keep WF-styled inputs uniform without
 // pulling shadcn Input (which has slightly different padding/border).
 // ────────────────────────────────────────────────────────────────────────
-const inputCls =
-  "block w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed";
-const textareaCls =
-  "block w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed";
-const selectCls =
-  "block w-full rounded border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60 disabled:cursor-not-allowed";
+const inputCls = "wf-input";
+const textareaCls = "wf-textarea";
+const selectCls = "wf-select";
