@@ -89,6 +89,10 @@ const PatchVersionBodySchema = z.object({
   sections: z.array(z.unknown()),
   scoringConfig: z.unknown(),
   reportConfig: z.unknown().optional().nullable(),
+  // F2 (Checkpoint 1b) — language edits originate from the Metadata tab
+  // (per WF16 — labelled "Language (this version)"). Optional so existing
+  // callers that only patch content stay byte-compatible.
+  language: z.string().min(2).max(20).optional(),
 });
 
 export async function PATCH(
@@ -164,18 +168,30 @@ export async function PATCH(
       invitationBodyMarkdown: template.invitationBodyMarkdown,
     });
 
+    const updatePayload: {
+      questions: Prisma.InputJsonValue;
+      sections: Prisma.InputJsonValue;
+      scoringConfig: Prisma.InputJsonValue;
+      reportConfig: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+      contentHash: string;
+      language?: string;
+    } = {
+      questions: data.questions as Prisma.InputJsonValue,
+      sections: data.sections as Prisma.InputJsonValue,
+      scoringConfig: data.scoringConfig as Prisma.InputJsonValue,
+      reportConfig:
+        data.reportConfig === null || data.reportConfig === undefined
+          ? Prisma.JsonNull
+          : (data.reportConfig as Prisma.InputJsonValue),
+      contentHash,
+    };
+    if (data.language !== undefined) {
+      updatePayload.language = data.language;
+    }
+
     await db.assessmentTemplateVersion.update({
       where: { id: versionId },
-      data: {
-        questions: data.questions as Prisma.InputJsonValue,
-        sections: data.sections as Prisma.InputJsonValue,
-        scoringConfig: data.scoringConfig as Prisma.InputJsonValue,
-        reportConfig:
-          data.reportConfig === null || data.reportConfig === undefined
-            ? Prisma.JsonNull
-            : (data.reportConfig as Prisma.InputJsonValue),
-        contentHash,
-      },
+      data: updatePayload,
     });
 
     await logAudit({

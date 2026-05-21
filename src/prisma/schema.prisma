@@ -1149,17 +1149,25 @@ model OrgRespondent {
 }
 
 model AssessmentTemplate {
-  id                     String                              @id @default(cuid())
-  name                   String
-  alias                  String                              @unique
-  description            String?
-  invitationSubject      String
-  invitationBodyMarkdown String
-  aggregationMode        AssessmentTemplateAggregationMode   @default(FULL_VISIBILITY)
-  createdBy              String
-  createdAt              DateTime                            @default(now())
-  updatedAt              DateTime                            @updatedAt
-  deletedAt              DateTime?
+  id                            String                              @id @default(cuid())
+  name                          String
+  alias                         String                              @unique
+  description                   String?
+  invitationSubject             String
+  invitationBodyMarkdown        String
+  // Results Email — Phase F0 (Checkpoint 1b). Nullable subject/body so a
+  // template can opt-in to a results email; gated behind
+  // `resultsEmailContentApproved` until the operator flips it true. Per
+  // anonymity constraint, the rendered email contains only the
+  // respondent's own individual result (never team aggregate).
+  resultsEmailSubject           String?
+  resultsEmailBodyMarkdown      String?
+  resultsEmailContentApproved   Boolean                             @default(false)
+  aggregationMode               AssessmentTemplateAggregationMode   @default(FULL_VISIBILITY)
+  createdBy                     String
+  createdAt                     DateTime                            @default(now())
+  updatedAt                     DateTime                            @updatedAt
+  deletedAt                     DateTime?
 
   creator       User                        @relation("AssessmentTemplateCreatedBy", fields: [createdBy], references: [id])
   versions      AssessmentTemplateVersion[]

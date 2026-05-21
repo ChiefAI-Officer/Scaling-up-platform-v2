@@ -82,6 +82,13 @@ const PatchTemplateBodySchema = z.object({
   invitationSubject: z.string().min(1).max(200).trim().optional(),
   invitationBodyMarkdown: z.string().min(1).max(5000).optional(),
   aggregationMode: z.enum(["FULL_VISIBILITY", "CEO_ONLY"]).optional(),
+  // Phase F0 (Checkpoint 1b) — Results Email fields. Subject + body are
+  // nullable so a template can opt-out (clear) without dropping the
+  // approval-gate state. The `resultsEmailContentApproved` boolean stays
+  // false until the operator flips it on the Metadata tab.
+  resultsEmailSubject: z.string().max(200).trim().nullable().optional(),
+  resultsEmailBodyMarkdown: z.string().max(5000).nullable().optional(),
+  resultsEmailContentApproved: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -139,6 +146,9 @@ export async function PATCH(
       invitationSubject?: string;
       invitationBodyMarkdown?: string;
       aggregationMode?: "FULL_VISIBILITY" | "CEO_ONLY";
+      resultsEmailSubject?: string | null;
+      resultsEmailBodyMarkdown?: string | null;
+      resultsEmailContentApproved?: boolean;
     } = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
@@ -148,6 +158,12 @@ export async function PATCH(
       updateData.invitationBodyMarkdown = data.invitationBodyMarkdown;
     if (data.aggregationMode !== undefined)
       updateData.aggregationMode = data.aggregationMode;
+    if (data.resultsEmailSubject !== undefined)
+      updateData.resultsEmailSubject = data.resultsEmailSubject;
+    if (data.resultsEmailBodyMarkdown !== undefined)
+      updateData.resultsEmailBodyMarkdown = data.resultsEmailBodyMarkdown;
+    if (data.resultsEmailContentApproved !== undefined)
+      updateData.resultsEmailContentApproved = data.resultsEmailContentApproved;
 
     await db.assessmentTemplate.update({ where: { id }, data: updateData });
 

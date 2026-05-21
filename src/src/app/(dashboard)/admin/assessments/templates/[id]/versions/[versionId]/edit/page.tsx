@@ -1,17 +1,19 @@
 /**
- * Admin assessment template version editor.
+ * Admin assessment template version editor — mounts the 7-tab
+ * TemplateEditorTabbed (Metadata / Sections / Questions / Scoring &
+ * Tiers / Conditional Logic / Access / Versions).
  *
- * Edits a draft version's content (sections / questions / scoring / report).
- * Published versions render in read-only mode (defensive — the PATCH route
- * also rejects with 409 ALREADY_PUBLISHED).
+ * Wireframe rebuild: see ~/.claude/plans/yes-we-were-in-cosmic-jellyfish.md
+ * (commits 554ea90 → 7907dc2 → cleanup).
  */
 
 export const dynamic = "force-dynamic";
 
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
-import { AssessmentVersionEditor } from "@/components/admin/AssessmentVersionEditor";
+import { db } from "@/lib/db";
+import { TemplateEditorTabbed } from "@/components/admin/TemplateEditorTabbed";
 
 export default async function AdminAssessmentVersionEditPage({
   params,
@@ -27,9 +29,101 @@ export default async function AdminAssessmentVersionEditPage({
     redirect("/unauthorized");
   }
   const { id, versionId } = await params;
+
+  const [template, version, allVersions] = await Promise.all([
+    db.assessmentTemplate.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        alias: true,
+        description: true,
+        invitationSubject: true,
+        invitationBodyMarkdown: true,
+        // F0 — Results Email card fields (Checkpoint 1b).
+        resultsEmailSubject: true,
+        resultsEmailBodyMarkdown: true,
+        resultsEmailContentApproved: true,
+        aggregationMode: true,
+      },
+    }),
+    db.assessmentTemplateVersion.findUnique({
+      where: { id: versionId },
+      select: {
+        id: true,
+        templateId: true,
+        versionNumber: true,
+        language: true,
+        // Content surfaces needed by the Sections card (F2) + future
+        // Questions / Scoring tabs (F3/F4).
+        questions: true,
+        sections: true,
+        scoringConfig: true,
+        reportConfig: true,
+        publishedAt: true,
+        contentHash: true,
+      },
+    }),
+    db.assessmentTemplateVersion.findMany({
+      where: { templateId: id },
+      orderBy: { versionNumber: "desc" },
+      select: {
+        id: true,
+        versionNumber: true,
+        language: true,
+        publishedAt: true,
+        contentHash: true,
+      },
+    }),
+  ]);
+
+  if (!template || !version || version.templateId !== id) {
+    notFound();
+  }
+
   return (
     <div className="space-y-6">
-      <AssessmentVersionEditor templateId={id} versionId={versionId} />
+      <TemplateEditorTabbed
+        template={{
+          id: template.id,
+          name: template.name,
+          alias: template.alias,
+          description: template.description,
+          invitationSubject: template.invitationSubject,
+          invitationBodyMarkdown: template.invitationBodyMarkdown,
+          resultsEmailSubject: template.resultsEmailSubject,
+          resultsEmailBodyMarkdown: template.resultsEmailBodyMarkdown,
+          resultsEmailContentApproved: template.resultsEmailContentApproved,
+          aggregationMode: template.aggregationMode,
+          // accessMode is a campaign-level concept; templates default to INVITED
+          // (v1 PUBLIC mode is hardcoded for Website Assessment per WF16 spec).
+          accessMode: "INVITED",
+        }}
+        version={{
+          id: version.id,
+          versionNumber: version.versionNumber,
+          language: version.language,
+          questions: version.questions,
+          sections: version.sections,
+          scoringConfig: version.scoringConfig,
+          reportConfig: version.reportConfig,
+          publishedAt:
+            version.publishedAt instanceof Date
+              ? version.publishedAt.toISOString()
+              : version.publishedAt,
+          contentHash: version.contentHash,
+        }}
+        allVersions={allVersions.map((v) => ({
+          id: v.id,
+          versionNumber: v.versionNumber,
+          language: v.language,
+          publishedAt:
+            v.publishedAt instanceof Date
+              ? v.publishedAt.toISOString()
+              : v.publishedAt,
+          contentHash: v.contentHash,
+        }))}
+      />
     </div>
   );
 }

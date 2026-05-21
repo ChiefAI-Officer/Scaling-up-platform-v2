@@ -790,8 +790,8 @@ describe("D2 — per-domain rollup", () => {
             label: "Domain 1",
             tiers: [
               { minMetric: 0, maxMetric: 3, label: "Lo", message: "lo" },
-              { minMetric: 4, maxMetric: 6, label: "Mid", message: "mid" },
-              { minMetric: 7, maxMetric: 10, label: "Hi", message: "hi" },
+              { minMetric: 3, maxMetric: 6, label: "Mid", message: "mid" },
+              { minMetric: 6, maxMetric: 10, label: "Hi", message: "hi" },
             ],
           },
           {
@@ -799,8 +799,8 @@ describe("D2 — per-domain rollup", () => {
             label: "Domain 2",
             tiers: [
               { minMetric: 0, maxMetric: 3, label: "Lo", message: "lo" },
-              { minMetric: 4, maxMetric: 6, label: "Mid", message: "mid" },
-              { minMetric: 7, maxMetric: 10, label: "Hi", message: "hi" },
+              { minMetric: 3, maxMetric: 6, label: "Mid", message: "mid" },
+              { minMetric: 6, maxMetric: 10, label: "Hi", message: "hi" },
             ],
           },
         ],
@@ -873,7 +873,7 @@ describe("D2 — per-domain rollup", () => {
             label: "Domain 1",
             tiers: [
               { minMetric: 0, maxMetric: 3, label: "Lo", message: "lo" },
-              { minMetric: 4, maxMetric: 10, label: "Hi", message: "hi" },
+              { minMetric: 3, maxMetric: 10, label: "Hi", message: "hi" },
             ],
           },
         ],
@@ -932,7 +932,7 @@ describe("D2 — per-domain rollup", () => {
             label: "D1",
             tiers: [
               { minMetric: 0, maxMetric: 5, label: "Lo", message: "lo" },
-              { minMetric: 6, maxMetric: 10, label: "Hi", message: "hi" },
+              { minMetric: 5, maxMetric: 10, label: "Hi", message: "hi" },
             ],
           },
         ],
@@ -989,7 +989,7 @@ describe("D2 — per-domain rollup", () => {
             label: "D1",
             tiers: [
               { minMetric: 0, maxMetric: 5, label: "Lo", message: "lo" },
-              { minMetric: 6, maxMetric: 10, label: "Hi", message: "hi" },
+              { minMetric: 5, maxMetric: 10, label: "Hi", message: "hi" },
             ],
           },
           {
@@ -997,7 +997,7 @@ describe("D2 — per-domain rollup", () => {
             label: "D2",
             tiers: [
               { minMetric: 0, maxMetric: 5, label: "Lo", message: "lo" },
-              { minMetric: 6, maxMetric: 10, label: "Hi", message: "hi" },
+              { minMetric: 5, maxMetric: 10, label: "Hi", message: "hi" },
             ],
           },
         ],
@@ -1054,7 +1054,7 @@ describe("D2 — per-domain rollup", () => {
             label: "D1",
             tiers: [
               { minMetric: 0, maxMetric: 5, label: "Lo", message: "lo" },
-              { minMetric: 6, maxMetric: 10, label: "Hi", message: "hi" },
+              { minMetric: 5, maxMetric: 10, label: "Hi", message: "hi" },
             ],
           },
           {
@@ -1062,7 +1062,7 @@ describe("D2 — per-domain rollup", () => {
             label: "D2",
             tiers: [
               { minMetric: 0, maxMetric: 5, label: "Lo", message: "lo" },
-              { minMetric: 6, maxMetric: 10, label: "Hi", message: "hi" },
+              { minMetric: 5, maxMetric: 10, label: "Hi", message: "hi" },
             ],
           },
         ],
@@ -1351,3 +1351,169 @@ describe("D2 — backwards-compat snapshot for QSP (post-D2.0 hotfix)", () => {
   });
 });
 
+
+// ─── E1.1 — Per-domain tier-tiling enforcement (publish + runtime) ──────
+
+describe("E1.1 — per-domain tier-tiling validation", () => {
+  function buildDomainTierVersion(opts: {
+    domainTiers: Array<{
+      minMetric: number;
+      maxMetric?: number;
+      label: string;
+      message: string;
+    }>;
+    scaleMax?: number;
+    scaleMin?: number;
+    mixedScales?: boolean;
+  }): TemplateVersionForScoring {
+    const scaleMax = opts.scaleMax ?? 10;
+    const scaleMin = opts.scaleMin ?? 0;
+    const sections = [
+      { stableKey: "S1", sortOrder: 1, name: "Section 1", domain: "D1" },
+      { stableKey: "S2", sortOrder: 2, name: "Section 2", domain: "D1" },
+    ] as TemplateVersionForScoring["sections"];
+    const questions: TemplateVersionForScoring["questions"] = [];
+    let sortOrder = 0;
+    for (const sk of ["S1", "S2"]) {
+      for (let q = 1; q <= 2; q++) {
+        sortOrder += 1;
+        // Optionally make one question on a different scale to exercise
+        // the mixed-scale rejection.
+        const isMixed = opts.mixedScales && sk === "S2" && q === 1;
+        questions.push({
+          stableKey: `${sk}_Q${q}`,
+          sortOrder,
+          type: "SLIDER_LIKERT" as const,
+          label: `${sk}Q${q}`,
+          sectionStableKey: sk,
+          isRequired: true,
+          scale: {
+            min: scaleMin,
+            max: isMixed ? scaleMax + 1 : scaleMax,
+            step: 1,
+            anchorMin: "L",
+            anchorMax: "H",
+          },
+        });
+      }
+    }
+    return {
+      sections,
+      questions,
+      scoringConfig: {
+        tierMetric: "overallAvg",
+        passThreshold: 7,
+        tiers: [
+          { minMetric: 0, maxMetric: 5, label: "Lo", message: "lo" },
+          { minMetric: 5, maxMetric: scaleMax, label: "Hi", message: "hi" },
+        ],
+        rollup: { overall: "meanOfDomains" },
+        domains: [
+          {
+            key: "D1",
+            label: "Domain 1",
+            tiers: opts.domainTiers,
+          },
+        ],
+      } as unknown as TemplateVersionForScoring["scoringConfig"],
+    };
+  }
+
+  it("publish schema rejects per-domain tier gap (fractional touching required)", () => {
+    const version = buildDomainTierVersion({
+      domainTiers: [
+        { minMetric: 0, maxMetric: 3, label: "Lo", message: "lo" },
+        { minMetric: 4, maxMetric: 7, label: "Mid", message: "mid" },
+        { minMetric: 7, maxMetric: 10, label: "Hi", message: "hi" },
+      ],
+    });
+    const parsed = TemplateVersionForPublishSchema.safeParse(version);
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      const hasDomainPath = parsed.error.issues.some(
+        (i) => i.path[0] === "scoringConfig" && i.path[1] === "domains",
+      );
+      expect(hasDomainPath).toBe(true);
+    }
+  });
+
+  it("publish schema rejects per-domain tier overlap", () => {
+    const version = buildDomainTierVersion({
+      domainTiers: [
+        { minMetric: 0, maxMetric: 5, label: "Lo", message: "lo" },
+        { minMetric: 4, maxMetric: 8, label: "Mid", message: "mid" },
+        { minMetric: 8, maxMetric: 10, label: "Hi", message: "hi" },
+      ],
+    });
+    const parsed = TemplateVersionForPublishSchema.safeParse(version);
+    expect(parsed.success).toBe(false);
+  });
+
+  it("publish schema accepts well-formed fractional-touching per-domain tiers", () => {
+    const version = buildDomainTierVersion({
+      domainTiers: [
+        { minMetric: 0, maxMetric: 3, label: "Lo", message: "lo" },
+        { minMetric: 3, maxMetric: 7, label: "Mid", message: "mid" },
+        { minMetric: 7, maxMetric: 10, label: "Hi", message: "hi" },
+      ],
+    });
+    // Add a full-coverage recommendation band per question + assignment
+    // (the publish schema also enforces recommendations on D2 templates,
+    // but a template that opts into rollup without per-question
+    // recommendations is OK — runtime+publish are lenient on recs being
+    // absent).
+    const parsed = TemplateVersionForPublishSchema.safeParse(version);
+    expect(parsed.success).toBe(true);
+  });
+
+  it("runtime engine rejects malformed per-domain tiers (belt-and-suspenders)", () => {
+    const version = buildDomainTierVersion({
+      domainTiers: [
+        { minMetric: 0, maxMetric: 3, label: "Lo", message: "lo" },
+        { minMetric: 5, maxMetric: 7, label: "Mid", message: "mid" },
+        { minMetric: 7, maxMetric: 10, label: "Hi", message: "hi" },
+      ],
+    });
+    const answers: Answer[] = [
+      { stableKey: "S1_Q1", value: 5 },
+      { stableKey: "S1_Q2", value: 5 },
+      { stableKey: "S2_Q1", value: 5 },
+      { stableKey: "S2_Q2", value: 5 },
+    ];
+    expect(() => scoreSubmission(version, answers)).toThrow(
+      ScoringValidationError,
+    );
+  });
+
+  it("publish schema rejects mixed question scales within a domain", () => {
+    const version = buildDomainTierVersion({
+      domainTiers: [
+        { minMetric: 0, maxMetric: 3, label: "Lo", message: "lo" },
+        { minMetric: 3, maxMetric: 7, label: "Mid", message: "mid" },
+        { minMetric: 7, maxMetric: 10, label: "Hi", message: "hi" },
+      ],
+      mixedScales: true,
+    });
+    const parsed = TemplateVersionForPublishSchema.safeParse(version);
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      const hasAmbiguousMessage = parsed.error.issues.some((i) =>
+        String(i.message).toLowerCase().includes("ambiguous"),
+      );
+      expect(hasAmbiguousMessage).toBe(true);
+    }
+  });
+
+  it("legacy Rockefeller BC: no rollup, no domains → no per-domain validation", () => {
+    // Reuse the existing Rockefeller fixture; just confirm it still scores
+    // without invoking any per-domain tile checks.
+    const version = buildRockefellerVersion();
+    const answers: Answer[] = version.questions.map((q) => ({
+      stableKey: q.stableKey,
+      value: 2,
+    }));
+    const result = scoreSubmission(version, answers);
+    expect(result.perDomain).toBeUndefined();
+    expect(result.tier).not.toBeNull();
+  });
+});

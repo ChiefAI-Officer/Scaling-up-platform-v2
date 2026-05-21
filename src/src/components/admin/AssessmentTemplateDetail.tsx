@@ -2,8 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  PublishFailureModal,
+  type PublishFailureIssue,
+} from "@/components/admin/PublishFailureModal";
 
 interface VersionRow {
   id: string;
@@ -30,6 +35,7 @@ interface TemplateDetail {
 
 export function AssessmentTemplateDetail({ templateId }: { templateId: string }) {
   const { toast } = useToast();
+  const router = useRouter();
   const [template, setTemplate] = useState<TemplateDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +50,7 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
   const [saving, setSaving] = useState(false);
   const [publishingVersionId, setPublishingVersionId] = useState<string | null>(null);
   const [duplicatingVersionId, setDuplicatingVersionId] = useState<string | null>(null);
+  const [publishIssues, setPublishIssues] = useState<PublishFailureIssue[] | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,6 +145,10 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
       "Publish this version? Once published, content is immutable.",
     );
     if (!confirmed) return;
+    // Clear any stale modal state from a previous attempt so the success
+    // path (or a different version's failure) doesn't leave the modal
+    // mounted over the wrong row.
+    setPublishIssues(null);
     setPublishingVersionId(versionId);
     try {
       const res = await fetch(
@@ -145,18 +156,44 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
         { method: "POST" },
       );
       const body = await res.json().catch(() => ({}));
-      if (!res.ok || body.success === false) {
-        if (body.error === "ALREADY_PUBLISHED") {
+      if (!res.ok) {
+        // E1.2: narrow modal scope — only publish-validation 422s with a
+        // well-shaped issues array open the modal. 409 ALREADY_PUBLISHED
+        // gets a dedicated toast. Everything else (500s, 401/403,
+        // 422-without-issues, 422-with-malformed-issues) falls through to
+        // the generic toast.
+        if (
+          res.status === 422 &&
+          Array.isArray(body?.issues) &&
+          body.issues.every(
+            (i: unknown) =>
+              i !== null &&
+              typeof i === "object" &&
+              Array.isArray((i as { path?: unknown }).path) &&
+              typeof (i as { message?: unknown }).message === "string",
+          )
+        ) {
+          setPublishIssues(body.issues as PublishFailureIssue[]);
+          return;
+        }
+        if (res.status === 409) {
           toast({
             title: "Already published",
             variant: "destructive",
           });
-        } else {
-          throw new Error(body.error || `HTTP ${res.status}`);
+          await load();
+          return;
         }
-      } else {
-        toast({ title: "Version published" });
+        toast({
+          title: "Could not publish",
+          description:
+            typeof body?.error === "string" ? body.error : "Please try again.",
+          variant: "destructive",
+        });
+        return;
       }
+      toast({ title: "Version published" });
+      router.refresh();
       await load();
     } catch (e) {
       toast({
@@ -454,6 +491,12 @@ export function AssessmentTemplateDetail({ templateId }: { templateId: string })
           </table>
         )}
       </div>
+
+      <PublishFailureModal
+        open={publishIssues !== null}
+        issues={publishIssues ?? []}
+        onClose={() => setPublishIssues(null)}
+      />
     </div>
   );
 }
