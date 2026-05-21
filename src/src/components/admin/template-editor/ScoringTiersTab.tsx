@@ -243,7 +243,7 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
                     }
                     disabled={isReadOnly}
                     data-testid={`${testIdPrefix}-min-${idx}`}
-                    className="w-full px-2 py-1 text-sm border border-border rounded bg-background disabled:opacity-60"
+                    className="wf-input disabled:opacity-60"
                   />
                 </td>
                 <td className="px-3 py-2">
@@ -260,7 +260,7 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
                     }
                     disabled={isReadOnly}
                     data-testid={`${testIdPrefix}-max-${idx}`}
-                    className="w-full px-2 py-1 text-sm border border-border rounded bg-background disabled:opacity-60"
+                    className="wf-input disabled:opacity-60"
                     placeholder="(unbounded)"
                   />
                 </td>
@@ -273,7 +273,7 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
                     }
                     disabled={isReadOnly}
                     data-testid={`${testIdPrefix}-label-${idx}`}
-                    className="w-full px-2 py-1 text-sm border border-border rounded bg-background disabled:opacity-60"
+                    className="wf-input disabled:opacity-60"
                   />
                 </td>
                 <td className="px-3 py-2">
@@ -285,7 +285,7 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
                     }
                     disabled={isReadOnly}
                     data-testid={`${testIdPrefix}-message-${idx}`}
-                    className="w-full px-2 py-1 text-sm border border-border rounded bg-background disabled:opacity-60"
+                    className="wf-input disabled:opacity-60"
                   />
                 </td>
                 <td className="px-3 py-2">
@@ -307,7 +307,7 @@ function TierTable({ tiers, onChange, isReadOnly, testIdPrefix }: TierTableProps
         type="button"
         onClick={addTier}
         disabled={isReadOnly}
-        className="text-xs font-medium px-3 py-1.5 rounded-md border border-border bg-card hover:bg-muted disabled:opacity-50"
+        className="wf-btn wf-btn-secondary disabled:opacity-50"
       >
         + Add Tier
       </button>
@@ -386,9 +386,9 @@ export function ScoringTiersTab({
       {/* ──────────────────────────────────────────────────────────────
           Section 1 — Scoring Configuration (editable per WF18)
           ────────────────────────────────────────────────────────────── */}
-      <section className="rounded-xl border border-border bg-card p-6 space-y-4">
+      <section className="wf-card space-y-4" style={{ padding: "1.5rem" }}>
         <header className="space-y-1">
-          <h3 className="text-base font-semibold text-foreground">
+          <h3 className="wf-card-title">
             Scoring Configuration
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -400,7 +400,7 @@ export function ScoringTiersTab({
           <div className="space-y-1">
             <label
               htmlFor="tier-metric"
-              className="block text-xs font-medium text-foreground"
+              className="wf-label"
             >
               Tier Metric
             </label>
@@ -411,7 +411,7 @@ export function ScoringTiersTab({
                 updateConfig({ tierMetric: e.target.value as TierMetric })
               }
               disabled={isReadOnly}
-              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background disabled:opacity-60"
+              className="wf-input disabled:opacity-60"
             >
               <option value="countAchieved">
                 countAchieved — Count of questions with score ≥ passThreshold
@@ -431,7 +431,7 @@ export function ScoringTiersTab({
           <div className="space-y-1">
             <label
               htmlFor="pass-threshold"
-              className="block text-xs font-medium text-foreground"
+              className="wf-label"
             >
               Pass Threshold
             </label>
@@ -445,7 +445,7 @@ export function ScoringTiersTab({
               disabled={isReadOnly}
               min={0}
               step={1}
-              className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background disabled:opacity-60"
+              className="wf-input disabled:opacity-60"
             />
             <p className="text-xs text-muted-foreground">
               A question counts as &ldquo;achieved&rdquo; when its score ≥ this
@@ -496,7 +496,8 @@ export function ScoringTiersTab({
           {/* Live preview card */}
           <div
             data-testid="tier-preview"
-            className="rounded-md border border-border bg-card px-4 py-3"
+            className="wf-card"
+            style={{ padding: "0.75rem 1rem" }}
           >
             <p className="text-sm font-semibold text-foreground mb-1">
               Preview — Tier Resolution
@@ -533,7 +534,7 @@ export function ScoringTiersTab({
       {domains.length > 0 && (
         <section className="space-y-4">
           <header className="space-y-1">
-            <h3 className="text-base font-semibold text-foreground">
+            <h3 className="wf-card-title">
               Per-domain tiers
             </h3>
             <p className="text-sm text-muted-foreground">
@@ -619,7 +620,8 @@ export function ScoringTiersTab({
           <button
             type="button"
             disabled
-            className="text-xs px-3 py-1.5 rounded-md border border-border bg-card opacity-50"
+            className="wf-btn wf-btn-secondary"
+            style={{ opacity: 0.5 }}
           >
             + Add Section
           </button>
@@ -700,7 +702,8 @@ export function ScoringTiersTab({
           <button
             type="button"
             disabled
-            className="text-xs px-3 py-1.5 rounded-md border border-border bg-card opacity-50"
+            className="wf-btn wf-btn-secondary"
+            style={{ opacity: 0.5 }}
           >
             + Add Benchmark
           </button>
@@ -716,7 +719,7 @@ export function ScoringTiersTab({
       {/* ──────────────────────────────────────────────────────────────
           Section 4 — Explanation card (verbatim WF18)
           ────────────────────────────────────────────────────────────── */}
-      <section className="rounded-xl border border-border bg-muted/10 p-6 space-y-2">
+      <section className="wf-card space-y-2" style={{ padding: "1.5rem", background: "hsl(var(--muted) / 0.1)" }}>
         <h4 className="text-sm font-semibold text-foreground">
           Why is this section deferred? (Codex co-validate, May 12 2026)
         </h4>
