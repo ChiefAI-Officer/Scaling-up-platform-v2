@@ -34,15 +34,12 @@ export default async function AdminAccessGroupDetailPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
-        <Link href="/admin/dashboard" className="hover:underline">
-          Admin
-        </Link>{" "}
-        ·{" "}
-        <Link href="/admin/assessments/access-groups" className="hover:underline">
-          Access Groups
-        </Link>{" "}
-        · <span className="text-foreground">Detail</span>
+      <nav className="wf-breadcrumb" aria-label="Breadcrumb">
+        <Link href="/admin/assessments">Assessments</Link>
+        <span className="wf-breadcrumb-sep">›</span>
+        <Link href="/admin/assessments/access-groups">Access Groups</Link>
+        <span className="wf-breadcrumb-sep">›</span>
+        <span>Detail</span>
       </nav>
 
       <AccessGroupDetail accessGroupId={id} />
