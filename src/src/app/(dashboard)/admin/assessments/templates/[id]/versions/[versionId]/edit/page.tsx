@@ -1,13 +1,10 @@
 /**
- * Admin assessment template version editor.
+ * Admin assessment template version editor — mounts the 7-tab
+ * TemplateEditorTabbed (Metadata / Sections / Questions / Scoring &
+ * Tiers / Conditional Logic / Access / Versions).
  *
- * F1 (Checkpoint 1a): swapped from AssessmentVersionEditor to
- * TemplateEditorTabbed — the new 7-tab editor shell. Tab content
- * placeholders for F1; real Metadata / Sections / Questions / Scoring
- * & Tiers / Versions panels land in F2-F5.
- *
- * AssessmentVersionEditor.tsx stays in place (referenced by no other
- * routes after this swap) — F7 cleanup phase deletes it.
+ * Wireframe rebuild: see ~/.claude/plans/yes-we-were-in-cosmic-jellyfish.md
+ * (commits 554ea90 → 7907dc2 → cleanup).
  */
 
 export const dynamic = "force-dynamic";

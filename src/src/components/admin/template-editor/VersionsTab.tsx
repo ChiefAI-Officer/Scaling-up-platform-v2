@@ -2,8 +2,7 @@
  * F5 — Versions tab (Checkpoint 4).
  *
  * Lists every version of the template with per-row Edit / Duplicate /
- * Publish actions. Mirrors the existing version-row UI from
- * AssessmentTemplateDetail.tsx (which stays in tree until F7 cleanup).
+ * Publish actions.
  *
  * Publish + Duplicate are PARENT-OWNED handlers (TemplateEditorTabbed)
  * so the E1.2 PublishFailureModal stays mounted at the shell and a

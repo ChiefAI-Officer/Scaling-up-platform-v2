@@ -1,10 +1,8 @@
 /**
  * Admin assessment template detail page.
  *
- * F6 (Checkpoint 4): redirects to the tabbed editor on the Versions tab
- * (the new home for version-management actions). The legacy
- * AssessmentTemplateDetail component stays in tree until F7 cleanup but
- * is no longer mounted by any route.
+ * Redirects to the tabbed editor on the Versions tab (the new home
+ * for version-management actions per WF16/17/18 + grill Q6).
  *
  * If the template has no versions (impossible in current flows — POST
  * /api/admin/assessment-templates creates v1 in the same transaction —
