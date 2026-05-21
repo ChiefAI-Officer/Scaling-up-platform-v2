@@ -89,6 +89,14 @@ const INV_STATUS_TONE: Record<string, string> = {
 
 const RESENDABLE = new Set(["PENDING", "SENT", "VIEWED"]);
 
+function formatDateTimeLocal(d: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
 function formatDateTime(d: Date | string | null | undefined): string {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
@@ -198,6 +206,16 @@ export function CampaignDetail({
   const emailDirty =
     emailSubject !== (overview.campaign.invitationSubject ?? "") ||
     emailBody !== (overview.campaign.invitationBodyMarkdown ?? "");
+
+  // Follow-on (May 21) — coach edit start-date affordance.
+  // openAt is set in the wizard and locked post-creation in earlier UI;
+  // PATCH route already supports openAt. This adds an inline editor next
+  // to the OPENED display.
+  const [openAtEditing, setOpenAtEditing] = useState(false);
+  const [openAtDraft, setOpenAtDraft] = useState<string>(() =>
+    formatDateTimeLocal(new Date(overview.campaign.openAt)),
+  );
+  const [openAtSaving, setOpenAtSaving] = useState(false);
 
   const campaign = overview.campaign;
   const isDraft = campaign.status === "DRAFT";
@@ -446,9 +464,11 @@ export function CampaignDetail({
       if (!res.ok) {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
-      const sent = body.sent ?? 0;
-      const skipped = body.skipped ?? 0;
-      const failed = Array.isArray(body.failed) ? body.failed.length : 0;
+      const sent = body.data?.sent ?? 0;
+      const skipped = body.data?.skipped ?? 0;
+      const failed = Array.isArray(body.data?.failed)
+        ? body.data.failed.length
+        : 0;
       toast({
         title: "Reminders sent",
         description: `Sent ${sent}, skipped ${skipped}${failed > 0 ? `, failed ${failed}` : ""}.`,
@@ -500,6 +520,48 @@ export function CampaignDetail({
       });
     } finally {
       setCeoSavingFor(null);
+    }
+  }
+
+  // Follow-on (May 21) — save updated openAt via PATCH.
+  async function handleSaveOpenAt() {
+    if (openAtSaving) return;
+    if (openAtDraft.trim() === "") return;
+    const parsed = new Date(openAtDraft);
+    if (Number.isNaN(parsed.getTime())) {
+      toast({
+        title: "Invalid date",
+        description: "Could not parse the start date — please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setOpenAtSaving(true);
+    try {
+      const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ openAt: parsed.toISOString() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.success === false) {
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      toast({
+        title: "Start date updated",
+        description: `Opens ${formatDateTime(parsed)}.`,
+      });
+      setOpenAtEditing(false);
+      router.refresh();
+    } catch (err) {
+      toast({
+        title: "Could not update start date",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setOpenAtSaving(false);
     }
   }
 
@@ -943,9 +1005,61 @@ export function CampaignDetail({
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Opened
             </div>
-            <div className="mt-1 font-medium text-foreground">
-              {formatDateTime(campaign.openAt)}
-            </div>
+            {openAtEditing ? (
+              <div className="mt-1 space-y-2">
+                <input
+                  type="datetime-local"
+                  value={openAtDraft}
+                  onChange={(e) => setOpenAtDraft(e.target.value)}
+                  disabled={openAtSaving}
+                  className="w-full px-2 py-1 text-sm border border-border rounded bg-background"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveOpenAt}
+                    disabled={openAtSaving}
+                    className="text-xs font-medium px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {openAtSaving ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenAtEditing(false);
+                      setOpenAtDraft(
+                        formatDateTimeLocal(new Date(campaign.openAt)),
+                      );
+                    }}
+                    disabled={openAtSaving}
+                    className="text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-1 flex items-center gap-2">
+                <span className="font-medium text-foreground">
+                  {formatDateTime(campaign.openAt)}
+                </span>
+                {!isClosed && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenAtDraft(
+                        formatDateTimeLocal(new Date(campaign.openAt)),
+                      );
+                      setOpenAtEditing(true);
+                    }}
+                    className="text-xs font-medium text-primary hover:underline"
+                    data-testid="edit-openAt"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
