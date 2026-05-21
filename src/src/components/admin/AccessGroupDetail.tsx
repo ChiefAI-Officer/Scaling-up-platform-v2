@@ -285,27 +285,32 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-foreground">{data.name}</h1>
+      <div className="wf-page-header-row">
+        <div>
+          <div className="wf-page-pill-row" style={{ marginBottom: "0.5rem" }}>
+            <h2 className="wf-page-title" style={{ margin: 0 }}>{data.name}</h2>
             <Badge variant={isArchived ? "secondary" : "success"}>
               {isArchived ? "Archived" : "Active"}
             </Badge>
           </div>
           {data.description && (
-            <p className="text-sm text-muted-foreground">{data.description}</p>
+            <p className="wf-page-subtitle-strong">{data.description}</p>
           )}
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={openEdit} disabled={isArchived}>
+        <div className="wf-page-action-row">
+          <button
+            type="button"
+            onClick={openEdit}
+            disabled={isArchived}
+            className="wf-btn wf-btn-secondary"
+          >
             Edit metadata
-          </Button>
+          </button>
         </div>
-      </header>
+      </div>
 
       {/* Metadata card */}
-      <div className="rounded-lg border bg-card p-4 text-sm">
+      <div className="wf-card" style={{ padding: "1rem", fontSize: "0.875rem" }}>
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <dt className="font-medium text-foreground">ACCESS_POLICY_VERSION</dt>
@@ -511,7 +516,7 @@ export function AccessGroupDetail({ accessGroupId }: Props) {
 
       {/* Archive button */}
       {!isArchived && (
-        <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+        <section className="wf-card" style={{ padding: "1rem", borderColor: "hsl(var(--destructive) / 0.3)", background: "hsl(var(--destructive) / 0.05)" }}>
           <h2 className="text-sm font-semibold text-foreground">Archive group</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Soft-deletes the group. Coach + template memberships are preserved
