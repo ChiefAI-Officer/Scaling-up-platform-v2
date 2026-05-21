@@ -1,5 +1,7 @@
 # Assessment Publish Runbook
 
+> **Updated May 21 2026**: The template list page now redirects to a tabbed editor. Version-management actions (Edit / Duplicate / Publish) live inside the editor's **Versions** tab. Content editing lives in the **Metadata / Sections / Questions / Scoring & Tiers** tabs. Workflow below reflects the new navigation.
+
 Audience: Suzanne / admin operator. This runbook covers publishing assessment template versions, updating tier thresholds on already-published templates, and the specific steps to bring "Scaling Up Full Assessment" live.
 
 This document does NOT explain Rockefeller methodology or scoring theory. It tells you which buttons to click and which guardrails to respect.
@@ -29,8 +31,8 @@ Steps:
 
 1. Sign in as an admin.
 2. Navigate to `/admin/assessments/templates`.
-3. Click the template you intend to publish. You will land on the template detail page.
-4. Find the version row marked as DRAFT.
+3. Click the template you intend to publish. You will land on the tabbed editor (it opens on the Versions tab by default).
+4. Find the version row marked as Draft.
 5. Click **Publish** on that row.
 6. Confirm the dialog.
 7. One of two things happens:

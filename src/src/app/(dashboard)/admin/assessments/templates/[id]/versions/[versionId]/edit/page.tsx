@@ -75,6 +75,7 @@ export default async function AdminAssessmentVersionEditPage({
         versionNumber: true,
         language: true,
         publishedAt: true,
+        contentHash: true,
       },
     }),
   ]);
@@ -123,6 +124,7 @@ export default async function AdminAssessmentVersionEditPage({
             v.publishedAt instanceof Date
               ? v.publishedAt.toISOString()
               : v.publishedAt,
+          contentHash: v.contentHash,
         }))}
       />
     </div>

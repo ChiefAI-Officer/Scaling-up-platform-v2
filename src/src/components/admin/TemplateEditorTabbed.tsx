@@ -67,6 +67,7 @@ import {
   ScoringTiersTab,
   type ScoringConfigShape,
 } from "@/components/admin/template-editor/ScoringTiersTab";
+import { VersionsTab } from "@/components/admin/template-editor/VersionsTab";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -142,6 +143,8 @@ export interface TemplateEditorTabbedVersionMeta {
   versionNumber: number;
   language: string;
   publishedAt: string | null;
+  /** F5 — Versions tab renders the first 12 chars in the row. */
+  contentHash: string;
 }
 
 export interface DirtyFlags {
@@ -732,71 +735,117 @@ export function TemplateEditorTabbed({
   ]);
 
   // ─── Publish (mirrors AssessmentTemplateDetail.handlePublish) ─────────
-  const [publishing, setPublishing] = useState(false);
+  // F5: handler accepts an explicit versionId so VersionsTab can publish
+  // any draft row, not just the currently-edited version. Header button
+  // calls it with the current version's id.
+  const [publishingVersionId, setPublishingVersionId] = useState<
+    string | null
+  >(null);
+  const publishing = publishingVersionId !== null;
   const [publishIssues, setPublishIssues] = useState<
     PublishFailureIssue[] | null
   >(null);
+  const [duplicatingVersionId, setDuplicatingVersionId] = useState<
+    string | null
+  >(null);
 
-  const handlePublish = useCallback(async () => {
-    if (publishing || isPublished) return;
-    const confirmed = window.confirm(
-      "Publish this version? Once published, content is immutable.",
-    );
-    if (!confirmed) return;
-    setPublishIssues(null);
-    setPublishing(true);
-    try {
-      const res = await fetch(
-        `/api/admin/assessment-templates/${template.id}/versions/${version.id}/publish`,
-        { method: "POST" },
+  const handlePublishVersion = useCallback(
+    async (versionId: string) => {
+      if (publishingVersionId) return;
+      const confirmed = window.confirm(
+        "Publish this version? Once published, content is immutable.",
       );
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        // Same modal-narrowing logic as AssessmentTemplateDetail.
-        if (
-          res.status === 422 &&
-          Array.isArray(body?.issues) &&
-          body.issues.every(
-            (i: unknown) =>
-              i !== null &&
-              typeof i === "object" &&
-              Array.isArray((i as { path?: unknown }).path) &&
-              typeof (i as { message?: unknown }).message === "string",
-          )
-        ) {
-          setPublishIssues(body.issues as PublishFailureIssue[]);
-          return;
-        }
-        if (res.status === 409) {
+      if (!confirmed) return;
+      setPublishIssues(null);
+      setPublishingVersionId(versionId);
+      try {
+        const res = await fetch(
+          `/api/admin/assessment-templates/${template.id}/versions/${versionId}/publish`,
+          { method: "POST" },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (
+            res.status === 422 &&
+            Array.isArray(body?.issues) &&
+            body.issues.every(
+              (i: unknown) =>
+                i !== null &&
+                typeof i === "object" &&
+                Array.isArray((i as { path?: unknown }).path) &&
+                typeof (i as { message?: unknown }).message === "string",
+            )
+          ) {
+            setPublishIssues(body.issues as PublishFailureIssue[]);
+            return;
+          }
+          if (res.status === 409) {
+            toast({
+              title: "Already published",
+              variant: "destructive",
+            });
+            router.refresh();
+            return;
+          }
           toast({
-            title: "Already published",
+            title: "Could not publish",
+            description:
+              typeof body?.error === "string"
+                ? body.error
+                : "Please try again.",
             variant: "destructive",
           });
-          router.refresh();
           return;
         }
+        toast({ title: "Version published" });
+        router.refresh();
+      } catch (e) {
         toast({
           title: "Could not publish",
-          description:
-            typeof body?.error === "string"
-              ? body.error
-              : "Please try again.",
+          description: e instanceof Error ? e.message : "Please try again.",
           variant: "destructive",
         });
-        return;
+      } finally {
+        setPublishingVersionId(null);
       }
-      toast({ title: "Version published" });
-      router.refresh();
-    } catch (e) {
-      toast({
-        title: "Could not publish",
-        description: e instanceof Error ? e.message : "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setPublishing(false);
-    }
-  }, [isPublished, publishing, router, template.id, toast, version.id]);
+    },
+    [publishingVersionId, router, template.id, toast],
+  );
+
+  const handlePublish = useCallback(() => {
+    if (isPublished) return;
+    return handlePublishVersion(version.id);
+  }, [handlePublishVersion, isPublished, version.id]);
+
+  const handleDuplicateVersion = useCallback(
+    async (sourceVersionId: string) => {
+      if (duplicatingVersionId) return;
+      setDuplicatingVersionId(sourceVersionId);
+      try {
+        const res = await fetch(
+          `/api/admin/assessment-templates/${template.id}/versions/${sourceVersionId}/duplicate`,
+          { method: "POST" },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || body.success === false) {
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        toast({
+          title: "New draft created",
+          description: `v${body.data.versionNumber} — opening editor…`,
+        });
+        window.location.href = `/admin/assessments/templates/${template.id}/versions/${body.data.newVersionId}/edit`;
+      } catch (e) {
+        toast({
+          title: "Could not duplicate version",
+          description: e instanceof Error ? e.message : "Please try again.",
+          variant: "destructive",
+        });
+        setDuplicatingVersionId(null);
+      }
+    },
+    [duplicatingVersionId, template.id, toast],
+  );
 
   // ─── Versions caption ─────────────────────────────────────────────────
   const publishedSibling = useMemo(
@@ -1048,11 +1097,22 @@ export function TemplateEditorTabbed({
           </div>
         </TabsContent>
         <TabsContent value="versions">
-          <div
-            data-testid="tab-panel-versions"
-            className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-12 text-center text-sm text-muted-foreground"
-          >
-            Versions tab (F5)
+          <div data-testid="tab-panel-versions">
+            <VersionsTab
+              templateId={template.id}
+              currentVersionId={version.id}
+              versions={allVersions.map((v) => ({
+                id: v.id,
+                versionNumber: v.versionNumber,
+                language: v.language,
+                publishedAt: v.publishedAt,
+                contentHash: v.contentHash,
+              }))}
+              publishingVersionId={publishingVersionId}
+              duplicatingVersionId={duplicatingVersionId}
+              onPublish={handlePublishVersion}
+              onDuplicate={handleDuplicateVersion}
+            />
           </div>
         </TabsContent>
       </Tabs>
