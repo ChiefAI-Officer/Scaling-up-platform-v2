@@ -54,6 +54,7 @@ interface SurveyData {
 type Phase =
   | { kind: "exchanging" }
   | { kind: "loading" }
+  | { kind: "intro"; data: SurveyData }
   | { kind: "ready"; data: SurveyData }
   | { kind: "submitting"; data: SurveyData }
   | { kind: "error"; message: string };
@@ -122,7 +123,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             setPhase({ kind: "error", message: "Failed to load survey." });
           return;
         }
-        if (!cancelled) setPhase({ kind: "ready", data: meBody.data });
+        if (!cancelled) setPhase({ kind: "intro", data: meBody.data });
       } catch (err) {
         console.error("[org-survey] init failed", err);
         if (!cancelled)
@@ -140,13 +141,23 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   }, [campaignAlias]);
 
   const sortedSections = useMemo<Section[]>(() => {
-    if (phase.kind !== "ready" && phase.kind !== "submitting") return [];
+    if (
+      phase.kind !== "intro" &&
+      phase.kind !== "ready" &&
+      phase.kind !== "submitting"
+    )
+      return [];
     return [...phase.data.sections].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [phase]);
 
   const questionsBySection = useMemo<Map<string, Question[]>>(() => {
     const out = new Map<string, Question[]>();
-    if (phase.kind !== "ready" && phase.kind !== "submitting") return out;
+    if (
+      phase.kind !== "intro" &&
+      phase.kind !== "ready" &&
+      phase.kind !== "submitting"
+    )
+      return out;
     const sorted = [...phase.data.questions].sort(
       (a, b) => a.sortOrder - b.sortOrder
     );
@@ -235,6 +246,43 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             <span className="hero-eyebrow">Notice</span>
             <h1 className="ty-title">We can&apos;t open this survey</h1>
             <p className="ty-lede">{phase.message}</p>
+          </section>
+        </main>
+        <footer className="ty-footer">Powered by Scaling Up</footer>
+      </div>
+    );
+  }
+
+  if (phase.kind === "intro") {
+    return (
+      <div className="ty-page">
+        <header className="ty-header">
+          <span className="ty-brand">Scaling Up</span>
+          <span>You&apos;re invited</span>
+        </header>
+        <main className="ty-body">
+          <section className="ty-card" aria-labelledby="invite-title">
+            <span className="hero-eyebrow">You&apos;re invited</span>
+            <h1 className="ty-title" id="invite-title">
+              {phase.data.campaign.name}
+            </h1>
+            <p className="ty-lede">
+              You&apos;ve been invited to take this assessment. Click below
+              when you&apos;re ready to begin.
+            </p>
+            <p className="ty-sub">
+              You can answer in one sitting or come back later — your link
+              stays active.
+            </p>
+            <div className="hero-cta-row">
+              <button
+                type="button"
+                onClick={() => setPhase({ kind: "ready", data: phase.data })}
+                className="wf-btn wf-btn-primary hero-cta"
+              >
+                Start Assessment
+              </button>
+            </div>
           </section>
         </main>
         <footer className="ty-footer">Powered by Scaling Up</footer>
