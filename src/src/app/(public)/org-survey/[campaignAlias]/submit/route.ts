@@ -138,11 +138,16 @@ export async function POST(
           return { kind: "conflict" as const };
         }
 
-        // Build the scoring input. scoreSubmission throws ScoringValidationError
-        // with codes the route maps to 400 below; we let it propagate out of
-        // the transaction.
+        // Build the scoring input. Only SLIDER_LIKERT questions are scoreable;
+        // other types (TEXT, NUMBER, etc.) are filtered out so they don't
+        // cause schema validation failures inside scoreSubmission.
+        const allQuestions = invitation.campaign.version.questions as Array<
+          Record<string, unknown>
+        >;
         const version: TemplateVersionForScoring = {
-          questions: invitation.campaign.version.questions as TemplateVersionForScoring["questions"],
+          questions: allQuestions.filter(
+            (q) => q.type === "SLIDER_LIKERT"
+          ) as TemplateVersionForScoring["questions"],
           sections: invitation.campaign.version.sections as TemplateVersionForScoring["sections"],
           scoringConfig: invitation.campaign.version.scoringConfig as TemplateVersionForScoring["scoringConfig"],
         };
