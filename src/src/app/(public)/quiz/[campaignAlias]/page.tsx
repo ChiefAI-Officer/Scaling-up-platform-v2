@@ -78,7 +78,9 @@ export default async function PublicQuizPage({
           openAtIso={campaign.openAt.toISOString()}
           closeAtIso={campaign.closeAt ? campaign.closeAt.toISOString() : null}
           sections={version.sections as unknown}
-          questions={version.questions as unknown}
+          questions={(version.questions as Array<Record<string, unknown>>).filter(
+            (q) => q.type === "SLIDER_LIKERT"
+          ) as unknown}
         />
       </div>
     </div>
