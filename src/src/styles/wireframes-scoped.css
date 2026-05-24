@@ -1040,6 +1040,9 @@
 .wf-scope .survey-slider {
   width: 100%;
 }
+.wf-scope .survey-slider--pristine {
+  opacity: 0.45;
+}
 .wf-scope .survey-slider-anchors {
   display: flex;
   justify-content: space-between;
