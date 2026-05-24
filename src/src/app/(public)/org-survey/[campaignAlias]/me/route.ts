@@ -77,6 +77,16 @@ export async function GET(
       return gateFailed();
     }
 
+    // Only return SLIDER_LIKERT questions — the client can only render sliders.
+    // Other types (TEXT, NUMBER, etc.) are skipped so they don't show up as
+    // unanswerable required fields in the form.
+    const allQuestions = invitation.campaign.version.questions as Array<
+      Record<string, unknown>
+    >;
+    const scoreableQuestions = allQuestions.filter(
+      (q) => q.type === "SLIDER_LIKERT"
+    );
+
     return NextResponse.json(
       {
         success: true,
@@ -87,7 +97,7 @@ export async function GET(
           },
           version: { language: invitation.campaign.version.language },
           sections: invitation.campaign.version.sections,
-          questions: invitation.campaign.version.questions,
+          questions: scoreableQuestions,
         },
       },
       { status: 200, headers: NO_STORE_HEADERS }
