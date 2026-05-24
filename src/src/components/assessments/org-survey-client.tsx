@@ -63,6 +63,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "exchanging" });
   const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [touched, setTouched] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -344,17 +345,25 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
                         min={q.scale.min}
                         max={q.scale.max}
                         step={q.scale.step}
-                        value={answers[q.stableKey] ?? q.scale.min}
-                        onChange={(e) =>
+                        value={
+                          answers[q.stableKey] ??
+                          Math.floor((q.scale.min + q.scale.max) / 2)
+                        }
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setTouched((prev) => new Set(prev).add(q.stableKey));
                           setAnswers((prev) => ({
                             ...prev,
-                            [q.stableKey]: Number(e.target.value),
-                          }))
-                        }
-                        className="survey-slider"
+                            [q.stableKey]: v,
+                          }));
+                        }}
+                        className={`survey-slider${touched.has(q.stableKey) ? "" : " survey-slider--pristine"}`}
                         aria-valuemin={q.scale.min}
                         aria-valuemax={q.scale.max}
-                        aria-valuenow={answers[q.stableKey] ?? q.scale.min}
+                        aria-valuenow={
+                          answers[q.stableKey] ??
+                          Math.floor((q.scale.min + q.scale.max) / 2)
+                        }
                       />
                       <div className="survey-slider-anchors">
                         <span>{q.scale.anchorMin}</span>
