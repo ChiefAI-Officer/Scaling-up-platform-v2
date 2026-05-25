@@ -6,6 +6,16 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-25 — {{workshopLocation}} virtual link fix <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:workshoplocation-virtual-fix -->
+
+**Commit:** `05fb7f1` | **Files:** 4
+
+**Root cause:** `buildLocationString` was updated in the Gmail Directions button fix to return `""` for VIRTUAL workshops (correct for ICS LOCATION field). However, `execute-workflow.ts` and `trigger-workflow-step.ts` both called `buildLocationString(workshop)` to build the `workshopLocation` workflow email context variable. This meant `{{workshopLocation}}` rendered as blank in all automated emails for virtual workshops.
+
+**Fix:** Both Inngest function files now check `workshop.format === "VIRTUAL"` and return `workshop.virtualLink ?? ""` directly, bypassing `buildLocationString`. IN_PERSON and HYBRID still go through `buildLocationString` (which includes venue + address + Online link for HYBRID). ICS and Google Calendar link generation are unaffected.
+
+**Tests (TDD — RED first):** 4 tests — VIRTUAL uses `virtualLink`, IN_PERSON uses `buildLocationString`, once in each Inngest handler. All 4 green.
+
 ### 2026-05-25 — Export Registrations: workshopId filter + live admin button <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:export-registrations-workshopid-filter -->
 
 **Commit:** `197d1f3` | **Files:** 3
