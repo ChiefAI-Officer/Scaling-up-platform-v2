@@ -150,9 +150,6 @@ export function AssessmentsAggregateReport() {
         };
         if (!cancelled) {
           setTemplates(body.data ?? []);
-          if (body.data && body.data.length > 0) {
-            setTemplateId(body.data[0].id);
-          }
         }
       } catch (e) {
         if (!cancelled) {
@@ -266,7 +263,7 @@ export function AssessmentsAggregateReport() {
                 onChange={(e) => setTemplateId(e.target.value)}
                 disabled={templates.length === 0}
               >
-                {templates.length === 0 && <option value="">No templates</option>}
+                <option value="">— Select a template —</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} ({t.alias})
@@ -367,6 +364,17 @@ export function AssessmentsAggregateReport() {
         <Card>
           <CardContent className="py-6">
             <p className="text-sm text-muted-foreground">Loading report…</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No template selected */}
+      {!templateId && (
+        <Card>
+          <CardContent className="py-6">
+            <p className="text-sm text-muted-foreground">
+              Select a template above to view its aggregate report.
+            </p>
           </CardContent>
         </Card>
       )}
