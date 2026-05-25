@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { updateCoachSchema } from "@/lib/validations";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
@@ -178,7 +179,35 @@ export async function DELETE(
       );
     }
 
+    let userAccountRetained = false;
+
     await db.$transaction(async (tx) => {
+      // Block if coach owns organizations — ownerCoachId is non-nullable, can't be auto-nullified.
+      const ownedOrgCount = await tx.organization.count({ where: { ownerCoachId: id } });
+      if (ownedOrgCount > 0) {
+        throw Object.assign(new Error("OWNS_ORGANIZATIONS"), { ownedOrgCount });
+      }
+
+      // Clean up non-cascade Coach FK relations before deleting the coach.
+      // AccessGroupCoach has no onDelete; OrganizationOwnershipEvent and
+      // AssessmentCampaign use nullable Coach? fields — null them out so
+      // the audit trail is preserved.
+      await Promise.all([
+        tx.accessGroupCoach.deleteMany({ where: { coachId: id } }),
+        tx.organizationOwnershipEvent.updateMany({
+          where: { oldOwnerCoachId: id },
+          data: { oldOwnerCoachId: null },
+        }),
+        tx.organizationOwnershipEvent.updateMany({
+          where: { newOwnerCoachId: id },
+          data: { newOwnerCoachId: null },
+        }),
+        tx.assessmentCampaign.updateMany({
+          where: { createdByCoachId: id },
+          data: { createdByCoachId: null },
+        }),
+      ]);
+
       // Count cascade-affected records inside transaction for accuracy
       const [approvalQueueCount, followUpReportCount] = await Promise.all([
         tx.approvalQueue.count({ where: { coachId: id } }),
@@ -187,9 +216,24 @@ export async function DELETE(
 
       await tx.coach.delete({ where: { id } });
 
-      // Delete linked User account to prevent orphaned logins
+      // Delete linked User account to prevent orphaned logins.
+      // Best-effort: if FK constraints block deletion (e.g., user created
+      // assessment data with non-nullable createdBy), skip User.delete and
+      // retain the account — the coach profile is gone so portal access is
+      // revoked via requireCoach().
       if (existing.userId) {
-        await tx.user.delete({ where: { id: existing.userId } });
+        try {
+          await tx.user.delete({ where: { id: existing.userId } });
+        } catch (err) {
+          if (
+            err instanceof Prisma.PrismaClientKnownRequestError &&
+            err.code === "P2003"
+          ) {
+            userAccountRetained = true;
+          } else {
+            throw err;
+          }
+        }
       }
 
       await tx.auditLog.create({
@@ -205,6 +249,7 @@ export async function DELETE(
             workshopsDeleted: existing.workshops.length,
             approvalQueueDeleted: approvalQueueCount,
             followUpReportsDeleted: followUpReportCount,
+            userAccountRetained,
           }),
         },
       });
@@ -212,9 +257,21 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: "Coach deleted successfully",
+      message: userAccountRetained
+        ? "Coach deleted. User account retained (linked to assessment data)."
+        : "Coach deleted successfully",
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "OWNS_ORGANIZATIONS") {
+      const count = (error as Error & { ownedOrgCount?: number }).ownedOrgCount ?? 1;
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cannot delete coach who owns ${count} organization(s). Transfer ownership first.`,
+        },
+        { status: 400 }
+      );
+    }
     console.error("Error deleting coach:", error);
     return NextResponse.json(
       { success: false, error: "Failed to delete coach" },
