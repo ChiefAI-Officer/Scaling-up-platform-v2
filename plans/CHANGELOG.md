@@ -6,6 +6,20 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-25 — Admin-created workshops no longer bypass approval queue <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:admin-workshop-no-premature-build -->
+
+**Commit:** `24e7535`. 2 files changed, 51 insertions, 15 deletions.
+
+**Bug:** When an admin created a workshop via `POST /api/workshops`, the route immediately emitted `workshop/approved` (the Inngest event that triggers `runAutoBuild()`), causing landing pages to be created and the "Workshop Ready" email to fire before Suzanne had reviewed the approval queue entry created in the same request.
+
+**Root cause:** Lines 440–452 of `src/src/app/api/workshops/route.ts` contained an explicit "Admin/staff bypass" block that called `inngest.send({ name: "workshop/approved", ... })` for any privileged actor. The approval route (`POST /api/approvals/[id]/respond`) already calls `runAutoBuild()` and emits `workshop/approved` on all three approval paths — the bypass was redundant and destructive.
+
+**Fix:** Removed the 13-line bypass block and the orphaned `import { inngest }` from `api/workshops/route.ts`. Admin-created workshops now sit in `AWAITING_APPROVAL` with a `PENDING` approval queue entry and pages are built only after Suzanne approves.
+
+**Tests (TDD):** New failing test first: `"does NOT fire workshop/approved Inngest event during admin creation — pages wait for Suzanne's approval"` in `src/src/__tests__/api/workshops.test.ts`. Confirmed RED (inngest.send called once). After fix: 12/12 green. Full suite: same 3 pre-existing lint failures, no regressions. Build gate clean.
+
+---
+
 ### 2026-05-25 — Venue address bug fixes (admin create + thank-you page) <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:venue-address-bug-fixes -->
 
 **Commit:** `d1033d4`. 5 files changed, 68 insertions, 5 deletions.
