@@ -137,7 +137,7 @@ export async function POST(
 
     const allQuestions = version.questions as Array<Record<string, unknown>>;
     const versionParsed = TemplateVersionForScoringSchema.safeParse({
-      questions: allQuestions.filter((q) => q.type === "SLIDER_LIKERT"),
+      questions: allQuestions,
       sections: version.sections,
       scoringConfig: version.scoringConfig,
     });

@@ -16,9 +16,10 @@
  *   tiers cover the full metric domain implied by the questions, with no gaps
  *   and no overlaps. This catches mis-configured templates at scoring time
  *   rather than at admin-edit time (defence in depth).
- * - v1 supports SLIDER_LIKERT only on the scoring path. Future question types
- *   (TEXT, MULTI_SELECT, etc.) require extending the Zod schema + the per-answer
- *   validation switch — they intentionally fall through to INVALID_TYPE today.
+ * - SLIDER_LIKERT questions are fully scored (range validation, tier resolution,
+ *   perQuestion output). TEXT / NUMBER / MULTI_CHOICE questions are accepted by
+ *   both Zod schemas and stored in the DB, but pass through scoreSubmission
+ *   without scoring — they never appear in validatedAnswers or perQuestion.
  */
 
 import { z } from "zod";
@@ -42,9 +43,8 @@ export const RecommendationBandSchema = z.object({
   text: z.string(),
 });
 
-// QuestionBase: shape common to runtime + publish. D2 adds the optional
-// `recommendations` array.
-const QuestionBase = z.object({
+// Named export so downstream code can use as a Zod schema + TypeScript type guard.
+export const SliderLikertQuestion = z.object({
   stableKey: z.string(),
   sortOrder: z.number().int(),
   type: z.literal("SLIDER_LIKERT"),
@@ -55,6 +55,28 @@ const QuestionBase = z.object({
   scale: SliderLikertScaleSchema,
   recommendations: z.array(RecommendationBandSchema).optional(),
 });
+export type SliderLikertQuestion = z.infer<typeof SliderLikertQuestion>;
+
+// Qualitative question types: TEXT, NUMBER, MULTI_CHOICE. No scale required.
+const QualitativeQuestion = z.object({
+  stableKey: z.string(),
+  sortOrder: z.number().int(),
+  type: z.enum(["TEXT", "NUMBER", "MULTI_CHOICE"]),
+  label: z.string(),
+  helpText: z.string().optional(),
+  sectionStableKey: z.string().optional(),
+  isRequired: z.boolean(),
+  options: z
+    .array(z.object({ key: z.string(), label: z.string() }))
+    .optional(),
+  maxChoices: z.number().int().optional(),
+});
+
+// Discriminated union — accepts all 4 question types.
+const QuestionBase = z.discriminatedUnion("type", [
+  SliderLikertQuestion,
+  QualitativeQuestion,
+]);
 
 export const QuestionSchema = QuestionBase;
 
@@ -115,8 +137,12 @@ function checkRecommendationsRuntime(
   questions: Array<z.infer<typeof QuestionBase>>,
   ctx: z.RefinementCtx
 ): void {
-  for (let qi = 0; qi < questions.length; qi++) {
-    const q = questions[qi];
+  const scoredWithIndex = questions
+    .map((q, origIdx) => ({ q, origIdx }))
+    .filter((x): x is { q: SliderLikertQuestion; origIdx: number } =>
+      x.q.type === "SLIDER_LIKERT"
+    );
+  for (const { q, origIdx } of scoredWithIndex) {
     if (!q.recommendations || q.recommendations.length === 0) continue;
     const bands = q.recommendations;
 
@@ -126,14 +152,14 @@ function checkRecommendationsRuntime(
       if (b.maxScore < b.minScore) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["questions", qi, "recommendations", bi],
+          path: ["questions", origIdx, "recommendations", bi],
           message: `Recommendation band ${bi}: maxScore < minScore`,
         });
       }
       if (b.minScore < q.scale.min || b.maxScore > q.scale.max) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["questions", qi, "recommendations", bi],
+          path: ["questions", origIdx, "recommendations", bi],
           message: `Recommendation band ${bi} falls outside scale [${q.scale.min}, ${q.scale.max}]`,
         });
       }
@@ -149,7 +175,7 @@ function checkRecommendationsRuntime(
       if (b.minScore <= a.maxScore) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["questions", qi, "recommendations"],
+          path: ["questions", origIdx, "recommendations"],
           message: `Recommendation bands overlap: [${a.minScore}, ${a.maxScore}] and [${b.minScore}, ${b.maxScore}]`,
         });
       }
@@ -161,8 +187,12 @@ function checkRecommendationsPublish(
   questions: Array<z.infer<typeof QuestionBase>>,
   ctx: z.RefinementCtx
 ): void {
-  for (let qi = 0; qi < questions.length; qi++) {
-    const q = questions[qi];
+  const scoredWithIndex = questions
+    .map((q, origIdx) => ({ q, origIdx }))
+    .filter((x): x is { q: SliderLikertQuestion; origIdx: number } =>
+      x.q.type === "SLIDER_LIKERT"
+    );
+  for (const { q, origIdx } of scoredWithIndex) {
     if (!q.recommendations || q.recommendations.length === 0) continue;
     const bands = q.recommendations;
 
@@ -174,14 +204,14 @@ function checkRecommendationsPublish(
     if (sorted[0].minScore !== q.scale.min) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["questions", qi, "recommendations"],
+        path: ["questions", origIdx, "recommendations"],
         message: `First band must start at scale.min (${q.scale.min}); got ${sorted[0].minScore}`,
       });
     }
     if (sorted[sorted.length - 1].maxScore !== q.scale.max) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["questions", qi, "recommendations"],
+        path: ["questions", origIdx, "recommendations"],
         message: `Last band must end at scale.max (${q.scale.max}); got ${sorted[sorted.length - 1].maxScore}`,
       });
     }
@@ -193,7 +223,7 @@ function checkRecommendationsPublish(
       if (b.minScore !== expectedNext) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["questions", qi, "recommendations"],
+          path: ["questions", origIdx, "recommendations"],
           message:
             b.minScore > expectedNext
               ? `Gap between bands at value ${expectedNext} (next band starts at ${b.minScore})`
@@ -209,7 +239,7 @@ function checkRecommendationsPublish(
         if (txt.includes(sentinel)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            path: ["questions", qi, "recommendations", bi, "text"],
+            path: ["questions", origIdx, "recommendations", bi, "text"],
             message: `Band text contains placeholder sentinel "${sentinel}"`,
           });
           break;
@@ -235,9 +265,12 @@ function checkScaleUpScoreOptIn(
     });
     return;
   }
-  // Requires EVERY question on a 0-10 scale.
-  for (let qi = 0; qi < questions.length; qi++) {
-    const s = questions[qi].scale;
+  // Requires EVERY SLIDER_LIKERT question on a 0-10 scale.
+  const sliderQuestions = questions.filter(
+    (q): q is SliderLikertQuestion => q.type === "SLIDER_LIKERT"
+  );
+  for (let qi = 0; qi < sliderQuestions.length; qi++) {
+    const s = sliderQuestions[qi].scale;
     if (s.min !== 0 || s.max !== 10) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -339,11 +372,14 @@ function checkPerDomainTierTiling(
   ctx: z.RefinementCtx,
 ): void {
   if (!cfg.domains || cfg.domains.length === 0) return;
+  const sliderQuestions = questions.filter(
+    (q): q is SliderLikertQuestion => q.type === "SLIDER_LIKERT"
+  );
   let ctxs;
   try {
     ctxs = computePerDomainTierContexts(
       sections,
-      questions,
+      sliderQuestions,
       cfg.domains.map((d) => d.key),
     );
   } catch (err) {
@@ -496,7 +532,7 @@ interface TierDomain {
  *                   REJECT for mixed scales (ambiguous).
  */
 function computeTierDomain(
-  questions: Question[],
+  questions: SliderLikertQuestion[],
   tierMetric: ScoringConfig["tierMetric"]
 ): TierDomain {
   if (tierMetric === "countAchieved") {
@@ -551,7 +587,7 @@ function computeTierDomain(
  * Throws INVALID_SCORING_CONFIG when scales are mixed (ambiguous; the rollup
  * mean would span a non-uniform range).
  */
-function computeRollupTierDomain(questions: Question[]): TierDomain {
+function computeRollupTierDomain(questions: SliderLikertQuestion[]): TierDomain {
   if (questions.length === 0) {
     throw new ScoringValidationError(
       "INVALID_SCORING_CONFIG",
@@ -730,7 +766,7 @@ interface PerDomainTierContext {
 
 export function computePerDomainTierContexts(
   sections: Section[],
-  questions: Question[],
+  questions: SliderLikertQuestion[],
   domainKeys: string[],
 ): PerDomainTierContext[] {
   const sectionsByDomain = new Map<string, Section[]>();
@@ -740,7 +776,7 @@ export function computePerDomainTierContexts(
     arr.push(s);
     sectionsByDomain.set(s.domain, arr);
   }
-  const questionsBySectionKey = new Map<string, Question[]>();
+  const questionsBySectionKey = new Map<string, SliderLikertQuestion[]>();
   for (const q of questions) {
     if (!q.sectionStableKey) continue;
     const arr = questionsBySectionKey.get(q.sectionStableKey) ?? [];
@@ -751,7 +787,7 @@ export function computePerDomainTierContexts(
   const contexts: PerDomainTierContext[] = [];
   for (const key of domainKeys) {
     const domainSections = sectionsByDomain.get(key) ?? [];
-    const domainQuestions: Question[] = [];
+    const domainQuestions: SliderLikertQuestion[] = [];
     for (const s of domainSections) {
       const qs = questionsBySectionKey.get(s.stableKey) ?? [];
       domainQuestions.push(...qs);
@@ -822,6 +858,13 @@ export function scoreSubmission(
   }
   const v = parsed.data;
 
+  // Filter to SLIDER_LIKERT questions only — all scoring math operates on
+  // these. TEXT / NUMBER / MULTI_CHOICE questions are stored in the template
+  // but are not scored; they are silently ignored throughout.
+  const scorableQuestions = v.questions.filter(
+    (q): q is SliderLikertQuestion => q.type === "SLIDER_LIKERT"
+  );
+
   // 2) Dynamic tier-domain validation.
   //    Legacy path (rollup unset): compute the implied metric domain from
   //    tierMetric and confirm the configured tiers tile it exactly. This is
@@ -833,11 +876,11 @@ export function scoreSubmission(
   //    with tier shapes that match the rollup metric (e.g., 0-10) without
   //    being constrained by the legacy domain math.
   if (v.scoringConfig.rollup) {
-    const rollupDomain = computeRollupTierDomain(v.questions);
+    const rollupDomain = computeRollupTierDomain(scorableQuestions);
     assertTierTiling(v.scoringConfig.tiers, rollupDomain);
   } else {
     const domain = computeTierDomain(
-      v.questions,
+      scorableQuestions,
       v.scoringConfig.tierMetric
     );
     assertTierTiling(v.scoringConfig.tiers, domain);
@@ -853,7 +896,7 @@ export function scoreSubmission(
   ) {
     const ctxs = computePerDomainTierContexts(
       v.sections,
-      v.questions,
+      scorableQuestions,
       v.scoringConfig.domains.map((d) => d.key),
     );
     const byKey = new Map(ctxs.map((c) => [c.domainKey, c.domain]));
@@ -894,14 +937,21 @@ export function scoreSubmission(
   }
 
   // 5) Build a lookup by stableKey + validate each answer against its question.
+  //    Include ALL question types in the lookup so we can detect unknown keys.
+  //    Scale-range validation only applies to SLIDER_LIKERT questions.
   const questionByKey = new Map<string, Question>();
   for (const q of v.questions) questionByKey.set(q.stableKey, q);
 
+  // Scorable-question lookup (SLIDER_LIKERT only) — used for range validation.
+  const sliderByKey = new Map<string, SliderLikertQuestion>();
+  for (const q of scorableQuestions) sliderByKey.set(q.stableKey, q);
+
   // Sort sections + questions deterministically by sortOrder for stable output.
+  // Only SLIDER_LIKERT questions participate in per-question scoring.
   const sortedSections = [...v.sections].sort(
     (a, b) => a.sortOrder - b.sortOrder
   );
-  const sortedQuestions = [...v.questions].sort(
+  const sortedQuestions = [...scorableQuestions].sort(
     (a, b) => a.sortOrder - b.sortOrder
   );
 
@@ -914,6 +964,12 @@ export function scoreSubmission(
         { stableKey: a.stableKey }
       );
     }
+
+    // Non-SLIDER answers (TEXT / NUMBER / MULTI_CHOICE) are accepted but not
+    // scored. Skip numeric validation for them entirely.
+    if (q.type !== "SLIDER_LIKERT") continue;
+
+    const sliderQ = sliderByKey.get(a.stableKey)!;
 
     // Strict type validation. Number primitives only, no NaN, no Infinity.
     if (typeof a.value !== "number" || !Number.isFinite(a.value)) {
@@ -934,14 +990,14 @@ export function scoreSubmission(
       );
     }
 
-    if (value < q.scale.min || value > q.scale.max) {
+    if (value < sliderQ.scale.min || value > sliderQ.scale.max) {
       throw new ScoringValidationError(
         "OUT_OF_RANGE",
         {
           stableKey: a.stableKey,
           value,
-          min: q.scale.min,
-          max: q.scale.max,
+          min: sliderQ.scale.min,
+          max: sliderQ.scale.max,
         }
       );
     }
@@ -949,15 +1005,15 @@ export function scoreSubmission(
     // Step alignment — for SLIDER_LIKERT with step=1 every integer in range is
     // aligned, so this never trips for Rockefeller. Included for forward compat
     // (e.g. a future 0/2/4/6 scale with step=2).
-    if ((value - q.scale.min) % q.scale.step !== 0) {
+    if ((value - sliderQ.scale.min) % sliderQ.scale.step !== 0) {
       throw new ScoringValidationError(
         "OUT_OF_RANGE",
         {
           stableKey: a.stableKey,
           value,
           reason: "step-misaligned",
-          min: q.scale.min,
-          step: q.scale.step,
+          min: sliderQ.scale.min,
+          step: sliderQ.scale.step,
         }
       );
     }
@@ -965,11 +1021,12 @@ export function scoreSubmission(
     validatedAnswers.set(a.stableKey, value);
   }
 
-  // 6) Required-key check. Collect ALL missing required keys so the client can
-  //    fix the form in one round trip instead of N.
+  // 6) Required-key check — only SLIDER_LIKERT questions participate in scoring.
+  //    Collect ALL missing required keys so the client can fix the form in one
+  //    round trip instead of N.
   const missingRequired: string[] = [];
   const unansweredKeys: string[] = [];
-  for (const q of v.questions) {
+  for (const q of scorableQuestions) {
     if (!validatedAnswers.has(q.stableKey)) {
       if (q.isRequired) missingRequired.push(q.stableKey);
       else unansweredKeys.push(q.stableKey);

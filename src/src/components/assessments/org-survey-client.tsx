@@ -16,6 +16,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { QuestionInput } from "./question-input";
 
 interface ScaleConfig {
   min: number;
@@ -33,7 +34,9 @@ interface Question {
   helpText?: string;
   sectionStableKey?: string;
   isRequired: boolean;
-  scale: ScaleConfig;
+  scale?: ScaleConfig;
+  options?: Array<{ key: string; label: string }>;
+  maxChoices?: number;
 }
 
 interface Section {
@@ -62,7 +65,7 @@ type Phase =
 export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "exchanging" });
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, number | string | string[]>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -175,7 +178,13 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
 
     const required = phase.data.questions.filter((q) => q.isRequired);
     const missing = required
-      .filter((q) => answers[q.stableKey] === undefined)
+      .filter((q) => {
+        const v = answers[q.stableKey];
+        if (v === undefined) return true;
+        if (typeof v === "string" && v.trim() === "") return true;
+        if (Array.isArray(v) && v.length === 0) return true;
+        return false;
+      })
       .map((q) => q.label);
     if (missing.length > 0) {
       setPhase({
@@ -338,33 +347,14 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
                       {q.helpText ? (
                         <p className="survey-question-help">{q.helpText}</p>
                       ) : null}
-                      <input
-                        id={`q-${q.stableKey}`}
-                        type="range"
-                        min={q.scale.min}
-                        max={q.scale.max}
-                        step={q.scale.step}
-                        value={answers[q.stableKey] ?? q.scale.min}
-                        onChange={(e) =>
-                          setAnswers((prev) => ({
-                            ...prev,
-                            [q.stableKey]: Number(e.target.value),
-                          }))
+                      <QuestionInput
+                        question={q}
+                        value={answers[q.stableKey]}
+                        onChange={(sk, v) =>
+                          setAnswers((prev) => ({ ...prev, [sk]: v }))
                         }
-                        className="survey-slider"
-                        aria-valuemin={q.scale.min}
-                        aria-valuemax={q.scale.max}
-                        aria-valuenow={answers[q.stableKey] ?? q.scale.min}
+                        disabled={submitting}
                       />
-                      <div className="survey-slider-anchors">
-                        <span>{q.scale.anchorMin}</span>
-                        <span className="survey-slider-value">
-                          {answers[q.stableKey] !== undefined
-                            ? answers[q.stableKey]
-                            : "—"}
-                        </span>
-                        <span>{q.scale.anchorMax}</span>
-                      </div>
                     </li>
                   ))}
                 </ul>

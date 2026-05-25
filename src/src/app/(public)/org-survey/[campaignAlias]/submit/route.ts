@@ -26,8 +26,8 @@ import { getInvitationSession } from "@/lib/assessments/invitation-cookie";
 import {
   scoreSubmission,
   ScoringValidationError,
+  TemplateVersionForScoringSchema,
   type Answer,
-  type TemplateVersionForScoring,
 } from "@/lib/assessments/scoring";
 import { logAudit } from "@/lib/audit";
 
@@ -138,31 +138,31 @@ export async function POST(
           return { kind: "conflict" as const };
         }
 
-        // Build the scoring input. Only SLIDER_LIKERT questions are scoreable;
-        // other types (TEXT, NUMBER, etc.) are filtered out so they don't
-        // cause schema validation failures inside scoreSubmission.
+        // Build the scoring input — pass ALL question types; Phase B
+        // scoreSubmission skips non-SLIDER_LIKERT answers gracefully.
         const allQuestions = invitation.campaign.version.questions as Array<
           Record<string, unknown>
         >;
-        const version: TemplateVersionForScoring = {
-          questions: allQuestions.filter(
-            (q) => q.type === "SLIDER_LIKERT"
-          ) as TemplateVersionForScoring["questions"],
-          sections: invitation.campaign.version.sections as TemplateVersionForScoring["sections"],
-          scoringConfig: invitation.campaign.version.scoringConfig as TemplateVersionForScoring["scoringConfig"],
-        };
-        const scoringAnswers: Answer[] = answers.map((a) => ({
+        const versionParsed = TemplateVersionForScoringSchema.safeParse({
+          questions: allQuestions,
+          sections: invitation.campaign.version.sections,
+          scoringConfig: invitation.campaign.version.scoringConfig,
+        });
+        if (!versionParsed.success) {
+          return { kind: "schema-error" as const };
+        }
+        const rawAnswers: Answer[] = answers.map((a) => ({
           stableKey: a.stableKey,
           value: a.value,
         }));
-        const scoreResult = scoreSubmission(version, scoringAnswers);
+        const scoreResult = scoreSubmission(versionParsed.data, rawAnswers);
 
         const submission = await tx.assessmentSubmission.create({
           data: {
             campaignId: invitation.campaignId,
             respondentId: invitation.respondentId,
             invitationId: invitation.id,
-            answers: scoringAnswers as unknown as object,
+            answers: rawAnswers as unknown as object, // ALL answers stored
             result: scoreResult as unknown as object,
           },
           select: { id: true },
@@ -185,6 +185,12 @@ export async function POST(
         return NextResponse.json(
           { success: false, error: "Invitation not found" },
           { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+      if (result.kind === "schema-error") {
+        return NextResponse.json(
+          { success: false, error: "Template version schema invalid" },
+          { status: 500, headers: NO_STORE_HEADERS }
         );
       }
       if (result.kind === "gate") return gateFailed();
