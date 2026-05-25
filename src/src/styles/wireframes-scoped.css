@@ -1055,6 +1055,41 @@
   justify-content: center;
   padding-top: 0.5rem;
 }
+.wf-scope .survey-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.wf-scope .survey-input-number {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+}
+.wf-scope .survey-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wf-scope .survey-checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.wf-scope .survey-checkbox-item input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
 
 /* ===========================================================
    Wizard stepper (WF20 admin public quiz wizard + campaign wizard)

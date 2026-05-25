@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { QuestionInput } from "./question-input";
 
 interface SectionDef {
   stableKey: string;
@@ -23,12 +24,14 @@ interface QuestionScale {
 interface QuestionDef {
   stableKey: string;
   sortOrder: number;
-  type: "SLIDER_LIKERT";
+  type: string;
   label: string;
   helpText?: string;
   sectionStableKey?: string;
   isRequired: boolean;
-  scale: QuestionScale;
+  scale?: QuestionScale;
+  options?: Array<{ key: string; label: string }>;
+  maxChoices?: number;
 }
 
 // Tolerant cast — server gives us `unknown`; runtime shape comes from the
@@ -41,14 +44,13 @@ function toSections(raw: unknown): SectionDef[] {
 }
 function toQuestions(raw: unknown): QuestionDef[] {
   if (!Array.isArray(raw)) return [];
+  // Accept all question types — only require stableKey + label.
+  // Non-SLIDER questions may not have a scale; QuestionInput handles them.
   return (raw as QuestionDef[]).filter(
     (q) =>
       q &&
       typeof q.stableKey === "string" &&
-      typeof q.label === "string" &&
-      q.scale &&
-      typeof q.scale.min === "number" &&
-      typeof q.scale.max === "number",
+      typeof q.label === "string",
   );
 }
 
@@ -103,7 +105,7 @@ export function PublicQuizClient({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, number | string | string[]>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -293,14 +295,18 @@ export function PublicQuizClient({
   }
 
   // step === "form"
-  function setAnswer(key: string, value: number) {
+  function setAnswer(key: string, value: number | string | string[]) {
     setAnswers((cur) => ({ ...cur, [key]: value }));
   }
 
   const requiredQuestions = sortedQuestions.filter((q) => q.isRequired);
-  const missingRequired = requiredQuestions.filter(
-    (q) => answers[q.stableKey] === undefined,
-  );
+  const missingRequired = requiredQuestions.filter((q) => {
+    const v = answers[q.stableKey];
+    if (v === undefined) return true;
+    if (typeof v === "string" && v.trim() === "") return true;
+    if (Array.isArray(v) && v.length === 0) return true;
+    return false;
+  });
   const canSubmit = missingRequired.length === 0;
 
   async function handleSubmit() {
@@ -381,6 +387,7 @@ export function PublicQuizClient({
                   question={q}
                   value={answers[q.stableKey]}
                   onChange={(v) => setAnswer(q.stableKey, v)}
+                  disabled={submitting}
                 />
               ))}
             </section>
@@ -394,6 +401,7 @@ export function PublicQuizClient({
                   question={q}
                   value={answers[q.stableKey]}
                   onChange={(v) => setAnswer(q.stableKey, v)}
+                  disabled={submitting}
                 />
               ))}
             </section>
@@ -457,16 +465,61 @@ function QuestionRow({
   question,
   value,
   onChange,
+  disabled,
 }: {
   question: QuestionDef;
-  value: number | undefined;
-  onChange: (v: number) => void;
+  value: number | string | string[] | undefined;
+  onChange: (v: number | string | string[]) => void;
+  disabled?: boolean;
 }) {
-  const { scale } = question;
-  // Build option buttons for the slider/likert range.
-  const options: number[] = [];
-  for (let v = scale.min; v <= scale.max; v += scale.step) options.push(v);
+  // For SLIDER_LIKERT, keep the existing button-style picker for quiz UX.
+  // For all other types, delegate to QuestionInput.
+  if (question.type === "SLIDER_LIKERT" && question.scale) {
+    const { scale } = question;
+    const options: number[] = [];
+    for (let v = scale.min; v <= scale.max; v += scale.step) options.push(v);
+    const numVal = typeof value === "number" ? value : undefined;
 
+    return (
+      <div className="space-y-2" data-testid={`quiz-question-${question.stableKey}`}>
+        <p className="text-sm font-medium text-foreground">
+          {question.label}
+          {question.isRequired && (
+            <span className="text-destructive ml-1">*</span>
+          )}
+        </p>
+        {question.helpText && (
+          <p className="text-xs text-muted-foreground">{question.helpText}</p>
+        )}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            {options.map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => onChange(opt)}
+                disabled={disabled}
+                className={`min-w-[44px] px-3 py-2 text-sm rounded-md border transition-colors ${
+                  numVal === opt
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-border text-foreground hover:bg-muted"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                data-testid={`quiz-answer-${question.stableKey}-${opt}`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-between text-[11px] text-muted-foreground">
+            <span>{scale.anchorMin}</span>
+            <span>{scale.anchorMax}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Non-SLIDER question types — use the shared QuestionInput component.
   return (
     <div className="space-y-2" data-testid={`quiz-question-${question.stableKey}`}>
       <p className="text-sm font-medium text-foreground">
@@ -478,29 +531,12 @@ function QuestionRow({
       {question.helpText && (
         <p className="text-xs text-muted-foreground">{question.helpText}</p>
       )}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          {options.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => onChange(opt)}
-              className={`min-w-[44px] px-3 py-2 text-sm rounded-md border transition-colors ${
-                value === opt
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background border-border text-foreground hover:bg-muted"
-              }`}
-              data-testid={`quiz-answer-${question.stableKey}-${opt}`}
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
-        <div className="flex justify-between text-[11px] text-muted-foreground">
-          <span>{scale.anchorMin}</span>
-          <span>{scale.anchorMax}</span>
-        </div>
-      </div>
+      <QuestionInput
+        question={question}
+        value={value}
+        onChange={(_sk, v) => onChange(v)}
+        disabled={disabled}
+      />
     </div>
   );
 }

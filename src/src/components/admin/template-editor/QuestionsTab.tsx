@@ -452,7 +452,20 @@ function QuestionConfigForm({
         />
       </div>
 
+      {/* Read-only fallback for non-SLIDER_LIKERT question types */}
+      {question.type !== "SLIDER_LIKERT" && (
+        <div className="wf-helper-card" style={{ opacity: 0.7 }}>
+          <span className="wf-pill wf-pill--status">
+            {question.type}
+          </span>
+          <span style={{ marginLeft: 8, fontSize: "0.85rem", color: "var(--muted-foreground)" }}>
+            {question.label} — editing not available for this question type in v1
+          </span>
+        </div>
+      )}
+
       {/* SLIDER_LIKERT — config block (active) */}
+      {question.type === "SLIDER_LIKERT" && (
       <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
         <h4 className="text-xs font-semibold text-foreground">
           SLIDER_LIKERT — config
@@ -558,6 +571,7 @@ function QuestionConfigForm({
           .
         </span>
       </div>
+      )}
 
       {/* NUMBER accordion (v1.5 deferred, all inputs disabled per Gap E) */}
       <div
