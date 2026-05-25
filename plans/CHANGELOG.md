@@ -6,6 +6,18 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-25 — ICS timezone offset fix: UTC absolute datetime (Z suffix) <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:ics-utc-datetime-fix -->
+
+**Commit:** `528a9de`. 2 files changed, 66 insertions, 37 deletions.
+
+**Bug:** ICS downloads (`.ics` files) and Google Calendar links showed wrong times for US timezone workshops. Jeff described it as "ICS timezone offset wrong (CST/PST)". Root cause: `generateIcsContent` and `buildGoogleCalendarUrl` used `start.setHours(hours)` (server-local time method) then emitted `DTSTART;TZID=America/Chicago:20260615T090000` — a floating datetime with TZID but WITHOUT the required `VTIMEZONE` block. Clients like Outlook ignore TZID without a `VTIMEZONE` companion and treat the time as UTC or local, producing 5–8 hour offsets for US attendees.
+
+**Fix:** Replaced the `setHours`/`getHours` approach in `generateIcsContent` and `buildGoogleCalendarUrl` with `resolveEventStartMoment` (already existed in `lib/workflows/resolve-event-start-moment.ts` — uses `Intl.DateTimeFormat` to correctly handle DST). Emit `DTSTART:20260615T140000Z` (RFC 5545 UTC absolute form, Z suffix) instead of the floating TZID form. Z-suffix datetimes are universally supported by all calendar clients including Outlook, Apple Calendar, and Google Calendar. Removed `formatIcsDate` (local-time formatter) and `parseStartTime` (no longer needed in this file); added `formatIcsDateUtc` (UTC formatter). Google Calendar URLs updated similarly; `ctz` parameter retained for timezone labeling.
+
+**Tests (TDD):** 2 new failing tests first: Chicago workshop (CDT=UTC-5: `20260615T140000Z`) + LA workshop (PDT=UTC-7: `20260615T160000Z`). 3 existing tests updated from TZID pattern to UTC expected values. 29/29 green. Full suite: same 3 pre-existing lint failures. Build gate clean.
+
+---
+
 ### 2026-05-25 — Admin-created workshops no longer bypass approval queue <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:admin-workshop-no-premature-build -->
 
 **Commit:** `24e7535`. 2 files changed, 51 insertions, 15 deletions.
