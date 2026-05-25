@@ -6,6 +6,18 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-25 — Export Registrations: workshopId filter + live admin button <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:export-registrations-workshopid-filter -->
+
+**Commit:** `197d1f3` | **Files:** 3
+
+**Root cause:** `GET /api/registrations/export` exported all registrations across every workshop because the route accepted no query params and had a hard-coded `where: { paymentStatus: { not: "PENDING" } }`. The "Export Registrations" button in `quick-actions.tsx` was a completely dead stub (`alert("Configuration Required…")`).
+
+**Fix:**
+- `src/src/app/api/registrations/export/route.ts`: changed `GET()` → `GET(request: Request)`, extracted `workshopId` from `searchParams`, added conditional `workshopId` spread to the Prisma `where` clause. Filename switches to `registrations-<date>.csv` when filtered (vs `contacts-<date>.csv` for the all-workshops export).
+- `src/src/app/(dashboard)/workshops/[id]/quick-actions.tsx`: replaced `alert(...)` with `window.location.href = /api/registrations/export?workshopId=${encodeURIComponent(workshopId)}`.
+
+**Tests (TDD — RED first):** 4 tests in `src/src/__tests__/api/registrations-export.test.ts` — 401 unauthenticated, 403 not admin/staff, CSV returned with no `workshopId` filter when param absent, `workshopId` correctly passed to Prisma `where` when param present. All 4 green.
+
 ### 2026-05-25 — ICS timezone offset fix: UTC absolute datetime (Z suffix) <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:ics-utc-datetime-fix -->
 
 **Commit:** `528a9de`. 2 files changed, 66 insertions, 37 deletions.
