@@ -6,6 +6,25 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-25 — Delete coach: FK constraint fix for assessment data + org ownership guard <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:delete-coach-fk-fix -->
+
+**Commit:** `c488308` | **Files:** 2
+
+**Root cause:** `DELETE /api/coaches/[id]` was returning 500 for any coach with:
+1. `AccessGroupCoach` memberships — the `coach` FK on that model has no `onDelete: Cascade`, causing P2003 on `tx.coach.delete()`
+2. Organization ownership — `Organization.ownerCoachId` is non-nullable with no cascade
+
+**Fix (`src/src/app/api/coaches/[id]/route.ts`):**
+- Pre-delete org ownership check: returns 400 with clear message "Cannot delete coach who owns N organization(s). Transfer ownership first."
+- Transaction now pre-cleans non-cascade Coach FK relations before `coach.delete()`:
+  - `accessGroupCoach.deleteMany({ where: { coachId } })`
+  - `organizationOwnershipEvent.updateMany` — nullifies old/newOwnerCoachId (nullable Coach? fields)
+  - `assessmentCampaign.updateMany` — nullifies createdByCoachId (nullable Coach? field)
+- User.delete() is wrapped in try/catch for P2003 — if the user created assessment data with non-nullable `createdBy` fields, the account is retained instead of failing the whole operation; coach portal access is blocked by `requireCoach()` redirect anyway
+- Added `import { Prisma } from "@prisma/client"` for `PrismaClientKnownRequestError` check
+
+**Tests (TDD — RED first):** 9 tests — 401/403/404/active-workshop guards, org ownership 400 block, accessGroupCoach cleanup, assessmentCampaign nullify, user account deleted, user account retained on P2003. All 9 green.
+
 ### 2026-05-25 — {{workshopLocation}} virtual link fix <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:workshoplocation-virtual-fix -->
 
 **Commit:** `05fb7f1` | **Files:** 4
