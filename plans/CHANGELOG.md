@@ -18,6 +18,8 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 **Tests (TDD):** 3 new failing tests written first, then fixed: Test A + B in `src/src/__tests__/components/thank-you-page-template.test.tsx` (raw JSON not rendered; null address no crash); Test C in `src/src/__tests__/api/workshops.test.ts` (venueAddress stored as-is, not double-encoded). 33/33 in both suites green. Pre-existing 3 failures confirmed pre-existing on clean main. Build gate: `CI=true npx next build --turbopack` clean.
 
+**Bug D — workflow emails render raw JSON address (`b87e3bc`):** `src/src/inngest/functions/schedule-emails.ts` line 67 was setting `venue_address: workshop.venueAddress` — the raw JSON string — into the email template variable. Any scheduled workflow email containing `{{venue_address}}` would show `{"street":"...","city":"..."}` to attendees. Fix: `venue_address: formatVenueAddress(workshop.venueAddress)` using the same `formatVenueAddress` from `@/lib/utils`. 2 new tests in `src/src/__tests__/inngest/schedule-emails.test.ts` (JSON address formats to readable string; null falls back to default message). Build gate clean.
+
 ---
 
 ### 2026-05-25 — Assessment Full Roster Build: multi-type questions + LVA seed <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:assessment-full-roster-multi-type-questions-lva-seed -->
