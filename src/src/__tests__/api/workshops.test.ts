@@ -60,6 +60,7 @@ jest.mock("@/inngest/client", () => ({
 import { GET, POST } from "@/app/api/workshops/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
+import { inngest } from "@/inngest/client";
 import { createWorkshopPromotionCode } from "@/services/stripe";
 
 function asPostRequest(request: Request): Parameters<typeof POST>[0] {
@@ -405,6 +406,56 @@ describe("Workshops API", () => {
             ]),
           }),
         })
+      );
+    });
+
+    it("does NOT fire workshop/approved Inngest event during admin creation — pages wait for Suzanne's approval", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      (db.coach.findUnique as jest.Mock).mockResolvedValue({
+        id: "coach-1",
+        email: "coach@example.com",
+        firstName: "Jamie",
+        lastName: "Coach",
+        linkedinUrl: null,
+        certifications: [{ id: "cert-1", status: "ACTIVE" }],
+      });
+      (db.workshopType.findUnique as jest.Mock).mockResolvedValue({
+        id: "wt-1",
+        slug: "scaling-up",
+      });
+      (db.workshop.create as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        title: "Scaling Up Growth Workshop",
+        coachId: "coach-1",
+        workshopCode: "WS-2026-A1B2",
+      });
+      (db.workshop.update as jest.Mock).mockResolvedValue({
+        id: "ws-1",
+        landingPageSlug: "scaling-up-growth-workshop-ws-1",
+      });
+      (inngest.send as jest.Mock).mockClear();
+
+      const tomorrow = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString();
+      const payload = buildWorkshopPayload(tomorrow);
+
+      const response = await POST(
+        asPostRequest(
+          new Request("http://localhost/api/workshops", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        )
+      );
+
+      expect(response.status).toBe(201);
+      expect(inngest.send).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: "workshop/approved" })
       );
     });
   });
