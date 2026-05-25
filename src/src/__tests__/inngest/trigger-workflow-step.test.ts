@@ -916,4 +916,41 @@ describe("triggerWorkflowStep Inngest function", () => {
             );
         });
     });
+
+    // ------------------------------------------------------------------
+    // workshopLocation token for VIRTUAL workshops (BUG-MAY25)
+    // ------------------------------------------------------------------
+    describe("workshopLocation context value", () => {
+        it("uses virtualLink as workshopLocation for VIRTUAL workshops", async () => {
+            (db.workshop.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkshop({ format: "VIRTUAL", virtualLink: "https://zoom.us/j/999" })
+            );
+
+            await capturedHandler({
+                event: { data: { stepId: "step-1", workshopId: "ws-1" } },
+                step: mockStep,
+            });
+
+            const interpolateCalls = (interpolateTemplate as jest.Mock).mock.calls;
+            expect(interpolateCalls.length).toBeGreaterThan(0);
+            const contextArg = interpolateCalls[0][1];
+            expect(contextArg).toMatchObject({ workshopLocation: "https://zoom.us/j/999" });
+        });
+
+        it("uses buildLocationString for IN_PERSON workshops", async () => {
+            (db.workshop.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkshop({ format: "IN_PERSON", virtualLink: null })
+            );
+
+            await capturedHandler({
+                event: { data: { stepId: "step-1", workshopId: "ws-1" } },
+                step: mockStep,
+            });
+
+            const interpolateCalls = (interpolateTemplate as jest.Mock).mock.calls;
+            expect(interpolateCalls.length).toBeGreaterThan(0);
+            const contextArg = interpolateCalls[0][1];
+            expect(contextArg).toMatchObject({ workshopLocation: "123 Main St, New York, NY" });
+        });
+    });
 });

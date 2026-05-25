@@ -132,7 +132,9 @@ export const triggerWorkflowStep = inngest.createFunction(
                 timeZone: "UTC",
             }),
             workshopTime: workshop.eventTime || "TBD",
-            workshopLocation: buildLocationString(workshop),
+            workshopLocation: workshop.format === "VIRTUAL"
+                ? (workshop.virtualLink ?? "")
+                : buildLocationString(workshop),
             workshopUrl: workshop.landingPageSlug
                 ? `${appUrl}/workshop/${workshop.landingPageSlug}`
                 : appUrl,

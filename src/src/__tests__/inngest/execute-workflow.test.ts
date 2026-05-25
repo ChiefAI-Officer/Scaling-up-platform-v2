@@ -1616,4 +1616,53 @@ describe("execute-workflow Inngest function", () => {
       expect(rollupUpdate).toBeDefined();
     });
   });
+
+  // ------------------------------------------------------------------
+  // workshopLocation token for VIRTUAL workshops (BUG-MAY25)
+  // ------------------------------------------------------------------
+  describe("workshopLocation context value", () => {
+    it("uses virtualLink as workshopLocation for VIRTUAL workshops", async () => {
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({
+            stepType: "EMAIL_COACH",
+            subject: "Join: {{workshopLocation}}",
+            body: "Link",
+          }),
+        ],
+        workshopOverrides: {
+          format: "VIRTUAL",
+          virtualLink: "https://zoom.us/j/123456",
+        },
+      });
+      findUnique.mockResolvedValue(assignment);
+
+      await invoke();
+
+      expect(mockInterpolate).toHaveBeenCalledWith(
+        "Join: {{workshopLocation}}",
+        expect.objectContaining({ workshopLocation: "https://zoom.us/j/123456" })
+      );
+    });
+
+    it("uses buildLocationString for IN_PERSON workshops", async () => {
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({ stepType: "EMAIL_COACH", subject: "Venue: {{workshopLocation}}", body: "" }),
+        ],
+        workshopOverrides: {
+          format: "IN_PERSON",
+          virtualLink: null,
+        },
+      });
+      findUnique.mockResolvedValue(assignment);
+
+      await invoke();
+
+      expect(mockInterpolate).toHaveBeenCalledWith(
+        "Venue: {{workshopLocation}}",
+        expect.objectContaining({ workshopLocation: "123 Main St, New York, NY" })
+      );
+    });
+  });
 });
