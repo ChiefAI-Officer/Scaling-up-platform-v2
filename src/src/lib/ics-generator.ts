@@ -4,6 +4,8 @@
  * No external dependency needed — ICS is a simple text format.
  */
 
+import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
+
 export interface IcsEventData {
   uid: string;
   title: string;
@@ -147,13 +149,15 @@ function escapeIcsText(text: string): string {
 }
 
 /**
- * Format a Date to ICS datetime format (YYYYMMDDTHHMMSS).
+ * Format a UTC Date to ICS absolute datetime format (YYYYMMDDTHHMMSSz).
+ * The Z suffix marks this as UTC, making it compatible with all calendar
+ * clients (including Outlook, which ignores TZID without a VTIMEZONE block).
  */
-function formatIcsDate(date: Date): string {
+function formatIcsDateUtc(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
-    `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}T` +
-    `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+    `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}T` +
+    `${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`
   );
 }
 
@@ -169,23 +173,19 @@ function formatIcsUtcNow(): string {
   );
 }
 
-function parseStartTime(eventTime: string): string {
-  return eventTime.split(/\s*[-–]\s*/)[0];
-}
-
 /**
  * Generate ICS calendar content for a workshop event.
  */
 export function generateIcsContent(event: IcsEventData): string {
-  // Build start date from eventDate + eventTime
-  const start = new Date(event.eventDate);
-  if (event.eventTime) {
-    const [hours, minutes] = parseStartTime(event.eventTime).split(":").map(Number);
-    if (!isNaN(hours)) start.setHours(hours);
-    if (!isNaN(minutes)) start.setMinutes(minutes);
-  } else {
-    start.setHours(9, 0, 0, 0); // Default 9 AM
-  }
+  // Resolve the true UTC start using the workshop's timezone (handles DST correctly).
+  // eventDate is midnight UTC (date-only); eventTime is the wall-clock time; timezone is IANA.
+  // UTC absolute time (Z suffix) is universally compatible with all calendar clients
+  // including Outlook, which ignores TZID without an accompanying VTIMEZONE block.
+  const start = resolveEventStartMoment({
+    eventDate: event.eventDate,
+    eventTime: event.eventTime || "09:00",
+    timezone: event.timezone,
+  });
 
   // Build end date
   const end = new Date(start.getTime() + event.durationHours * 60 * 60 * 1000);
@@ -200,8 +200,8 @@ export function generateIcsContent(event: IcsEventData): string {
     `UID:${event.uid}`,
     `DTSTAMP:${formatIcsUtcNow()}`,
     "SEQUENCE:0",
-    `DTSTART;TZID=${event.timezone}:${formatIcsDate(start)}`,
-    `DTEND;TZID=${event.timezone}:${formatIcsDate(end)}`,
+    `DTSTART:${formatIcsDateUtc(start)}`,
+    `DTEND:${formatIcsDateUtc(end)}`,
     `SUMMARY:${escapeIcsText(event.title)}`,
   ];
 
@@ -241,24 +241,17 @@ export function generateIcsContent(event: IcsEventData): string {
  * Build a Google Calendar URL for a workshop event.
  */
 export function buildGoogleCalendarUrl(event: IcsEventData): string {
-  const start = new Date(event.eventDate);
-  if (event.eventTime) {
-    const [hours, minutes] = parseStartTime(event.eventTime).split(":").map(Number);
-    if (!isNaN(hours)) start.setHours(hours);
-    if (!isNaN(minutes)) start.setMinutes(minutes);
-  } else {
-    start.setHours(9, 0, 0, 0);
-  }
-
+  const start = resolveEventStartMoment({
+    eventDate: event.eventDate,
+    eventTime: event.eventTime || "09:00",
+    timezone: event.timezone,
+  });
   const end = new Date(start.getTime() + event.durationHours * 60 * 60 * 1000);
-
-  // Google Calendar uses YYYYMMDDTHHMMSS format (no timezone — uses ctz param)
-  const fmt = (d: Date) => formatIcsDate(d);
 
   const params = new URLSearchParams({
     action: "TEMPLATE",
     text: event.title,
-    dates: `${fmt(start)}/${fmt(end)}`,
+    dates: `${formatIcsDateUtc(start)}/${formatIcsDateUtc(end)}`,
     ctz: event.timezone,
   });
 

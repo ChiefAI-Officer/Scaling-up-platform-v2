@@ -36,16 +36,18 @@ describe("ics-generator", () => {
   });
 
   it("parses minutes from eventTime range (HH:MM - HH:MM) for DTSTART/DTEND", () => {
+    // June 15 2026 is EDT (UTC-4); 14:30 EDT = 18:30 UTC; 16:00 EDT = 20:00 UTC
     const content = generateIcsContent({
       ...baseData,
       eventTime: "14:30 - 16:00",
       durationHours: 1.5,
     });
-    expect(content).toMatch(/DTSTART;TZID=America\/New_York:\d{8}T143000/);
-    expect(content).toMatch(/DTEND;TZID=America\/New_York:\d{8}T160000/);
+    expect(content).toContain("DTSTART:20260615T183000Z");
+    expect(content).toContain("DTEND:20260615T200000Z");
   });
 
   it("buildGoogleCalendarUrl parses minutes from eventTime range", () => {
+    // June 15 2026 is EDT (UTC-4); 14:30 EDT = 18:30 UTC
     const url = buildGoogleCalendarUrl({
       ...baseData,
       eventTime: "14:30 - 16:00",
@@ -55,17 +57,18 @@ describe("ics-generator", () => {
     const dates = parsed.searchParams.get("dates");
     expect(dates).not.toBeNull();
     const [startSegment] = (dates ?? "").split("/");
-    expect(startSegment).toMatch(/\d{8}T143000/);
+    expect(startSegment).toBe("20260615T183000Z");
   });
 
   it("handles zero-minute eventTime range (regression)", () => {
+    // June 15 2026 is EDT (UTC-4); 09:00 EDT = 13:00 UTC; 17:00 EDT = 21:00 UTC
     const content = generateIcsContent({
       ...baseData,
       eventTime: "09:00 - 17:00",
       durationHours: 8,
     });
-    expect(content).toMatch(/DTSTART;TZID=America\/New_York:\d{8}T090000/);
-    expect(content).toMatch(/DTEND;TZID=America\/New_York:\d{8}T170000/);
+    expect(content).toContain("DTSTART:20260615T130000Z");
+    expect(content).toContain("DTEND:20260615T210000Z");
   });
 });
 
@@ -197,6 +200,39 @@ describe("buildIcsDescription", () => {
         virtualLink: null,
       })
     ).toBe("");
+  });
+});
+
+describe("generateIcsContent — UTC absolute datetime (CST/PST offset fix)", () => {
+  it("emits DTSTART as UTC Z-suffix datetime, not TZID floating (Chicago workshop)", () => {
+    // June 15 2026 is CDT (UTC-5); 9 AM CDT = 14:00 UTC
+    const content = generateIcsContent({
+      uid: "test-cst@example.com",
+      title: "Chicago Workshop",
+      eventDate: new Date("2026-06-15T00:00:00.000Z"),
+      eventTime: "09:00",
+      timezone: "America/Chicago",
+      durationHours: 8,
+    });
+    expect(content).toContain("DTSTART:20260615T140000Z");
+    expect(content).toContain("DTEND:20260615T220000Z");
+    expect(content).not.toContain("DTSTART;TZID=");
+    expect(content).not.toContain("DTEND;TZID=");
+  });
+
+  it("emits DTSTART as UTC Z-suffix datetime, not TZID floating (Los Angeles workshop)", () => {
+    // June 15 2026 is PDT (UTC-7); 9 AM PDT = 16:00 UTC; 9 AM + 8h = 17:00 PDT = 00:00 UTC next day
+    const content = generateIcsContent({
+      uid: "test-pst@example.com",
+      title: "LA Workshop",
+      eventDate: new Date("2026-06-15T00:00:00.000Z"),
+      eventTime: "09:00",
+      timezone: "America/Los_Angeles",
+      durationHours: 8,
+    });
+    expect(content).toContain("DTSTART:20260615T160000Z");
+    expect(content).toContain("DTEND:20260616T000000Z");
+    expect(content).not.toContain("DTSTART;TZID=");
   });
 });
 
