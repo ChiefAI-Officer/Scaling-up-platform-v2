@@ -46,7 +46,7 @@ export function QuickActions({
     };
 
     const handleExport = () => {
-        alert("Configuration Required\n\nExport functionality requires active Mailgun and AWS S3 configuration.");
+        window.location.href = `/api/registrations/export?workshopId=${encodeURIComponent(workshopId)}`;
     };
 
     return (
