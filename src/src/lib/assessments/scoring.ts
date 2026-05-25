@@ -16,9 +16,10 @@
  *   tiers cover the full metric domain implied by the questions, with no gaps
  *   and no overlaps. This catches mis-configured templates at scoring time
  *   rather than at admin-edit time (defence in depth).
- * - v1 supports SLIDER_LIKERT only on the scoring path. Future question types
- *   (TEXT, MULTI_SELECT, etc.) require extending the Zod schema + the per-answer
- *   validation switch — they intentionally fall through to INVALID_TYPE today.
+ * - SLIDER_LIKERT questions are fully scored (range validation, tier resolution,
+ *   perQuestion output). TEXT / NUMBER / MULTI_CHOICE questions are accepted by
+ *   both Zod schemas and stored in the DB, but pass through scoreSubmission
+ *   without scoring — they never appear in validatedAnswers or perQuestion.
  */
 
 import { z } from "zod";
@@ -136,11 +137,12 @@ function checkRecommendationsRuntime(
   questions: Array<z.infer<typeof QuestionBase>>,
   ctx: z.RefinementCtx
 ): void {
-  const scoredQuestions = questions.filter(
-    (q): q is SliderLikertQuestion => q.type === "SLIDER_LIKERT"
-  );
-  for (let qi = 0; qi < scoredQuestions.length; qi++) {
-    const q = scoredQuestions[qi];
+  const scoredWithIndex = questions
+    .map((q, origIdx) => ({ q, origIdx }))
+    .filter((x): x is { q: SliderLikertQuestion; origIdx: number } =>
+      x.q.type === "SLIDER_LIKERT"
+    );
+  for (const { q, origIdx } of scoredWithIndex) {
     if (!q.recommendations || q.recommendations.length === 0) continue;
     const bands = q.recommendations;
 
@@ -150,14 +152,14 @@ function checkRecommendationsRuntime(
       if (b.maxScore < b.minScore) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["questions", qi, "recommendations", bi],
+          path: ["questions", origIdx, "recommendations", bi],
           message: `Recommendation band ${bi}: maxScore < minScore`,
         });
       }
       if (b.minScore < q.scale.min || b.maxScore > q.scale.max) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["questions", qi, "recommendations", bi],
+          path: ["questions", origIdx, "recommendations", bi],
           message: `Recommendation band ${bi} falls outside scale [${q.scale.min}, ${q.scale.max}]`,
         });
       }
@@ -173,7 +175,7 @@ function checkRecommendationsRuntime(
       if (b.minScore <= a.maxScore) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["questions", qi, "recommendations"],
+          path: ["questions", origIdx, "recommendations"],
           message: `Recommendation bands overlap: [${a.minScore}, ${a.maxScore}] and [${b.minScore}, ${b.maxScore}]`,
         });
       }
@@ -185,11 +187,12 @@ function checkRecommendationsPublish(
   questions: Array<z.infer<typeof QuestionBase>>,
   ctx: z.RefinementCtx
 ): void {
-  const scoredQuestions = questions.filter(
-    (q): q is SliderLikertQuestion => q.type === "SLIDER_LIKERT"
-  );
-  for (let qi = 0; qi < scoredQuestions.length; qi++) {
-    const q = scoredQuestions[qi];
+  const scoredWithIndex = questions
+    .map((q, origIdx) => ({ q, origIdx }))
+    .filter((x): x is { q: SliderLikertQuestion; origIdx: number } =>
+      x.q.type === "SLIDER_LIKERT"
+    );
+  for (const { q, origIdx } of scoredWithIndex) {
     if (!q.recommendations || q.recommendations.length === 0) continue;
     const bands = q.recommendations;
 
@@ -201,14 +204,14 @@ function checkRecommendationsPublish(
     if (sorted[0].minScore !== q.scale.min) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["questions", qi, "recommendations"],
+        path: ["questions", origIdx, "recommendations"],
         message: `First band must start at scale.min (${q.scale.min}); got ${sorted[0].minScore}`,
       });
     }
     if (sorted[sorted.length - 1].maxScore !== q.scale.max) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["questions", qi, "recommendations"],
+        path: ["questions", origIdx, "recommendations"],
         message: `Last band must end at scale.max (${q.scale.max}); got ${sorted[sorted.length - 1].maxScore}`,
       });
     }
@@ -220,7 +223,7 @@ function checkRecommendationsPublish(
       if (b.minScore !== expectedNext) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["questions", qi, "recommendations"],
+          path: ["questions", origIdx, "recommendations"],
           message:
             b.minScore > expectedNext
               ? `Gap between bands at value ${expectedNext} (next band starts at ${b.minScore})`
@@ -236,7 +239,7 @@ function checkRecommendationsPublish(
         if (txt.includes(sentinel)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            path: ["questions", qi, "recommendations", bi, "text"],
+            path: ["questions", origIdx, "recommendations", bi, "text"],
             message: `Band text contains placeholder sentinel "${sentinel}"`,
           });
           break;
