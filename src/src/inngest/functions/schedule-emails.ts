@@ -1,6 +1,7 @@
 import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
 import { sendEmailTemplate } from "@/services/email-sender";
+import { formatVenueAddress } from "@/lib/utils";
 
 /**
  * Inngest Function: Schedule Email Sequence
@@ -64,7 +65,7 @@ export const scheduleEmailSequence = inngest.createFunction(
                         first_name: firstName,
                         workshop_name: workshop.title,
                         venue_name: workshop.venueName || "TBD",
-                        venue_address: workshop.venueAddress || "See registration confirmation for details",
+                        venue_address: formatVenueAddress(workshop.venueAddress) || "See registration confirmation for details",
                     }
                 });
             });
