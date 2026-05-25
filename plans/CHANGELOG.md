@@ -6,6 +6,42 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-25 — Assessment Full Roster Build: multi-type questions + LVA seed <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:assessment-full-roster-multi-type-questions-lva-seed -->
+
+**Branch:** `feat/assessment-full-roster` → squash-merged to main as `22d2578`. 5 commits (`be29d5a`–`7c9342a` + merge `22d2578`). 13 files changed, 1838 insertions, 132 deletions.
+
+**Phase B — Scoring engine discriminated union** (`be29d5a` + `d57a669`):
+- `src/src/lib/assessments/scoring.ts`: `QuestionBase` split into `SliderLikertQuestion` (type literal `"SLIDER_LIKERT"`, `scale` required, exported) + `QualitativeQuestion` (enum `["TEXT","NUMBER","MULTI_CHOICE"]`, optional `options`/`maxChoices`, no scale). Replaced with `z.discriminatedUnion("type", [SliderLikertQuestion, QualitativeQuestion])`.
+- `scoreSubmission`: `scorableQuestions = v.questions.filter((q): q is SliderLikertQuestion => q.type === "SLIDER_LIKERT")` for scoring math. `questionByKey` built from ALL questions (prevents UNKNOWN_STABLE_KEY on non-slider answers). Non-SLIDER answers skip via `if (q.type !== "SLIDER_LIKERT") continue`.
+- `checkRecommendationsRuntime` / `checkRecommendationsPublish`: `.map((q, origIdx) => ({ q, origIdx })).filter(...)` pattern preserves original array indices for Zod error paths.
+- `checkScaleUpScoreOptIn`, `computeTierDomain`, `computeRollupTierDomain`, `computePerDomainTierContexts`: typed to `SliderLikertQuestion[]`.
+- Follow-on commit fixes `qi` (filtered index) → `origIdx` (original index) bug in Zod error paths; updates stale file header comment.
+- New test file `src/src/__tests__/lib/assessments/scoring-multi-type.test.ts` (5 tests). 83/83 scoring tests green.
+- Backward-compatible: QSP v1/v2, Rockefeller, SU Full all SLIDER_LIKERT-only, unchanged.
+
+**Phase C — Frontend multi-type rendering** (`1fcef66` + `43f59de`):
+- New `src/src/components/assessments/question-input.tsx`: shared `QuestionInput` component for all 4 types. MULTI_CHOICE uses `aria-label={q.label}` (no dangling aria-labelledby; fixed in follow-on). `maxChoices` enforced by disabling unchecked boxes once limit reached.
+- `org-survey-client.tsx`: `Question.scale` made optional; `type`/`options`/`maxChoices` added; `answers` state widened to `Record<string, number|string|string[]>`; required validation handles empty string + empty array; inline slider replaced with `<QuestionInput>`.
+- `public-quiz-client.tsx`: same interface widening + `<QuestionInput>` for non-SLIDER_LIKERT; SLIDER_LIKERT keeps existing button-picker UI; `toQuestions()` guard relaxed.
+- `me/route.ts`: removed `allQuestions.filter((q) => q.type === "SLIDER_LIKERT")` — returns all question types.
+- `quiz/[campaignAlias]/page.tsx`: removed `.filter((q) => q.type === "SLIDER_LIKERT")` from questions prop.
+- Both submit routes: store `rawAnswers` (all types) in DB; SLIDER_LIKERT filter applied before `scoreSubmission` call; `schema-error` transaction kind wired to 500.
+- `wireframes-scoped.css`: added `.survey-textarea`, `.survey-input-number`, `.survey-checkbox-group`, `.survey-checkbox-item` (with disabled state).
+- `QuestionsTab.tsx`: read-only fallback row for non-SLIDER_LIKERT questions in editor config panel.
+- New test file `src/src/__tests__/components/assessments/question-input.test.tsx` (8 tests).
+
+**Phase D — LVA seed** (`7c9342a`):
+- New `src/prisma/seed-lva-assessment.ts`: Leadership Vision Alignment, alias `leadership-vision-alignment`, 9 sections, 54 questions. S1 NUMBER×9 (financials), S2–S3 TEXT×8 (context/vision), S4 SLIDER_LIKERT×16 (scale 1–3, Weak→Strong, isRequired:true), S5 MULTI_CHOICE×1 (pick-3 obstacles), S6 TEXT×5, S7 1×NUMBER + 5×TEXT, S8 TEXT×6, S9 TEXT×3. Advisory lock `"assessment-lva-v1-seed"`, 6-state idempotency (A–F). DRAFT (publishedAt: null). ScoringConfig: tierMetric `overallAvg`, tiers Developing(1.0–1.67)/Building(1.67–2.34)/Scaling(2.34–3.01) — thresholds are placeholders, Jeff to confirm before publish.
+
+**Phase E — Deploy**:
+- Build gate: `CI=true npx next build --turbopack` ✓ clean.
+- LVA seed ran against production (state A — first run). Template ID `cmpl64cb30003mjdszd2e5fql`, version `cmpl64csb0005mjdsvhq4q94x`, hash `bb2b3b90...`.
+- Scaling Up Full seed: state B idempotent no-op (already present as DRAFT from May 20).
+- No DB migration — `AssessmentSubmission.answers` is `Json`, both submit routes accept `value: z.unknown()`.
+- Admin next step: publish both DRAFT templates after Jeff confirms tier thresholds (SU Full pending since May 20; LVA thresholds are mathematical thirds, pending confirmation).
+
+---
+
 ### 2026-05-21 — Admin template editor wireframe rebuild + production data protection scaffold <!-- ENTRY_ISO:2026-05-21 ENTRY_SLUG:assessment-editor-wireframe-rebuild-plus-data-protection -->
 
 **Single squash commit on main:** `35ee73b` (36 files changed, +8620/−1146). Replaces 19 commits on `feat/assessment-e1-tier-editor` (E1 foundation 6 commits + 12 wireframe rebuild + 1 data protection).
