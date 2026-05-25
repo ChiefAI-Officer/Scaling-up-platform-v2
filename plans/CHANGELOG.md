@@ -6,6 +6,20 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-25 — Venue address bug fixes (admin create + thank-you page) <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:venue-address-bug-fixes -->
+
+**Commit:** `d1033d4`. 5 files changed, 68 insertions, 5 deletions.
+
+**Bug A — form sends object instead of string:** `src/src/app/(dashboard)/workshops/new/page.tsx` line ~432 built `venueAddress` as a plain JS `{street,city,state,zip}` object. The Zod schema declares `venueAddress: z.string().optional()` so this threw "expected string, received object". Fix: `JSON.stringify({...})` with an all-field truthy guard — if all four sub-fields are empty the field is `undefined` (not `"{}"`).
+
+**Bug B — API double-encodes the string:** `src/src/app/api/workshops/route.ts` line 370 called `JSON.stringify(data.venueAddress)` on the value again after it arrived as a JSON string, producing double-escaped output like `"\"{\\"street\\"...}\""` in the DB. Fix: `venueAddress: data.venueAddress ?? null` (pass through as-is).
+
+**Bug C — thank-you page renders raw JSON:** `src/src/components/templates/thank-you-page-template.tsx` joined `workshop.venueAddress` directly into the location label. Fix: import `formatVenueAddress` from `@/lib/utils` (already existed) and call it — returns parsed "Street, City, ST ZIP" string; returns `""` for null/undefined/unparseable (safe for `.filter(Boolean)`).
+
+**Tests (TDD):** 3 new failing tests written first, then fixed: Test A + B in `src/src/__tests__/components/thank-you-page-template.test.tsx` (raw JSON not rendered; null address no crash); Test C in `src/src/__tests__/api/workshops.test.ts` (venueAddress stored as-is, not double-encoded). 33/33 in both suites green. Pre-existing 3 failures confirmed pre-existing on clean main. Build gate: `CI=true npx next build --turbopack` clean.
+
+---
+
 ### 2026-05-25 — Assessment Full Roster Build: multi-type questions + LVA seed <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:assessment-full-roster-multi-type-questions-lva-seed -->
 
 **Branch:** `feat/assessment-full-roster` → squash-merged to main as `22d2578`. 5 commits (`be29d5a`–`7c9342a` + merge `22d2578`). 13 files changed, 1838 insertions, 132 deletions.
