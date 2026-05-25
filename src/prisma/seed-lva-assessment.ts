@@ -62,7 +62,7 @@ const SCORING_CONFIG = {
     {
       order: 1,
       minMetric: 1.0,
-      maxMetric: 1.66,
+      maxMetric: 1.67,
       label: "Developing",
       message:
         "TODO: confirm tier messaging with Jeff before publishing.",
@@ -71,7 +71,7 @@ const SCORING_CONFIG = {
     {
       order: 2,
       minMetric: 1.67,
-      maxMetric: 2.33,
+      maxMetric: 2.34,
       label: "Building",
       message:
         "TODO: confirm tier messaging with Jeff before publishing.",
