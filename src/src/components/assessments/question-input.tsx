@@ -27,6 +27,7 @@ interface OptionDef {
 export interface QuestionForInput {
   stableKey: string;
   type: string;
+  label: string;
   isRequired: boolean;
   scale?: SliderScale;
   options?: OptionDef[];
@@ -120,7 +121,7 @@ export function QuestionInput({
       <div
         className="survey-checkbox-group"
         role="group"
-        aria-labelledby={`q-${q.stableKey}-label`}
+        aria-label={q.label}
       >
         {q.options.map((opt) => {
           const checked = selected.includes(opt.key);
