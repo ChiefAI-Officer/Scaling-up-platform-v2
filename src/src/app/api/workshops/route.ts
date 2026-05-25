@@ -367,7 +367,7 @@ export async function POST(request: NextRequest) {
         eventTime: data.eventTime,
         timezone: data.timezone,
         venueName: data.venueName,
-        venueAddress: data.venueAddress ? JSON.stringify(data.venueAddress) : null,
+        venueAddress: data.venueAddress ?? null,
         venueInstructions: data.venueInstructions,
         virtualLink: data.virtualLink || null,
         geoTargetAreas: data.geoTargetAreas,

@@ -430,13 +430,14 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach }: NewWo
         timezone: formData.timezone,
         venueName: formData.venueName || undefined,
         venueAddress:
-          formData.format !== "VIRTUAL"
-            ? {
+          formData.format !== "VIRTUAL" &&
+          (formData.venueStreet || formData.venueCity || formData.venueState || formData.venueZip)
+            ? JSON.stringify({
                 street: formData.venueStreet || undefined,
                 city: formData.venueCity || undefined,
                 state: formData.venueState || undefined,
                 zip: formData.venueZip || undefined,
-              }
+              })
             : undefined,
         venueInstructions: formData.venueInstructions || undefined,
         virtualLink: formData.virtualLink || undefined,

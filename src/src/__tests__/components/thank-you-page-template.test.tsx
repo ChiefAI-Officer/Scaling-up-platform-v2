@@ -124,6 +124,30 @@ describe("ThankYouPageTemplate", () => {
       render(<ThankYouPageTemplate content={baseContent} workshop={workshop} />);
       expect(screen.getByText("In-Person")).toBeInTheDocument();
     });
+
+    it("renders formatted venue address for in-person workshop (not raw JSON)", () => {
+      const workshop = {
+        ...baseWorkshop,
+        format: "IN_PERSON",
+        venueName: "Marriott Hotel",
+        venueAddress: '{"street":"123 Main St","city":"New York","state":"NY","zip":"10001"}',
+      };
+      render(<ThankYouPageTemplate content={baseContent} workshop={workshop} />);
+      expect(screen.getByText(/123 Main St/)).toBeInTheDocument();
+      expect(screen.getByText(/New York/)).toBeInTheDocument();
+      expect(document.body.innerHTML).not.toContain('{"street":"123 Main St"');
+    });
+
+    it("renders only venue name when venueAddress is null", () => {
+      const workshop = {
+        ...baseWorkshop,
+        format: "IN_PERSON",
+        venueName: "Marriott Hotel",
+        venueAddress: null,
+      };
+      render(<ThankYouPageTemplate content={baseContent} workshop={workshop} />);
+      expect(screen.getByText("Marriott Hotel")).toBeInTheDocument();
+    });
   });
 
   describe("preview mode (isPreview=true)", () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { stripPlaceholders } from "@/lib/templates/template-utils";
+import { formatVenueAddress } from "@/lib/utils";
 import { normalizeVideoUrl } from "@/lib/templates/landing-page-overlay";
 import {
   buildGoogleCalendarUrl,
@@ -82,7 +83,7 @@ export function ThankYouPageTemplate({
       ? workshop.virtualLink
         ? "Virtual — link will be emailed"
         : "Virtual Workshop"
-      : [workshop.venueName, workshop.venueAddress].filter(Boolean).join(", ") || "Location TBA";
+      : [workshop.venueName, formatVenueAddress(workshop.venueAddress)].filter(Boolean).join(", ") || "Location TBA";
 
   const calendarUrl = isPreview
     ? "#"

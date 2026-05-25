@@ -295,6 +295,43 @@ describe("Workshops API", () => {
       );
     });
 
+    it("accepts venueAddress as JSON string and stores it without double-encoding", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      (db.coach.findUnique as jest.Mock).mockResolvedValue({
+        id: "coach-1",
+        certifications: [{ id: "cert-1", status: "ACTIVE" }],
+      });
+      (db.workshopType.findUnique as jest.Mock).mockResolvedValue({ id: "wt-1", slug: "scaling-up" });
+      (db.workshop.create as jest.Mock).mockResolvedValue({ id: "ws-1", title: "Scaling Up Growth Workshop" });
+      (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1", landingPageSlug: "test-slug" });
+
+      const ninetyFiveDaysFromNow = new Date(Date.now() + 95 * 24 * 60 * 60 * 1000).toISOString();
+      const venueAddressJson = '{"street":"123 Main","city":"NY","state":"NY","zip":"10001"}';
+      const payload = {
+        ...buildWorkshopPayload(ninetyFiveDaysFromNow),
+        venueAddress: venueAddressJson,
+      };
+
+      const response = await POST(
+        asPostRequest(
+          new Request("http://localhost/api/workshops", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        )
+      );
+
+      expect(response.status).toBe(201);
+      const createCall = (db.workshop.create as jest.Mock).mock.calls[0][0];
+      expect(createCall.data.venueAddress).toBe(venueAddressJson);
+    });
+
     it("persists admin-created workshop coupons with Stripe promotion code references", async () => {
       (getApiActor as jest.Mock).mockResolvedValue({
         userId: "admin-1",
