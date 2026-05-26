@@ -187,6 +187,19 @@ export const executeWorkflow = inngest.createFunction(
       // Execute the step based on type
       try {
         await step.run(`execute-${stepName}`, async () => {
+          // Guard: re-check assignment liveness — fetch-assignment is memoized
+          // by Inngest and will replay its cached result (isActive: true) even
+          // after the workshop is canceled/deleted during step.sleepUntil.
+          // This fresh query is NOT memoized (first run of this specific step),
+          // so it reflects the current DB state at execution time.
+          const freshAssignment = await db.workflowAssignment.findUnique({
+            where: { id: workflowAssignmentId },
+            select: { isActive: true },
+          });
+          if (!freshAssignment || !freshAssignment.isActive) {
+            return;
+          }
+
           // Resolve email subject and body
           let subject = workflowStep.subject || "";
           let body = workflowStep.body || "";

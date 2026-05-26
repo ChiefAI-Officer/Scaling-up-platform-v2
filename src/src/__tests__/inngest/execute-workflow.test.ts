@@ -1616,4 +1616,35 @@ describe("execute-workflow Inngest function", () => {
       expect(rollupUpdate).toBeDefined();
     });
   });
+
+  // ------------------------------------------------------------------
+  // Cancellation guard: stale memoization bypass
+  // ------------------------------------------------------------------
+  describe("cancellation guard (stale fetch-assignment memoization fix)", () => {
+    it("skips EMAIL_COACH when assignment becomes inactive during sleep (workshop canceled)", async () => {
+      // fetch-assignment sees isActive:true (memoized before sleep)
+      // fresh re-check inside execute-step sees isActive:false (canceled during sleep)
+      findUnique
+        .mockResolvedValueOnce(makeAssignment()) // initial fetch-assignment step
+        .mockResolvedValueOnce({ isActive: false }); // fresh check inside execute-step
+      executionFindFirst.mockResolvedValue(null);
+
+      await invoke();
+
+      expect(sendEmailViaSMTP).not.toHaveBeenCalled();
+    });
+
+    it("skips EMAIL_COACH when assignment is permanently deleted during sleep", async () => {
+      // fetch-assignment sees isActive:true (memoized before sleep)
+      // fresh re-check inside execute-step returns null (workshop+assignment cascade-deleted)
+      findUnique
+        .mockResolvedValueOnce(makeAssignment()) // initial fetch-assignment step
+        .mockResolvedValueOnce(null); // fresh check — deleted
+      executionFindFirst.mockResolvedValue(null);
+
+      await invoke();
+
+      expect(sendEmailViaSMTP).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -338,7 +338,8 @@ export function calculateSendDate(
  * sites must stay in sync.
  *
  * Known limitation: jobs already sleeping via step.sleepUntil() will still fire because Inngest
- * caches step.run() results and ignores isActive=false. Future fix: emit a workflow/cancel event.
+ * caches step.run() results and ignores isActive=false. Fixed: each execute-step re-checks
+ * isActive from DB before sending (see execute-workflow.ts freshAssignment guard).
  */
 export async function cancelWorkflowExecutions(
   workshopId: string,
