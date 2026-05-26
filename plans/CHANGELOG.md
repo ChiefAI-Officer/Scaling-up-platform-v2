@@ -6,6 +6,27 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-26 — Workflow cancellation ghost emails: Inngest memoization bypass fixed <!-- ENTRY_ISO:2026-05-26 ENTRY_SLUG:workflow-cancel-ghost-emails -->
+
+**Commit:** `5cd3fec` — 3 files changed, 46 insertions, 1 deletion.
+
+**Bug:** Workflows continued sending emails after a workshop was canceled or permanently deleted. Jeff reported 3 emails arriving at 8pm Saturday from test workshops he had already deleted.
+
+**Root cause:** `execute-workflow.ts` opens with `step.run("fetch-assignment", ...)` which fetches `WorkflowAssignment` (including `isActive: true`). Inngest **memoizes** all `step.run` results — on any subsequent replay after a `step.sleepUntil`, this step returns the **cached** value, not a fresh DB read. Canceling a workshop sets `WorkflowAssignment.isActive = false` in the DB, but the function's in-flight `fetch-assignment` result is already cached as `isActive: true`. The outer guard at `if (!assignment.isActive)` therefore never fires after a sleep. Each email-sending `step.run("execute-stepN")` ran a dedup check only for `status: "SENT"` executions — CANCELED executions looked identical to "never sent", so the email fired.
+
+The `cancelWorkflowExecutions` function had a comment explicitly flagging this: *"Future fix: emit a workflow/cancel event."* — this commit is that fix.
+
+**Fix:** At the top of every `step.run("execute-${stepName}")` callback (before any email logic), added a **fresh** `db.workflowAssignment.findUnique({ select: { isActive } })`. This query is NOT memoized because it's the first run of this specific named step. If the assignment is `null` (permanently deleted, cascade) or `isActive: false` (canceled), returns early — no email sent.
+
+**Covers both deletion paths:**
+- Workshop canceled (status → CANCELED): `WorkflowAssignment.isActive = false` → fresh check catches it
+- Workshop permanently deleted: `WorkflowAssignment` cascade-deleted → `findUnique` returns `null` → fresh check catches it
+
+**Tests:** 2 new TDD tests in `execute-workflow.test.ts` under `"cancellation guard (stale fetch-assignment memoization fix)"`:
+1. `skips EMAIL_COACH when assignment becomes inactive during sleep (workshop canceled)`
+2. `skips EMAIL_COACH when assignment is permanently deleted during sleep`
+42/42 suite green. Updated stale comment in `cancelWorkflowExecutions`.
+
 ### 2026-05-25 — Delete coach: FK constraint fix for assessment data + org ownership guard <!-- ENTRY_ISO:2026-05-25 ENTRY_SLUG:delete-coach-fk-fix -->
 
 **Commit:** `c488308` | **Files:** 2
