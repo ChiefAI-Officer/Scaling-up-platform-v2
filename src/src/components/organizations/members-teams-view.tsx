@@ -14,6 +14,8 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import { ChevronRight, ChevronDown, Building2, Users, UserPlus, FolderPlus } from "lucide-react";
+import { AddTeamModal } from "./add-team-modal";
+import type { CreatedResult } from "./add-team-modal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -147,6 +149,9 @@ function NodeButton({
 // ---------------------------------------------------------------------------
 
 export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps) {
+  // Companies list — may grow when a new Company is created via the modal
+  const [organizations, setOrganizations] = useState<OrgSummary[]>(initialOrganizations);
+
   // Per-org expansion + team data state
   const [orgStates, setOrgStates] = useState<Record<string, OrgState>>(() => {
     const init: Record<string, OrgState> = {};
@@ -155,6 +160,9 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
     }
     return init;
   });
+
+  // Add Team modal state
+  const [addTeamOpen, setAddTeamOpen] = useState(false);
 
   // Selected node drives the right panel
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
@@ -309,6 +317,38 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
   );
 
   // --------------------------------------------------------------------------
+  // AddTeamModal callback
+  // --------------------------------------------------------------------------
+
+  const handleCreated = useCallback(
+    async (result: CreatedResult) => {
+      if (result.kind === "organization") {
+        // Add the new company to the local list + bootstrap its org state
+        setOrganizations((prev) => [result.org, ...prev]);
+        setOrgStates((prev) => ({
+          ...prev,
+          [result.org.id]: { expanded: false, teams: null, loadingTeams: false, teamsError: false },
+        }));
+      } else {
+        // Refresh the team tree for the affected org so the new team appears
+        await loadTeams(result.orgId);
+      }
+    },
+    [loadTeams]
+  );
+
+  // Build the loadedTeams map the modal needs for its Parent select
+  const loadedTeamsForModal: Record<string, ApiTeamNode[]> = {};
+  for (const org of organizations) {
+    const state = orgStates[org.id];
+    if (state?.teams) {
+      loadedTeamsForModal[org.id] = state.teams;
+    } else {
+      loadedTeamsForModal[org.id] = [];
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // Render — LEFT panel
   // --------------------------------------------------------------------------
 
@@ -321,23 +361,23 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
           </h2>
           <button
             type="button"
-            disabled
-            title="Add Team (coming soon)"
-            className="p-1 rounded-md text-muted-foreground opacity-40 cursor-not-allowed"
-            aria-label="Add Team (coming soon)"
+            onClick={() => setAddTeamOpen(true)}
+            title="Add Company or Team"
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            aria-label="Add Company or Team"
           >
             <FolderPlus className="w-4 h-4" />
           </button>
         </div>
 
-        {initialOrganizations.length === 0 && (
+        {organizations.length === 0 && (
           <p className="px-4 py-6 text-sm text-muted-foreground">
             No companies yet. Create one to get started.
           </p>
         )}
 
         <div className="p-2 space-y-0.5">
-          {initialOrganizations.map((org) => {
+          {organizations.map((org) => {
             const state = orgStates[org.id];
             const orgNode: TreeNode = { kind: "organization", id: org.id, name: org.name };
             const isSelected = isSameNode(selectedNode, orgNode);
@@ -437,7 +477,7 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
   function renderRightPanel() {
     const panelTitle = selectedNode
       ? selectedNode.kind === "organization"
-        ? initialOrganizations.find((o) => o.id === selectedNode.id)?.name ?? "Organization"
+        ? organizations.find((o) => o.id === selectedNode.id)?.name ?? "Organization"
         : selectedNode.kind === "team"
         ? selectedNode.name
         : "Not associated with any team"
@@ -532,9 +572,19 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
   // --------------------------------------------------------------------------
 
   return (
-    <div className="flex h-full min-h-[500px] rounded-xl border border-border bg-card overflow-hidden">
-      {renderLeftPanel()}
-      {renderRightPanel()}
-    </div>
+    <>
+      <div className="flex h-full min-h-[500px] rounded-xl border border-border bg-card overflow-hidden">
+        {renderLeftPanel()}
+        {renderRightPanel()}
+      </div>
+
+      <AddTeamModal
+        open={addTeamOpen}
+        onClose={() => setAddTeamOpen(false)}
+        onCreated={handleCreated}
+        organizations={organizations}
+        loadedTeams={loadedTeamsForModal}
+      />
+    </>
   );
 }
