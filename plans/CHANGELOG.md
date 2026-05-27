@@ -6,6 +6,23 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-27 — Database-wipe protection: enforce migration gate + guard destructive prisma commands <!-- ENTRY_ISO:2026-05-27 ENTRY_SLUG:db-wipe-protection-enforced -->
+
+**Branch:** `fix/db-wipe-protection` (off `main`; isolated worktree, parallel to assessment work). **P0** — production data was wiped twice (coaches + user logins lost).
+
+**Diagnosis.** `prisma migrate deploy` (the deploy path) **cannot** wipe data — it only applies pending migrations and errors on drift. A scan of all 29 migrations found exactly one destructive statement, already `-- @approved:` and scoped (orphan `DELETE FROM workflow_step_executions` in `20260401000000_add_workshop_cascade_deletes`). So the wipes did **not** come through migrations. Most likely cause: an **unguarded `prisma migrate reset` / `migrate dev` run locally against the prod `DATABASE_URL`** during a migration conflict — both were exposed as `npm run db:reset` / `db:migrate` with no guard, and `migrate dev` prompts a reset on drift. Catalyst: the Mar 31 baseline migration introduced migration files into a `db push`-managed prod DB that Prisma then saw as fully drifted. Matches the operator's "conflicting with a commit, I replaced it." Full confirmation needs Neon query/branch history (see runbook §7).
+
+**What shipped (this branch):**
+- **`scripts/safe-prisma.mjs`** — single guard wrapper. `db:reset`, `db:migrate`, `db:push` now route through it (`node scripts/safe-prisma.mjs <migrate reset|migrate dev|db push>`). Blocks the destructive command against a Neon-host `DATABASE_URL` unless `--i-know-this-is-prod`, and **consumes** that flag before spawning prisma. This fixes a latent bug in the old `guard-db-push.mjs && prisma db push` form: `npm run … -- --flag` appended the flag to prisma, not the guard, so the documented override never actually worked. `guard-db-push.mjs` deleted (superseded). 8 tests (`safe-prisma.test.ts`).
+- **Migration safety gate now ENFORCED on every deploy.** `node scripts/check-migration-safety.mjs` prepended before `prisma migrate deploy` in `vercel.json` buildCommand (the real Vercel path) and `package.json` build. An unapproved destructive migration fails the build before any migration runs (proven with a temp `DROP TABLE "User"` migration → build chain halted before `migrate deploy`). Also added to `src/.github/workflows/deploy.yml` as a future-proof tripwire — though that workflow is currently **inert** (workflows must live at repo-root `.github/workflows/`, not `src/.github/workflows/`; live deploys go through Vercel git integration).
+- **Snapshot hardened** (`snapshot-prod-tables.ts` + new pure `snapshot-prod-helpers.mjs`): retries transient connection drops (a Neon cold-start blip had silently dropped the `User` table from a snapshot); a snapshot missing any core table is written as `*.PARTIAL.json` and exits non-zero, so a partial can never be mistaken for a complete recovery fixture. 7 helper tests.
+- **Config-integrity + negative-scan tests** (`deploy-safety-config.test.ts`, parses JSON not string-grep): asserts the gate ordering, that destructive db scripts route through `safe-prisma`, and that no npm script invokes a raw `prisma migrate dev|reset` / `db push`.
+- **Immediate safety net:** a complete read-only prod snapshot was taken (User 12, Coach 7, Survey 8, SurveyTemplate 3, Workflow 3, WorkflowStep 6, CoachCertification 16 — 185 rows, 0 errors), stored locally in gitignored `.snapshots/`.
+
+**Verification:** 28/28 script tests green (4 suites); `CI=true npx next build --turbopack` clean; ESLint clean; `npm run db:reset` / `db:push` against the live prod env both BLOCKED before prisma is spawned (no DB contact); override DRY-RUN confirmed the flag is now honored + stripped.
+
+**Open items (need the Neon-account owner, `josh-4119`) — documented in runbook §8 + Notion:** least-privilege runtime DB role (highest leverage), confirm PITR retention window, Neon protected branch, pre-migration Neon checkpoint branch, move CI to repo root, branch protection + CODEOWNERS on migrations, long-term removal of `migrate deploy` from buildCommand.
+
 ### 2026-05-26 — Workflow cancellation ghost emails: Inngest memoization bypass fixed <!-- ENTRY_ISO:2026-05-26 ENTRY_SLUG:workflow-cancel-ghost-emails -->
 
 **Commit:** `5cd3fec` — 3 files changed, 46 insertions, 1 deletion.

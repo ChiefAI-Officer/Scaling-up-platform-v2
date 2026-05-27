@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && node scripts/check-migration-safety.mjs && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
@@ -29,8 +29,8 @@
     "deploy:staging": "vercel",
     "deploy:prod": "vercel --prod",
     "db:generate": "prisma generate",
-    "db:push": "node scripts/guard-db-push.mjs && prisma db push",
-    "db:migrate": "prisma migrate dev",
+    "db:push": "node scripts/safe-prisma.mjs db push",
+    "db:migrate": "node scripts/safe-prisma.mjs migrate dev",
     "db:check-migrations": "node scripts/check-migration-safety.mjs",
     "snapshot:prod": "npx tsx scripts/snapshot-prod-tables.ts",
     "restore:from-snapshot": "npx tsx scripts/restore-from-snapshot.ts",
@@ -40,7 +40,7 @@
     "seed:qsp-v2": "npx tsx prisma/seed-qsp-v2-assessment.ts",
     "seed:scaling-up-full": "npx tsx prisma/seed-scaling-up-full-assessment.ts",
     "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset",
+    "db:reset": "node scripts/safe-prisma.mjs migrate reset",
     "postinstall": "prisma generate",
     "validate:apis": "npx tsx scripts/validate-apis.ts"
   },

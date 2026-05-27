@@ -34,6 +34,8 @@ loadEnv({ path: join(SRC_DIR, ".env") });
 import { PrismaClient } from "@prisma/client";
 import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+// @ts-expect-error — sibling .mjs helper, no type declarations
+import { isConnectionError, classifySnapshot } from "./snapshot-prod-helpers.mjs";
 
 const SNAPSHOT_DIR = join(SRC_DIR, ".snapshots");
 
@@ -64,7 +66,44 @@ const CRITICAL_TABLES = [
   "Organization",
 ] as const;
 
-type CriticalTable = (typeof CRITICAL_TABLES)[number];
+// The subset whose loss caused the production wipes. If ANY of these fail to
+// export, the snapshot is not trustworthy as a recovery fixture → hard fail.
+const CORE_TABLES: readonly string[] = [
+  "User",
+  "Coach",
+  "CoachCertification",
+  "Survey",
+  "SurveyTemplate",
+  "SurveyQuestion",
+  "Workflow",
+  "WorkflowStep",
+];
+
+const MAX_ATTEMPTS = 3;
+
+// Retry transient connectivity failures (e.g. a Neon pooler cold-start drop on
+// the first query) so a blip doesn't silently leave a table out of the snapshot.
+async function findManyWithRetry(
+  model: { findMany: () => Promise<unknown[]> },
+  table: string,
+): Promise<unknown[]> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await model.findMany();
+    } catch (e) {
+      lastErr = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!isConnectionError(msg) || attempt === MAX_ATTEMPTS) throw e;
+      const backoffMs = 500 * attempt;
+      console.warn(
+        `  ${table}: connection error (attempt ${attempt}/${MAX_ATTEMPTS}) — retrying in ${backoffMs}ms`,
+      );
+      await new Promise((r) => setTimeout(r, backoffMs));
+    }
+  }
+  throw lastErr;
+}
 
 async function main() {
   if (!process.env.DATABASE_URL) {
@@ -93,7 +132,7 @@ async function main() {
       continue;
     }
     try {
-      const rows = await model.findMany();
+      const rows = await findManyWithRetry(model, table);
       snapshot[table] = rows;
       console.log(`  ${table}: ${rows.length} rows`);
     } catch (e) {
@@ -108,7 +147,9 @@ async function main() {
     .toISOString()
     .replace(/[:.]/g, "-")
     .slice(0, 19);
-  const filename = `snapshot-${timestamp}.json`;
+  const outcome = classifySnapshot(Object.keys(errors), CORE_TABLES);
+  // A partial snapshot must NEVER be named like a complete one.
+  const filename = `snapshot-${timestamp}${outcome.filenameSuffix}.json`;
   const outPath = join(SNAPSHOT_DIR, filename);
 
   const payload = {
@@ -116,6 +157,7 @@ async function main() {
     databaseUrlHost: process.env.DATABASE_URL.split("@")[1]?.split("/")[0] ?? "unknown",
     nodeEnv: process.env.NODE_ENV ?? "unknown",
     isProdLike: isProd,
+    complete: !outcome.partial,
     tables: CRITICAL_TABLES.length,
     totalRows: Object.values(snapshot).reduce((sum, rows) => sum + rows.length, 0),
     errors,
@@ -125,9 +167,21 @@ async function main() {
   await writeFile(outPath, JSON.stringify(payload, null, 2), "utf-8");
   console.log(`\nWrote ${payload.totalRows} rows across ${CRITICAL_TABLES.length} tables to:`);
   console.log(`  ${outPath}`);
-  if (Object.keys(errors).length > 0) {
-    console.warn(`\n⚠️  ${Object.keys(errors).length} table(s) failed — review errors above.`);
-    process.exit(2);
+
+  if (outcome.severe) {
+    console.error(
+      `\n❌ INCOMPLETE SNAPSHOT — core table(s) failed to export: ${outcome.coreFailed.join(", ")}.`,
+    );
+    console.error(
+      "   This file is NOT a safe recovery fixture (saved with a .PARTIAL suffix). Re-run `npm run snapshot:prod`.",
+    );
+    process.exit(outcome.exitCode);
+  }
+  if (outcome.partial) {
+    console.warn(
+      `\n⚠️  PARTIAL SNAPSHOT — ${Object.keys(errors).length} non-core table(s) failed (saved with a .PARTIAL suffix). Review errors above.`,
+    );
+    process.exit(outcome.exitCode);
   }
 }
 
