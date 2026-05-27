@@ -1,6 +1,6 @@
 # Plan — Issue #10: Assessment Tool with Team Hierarchies & Longitudinal Reporting
 
-> **Status (May 17 2026)**: v7.6 spec locked across 7 spec files in `docs/specs/v7.6/`. v1 foundation Tasks 0–4 shipped May 14; deployment to prod pending env-mismatch resolution (Task 9). v7.6 spec amendments (Tasks 5–9 next) wait for the user before any subagent dispatch.
+> **Status (May 27 2026)**: v7.6 spec locked (specs 01–08). **Current priority — the setup-first "flip"** (May 26 Jeff redirect): coaches manage Company→Team→Users *first*, then campaigns pick existing members. See [08 Members & Teams lane](docs/specs/v7.6/08-members-teams-lane.md) — contract-first Slices 1–5 on branch `feat/assessment-setup-first` (subagent-driven dev). Engine + seeds (Rockefeller / QSP v1+v2 / Scaling Up Full / LVA) already in prod. Prior Tasks 5–9 (May 17) are parked behind the flip.
 
 ## Spec library (v7.6 — canonical, locked May 15-16)
 
@@ -13,6 +13,7 @@
 | [05 Wireframes Wave 5](docs/specs/v7.6/05-wireframes-wave5.md) | Wave 2 revisions + Wave 5 deliverables (markdown + HTML acceptance criteria) |
 | [06 Observability](docs/specs/v7.6/06-observability.md) | 7 metrics, 6 alert gates, /admin/observability deploy-time dashboard |
 | [07 Bootstrap runbook](docs/specs/v7.6/07-bootstrap-runbook.md) | Admin first-time setup (bulk-add certified coaches to default group) |
+| [08 Members & Teams lane](docs/specs/v7.6/08-members-teams-lane.md) | **Setup-first flip (current priority)**: (A+) Company=Organization as a unified team tree, 12 locked decisions, contract-first Slices 1–5, Esperto UX parity |
 
 ## Locked-decisions ledger (one line each)
 
@@ -27,6 +28,7 @@
 | 7 | Self-signed coach lands with zero assessment access until admin adds to a group | 02-service-layer-rules, 07-bootstrap-runbook |
 | 8 | Admin aggregate dashboard MVP shape: template selector + version selector, no filters on day 1 | 06-observability |
 | 9 | Deploy via .env.production.local + dotenv-cli (one-shot injection); local .env NEVER overwritten | 04-deploy-runbook |
+| 10 | Setup-first flip (May 26): user structure before campaigns; wizard picks existing members (not inline-create); (A+) Company=Organization presented Esperto-style as a unified tree | 08-members-teams-lane |
 
 ## Active Notion tasks (May 14 + May 17)
 
