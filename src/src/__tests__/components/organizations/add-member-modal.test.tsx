@@ -185,8 +185,8 @@ describe("AddMemberModal", () => {
       RequestInit,
     ];
     const body = JSON.parse(init.body as string);
-    // teamId must NOT appear in the body (or be null) when no team selected
-    expect(body.teamId == null).toBe(true);
+    // teamId must be ABSENT from the body when no team selected
+    expect("teamId" in body).toBe(false);
     // jobTitle must NOT appear when blank
     expect(body.jobTitle).toBeUndefined();
   });
@@ -322,5 +322,57 @@ describe("AddMemberModal", () => {
 
     const select = screen.getByTestId("select-team") as HTMLSelectElement;
     expect(select.value).toBe("team-eng");
+  });
+
+  /**
+   * (8) When defaultTeamId is null (org node selected, not a team), the Team
+   *     select defaults to "— no team —" AND submitting omits teamId from the body
+   */
+  test("(8) no defaultTeamId defaults to '— no team —' and submit omits teamId", async () => {
+    const mockRespondent = {
+      id: "r-8",
+      organizationId: ORG_ID,
+      firstName: "Dana",
+      lastName: "Lee",
+      email: "dana@example.com",
+      teamId: null,
+    };
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      json: async () => ({ success: true, data: mockRespondent }),
+    });
+
+    // Render with no defaultTeamId (organisation node is selected, not a team)
+    renderModal({ defaultTeamId: null });
+
+    // Team select must default to empty value ("— no team —")
+    const select = screen.getByTestId("select-team") as HTMLSelectElement;
+    expect(select.value).toBe("");
+
+    // Fill required fields and submit without changing the team select
+    fireEvent.change(screen.getByLabelText(/first name/i), {
+      target: { value: "Dana" },
+    });
+    fireEvent.change(screen.getByLabelText(/last name/i), {
+      target: { value: "Lee" },
+    });
+    fireEvent.change(screen.getByLabelText(/e-?mail/i), {
+      target: { value: "dana@example.com" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(init.body as string);
+    // teamId must be ABSENT from the POST body
+    expect("teamId" in body).toBe(false);
   });
 });

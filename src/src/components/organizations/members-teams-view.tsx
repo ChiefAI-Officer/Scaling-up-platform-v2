@@ -511,7 +511,18 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
           <button
             type="button"
             disabled={!selectedNode}
-            onClick={() => setAddMemberOpen(true)}
+            onClick={() => {
+              if (!selectedNode) return;
+              // Resolve the org for this node and lazy-load teams if not yet fetched
+              const modalOrgId =
+                selectedNode.kind === "organization" ? selectedNode.id :
+                selectedNode.kind === "team"         ? selectedNode.orgId :
+                /* unassigned */                       selectedNode.orgId;
+              if (orgStates[modalOrgId]?.teams === null && !orgStates[modalOrgId]?.loadingTeams) {
+                loadTeams(modalOrgId);
+              }
+              setAddMemberOpen(true);
+            }}
             title={selectedNode ? "Add Member" : "Select a company or team first"}
             className={[
               "p-1 rounded-md transition-colors",
@@ -641,6 +652,7 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
             orgId={modalOrgId}
             teams={modalTeams}
             defaultTeamId={modalDefaultTeamId}
+            loadingTeams={orgStates[modalOrgId]?.loadingTeams ?? false}
           />
         );
       })()}

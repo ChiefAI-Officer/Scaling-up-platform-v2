@@ -54,6 +54,8 @@ export interface AddMemberModalProps {
   teams: ApiTeamNode[];
   /** Pre-selected team (the currently selected TreeNode when it's a team) */
   defaultTeamId: string | null;
+  /** True while the parent is fetching teams for this org */
+  loadingTeams?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,6 +78,7 @@ export function AddMemberModal({
   orgId,
   teams,
   defaultTeamId,
+  loadingTeams = false,
 }: AddMemberModalProps) {
   const firstNameId = useId();
   const lastNameId  = useId();
@@ -248,15 +251,21 @@ export function AddMemberModal({
                 data-testid="select-team"
                 value={teamId}
                 onChange={(e) => setTeamId(e.target.value)}
-                disabled={submitting}
+                disabled={submitting || loadingTeams}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <option value="">— no team —</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
+                {loadingTeams ? (
+                  <option value="">Loading teams…</option>
+                ) : (
+                  <>
+                    <option value="">— no team —</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
             </div>
 
