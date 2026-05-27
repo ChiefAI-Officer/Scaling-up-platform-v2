@@ -305,9 +305,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Task M — process optional bulkRespondents payload from the wizard
-    // CSV import. Best-effort: any per-row failure is recorded as an error
-    // and returned to the client; the campaign itself stays created.
+    // deprecated: Task M wizard CSV import. The setup-first flip (Slice 1)
+    // stopped the wizard from sending bulkRespondents — coaches now pick
+    // EXISTING members. Kept intact (optional, now unused by the UI) so older
+    // drafts/clients that still POST bulkRespondents keep working.
     let bulkResult: {
       created: Array<{ id: string; email: string }>;
       skipped: Array<{ email: string }>;
@@ -357,6 +358,11 @@ export async function POST(request: NextRequest) {
 // ────────────────────────────────────────────────────────────────────────
 // Task M — bulk-respondent helper (wizard-create path)
 // ────────────────────────────────────────────────────────────────────────
+//
+// deprecated: the campaign wizard no longer sends `bulkRespondents` (Slice 1
+// setup-first flip — coaches pick EXISTING members). This helper + the
+// `bulkRespondents` field on `createAssessmentCampaignSchema` are retained,
+// optional and functional, for backward-compat with older drafts/clients.
 //
 // Idempotent skip-on-conflict semantics: if an OrgRespondent already
 // exists (same org + dedupeValue), the row is reported in `skipped` and
