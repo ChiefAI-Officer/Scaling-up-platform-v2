@@ -330,7 +330,11 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
           [result.org.id]: { expanded: false, teams: null, loadingTeams: false, teamsError: false },
         }));
       } else {
-        // Refresh the team tree for the affected org so the new team appears
+        // Expand the org so the new team is visible, then refresh its team tree
+        setOrgStates((prev) => ({
+          ...prev,
+          [result.orgId]: { ...(prev[result.orgId] ?? { teams: null, loadingTeams: false, teamsError: false }), expanded: true },
+        }));
         await loadTeams(result.orgId);
       }
     },

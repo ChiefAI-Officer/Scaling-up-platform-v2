@@ -29,6 +29,7 @@ import React, { useState, useEffect, useId } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -132,15 +133,13 @@ export function AddTeamModal({
 
   function validate(): string | null {
     if (!name.trim()) return "Name is required.";
+    if (!type) return "Type is required.";
 
     if (type === "company" && parent !== "root") {
       return 'A Company type must have no parent — set Parent to "— none (root) —".';
     }
     if (type !== "company" && parent === "root") {
       return "Only the Company type may be at root. Choose a parent company or team.";
-    }
-    if (!type) {
-      return "Type is required.";
     }
     return null;
   }
@@ -167,7 +166,9 @@ export function AddTeamModal({
         const json = await res.json();
         if (!res.ok || !json.success) {
           setError(
-            typeof json.error === "string"
+            Array.isArray(json.error)
+              ? (json.error[0]?.message ?? "Failed to create company. Please try again.")
+              : typeof json.error === "string"
               ? json.error
               : "Failed to create company. Please try again."
           );
@@ -193,7 +194,9 @@ export function AddTeamModal({
         const json = await res.json();
         if (!res.ok || !json.success) {
           setError(
-            typeof json.error === "string"
+            Array.isArray(json.error)
+              ? (json.error[0]?.message ?? "Failed to create team. Please try again.")
+              : typeof json.error === "string"
               ? json.error
               : "Failed to create team. Please try again."
           );
@@ -221,7 +224,9 @@ export function AddTeamModal({
         const json = await res.json();
         if (!res.ok || !json.success) {
           setError(
-            typeof json.error === "string"
+            Array.isArray(json.error)
+              ? (json.error[0]?.message ?? "Failed to create team. Please try again.")
+              : typeof json.error === "string"
               ? json.error
               : "Failed to create team. Please try again."
           );
@@ -265,6 +270,9 @@ export function AddTeamModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add Team / Company</DialogTitle>
+          <DialogDescription>
+            Create a company, department, team, or folder.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} noValidate>
@@ -326,18 +334,20 @@ export function AddTeamModal({
               </select>
             </div>
 
-            {/* ---- Description (optional, not sent for orgs) ---- */}
-            <div className="space-y-1.5">
-              <Label htmlFor={descId}>Description</Label>
-              <Textarea
-                id={descId}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional description"
-                disabled={submitting}
-                className="min-h-[72px] resize-none"
-              />
-            </div>
+            {/* ---- Description (optional, not sent for orgs; hidden when Type=Company) ---- */}
+            {type !== "company" && (
+              <div className="space-y-1.5">
+                <Label htmlFor={descId}>Description</Label>
+                <Textarea
+                  id={descId}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Optional description"
+                  disabled={submitting}
+                  className="min-h-[72px] resize-none"
+                />
+              </div>
+            )}
 
             {/* ---- Inline error ---- */}
             {error && (

@@ -8,6 +8,8 @@
  *  (4) Guard: Type=Company with a non-root Parent is blocked (no fetch, error shown)
  *  (5) Guard: non-Company type with Parent=root is blocked
  *  (6) A failed create shows an inline error and keeps the modal open
+ *  (7) After a successful TEAM create, handleCreated sets the org to expanded=true
+ *  (8) A 400 with { error: [{message: "..."}] } surfaces the specific Zod message
  *
  * Note: uses fireEvent only (no @testing-library/user-event).
  * The Radix Select portal renders items into document.body; we query them
@@ -17,6 +19,7 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { AddTeamModal } from "@/components/organizations/add-team-modal";
+import { MembersTeamsView } from "@/components/organizations/members-teams-view";
 import type { OrgSummary, ApiTeamNode } from "@/components/organizations/members-teams-view";
 
 // ---------------------------------------------------------------------------
@@ -318,5 +321,107 @@ describe("AddTeamModal", () => {
     // Modal NOT closed
     expect(onClose).not.toHaveBeenCalled();
     expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  /**
+   * (7) After a successful TEAM create via the modal flow, the onCreated callback
+   *     fires with kind="team" so MembersTeamsView can set expanded=true.
+   *     We test this by driving MembersTeamsView end-to-end: open the Add modal,
+   *     fill in a team under Acme Corp, submit — after success the org row should
+   *     be expanded (ChevronDown visible) and the refreshed teams rendered.
+   */
+  test("(7) after successful TEAM create, the org becomes expanded", async () => {
+    // Sequence:
+    //   1st fetch = POST /api/organizations/org-1/teams (the modal submit)
+    //   2nd fetch = GET /api/organizations/org-1/teams (loadTeams after handleCreated)
+    const mockNewTeam = {
+      id: "team-design",
+      organizationId: "org-1",
+      name: "Design",
+      parentTeamId: null,
+      type: "team",
+      description: null,
+      children: [],
+    };
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({ success: true, data: mockNewTeam }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, data: [mockNewTeam] }),
+      });
+
+    render(
+      <MembersTeamsView
+        initialOrganizations={[ORG_ACME]}
+      />
+    );
+
+    // Open the Add modal via the FolderPlus button
+    fireEvent.click(screen.getByRole("button", { name: /add company or team/i }));
+
+    // Fill in Name
+    await waitFor(() => {
+      expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText(/name/i), { target: { value: "Design" } });
+
+    // Parent = Acme Corp
+    fireEvent.change(screen.getByTestId("select-parent"), { target: { value: "org:org-1" } });
+
+    // Type = team
+    fireEvent.change(screen.getByTestId("select-type"), { target: { value: "team" } });
+
+    // Submit
+    fireEvent.click(screen.getByRole("button", { name: /create/i }));
+
+    // After success, the org should be expanded — ChevronDown aria or the team node visible
+    await waitFor(() => {
+      // The refreshed teams list should render "Design" under Acme Corp
+      expect(screen.getByRole("button", { name: "Design" })).toBeInTheDocument();
+    });
+
+    // Verify the org row carries aria-expanded=true
+    expect(screen.getByRole("button", { name: "Acme Corp" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+  });
+
+  /**
+   * (8) A 400 response with { success:false, error: [{message:"Name must be at most 200 characters"}] }
+   *     surfaces the specific Zod message in the modal (not the generic fallback).
+   */
+  test("(8) 400 with Zod array error surfaces the specific message", async () => {
+    const zodMessage = "Name must be at most 200 characters";
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        success: false,
+        error: [{ message: zodMessage, path: ["name"], code: "too_big" }],
+      }),
+    });
+
+    renderModal();
+
+    // Fill name + valid company combo
+    fireEvent.change(screen.getByLabelText(/name/i), {
+      target: { value: "A".repeat(201) },
+    });
+    fireEvent.change(screen.getByTestId("select-type"), { target: { value: "company" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /create/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(zodMessage);
+    });
+
+    // Must NOT show the generic fallback
+    expect(screen.queryByText(/failed to create company/i)).not.toBeInTheDocument();
   });
 });
