@@ -16,6 +16,8 @@ import React, { useState, useCallback, useRef } from "react";
 import { ChevronRight, ChevronDown, Building2, Users, UserPlus, FolderPlus } from "lucide-react";
 import { AddTeamModal } from "./add-team-modal";
 import type { CreatedResult } from "./add-team-modal";
+import { AddMemberModal } from "./add-member-modal";
+import type { MemberCreatedResult } from "./add-member-modal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -163,6 +165,9 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
 
   // Add Team modal state
   const [addTeamOpen, setAddTeamOpen] = useState(false);
+
+  // Add Member modal state
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
 
   // Selected node drives the right panel
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
@@ -341,6 +346,16 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
     [loadTeams]
   );
 
+  // AddMemberModal callback — refresh the right panel after create
+  const handleMemberCreated = useCallback(
+    async (_result: MemberCreatedResult) => {
+      if (selectedNode) {
+        await loadMembers(selectedNode);
+      }
+    },
+    [selectedNode, loadMembers]
+  );
+
   // Build the loadedTeams map the modal needs for its Parent select
   const loadedTeamsForModal: Record<string, ApiTeamNode[]> = {};
   for (const org of organizations) {
@@ -495,10 +510,16 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
           </h2>
           <button
             type="button"
-            disabled
-            title="Add Member (coming soon)"
-            className="p-1 rounded-md text-muted-foreground opacity-40 cursor-not-allowed"
-            aria-label="Add Member (coming soon)"
+            disabled={!selectedNode}
+            onClick={() => setAddMemberOpen(true)}
+            title={selectedNode ? "Add Member" : "Select a company or team first"}
+            className={[
+              "p-1 rounded-md transition-colors",
+              selectedNode
+                ? "text-muted-foreground hover:text-foreground hover:bg-muted"
+                : "text-muted-foreground opacity-40 cursor-not-allowed",
+            ].join(" ")}
+            aria-label={selectedNode ? "Add Member" : "Add Member (select a node first)"}
           >
             <UserPlus className="w-4 h-4" />
           </button>
@@ -589,6 +610,40 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
         organizations={organizations}
         loadedTeams={loadedTeamsForModal}
       />
+
+      {/* AddMemberModal — only mount when we have an org context */}
+      {selectedNode && (() => {
+        // Resolve orgId + defaultTeamId from the current node
+        const modalOrgId =
+          selectedNode.kind === "organization" ? selectedNode.id :
+          selectedNode.kind === "team"         ? selectedNode.orgId :
+          /* unassigned */                       selectedNode.orgId;
+
+        const modalDefaultTeamId =
+          selectedNode.kind === "team" ? selectedNode.id : null;
+
+        // Flatten the org's loaded teams for the Team selector
+        function flattenForModal(nodes: ApiTeamNode[]): ApiTeamNode[] {
+          const result: ApiTeamNode[] = [];
+          for (const n of nodes) {
+            result.push(n);
+            result.push(...flattenForModal(n.children));
+          }
+          return result;
+        }
+        const modalTeams = flattenForModal(orgStates[modalOrgId]?.teams ?? []);
+
+        return (
+          <AddMemberModal
+            open={addMemberOpen}
+            onClose={() => setAddMemberOpen(false)}
+            onCreated={handleMemberCreated}
+            orgId={modalOrgId}
+            teams={modalTeams}
+            defaultTeamId={modalDefaultTeamId}
+          />
+        );
+      })()}
     </>
   );
 }
