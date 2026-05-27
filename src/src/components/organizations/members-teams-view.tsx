@@ -12,7 +12,7 @@
  *   GET /api/organizations/[id]/respondents?teamId=<id>
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { ChevronRight, ChevronDown, Building2, Users, UserPlus, FolderPlus } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -74,6 +74,7 @@ interface OrgState {
   expanded: boolean;
   teams: ApiTeamNode[] | null; // null = not yet loaded
   loadingTeams: boolean;
+  teamsError: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +151,7 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
   const [orgStates, setOrgStates] = useState<Record<string, OrgState>>(() => {
     const init: Record<string, OrgState> = {};
     for (const org of initialOrganizations) {
-      init[org.id] = { expanded: false, teams: null, loadingTeams: false };
+      init[org.id] = { expanded: false, teams: null, loadingTeams: false, teamsError: false };
     }
     return init;
   });
@@ -161,38 +162,65 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
   // Members for the currently selected node
   const [members, setMembers] = useState<ApiRespondent[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [membersError, setMembersError] = useState(false);
+
+  // Sequence counters for request-ordering guards (prevent stale responses overwriting newer ones)
+  const memberSeqRef = useRef(0);
+  // Per-org team sequence counters: orgId → latest seq number
+  const teamSeqRef = useRef<Record<string, number>>({});
 
   // --------------------------------------------------------------------------
   // Fetch helpers
   // --------------------------------------------------------------------------
 
   const loadTeams = useCallback(async (orgId: string) => {
+    // Increment per-org sequence; capture this call's seq
+    const prevSeq = teamSeqRef.current[orgId] ?? 0;
+    const mySeq = prevSeq + 1;
+    teamSeqRef.current = { ...teamSeqRef.current, [orgId]: mySeq };
+
     setOrgStates((prev) => ({
       ...prev,
-      [orgId]: { ...prev[orgId], loadingTeams: true },
+      [orgId]: { ...prev[orgId], loadingTeams: true, teamsError: false },
     }));
     try {
       const res = await fetch(`/api/organizations/${orgId}/teams`);
       const json = await res.json();
+      // Bail if a newer call has started for this org
+      if (teamSeqRef.current[orgId] !== mySeq) return;
+      if (!res.ok || !json.success) {
+        setOrgStates((prev) => ({
+          ...prev,
+          [orgId]: { ...prev[orgId], teams: null, loadingTeams: false, teamsError: true },
+        }));
+        return;
+      }
       setOrgStates((prev) => ({
         ...prev,
         [orgId]: {
           ...prev[orgId],
-          teams: json.success ? (json.data as ApiTeamNode[]) : [],
+          teams: json.data as ApiTeamNode[],
           loadingTeams: false,
+          teamsError: false,
         },
       }));
     } catch {
+      if (teamSeqRef.current[orgId] !== mySeq) return;
       setOrgStates((prev) => ({
         ...prev,
-        [orgId]: { ...prev[orgId], teams: [], loadingTeams: false },
+        [orgId]: { ...prev[orgId], teams: null, loadingTeams: false, teamsError: true },
       }));
     }
   }, []);
 
   const loadMembers = useCallback(async (node: TreeNode) => {
+    // Increment sequence; capture this call's seq
+    const mySeq = memberSeqRef.current + 1;
+    memberSeqRef.current = mySeq;
+
     setLoadingMembers(true);
     setMembers([]);
+    setMembersError(false);
     try {
       let url: string;
       if (node.kind === "organization") {
@@ -205,18 +233,26 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
       }
       const res = await fetch(url);
       const json = await res.json();
-      if (json.success) {
-        let data = json.data as ApiRespondent[];
-        // For the unassigned bucket, filter to only unteamed respondents
-        if (node.kind === "unassigned") {
-          data = data.filter((r) => r.teamId === null);
-        }
-        setMembers(data);
+      // Bail if a newer call has started
+      if (memberSeqRef.current !== mySeq) return;
+      if (!res.ok || !json.success) {
+        setMembersError(true);
+        return;
       }
+      let data = json.data as ApiRespondent[];
+      // For the unassigned bucket, filter to only unteamed respondents
+      if (node.kind === "unassigned") {
+        data = data.filter((r) => r.teamId === null);
+      }
+      setMembers(data);
     } catch {
-      setMembers([]);
+      if (memberSeqRef.current !== mySeq) return;
+      setMembersError(true);
     } finally {
-      setLoadingMembers(false);
+      // Only clear loading if this call is still the latest
+      if (memberSeqRef.current === mySeq) {
+        setLoadingMembers(false);
+      }
     }
   }, []);
 
@@ -338,6 +374,19 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
                       <p className="pl-8 py-1 text-xs text-muted-foreground">Loading…</p>
                     )}
 
+                    {!state.loadingTeams && state.teamsError && (
+                      <div className="pl-8 py-1 flex items-center gap-2">
+                        <p className="text-xs text-destructive" role="alert">Failed to load teams.</p>
+                        <button
+                          type="button"
+                          onClick={() => loadTeams(org.id)}
+                          className="text-xs text-primary underline hover:no-underline"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+
                     {/* Nested team tree */}
                     {state.teams &&
                       flattenTree(state.teams, org.id, 1).map(({ node: tn, depth }) => {
@@ -425,13 +474,26 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
           </div>
         )}
 
-        {selectedNode && !loadingMembers && members.length === 0 && (
+        {selectedNode && !loadingMembers && membersError && (
+          <div className="flex flex-col items-center justify-center h-48 gap-2">
+            <p className="text-sm text-destructive" role="alert">Failed to load members.</p>
+            <button
+              type="button"
+              onClick={() => loadMembers(selectedNode)}
+              className="text-sm text-primary underline hover:no-underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {selectedNode && !loadingMembers && !membersError && members.length === 0 && (
           <div className="flex items-center justify-center h-48">
             <p className="text-sm text-muted-foreground">No members found.</p>
           </div>
         )}
 
-        {selectedNode && !loadingMembers && members.length > 0 && (
+        {selectedNode && !loadingMembers && !membersError && members.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

@@ -232,7 +232,9 @@ describe("MembersTeamsView", () => {
   });
 
   test("selecting the company root node shows all org members", async () => {
-    // No teams expansion needed — just clicking the org node itself
+    // First click expands AND selects the org node, triggering a respondents fetch
+    // with no teamId param (all members for the org)
+    mockFetchForOrg1Teams();
     mockFetchRespondents([RESPONDENT_ALICE, RESPONDENT_BOB]);
 
     render(
@@ -241,14 +243,70 @@ describe("MembersTeamsView", () => {
       />
     );
 
-    // Org root node button exists; clicking WITHOUT expanding loads org members
-    // We'll select it directly (not expand)
-    // In the component, there should be a separate "select" click target or
-    // the button click both selects and (optionally) expands.
-    // This test verifies: when org node is selected, members are loaded.
-    mockFetchRespondents([RESPONDENT_ALICE, RESPONDENT_BOB]);
-
-    // The component should start with no members shown (right panel empty)
+    // Right panel starts empty (no node selected)
     expect(screen.queryByText("Alice Smith")).not.toBeInTheDocument();
+
+    // Click the org root node — both selects it and initiates team + member loads
+    fireEvent.click(screen.getByRole("button", { name: /acme corp/i }));
+
+    // Respondents endpoint called WITHOUT a teamId query param
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/organizations/org-1/respondents"
+      );
+    });
+
+    // Both member rows render in the right panel
+    await waitFor(() => {
+      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Bob Jones")).toBeInTheDocument();
+  });
+
+  test("(e) member fetch failure shows error affordance and Retry re-fetches", async () => {
+    // First expand to get teams, then fail the member load
+    mockFetchForOrg1Teams();
+
+    render(
+      <MembersTeamsView
+        initialOrganizations={[ORG_1]}
+      />
+    );
+
+    // Expand org to show teams
+    fireEvent.click(screen.getByRole("button", { name: /acme corp/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Engineering")).toBeInTheDocument();
+    });
+
+    // Mock a non-ok response for the member fetch
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ success: false, error: "SERVER_ERROR" }),
+    });
+
+    // Click the Engineering team node to trigger member load
+    fireEvent.click(screen.getByRole("button", { name: /engineering/i }));
+
+    // Error affordance appears — error message + Retry button
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Failed to load members.");
+    });
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+
+    // No member rows rendered
+    expect(screen.queryByText("Alice Smith")).not.toBeInTheDocument();
+
+    // Clicking Retry re-fetches: mock a successful response this time
+    mockFetchRespondents([RESPONDENT_ALICE]);
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    });
+
+    // Error affordance gone
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
