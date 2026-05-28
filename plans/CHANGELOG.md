@@ -6,6 +6,39 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-28 — Assessment Slice 3 — Levels + CEO-from-Level suggestion <!-- ENTRY_ISO:2026-05-28 ENTRY_SLUG:assessment-slice-3-levels-ceo-suggest -->
+
+**Branch:** `feat/assessment-slice-3-levels` (off `main`, merged via PR #20, squash commit `37dcd96`). Same-session continuation of Slices 1 + 2 via `superpowers:subagent-driven-development`. 3 commits.
+
+**What shipped.** End-to-end `roleType` wiring + a never-silent CEO auto-suggest.
+
+- **Levels infrastructure** (commit `9d1e890`, Critical fix `b5012fa`):
+  - New `src/src/lib/assessments/respondent-levels.ts` — canonical 6-level taxonomy matching Esperto's Add Member dropdown verbatim: `Leadership team member` (`teamleader`), `Employee` (`employee`), `Guest` (`guest`), `CEO/Founder with team` (`ceofounderwithteam`), `CEO/Founder alone` (`ceofounderalone`), `CEO/Founder` (`ceofounder`). Only `ceofounder` is confirmed against a live Esperto stored value (Rodriguez Jaime's row); the 3 CEO-variant slugs are flagged in code as best-guess pending a real Esperto CSV export. Exports `RESPONDENT_LEVELS`, `RESPONDENT_LEVEL_VALUES` tuple for `z.enum(...)`, `levelLabel(value)` (returns `"—"` for null/undefined; the raw value for unknown legacy slugs), and `isCEOFamily(value)` (true for the 3 CEO/Founder slugs only).
+  - `validations.ts` — both `createRespondentSchema` and `updateRespondentSchema` gain `roleType: z.enum(RESPONDENT_LEVEL_VALUES).optional().nullable()`. BC preserved (existing callers don't send `roleType`).
+  - Add Member modal — Level `<select>` after Team; selecting → POST body includes `roleType`; "— no level —" → key omitted.
+  - Edit Member modal — Level pre-fill from `member.roleType`; **legacy passthrough**: if the value is outside the 6 known slugs, the select renders a `(value) (legacy)` option so it's preserved + visible; clearing sends `roleType: null` to explicitly unset.
+  - Members table column — `m.roleType ?? "—"` replaced with `levelLabel(m.roleType)`, so users see human labels (and the raw slug for unknown values, not "—" which would hide them).
+  - 22 new respondent-levels tests + extensions to Add Member / Edit Member / members-teams-view tests.
+  - **Critical bug caught in code-quality review** — Zod validated `roleType` but the API handlers NEVER forwarded it to Prisma. The whole feature was silently no-op at the persistence layer; the UI/test suite passed because tests mocked `fetch` and verified request shape, not DB writes. Fixed by adding `roleType: data.roleType ?? null` to `db.orgRespondent.create({ data })` in the POST route and `if (data.roleType !== undefined) updateData.roleType = data.roleType` in the PATCH route (the `!== undefined` check lets explicit `null` clear the field while body-omits remain no-ops). Six new API tests now assert the Prisma `data` argument shape directly (not the request body) to lock this invariant.
+  - **Legacy slug + Zod rejection** — separately, the Edit modal previously sent the legacy unchanged value back in PATCH, which `z.enum(...)` would 400-reject on first encounter with imported data. Fixed by tracking `initialRoleType` and omitting `roleType` from the PATCH body when it equals the original AND the original is not in `RESPONDENT_LEVEL_VALUES`. Legacy values now survive an unrelated edit untouched. 3 modal tests cover unchanged-legacy / legacy→known / legacy→cleared paths.
+
+- **CEO-from-Level suggestion in the wizard** (commit `20accd2`):
+  - In `CampaignWizard.tsx`'s `ParticipantsStep`, when exactly **one** CEO/Founder-Level member is selected (`isCEOFamily(roleType) === true`) → auto-suggest that member as the campaign CEO, set `ceoRespondentId`, and render an inline `Suggested by Level` hint next to their CEO radio.
+  - State machine via `ceoPickSource: 'auto' | 'user' | null` (discriminator chosen over a bare flag so a cleared auto-suggestion is distinct from "never set" — fixes the "re-suggest after |C| drops back to 1" edge case).
+  - **A deliberate user click on the CEO radio always wins** — auto-logic returns early if `ceoPickSource === 'user'` and the picked member is still selected.
+  - **|C| === 0 → CEO null** (clears any prior auto). **|C| > 1 → CEO null** (per decision #5 — never silently first-wins under ambiguity; the coach must explicitly pick one or leave it null). Removing the suggested member clears the CEO.
+  - Members with `roleType: null` are never auto-suggested. Manual CEO selection still works for any member (including non-CEO-Level), and that pick persists across selection changes as long as the picked member stays in `respondentIds`.
+  - 6 new wizard tests cover all six branches (single-suggest, multi-no-suggest, manual-wins, removal-clears, re-suggest-after-removal-back-to-one, null-roleType-never-suggested).
+  - `canActivate` rule unchanged — a campaign can still ship without a CEO. The wizard's Review step + the Save click remain the explicit confirmation point (decision #5: "explicit single-CEO confirmation before save").
+
+**Verification.** Full suite: **2140 passing, 3 failing** — exactly the 3 known pre-existing failures (`no-inline-tolocaledatestring` / `org-survey/exchange` / `assessment-campaigns/detail-route`) in files this branch never touched. `CI=true npx next build --turbopack` clean under the safety gate (PR #17). Zero migrations; zero destructive operations.
+
+**Out of scope (deferred).** Bulk CSV import in the Members lane + persistent quick-add in the wizard (Slice 4). Coach landing companies-supported + per-campaign metrics + CampaignDetail Team column + staged-progress icons (Slice 5). Esperto-faithful pixel polish, admin-lane mirror, Reports lane, Edit-Campaign advanced tabs all still out of v1 entirely.
+
+**Plan:** `~/.claude/plans/yes-we-were-in-cosmic-jellyfish.md`.
+
+---
+
 ### 2026-05-28 — Assessment Slice 2 — Members & Teams edit modals + coach nav entry <!-- ENTRY_ISO:2026-05-28 ENTRY_SLUG:assessment-slice-2-edit-modals -->
 
 **Branch:** `feat/assessment-slice-2-polish` (off `main`, merged via PR #19, squash commit `3b85992`). Same-session continuation of Slice 1 via `superpowers:subagent-driven-development`. 5 commits.
