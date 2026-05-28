@@ -39,6 +39,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ApiTeamNode } from "./members-teams-view";
+import { RESPONDENT_LEVELS, RESPONDENT_LEVEL_VALUES } from "@/lib/assessments/respondent-levels";
+import type { RespondentLevelValue } from "@/lib/assessments/respondent-levels";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,6 +54,7 @@ export interface EditMemberModalMember {
   email: string;
   jobTitle?: string | null;
   teamId?: string | null;
+  roleType?: string | null;
 }
 
 export interface EditMemberModalProps {
@@ -85,12 +88,17 @@ export function EditMemberModal({
   const emailId     = useId();
   const jobTitleId  = useId();
   const teamId_id   = useId();
+  const levelId     = useId();
 
   // Form state — pre-filled from member prop
-  const [firstName, setFirstName] = useState(member.firstName);
-  const [lastName,  setLastName]  = useState(member.lastName);
-  const [jobTitle,  setJobTitle]  = useState(member.jobTitle ?? "");
-  const [teamId,    setTeamId]    = useState<string>(member.teamId ?? "");
+  const [firstName,       setFirstName]       = useState(member.firstName);
+  const [lastName,        setLastName]        = useState(member.lastName);
+  const [jobTitle,        setJobTitle]        = useState(member.jobTitle ?? "");
+  const [teamId,          setTeamId]          = useState<string>(member.teamId ?? "");
+  const [roleType,        setRoleType]        = useState<string>(member.roleType ?? "");
+  // Track the value that was in the DB when the modal opened so we can detect
+  // if the user actually changed it (needed for legacy-slug preservation below).
+  const [initialRoleType, setInitialRoleType] = useState<string | null | undefined>(member.roleType);
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
@@ -103,10 +111,12 @@ export function EditMemberModal({
       setLastName(member.lastName);
       setJobTitle(member.jobTitle ?? "");
       setTeamId(member.teamId ?? "");
+      setRoleType(member.roleType ?? "");
+      setInitialRoleType(member.roleType);
       setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, member.id, member.firstName, member.lastName, member.jobTitle, member.teamId]);
+  }, [open, member.id, member.firstName, member.lastName, member.jobTitle, member.teamId, member.roleType]);
 
   // ---------------------------------------------------------------------------
   // Validation + submit
@@ -141,6 +151,19 @@ export function EditMemberModal({
       // Include teamId only when a team is actually selected (mirror Add Member omit logic)
       if (teamId) {
         body.teamId = teamId;
+      }
+      // roleType handling:
+      //  - If the user explicitly cleared the field (empty string), send null to wipe it.
+      //  - If the user explicitly picked a known slug, send it.
+      //  - If the value is unchanged AND it's a legacy/unknown slug (not in the known list),
+      //    omit roleType entirely so the unknown slug passes through the Zod enum guard on
+      //    PATCH without a 400 rejection.
+      const isLegacyUnchanged =
+        roleType === (initialRoleType ?? "") &&
+        initialRoleType != null &&
+        !(RESPONDENT_LEVEL_VALUES as readonly string[]).includes(initialRoleType);
+      if (!isLegacyUnchanged) {
+        body.roleType = roleType || null;
       }
       // NOTE: email is intentionally NOT included — the API rejects email changes
       // (email is the dedupe key for OrgRespondent).
@@ -270,6 +293,39 @@ export function EditMemberModal({
                     {t.name}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            {/* ---- Level (optional) ---- */}
+            <div className="space-y-1.5">
+              <Label htmlFor={levelId}>Level</Label>
+              {/*
+                Native <select> — same pattern as Team selector.
+                Six Esperto-aligned options; always sends roleType (null = clear).
+                If member.roleType is set but isn't one of the 6 known values (legacy
+                data), a "(legacy)" option is appended so the saved value is preserved.
+              */}
+              <select
+                id={levelId}
+                data-testid="select-level"
+                value={roleType}
+                onChange={(e) => setRoleType(e.target.value)}
+                disabled={submitting}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">— no level —</option>
+                {RESPONDENT_LEVELS.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+                {/* Passthrough for legacy values not in the 6 known slugs */}
+                {member.roleType &&
+                  !(RESPONDENT_LEVEL_VALUES as readonly string[]).includes(member.roleType) && (
+                    <option value={member.roleType}>
+                      {member.roleType} (legacy)
+                    </option>
+                  )}
               </select>
             </div>
 

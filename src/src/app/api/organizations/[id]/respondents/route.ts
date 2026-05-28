@@ -156,6 +156,7 @@ export async function POST(
         data: {
           organizationId,
           teamId: data.teamId ?? null,
+          roleType: data.roleType ?? null,
           email: data.email,
           normalizedEmail,
           firstName: data.firstName,
