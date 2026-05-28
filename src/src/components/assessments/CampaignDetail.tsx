@@ -16,13 +16,12 @@
  *  - public/wireframes-phase2/revisions/08-revised-individual-results.html
  */
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Download,
-  FileUp,
   Loader2,
   Mail,
   Eye,
@@ -31,7 +30,6 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
-import { parseRespondentCsv } from "@/lib/assessments/respondent-csv";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Dialog,
@@ -156,26 +154,13 @@ export function CampaignDetail({
   const [closeReason, setCloseReason] = useState("");
   const [closing, setClosing] = useState(false);
 
-  // Add Respondent modal state.
+  // Add Respondent modal state — pick-existing only (Slice 1).
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [addTab, setAddTab] = useState<"single" | "bulk">("single");
   const [orgRespondents, setOrgRespondents] = useState<OrgRespondentRow[]>([]);
   const [loadingOrgRespondents, setLoadingOrgRespondents] = useState(false);
-  const [selectedRespondentId, setSelectedRespondentId] = useState<string>("");
+  const [orgRespondentsLoaded, setOrgRespondentsLoaded] = useState(false);
+  const [selectedRespondentIds, setSelectedRespondentIds] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
-  const [newRespondentFirstName, setNewRespondentFirstName] = useState("");
-  const [newRespondentLastName, setNewRespondentLastName] = useState("");
-  const [newRespondentEmail, setNewRespondentEmail] = useState("");
-  const [creatingRespondent, setCreatingRespondent] = useState(false);
-
-  // Task M — Bulk CSV tab state.
-  const [bulkCsvText, setBulkCsvText] = useState("");
-  const [bulkMode, setBulkMode] = useState<"skip" | "merge">("skip");
-  const [bulkSubmitting, setBulkSubmitting] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState<{
-    current: number;
-    total: number;
-  } | null>(null);
 
   // Remove participant confirm dialog state.
   const [removeTarget, setRemoveTarget] =
@@ -644,15 +629,18 @@ export function CampaignDetail({
       });
     } finally {
       setLoadingOrgRespondents(false);
+      setOrgRespondentsLoaded(true);
     }
   }, [campaign.organizationId, toast]);
 
   // Lazy-load the org respondents on first open of the Add dialog.
+  // Use orgRespondentsLoaded flag instead of length check to avoid an
+  // infinite loop when the org has zero members.
   useEffect(() => {
-    if (addDialogOpen && orgRespondents.length === 0 && !loadingOrgRespondents) {
+    if (addDialogOpen && !orgRespondentsLoaded && !loadingOrgRespondents) {
       void loadOrgRespondents();
     }
-  }, [addDialogOpen, orgRespondents.length, loadingOrgRespondents, loadOrgRespondents]);
+  }, [addDialogOpen, orgRespondentsLoaded, loadingOrgRespondents, loadOrgRespondents]);
 
   const participantRespondentIds = new Set(
     respondents.map((r) => r.respondent.id),
@@ -663,232 +651,70 @@ export function CampaignDetail({
 
   function resetAddDialog() {
     setAddDialogOpen(false);
-    setSelectedRespondentId("");
-    setNewRespondentFirstName("");
-    setNewRespondentLastName("");
-    setNewRespondentEmail("");
-    setAddTab("single");
-    setBulkCsvText("");
-    setBulkMode("skip");
-    setBulkProgress(null);
+    setSelectedRespondentIds(new Set());
+    // Clear loaded state so the next open re-fetches fresh members.
+    setOrgRespondents([]);
+    setOrgRespondentsLoaded(false);
   }
 
-  async function handleCreateAndAdd() {
-    const firstName = newRespondentFirstName.trim();
-    const lastName = newRespondentLastName.trim();
-    const email = newRespondentEmail.trim();
-    if (!firstName || !lastName || !email) {
+  /**
+   * Add all selected (checked) respondents to the campaign one by one.
+   * Loops through selectedRespondentIds and calls the existing POST
+   * /api/assessment-campaigns/[id]/respondents endpoint for each.
+   * ALREADY_PARTICIPANT responses are treated as benign (idempotent).
+   */
+  async function handleConfirmAdd() {
+    if (selectedRespondentIds.size === 0 || adding) return;
+    setAdding(true);
+    const ids = Array.from(selectedRespondentIds);
+    const errors: string[] = [];
+    for (const orgRespondentId of ids) {
+      try {
+        const res = await fetch(
+          `/api/assessment-campaigns/${campaign.id}/respondents`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orgRespondentId }),
+          },
+        );
+        const body = await res.json();
+        if (!res.ok || !body.success) {
+          const code = body.code as string | undefined;
+          if (code === "ALREADY_PARTICIPANT") continue; // benign
+          const msg = typeof body.error === "string"
+            ? body.error
+            : code === "WRONG_ORGANIZATION"
+              ? "Respondent belongs to a different organization."
+              : code === "CAMPAIGN_CLOSED"
+                ? "Cannot add respondents to a closed campaign."
+                : "Failed to add respondent";
+          errors.push(msg);
+        }
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : "Network error");
+      }
+    }
+    setAdding(false);
+    if (errors.length > 0) {
       toast({
-        title: "Missing fields",
-        description: "First name, last name, and email are required.",
+        title: "Could not add respondent",
+        description: errors[0],
         variant: "destructive",
       });
       return;
     }
-    setCreatingRespondent(true);
-    try {
-      const createRes = await fetch(
-        `/api/organizations/${campaign.organizationId}/respondents`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ firstName, lastName, email }),
-        },
-      );
-      const createBody = await createRes.json();
-      if (!createRes.ok || !createBody.success) {
-        throw new Error(
-          typeof createBody.error === "string"
-            ? createBody.error
-            : "Failed to create respondent",
-        );
-      }
-      const created = createBody.data as OrgRespondentRow;
-      setOrgRespondents((prev) => [...prev, created]);
-      setSelectedRespondentId(created.id);
-      setNewRespondentFirstName("");
-      setNewRespondentLastName("");
-      setNewRespondentEmail("");
-      toast({
-        title: "Respondent created",
-        description: `${created.firstName} ${created.lastName} has been added to the organization.`,
-      });
-    } catch (err) {
-      toast({
-        title: "Could not create respondent",
-        description:
-          err instanceof Error ? err.message : "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setCreatingRespondent(false);
-    }
-  }
-
-  async function handleConfirmAdd() {
-    if (!selectedRespondentId || adding) return;
-    setAdding(true);
-    try {
-      const res = await fetch(
-        `/api/assessment-campaigns/${campaign.id}/respondents`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orgRespondentId: selectedRespondentId }),
-        },
-      );
-      const body = await res.json();
-      if (!res.ok || !body.success) {
-        throw new Error(
-          typeof body.error === "string"
-            ? body.error
-            : body.code === "ALREADY_PARTICIPANT"
-              ? "This respondent is already a participant."
-              : body.code === "WRONG_ORGANIZATION"
-                ? "This respondent belongs to a different organization."
-                : body.code === "CAMPAIGN_CLOSED"
-                  ? "Cannot add respondents to a closed campaign."
-                  : "Failed to add respondent",
-        );
-      }
-      toast({
-        title: "Respondent added",
-        description:
-          body.data?.invitation !== null
-            ? "Participant added and a pending invitation row was created. Use Resend to deliver the link."
-            : "Participant added to this draft campaign.",
-      });
-      resetAddDialog();
-      await refreshRespondents();
-      router.refresh();
-    } catch (err) {
-      toast({
-        title: "Could not add respondent",
-        description:
-          err instanceof Error ? err.message : "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  // Task M — Bulk CSV: live-parsed preview.
-  const bulkParsed = useMemo(
-    () =>
-      bulkCsvText.trim().length > 0
-        ? parseRespondentCsv(bulkCsvText)
-        : null,
-    [bulkCsvText],
-  );
-
-  async function handleConfirmBulkAdd() {
-    if (!bulkParsed || bulkParsed.errors.length > 0) return;
-    if (bulkParsed.rows.length === 0) return;
-    setBulkSubmitting(true);
-    setBulkProgress(null);
-    try {
-      // 1) Bulk-create org respondents (Task M's new route).
-      const createRes = await fetch(
-        `/api/organizations/${campaign.organizationId}/respondents/bulk`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            rows: bulkParsed.rows,
-            mode: bulkMode,
-          }),
-        },
-      );
-      const createBody = await createRes.json();
-      if (!createRes.ok || !createBody.success) {
-        throw new Error(
-          typeof createBody.error === "string"
-            ? createBody.error
-            : "Failed to import respondents",
-        );
-      }
-      type RefRow = { id: string; email: string };
-      const created: RefRow[] = createBody.data?.created ?? [];
-      const updated: RefRow[] = createBody.data?.updated ?? [];
-      const skipped: { email: string }[] = createBody.data?.skipped ?? [];
-      const errors: { row: number; reason: string }[] =
-        createBody.data?.errors ?? [];
-
-      // 2) For every created OR updated respondent, attach as campaign
-      // participant. Skipped respondents are NOT auto-attached because
-      // the coach may already be tracking them on another campaign — we
-      // surface them in the toast and let the coach add explicitly via
-      // the Single tab if desired.
-      const attachTargets: RefRow[] = [...created, ...updated];
-      // Filter out anyone already in the participants table to avoid the
-      // 409 ALREADY_PARTICIPANT noise.
-      const alreadyIds = new Set(respondents.map((r) => r.respondent.id));
-      const toAttach = attachTargets.filter((r) => !alreadyIds.has(r.id));
-
-      let attachedCount = 0;
-      const attachErrors: string[] = [];
-      setBulkProgress({ current: 0, total: toAttach.length });
-      for (let i = 0; i < toAttach.length; i++) {
-        const ref = toAttach[i];
-        try {
-          const res = await fetch(
-            `/api/assessment-campaigns/${campaign.id}/respondents`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ orgRespondentId: ref.id }),
-            },
-          );
-          if (res.ok) {
-            attachedCount += 1;
-          } else {
-            const body = await res.json().catch(() => ({}));
-            // ALREADY_PARTICIPANT is benign — coach added them via another
-            // path between bulk-create and this attach loop.
-            if (body?.code !== "ALREADY_PARTICIPANT") {
-              attachErrors.push(`${ref.email}: ${body?.error ?? res.status}`);
-            }
-          }
-        } catch (err) {
-          attachErrors.push(
-            `${ref.email}: ${err instanceof Error ? err.message : "network error"}`,
-          );
-        }
-        setBulkProgress({ current: i + 1, total: toAttach.length });
-      }
-
-      const summary = [
-        `${created.length} created`,
-        `${updated.length} updated`,
-        `${skipped.length} skipped`,
-        `${attachedCount} added to campaign`,
-      ];
-      if (errors.length > 0 || attachErrors.length > 0) {
-        summary.push(`${errors.length + attachErrors.length} errors`);
-      }
-
-      toast({
-        title: "Bulk import complete",
-        description: summary.join(" • "),
-        variant:
-          errors.length + attachErrors.length > 0 ? "destructive" : undefined,
-      });
-
-      resetAddDialog();
-      await refreshRespondents();
-      router.refresh();
-    } catch (err) {
-      toast({
-        title: "Could not import respondents",
-        description:
-          err instanceof Error ? err.message : "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setBulkSubmitting(false);
-      setBulkProgress(null);
-    }
+    const added = ids.length;
+    toast({
+      title: added === 1 ? "Respondent added" : `${added} respondents added`,
+      description:
+        campaign.status === "ACTIVE"
+          ? "Pending invitation rows created. Use Resend to deliver the emails."
+          : "Participants added to this draft campaign.",
+    });
+    resetAddDialog();
+    await refreshRespondents();
+    router.refresh();
   }
 
   async function handleConfirmRemove() {
@@ -1482,7 +1308,7 @@ export function CampaignDetail({
       <Dialog
         open={addDialogOpen}
         onOpenChange={(open) => {
-          if (adding || creatingRespondent) return;
+          if (adding) return;
           if (!open) resetAddDialog();
           else setAddDialogOpen(open);
         }}
@@ -1495,277 +1321,74 @@ export function CampaignDetail({
             <DialogTitle>Add respondents to this campaign</DialogTitle>
             <DialogDescription>
               {isDraft
-                ? "Draft campaigns: new respondents are queued and will receive an invitation when you launch."
-                : "Active campaigns: new respondents get pending invitation rows. Use Resend to deliver the email."}
+                ? "Draft campaigns: selected members are queued and will receive an invitation when you launch."
+                : "Active campaigns: selected members get pending invitation rows. Use Resend to deliver the email."}
             </DialogDescription>
           </DialogHeader>
 
-          {/* Task M — Single vs Bulk tabs */}
-          <div
-            className="inline-flex items-center rounded-lg border border-border bg-muted/30 p-0.5 text-xs font-medium"
-            role="tablist"
-            aria-label="Add respondent mode"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={addTab === "single"}
-              onClick={() => setAddTab("single")}
-              disabled={adding || creatingRespondent || bulkSubmitting}
-              className={
-                addTab === "single"
-                  ? "px-3 py-1.5 rounded-md bg-card text-foreground shadow-sm"
-                  : "px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground"
-              }
-              data-testid="add-respondent-tab-single"
-            >
-              Single
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={addTab === "bulk"}
-              onClick={() => setAddTab("bulk")}
-              disabled={adding || creatingRespondent || bulkSubmitting}
-              className={
-                addTab === "bulk"
-                  ? "px-3 py-1.5 rounded-md bg-card text-foreground shadow-sm inline-flex items-center gap-1"
-                  : "px-3 py-1.5 rounded-md text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-              }
-              data-testid="add-respondent-tab-bulk"
-            >
-              <FileUp className="w-3.5 h-3.5" />
-              Bulk CSV
-            </button>
-          </div>
-
-          {addTab === "single" && (
-          <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="add-respondent-select"
-                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-              >
-                Existing respondent
-              </label>
-              <select
-                id="add-respondent-select"
-                data-testid="add-respondent-select"
-                value={selectedRespondentId}
-                onChange={(e) => setSelectedRespondentId(e.target.value)}
-                disabled={loadingOrgRespondents || adding}
-                className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-              >
-                <option value="">
-                  {loadingOrgRespondents
-                    ? "Loading..."
-                    : availableRespondents.length === 0
-                      ? "No respondents available — create one below"
-                      : "Select a respondent..."}
-                </option>
-                {availableRespondents.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.firstName} {r.lastName} — {r.email}
-                  </option>
-                ))}
-              </select>
+          {/* Pick-existing member list */}
+          {loadingOrgRespondents ? (
+            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading members…
             </div>
-
-            <div className="border-t border-border pt-4 space-y-3">
-              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Or create a new respondent
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  data-testid="new-respondent-firstName"
-                  type="text"
-                  placeholder="First name"
-                  value={newRespondentFirstName}
-                  onChange={(e) =>
-                    setNewRespondentFirstName(e.target.value)
-                  }
-                  disabled={creatingRespondent}
-                  className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                />
-                <input
-                  data-testid="new-respondent-lastName"
-                  type="text"
-                  placeholder="Last name"
-                  value={newRespondentLastName}
-                  onChange={(e) =>
-                    setNewRespondentLastName(e.target.value)
-                  }
-                  disabled={creatingRespondent}
-                  className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                />
-              </div>
-              <input
-                data-testid="new-respondent-email"
-                type="email"
-                placeholder="Email"
-                value={newRespondentEmail}
-                onChange={(e) => setNewRespondentEmail(e.target.value)}
-                disabled={creatingRespondent}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-              />
-              <button
-                type="button"
-                onClick={handleCreateAndAdd}
-                disabled={
-                  creatingRespondent ||
-                  !newRespondentFirstName.trim() ||
-                  !newRespondentLastName.trim() ||
-                  !newRespondentEmail.trim()
-                }
-                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                data-testid="create-new-respondent-btn"
-              >
-                {creatingRespondent && (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                )}
-                Create & select
-              </button>
-            </div>
-          </div>
-          )}
-
-          {addTab === "bulk" && (
+          ) : availableRespondents.length === 0 ? (
             <div
-              className="space-y-3"
-              data-testid="add-respondent-bulk-panel"
+              className="py-8 text-center space-y-3"
+              data-testid="add-respondent-empty-state"
             >
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Paste CSV
-                </label>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Header row: <code className="font-mono">name,email,team</code>{" "}
-                  (team optional, slash-delimited). Max 500 rows.
-                </p>
-              </div>
-              <textarea
-                value={bulkCsvText}
-                onChange={(e) => setBulkCsvText(e.target.value)}
-                placeholder={`name,email,team\nAlice Example,alice@example.com,Marketing/Brand\nBob Tester,bob@example.com,`}
-                rows={6}
-                disabled={bulkSubmitting}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                data-testid="add-respondent-bulk-textarea"
-              />
-
-              <div className="space-y-2">
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  If a respondent already exists
-                </div>
-                <div className="flex items-center gap-4 text-xs">
-                  <label className="inline-flex items-center gap-2 cursor-pointer">
+              <p className="text-sm text-muted-foreground">
+                {orgRespondents.length === 0
+                  ? "This company has no members yet."
+                  : "All company members are already participants in this campaign."}
+              </p>
+              <Link
+                href="/portal/members"
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors"
+              >
+                Add members in the Members lane
+              </Link>
+            </div>
+          ) : (
+            <div
+              className="border border-border rounded-lg divide-y divide-border max-h-72 overflow-y-auto"
+              data-testid="add-respondent-member-list"
+            >
+              {availableRespondents.map((r) => {
+                const checked = selectedRespondentIds.has(r.id);
+                return (
+                  <label
+                    key={r.id}
+                    className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/30 transition-colors"
+                    aria-label={`${r.firstName} ${r.lastName}`}
+                  >
                     <input
-                      type="radio"
-                      name="bulk-mode"
-                      value="skip"
-                      checked={bulkMode === "skip"}
-                      onChange={() => setBulkMode("skip")}
-                      disabled={bulkSubmitting}
-                      className="accent-primary"
-                      data-testid="add-respondent-bulk-mode-skip"
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        setSelectedRespondentIds((prev) => {
+                          const next = new Set(prev);
+                          if (checked) next.delete(r.id);
+                          else next.add(r.id);
+                          return next;
+                        });
+                      }}
+                      disabled={adding}
+                      className="accent-primary shrink-0"
+                      aria-label={`${r.firstName} ${r.lastName}`}
                     />
-                    Skip existing
-                  </label>
-                  <label className="inline-flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="bulk-mode"
-                      value="merge"
-                      checked={bulkMode === "merge"}
-                      onChange={() => setBulkMode("merge")}
-                      disabled={bulkSubmitting}
-                      className="accent-primary"
-                      data-testid="add-respondent-bulk-mode-merge"
-                    />
-                    Merge existing
-                  </label>
-                </div>
-              </div>
-
-              {bulkParsed && (
-                <div
-                  className="text-xs space-y-2"
-                  data-testid="add-respondent-bulk-preview"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-foreground">
-                      {bulkParsed.rows.length} valid row
-                      {bulkParsed.rows.length === 1 ? "" : "s"}
-                    </span>
-                    {bulkParsed.errors.length > 0 && (
-                      <span className="text-destructive font-medium">
-                        {bulkParsed.errors.length} error
-                        {bulkParsed.errors.length === 1 ? "" : "s"}
-                      </span>
-                    )}
-                  </div>
-                  {bulkParsed.rows.length > 0 && (
-                    <div className="border border-border rounded-md overflow-hidden max-h-48 overflow-y-auto">
-                      <table className="w-full">
-                        <thead className="bg-muted/40 sticky top-0">
-                          <tr>
-                            <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              Name
-                            </th>
-                            <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              Email
-                            </th>
-                            <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              Team
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {bulkParsed.rows.map((row, i) => (
-                            <tr key={`${row.email}-${i}`}>
-                              <td className="px-2 py-1 text-foreground">
-                                {row.name}
-                              </td>
-                              <td className="px-2 py-1 text-foreground font-mono">
-                                {row.email}
-                              </td>
-                              <td className="px-2 py-1 text-muted-foreground">
-                                {row.teamPath.length > 0
-                                  ? row.teamPath.join(" / ")
-                                  : "—"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-foreground truncate">
+                        {r.firstName} {r.lastName}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {r.email}
+                        {r.jobTitle ? ` · ${r.jobTitle}` : ""}
+                      </div>
                     </div>
-                  )}
-                  {bulkParsed.errors.length > 0 && (
-                    <ul className="border border-destructive/40 rounded-md p-2 bg-destructive/5 max-h-32 overflow-y-auto space-y-1">
-                      {bulkParsed.errors.slice(0, 20).map((e, i) => (
-                        <li key={i} className="text-destructive">
-                          Row {e.row}: {e.reason}
-                        </li>
-                      ))}
-                      {bulkParsed.errors.length > 20 && (
-                        <li className="text-destructive/80 italic">
-                          + {bulkParsed.errors.length - 20} more errors…
-                        </li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {bulkProgress && (
-                <div
-                  className="text-xs text-muted-foreground"
-                  data-testid="add-respondent-bulk-progress"
-                  role="status"
-                >
-                  Adding {bulkProgress.current} of {bulkProgress.total}…
-                </div>
-              )}
+                  </label>
+                );
+              })}
             </div>
           )}
 
@@ -1773,50 +1396,24 @@ export function CampaignDetail({
             <button
               type="button"
               onClick={resetAddDialog}
-              disabled={adding || creatingRespondent || bulkSubmitting}
+              disabled={adding}
               className="inline-flex items-center justify-center text-sm font-medium px-4 py-2 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               data-testid="add-respondent-cancel"
             >
               Cancel
             </button>
-            {addTab === "single" ? (
-              <button
-                type="button"
-                onClick={handleConfirmAdd}
-                disabled={
-                  !selectedRespondentId || adding || creatingRespondent
-                }
-                className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                data-testid="add-respondent-confirm"
-              >
-                {adding && <Loader2 className="w-4 h-4 animate-spin" />}
-                Add to campaign
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleConfirmBulkAdd}
-                disabled={
-                  !bulkParsed ||
-                  bulkParsed.rows.length === 0 ||
-                  bulkParsed.errors.length > 0 ||
-                  bulkSubmitting
-                }
-                className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                data-testid="add-respondent-bulk-confirm"
-              >
-                {bulkSubmitting && (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                )}
-                {bulkSubmitting
-                  ? bulkProgress
-                    ? `Adding ${bulkProgress.current}/${bulkProgress.total}…`
-                    : "Importing…"
-                  : `Import ${bulkParsed?.rows.length ?? 0} respondent${
-                      bulkParsed?.rows.length === 1 ? "" : "s"
-                    }`}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleConfirmAdd}
+              disabled={selectedRespondentIds.size === 0 || adding}
+              className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              data-testid="add-respondent-confirm"
+            >
+              {adding && <Loader2 className="w-4 h-4 animate-spin" />}
+              {selectedRespondentIds.size > 1
+                ? `Add ${selectedRespondentIds.size} to campaign`
+                : "Add to campaign"}
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
