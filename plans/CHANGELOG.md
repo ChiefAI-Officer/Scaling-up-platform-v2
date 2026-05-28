@@ -6,6 +6,39 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-28 — Assessment Slice 2 — Members & Teams edit modals + coach nav entry <!-- ENTRY_ISO:2026-05-28 ENTRY_SLUG:assessment-slice-2-edit-modals -->
+
+**Branch:** `feat/assessment-slice-2-polish` (off `main`, merged via PR #19, squash commit `3b85992`). Same-session continuation of Slice 1 via `superpowers:subagent-driven-development`. 5 commits.
+
+**What shipped.** Polish on top of Slice 1's Members & Teams lane — coaches now have full CRUD on every node.
+
+- **Edit Team modal** (commit `98cd8eb`, polish `0484db5`) — opens from a Pencil affordance on every team row. PATCHes `/api/organizations/{orgId}/teams/{teamId}` with the standard envelope. Enforces decision #3's schema invariant at edit-time (which the create modal already enforced):
+  - **Type may NOT become "Company"** — omitted from the Type select; submit-time guard blocks any forced value.
+  - **Parent may NOT become root** — omitted from the Parent select; placeholder `<option disabled>` reveals when the team is itself root-level and forces the user to consciously pick a parent (closes a real "silent auto-reparent on rename" bug caught in review).
+  - **Parent may NOT be self or any descendant** — `collectSubtreeIds` DFS + `excludeTeamSubtree` client-side prune; server-side cycle-detection is the backstop.
+  - **Delete affordance** in the modal footer with `window.confirm` + inline 409-children message ("Cannot delete — this team has sub-teams").
+  - **Null-type helper text** when a legacy team has `type: null` — surfaces the data-state to the user rather than silently stranding their edit.
+  - **Awaitable `onUpdated`** (`() => void | Promise<void>`) `await`ed BEFORE `onClose()`, so the tree reflects the rename/move before the modal disappears. `submitting`/`deleting` flags stay true through the await.
+  - 10 tests (8 in the modal suite + 2 integration in `members-teams-view.test.tsx`).
+
+- **Edit Member modal** (commit `0a6eb25`, hardening `5e5c826`) — Pencil affordance on every member row. PATCHes `/api/organizations/{orgId}/respondents/{memberId}` with `{ firstName, lastName, jobTitle?, teamId? }`. **Email field is `disabled + readOnly` and is NEVER included in the PATCH body** (the dedupe key is immutable via this surface; `updateRespondentSchema` doesn't accept it). Mirrors all the Add Member conventions (useId-linked labels, error unwrap, submitting guard).
+
+- **Edit Organization modal** (commit `0a6eb25`, fix `5e5c826`) — Pencil affordance on every company root node. PATCHes `/api/organizations/{orgId}` with `{ name, externalId }`. Empty-name blocks submit; cleared `externalId` sends `null` (the route coerces `null` and `""` identically).
+  - **Critical fix caught by code-quality review** — `OrgSummary` (the type the server page hands to the client) was missing `externalId`, the Pencil onClick was passing `externalId: undefined`, and the modal pre-filled empty. **Every single org edit was silently nulling out a real `externalId` value.** Fixed by threading `externalId` through schema-select → `OrgSummary` → Pencil onClick → modal pre-fill → PATCH body, plus updating the local state on refresh so subsequent edits see fresh data.
+  - **Race-safe refresh**: close-the-modal-before-the-fetch ordering (rather than seqRef) — serializes naturally because the modal can't fire `onUpdated` again until reopened. Documented inline.
+
+- **Coach nav entry** (commit `0452e26`) — `coachPrimaryNavItems` now includes **Members** (Building2 icon) between **My Workshops** and **Assessments**. Closes a discoverability gap that Slice 1 left open: I'd repointed the `AssessmentsSidebar` "My Organizations" placeholder to `/portal/members`, but that sidebar component doesn't actually render in the coach lane (it's the admin-lane nav), so `/portal/members` was only reachable by direct URL or via the wizard Step-3 "Manage members" CTA. Now it's first-class in the outer portal sidebar. 2/2 nav tests pass.
+
+**A11y disambiguation.** Per-row Pencil buttons now use distinct `aria-label`s — `Edit organization {name}` / `Edit team {name}` / `Edit {firstName} {lastName}` — so a screen reader user navigating a list of 10 orgs doesn't hear "Edit organization" ten times. The 7 pre-existing `members-teams-view.test.tsx` tests that queried `getByRole('button', { name: /acme corp/i })` were tightened to anchored regexes (`/^Acme Corp$/i`) to disambiguate from the new edit buttons.
+
+**Verification.** Full suite: **2080 passing, 3 failing** — the 3 failures are exactly the known pre-existing (`no-inline-tolocaledatestring` / `org-survey-exchange` / `assessment-campaigns-detail-route`) in files this branch never touched. `CI=true npx next build --turbopack` clean under the safety gate from PR #17. Zero migrations; zero destructive operations.
+
+**Out of scope (deferred).** Task 2.3's pixel-faithful Esperto layout polish — pure cosmetic and Jeff judges on "is it built." Slices 3-5 (Levels + CEO suggestion / bulk import + persistent quick-add / coach landing companies-supported + staged-progress + Team column on CampaignDetail) all still pending.
+
+**Plan:** `~/.claude/plans/yes-we-were-in-cosmic-jellyfish.md`.
+
+---
+
 ### 2026-05-28 — Assessment Setup-First Flip — Slice 1 (Members lane + pick-existing wizard) <!-- ENTRY_ISO:2026-05-28 ENTRY_SLUG:assessment-setup-first-coach-lane -->
 
 **Branch:** `feat/assessment-setup-first` (off `main`, merged via PR #18, squash commit `3d3dc10`). Implementation via `superpowers:subagent-driven-development`: fresh implementer subagent per task → spec-compliance review → code-quality review → fix → re-verify.
