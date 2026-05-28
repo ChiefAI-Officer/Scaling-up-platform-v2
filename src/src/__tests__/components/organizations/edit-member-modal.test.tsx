@@ -116,11 +116,15 @@ describe("EditMemberModal", () => {
 
   /**
    * (2) Email field is rendered read-only / disabled.
+   *     Defense-in-depth: check both disabled AND readOnly so neither
+   *     protection is accidentally removed in isolation.
    */
   test("(2) email field is disabled and read-only", () => {
     renderModal();
     const emailInput = screen.getByLabelText(/e-mail/i) as HTMLInputElement;
     expect(emailInput.disabled).toBe(true);
+    // m1: also assert readOnly so the defense-in-depth intent is locked in
+    expect(emailInput).toHaveAttribute("readonly");
   });
 
   /**

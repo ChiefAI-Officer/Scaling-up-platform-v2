@@ -203,6 +203,90 @@ describe("EditOrganizationModal", () => {
   });
 
   /**
+   * (C1-preserve) Saving without touching fields must send the real externalId —
+   * NOT null. This is the critical regression guard for silent externalId data loss.
+   */
+  test("(C1-preserve) save without changes sends existing externalId, not null", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: { id: "org-1", name: "Acme Corp", externalId: "acme-001" },
+      }),
+    });
+
+    renderModal({ organization: { id: "org-1", name: "Acme Corp", externalId: "acme-001" } });
+
+    // Submit with no changes
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const sentBody = JSON.parse(call[1].body as string);
+    // Must preserve the real externalId, not silently null it out
+    expect(sentBody.externalId).toBe("acme-001");
+  });
+
+  /**
+   * (C1-clear) Explicitly clearing the field sends null.
+   */
+  test("(C1-clear) explicitly clearing the External ID field sends null", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: { id: "org-1", name: "Acme Corp", externalId: null },
+      }),
+    });
+
+    renderModal({ organization: { id: "org-1", name: "Acme Corp", externalId: "acme-001" } });
+
+    // Clear the External ID field
+    fireEvent.change(screen.getByLabelText(/external id/i), { target: { value: "" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const sentBody = JSON.parse(call[1].body as string);
+    expect(sentBody.externalId).toBeNull();
+  });
+
+  /**
+   * (m2) 400 response with Zod-array error shape surfaces exact message.
+   */
+  test("(m2) 400 with {success:false, error:[{message}]} surfaces that exact message", async () => {
+    const zodMessage = "Name too long";
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        success: false,
+        error: [{ message: zodMessage, path: ["name"], code: "too_big" }],
+      }),
+    });
+
+    const { onUpdated, onClose } = renderModal();
+
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(zodMessage);
+    });
+
+    expect(onUpdated).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  /**
    * (5) onUpdated is awaited BEFORE onClose is called.
    */
   test("(5) onUpdated is awaited before onClose is called", async () => {

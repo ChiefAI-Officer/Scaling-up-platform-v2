@@ -16,8 +16,8 @@ import { MembersTeamsView } from "@/components/organizations/members-teams-view"
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const ORG_1 = { id: "org-1", name: "Acme Corp", ownerCoachId: "coach-1" };
-const ORG_2 = { id: "org-2", name: "Beta Inc", ownerCoachId: "coach-1" };
+const ORG_1 = { id: "org-1", name: "Acme Corp", ownerCoachId: "coach-1", externalId: null };
+const ORG_2 = { id: "org-2", name: "Beta Inc", ownerCoachId: "coach-1", externalId: null };
 
 const TEAM_ENG = {
   id: "team-eng",
@@ -112,7 +112,7 @@ describe("MembersTeamsView", () => {
     );
 
     // Click the expand control for Acme Corp
-    const expandBtn = screen.getByRole("button", { name: /acme corp/i });
+    const expandBtn = screen.getByRole("button", { name: /^Acme Corp$/i });
     fireEvent.click(expandBtn);
 
     // Should have called GET /api/organizations/org-1/teams
@@ -142,7 +142,7 @@ describe("MembersTeamsView", () => {
     );
 
     // Expand the org
-    fireEvent.click(screen.getByRole("button", { name: /acme corp/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Engineering")).toBeInTheDocument();
@@ -181,7 +181,7 @@ describe("MembersTeamsView", () => {
     );
 
     // Expand the org
-    fireEvent.click(screen.getByRole("button", { name: /acme corp/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Engineering")).toBeInTheDocument();
@@ -203,7 +203,7 @@ describe("MembersTeamsView", () => {
     );
 
     // Expand the org
-    fireEvent.click(screen.getByRole("button", { name: /acme corp/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/not associated with any team/i)).toBeInTheDocument();
@@ -248,7 +248,7 @@ describe("MembersTeamsView", () => {
     expect(screen.queryByText("Alice Smith")).not.toBeInTheDocument();
 
     // Click the org root node — both selects it and initiates team + member loads
-    fireEvent.click(screen.getByRole("button", { name: /acme corp/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
 
     // Respondents endpoint called WITHOUT a teamId query param
     await waitFor(() => {
@@ -275,7 +275,7 @@ describe("MembersTeamsView", () => {
     );
 
     // Expand org to show teams
-    fireEvent.click(screen.getByRole("button", { name: /acme corp/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Engineering")).toBeInTheDocument();
@@ -313,6 +313,65 @@ describe("MembersTeamsView", () => {
   });
 
   /**
+   * (g) Clicking the org Pencil opens EditOrganizationModal (integration test).
+   */
+  test("(g) clicking the org Edit affordance opens the EditOrganizationModal", async () => {
+    render(<MembersTeamsView initialOrganizations={[ORG_1]} />);
+
+    // The Edit button is visible by data-testid
+    const editBtn = screen.getByTestId("edit-org-org-1");
+    expect(editBtn).toBeInTheDocument();
+    expect(editBtn).toHaveAttribute("aria-label", "Edit organization Acme Corp");
+
+    fireEvent.click(editBtn);
+
+    // EditOrganizationModal dialog heading appears
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /edit organization/i })).toBeInTheDocument();
+    });
+
+    // Cancel closes the modal cleanly
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: /edit organization/i })).not.toBeInTheDocument();
+    });
+  });
+
+  /**
+   * (h) Clicking a member Pencil opens EditMemberModal (integration test).
+   */
+  test("(h) clicking the member Edit affordance opens the EditMemberModal", async () => {
+    mockFetchForOrg1Teams();
+    mockFetchRespondents([RESPONDENT_ALICE]);
+
+    render(<MembersTeamsView initialOrganizations={[ORG_1]} />);
+
+    // Expand org and select it so the member list loads
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    });
+
+    const editMemberBtn = screen.getByTestId("edit-member-resp-1");
+    expect(editMemberBtn).toBeInTheDocument();
+    expect(editMemberBtn).toHaveAttribute("aria-label", "Edit Alice Smith");
+
+    fireEvent.click(editMemberBtn);
+
+    // EditMemberModal dialog heading appears
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /edit member/i })).toBeInTheDocument();
+    });
+
+    // Cancel closes the modal cleanly
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: /edit member/i })).not.toBeInTheDocument();
+    });
+  });
+
+  /**
    * (f) Slice 2 — Each team row exposes an Edit affordance that opens the
    *     EditTeamModal pre-filled with that team.
    */
@@ -322,7 +381,7 @@ describe("MembersTeamsView", () => {
     render(<MembersTeamsView initialOrganizations={[ORG_1]} />);
 
     // Expand Acme Corp
-    fireEvent.click(screen.getByRole("button", { name: /acme corp/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
 
     // Wait for the team to render
     await waitFor(() => {

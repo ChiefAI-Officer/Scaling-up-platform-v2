@@ -34,6 +34,7 @@ export interface OrgSummary {
   id: string;
   name: string;
   ownerCoachId: string;
+  externalId: string | null;
 }
 
 /** Shape returned by GET /api/organizations/[id]/teams (nested tree) */
@@ -444,7 +445,7 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
                   {/* Edit affordance — shown on hover or when org row is selected */}
                   <button
                     type="button"
-                    aria-label="Edit organization"
+                    aria-label={`Edit organization ${org.name}`}
                     title={`Edit ${org.name}`}
                     data-testid={`edit-org-${org.id}`}
                     onClick={(e) => {
@@ -452,7 +453,7 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
                       setOrgBeingEdited({
                         id: org.id,
                         name: org.name,
-                        externalId: undefined,
+                        externalId: org.externalId,
                       });
                     }}
                     className={[
@@ -833,16 +834,20 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
           open={true}
           onClose={() => setOrgBeingEdited(null)}
           onUpdated={async () => {
-            // The org list is server-rendered; router.refresh() triggers a
-            // server re-fetch and re-renders the page with the updated org name.
-            // We also update local state immediately so the left-panel name
-            // reflects the change before the server round-trip completes.
-            const res = await fetch(`/api/organizations/${orgBeingEdited.id}`);
+            // Close the modal BEFORE fetching so a second edit cannot fire
+            // onUpdated again while the fetch is in flight (race-safe ordering).
+            const editedId = orgBeingEdited.id;
+            setOrgBeingEdited(null);
+            const res = await fetch(`/api/organizations/${editedId}`);
             const json = await res.json();
             if (res.ok && json.success && json.data) {
-              const updated = json.data as { id: string; name: string };
+              const updated = json.data as { id: string; name: string; externalId: string | null };
               setOrganizations((prev) =>
-                prev.map((o) => o.id === updated.id ? { ...o, name: updated.name } : o)
+                prev.map((o) =>
+                  o.id === updated.id
+                    ? { ...o, name: updated.name, externalId: updated.externalId }
+                    : o
+                )
               );
             }
           }}

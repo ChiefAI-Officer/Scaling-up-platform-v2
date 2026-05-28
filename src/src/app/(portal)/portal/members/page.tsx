@@ -25,13 +25,14 @@ export default async function MembersPage() {
   const organizations = await db.organization.findMany({
     where: { ownerCoachId: coach.id, deletedAt: null },
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, ownerCoachId: true },
+    select: { id: true, name: true, ownerCoachId: true, externalId: true },
   });
 
   const items: OrgSummary[] = organizations.map((o) => ({
     id: o.id,
     name: o.name,
     ownerCoachId: o.ownerCoachId,
+    externalId: o.externalId,
   }));
 
   return (
