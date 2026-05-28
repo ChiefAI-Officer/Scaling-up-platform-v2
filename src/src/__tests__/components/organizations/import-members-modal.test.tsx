@@ -263,4 +263,72 @@ describe("ImportMembersModal", () => {
     // No text pasted yet → button disabled
     expect(importBtn).toBeDisabled();
   });
+
+  /**
+   * (7) Partial-success — success:true but server returns row-level errors.
+   *     Asserts: counts render, each row reason renders, modal stays open,
+   *     onUpdated was still called (the data did write).
+   */
+  test("(7) partial-success: counts render, row errors listed, modal stays open, onUpdated called", async () => {
+    const PARTIAL_CSV =
+      "name,email,team\n" +
+      "Alice Smith,alice@example.com,Engineering\n" +
+      "Bob Jones,bob@example.com,Sales\n" +
+      "Carol White,carol@example.com,Marketing\n" +
+      "Dave Black,dave@example.com,\n" +
+      "Eve Green,eve@example.com,\n";
+
+    const onUpdatedMock = jest.fn().mockResolvedValue(undefined);
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          created: [
+            { id: "r1", email: "alice@example.com" },
+            { id: "r3", email: "carol@example.com" },
+            { id: "r4", email: "dave@example.com" },
+          ],
+          updated: [],
+          skipped: [],
+          errors: [
+            { row: 2, reason: "team create failed" },
+            { row: 5, reason: "duplicate email" },
+          ],
+        },
+      }),
+    });
+
+    const { onClose } = renderModal({ onUpdated: onUpdatedMock });
+
+    const textarea = screen.getByRole("textbox");
+    fireEvent.change(textarea, { target: { value: PARTIAL_CSV } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/parsed 5 rows/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /import 5 respondents/i }));
+
+    // Success counts must render
+    await waitFor(() => {
+      expect(screen.getByText(/imported 3/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/3 created/i)).toBeInTheDocument();
+
+    // Row-level reasons must render
+    expect(screen.getByText(/team create failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/duplicate email/i)).toBeInTheDocument();
+
+    // onUpdated must have been called (data did write)
+    expect(onUpdatedMock).toHaveBeenCalled();
+
+    // Modal must stay open — no auto-close when errors exist
+    // Advance past the 1.5 s auto-close window
+    await act(async () => {
+      jest.advanceTimersByTime(3000);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });

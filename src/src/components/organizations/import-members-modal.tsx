@@ -23,7 +23,7 @@
  * orgName     — displayed in the dialog title for context
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, useId } from "react";
 import {
   Dialog,
   DialogContent,
@@ -67,6 +67,7 @@ export interface ImportMembersModalProps {
 
 const PREVIEW_ROW_LIMIT = 10;
 const ERROR_DISPLAY_LIMIT = 5;
+const ROW_ERROR_DISPLAY_LIMIT = 20;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -83,6 +84,8 @@ export function ImportMembersModal({
   // Form state
   // --------------------------------------------------------------------------
 
+  const csvId = useId();
+
   const [csvText,    setCsvText]    = useState("");
   const [mode,       setMode]       = useState<ConflictMode>("skip");
 
@@ -90,6 +93,10 @@ export function ImportMembersModal({
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState<string | null>(null);
   const [result,     setResult]     = useState<ImportResult | null>(null);
+
+  // Guard against double-close during the 1.5 s auto-close timeout (I2)
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const closedRef       = useRef(false);
 
   // --------------------------------------------------------------------------
   // Reset state on open/close
@@ -101,6 +108,16 @@ export function ImportMembersModal({
       setMode("skip");
       setError(null);
       setResult(null);
+      closedRef.current = false;
+    } else {
+      // If the modal closes (prop goes false) while the auto-close timeout is
+      // pending (e.g. Escape / overlay click), cancel the timeout so onClose
+      // is not called a second time.
+      if (closeTimeoutRef.current !== null) {
+        clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
+      closedRef.current = true;
     }
   }, [open]);
 
@@ -151,15 +168,23 @@ export function ImportMembersModal({
         return;
       }
 
-      // Success — show summary, then notify + close after brief display
+      // Success — show summary. If there are row-level errors keep the modal
+      // open so the user can read them; otherwise auto-close after ~1.5 s.
       const importResult = json.data!;
       setResult(importResult);
       await onUpdated();
 
-      // Give the user ~1.5 s to read the summary, then close
-      setTimeout(() => {
-        onClose();
-      }, 1500);
+      if (importResult.errors.length === 0) {
+        // No row errors — give the user ~1.5 s to read the summary, then close
+        closeTimeoutRef.current = setTimeout(() => {
+          closeTimeoutRef.current = null;
+          if (!closedRef.current) {
+            closedRef.current = true;
+            onClose();
+          }
+        }, 1500);
+      }
+      // If there are row errors, stay open; the user must click Cancel/Close manually.
     } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
@@ -174,6 +199,10 @@ export function ImportMembersModal({
   const previewRows  = rows.slice(0, PREVIEW_ROW_LIMIT);
   const shownErrors  = parseErrors.slice(0, ERROR_DISPLAY_LIMIT);
   const hiddenErrors = parseErrors.length - shownErrors.length;
+
+  // Row-level errors returned by the server on a partial-success response (C1)
+  const shownRowErrors  = result ? result.errors.slice(0, ROW_ERROR_DISPLAY_LIMIT) : [];
+  const hiddenRowErrors = result ? result.errors.length - shownRowErrors.length : 0;
 
   const importBtnLabel = (() => {
     if (submitting)     return "Importing…";
@@ -219,9 +248,9 @@ export function ImportMembersModal({
           {/* Paste area                                                        */}
           {/* ---------------------------------------------------------------- */}
           <div className="space-y-1.5">
-            <Label htmlFor="csv-paste-area">CSV data</Label>
+            <Label htmlFor={csvId}>CSV data</Label>
             <textarea
-              id="csv-paste-area"
+              id={csvId}
               rows={10}
               placeholder={"name,email,team\nAlice Smith,alice@company.com,Engineering\nBob Jones,bob@company.com,"}
               value={csvText}
@@ -248,7 +277,7 @@ export function ImportMembersModal({
 
               {/* Parse errors */}
               {parseErrors.length > 0 && (
-                <ul className="space-y-1">
+                <ul role="alert" className="space-y-1">
                   {shownErrors.map((e, i) => (
                     <li
                       key={i}
@@ -338,18 +367,47 @@ export function ImportMembersModal({
           {/* Result summary (post-success)                                     */}
           {/* ---------------------------------------------------------------- */}
           {result !== null && (
-            <div className="rounded-md bg-success/10 border border-success/20 px-4 py-3 space-y-1">
-              <p className="text-sm font-medium text-success">
-                Imported {importTotal}{" "}
-                {importTotal === 1 ? "respondent" : "respondents"}.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {result.created.length} created,{" "}
-                {result.updated.length} updated,{" "}
-                {result.skipped.length} skipped,{" "}
-                {result.errors.length} errors.
-              </p>
-            </div>
+            <>
+              <div
+                role="status"
+                className="rounded-md bg-success/10 border border-success/20 px-4 py-3 space-y-1"
+              >
+                <p className="text-sm font-medium text-success">
+                  Imported {importTotal}{" "}
+                  {importTotal === 1 ? "respondent" : "respondents"}.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {result.created.length} created,{" "}
+                  {result.updated.length} updated,{" "}
+                  {result.skipped.length} skipped,{" "}
+                  {result.errors.length} errors.
+                </p>
+              </div>
+
+              {/* Row-level partial-success errors (C1) */}
+              {shownRowErrors.length > 0 && (
+                <ul
+                  role="alert"
+                  className="space-y-1 mt-2"
+                  aria-label="Row import errors"
+                >
+                  {shownRowErrors.map((e, i) => (
+                    <li
+                      key={i}
+                      className="rounded-md bg-destructive/10 px-3 py-1.5 text-xs text-destructive"
+                    >
+                      <span className="font-medium">Row {e.row}:</span>{" "}
+                      {e.reason}
+                    </li>
+                  ))}
+                  {hiddenRowErrors > 0 && (
+                    <li className="text-xs text-muted-foreground pl-3">
+                      + {hiddenRowErrors} more…
+                    </li>
+                  )}
+                </ul>
+              )}
+            </>
           )}
 
           {/* ---------------------------------------------------------------- */}
@@ -372,7 +430,7 @@ export function ImportMembersModal({
             onClick={onClose}
             disabled={submitting}
           >
-            Cancel
+            {result !== null && result.errors.length > 0 ? "Close" : "Cancel"}
           </Button>
           <Button
             type="button"
