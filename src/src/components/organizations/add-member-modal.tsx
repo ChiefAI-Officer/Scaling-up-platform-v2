@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ApiTeamNode } from "./members-teams-view";
+import { RESPONDENT_LEVELS } from "@/lib/assessments/respondent-levels";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -85,6 +86,7 @@ export function AddMemberModal({
   const emailId     = useId();
   const jobTitleId  = useId();
   const teamId_id   = useId();
+  const levelId     = useId();
 
   // Form state
   const [firstName, setFirstName] = useState("");
@@ -92,6 +94,7 @@ export function AddMemberModal({
   const [email,     setEmail]     = useState("");
   const [jobTitle,  setJobTitle]  = useState("");
   const [teamId,    setTeamId]    = useState<string>(defaultTeamId ?? "");
+  const [roleType,  setRoleType]  = useState<string>("");
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
@@ -105,6 +108,7 @@ export function AddMemberModal({
       setEmail("");
       setJobTitle("");
       setTeamId(defaultTeamId ?? "");
+      setRoleType("");
       setError(null);
     }
   }, [open, defaultTeamId]);
@@ -142,6 +146,10 @@ export function AddMemberModal({
       // Send teamId only when a team is actually selected
       if (teamId) {
         body.teamId = teamId;
+      }
+      // Send roleType only when a level is actually selected
+      if (roleType) {
+        body.roleType = roleType;
       }
 
       const res = await fetch(`/api/organizations/${orgId}/respondents`, {
@@ -266,6 +274,30 @@ export function AddMemberModal({
                     ))}
                   </>
                 )}
+              </select>
+            </div>
+
+            {/* ---- Level (optional) ---- */}
+            <div className="space-y-1.5">
+              <Label htmlFor={levelId}>Level</Label>
+              {/*
+                Native <select> — same pattern as Team selector above.
+                Six Esperto-aligned options; omits roleType from body when empty.
+              */}
+              <select
+                id={levelId}
+                data-testid="select-level"
+                value={roleType}
+                onChange={(e) => setRoleType(e.target.value)}
+                disabled={submitting}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">— no level —</option>
+                {RESPONDENT_LEVELS.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
               </select>
             </div>
 

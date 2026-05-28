@@ -405,4 +405,55 @@ describe("MembersTeamsView", () => {
     const nameInput = screen.getByLabelText(/name \*/i) as HTMLInputElement;
     expect(nameInput.value).toBe("Engineering");
   });
+
+  /**
+   * (i) Level column renders human label for a member with a known roleType slug.
+   */
+  test("(i) Level column renders human label for known roleType", async () => {
+    mockFetchForOrg1Teams();
+
+    // Override RESPONDENT_ALICE with a known slug
+    const memberWithLevel = {
+      ...RESPONDENT_ALICE,
+      roleType: "employee",
+    };
+    mockFetchRespondents([memberWithLevel]);
+
+    render(<MembersTeamsView initialOrganizations={[ORG_1]} />);
+
+    // Expand org and load members
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    });
+
+    // The Level cell must show the human label, NOT the raw slug
+    expect(screen.getByText("Employee")).toBeInTheDocument();
+    // Raw slug must NOT be in the document
+    expect(screen.queryByText("employee")).not.toBeInTheDocument();
+  });
+
+  /**
+   * (j) Level column renders "—" for a member with null roleType.
+   */
+  test("(j) Level column renders '—' for null roleType", async () => {
+    mockFetchForOrg1Teams();
+
+    // RESPONDENT_BOB has roleType: null
+    mockFetchRespondents([RESPONDENT_BOB]);
+
+    render(<MembersTeamsView initialOrganizations={[ORG_1]} />);
+
+    // Expand org and load members
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Bob Jones")).toBeInTheDocument();
+    });
+
+    // The Level column must render the em-dash
+    const memberRow = screen.getByTestId("member-row-resp-2");
+    expect(memberRow).toHaveTextContent("—");
+  });
 });

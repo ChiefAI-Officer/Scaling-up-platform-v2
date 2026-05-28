@@ -14,6 +14,7 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import { ChevronRight, ChevronDown, Building2, Users, UserPlus, FolderPlus, Pencil } from "lucide-react";
+import { levelLabel } from "@/lib/assessments/respondent-levels";
 import { AddTeamModal } from "./add-team-modal";
 import type { CreatedResult } from "./add-team-modal";
 import { AddMemberModal } from "./add-member-modal";
@@ -676,7 +677,7 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
                       </td>
                       <td className="px-6 py-3 text-muted-foreground">{m.email}</td>
                       <td className="px-6 py-3 text-muted-foreground">
-                        {m.roleType ?? "—"}
+                        {levelLabel(m.roleType)}
                       </td>
                       <td className="px-3 py-3 text-right">
                         {/* Edit affordance — shown on row hover */}
@@ -694,6 +695,7 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
                               email: m.email,
                               jobTitle: m.jobTitle ?? null,
                               teamId: m.teamId ?? null,
+                              roleType: m.roleType ?? null,
                             });
                             // Lazy-load teams if not yet fetched
                             if (

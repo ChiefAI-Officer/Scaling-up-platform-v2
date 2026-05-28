@@ -52,6 +52,7 @@ const MEMBER = {
   email: "jane.smith@example.com",
   jobTitle: "Director",
   teamId: "team-eng",
+  roleType: null as string | null,
 };
 
 // ---------------------------------------------------------------------------
@@ -182,6 +183,7 @@ describe("EditMemberModal", () => {
       lastName: "Smithson",
       jobTitle: "VP",
       teamId: "team-mkt",
+      roleType: null,
     });
 
     await waitFor(() => {
@@ -249,6 +251,91 @@ describe("EditMemberModal", () => {
 
     expect(onUpdated).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  /**
+   * (7) Opening with roleType: "ceofounder" → select pre-selected to that value.
+   */
+  test("(7) opening with roleType: 'ceofounder' pre-selects that value", () => {
+    renderModal({ member: { ...MEMBER, roleType: "ceofounder" } });
+
+    const levelSelect = screen.getByTestId("select-level") as HTMLSelectElement;
+    expect(levelSelect.value).toBe("ceofounder");
+  });
+
+  /**
+   * (8) Opening with an unknown legacy value → the legacy value appears as an extra option
+   *     AND is the selected value.
+   */
+  test("(8) unknown legacy roleType shows legacy option and is selected", () => {
+    renderModal({ member: { ...MEMBER, roleType: "senior_vp_legacy" } });
+
+    const levelSelect = screen.getByTestId("select-level") as HTMLSelectElement;
+    expect(levelSelect.value).toBe("senior_vp_legacy");
+
+    // The legacy option text must include the raw value
+    const legacyOption = Array.from(levelSelect.options).find(
+      (o) => o.value === "senior_vp_legacy"
+    );
+    expect(legacyOption).toBeDefined();
+    expect(legacyOption!.text).toContain("senior_vp_legacy");
+    expect(legacyOption!.text).toContain("legacy");
+  });
+
+  /**
+   * (9) Changing Level → PATCH body includes the new roleType.
+   */
+  test("(9) changing Level includes new roleType in PATCH body", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: { id: "respondent-1" } }),
+    });
+
+    renderModal({ member: { ...MEMBER, roleType: "employee" } });
+
+    fireEvent.change(screen.getByTestId("select-level"), {
+      target: { value: "teamleader" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const sentBody = JSON.parse(call[1].body as string);
+    expect(sentBody.roleType).toBe("teamleader");
+  });
+
+  /**
+   * (10) Clearing Level (selecting "— no level —") → PATCH body includes roleType: null.
+   */
+  test("(10) clearing Level sends roleType: null in PATCH body", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: { id: "respondent-1" } }),
+    });
+
+    renderModal({ member: { ...MEMBER, roleType: "employee" } });
+
+    // Clear the level by picking "— no level —"
+    fireEvent.change(screen.getByTestId("select-level"), {
+      target: { value: "" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const sentBody = JSON.parse(call[1].body as string);
+    // roleType must be explicitly null so the server can unset the field
+    expect(sentBody.roleType).toBeNull();
   });
 
   /**

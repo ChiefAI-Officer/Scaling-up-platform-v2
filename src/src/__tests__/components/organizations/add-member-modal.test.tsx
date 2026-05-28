@@ -325,6 +325,138 @@ describe("AddMemberModal", () => {
   });
 
   /**
+   * (7b) Level select renders all 6 options in spec order
+   */
+  test("(7b) Level select renders all 6 options in spec order", () => {
+    renderModal();
+
+    const levelSelect = screen.getByTestId("select-level") as HTMLSelectElement;
+    // 7 options: "— no level —" + 6 levels
+    expect(levelSelect.options).toHaveLength(7);
+
+    // Verify the placeholder
+    expect(levelSelect.options[0].value).toBe("");
+    expect(levelSelect.options[0].text).toMatch(/no level/i);
+
+    // Verify each level option in order
+    expect(levelSelect.options[1].value).toBe("teamleader");
+    expect(levelSelect.options[1].text).toBe("Leadership team member");
+
+    expect(levelSelect.options[2].value).toBe("employee");
+    expect(levelSelect.options[2].text).toBe("Employee");
+
+    expect(levelSelect.options[3].value).toBe("guest");
+    expect(levelSelect.options[3].text).toBe("Guest");
+
+    expect(levelSelect.options[4].value).toBe("ceofounderwithteam");
+    expect(levelSelect.options[4].text).toBe("CEO/Founder with team");
+
+    expect(levelSelect.options[5].value).toBe("ceofounderalone");
+    expect(levelSelect.options[5].text).toBe("CEO/Founder alone");
+
+    expect(levelSelect.options[6].value).toBe("ceofounder");
+    expect(levelSelect.options[6].text).toBe("CEO/Founder");
+  });
+
+  /**
+   * (7c) Selecting Level=teamleader → POST body includes roleType: "teamleader"
+   */
+  test("(7c) selecting Level=teamleader includes roleType in POST body", async () => {
+    const mockRespondent = {
+      id: "r-level",
+      organizationId: ORG_ID,
+      firstName: "Eve",
+      lastName: "Taylor",
+      email: "eve@example.com",
+      roleType: "teamleader",
+      teamId: null,
+    };
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      json: async () => ({ success: true, data: mockRespondent }),
+    });
+
+    renderModal();
+
+    fireEvent.change(screen.getByLabelText(/first name/i), {
+      target: { value: "Eve" },
+    });
+    fireEvent.change(screen.getByLabelText(/last name/i), {
+      target: { value: "Taylor" },
+    });
+    fireEvent.change(screen.getByLabelText(/e-?mail/i), {
+      target: { value: "eve@example.com" },
+    });
+    fireEvent.change(screen.getByTestId("select-level"), {
+      target: { value: "teamleader" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(init.body as string);
+    expect(body.roleType).toBe("teamleader");
+  });
+
+  /**
+   * (7d) "— no level —" → roleType is OMITTED from the POST body
+   */
+  test("(7d) '— no level —' selection omits roleType from POST body", async () => {
+    const mockRespondent = {
+      id: "r-nolevel",
+      organizationId: ORG_ID,
+      firstName: "Frank",
+      lastName: "Brown",
+      email: "frank@example.com",
+      roleType: null,
+      teamId: null,
+    };
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 201,
+      json: async () => ({ success: true, data: mockRespondent }),
+    });
+
+    renderModal();
+
+    fireEvent.change(screen.getByLabelText(/first name/i), {
+      target: { value: "Frank" },
+    });
+    fireEvent.change(screen.getByLabelText(/last name/i), {
+      target: { value: "Brown" },
+    });
+    fireEvent.change(screen.getByLabelText(/e-?mail/i), {
+      target: { value: "frank@example.com" },
+    });
+    // Explicitly pick "— no level —" (default, but be explicit)
+    fireEvent.change(screen.getByTestId("select-level"), {
+      target: { value: "" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0] as [
+      string,
+      RequestInit,
+    ];
+    const body = JSON.parse(init.body as string);
+    // roleType must be ABSENT from the body when no level selected
+    expect("roleType" in body).toBe(false);
+  });
+
+  /**
    * (8) When defaultTeamId is null (org node selected, not a team), the Team
    *     select defaults to "— no team —" AND submitting omits teamId from the body
    */
