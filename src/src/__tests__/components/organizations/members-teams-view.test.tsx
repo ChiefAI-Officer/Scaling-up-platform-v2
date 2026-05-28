@@ -456,4 +456,42 @@ describe("MembersTeamsView", () => {
     const memberRow = screen.getByTestId("member-row-resp-2");
     expect(memberRow).toHaveTextContent("—");
   });
+
+  /**
+   * (k) Clicking "Import members" with a node selected opens ImportMembersModal.
+   */
+  test("(k) clicking Import members with a node selected opens the ImportMembersModal", async () => {
+    mockFetchForOrg1Teams();
+
+    render(<MembersTeamsView initialOrganizations={[ORG_1]} />);
+
+    // Import members button exists but is disabled before selecting a node
+    const importBtn = screen.getByRole("button", { name: /import members \(select a node first\)/i });
+    expect(importBtn).toBeDisabled();
+
+    // Expand and select the org node (this also loads members, need to mock)
+    mockFetchRespondents([RESPONDENT_ALICE]);
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    });
+
+    // Now the Import members button should be enabled
+    const importBtnEnabled = screen.getByRole("button", { name: /^import members$/i });
+    expect(importBtnEnabled).not.toBeDisabled();
+
+    // Click it — the ImportMembersModal dialog should open
+    fireEvent.click(importBtnEnabled);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /import members/i })).toBeInTheDocument();
+    });
+
+    // Cancel closes the modal cleanly
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: /import members/i })).not.toBeInTheDocument();
+    });
+  });
 });
