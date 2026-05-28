@@ -13,11 +13,13 @@
  */
 
 import React, { useState, useCallback, useRef } from "react";
-import { ChevronRight, ChevronDown, Building2, Users, UserPlus, FolderPlus } from "lucide-react";
+import { ChevronRight, ChevronDown, Building2, Users, UserPlus, FolderPlus, Pencil } from "lucide-react";
 import { AddTeamModal } from "./add-team-modal";
 import type { CreatedResult } from "./add-team-modal";
 import { AddMemberModal } from "./add-member-modal";
 import type { MemberCreatedResult } from "./add-member-modal";
+import { EditTeamModal, excludeTeamSubtree } from "./edit-team-modal";
+import type { EditTeamModalTeam } from "./edit-team-modal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -168,6 +170,9 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
 
   // Add Member modal state
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+
+  // Edit Team modal state — null when closed
+  const [editingTeam, setEditingTeam] = useState<EditTeamModalTeam | null>(null);
 
   // Selected node drives the right panel
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
@@ -458,14 +463,41 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
                         };
                         const isTeamSelected = isSameNode(selectedNode, teamNode);
                         return (
-                          <NodeButton
-                            key={tn.id}
-                            label={tn.name}
-                            selected={isTeamSelected}
-                            depth={depth}
-                            icon={<Users className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />}
-                            onClick={() => handleTeamClick(tn, org.id)}
-                          />
+                          <div key={tn.id} className="group relative flex items-center">
+                            {/* The clickable name row — fills available width */}
+                            <NodeButton
+                              label={tn.name}
+                              selected={isTeamSelected}
+                              depth={depth}
+                              icon={<Users className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground" />}
+                              onClick={() => handleTeamClick(tn, org.id)}
+                            />
+                            {/* Edit affordance — shown on hover or when row is selected */}
+                            <button
+                              type="button"
+                              aria-label={`Edit ${tn.name}`}
+                              title="Edit team"
+                              data-testid={`edit-team-${tn.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingTeam({
+                                  id: tn.id,
+                                  orgId: org.id,
+                                  name: tn.name,
+                                  type: tn.type ?? undefined,
+                                  description: tn.description ?? undefined,
+                                  parentTeamId: tn.parentTeamId,
+                                });
+                              }}
+                              className={[
+                                "absolute right-1 top-1/2 -translate-y-1/2",
+                                "p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+                                isTeamSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                              ].join(" ")}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         );
                       })}
 
@@ -653,6 +685,31 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
             teams={modalTeams}
             defaultTeamId={modalDefaultTeamId}
             loadingTeams={orgStates[modalOrgId]?.loadingTeams ?? false}
+          />
+        );
+      })()}
+
+      {/* EditTeamModal — only mount when a team is being edited */}
+      {editingTeam && (() => {
+        const teamsForOrg = orgStates[editingTeam.orgId]?.teams ?? [];
+        // Defense in depth: prune self + descendants from the picker. The
+        // modal also re-prunes internally.
+        const prunedTeams = excludeTeamSubtree(teamsForOrg, editingTeam.id);
+        return (
+          <EditTeamModal
+            open={true}
+            onClose={() => setEditingTeam(null)}
+            onUpdated={async () => {
+              // Refresh the affected org's team tree so the rename/move is visible
+              await loadTeams(editingTeam.orgId);
+              // If the edited team was selected, its display may have changed
+              if (selectedNode && selectedNode.kind === "team" && selectedNode.id === editingTeam.id) {
+                // Re-fetch members (no-op for membership change, but cheap and consistent)
+                await loadMembers(selectedNode);
+              }
+            }}
+            team={editingTeam}
+            teams={prunedTeams}
           />
         );
       })()}

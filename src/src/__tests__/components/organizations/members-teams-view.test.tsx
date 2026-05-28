@@ -151,8 +151,9 @@ describe("MembersTeamsView", () => {
     // Now mock the respondents fetch
     mockFetchRespondents([RESPONDENT_ALICE]);
 
-    // Click the Engineering team node
-    const teamBtn = screen.getByRole("button", { name: /engineering/i });
+    // Click the Engineering team node (exact match to disambiguate from the
+    // "Edit Engineering" affordance also rendered on team rows)
+    const teamBtn = screen.getByRole("button", { name: "Engineering" });
     fireEvent.click(teamBtn);
 
     // Should have called GET /api/organizations/org-1/respondents?teamId=team-eng
@@ -286,8 +287,9 @@ describe("MembersTeamsView", () => {
       json: async () => ({ success: false, error: "SERVER_ERROR" }),
     });
 
-    // Click the Engineering team node to trigger member load
-    fireEvent.click(screen.getByRole("button", { name: /engineering/i }));
+    // Click the Engineering team node to trigger member load (exact match to
+    // disambiguate from the "Edit Engineering" affordance also on the row)
+    fireEvent.click(screen.getByRole("button", { name: "Engineering" }));
 
     // Error affordance appears — error message + Retry button
     await waitFor(() => {
@@ -308,5 +310,40 @@ describe("MembersTeamsView", () => {
 
     // Error affordance gone
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  /**
+   * (f) Slice 2 — Each team row exposes an Edit affordance that opens the
+   *     EditTeamModal pre-filled with that team.
+   */
+  test("(f) clicking the team Edit affordance opens the EditTeamModal", async () => {
+    mockFetchForOrg1Teams();
+
+    render(<MembersTeamsView initialOrganizations={[ORG_1]} />);
+
+    // Expand Acme Corp
+    fireEvent.click(screen.getByRole("button", { name: /acme corp/i }));
+
+    // Wait for the team to render
+    await waitFor(() => {
+      expect(screen.getByText("Engineering")).toBeInTheDocument();
+    });
+
+    // The Edit icon button is rendered next to the team — assert it exists
+    const editBtn = screen.getByTestId("edit-team-team-eng");
+    expect(editBtn).toBeInTheDocument();
+    expect(editBtn).toHaveAttribute("aria-label", "Edit Engineering");
+
+    // Click it — the EditTeamModal opens
+    fireEvent.click(editBtn);
+
+    // Modal heading appears
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /edit team/i })).toBeInTheDocument();
+    });
+
+    // Pre-filled name input matches the team
+    const nameInput = screen.getByLabelText(/name \*/i) as HTMLInputElement;
+    expect(nameInput.value).toBe("Engineering");
   });
 });
