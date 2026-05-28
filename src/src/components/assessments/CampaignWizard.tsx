@@ -58,6 +58,26 @@ function relativeTimeFrom(d: Date): string {
   return `${days}d ago`;
 }
 
+/**
+ * API error fields come back as either a string or a Zod issues array
+ * (`[{ message, path }]`). Reduce either to a single human-readable reason,
+ * falling back to `fallback` when nothing useful is present.
+ */
+function extractErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === "string" && error.trim() !== "") return error;
+  if (Array.isArray(error)) {
+    const messages = error
+      .map((issue) =>
+        issue && typeof issue === "object" && "message" in issue
+          ? String((issue as { message: unknown }).message)
+          : "",
+      )
+      .filter((m) => m.trim() !== "");
+    if (messages.length > 0) return messages.join("; ");
+  }
+  return fallback;
+}
+
 type EndMode = "OPEN_END" | "ENDS_AFTER";
 
 interface Organization {
@@ -403,6 +423,14 @@ export function CampaignWizard() {
       const campaignId = createBody.data.id as string;
 
       // 2) Add participants.
+      // TODO: atomic create+participants — the create route does NOT accept
+      // respondentIds/ceoRespondentId (only the deprecated bulkRespondents
+      // create-new path), so picking EXISTING members requires this second
+      // call. Until the create route grows a "pick-existing participants"
+      // input, the campaign row exists before participants are attached, so a
+      // failure here leaves a created-but-empty campaign. We surface that
+      // partial state explicitly (below) rather than a generic error, and do
+      // NOT delete-rollback.
       const partRes = await fetch(
         `/api/assessment-campaigns/${campaignId}/participants`,
         {
@@ -416,11 +444,28 @@ export function CampaignWizard() {
       );
       const partBody = await partRes.json();
       if (!partRes.ok || !partBody.success) {
-        throw new Error(
-          typeof partBody.error === "string"
-            ? partBody.error
-            : "Failed to assign participants",
+        // The campaign WAS created — make the partial state understandable
+        // instead of a generic "Could not save campaign" toast.
+        const reason = extractErrorMessage(
+          partBody.error,
+          "the participants could not be added",
         );
+        // Clear the auto-save draft: the campaign exists, so resuming the
+        // wizard draft would create a duplicate. The coach finishes in the
+        // campaign detail page.
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        try {
+          await fetch(DRAFT_ENDPOINT, { method: "DELETE" });
+        } catch {
+          // best-effort; the campaign was already created
+        }
+        toast({
+          title: "Campaign created, but adding participants failed",
+          description: `${reason}. Open the campaign to add them.`,
+          variant: "destructive",
+        });
+        router.push(`/portal/assessments/${campaignId}`);
+        return;
       }
 
       // 3) Optionally activate.
@@ -533,7 +578,22 @@ export function CampaignWizard() {
         {state.step === 0 && (
           <OrganizationStep
             value={state.organizationId}
-            onChange={(v) => update("organizationId", v)}
+            onChange={(v) =>
+              setState((s) => {
+                // Re-selecting the same org must NOT wipe a valid member
+                // selection. Only on an actual company change do we clear the
+                // picked members + CEO — otherwise their (other-company) ids
+                // would persist and get rejected by /participants later,
+                // leaving an orphaned empty campaign.
+                if (s.organizationId === v) return s;
+                return {
+                  ...s,
+                  organizationId: v,
+                  respondentIds: [],
+                  ceoRespondentId: null,
+                };
+              })
+            }
             onNext={next}
           />
         )}
@@ -827,14 +887,18 @@ function ParticipantsStep({
       ]);
       const teamsBody = await teamsRes.json();
       const respBody = await respRes.json();
-      if (teamsRes.ok && teamsBody.success) {
-        setTeams(teamsBody.data as ApiTeamNode[]);
-      }
-      if (respRes.ok && respBody.success) {
-        setRespondents(respBody.data as Respondent[]);
-      } else {
+      const teamsOk = teamsRes.ok && teamsBody.success;
+      const respOk = respRes.ok && respBody.success;
+      // BOTH fetches must succeed. If teams fails but members load, every
+      // member would silently fall into the "Not associated with any team"
+      // bucket — wrong grouping shown as correct. Surface the error (with the
+      // same Retry affordance) instead.
+      if (!teamsOk || !respOk) {
         setError(true);
+        return;
       }
+      setTeams(teamsBody.data as ApiTeamNode[]);
+      setRespondents(respBody.data as Respondent[]);
     } catch {
       setError(true);
     } finally {
