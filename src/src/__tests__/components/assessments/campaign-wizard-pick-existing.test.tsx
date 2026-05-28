@@ -50,6 +50,7 @@ const ALICE = {
   jobTitle: "CEO",
   teamId: "team-eng",
   organizationId: "org-1",
+  roleType: null as string | null,
 };
 const BOB = {
   id: "resp-2",
@@ -59,6 +60,7 @@ const BOB = {
   jobTitle: null,
   teamId: null,
   organizationId: "org-1",
+  roleType: null as string | null,
 };
 
 // ---------------------------------------------------------------------------
@@ -170,6 +172,7 @@ const CAROL = {
   jobTitle: null,
   teamId: "team-sales-b",
   organizationId: "org-2",
+  roleType: null as string | null,
 };
 
 /**
@@ -491,6 +494,234 @@ describe("CampaignWizard — C1 cross-company selection reset", () => {
       name: /alice smith/i,
     });
     expect(aliceAgain).toBeChecked();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CEO-from-Level suggestion (decision #5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a fetch installer for the CEO-Level tests. The respondents returned by
+ * /api/organizations/org-1/respondents are customisable per test via
+ * `respondents`.
+ */
+function installCEOLevelFetch(respondents: typeof ALICE[]) {
+  fetchCalls = [];
+  global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : String(input);
+    const method = (init?.method ?? "GET").toUpperCase();
+    let body: unknown = undefined;
+    if (init?.body && typeof init.body === "string") {
+      try { body = JSON.parse(init.body); } catch { body = init.body; }
+    }
+    fetchCalls.push({ url, method, body });
+
+    if (url.includes("/api/assessment-campaign-drafts")) {
+      if (method === "GET") return jsonResponse({ success: true, data: null });
+      return jsonResponse({ success: true });
+    }
+    if (url.endsWith("/api/organizations") && method === "GET") {
+      return jsonResponse({ success: true, data: [ORG] });
+    }
+    if (url.match(/\/api\/organizations\/org-1$/) && method === "GET") {
+      return jsonResponse({ success: true, data: ORG });
+    }
+    if (url.endsWith("/api/assessment-templates") && method === "GET") {
+      return jsonResponse({ success: true, data: [TEMPLATE] });
+    }
+    if (url.includes("/api/organizations/org-1/teams") && method === "GET") {
+      return jsonResponse({ success: true, data: [TEAM_ENG] });
+    }
+    if (url.includes("/api/organizations/org-1/respondents") && method === "GET") {
+      return jsonResponse({ success: true, data: respondents });
+    }
+    if (url.endsWith("/api/assessment-campaigns") && method === "POST") {
+      return jsonResponse({ success: true, data: { id: "camp-1" } });
+    }
+    if (url.includes("/api/assessment-campaigns/camp-1/participants")) {
+      return jsonResponse({ success: true, data: { added: 1 } });
+    }
+    if (url.includes("/api/assessment-campaigns/camp-1/activate")) {
+      return jsonResponse({ success: true, data: { status: "ACTIVE" } });
+    }
+    return jsonResponse({ success: false, error: "unhandled" }, false);
+  }) as unknown as typeof fetch;
+}
+
+/** Navigate the wizard from Step 0 → Step 2 (Participants). */
+async function advanceToParticipantsCEO() {
+  const orgRadio = await screen.findByRole("radio", { name: /acme corp/i });
+  fireEvent.click(orgRadio);
+  fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+  const tplRadio = await screen.findByRole("radio", { name: /rockefeller habits/i });
+  fireEvent.click(tplRadio);
+  fireEvent.click(screen.getByRole("button", { name: /next/i }));
+}
+
+describe("CampaignWizard — CEO-from-Level suggestion", () => {
+  it("L1: one CEO/Founder-Level member selected → auto-suggests as CEO", async () => {
+    const respondents = [
+      { ...ALICE, id: "resp-1", firstName: "Alice", lastName: "Smith", roleType: "ceofounder", teamId: "team-eng" },
+      { ...BOB,   id: "resp-2", firstName: "Bob",   lastName: "Jones", roleType: "employee",   teamId: null },
+    ];
+    installCEOLevelFetch(respondents);
+    render(<CampaignWizard />);
+    await advanceToParticipantsCEO();
+
+    // Check Alice — she has ceofounder roleType.
+    const aliceCheckbox = await screen.findByRole("checkbox", { name: /alice smith/i });
+    fireEvent.click(aliceCheckbox);
+
+    // Alice's CEO radio should be auto-selected.
+    await waitFor(() => {
+      const aliceCeoRadio = screen.getByRole("radio", { name: /mark alice smith as ceo/i });
+      expect(aliceCeoRadio).toBeChecked();
+    });
+
+    // "Suggested by Level" hint visible near Alice's row.
+    expect(screen.getByText(/suggested by level/i)).toBeInTheDocument();
+
+    // Bob's CEO radio is NOT checked and has no hint.
+    const bobCeoRadio = screen.getByRole("radio", { name: /mark bob jones as ceo/i });
+    expect(bobCeoRadio).not.toBeChecked();
+  });
+
+  it("L2: two CEO-Level members selected → no auto-suggest, no hint", async () => {
+    const respondents = [
+      { ...ALICE, id: "resp-1", firstName: "Alice", lastName: "Smith", roleType: "ceofounder",         teamId: "team-eng" },
+      { ...BOB,   id: "resp-2", firstName: "Bob",   lastName: "Jones", roleType: "ceofounderwithteam", teamId: null },
+      { id: "resp-3", firstName: "Carol", lastName: "C", email: "carol@acme.com", jobTitle: null, teamId: null, organizationId: "org-1", roleType: "employee" },
+    ];
+    installCEOLevelFetch(respondents);
+    render(<CampaignWizard />);
+    await advanceToParticipantsCEO();
+
+    // Select both CEO-Level members.
+    const aliceCheckbox = await screen.findByRole("checkbox", { name: /alice smith/i });
+    const bobCheckbox = screen.getByRole("checkbox", { name: /bob jones/i });
+    fireEvent.click(aliceCheckbox);
+    fireEvent.click(bobCheckbox);
+
+    // Neither CEO radio should be selected.
+    await waitFor(() => {
+      const aliceCeo = screen.getByRole("radio", { name: /mark alice smith as ceo/i });
+      const bobCeo   = screen.getByRole("radio", { name: /mark bob jones as ceo/i });
+      expect(aliceCeo).not.toBeChecked();
+      expect(bobCeo).not.toBeChecked();
+    });
+
+    // No "Suggested by Level" hint anywhere.
+    expect(screen.queryByText(/suggested by level/i)).not.toBeInTheDocument();
+  });
+
+  it("L3: user clicks a non-CEO-Level member as CEO → manual pick wins, hint gone", async () => {
+    const respondents = [
+      { ...ALICE, id: "resp-1", firstName: "Alice", lastName: "Smith", roleType: "ceofounder", teamId: "team-eng" },
+      { ...BOB,   id: "resp-2", firstName: "Bob",   lastName: "Jones", roleType: "employee",   teamId: null },
+    ];
+    installCEOLevelFetch(respondents);
+    render(<CampaignWizard />);
+    await advanceToParticipantsCEO();
+
+    // Check Alice → auto-suggest should fire.
+    const aliceCheckbox = await screen.findByRole("checkbox", { name: /alice smith/i });
+    fireEvent.click(aliceCheckbox);
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: /mark alice smith as ceo/i })).toBeChecked();
+    });
+    expect(screen.getByText(/suggested by level/i)).toBeInTheDocument();
+
+    // Check Bob too so his CEO radio is accessible.
+    const bobCheckbox = screen.getByRole("checkbox", { name: /bob jones/i });
+    fireEvent.click(bobCheckbox);
+
+    // User manually picks Bob as CEO.
+    const bobCeoRadio = screen.getByRole("radio", { name: /mark bob jones as ceo/i });
+    fireEvent.click(bobCeoRadio);
+
+    // Bob should now be CEO and the hint should be gone.
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: /mark bob jones as ceo/i })).toBeChecked();
+      expect(screen.getByRole("radio", { name: /mark alice smith as ceo/i })).not.toBeChecked();
+    });
+    expect(screen.queryByText(/suggested by level/i)).not.toBeInTheDocument();
+  });
+
+  it("L4: unchecking the auto-suggested CEO member clears CEO", async () => {
+    const respondents = [
+      { ...ALICE, id: "resp-1", firstName: "Alice", lastName: "Smith", roleType: "ceofounder", teamId: "team-eng" },
+      { ...BOB,   id: "resp-2", firstName: "Bob",   lastName: "Jones", roleType: "employee",   teamId: null },
+    ];
+    installCEOLevelFetch(respondents);
+    render(<CampaignWizard />);
+    await advanceToParticipantsCEO();
+
+    // Check Alice → auto-suggest fires.
+    const aliceCheckbox = await screen.findByRole("checkbox", { name: /alice smith/i });
+    fireEvent.click(aliceCheckbox);
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: /mark alice smith as ceo/i })).toBeChecked();
+    });
+
+    // Uncheck Alice.
+    fireEvent.click(aliceCheckbox);
+
+    // CEO radio for Alice should no longer be checked.
+    await waitFor(() => {
+      const aliceCeoRadio = screen.getByRole("radio", { name: /mark alice smith as ceo/i });
+      expect(aliceCeoRadio).not.toBeChecked();
+    });
+    // Hint also gone.
+    expect(screen.queryByText(/suggested by level/i)).not.toBeInTheDocument();
+  });
+
+  it("L5: |C| > 1 → remove one → auto-suggest resumes for the remaining CEO-Level member", async () => {
+    const respondents = [
+      { ...ALICE, id: "resp-1", firstName: "Alice", lastName: "Smith", roleType: "ceofounder",         teamId: "team-eng" },
+      { ...BOB,   id: "resp-2", firstName: "Bob",   lastName: "Jones", roleType: "ceofounderalone",    teamId: null },
+    ];
+    installCEOLevelFetch(respondents);
+    render(<CampaignWizard />);
+    await advanceToParticipantsCEO();
+
+    // Select both — |C| = 2 → no auto-suggest.
+    const aliceCheckbox = await screen.findByRole("checkbox", { name: /alice smith/i });
+    const bobCheckbox = screen.getByRole("checkbox", { name: /bob jones/i });
+    fireEvent.click(aliceCheckbox);
+    fireEvent.click(bobCheckbox);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/suggested by level/i)).not.toBeInTheDocument();
+    });
+
+    // Uncheck Bob → |C| = 1 → auto-suggest Alice.
+    fireEvent.click(bobCheckbox);
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: /mark alice smith as ceo/i })).toBeChecked();
+      expect(screen.getByText(/suggested by level/i)).toBeInTheDocument();
+    });
+  });
+
+  it("L6: null roleType members are never auto-suggested", async () => {
+    const respondents = [
+      { ...ALICE, id: "resp-1", firstName: "Alice", lastName: "Smith", roleType: null,     teamId: "team-eng" },
+      { ...BOB,   id: "resp-2", firstName: "Bob",   lastName: "Jones", roleType: null,     teamId: null },
+    ];
+    installCEOLevelFetch(respondents);
+    render(<CampaignWizard />);
+    await advanceToParticipantsCEO();
+
+    // Select Alice.
+    const aliceCheckbox = await screen.findByRole("checkbox", { name: /alice smith/i });
+    fireEvent.click(aliceCheckbox);
+
+    // No CEO radio selected, no hint.
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: /mark alice smith as ceo/i })).not.toBeChecked();
+    });
+    expect(screen.queryByText(/suggested by level/i)).not.toBeInTheDocument();
   });
 });
 

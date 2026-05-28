@@ -36,6 +36,7 @@ import {
   Building2,
   Users,
 } from "lucide-react";
+import { isCEOFamily } from "@/lib/assessments/respondent-levels";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,7 @@ interface Respondent {
   email: string;
   jobTitle: string | null;
   teamId: string | null;
+  roleType?: string | null;
 }
 
 /** Shape returned by GET /api/organizations/[id]/teams (nested tree). */
@@ -853,6 +855,14 @@ function TemplateStep({
 
 // ── Step 2 — Participants ──────────────────────────────────────────────
 
+/**
+ * Internal CEO pick source discriminator.
+ *   'auto'  — the system derived the CEO from a single CEO-family Level member
+ *   'user'  — the coach explicitly clicked a CEO radio button
+ *   null    — no CEO set
+ */
+type CeoPickSource = "auto" | "user" | null;
+
 function ParticipantsStep({
   organizationId,
   respondentIds,
@@ -872,6 +882,8 @@ function ParticipantsStep({
   const [teams, setTeams] = useState<ApiTeamNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // Tracks whether the current ceoRespondentId was auto-derived (vs. user-clicked).
+  const [ceoPickSource, setCeoPickSource] = useState<CeoPickSource>(null);
 
   const refresh = useCallback(async () => {
     if (!organizationId) return;
@@ -910,19 +922,68 @@ function ParticipantsStep({
     refresh();
   }, [refresh]);
 
+  // ── CEO-from-Level suggestion (decision #5) ───────────────────────────────
+  // Runs whenever the selection or loaded member list changes. Only applies
+  // when ceoPickSource !== 'user' (i.e., no deliberate user pick is in effect
+  // for a still-selected member).
+  useEffect(() => {
+    if (loading || error) return;
+
+    // If the user explicitly picked a CEO and that member is still selected,
+    // their manual choice wins — do nothing.
+    if (ceoPickSource === "user" && ceoRespondentId !== null && respondentIds.includes(ceoRespondentId)) {
+      return;
+    }
+
+    // C = selected members whose roleType is in the CEO/Founder family.
+    const ceoFamilySelected = respondentIds
+      .map((id) => respondents.find((r) => r.id === id))
+      .filter((r): r is Respondent => r !== undefined && isCEOFamily(r.roleType ?? null));
+
+    if (ceoFamilySelected.length === 1) {
+      // Exactly one CEO-family member selected → auto-suggest.
+      const suggested = ceoFamilySelected[0].id;
+      if (ceoRespondentId !== suggested || ceoPickSource !== "auto") {
+        setCeoPickSource("auto");
+        onChange(respondentIds, suggested);
+      }
+    } else {
+      // 0 or >1 CEO-family members → clear auto-suggest.
+      if (ceoPickSource === "auto" && ceoRespondentId !== null) {
+        setCeoPickSource(null);
+        onChange(respondentIds, null);
+      } else if (ceoPickSource !== "user" && ceoRespondentId !== null && ceoFamilySelected.length === 0) {
+        // The previously auto-set CEO is no longer selected at all.
+        setCeoPickSource(null);
+        onChange(respondentIds, null);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [respondentIds, respondents, loading, error]);
+
   function toggleRespondent(id: string, checked: boolean) {
     let next = respondentIds.slice();
     let ceo = ceoRespondentId;
+    let pickSource = ceoPickSource;
     if (checked) {
       if (!next.includes(id)) next.push(id);
     } else {
       next = next.filter((r) => r !== id);
-      if (ceo === id) ceo = null;
+      if (ceo === id) {
+        ceo = null;
+        pickSource = null;
+        setCeoPickSource(null);
+      }
     }
     onChange(next, ceo);
+    // If we just cleared an auto-pick via uncheck, the effect will re-run.
+    // Keep pickSource in sync locally so the effect's guard sees the right state.
+    void pickSource;
   }
 
   function setCEO(id: string) {
+    // Explicit user click — mark as user pick.
+    setCeoPickSource("user");
     if (!respondentIds.includes(id)) {
       // Auto-include if the coach marked CEO without checking the box first.
       onChange([...respondentIds, id], id);
@@ -983,6 +1044,7 @@ function ParticipantsStep({
   function renderRow(r: Respondent) {
     const checked = respondentIds.includes(r.id);
     const isCEO = ceoRespondentId === r.id;
+    const isAutoSuggested = isCEO && ceoPickSource === "auto";
     return (
       <div
         key={r.id}
@@ -1004,17 +1066,24 @@ function ParticipantsStep({
             {r.jobTitle ? ` • ${r.jobTitle}` : ""}
           </div>
         </div>
-        <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
-          <input
-            type="radio"
-            name="ceo"
-            checked={isCEO}
-            onChange={() => setCEO(r.id)}
-            className="accent-primary"
-            aria-label={`Mark ${r.firstName} ${r.lastName} as CEO`}
-          />
-          CEO
-        </label>
+        <div className="flex flex-col items-end gap-0.5">
+          <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
+            <input
+              type="radio"
+              name="ceo"
+              checked={isCEO}
+              onChange={() => setCEO(r.id)}
+              className="accent-primary"
+              aria-label={`Mark ${r.firstName} ${r.lastName} as CEO`}
+            />
+            CEO
+          </label>
+          {isAutoSuggested && (
+            <span className="text-xs text-muted-foreground italic">
+              Suggested by Level
+            </span>
+          )}
+        </div>
       </div>
     );
   }
