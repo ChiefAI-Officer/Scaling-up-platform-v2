@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useCallback, useRef } from "react";
-import { ChevronRight, ChevronDown, Building2, Users, UserPlus, FolderPlus, Pencil } from "lucide-react";
+import { ChevronRight, ChevronDown, Building2, Users, UserPlus, Upload, FolderPlus, Pencil } from "lucide-react";
 import { levelLabel } from "@/lib/assessments/respondent-levels";
 import { AddTeamModal } from "./add-team-modal";
 import type { CreatedResult } from "./add-team-modal";
@@ -25,6 +25,7 @@ import { EditMemberModal } from "./edit-member-modal";
 import type { EditMemberModalMember } from "./edit-member-modal";
 import { EditOrganizationModal } from "./edit-organization-modal";
 import type { EditOrganizationModalOrg } from "./edit-organization-modal";
+import { ImportMembersModal } from "./import-members-modal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -176,6 +177,9 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
 
   // Add Member modal state
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+
+  // Import Members (bulk CSV) modal state
+  const [importMembersOpen, setImportMembersOpen] = useState(false);
 
   // Edit Team modal state — null when closed
   const [editingTeam, setEditingTeam] = useState<EditTeamModalTeam | null>(null);
@@ -576,32 +580,55 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
           <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
             {panelTitle ? `Members — ${panelTitle}` : "Members"}
           </h2>
-          <button
-            type="button"
-            disabled={!selectedNode}
-            onClick={() => {
-              if (!selectedNode) return;
-              // Resolve the org for this node and lazy-load teams if not yet fetched
-              const modalOrgId =
-                selectedNode.kind === "organization" ? selectedNode.id :
-                selectedNode.kind === "team"         ? selectedNode.orgId :
-                /* unassigned */                       selectedNode.orgId;
-              if (orgStates[modalOrgId]?.teams === null && !orgStates[modalOrgId]?.loadingTeams) {
-                loadTeams(modalOrgId);
-              }
-              setAddMemberOpen(true);
-            }}
-            title={selectedNode ? "Add Member" : "Select a company or team first"}
-            className={[
-              "p-1 rounded-md transition-colors",
-              selectedNode
-                ? "text-muted-foreground hover:text-foreground hover:bg-muted"
-                : "text-muted-foreground opacity-40 cursor-not-allowed",
-            ].join(" ")}
-            aria-label={selectedNode ? "Add Member" : "Add Member (select a node first)"}
-          >
-            <UserPlus className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Import members (bulk CSV) */}
+            <button
+              type="button"
+              disabled={!selectedNode}
+              onClick={() => {
+                if (!selectedNode) return;
+                setImportMembersOpen(true);
+              }}
+              title={selectedNode ? "Import members" : "Select a company or team first"}
+              className={[
+                "p-1 rounded-md transition-colors",
+                selectedNode
+                  ? "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  : "text-muted-foreground opacity-40 cursor-not-allowed",
+              ].join(" ")}
+              aria-label={selectedNode ? "Import members" : "Import members (select a node first)"}
+            >
+              <Upload className="w-4 h-4" />
+            </button>
+
+            {/* Add single member */}
+            <button
+              type="button"
+              disabled={!selectedNode}
+              onClick={() => {
+                if (!selectedNode) return;
+                // Resolve the org for this node and lazy-load teams if not yet fetched
+                const modalOrgId =
+                  selectedNode.kind === "organization" ? selectedNode.id :
+                  selectedNode.kind === "team"         ? selectedNode.orgId :
+                  /* unassigned */                       selectedNode.orgId;
+                if (orgStates[modalOrgId]?.teams === null && !orgStates[modalOrgId]?.loadingTeams) {
+                  loadTeams(modalOrgId);
+                }
+                setAddMemberOpen(true);
+              }}
+              title={selectedNode ? "Add Member" : "Select a company or team first"}
+              className={[
+                "p-1 rounded-md transition-colors",
+                selectedNode
+                  ? "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  : "text-muted-foreground opacity-40 cursor-not-allowed",
+              ].join(" ")}
+              aria-label={selectedNode ? "Add Member" : "Add Member (select a node first)"}
+            >
+              <UserPlus className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {!selectedNode && (
@@ -739,6 +766,28 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
         organizations={organizations}
         loadedTeams={loadedTeamsForModal}
       />
+
+      {/* ImportMembersModal — only mount when we have an org context */}
+      {selectedNode && (() => {
+        const importOrgId =
+          selectedNode.kind === "organization" ? selectedNode.id :
+          selectedNode.kind === "team"         ? selectedNode.orgId :
+          /* unassigned */                       selectedNode.orgId;
+        const importOrg = organizations.find((o) => o.id === importOrgId);
+        return (
+          <ImportMembersModal
+            open={importMembersOpen}
+            onClose={() => setImportMembersOpen(false)}
+            onUpdated={async () => {
+              if (selectedNode) {
+                await loadMembers(selectedNode);
+              }
+            }}
+            orgId={importOrgId}
+            orgName={importOrg?.name ?? importOrgId}
+          />
+        );
+      })()}
 
       {/* AddMemberModal — only mount when we have an org context */}
       {selectedNode && (() => {

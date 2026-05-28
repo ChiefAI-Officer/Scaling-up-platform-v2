@@ -726,6 +726,211 @@ describe("CampaignWizard — CEO-from-Level suggestion", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Slice 4 / Task 2 — Persistent quick-add member from within the wizard
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch installer for the quick-add tests.  The respondents list returned by
+ * GET /api/organizations/org-1/respondents can be replaced mid-test by
+ * swapping `respondentStore` — the fetch closure captures the reference.
+ *
+ * POST /api/organizations/org-1/respondents returns the fixture passed in
+ * `postResult`.
+ */
+const NEW_MEMBER = {
+  id: "new-id-1",
+  firstName: "New",
+  lastName: "Member",
+  email: "new@example.com",
+  jobTitle: null as string | null,
+  teamId: null as string | null,
+  roleType: null as string | null,
+};
+const NEW_CEO_MEMBER = {
+  id: "new-ceo-1",
+  firstName: "CEO",
+  lastName: "Quick",
+  email: "ceoquick@example.com",
+  jobTitle: null as string | null,
+  teamId: null as string | null,
+  roleType: "ceofounder" as string | null,
+};
+
+function installQuickAddFetch(opts: {
+  postResult: typeof NEW_MEMBER;
+  afterRespondents: (typeof NEW_MEMBER)[];
+}) {
+  fetchCalls = [];
+  global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : String(input);
+    const method = (init?.method ?? "GET").toUpperCase();
+    let body: unknown = undefined;
+    if (init?.body && typeof init.body === "string") {
+      try { body = JSON.parse(init.body); } catch { body = init.body; }
+    }
+    fetchCalls.push({ url, method, body });
+
+    if (url.includes("/api/assessment-campaign-drafts")) {
+      if (method === "GET") return jsonResponse({ success: true, data: null });
+      return jsonResponse({ success: true });
+    }
+    if (url.endsWith("/api/organizations") && method === "GET") {
+      return jsonResponse({ success: true, data: [ORG] });
+    }
+    if (url.match(/\/api\/organizations\/org-1$/) && method === "GET") {
+      return jsonResponse({ success: true, data: ORG });
+    }
+    if (url.endsWith("/api/assessment-templates") && method === "GET") {
+      return jsonResponse({ success: true, data: [TEMPLATE] });
+    }
+    if (url.includes("/api/organizations/org-1/teams") && method === "GET") {
+      return jsonResponse({ success: true, data: [TEAM_ENG] });
+    }
+    // POST /respondents — creates the new member
+    if (url.includes("/api/organizations/org-1/respondents") && method === "POST") {
+      return jsonResponse({ success: true, data: opts.postResult });
+    }
+    // GET /respondents — first call returns ALICE+BOB; subsequent calls include the new member
+    if (url.includes("/api/organizations/org-1/respondents") && method === "GET") {
+      const callCount = fetchCalls.filter(
+        (c) => c.url.includes("/api/organizations/org-1/respondents") && c.method === "GET"
+      ).length;
+      // First call (initial load) returns original members; re-fetch returns extended list
+      if (callCount <= 1) {
+        return jsonResponse({ success: true, data: [ALICE, BOB] });
+      }
+      return jsonResponse({ success: true, data: opts.afterRespondents });
+    }
+    if (url.endsWith("/api/assessment-campaigns") && method === "POST") {
+      return jsonResponse({ success: true, data: { id: "camp-1" } });
+    }
+    if (url.includes("/api/assessment-campaigns/camp-1/participants")) {
+      return jsonResponse({ success: true, data: { added: 1 } });
+    }
+    if (url.includes("/api/assessment-campaigns/camp-1/activate")) {
+      return jsonResponse({ success: true, data: { status: "ACTIVE" } });
+    }
+    return jsonResponse({ success: false, error: "unhandled" }, false);
+  }) as unknown as typeof fetch;
+}
+
+describe("CampaignWizard — Slice 4 quick-add member", () => {
+  /** Navigate Step 0 → Step 2 (Participants) using installQuickAddFetch. */
+  async function advanceToParticipantsQA() {
+    const orgRadio = await screen.findByRole("radio", { name: /acme corp/i });
+    fireEvent.click(orgRadio);
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    const tplRadio = await screen.findByRole("radio", { name: /rockefeller habits/i });
+    fireEvent.click(tplRadio);
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+  }
+
+  it("QA1: 'Add new member' button is visible in Step 3 with an org selected", async () => {
+    installQuickAddFetch({
+      postResult: NEW_MEMBER,
+      afterRespondents: [ALICE, BOB, NEW_MEMBER],
+    });
+    render(<CampaignWizard />);
+    await advanceToParticipantsQA();
+
+    // Members list rendered.
+    await screen.findByText("Alice Smith");
+
+    // The quick-add button must be present.
+    expect(
+      screen.getByRole("button", { name: /add new member/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("QA2: clicking 'Add new member' opens the AddMemberModal with the right description", async () => {
+    installQuickAddFetch({
+      postResult: NEW_MEMBER,
+      afterRespondents: [ALICE, BOB, NEW_MEMBER],
+    });
+    render(<CampaignWizard />);
+    await advanceToParticipantsQA();
+
+    await screen.findByText("Alice Smith");
+
+    fireEvent.click(screen.getByRole("button", { name: /add new member/i }));
+
+    // The modal dialog should open.
+    await screen.findByRole("dialog");
+
+    // Decision #8 explicit labeling: description must mention "Acme Corp's roster".
+    expect(
+      screen.getByText(/adds this person to acme corp's roster/i),
+    ).toBeInTheDocument();
+  });
+
+  it("QA3: successful add auto-includes the new member and they appear checked", async () => {
+    installQuickAddFetch({
+      postResult: NEW_MEMBER,
+      afterRespondents: [ALICE, BOB, NEW_MEMBER],
+    });
+    render(<CampaignWizard />);
+    await advanceToParticipantsQA();
+
+    await screen.findByText("Alice Smith");
+
+    // Open the quick-add modal.
+    fireEvent.click(screen.getByRole("button", { name: /add new member/i }));
+    await screen.findByRole("dialog");
+
+    // Fill in required fields.
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: "New" } });
+    fireEvent.change(screen.getByLabelText(/last name/i), { target: { value: "Member" } });
+    fireEvent.change(screen.getByLabelText(/e-mail/i), { target: { value: "new@example.com" } });
+
+    // Submit the modal.
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+
+    // After save, the new member row should appear and be checked.
+    await waitFor(() => {
+      const checkbox = screen.getByRole("checkbox", { name: /new member/i });
+      expect(checkbox).toBeChecked();
+    });
+  });
+
+  it("QA4: quick-add CEO/Founder-Level member triggers auto-suggest", async () => {
+    installQuickAddFetch({
+      postResult: NEW_CEO_MEMBER,
+      afterRespondents: [ALICE, BOB, NEW_CEO_MEMBER],
+    });
+    render(<CampaignWizard />);
+    await advanceToParticipantsQA();
+
+    await screen.findByText("Alice Smith");
+
+    // Open the quick-add modal.
+    fireEvent.click(screen.getByRole("button", { name: /add new member/i }));
+    await screen.findByRole("dialog");
+
+    // Fill required fields.
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: "CEO" } });
+    fireEvent.change(screen.getByLabelText(/last name/i), { target: { value: "Quick" } });
+    fireEvent.change(screen.getByLabelText(/e-mail/i), { target: { value: "ceoquick@example.com" } });
+    // Select ceofounder level.
+    fireEvent.change(screen.getByTestId("select-level"), { target: { value: "ceofounder" } });
+
+    // Submit the modal.
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+
+    // New CEO member checked AND auto-suggested as CEO.
+    await waitFor(() => {
+      const checkbox = screen.getByRole("checkbox", { name: /ceo quick/i });
+      expect(checkbox).toBeChecked();
+    });
+    await waitFor(() => {
+      const ceoRadio = screen.getByRole("radio", { name: /mark ceo quick as ceo/i });
+      expect(ceoRadio).toBeChecked();
+    });
+    expect(screen.getByText(/suggested by level/i)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // I2 — a teams-fetch failure is surfaced (not silently swallowed) even when
 // the respondents fetch succeeds.
 // ---------------------------------------------------------------------------

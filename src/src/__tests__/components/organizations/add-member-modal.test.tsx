@@ -308,7 +308,17 @@ describe("AddMemberModal", () => {
     fireEvent.click(screen.getByRole("button", { name: /add member/i }));
 
     await waitFor(() => {
-      expect(onCreated).toHaveBeenCalledWith({ respondent: mockRespondent });
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          respondent: mockRespondent,
+          created: expect.objectContaining({
+            id: "r-3",
+            firstName: "Carol",
+            lastName: "White",
+            email: "carol@example.com",
+          }),
+        })
+      );
     });
 
     expect(onClose).toHaveBeenCalled();

@@ -40,9 +40,22 @@ import { RESPONDENT_LEVELS } from "@/lib/assessments/respondent-levels";
 // Types
 // ---------------------------------------------------------------------------
 
+/** Typed shape of the created respondent passed back to callers. */
+export type CreatedRespondent = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  jobTitle: string | null;
+  teamId: string | null;
+  roleType: string | null;
+};
+
 /** What we call back with on success */
 export type MemberCreatedResult = {
   respondent: Record<string, unknown>;
+  /** Typed shortcut — same data as `respondent` but with a guaranteed shape. */
+  created: CreatedRespondent;
 };
 
 export interface AddMemberModalProps {
@@ -57,6 +70,12 @@ export interface AddMemberModalProps {
   defaultTeamId: string | null;
   /** True while the parent is fetching teams for this org */
   loadingTeams?: boolean;
+  /**
+   * Optional override for the DialogDescription text.
+   * When omitted the default "Add a respondent to this organization." text is used.
+   * Pass from the campaign wizard to show the decision-#8 roster hint.
+   */
+  description?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,6 +99,7 @@ export function AddMemberModal({
   teams,
   defaultTeamId,
   loadingTeams = false,
+  description,
 }: AddMemberModalProps) {
   const firstNameId = useId();
   const lastNameId  = useId();
@@ -170,7 +190,17 @@ export function AddMemberModal({
         return;
       }
 
-      onCreated({ respondent: json.data as Record<string, unknown> });
+      const raw = json.data as Record<string, unknown>;
+      const created: CreatedRespondent = {
+        id:        String(raw.id        ?? ""),
+        firstName: String(raw.firstName ?? ""),
+        lastName:  String(raw.lastName  ?? ""),
+        email:     String(raw.email     ?? ""),
+        jobTitle:  raw.jobTitle  != null ? String(raw.jobTitle)  : null,
+        teamId:    raw.teamId    != null ? String(raw.teamId)    : null,
+        roleType:  raw.roleType  != null ? String(raw.roleType)  : null,
+      };
+      onCreated({ respondent: raw, created });
       onClose();
     } catch {
       setError("An unexpected error occurred. Please try again.");
@@ -189,7 +219,7 @@ export function AddMemberModal({
         <DialogHeader>
           <DialogTitle>Add Member</DialogTitle>
           <DialogDescription>
-            Add a respondent to this organization. Fields marked * are required.
+            {description ?? "Add a respondent to this organization. Fields marked * are required."}
           </DialogDescription>
         </DialogHeader>
 

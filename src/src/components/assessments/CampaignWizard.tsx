@@ -35,12 +35,15 @@ import {
   Loader2,
   Building2,
   Users,
+  UserPlus,
 } from "lucide-react";
 import { isCEOFamily } from "@/lib/assessments/respondent-levels";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { AddMemberModal } from "@/components/organizations/add-member-modal";
+import type { MemberCreatedResult } from "@/components/organizations/add-member-modal";
 
 const DRAFT_ENDPOINT = "/api/assessment-campaign-drafts";
 const DRAFT_DEBOUNCE_MS = 800;
@@ -111,12 +114,18 @@ interface ApiTeamNode {
   organizationId: string;
   parentTeamId: string | null;
   name: string;
+  type: string | null;
+  description: string | null;
   children: ApiTeamNode[];
 }
 
 interface WizardState {
   step: number;
   organizationId: string;
+  /** Display name of the selected org — tracked so ParticipantsStep can show
+   *  the decision-#8 "adds to <orgName>'s roster" hint without an extra fetch.
+   *  NOT persisted to the draft (ephemeral UI label only). */
+  orgName: string;
   templateId: string;
   respondentIds: string[];
   ceoRespondentId: string | null;
@@ -184,6 +193,7 @@ export function CampaignWizard() {
     return {
       step: 0,
       organizationId: "",
+      orgName: "",
       templateId: "",
       respondentIds: [],
       ceoRespondentId: null,
@@ -241,6 +251,7 @@ export function CampaignWizard() {
         const merged: WizardState = {
           step: typeof draft.currentStep === "number" ? draft.currentStep : 0,
           organizationId: parsed.organizationId ?? "",
+          orgName: "", // ephemeral — not persisted; will re-populate when org is re-selected
           templateId: parsed.templateId ?? "",
           respondentIds: Array.isArray(parsed.respondentIds)
             ? parsed.respondentIds
@@ -580,17 +591,18 @@ export function CampaignWizard() {
         {state.step === 0 && (
           <OrganizationStep
             value={state.organizationId}
-            onChange={(v) =>
+            onChange={({ id, name }) =>
               setState((s) => {
                 // Re-selecting the same org must NOT wipe a valid member
                 // selection. Only on an actual company change do we clear the
                 // picked members + CEO — otherwise their (other-company) ids
                 // would persist and get rejected by /participants later,
                 // leaving an orphaned empty campaign.
-                if (s.organizationId === v) return s;
+                if (s.organizationId === id) return s;
                 return {
                   ...s,
-                  organizationId: v,
+                  organizationId: id,
+                  orgName: name,
                   respondentIds: [],
                   ceoRespondentId: null,
                 };
@@ -610,6 +622,7 @@ export function CampaignWizard() {
         {state.step === 2 && (
           <ParticipantsStep
             organizationId={state.organizationId}
+            orgName={state.orgName}
             respondentIds={state.respondentIds}
             ceoRespondentId={state.ceoRespondentId}
             onChange={(rIds, ceoId) => {
@@ -658,7 +671,7 @@ function OrganizationStep({
   onNext,
 }: {
   value: string;
-  onChange: (v: string) => void;
+  onChange: (v: { id: string; name: string }) => void;
   onNext: () => void;
 }) {
   const [orgs, setOrgs] = useState<Organization[]>([]);
@@ -727,7 +740,7 @@ function OrganizationStep({
                 name="org"
                 value={o.id}
                 checked={value === o.id}
-                onChange={() => onChange(o.id)}
+                onChange={() => onChange({ id: o.id, name: o.name })}
                 className="accent-primary"
               />
               <div>
@@ -865,6 +878,7 @@ type CeoPickSource = "auto" | "user" | null;
 
 function ParticipantsStep({
   organizationId,
+  orgName,
   respondentIds,
   ceoRespondentId,
   onChange,
@@ -872,6 +886,8 @@ function ParticipantsStep({
   onNext,
 }: {
   organizationId: string;
+  /** Display name of the selected org — used for the quick-add modal hint. */
+  orgName: string;
   respondentIds: string[];
   ceoRespondentId: string | null;
   onChange: (rIds: string[], ceoId: string | null) => void;
@@ -882,6 +898,7 @@ function ParticipantsStep({
   const [teams, setTeams] = useState<ApiTeamNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
   // Tracks whether the current ceoRespondentId was auto-derived (vs. user-clicked).
   const [ceoPickSource, setCeoPickSource] = useState<CeoPickSource>(null);
 
@@ -990,6 +1007,30 @@ function ParticipantsStep({
     } else {
       onChange(respondentIds, id);
     }
+  }
+
+  /**
+   * Called by AddMemberModal on successful create.
+   *
+   * Decision: we use the typed `created` payload returned directly from the
+   * modal (rather than a re-fetch + email match) because:
+   *  1. It's synchronous — no extra round-trip before we can check the id.
+   *  2. The `created.id` is authoritative (from the DB response).
+   *  3. The email-match approach would be ambiguous if the same email was
+   *     somehow added twice (e.g., re-opened after a network timeout).
+   *
+   * We still re-fetch the full respondents list so the new member appears in
+   * the picker with correct team grouping and full metadata. The auto-include
+   * sets `respondentIds` immediately (before the re-fetch resolves) so the
+   * CEO-suggestion useEffect fires on the next render with the new id already
+   * in the selection.
+   */
+  async function handleMemberCreated(result: MemberCreatedResult) {
+    const newId = result.created.id;
+    // 1. Auto-include the new member.
+    onChange([...respondentIds, newId], ceoRespondentId);
+    // 2. Re-fetch so the picker row renders with correct metadata + team group.
+    await refresh();
   }
 
   // Build ordered team groups (flattened, with depth) + an "unassigned"
@@ -1102,6 +1143,18 @@ function ParticipantsStep({
           </Link>
           .
         </p>
+        <div className="mt-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            onClick={() => setAddMemberOpen(true)}
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Add new member
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -1171,6 +1224,21 @@ function ParticipantsStep({
           Next <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
+
+      {/* Quick-add modal — creates the member in the org roster, then auto-includes them */}
+      <AddMemberModal
+        open={addMemberOpen}
+        onClose={() => setAddMemberOpen(false)}
+        onCreated={(result) => {
+          // The modal calls onClose() itself after onCreated(), so we don't
+          // need to close manually here. Just trigger the auto-include + re-fetch.
+          void handleMemberCreated(result);
+        }}
+        orgId={organizationId}
+        teams={teams}
+        defaultTeamId={null}
+        description={`Adds this person to ${orgName || "this company"}'s roster (not just this campaign).`}
+      />
     </div>
   );
 }
