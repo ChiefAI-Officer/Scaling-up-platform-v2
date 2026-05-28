@@ -65,7 +65,7 @@ describe("AssessmentsSidebar", () => {
     render(<AssessmentsSidebar session={makeSession("COACH")} />);
     // Admin-only labels disappear (Organizations / Access Groups / Templates /
     // Campaigns / Public Quizzes / Aggregate Report). The "Dashboard" label
-    // is admin-only as well — coaches see "My Campaigns" / "My Organizations".
+    // is admin-only as well — coaches see "My Campaigns" / "Members".
     expect(screen.queryByText("Organizations")).not.toBeInTheDocument();
     expect(screen.queryByText("Access Groups")).not.toBeInTheDocument();
     expect(screen.queryByText("Templates")).not.toBeInTheDocument();
@@ -77,20 +77,20 @@ describe("AssessmentsSidebar", () => {
   it("renders the coach-lane section ONLY when role is COACH", () => {
     render(<AssessmentsSidebar session={makeSession("COACH")} />);
     expect(screen.getByText("My Campaigns")).toBeInTheDocument();
-    expect(screen.getByText("My Organizations")).toBeInTheDocument();
+    expect(screen.getByText("Members")).toBeInTheDocument();
     expect(screen.getByText(/coach lane/i)).toBeInTheDocument();
   });
 
   it("does NOT render the coach-lane section for ADMIN", () => {
     render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
     expect(screen.queryByText("My Campaigns")).not.toBeInTheDocument();
-    expect(screen.queryByText("My Organizations")).not.toBeInTheDocument();
+    expect(screen.queryByText("Members")).not.toBeInTheDocument();
   });
 
   it("does NOT render the coach-lane section for STAFF", () => {
     render(<AssessmentsSidebar session={makeSession("STAFF")} />);
     expect(screen.queryByText("My Campaigns")).not.toBeInTheDocument();
-    expect(screen.queryByText("My Organizations")).not.toBeInTheDocument();
+    expect(screen.queryByText("Members")).not.toBeInTheDocument();
   });
 
   it("renders 7 admin entries for STAFF role too", () => {
@@ -145,20 +145,19 @@ describe("AssessmentsSidebar", () => {
       }
     });
 
-    it("marks My Organizations as a placeholder for COACH (but NOT My Campaigns)", () => {
+    it("marks neither coach-lane entry as a placeholder (both are real routes)", () => {
       render(<AssessmentsSidebar session={makeSession("COACH")} />);
 
-      const orgAnchor = anchorFor("My Organizations");
-      expect(orgAnchor).toHaveAttribute("aria-disabled", "true");
-      expect(orgAnchor.className).toMatch(/opacity-60/);
+      const membersAnchor = anchorFor("Members");
+      expect(membersAnchor).not.toHaveAttribute("aria-disabled");
+      expect(membersAnchor.className).not.toMatch(/opacity-60/);
 
       const campaignsAnchor = anchorFor("My Campaigns");
       expect(campaignsAnchor).not.toHaveAttribute("aria-disabled");
       expect(campaignsAnchor.className).not.toMatch(/opacity-60/);
 
-      // Exactly one "(coming soon)" marker on the coach lane.
-      const comingSoon = screen.getAllByText(/coming soon/i);
-      expect(comingSoon.length).toBe(1);
+      // No "(coming soon)" markers on the coach lane (both entries are live).
+      expect(screen.queryAllByText(/coming soon/i).length).toBe(0);
     });
   });
 });
