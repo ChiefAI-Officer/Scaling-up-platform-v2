@@ -106,12 +106,14 @@ export async function PATCH(
       lastName?: string;
       jobTitle?: string | null;
       teamId?: string | null;
+      roleType?: string | null;
     } = {};
     if (data.firstName !== undefined) updateData.firstName = data.firstName;
     if (data.lastName !== undefined) updateData.lastName = data.lastName;
     if (data.jobTitle !== undefined)
       updateData.jobTitle = data.jobTitle ?? null;
     if (data.teamId !== undefined) updateData.teamId = data.teamId ?? null;
+    if (data.roleType !== undefined) updateData.roleType = data.roleType;
 
     const respondent = await db.orgRespondent.update({
       where: { id: respondentId },

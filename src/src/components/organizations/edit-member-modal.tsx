@@ -91,11 +91,14 @@ export function EditMemberModal({
   const levelId     = useId();
 
   // Form state — pre-filled from member prop
-  const [firstName, setFirstName] = useState(member.firstName);
-  const [lastName,  setLastName]  = useState(member.lastName);
-  const [jobTitle,  setJobTitle]  = useState(member.jobTitle ?? "");
-  const [teamId,    setTeamId]    = useState<string>(member.teamId ?? "");
-  const [roleType,  setRoleType]  = useState<string>(member.roleType ?? "");
+  const [firstName,       setFirstName]       = useState(member.firstName);
+  const [lastName,        setLastName]        = useState(member.lastName);
+  const [jobTitle,        setJobTitle]        = useState(member.jobTitle ?? "");
+  const [teamId,          setTeamId]          = useState<string>(member.teamId ?? "");
+  const [roleType,        setRoleType]        = useState<string>(member.roleType ?? "");
+  // Track the value that was in the DB when the modal opened so we can detect
+  // if the user actually changed it (needed for legacy-slug preservation below).
+  const [initialRoleType, setInitialRoleType] = useState<string | null | undefined>(member.roleType);
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
@@ -109,6 +112,7 @@ export function EditMemberModal({
       setJobTitle(member.jobTitle ?? "");
       setTeamId(member.teamId ?? "");
       setRoleType(member.roleType ?? "");
+      setInitialRoleType(member.roleType);
       setError(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -148,8 +152,19 @@ export function EditMemberModal({
       if (teamId) {
         body.teamId = teamId;
       }
-      // Always include roleType so the user can unset it (null = clear the field)
-      body.roleType = roleType || null;
+      // roleType handling:
+      //  - If the user explicitly cleared the field (empty string), send null to wipe it.
+      //  - If the user explicitly picked a known slug, send it.
+      //  - If the value is unchanged AND it's a legacy/unknown slug (not in the known list),
+      //    omit roleType entirely so the unknown slug passes through the Zod enum guard on
+      //    PATCH without a 400 rejection.
+      const isLegacyUnchanged =
+        roleType === (initialRoleType ?? "") &&
+        initialRoleType != null &&
+        !(RESPONDENT_LEVEL_VALUES as readonly string[]).includes(initialRoleType);
+      if (!isLegacyUnchanged) {
+        body.roleType = roleType || null;
+      }
       // NOTE: email is intentionally NOT included — the API rejects email changes
       // (email is the dedupe key for OrgRespondent).
 

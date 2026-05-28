@@ -300,6 +300,78 @@ describe("POST /api/organizations/[id]/respondents", () => {
     const body = await res.json();
     expect(body.existingId).toBe("existing-r");
   });
+
+  // C1 — roleType must be forwarded to Prisma create
+  it("C1: persists roleType to Prisma create data when provided", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.create as jest.Mock).mockResolvedValue({
+      id: "r-level",
+      organizationId: "o1",
+      email: "carol@example.com",
+      normalizedEmail: "carol@example.com",
+      firstName: "Carol",
+      lastName: "Doe",
+      roleType: "employee",
+      dedupeSource: "email",
+      dedupeValue: "carol@example.com",
+    });
+
+    const res = await listPost(
+      jsonReq({
+        email: "carol@example.com",
+        firstName: "Carol",
+        lastName: "Doe",
+        roleType: "employee",
+      }) as never,
+      listParams("o1")
+    );
+
+    expect(res.status).toBe(201);
+    // The critical assertion: roleType must be in the data passed to Prisma
+    expect(db.orgRespondent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          roleType: "employee",
+        }),
+      })
+    );
+  });
+
+  // C1 — null roleType (omitted in body) must be stored as null, not skipped
+  it("C1: persists roleType: null to Prisma when not provided", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.create as jest.Mock).mockResolvedValue({
+      id: "r-nolevel",
+      organizationId: "o1",
+      email: "dave@example.com",
+      normalizedEmail: "dave@example.com",
+      firstName: "Dave",
+      lastName: "Kim",
+      roleType: null,
+      dedupeSource: "email",
+      dedupeValue: "dave@example.com",
+    });
+
+    await listPost(
+      jsonReq({
+        email: "dave@example.com",
+        firstName: "Dave",
+        lastName: "Kim",
+        // no roleType
+      }) as never,
+      listParams("o1")
+    );
+
+    expect(db.orgRespondent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          roleType: null,
+        }),
+      })
+    );
+  });
 });
 
 describe("PATCH /api/organizations/[id]/respondents/[respondentId]", () => {
@@ -378,6 +450,86 @@ describe("PATCH /api/organizations/[id]/respondents/[respondentId]", () => {
         data: expect.objectContaining({ lastName: "Updated" }),
       })
     );
+  });
+
+  // C1 — roleType must be forwarded to Prisma update data
+  it("C1: persists roleType to Prisma update data when provided", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findUnique as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      deletedAt: null,
+    });
+    (db.orgRespondent.update as jest.Mock).mockResolvedValue({
+      id: "r1",
+      roleType: "ceofounder",
+    });
+
+    const res = await detailPatch(
+      jsonReq({ roleType: "ceofounder" }, "PATCH") as never,
+      detailParams("o1", "r1")
+    );
+
+    expect(res.status).toBe(200);
+    // The critical assertion: roleType must be in the data arg, not dropped
+    expect(db.orgRespondent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "r1" },
+        data: expect.objectContaining({ roleType: "ceofounder" }),
+      })
+    );
+  });
+
+  // C1 — null roleType must clear the field (not skip the write)
+  it("C1: persists roleType: null to Prisma to clear the field", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findUnique as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      deletedAt: null,
+    });
+    (db.orgRespondent.update as jest.Mock).mockResolvedValue({
+      id: "r1",
+      roleType: null,
+    });
+
+    const res = await detailPatch(
+      jsonReq({ roleType: null }, "PATCH") as never,
+      detailParams("o1", "r1")
+    );
+
+    expect(res.status).toBe(200);
+    expect(db.orgRespondent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "r1" },
+        data: expect.objectContaining({ roleType: null }),
+      })
+    );
+  });
+
+  // C1 — when roleType is absent from body, it must NOT appear in update data
+  it("C1: omits roleType from Prisma update data when not in body", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findUnique as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      deletedAt: null,
+    });
+    (db.orgRespondent.update as jest.Mock).mockResolvedValue({
+      id: "r1",
+      lastName: "Updated",
+    });
+
+    await detailPatch(
+      jsonReq({ lastName: "Updated" }, "PATCH") as never,
+      detailParams("o1", "r1")
+    );
+
+    const updateCall = (db.orgRespondent.update as jest.Mock).mock.calls[0][0];
+    expect(updateCall.data).not.toHaveProperty("roleType");
   });
 });
 

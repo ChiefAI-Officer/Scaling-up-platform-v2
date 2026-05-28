@@ -339,6 +339,88 @@ describe("EditMemberModal", () => {
   });
 
   /**
+   * I1(a) — legacy roleType unchanged: PATCH body must NOT include roleType
+   * so the unknown slug never hits the Zod enum gate.
+   */
+  test("I1(a) legacy roleType unchanged — omits roleType from PATCH body", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: { id: "respondent-1" } }),
+    });
+
+    renderModal({ member: { ...MEMBER, roleType: "weirdlegacy" } });
+
+    // Do NOT change the level — user opens modal and saves as-is
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const sentBody = JSON.parse(call[1].body as string);
+    // roleType must be absent so Zod doesn't reject the unknown slug
+    expect(sentBody).not.toHaveProperty("roleType");
+  });
+
+  /**
+   * I1(b) — legacy roleType changed to known: PATCH body MUST include new roleType.
+   */
+  test("I1(b) legacy roleType changed to known slug — includes new roleType in body", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: { id: "respondent-1" } }),
+    });
+
+    renderModal({ member: { ...MEMBER, roleType: "weirdlegacy" } });
+
+    // User explicitly picks a known value
+    fireEvent.change(screen.getByTestId("select-level"), {
+      target: { value: "employee" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const sentBody = JSON.parse(call[1].body as string);
+    expect(sentBody.roleType).toBe("employee");
+  });
+
+  /**
+   * I1(c) — legacy roleType explicitly cleared to "— no level —": sends roleType: null.
+   */
+  test("I1(c) legacy roleType cleared to no-level — sends roleType: null", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: { id: "respondent-1" } }),
+    });
+
+    renderModal({ member: { ...MEMBER, roleType: "weirdlegacy" } });
+
+    // User picks "— no level —" to explicitly clear
+    fireEvent.change(screen.getByTestId("select-level"), {
+      target: { value: "" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const sentBody = JSON.parse(call[1].body as string);
+    expect(sentBody.roleType).toBeNull();
+  });
+
+  /**
    * (6) onUpdated is awaited BEFORE onClose.
    */
   test("(6) onUpdated is awaited before onClose is called", async () => {
