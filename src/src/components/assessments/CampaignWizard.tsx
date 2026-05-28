@@ -3,35 +3,43 @@
 /**
  * Assessment v7.6 — Coach Campaign Wizard.
  *
+ * Setup-first flip (Slice 1): coaches set up Company → Team → Users in the
+ * Members lane FIRST, then a campaign PICKS an existing company + a subset
+ * of its existing members. No inline create here.
+ *
  * 5 steps:
- *   0. Pick organization (or inline-create one).
+ *   0. Pick an EXISTING organization (no inline-create; CTA to /portal/members
+ *      when the coach has none yet).
  *   1. Pick template (INTERSECTION-filtered).
- *   2. Assign participants + CEO (or inline-create respondents).
+ *   2. Pick EXISTING participants (grouped by team) + manually mark a CEO.
  *   3. Schedule (name, openAt, endMode, closeAt).
  *   4. Review → "Save Draft" or "Create + Activate".
  *
  * Wiring:
  *   GET  /api/organizations
- *   POST /api/organizations
  *   GET  /api/assessment-templates
+ *   GET  /api/organizations/[orgId]/teams
  *   GET  /api/organizations/[orgId]/respondents
- *   POST /api/organizations/[orgId]/respondents
  *   POST /api/assessment-campaigns
  *   POST /api/assessment-campaigns/[id]/participants
  *   POST /api/assessment-campaigns/[id]/activate
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, Loader2, FileUp } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Loader2,
+  Building2,
+  Users,
+} from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import {
-  parseRespondentCsv,
-  type ParsedRow,
-} from "@/lib/assessments/respondent-csv";
 
 const DRAFT_ENDPOINT = "/api/assessment-campaign-drafts";
 const DRAFT_DEBOUNCE_MS = 800;
@@ -48,6 +56,26 @@ function relativeTimeFrom(d: Date): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+/**
+ * API error fields come back as either a string or a Zod issues array
+ * (`[{ message, path }]`). Reduce either to a single human-readable reason,
+ * falling back to `fallback` when nothing useful is present.
+ */
+function extractErrorMessage(error: unknown, fallback: string): string {
+  if (typeof error === "string" && error.trim() !== "") return error;
+  if (Array.isArray(error)) {
+    const messages = error
+      .map((issue) =>
+        issue && typeof issue === "object" && "message" in issue
+          ? String((issue as { message: unknown }).message)
+          : "",
+      )
+      .filter((m) => m.trim() !== "");
+    if (messages.length > 0) return messages.join("; ");
+  }
+  return fallback;
 }
 
 type EndMode = "OPEN_END" | "ENDS_AFTER";
@@ -75,6 +103,15 @@ interface Respondent {
   teamId: string | null;
 }
 
+/** Shape returned by GET /api/organizations/[id]/teams (nested tree). */
+interface ApiTeamNode {
+  id: string;
+  organizationId: string;
+  parentTeamId: string | null;
+  name: string;
+  children: ApiTeamNode[];
+}
+
 interface WizardState {
   step: number;
   organizationId: string;
@@ -85,11 +122,6 @@ interface WizardState {
   openAt: string; // datetime-local string
   endMode: EndMode;
   closeAt: string;
-  // Task M — bulk CSV import staged in the wizard. Server-side
-  // `POST /api/assessment-campaigns` accepts this alongside the singly-
-  // assigned `respondentIds` and creates OrgRespondent rows after the
-  // campaign exists. Skipped on resubmit (idempotent dedupe).
-  bulkRespondents: ParsedRow[];
   // Task O UI — per-campaign invitation email overrides. Null/empty = fall back to template default.
   invitationSubject: string;
   invitationBodyMarkdown: string;
@@ -157,7 +189,6 @@ export function CampaignWizard() {
       openAt: formatDateTimeLocal(tomorrow),
       endMode: "OPEN_END",
       closeAt: "",
-      bulkRespondents: [],
       invitationSubject: "",
       invitationBodyMarkdown: "",
     };
@@ -217,9 +248,6 @@ export function CampaignWizard() {
           openAt: parsed.openAt ?? state.openAt,
           endMode: parsed.endMode === "ENDS_AFTER" ? "ENDS_AFTER" : "OPEN_END",
           closeAt: parsed.closeAt ?? "",
-          bulkRespondents: Array.isArray(parsed.bulkRespondents)
-            ? (parsed.bulkRespondents as ParsedRow[])
-            : [],
           invitationSubject:
             typeof parsed.invitationSubject === "string"
               ? parsed.invitationSubject
@@ -266,7 +294,6 @@ export function CampaignWizard() {
             openAt: snapshot.openAt,
             endMode: snapshot.endMode,
             closeAt: snapshot.closeAt,
-            bulkRespondents: snapshot.bulkRespondents,
           },
         }),
       });
@@ -346,8 +373,7 @@ export function CampaignWizard() {
   const canActivate =
     state.organizationId &&
     state.templateId &&
-    (state.respondentIds.length > 0 ||
-      state.bulkRespondents.length > 0) &&
+    state.respondentIds.length > 0 &&
     state.name &&
     state.openAt &&
     (state.endMode === "OPEN_END" || state.closeAt);
@@ -360,10 +386,9 @@ export function CampaignWizard() {
     if (!canActivate) return;
     setSubmitting(true);
     try {
-      // 1) Create campaign (Task M: include staged bulkRespondents so the
-      // server creates the OrgRespondent rows in the same request — they
-      // were parsed client-side from a CSV but couldn't be POSTed earlier
-      // because the wizard hasn't created the Organization yet).
+      // 1) Create campaign. Setup-first flip: participants are EXISTING
+      // members picked in Step 2, so the create body no longer carries a
+      // `bulkRespondents` array — the company + members already exist.
       const createRes = await fetch("/api/assessment-campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -377,10 +402,6 @@ export function CampaignWizard() {
             state.endMode === "ENDS_AFTER" && state.closeAt
               ? new Date(state.closeAt).toISOString()
               : null,
-          bulkRespondents:
-            state.bulkRespondents.length > 0
-              ? state.bulkRespondents
-              : undefined,
           invitationSubject:
             state.invitationSubject.trim() !== ""
               ? state.invitationSubject.trim()
@@ -402,6 +423,14 @@ export function CampaignWizard() {
       const campaignId = createBody.data.id as string;
 
       // 2) Add participants.
+      // TODO: atomic create+participants — the create route does NOT accept
+      // respondentIds/ceoRespondentId (only the deprecated bulkRespondents
+      // create-new path), so picking EXISTING members requires this second
+      // call. Until the create route grows a "pick-existing participants"
+      // input, the campaign row exists before participants are attached, so a
+      // failure here leaves a created-but-empty campaign. We surface that
+      // partial state explicitly (below) rather than a generic error, and do
+      // NOT delete-rollback.
       const partRes = await fetch(
         `/api/assessment-campaigns/${campaignId}/participants`,
         {
@@ -415,11 +444,28 @@ export function CampaignWizard() {
       );
       const partBody = await partRes.json();
       if (!partRes.ok || !partBody.success) {
-        throw new Error(
-          typeof partBody.error === "string"
-            ? partBody.error
-            : "Failed to assign participants",
+        // The campaign WAS created — make the partial state understandable
+        // instead of a generic "Could not save campaign" toast.
+        const reason = extractErrorMessage(
+          partBody.error,
+          "the participants could not be added",
         );
+        // Clear the auto-save draft: the campaign exists, so resuming the
+        // wizard draft would create a duplicate. The coach finishes in the
+        // campaign detail page.
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        try {
+          await fetch(DRAFT_ENDPOINT, { method: "DELETE" });
+        } catch {
+          // best-effort; the campaign was already created
+        }
+        toast({
+          title: "Campaign created, but adding participants failed",
+          description: `${reason}. Open the campaign to add them.`,
+          variant: "destructive",
+        });
+        router.push(`/portal/assessments/${campaignId}`);
+        return;
       }
 
       // 3) Optionally activate.
@@ -532,7 +578,22 @@ export function CampaignWizard() {
         {state.step === 0 && (
           <OrganizationStep
             value={state.organizationId}
-            onChange={(v) => update("organizationId", v)}
+            onChange={(v) =>
+              setState((s) => {
+                // Re-selecting the same org must NOT wipe a valid member
+                // selection. Only on an actual company change do we clear the
+                // picked members + CEO — otherwise their (other-company) ids
+                // would persist and get rejected by /participants later,
+                // leaving an orphaned empty campaign.
+                if (s.organizationId === v) return s;
+                return {
+                  ...s,
+                  organizationId: v,
+                  respondentIds: [],
+                  ceoRespondentId: null,
+                };
+              })
+            }
             onNext={next}
           />
         )}
@@ -549,7 +610,6 @@ export function CampaignWizard() {
             organizationId={state.organizationId}
             respondentIds={state.respondentIds}
             ceoRespondentId={state.ceoRespondentId}
-            bulkRespondents={state.bulkRespondents}
             onChange={(rIds, ceoId) => {
               setState((s) => ({
                 ...s,
@@ -557,9 +617,6 @@ export function CampaignWizard() {
                 ceoRespondentId: ceoId,
               }));
             }}
-            onChangeBulk={(rows) =>
-              setState((s) => ({ ...s, bulkRespondents: rows }))
-            }
             onBack={back}
             onNext={next}
           />
@@ -602,13 +659,8 @@ function OrganizationStep({
   onChange: (v: string) => void;
   onNext: () => void;
 }) {
-  const { toast } = useToast();
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [name, setName] = useState("");
-  const [externalId, setExternalId] = useState("");
-  const [creating, setCreating] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -627,49 +679,15 @@ function OrganizationStep({
     refresh();
   }, [refresh]);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-    setCreating(true);
-    try {
-      const res = await fetch("/api/organizations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          externalId: externalId.trim() || undefined,
-        }),
-      });
-      const body = await res.json();
-      if (!res.ok || !body.success) {
-        throw new Error(
-          typeof body.error === "string" ? body.error : "Failed to create",
-        );
-      }
-      setName("");
-      setExternalId("");
-      setShowCreate(false);
-      onChange(body.data.id);
-      await refresh();
-    } catch (err) {
-      toast({
-        title: "Failed to create organization",
-        description: err instanceof Error ? err.message : "",
-        variant: "destructive",
-      });
-    } finally {
-      setCreating(false);
-    }
-  }
-
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-foreground">
-          Pick an organization
+          Pick a company
         </h2>
         <p className="text-sm text-muted-foreground">
-          Assessments are scoped to a single organization that you own.
+          Assessments are scoped to a single company you&apos;ve set up. Pick
+          the one this campaign is for.
         </p>
       </div>
 
@@ -677,17 +695,19 @@ function OrganizationStep({
         <div className="flex items-center text-sm text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading...
         </div>
-      ) : orgs.length === 0 && !showCreate ? (
-        <div className="text-sm text-muted-foreground">
-          You don&apos;t have any organizations yet.{" "}
-          <button
-            type="button"
-            className="text-primary hover:underline"
-            onClick={() => setShowCreate(true)}
+      ) : orgs.length === 0 ? (
+        <div className="border border-dashed border-border rounded-lg p-6 text-center space-y-3">
+          <Building2 className="w-8 h-8 mx-auto text-muted-foreground" />
+          <div className="text-sm text-muted-foreground">
+            You haven&apos;t set up any companies yet. Create a company and add
+            its people before you start a campaign.
+          </div>
+          <Link
+            href="/portal/members"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
           >
-            Create one
-          </button>
-          .
+            Set up a company first
+          </Link>
         </div>
       ) : (
         <div className="space-y-2">
@@ -719,62 +739,6 @@ function OrganizationStep({
             </label>
           ))}
         </div>
-      )}
-
-      {!showCreate ? (
-        <button
-          type="button"
-          className="text-sm text-primary hover:underline"
-          onClick={() => setShowCreate(true)}
-        >
-          + New organization
-        </button>
-      ) : (
-        <form
-          onSubmit={handleCreate}
-          className="border border-border rounded-lg p-4 space-y-3 bg-muted/30"
-        >
-          <div className="space-y-2">
-            <Label htmlFor="orgName">Organization name</Label>
-            <Input
-              id="orgName"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Acme Corp"
-              required
-              maxLength={200}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="orgExt">External ID (optional)</Label>
-            <Input
-              id="orgExt"
-              value={externalId}
-              onChange={(e) => setExternalId(e.target.value)}
-              placeholder="HUB-12345"
-              maxLength={200}
-            />
-          </div>
-          <div className="flex gap-2 justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowCreate(false)}
-              disabled={creating}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={creating || !name.trim()}>
-              {creating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Creating...
-                </>
-              ) : (
-                "Create"
-              )}
-            </Button>
-          </div>
-        </form>
       )}
 
       <div className="flex justify-end pt-4">
@@ -893,65 +857,50 @@ function ParticipantsStep({
   organizationId,
   respondentIds,
   ceoRespondentId,
-  bulkRespondents,
   onChange,
-  onChangeBulk,
   onBack,
   onNext,
 }: {
   organizationId: string;
   respondentIds: string[];
   ceoRespondentId: string | null;
-  bulkRespondents: ParsedRow[];
   onChange: (rIds: string[], ceoId: string | null) => void;
-  onChangeBulk: (rows: ParsedRow[]) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
-  const { toast } = useToast();
   const [respondents, setRespondents] = useState<Respondent[]>([]);
+  const [teams, setTeams] = useState<ApiTeamNode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [showBulk, setShowBulk] = useState(bulkRespondents.length > 0);
-  const [bulkCsvText, setBulkCsvText] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [creating, setCreating] = useState(false);
-
-  // Task M — live-parse the CSV textarea so the preview/error counters
-  // update on every keystroke.
-  const bulkParsed = useMemo(
-    () => (bulkCsvText.trim().length > 0 ? parseRespondentCsv(bulkCsvText) : null),
-    [bulkCsvText],
-  );
-
-  function applyParsedBulk() {
-    if (!bulkParsed) return;
-    if (bulkParsed.errors.length > 0) return;
-    if (bulkParsed.rows.length === 0) return;
-    onChangeBulk(bulkParsed.rows);
-    setBulkCsvText("");
-    toast({
-      title: "Staged for import",
-      description: `${bulkParsed.rows.length} respondent${bulkParsed.rows.length === 1 ? "" : "s"} will be created when you save the campaign.`,
-    });
-  }
-
-  function clearStagedBulk() {
-    onChangeBulk([]);
-  }
+  const [error, setError] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!organizationId) return;
     setLoading(true);
+    setError(false);
     try {
-      const res = await fetch(`/api/organizations/${organizationId}/respondents`);
-      const body = await res.json();
-      if (res.ok && body.success) {
-        setRespondents(body.data as Respondent[]);
+      // Fetch the team tree + all members for THIS company only. The picker
+      // is strictly scoped to the selected org — other companies are never
+      // requested or shown.
+      const [teamsRes, respRes] = await Promise.all([
+        fetch(`/api/organizations/${organizationId}/teams`),
+        fetch(`/api/organizations/${organizationId}/respondents`),
+      ]);
+      const teamsBody = await teamsRes.json();
+      const respBody = await respRes.json();
+      const teamsOk = teamsRes.ok && teamsBody.success;
+      const respOk = respRes.ok && respBody.success;
+      // BOTH fetches must succeed. If teams fails but members load, every
+      // member would silently fall into the "Not associated with any team"
+      // bucket — wrong grouping shown as correct. Surface the error (with the
+      // same Retry affordance) instead.
+      if (!teamsOk || !respOk) {
+        setError(true);
+        return;
       }
+      setTeams(teamsBody.data as ApiTeamNode[]);
+      setRespondents(respBody.data as Respondent[]);
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -975,357 +924,173 @@ function ParticipantsStep({
 
   function setCEO(id: string) {
     if (!respondentIds.includes(id)) {
-      // Auto-include if user clicked CEO without checking first.
+      // Auto-include if the coach marked CEO without checking the box first.
       onChange([...respondentIds, id], id);
     } else {
       onChange(respondentIds, id);
     }
   }
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!firstName.trim() || !lastName.trim() || !email.trim()) return;
-    setCreating(true);
-    try {
-      const res = await fetch(
-        `/api/organizations/${organizationId}/respondents`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            firstName: firstName.trim(),
-            lastName: lastName.trim(),
-            email: email.trim(),
-            jobTitle: jobTitle.trim() || undefined,
-          }),
-        },
-      );
-      const body = await res.json();
-      if (!res.ok || !body.success) {
-        throw new Error(
-          typeof body.error === "string" ? body.error : "Failed to create",
-        );
+  // Build ordered team groups (flattened, with depth) + an "unassigned"
+  // bucket for members whose teamId is null or points at a team we don't
+  // have. Members within a group keep the server order (lastName, firstName).
+  const groups = useMemo(() => {
+    const flat: Array<{ id: string; name: string; depth: number }> = [];
+    const walk = (nodes: ApiTeamNode[], depth: number) => {
+      for (const n of nodes) {
+        flat.push({ id: n.id, name: n.name, depth });
+        if (n.children?.length) walk(n.children, depth + 1);
       }
-      // Auto-add the new respondent.
-      onChange([...respondentIds, body.data.id], ceoRespondentId);
-      setFirstName("");
-      setLastName("");
-      setEmail("");
-      setJobTitle("");
-      setShowCreate(false);
-      await refresh();
-    } catch (err) {
-      toast({
-        title: "Failed to add respondent",
-        description: err instanceof Error ? err.message : "",
-        variant: "destructive",
-      });
-    } finally {
-      setCreating(false);
+    };
+    walk(teams, 0);
+
+    const knownTeamIds = new Set(flat.map((t) => t.id));
+    const byTeam = new Map<string, Respondent[]>();
+    const unassigned: Respondent[] = [];
+    for (const r of respondents) {
+      if (r.teamId && knownTeamIds.has(r.teamId)) {
+        const list = byTeam.get(r.teamId) ?? [];
+        list.push(r);
+        byTeam.set(r.teamId, list);
+      } else {
+        unassigned.push(r);
+      }
     }
+
+    const result: Array<{
+      key: string;
+      label: string;
+      depth: number;
+      members: Respondent[];
+    }> = [];
+    for (const t of flat) {
+      const members = byTeam.get(t.id) ?? [];
+      if (members.length > 0) {
+        result.push({ key: t.id, label: t.name, depth: t.depth, members });
+      }
+    }
+    if (unassigned.length > 0) {
+      result.push({
+        key: "__unassigned__",
+        label: "Not associated with any team",
+        depth: 0,
+        members: unassigned,
+      });
+    }
+    return result;
+  }, [teams, respondents]);
+
+  function renderRow(r: Respondent) {
+    const checked = respondentIds.includes(r.id);
+    const isCEO = ceoRespondentId === r.id;
+    return (
+      <div
+        key={r.id}
+        className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30"
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => toggleRespondent(r.id, e.target.checked)}
+          className="accent-primary"
+          aria-label={`Include ${r.firstName} ${r.lastName}`}
+        />
+        <div className="flex-1 text-sm">
+          <div className="font-medium text-foreground">
+            {r.firstName} {r.lastName}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {r.email}
+            {r.jobTitle ? ` • ${r.jobTitle}` : ""}
+          </div>
+        </div>
+        <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
+          <input
+            type="radio"
+            name="ceo"
+            checked={isCEO}
+            onChange={() => setCEO(r.id)}
+            className="accent-primary"
+            aria-label={`Mark ${r.firstName} ${r.lastName} as CEO`}
+          />
+          CEO
+        </label>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-foreground">
-          Assign participants
+          Pick participants
         </h2>
         <p className="text-sm text-muted-foreground">
-          Pick the respondents who will take this assessment. Choose one as
-          CEO if needed.
+          Choose the existing members of this company who will take the
+          assessment. Mark one as CEO if needed. Need to add someone?{" "}
+          <Link href="/portal/members" className="text-primary hover:underline">
+            Manage members
+          </Link>
+          .
         </p>
       </div>
 
       {loading ? (
         <div className="flex items-center text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading respondents...
+          <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading members...
+        </div>
+      ) : error ? (
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-destructive" role="alert">
+            Failed to load members.
+          </span>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="text-primary underline hover:no-underline"
+          >
+            Retry
+          </button>
         </div>
       ) : respondents.length === 0 ? (
-        <div className="text-sm text-muted-foreground">
-          No respondents yet for this organization. Add one below.
+        <div className="border border-dashed border-border rounded-lg p-6 text-center space-y-3">
+          <Users className="w-8 h-8 mx-auto text-muted-foreground" />
+          <div className="text-sm text-muted-foreground">
+            This company has no members yet. Add people to the company before
+            you can pick participants.
+          </div>
+          <Link
+            href="/portal/members"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Manage members
+          </Link>
         </div>
       ) : (
-        <div className="border border-border rounded-lg divide-y divide-border overflow-hidden">
-          {respondents.map((r) => {
-            const checked = respondentIds.includes(r.id);
-            const isCEO = ceoRespondentId === r.id;
-            return (
-              <div
-                key={r.id}
-                className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(e) => toggleRespondent(r.id, e.target.checked)}
-                  className="accent-primary"
-                  aria-label={`Include ${r.firstName} ${r.lastName}`}
-                />
-                <div className="flex-1 text-sm">
-                  <div className="font-medium text-foreground">
-                    {r.firstName} {r.lastName}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {r.email}
-                    {r.jobTitle ? ` • ${r.jobTitle}` : ""}
-                  </div>
-                </div>
-                <label className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer">
-                  <input
-                    type="radio"
-                    name="ceo"
-                    checked={isCEO}
-                    onChange={() => setCEO(r.id)}
-                    className="accent-primary"
-                  />
-                  CEO
-                </label>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {!showCreate ? (
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            className="text-sm text-primary hover:underline"
-            onClick={() => setShowCreate(true)}
-          >
-            + New respondent
-          </button>
-          <button
-            type="button"
-            className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-            onClick={() => setShowBulk((v) => !v)}
-            data-testid="wizard-toggle-bulk-csv"
-          >
-            <FileUp className="w-3.5 h-3.5" />
-            {showBulk ? "Hide bulk import" : "Bulk import from CSV"}
-          </button>
-        </div>
-      ) : (
-        <form
-          onSubmit={handleCreate}
-          className="border border-border rounded-lg p-4 space-y-3 bg-muted/30"
-        >
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First name</Label>
-              <Input
-                id="firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                maxLength={200}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last name</Label>
-              <Input
-                id="lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                maxLength={200}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              maxLength={320}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="jobTitle">Job title (optional)</Label>
-            <Input
-              id="jobTitle"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-              maxLength={200}
-            />
-          </div>
-          <div className="flex gap-2 justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowCreate(false)}
-              disabled={creating}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={creating || !firstName.trim() || !lastName.trim() || !email.trim()}
-            >
-              {creating ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Adding...
-                </>
-              ) : (
-                "Add respondent"
-              )}
-            </Button>
-          </div>
-        </form>
-      )}
-
-      {showBulk && (
-        <div
-          className="border border-border rounded-lg p-4 space-y-3 bg-muted/20"
-          data-testid="wizard-bulk-csv-panel"
-        >
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">
-              Bulk import respondents from CSV
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Paste CSV with header row{" "}
-              <code className="font-mono">name,email,team</code> (team
-              optional, slash-delimited). Rows will be created with the
-              campaign and skipped if the email already exists. Max 500
-              rows.
-            </p>
-          </div>
-
-          <textarea
-            data-testid="wizard-bulk-csv-textarea"
-            value={bulkCsvText}
-            onChange={(e) => setBulkCsvText(e.target.value)}
-            placeholder={`name,email,team\nAlice Example,alice@example.com,Marketing/Brand\nBob Tester,bob@example.com,`}
-            rows={6}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-
-          {bulkParsed && (
+        <div className="space-y-4">
+          {groups.map((g) => (
             <div
-              className="text-xs space-y-2"
-              data-testid="wizard-bulk-csv-preview"
+              key={g.key}
+              className="border border-border rounded-lg overflow-hidden"
+              data-testid={`participant-group-${g.key}`}
             >
-              <div className="flex items-center gap-3">
-                <span className="font-medium text-foreground">
-                  {bulkParsed.rows.length} valid row
-                  {bulkParsed.rows.length === 1 ? "" : "s"}
+              <div
+                className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border"
+                style={{ paddingLeft: `${g.depth * 16 + 12}px` }}
+              >
+                <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {g.label}
                 </span>
-                {bulkParsed.errors.length > 0 && (
-                  <span className="text-destructive font-medium">
-                    {bulkParsed.errors.length} error
-                    {bulkParsed.errors.length === 1 ? "" : "s"}
-                  </span>
-                )}
+                <span className="text-[10px] text-muted-foreground">
+                  ({g.members.length})
+                </span>
               </div>
-
-              {bulkParsed.rows.length > 0 && (
-                <div className="border border-border rounded-md overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-muted/40">
-                      <tr>
-                        <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Name
-                        </th>
-                        <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Email
-                        </th>
-                        <th className="text-left px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Team
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {bulkParsed.rows.slice(0, 10).map((row, i) => (
-                        <tr key={`${row.email}-${i}`}>
-                          <td className="px-2 py-1 text-foreground">
-                            {row.name}
-                          </td>
-                          <td className="px-2 py-1 text-foreground font-mono">
-                            {row.email}
-                          </td>
-                          <td className="px-2 py-1 text-muted-foreground">
-                            {row.teamPath.length > 0
-                              ? row.teamPath.join(" / ")
-                              : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {bulkParsed.rows.length > 10 && (
-                    <div className="px-2 py-1 text-[10px] text-muted-foreground bg-muted/30 border-t border-border">
-                      + {bulkParsed.rows.length - 10} more rows…
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {bulkParsed.errors.length > 0 && (
-                <ul className="border border-destructive/40 rounded-md p-2 bg-destructive/5 max-h-40 overflow-y-auto space-y-1">
-                  {bulkParsed.errors.slice(0, 20).map((e, i) => (
-                    <li key={i} className="text-destructive">
-                      Row {e.row}: {e.reason}
-                    </li>
-                  ))}
-                  {bulkParsed.errors.length > 20 && (
-                    <li className="text-destructive/80 italic">
-                      + {bulkParsed.errors.length - 20} more errors…
-                    </li>
-                  )}
-                </ul>
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 pt-1">
-            <Button
-              type="button"
-              size="sm"
-              onClick={applyParsedBulk}
-              disabled={
-                !bulkParsed ||
-                bulkParsed.rows.length === 0 ||
-                bulkParsed.errors.length > 0
-              }
-              data-testid="wizard-bulk-csv-apply"
-            >
-              Stage for import
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => setBulkCsvText("")}
-              disabled={bulkCsvText.length === 0}
-            >
-              Clear textarea
-            </Button>
-          </div>
-
-          {bulkRespondents.length > 0 && (
-            <div className="border-t border-border pt-3 text-xs space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-foreground">
-                  {bulkRespondents.length} respondent
-                  {bulkRespondents.length === 1 ? "" : "s"} staged for
-                  creation
-                </span>
-                <button
-                  type="button"
-                  onClick={clearStagedBulk}
-                  className="text-destructive hover:underline"
-                  data-testid="wizard-bulk-csv-clear-staged"
-                >
-                  Remove staged
-                </button>
+              <div className="divide-y divide-border">
+                {g.members.map(renderRow)}
               </div>
             </div>
-          )}
+          ))}
         </div>
       )}
 
@@ -1333,12 +1098,7 @@ function ParticipantsStep({
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Button>
-        <Button
-          onClick={onNext}
-          disabled={
-            respondentIds.length === 0 && bulkRespondents.length === 0
-          }
-        >
+        <Button onClick={onNext} disabled={respondentIds.length === 0}>
           Next <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>

@@ -511,10 +511,12 @@ export const createAssessmentCampaignSchema = z
         // Task O — per-campaign invitation email overrides (null = fall back to template defaults)
         invitationSubject: z.string().max(200).transform(_trim).optional().nullable(),
         invitationBodyMarkdown: z.string().max(5000).transform(_trim).optional().nullable(),
-        // Task M — optional bulk-respondent payload from the wizard CSV
-        // import. Server resolves teamPath to OrgTeam rows (creating any
-        // missing teams), and creates OrgRespondent rows with skip-on-conflict
-        // semantics so the wizard can retry idempotently.
+        // deprecated: Task M optional bulk-respondent payload from the wizard
+        // CSV import. The setup-first flip (Slice 1) stopped the wizard from
+        // sending this — coaches now pick EXISTING members. Kept optional and
+        // functional for backward-compat with older drafts/clients. Server
+        // resolves teamPath to OrgTeam rows (creating any missing teams), and
+        // creates OrgRespondent rows with skip-on-conflict semantics.
         bulkRespondents: z
             .array(
                 z.object({

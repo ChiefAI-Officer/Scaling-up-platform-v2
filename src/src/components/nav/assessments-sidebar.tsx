@@ -65,14 +65,9 @@ const ADMIN_ENTRIES: SidebarEntry[] = [
 
 const COACH_ENTRIES: SidebarEntry[] = [
   { href: "/portal/assessments", label: "My Campaigns", exact: true },
-  // Placeholder until a dedicated org-list portal page lands. Uses a
-  // sentinel query string so it never matches the My Campaigns active
-  // state on /portal/assessments. Still navigates (Next.js strips the
-  // query at render, so the campaigns page renders normally).
   {
-    href: "/portal/assessments?tab=organizations",
-    label: "My Organizations",
-    placeholder: true,
+    href: "/portal/members",
+    label: "Members",
   },
 ];
 
