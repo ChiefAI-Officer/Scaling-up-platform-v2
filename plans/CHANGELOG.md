@@ -6,6 +6,36 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-28 — Assessment Slice 4 — Bulk CSV import + wizard persistent quick-add <!-- ENTRY_ISO:2026-05-28 ENTRY_SLUG:assessment-slice-4-bulk-import-quickadd -->
+
+**Branch:** `feat/assessment-slice-4-import-quickadd` (off `main`, merged via PR #21, squash commit `8ffc3d4`). Same-session continuation of Slices 1-3 via `superpowers:subagent-driven-development`. 3 commits.
+
+**What shipped.** Coaches can now (a) bulk-import members from CSV inside the Members lane, and (b) create a new member mid-wizard that persists into the company roster (per locked decision #8 — setup-first even when done in-flow).
+
+- **Bulk CSV import** (commit `be0c21a`, Critical fix `54c79e1`):
+  - New `src/src/components/organizations/import-members-modal.tsx` (~388 LOC) reachable from an "Import members" button next to "+ Add Member" in the right Members panel header. Disabled until a node is selected (org context required for the bulk POST).
+  - Paste-area textarea + **live preview** using the existing pure parser `parseRespondentCsv` — first ~10 rows in a small table + a per-row parse-error list (line numbers + reasons). The Import button is disabled while `rows.length === 0 || errors.length > 0` — defense-in-depth client-side gating.
+  - Conflict mode radio: `skip` (default, leave existing untouched) / `merge` (update firstName/lastName/teamId by email).
+  - Submit → `POST /api/organizations/{orgId}/respondents/bulk` with `{ rows, mode }`. Server response `{ success, data: { created, updated, skipped, errors[] } }` renders as a summary panel inside the modal (counts + role="status" for screen readers).
+  - **Critical caught in code-quality review** — server-returned row-level errors on `success: true` were silently dropped. Only the COUNT rendered. A coach who imports 50 rows and gets 5 quietly-failed rows would have no way to know which 5 or why. Fixed by rendering each `Row N: reason` in a `role="alert"` list below the counts panel AND keeping the modal open (no auto-close) when `errors.length > 0` so the user can read the failures; the footer button label flips from "Cancel" to "Close" to make the intent clear. Zero-error path retains the original 1.5s auto-close. Plus a `closeTimeoutRef` + `closedRef` double-close guard around the post-success timeout (Escape / overlay click during the 1.5s window no longer triggers `onClose` twice). `useId()` for the textarea (no hard-coded id collisions in SSR/testing). `role="alert"` on the parse-error `<ul>` and `role="status"` on the success-summary `<div>` for proper a11y announcements.
+  - 11 modal tests (incl. partial-success path: `success: true` + `errors.length > 0` → row reasons render, modal stays open, `onUpdated` still awaits) + 1 view-integration test asserting the Import button gates on selection.
+
+- **Wizard persistent quick-add** (commit `3281163`):
+  - In `CampaignWizard.tsx`'s `ParticipantsStep`, a new "Add new member" button (UserPlus icon, disabled while loading) opens the existing `AddMemberModal` with a **DialogDescription override**: `Adds this person to {orgName}'s roster (not just this campaign).` This is the explicit locked-#8 labeling — setup-first even when the create happens mid-wizard.
+  - `AddMemberModal` API extended **additively, backward-compatibly**: the existing `onCreated` callback now receives `{ respondent, created }` where `created` is the typed new-respondent payload (`id`, `firstName`, `lastName`, `email`, `jobTitle`, `teamId`, `roleType`). The existing Members-lane caller uses `_result: MemberCreatedResult` (ignored arg) — verified via grep. New `description?: string` prop overrides the default `DialogDescription` text only when passed.
+  - `WizardState` gains an ephemeral `orgName: string` (deliberately omitted from auto-save draft persistence so it doesn't leak into the server-side schema). `OrganizationStep.onChange` widened to `{ id, name }` so the wizard captures the display name for the modal description.
+  - On modal success: `handleMemberCreated` calls `onChange([...respondentIds, newId], ceoRespondentId)` first (auto-includes the new id in selection), then `await refresh()` re-fetches the respondents list so the new member appears in the picker already checked.
+  - **CEO-from-Level handoff** through quick-add: a member with `roleType: "ceofounder"` (etc.) created via quick-add is auto-included → the existing Slice-3 CEO-suggestion `useEffect` re-runs after the refresh → it sees exactly one CEO-family member in the selection and auto-sets them as CEO via `setCeoPickSource("auto")`. No special-casing — the state machine handles it. (Test QA4 verifies; one known test-quality note: QA4's assertion ordering implies the auto-suggest fires synchronously, when in practice it requires the re-fetch to complete first. Not a runtime defect; tightening the test is a follow-on.)
+  - 4 new wizard tests (QA1–QA4): button visibility, modal description text, auto-include + auto-fetch with right URL/body shapes, CEO-from-Level handoff.
+
+**Verification.** Full suite: **2152 passing, 3 failing** — exactly the 3 known pre-existing failures (`no-inline-tolocaledatestring` / `org-survey/exchange` / `assessment-campaigns/detail-route`) in files this branch never touched. 142/142 organizations test suites green (11 suites); 17/17 wizard test suite (4 new). `CI=true npx next build --turbopack` clean under the safety gate. Zero migrations; zero destructive operations. The new `AddMemberModal` API change verified backward-compatible (only one existing non-test caller, intentionally ignored arg).
+
+**Out of scope (deferred to Slice 5).** Coach landing companies-supported list + per-campaign nag metrics (total/new/invited/started/completed); CampaignDetail Team column + staged-progress icons (the `new → invited → started → completed` lifecycle visualization Jeff stressed). Esperto-faithful pixel polish, top-level Reports lane, admin-lane mirror, Edit-Campaign advanced tabs all still out of v1 entirely.
+
+**Plan:** `~/.claude/plans/yes-we-were-in-cosmic-jellyfish.md`.
+
+---
+
 ### 2026-05-28 — Assessment Slice 3 — Levels + CEO-from-Level suggestion <!-- ENTRY_ISO:2026-05-28 ENTRY_SLUG:assessment-slice-3-levels-ceo-suggest -->
 
 **Branch:** `feat/assessment-slice-3-levels` (off `main`, merged via PR #20, squash commit `37dcd96`). Same-session continuation of Slices 1 + 2 via `superpowers:subagent-driven-development`. 3 commits.
