@@ -20,6 +20,10 @@ import { AddMemberModal } from "./add-member-modal";
 import type { MemberCreatedResult } from "./add-member-modal";
 import { EditTeamModal, excludeTeamSubtree } from "./edit-team-modal";
 import type { EditTeamModalTeam } from "./edit-team-modal";
+import { EditMemberModal } from "./edit-member-modal";
+import type { EditMemberModalMember } from "./edit-member-modal";
+import { EditOrganizationModal } from "./edit-organization-modal";
+import type { EditOrganizationModalOrg } from "./edit-organization-modal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -173,6 +177,12 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
 
   // Edit Team modal state — null when closed
   const [editingTeam, setEditingTeam] = useState<EditTeamModalTeam | null>(null);
+
+  // Edit Member modal state — null when closed
+  const [memberBeingEdited, setMemberBeingEdited] = useState<EditMemberModalMember | null>(null);
+
+  // Edit Organization modal state — null when closed
+  const [orgBeingEdited, setOrgBeingEdited] = useState<EditOrganizationModalOrg | null>(null);
 
   // Selected node drives the right panel
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
@@ -408,28 +418,52 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
 
             return (
               <div key={org.id}>
-                {/* Company root node */}
-                <button
-                  type="button"
-                  aria-label={org.name}
-                  aria-pressed={isSelected}
-                  aria-expanded={state.expanded}
-                  onClick={() => handleOrgClick(org)}
-                  className={[
-                    "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors",
-                    isSelected
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-foreground hover:bg-muted",
-                  ].join(" ")}
-                >
-                  {state.expanded ? (
-                    <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-                  )}
-                  <Building2 className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate font-medium">{org.name}</span>
-                </button>
+                {/* Company root node — wrapped in group for Edit affordance */}
+                <div className="group relative flex items-center">
+                  <button
+                    type="button"
+                    aria-label={org.name}
+                    aria-pressed={isSelected}
+                    aria-expanded={state.expanded}
+                    onClick={() => handleOrgClick(org)}
+                    className={[
+                      "flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors",
+                      isSelected
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-foreground hover:bg-muted",
+                    ].join(" ")}
+                  >
+                    {state.expanded ? (
+                      <ChevronDown className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+                    )}
+                    <Building2 className="w-4 h-4 flex-shrink-0" />
+                    <span className="truncate font-medium">{org.name}</span>
+                  </button>
+                  {/* Edit affordance — shown on hover or when org row is selected */}
+                  <button
+                    type="button"
+                    aria-label="Edit organization"
+                    title={`Edit ${org.name}`}
+                    data-testid={`edit-org-${org.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOrgBeingEdited({
+                        id: org.id,
+                        name: org.name,
+                        externalId: undefined,
+                      });
+                    }}
+                    className={[
+                      "absolute right-1 top-1/2 -translate-y-1/2",
+                      "p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+                      isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+                    ].join(" ")}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </div>
 
                 {/* Expanded children */}
                 {state.expanded && (
@@ -609,24 +643,73 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
                   <th className="px-6 py-2.5 text-left font-medium text-muted-foreground">Name</th>
                   <th className="px-6 py-2.5 text-left font-medium text-muted-foreground">Email</th>
                   <th className="px-6 py-2.5 text-left font-medium text-muted-foreground">Level</th>
+                  <th className="px-3 py-2.5 text-left font-medium text-muted-foreground w-12"></th>
                 </tr>
               </thead>
               <tbody>
-                {members.map((m) => (
-                  <tr
-                    key={m.id}
-                    className="border-b border-border hover:bg-muted/20 transition-colors"
-                    data-testid={`member-row-${m.id}`}
-                  >
-                    <td className="px-6 py-3 text-foreground font-medium">
-                      {m.firstName} {m.lastName}
-                    </td>
-                    <td className="px-6 py-3 text-muted-foreground">{m.email}</td>
-                    <td className="px-6 py-3 text-muted-foreground">
-                      {m.roleType ?? "—"}
-                    </td>
-                  </tr>
-                ))}
+                {members.map((m) => {
+                  // Resolve orgId from the selected node for the Edit modal
+                  const memberOrgId =
+                    selectedNode!.kind === "organization" ? selectedNode!.id :
+                    selectedNode!.kind === "team"         ? selectedNode!.orgId :
+                    /* unassigned */                        selectedNode!.orgId;
+
+                  // Flatten the org's loaded teams for the Team selector in the edit modal
+                  function flattenForModal(nodes: ApiTeamNode[]): ApiTeamNode[] {
+                    const result: ApiTeamNode[] = [];
+                    for (const n of nodes) {
+                      result.push(n);
+                      result.push(...flattenForModal(n.children));
+                    }
+                    return result;
+                  }
+
+                  return (
+                    <tr
+                      key={m.id}
+                      className="border-b border-border hover:bg-muted/20 transition-colors group"
+                      data-testid={`member-row-${m.id}`}
+                    >
+                      <td className="px-6 py-3 text-foreground font-medium">
+                        {m.firstName} {m.lastName}
+                      </td>
+                      <td className="px-6 py-3 text-muted-foreground">{m.email}</td>
+                      <td className="px-6 py-3 text-muted-foreground">
+                        {m.roleType ?? "—"}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        {/* Edit affordance — shown on row hover */}
+                        <button
+                          type="button"
+                          aria-label={`Edit ${m.firstName} ${m.lastName}`}
+                          title="Edit member"
+                          data-testid={`edit-member-${m.id}`}
+                          onClick={() => {
+                            setMemberBeingEdited({
+                              id: m.id,
+                              orgId: memberOrgId,
+                              firstName: m.firstName,
+                              lastName: m.lastName,
+                              email: m.email,
+                              jobTitle: m.jobTitle ?? null,
+                              teamId: m.teamId ?? null,
+                            });
+                            // Lazy-load teams if not yet fetched
+                            if (
+                              orgStates[memberOrgId]?.teams === null &&
+                              !orgStates[memberOrgId]?.loadingTeams
+                            ) {
+                              loadTeams(memberOrgId);
+                            }
+                          }}
+                          className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -713,6 +796,59 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
           />
         );
       })()}
+
+      {/* EditMemberModal — only mount when a member is being edited */}
+      {memberBeingEdited && (() => {
+        // Flatten the org's loaded teams for the Team selector
+        function flattenTeamsForEdit(nodes: ApiTeamNode[]): ApiTeamNode[] {
+          const result: ApiTeamNode[] = [];
+          for (const n of nodes) {
+            result.push(n);
+            result.push(...flattenTeamsForEdit(n.children));
+          }
+          return result;
+        }
+        const editMemberTeams = flattenTeamsForEdit(
+          orgStates[memberBeingEdited.orgId]?.teams ?? []
+        );
+        return (
+          <EditMemberModal
+            open={true}
+            onClose={() => setMemberBeingEdited(null)}
+            onUpdated={async () => {
+              // Refresh the right pane so the updated member details are visible
+              if (selectedNode) {
+                await loadMembers(selectedNode);
+              }
+            }}
+            member={memberBeingEdited}
+            teams={editMemberTeams}
+          />
+        );
+      })()}
+
+      {/* EditOrganizationModal — only mount when an org is being edited */}
+      {orgBeingEdited && (
+        <EditOrganizationModal
+          open={true}
+          onClose={() => setOrgBeingEdited(null)}
+          onUpdated={async () => {
+            // The org list is server-rendered; router.refresh() triggers a
+            // server re-fetch and re-renders the page with the updated org name.
+            // We also update local state immediately so the left-panel name
+            // reflects the change before the server round-trip completes.
+            const res = await fetch(`/api/organizations/${orgBeingEdited.id}`);
+            const json = await res.json();
+            if (res.ok && json.success && json.data) {
+              const updated = json.data as { id: string; name: string };
+              setOrganizations((prev) =>
+                prev.map((o) => o.id === updated.id ? { ...o, name: updated.name } : o)
+              );
+            }
+          }}
+          organization={orgBeingEdited}
+        />
+      )}
     </>
   );
 }
