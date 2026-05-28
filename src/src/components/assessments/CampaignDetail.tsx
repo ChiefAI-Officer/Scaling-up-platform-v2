@@ -668,6 +668,7 @@ export function CampaignDetail({
     setAdding(true);
     const ids = Array.from(selectedRespondentIds);
     const errors: string[] = [];
+    let successCount = 0;
     for (const orgRespondentId of ids) {
       try {
         const res = await fetch(
@@ -681,7 +682,10 @@ export function CampaignDetail({
         const body = await res.json();
         if (!res.ok || !body.success) {
           const code = body.code as string | undefined;
-          if (code === "ALREADY_PARTICIPANT") continue; // benign
+          if (code === "ALREADY_PARTICIPANT") {
+            successCount++; // benign — already in, counts as success
+            continue;
+          }
           const msg = typeof body.error === "string"
             ? body.error
             : code === "WRONG_ORGANIZATION"
@@ -690,31 +694,46 @@ export function CampaignDetail({
                 ? "Cannot add respondents to a closed campaign."
                 : "Failed to add respondent";
           errors.push(msg);
+        } else {
+          successCount++;
         }
       } catch (err) {
         errors.push(err instanceof Error ? err.message : "Network error");
       }
     }
     setAdding(false);
-    if (errors.length > 0) {
+
+    // Always refresh so any partial successes appear in the table.
+    await refreshRespondents();
+    router.refresh();
+
+    const failCount = errors.length;
+
+    if (successCount > 0 && failCount === 0) {
+      // All succeeded.
+      toast({
+        title: successCount === 1 ? "Respondent added" : `${successCount} respondents added`,
+        description:
+          campaign.status === "ACTIVE"
+            ? "Pending invitation rows created. Use Resend to deliver the emails."
+            : "Participants added to this draft campaign.",
+      });
+      resetAddDialog();
+    } else if (successCount > 0 && failCount > 0) {
+      // Partial success — keep dialog open so the coach can retry the failures.
+      toast({
+        title: `${successCount} added, ${failCount} couldn't be added`,
+        description: errors[0],
+        variant: "destructive",
+      });
+    } else {
+      // All failed.
       toast({
         title: "Could not add respondent",
         description: errors[0],
         variant: "destructive",
       });
-      return;
     }
-    const added = ids.length;
-    toast({
-      title: added === 1 ? "Respondent added" : `${added} respondents added`,
-      description:
-        campaign.status === "ACTIVE"
-          ? "Pending invitation rows created. Use Resend to deliver the emails."
-          : "Participants added to this draft campaign.",
-    });
-    resetAddDialog();
-    await refreshRespondents();
-    router.refresh();
   }
 
   async function handleConfirmRemove() {

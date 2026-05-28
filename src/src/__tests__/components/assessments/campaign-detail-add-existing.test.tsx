@@ -176,6 +176,70 @@ function findCall(predicate: (c: FetchCall) => boolean): FetchCall | undefined {
   return fetchCalls.find(predicate);
 }
 
+function findAllCalls(predicate: (c: FetchCall) => boolean): FetchCall[] {
+  return fetchCalls.filter(predicate);
+}
+
+/**
+ * Like installFetch but lets the first add-POST succeed and all subsequent
+ * add-POSTs fail — for testing the partial-failure path.
+ */
+function installFetchPartialFailure({
+  orgMembers = [BOB_ORG, CAROL_ORG],
+}: { orgMembers?: typeof BOB_ORG[] } = {}) {
+  fetchCalls = [];
+  let addPostCallCount = 0;
+  global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : String(input);
+    const method = (init?.method ?? "GET").toUpperCase();
+    let body: unknown = undefined;
+    if (init?.body && typeof init.body === "string") {
+      try {
+        body = JSON.parse(init.body);
+      } catch {
+        body = init.body;
+      }
+    }
+    fetchCalls.push({ url, method, body });
+
+    // Org respondents list.
+    if (
+      url.includes(`/api/organizations/${ORG_ID}/respondents`) &&
+      method === "GET"
+    ) {
+      return jsonResponse({ success: true, data: orgMembers });
+    }
+
+    // Add respondent POST — first call succeeds, subsequent calls fail.
+    if (
+      url.includes(`/api/assessment-campaigns/${CAMPAIGN_ID}/respondents`) &&
+      method === "POST"
+    ) {
+      addPostCallCount++;
+      if (addPostCallCount === 1) {
+        return jsonResponse({ success: true, data: { invitation: null } });
+      }
+      return jsonResponse(
+        { success: false, error: "Server error adding respondent" },
+        false,
+      );
+    }
+
+    // Campaign respondents re-fetch (refresh after add).
+    if (
+      url.includes(`/api/assessment-campaigns/${CAMPAIGN_ID}/respondents`) &&
+      method === "GET"
+    ) {
+      return jsonResponse({
+        success: true,
+        data: { overview: BASE_OVERVIEW, respondents: [ALICE_ROW] },
+      });
+    }
+
+    return jsonResponse({ success: false, error: "unhandled" }, false);
+  }) as unknown as typeof fetch;
+}
+
 // ─── Render helper ──────────────────────────────────────────────────────────
 
 function renderDetail(
@@ -444,5 +508,66 @@ describe("CampaignDetail — Add Respondent dialog (pick-existing)", () => {
 
     // toast should have been called (error notification).
     await waitFor(() => expect(toastFn).toHaveBeenCalled());
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // (8) Partial failure — 2 selected, first succeeds, second fails
+  // ────────────────────────────────────────────────────────────────────────
+  it("partial failure: reports '1 added, 1 couldn't be added', refreshes table, keeps dialog open", async () => {
+    installFetchPartialFailure();
+    const toastFn = jest.fn();
+    jest
+      .spyOn(
+        require("@/components/ui/use-toast"),
+        "useToast",
+      )
+      .mockReturnValue({ toast: toastFn });
+
+    renderDetail();
+
+    // Open dialog and wait for members to load.
+    fireEvent.click(screen.getByTestId("add-respondent-btn"));
+    const bobCheckbox = await screen.findByRole("checkbox", {
+      name: /bob jones/i,
+    });
+    const carolCheckbox = await screen.findByRole("checkbox", {
+      name: /carol danvers/i,
+    });
+
+    // Select both Bob (first POST → success) and Carol (second POST → fail).
+    fireEvent.click(bobCheckbox);
+    fireEvent.click(carolCheckbox);
+    fireEvent.click(screen.getByTestId("add-respondent-confirm"));
+
+    // Wait for both add-POSTs to fire.
+    await waitFor(() => {
+      const addPosts = findAllCalls(
+        (c) =>
+          c.url.includes(`/api/assessment-campaigns/${CAMPAIGN_ID}/respondents`) &&
+          c.method === "POST",
+      );
+      expect(addPosts).toHaveLength(2);
+    });
+
+    // (a) refreshRespondents was triggered — the GET re-fetch for the campaign respondents fires.
+    await waitFor(() =>
+      expect(
+        findCall(
+          (c) =>
+            c.url.includes(`/api/assessment-campaigns/${CAMPAIGN_ID}/respondents`) &&
+            c.method === "GET",
+        ),
+      ).toBeTruthy(),
+    );
+
+    // (b) Toast reflects "1 added, 1 couldn't be added" — NOT "2 added".
+    await waitFor(() => expect(toastFn).toHaveBeenCalled());
+    const toastArgs = toastFn.mock.calls[0][0] as { title: string; description: string; variant?: string };
+    expect(toastArgs.title).toMatch(/1 added.*1 couldn't be added/i);
+    expect(toastArgs.variant).toBe("destructive");
+    expect(toastArgs.title).not.toMatch(/^2 respondents added/i);
+
+    // (c) Dialog stays open (partial failure keeps it open for retry).
+    expect(screen.getByTestId("add-respondent-dialog")).toBeInTheDocument();
   });
 });
