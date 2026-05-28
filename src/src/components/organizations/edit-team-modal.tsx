@@ -69,8 +69,10 @@ export interface EditTeamModalTeam {
 export interface EditTeamModalProps {
   open: boolean;
   onClose: () => void;
-  /** Called after a successful PATCH or DELETE so the parent can re-render. */
-  onUpdated: () => void;
+  /** Called after a successful PATCH or DELETE so the parent can re-render.
+   * May return a Promise — the modal awaits it before closing, keeping buttons
+   * disabled throughout so the parent's refresh completes before the UI closes. */
+  onUpdated: () => void | Promise<void>;
   /** The OrgTeam being edited. */
   team: EditTeamModalTeam;
   /**
@@ -179,15 +181,23 @@ export function EditTeamModal({
 
   /**
    * Choose the initial Parent <select> value.
-   *  - team.parentTeamId if it's a valid (non-self, non-descendant) team
-   *  - otherwise the first valid option (so the dropdown shows a real choice)
-   *  - otherwise "" (no valid options → submit blocked by validate())
+   *  - "" (placeholder) when the team currently has no parent (root-level),
+   *    so the user must consciously choose a parent before saving — prevents
+   *    silent auto-reparent to the first sibling on rename-only edits.
+   *  - team.parentTeamId if it is a valid (non-self, non-descendant) team
+   *  - otherwise "" (no valid options OR stale parentTeamId → submit blocked
+   *    by validate() which requires a non-empty parent)
    */
   function pickInitialParent(): string {
-    if (team.parentTeamId && validParentValues.has(team.parentTeamId)) {
+    if (!team.parentTeamId) {
+      // Root-level team: start at the placeholder so the user must explicitly
+      // choose a parent (prevents silent reparent on save).
+      return "";
+    }
+    if (validParentValues.has(team.parentTeamId)) {
       return team.parentTeamId;
     }
-    return parentOptions[0]?.teamId ?? "";
+    return "";
   }
 
   // ---- Form state -----------------------------------------------------------
@@ -197,6 +207,14 @@ export function EditTeamModal({
   );
   const [parent, setParent] = useState<string>(pickInitialParent());
   const [description, setDescription] = useState(team.description ?? "");
+  /**
+   * Track whether the team's initial type was null so we can show the
+   * "no type set" helper without re-inspecting the live `type` state (which
+   * the user may have already changed).  Reset on each modal open.
+   */
+  const [initialTypeWasNull, setInitialTypeWasNull] = useState(
+    !team.type
+  );
 
   // ---- Submission state -----------------------------------------------------
   const [submitting, setSubmitting] = useState(false);
@@ -209,6 +227,7 @@ export function EditTeamModal({
       setType((team.type as EditableTeamType | undefined) ?? "");
       setParent(pickInitialParent());
       setDescription(team.description ?? "");
+      setInitialTypeWasNull(!team.type);
       setError(null);
     }
     // pickInitialParent depends on team + parentOptions+validParentValues which
@@ -278,7 +297,10 @@ export function EditTeamModal({
         );
         return;
       }
-      onUpdated();
+      // Await the refresh callback before closing so the parent's data is up
+      // to date and any refresh error is surfaced before the modal disappears.
+      // `submitting` stays true through the await so buttons remain disabled.
+      await onUpdated();
       onClose();
     } catch {
       setError("An unexpected error occurred. Please try again.");
@@ -325,7 +347,8 @@ export function EditTeamModal({
         );
         return;
       }
-      onUpdated();
+      // Await the refresh callback before closing (same as handleSubmit).
+      await onUpdated();
       onClose();
     } catch {
       setError("An unexpected error occurred. Please try again.");
@@ -381,6 +404,12 @@ export function EditTeamModal({
                 <option value="team">Team</option>
                 <option value="folder">Folder</option>
               </select>
+              {/* I3: hint for legacy teams that were saved without a type */}
+              {initialTypeWasNull && !type && (
+                <p className="text-xs italic text-muted-foreground">
+                  This team has no type set. Please assign one before saving.
+                </p>
+              )}
             </div>
 
             {/* ---- Parent ---- (NO root, NO self, NO descendants) */}
@@ -396,20 +425,30 @@ export function EditTeamModal({
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {/*
-                  When there are no valid parent options at all (e.g. the only
-                  other teams are this team's own descendants), surface a
-                  disabled placeholder. The submit-time guard will block the
-                  PATCH anyway because validate() requires a non-empty parent.
+                  Always render the disabled placeholder so:
+                  (a) root-level teams open with a visible "pick a parent" prompt
+                      instead of silently landing on the first sibling.
+                  (b) teams with no valid options also get a clear message.
+                  The placeholder is shown as the selected option only when
+                  parent === "" (controlled select).
                 */}
-                {parentOptions.length === 0 && (
-                  <option value="" disabled>No valid parent — cannot reparent here</option>
-                )}
+                <option value="" disabled>
+                  {parentOptions.length === 0
+                    ? "No valid parent — cannot reparent here"
+                    : "— select a parent (required) —"}
+                </option>
                 {parentOptions.map((opt) => (
                   <option key={opt.teamId} value={opt.teamId}>
                     {`${"  ".repeat(opt.depth)}${opt.name}`}
                   </option>
                 ))}
               </select>
+              {/* Inline hint — only shown when the team currently has no parent */}
+              {!team.parentTeamId && (
+                <p className="text-xs italic text-muted-foreground">
+                  This team currently has no parent. Pick a parent before saving.
+                </p>
+              )}
             </div>
 
             {/* ---- Description (optional) ---- */}
