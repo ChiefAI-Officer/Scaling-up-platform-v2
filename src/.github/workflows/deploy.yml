@@ -78,6 +78,15 @@ jobs:
           url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> $GITHUB_OUTPUT
 
+      # NOTE: This workflow currently does NOT run on GitHub — workflows are only
+      # discovered under the repo-root `.github/workflows/`, and these live under
+      # `src/.github/workflows/`. The live deploy path is Vercel's git integration
+      # (Root Directory = src), which runs the vercel.json buildCommand. The gate
+      # below is kept so that IF this workflow is ever activated (moved to repo
+      # root), the destructive-migration check fires before any migration applies.
+      - name: Check migration safety (gate before applying migrations)
+        run: node src/scripts/check-migration-safety.mjs
+
       - name: Run Database Migrations
         run: npx prisma migrate deploy
         env:
