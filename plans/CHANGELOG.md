@@ -6,6 +6,16 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-05-29 — Coach portal nav exposes Members (Slice 2 anchor correction) <!-- ENTRY_ISO:2026-05-29 ENTRY_SLUG:coach-nav-members-correction -->
+
+PR #22 squash-merged to main (`ea72a30`). Three-line cherry-pick of commit `0452e26` — adds the `Members` entry (`Building2` icon) to `coachPrimaryNavItems` between *My Workshops* and *Assessments*, plus the matching assertion update in `coach-nav.test.ts`. Closes a real discoverability gap from Slice 2: `/portal/members` shipped in Slice 1 and all its CRUD (edit-team / edit-member / edit-organization modals from Slice 2, bulk import + quick-add from Slice 4) shipped on the page itself, but the outer coach sidebar never linked to it. The only ways to reach it were a direct URL or the wizard's "Manage members" CTA.
+
+**Correcting the record:** the Slice 2 CHANGELOG entry (`assessment-slice-2-edit-modals`) and the CLAUDE.md anchor that pointed to it both stated *"The outer coach portal nav (`coachPrimaryNavItems`) now exposes a Members entry (`Building2` icon) between My Workshops and Assessments"*. That claim was false at merge time — the actual coach-nav.ts change was committed on the Slice 2 branch **47 min after** PR #19 squash-merged (`0452e26` at 08:21 EDT vs. `3b85992` at 07:34 EDT), so it was orphaned on the branch and never made it to main. Prod deploys `h4fikoykx` (Slice 4) and every earlier deploy back to Slice 1 lacked the nav link. This PR makes the original Slice 2 claim true.
+
+Cherry-pick was clean (2 files / 3 insertions). Build gate green after a `.next/` cache clear (the cache held a stale resolution error for `@/components/approvals/approval-thread` that vanished on rebuild — unrelated to the change). Targeted test `coach-nav.test.ts` 2/2 passing. Zero migrations; zero risk.
+
+---
+
 ### 2026-05-28 — Assessment Slice 4 — Bulk CSV import + wizard persistent quick-add <!-- ENTRY_ISO:2026-05-28 ENTRY_SLUG:assessment-slice-4-bulk-import-quickadd -->
 
 **Branch:** `feat/assessment-slice-4-import-quickadd` (off `main`, merged via PR #21, squash commit `8ffc3d4`). Same-session continuation of Slices 1-3 via `superpowers:subagent-driven-development`. 3 commits.
