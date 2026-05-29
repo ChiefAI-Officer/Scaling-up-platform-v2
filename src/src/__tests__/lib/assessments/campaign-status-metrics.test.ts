@@ -1,5 +1,6 @@
 import {
   computeCampaignStatusMetrics,
+  getInvitationBand,
   CampaignStatusMetricsInput,
 } from "../../../lib/assessments/campaign-status-metrics";
 
@@ -184,5 +185,56 @@ describe("computeCampaignStatusMetrics", () => {
     expect(result.new + result.invited + result.started + result.completed).toBe(
       result.total,
     );
+  });
+});
+
+describe("getInvitationBand", () => {
+  test("1. null invitation → 'new'", () => {
+    expect(getInvitationBand(null)).toBe("new");
+  });
+
+  test("2. PENDING + sentAt null → 'new'", () => {
+    expect(getInvitationBand(inv("PENDING", null))).toBe("new");
+  });
+
+  test("3. PENDING + sentAt set (defensive edge) → 'invited'", () => {
+    expect(getInvitationBand(inv("PENDING", new Date()))).toBe("invited");
+  });
+
+  test("4. SENT + sentAt set → 'invited'", () => {
+    expect(getInvitationBand(inv("SENT", new Date()))).toBe("invited");
+  });
+
+  test("5. VIEWED + sentAt set → 'started'", () => {
+    expect(getInvitationBand(inv("VIEWED", new Date()))).toBe("started");
+  });
+
+  test("6. SUBMITTED + sentAt set → 'completed'", () => {
+    expect(getInvitationBand(inv("SUBMITTED", new Date()))).toBe("completed");
+  });
+
+  test("7. revokedAt set (SENT) → 'revoked'", () => {
+    expect(getInvitationBand(inv("SENT", new Date(), new Date()))).toBe("revoked");
+  });
+
+  test("8. aggregator and per-row helper agree on a mixed batch", () => {
+    const rows: CampaignStatusMetricsInput[] = [
+      row("p-new-1", null),
+      row("p-inv-1", inv("SENT", new Date())),
+      row("p-start-1", inv("VIEWED", new Date())),
+      row("p-done-1", inv("SUBMITTED", new Date())),
+      row("p-rev-1", inv("SENT", new Date(), new Date())),
+    ];
+
+    // Per-row helper returns the same classifications as the aggregator.
+    const bands = rows.map((r) => getInvitationBand(r.invitation));
+    expect(bands).toEqual(["new", "invited", "started", "completed", "revoked"]);
+
+    const metrics = computeCampaignStatusMetrics(rows);
+    expect(metrics.new).toBe(1);
+    expect(metrics.invited).toBe(1);
+    expect(metrics.started).toBe(1);
+    expect(metrics.completed).toBe(1);
+    expect(metrics.revoked).toBe(1);
   });
 });

@@ -16,7 +16,7 @@
  *  - public/wireframes-phase2/revisions/08-revised-individual-results.html
  */
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -40,11 +40,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AssessmentResultView } from "./AssessmentResultView";
+import { CampaignStatusMetrics } from "./CampaignStatusMetrics";
 import type {
   CampaignOverview,
   CampaignRespondentRow,
 } from "@/lib/assessments/campaign-detail";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import {
+  computeCampaignStatusMetrics,
+  getInvitationBand,
+} from "@/lib/assessments/campaign-status-metrics";
 
 const REASON_MAX_LENGTH = 500;
 
@@ -78,14 +83,25 @@ const CAMPAIGN_STATUS_TONE: Record<string, string> = {
   CLOSED: "bg-secondary/10 text-secondary-foreground ring-border",
 };
 
-const INV_STATUS_TONE: Record<string, string> = {
-  PENDING: "bg-muted text-muted-foreground ring-border",
-  SENT: "bg-primary/10 text-primary ring-primary/20",
-  VIEWED: "bg-warning/10 text-warning ring-warning/20",
-  SUBMITTED: "bg-success/10 text-success ring-success/20",
+const RESENDABLE = new Set(["PENDING", "SENT", "VIEWED"]);
+
+// Band tones and labels for per-row status display — must match
+// the CampaignStatusMetrics tile colours exactly.
+const BAND_TONE: Record<string, string> = {
+  new: "bg-muted text-muted-foreground ring-border",
+  invited: "bg-primary/10 text-primary ring-primary/20",
+  started: "bg-warning/10 text-warning ring-warning/20",
+  completed: "bg-success/10 text-success ring-success/20",
+  revoked: "bg-destructive/10 text-destructive ring-destructive/20",
 };
 
-const RESENDABLE = new Set(["PENDING", "SENT", "VIEWED"]);
+const BAND_LABEL: Record<string, string> = {
+  new: "New",
+  invited: "Invited",
+  started: "Started",
+  completed: "Completed",
+  revoked: "Revoked",
+};
 
 function formatDateTimeLocal(d: Date): string {
   const pad = (n: number) => n.toString().padStart(2, "0");
@@ -205,6 +221,26 @@ export function CampaignDetail({
   const campaign = overview.campaign;
   const isDraft = campaign.status === "DRAFT";
   const isClosed = campaign.status === "CLOSED";
+
+  // Derive header aggregate metrics from the current respondents list.
+  // Recomputes automatically whenever respondents changes (add/remove/refresh).
+  const headerMetrics = useMemo(
+    () =>
+      computeCampaignStatusMetrics(
+        respondents.map((r) => ({
+          participantId: r.participantId,
+          invitation: r.invitation
+            ? {
+                status: r.invitation.status,
+                sentAt: r.invitation.sentAt,
+                revokedAt: r.invitation.revokedAt,
+              }
+            : null,
+        })),
+      ),
+    [respondents],
+  );
+
   const closeActionLabel = isDraft ? "Discard Draft" : "Close Campaign";
   const closeDialogTitle = isDraft
     ? "Discard this draft?"
@@ -1057,6 +1093,13 @@ export function CampaignDetail({
         </div>
       )}
 
+      {/* Header aggregate metrics strip (Slice 5 Task 5.5) */}
+      <CampaignStatusMetrics
+        metrics={headerMetrics}
+        testIdPrefix="campaign-detail-metrics"
+        className="mb-3"
+      />
+
       {/* Respondents table */}
       <div
         className="bg-card border border-border rounded-xl overflow-hidden"
@@ -1258,10 +1301,27 @@ export function CampaignDetail({
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <StatusPill
-                          status={invStatus}
-                          toneMap={INV_STATUS_TONE}
-                        />
+                        {(() => {
+                          const band = getInvitationBand(
+                            row.invitation
+                              ? {
+                                  status: row.invitation.status,
+                                  sentAt: row.invitation.sentAt,
+                                  revokedAt: row.invitation.revokedAt,
+                                }
+                              : null,
+                          );
+                          const label = BAND_LABEL[band];
+                          const tone = BAND_TONE[band];
+                          return (
+                            <span
+                              className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded ring-1 ${tone}`}
+                              data-testid={`band-pill-${band}`}
+                            >
+                              {label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
                         {formatDateTime(row.invitation?.sentAt)}

@@ -16,6 +16,45 @@ export interface CampaignStatusMetrics {
   revoked: number;
 }
 
+export type InvitationBand =
+  | "new"
+  | "invited"
+  | "started"
+  | "completed"
+  | "revoked";
+
+/**
+ * Classify a single invitation row into its staged-progress band.
+ * This is the single source of truth — `computeCampaignStatusMetrics`
+ * calls this internally so per-row display and aggregate counts can
+ * never drift.
+ *
+ * Rules (in priority order):
+ *  1. null invitation                          → "new"
+ *  2. revokedAt is set                         → "revoked"  (excluded from total)
+ *  3. PENDING + sentAt null                    → "new"
+ *  4. PENDING + sentAt set (defensive edge)    → "invited"
+ *  5. SENT                                     → "invited"
+ *  6. VIEWED                                   → "started"
+ *  7. SUBMITTED                                → "completed"
+ */
+export function getInvitationBand(
+  invitation: CampaignStatusMetricsInput["invitation"],
+): InvitationBand {
+  if (invitation === null) return "new";
+  if (invitation.revokedAt !== null) return "revoked";
+  if (invitation.status === "PENDING" && invitation.sentAt === null) return "new";
+  switch (invitation.status) {
+    case "PENDING":
+    case "SENT":
+      return "invited";
+    case "VIEWED":
+      return "started";
+    case "SUBMITTED":
+      return "completed";
+  }
+}
+
 export function computeCampaignStatusMetrics(
   rows: ReadonlyArray<CampaignStatusMetricsInput>,
 ): CampaignStatusMetrics {
@@ -29,39 +68,12 @@ export function computeCampaignStatusMetrics(
   };
 
   for (const row of rows) {
-    const inv = row.invitation;
-
-    if (inv === null) {
-      metrics.new += 1;
-      metrics.total += 1;
-      continue;
-    }
-
-    // revoked invitations are excluded from all status bands
-    if (inv.revokedAt !== null) {
+    const band = getInvitationBand(row.invitation);
+    if (band === "revoked") {
       metrics.revoked += 1;
       continue;
     }
-
-    // sentAt is the source of truth for whether the invitation was sent;
-    // a PENDING row with sentAt set is treated as invited (defensive)
-    if (inv.status === "PENDING" && inv.sentAt === null) {
-      metrics.new += 1;
-    } else {
-      switch (inv.status) {
-        case "PENDING":
-        case "SENT":
-          metrics.invited += 1;
-          break;
-        case "VIEWED":
-          metrics.started += 1;
-          break;
-        case "SUBMITTED":
-          metrics.completed += 1;
-          break;
-      }
-    }
-
+    metrics[band] += 1;
     metrics.total += 1;
   }
 
