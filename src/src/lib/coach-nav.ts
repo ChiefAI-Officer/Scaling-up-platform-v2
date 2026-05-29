@@ -1,4 +1,5 @@
 import {
+  Building2,
   Calendar,
   ClipboardList,
   LayoutDashboard,
@@ -17,6 +18,7 @@ export interface CoachNavItem {
 export const coachPrimaryNavItems: CoachNavItem[] = [
   { href: "/portal/home", label: "Dashboard", icon: LayoutDashboard },
   { href: "/portal/workshops", label: "My Workshops", icon: Calendar },
+  { href: "/portal/members", label: "Members", icon: Building2 },
   { href: "/portal/assessments", label: "Assessments", icon: ClipboardList },
   { href: "/portal/registrations", label: "Registrations", icon: Users },
   { href: "/portal/request", label: "Request Workshop", icon: PlusCircle },
