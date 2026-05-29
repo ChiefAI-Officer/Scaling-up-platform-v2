@@ -42,6 +42,10 @@ export interface CampaignRespondentRow {
     email: string;
     jobTitle: string | null;
   };
+  teamSnapshot: {
+    pathIds: string[];
+    pathLabels: string[];
+  };
   isCEO: boolean;
   invitation: {
     id: string;
@@ -131,6 +135,8 @@ interface CampaignWithRels {
 interface ParticipantWithRespondent {
   id: string;
   isCEO: boolean;
+  teamPathAtAdd: string[] | null;
+  teamLabelsAtAdd: string[] | null;
   respondent: {
     id: string;
     firstName: string;
@@ -319,6 +325,10 @@ export async function getCampaignRespondents(
     return {
       participantId: p.id,
       respondent: p.respondent,
+      teamSnapshot: {
+        pathIds: p.teamPathAtAdd ?? [],
+        pathLabels: p.teamLabelsAtAdd ?? [],
+      },
       isCEO: p.isCEO,
       invitation: inv
         ? {

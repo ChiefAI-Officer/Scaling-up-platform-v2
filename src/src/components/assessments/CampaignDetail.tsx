@@ -1146,6 +1146,9 @@ export function CampaignDetail({
                   Email
                 </th>
                 <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Team
+                </th>
+                <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Status
                 </th>
                 <th className="text-left px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1235,6 +1238,25 @@ export function CampaignDetail({
                       <td className="px-4 py-3 text-sm text-muted-foreground">
                         {row.respondent.email}
                       </td>
+                      <td
+                        className="px-4 py-3 text-sm"
+                        data-testid={`team-cell-${row.respondent.id}`}
+                      >
+                        {row.teamSnapshot.pathLabels.length === 0 ? (
+                          <span className="text-muted-foreground italic">—</span>
+                        ) : (
+                          <>
+                            <span className="text-foreground">
+                              {row.teamSnapshot.pathLabels[row.teamSnapshot.pathLabels.length - 1]}
+                            </span>
+                            {row.teamSnapshot.pathLabels.length > 1 && (
+                              <div className="text-xs text-muted-foreground">
+                                {row.teamSnapshot.pathLabels.join(" › ")}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <StatusPill
                           status={invStatus}
@@ -1308,7 +1330,7 @@ export function CampaignDetail({
                     </tr>
                     {expanded && cached && (
                       <tr className="bg-muted/10">
-                        <td colSpan={6} className="px-4 py-4">
+                        <td colSpan={7} className="px-4 py-4">
                           <AssessmentResultView
                             result={cached.result}
                             version={cached.version}
