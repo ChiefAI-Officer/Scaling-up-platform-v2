@@ -1,7 +1,11 @@
 /**
- * Assessment v7.6 — Coach assessments landing page.
- * Lists campaigns the coach created. Top-right CTA → wizard.
- * Status filter pills (Task I) are handled in a client child component.
+ * Assessment v7.6 — Coach assessments landing page (Slice 5 Task 5.3).
+ *
+ * Lists campaigns the coach created, grouped by company (Organization).
+ * Each campaign carries precomputed staged-progress metrics
+ * (total / new / invited / started / completed) via computeCampaignStatusMetrics.
+ *
+ * Top-right CTA → wizard. Status filter pills are handled client-side.
  */
 
 import Link from "next/link";
@@ -13,28 +17,74 @@ import {
   CampaignsListWithFilter,
   type CampaignListItem,
 } from "@/components/assessments/CampaignsListWithFilter";
+import {
+  computeCampaignStatusMetrics,
+  type CampaignStatusMetricsInput,
+} from "@/lib/assessments/campaign-status-metrics";
 
 export default async function CoachAssessmentsPage() {
   const { coach } = await requireCoach();
 
+  // Single round-trip: include participants (for respondentId → invitation join)
+  // and invitations (for staged-progress metrics).
   const campaigns = await db.assessmentCampaign.findMany({
     where: { createdByCoachId: coach.id },
     include: {
       organization: { select: { id: true, name: true } },
       template: { select: { id: true, name: true } },
+      participants: {
+        select: { id: true, respondentId: true },
+      },
+      invitations: {
+        select: {
+          respondentId: true,
+          status: true,
+          sentAt: true,
+          revokedAt: true,
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  const items: CampaignListItem[] = campaigns.map((c) => ({
-    id: c.id,
-    name: c.name,
-    alias: c.alias,
-    status: c.status,
-    templateName: c.template.name,
-    organizationName: c.organization.name,
-    openAt: c.openAt.toISOString(),
-  }));
+  const items: CampaignListItem[] = campaigns.map((c) => {
+    // Build a lookup from respondentId → invitation row (1-to-1 per campaign)
+    const invByRespondentId = new Map(
+      c.invitations.map((inv) => [inv.respondentId, inv])
+    );
+
+    // Build the metrics input: one row per participant.
+    // AssessmentInvitationStatus enum values are a superset of the helper's
+    // PENDING | SENT | VIEWED | SUBMITTED — cast is safe because those are
+    // the only values the DB can hold for active (non-revoked) invitations.
+    const metricsInput: CampaignStatusMetricsInput[] = c.participants.map((p) => {
+      const inv = invByRespondentId.get(p.respondentId) ?? null;
+      return {
+        participantId: p.id,
+        invitation: inv
+          ? {
+              status: inv.status as "PENDING" | "SENT" | "VIEWED" | "SUBMITTED",
+              sentAt: inv.sentAt,
+              revokedAt: inv.revokedAt,
+            }
+          : null,
+      };
+    });
+
+    const metrics = computeCampaignStatusMetrics(metricsInput);
+
+    return {
+      id: c.id,
+      name: c.name,
+      alias: c.alias,
+      status: c.status,
+      templateName: c.template.name,
+      organizationId: c.organization.id,
+      organizationName: c.organization.name,
+      openAt: c.openAt.toISOString(),
+      metrics,
+    };
+  });
 
   return (
     <div className="space-y-6">

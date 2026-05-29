@@ -68,6 +68,7 @@ const ALICE_ROW: CampaignRespondentRow = {
     email: "alice@acme.com",
     jobTitle: "CEO",
   },
+  teamSnapshot: { pathIds: [], pathLabels: [] },
   invitation: null,
   hasSubmission: false,
   submissionId: null,

@@ -29,11 +29,18 @@ function participant(
   id: string,
   respondentId: string,
   firstName: string,
-  opts: { isCEO?: boolean; jobTitle?: string | null } = {},
+  opts: {
+    isCEO?: boolean;
+    jobTitle?: string | null;
+    teamPathAtAdd?: string[] | null;
+    teamLabelsAtAdd?: string[] | null;
+  } = {},
 ) {
   return {
     id,
     isCEO: opts.isCEO ?? false,
+    teamPathAtAdd: opts.teamPathAtAdd ?? null,
+    teamLabelsAtAdd: opts.teamLabelsAtAdd ?? null,
     respondent: {
       id: respondentId,
       firstName,
@@ -321,5 +328,48 @@ describe("getCampaignRespondents", () => {
     });
     const rows = await getCampaignRespondents(db, "c1");
     expect(rows[0].invitation?.revokedAt).toEqual(revokedAt);
+  });
+
+  it("teamSnapshot: null snapshot fields → empty arrays", async () => {
+    const db = buildDb({
+      participants: [participant("p1", "r1", "Alice")],
+      invitations: [],
+    });
+    const rows = await getCampaignRespondents(db, "c1");
+    expect(rows[0].teamSnapshot).toEqual({ pathIds: [], pathLabels: [] });
+  });
+
+  it("teamSnapshot: single-segment path → one label", async () => {
+    const db = buildDb({
+      participants: [
+        participant("p1", "r1", "Alice", {
+          teamPathAtAdd: ["org-1"],
+          teamLabelsAtAdd: ["Acme Corp"],
+        }),
+      ],
+      invitations: [],
+    });
+    const rows = await getCampaignRespondents(db, "c1");
+    expect(rows[0].teamSnapshot).toEqual({
+      pathIds: ["org-1"],
+      pathLabels: ["Acme Corp"],
+    });
+  });
+
+  it("teamSnapshot: multi-segment path → ids and labels preserved in order", async () => {
+    const db = buildDb({
+      participants: [
+        participant("p1", "r1", "Alice", {
+          teamPathAtAdd: ["t1", "t2", "t3"],
+          teamLabelsAtAdd: ["ABC Corp", "Engineering", "Backend"],
+        }),
+      ],
+      invitations: [],
+    });
+    const rows = await getCampaignRespondents(db, "c1");
+    expect(rows[0].teamSnapshot).toEqual({
+      pathIds: ["t1", "t2", "t3"],
+      pathLabels: ["ABC Corp", "Engineering", "Backend"],
+    });
   });
 });
