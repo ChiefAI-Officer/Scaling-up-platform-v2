@@ -458,8 +458,12 @@ describe("runAutoBuild", () => {
       const soloCall = createCalls.find((c) => c[0].data.template === "SOLO_LANDING");
       expect(soloCall).toBeDefined();
       const customHtml: string = soloCall![0].data.customHtml;
-      // Token replaced with empty string (no leaked {{registration_url}})
-      expect(customHtml).toBe('<a href="">register</a>');
+      // Token replaced with empty string. sanitize-html drops invalid empty
+      // hrefs entirely, leaving the anchor text intact — no broken
+      // {{registration_url}} token leaks to public HTML.
+      expect(customHtml).not.toContain("{{registration_url}}");
+      expect(customHtml).toContain("register");
+      expect(customHtml).toMatch(/<a[^>]*>register<\/a>/);
     });
 
     it("HTML-escapes variable values that contain HTML (XSS regression)", async () => {
