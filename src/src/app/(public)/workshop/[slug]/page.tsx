@@ -139,6 +139,20 @@ export default async function LandingPageView({ params, searchParams }: PageProp
       notFound();
     }
 
+    // TEMPLATE-02: customHtml override. DOMPurify sanitized at save-time
+    // (PATCH /api/page-templates/[id]); variables HTML-escaped + interpolated
+    // at build-time (auto-build). Render is a trusted echo of the stored
+    // already-sanitized + escaped string.
+    if (landingPage.customHtml && landingPage.customHtml.trim().length > 0) {
+      return (
+        <div
+          data-custom-html-render
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: landingPage.customHtml }}
+        />
+      );
+    }
+
     const content = JSON.parse(landingPage.content);
     const workshop = landingPage.workshop;
 

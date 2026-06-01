@@ -43,10 +43,10 @@ jest.mock("@/lib/templates/template-interpolation", () => ({
   buildWorkshopVariables: jest.fn().mockResolvedValue(null),
 }));
 
-import { GET } from "@/app/api/landing-pages/library/route";
+import { GET, POST } from "@/app/api/landing-pages/library/route";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { getApiActor } from "@/lib/auth/authorization";
+import { getApiActor, canManageCoachData } from "@/lib/auth/authorization";
 
 const adminActor = {
   userId: "admin-1",
@@ -261,5 +261,115 @@ describe("Landing Page Library API - GET /api/landing-pages/library", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data).toEqual([]);
+  });
+});
+
+// ===========================================================================
+// TEMPLATE-02: POST /api/landing-pages/library — customHtml clone copy-through
+// ===========================================================================
+describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-02 customHtml)", () => {
+  function buildPostRequest(body: Record<string, unknown>): Parameters<typeof POST>[0] {
+    return new NextRequest("http://localhost/api/landing-pages/library", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }) as unknown as Parameters<typeof POST>[0];
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (canManageCoachData as jest.Mock).mockReturnValue(true);
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue({
+      id: "ws-target",
+      title: "Target Workshop",
+      coachId: "coach-target",
+    });
+    (db.landingPage.update as jest.Mock).mockResolvedValue({});
+  });
+
+  it("copies customHtml from source SOLO_LANDING to a SOLO_LANDING clone", async () => {
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        // source page
+        id: "lp-src",
+        template: "SOLO_LANDING",
+        content: '{"heading":"x"}',
+        customCode: null,
+        customHtml: "<p>Cloned customHtml</p>",
+        workshop: { coachId: "coach-target" },
+      })
+      .mockResolvedValueOnce(null); // no existing target page
+    (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+      Promise.resolve({ id: "lp-new", ...args.data })
+    );
+
+    const response = await POST(
+      buildPostRequest({
+        targetWorkshopId: "ws-target",
+        targetTemplate: "SOLO_LANDING",
+        sourceLandingPageId: "lp-src",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const createArgs = (db.landingPage.create as jest.Mock).mock.calls[0][0];
+    expect(createArgs.data.customHtml).toBe("<p>Cloned customHtml</p>");
+  });
+
+  it("nulls customHtml on the destination when target template is ineligible (THANK_YOU)", async () => {
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        id: "lp-src",
+        template: "THANK_YOU",
+        content: '{"heading":"x"}',
+        customCode: null,
+        customHtml: "<p>Should NOT carry over</p>",
+        workshop: { coachId: "coach-target" },
+      })
+      .mockResolvedValueOnce(null);
+    (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+      Promise.resolve({ id: "lp-new", ...args.data })
+    );
+
+    const response = await POST(
+      buildPostRequest({
+        targetWorkshopId: "ws-target",
+        targetTemplate: "THANK_YOU",
+        sourceLandingPageId: "lp-src",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const createArgs = (db.landingPage.create as jest.Mock).mock.calls[0][0];
+    expect(createArgs.data.customHtml).toBeNull();
+  });
+
+  it("keeps customHtml=null on destination when source page has customHtml=null", async () => {
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        id: "lp-src",
+        template: "SOLO_LANDING",
+        content: '{"heading":"x"}',
+        customCode: null,
+        customHtml: null,
+        workshop: { coachId: "coach-target" },
+      })
+      .mockResolvedValueOnce(null);
+    (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+      Promise.resolve({ id: "lp-new", ...args.data })
+    );
+
+    const response = await POST(
+      buildPostRequest({
+        targetWorkshopId: "ws-target",
+        targetTemplate: "SOLO_LANDING",
+        sourceLandingPageId: "lp-src",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const createArgs = (db.landingPage.create as jest.Mock).mock.calls[0][0];
+    expect(createArgs.data.customHtml).toBeNull();
   });
 });

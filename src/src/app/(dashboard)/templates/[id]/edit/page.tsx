@@ -39,6 +39,7 @@ export default async function TemplateEditorPage({ params }: PageProps) {
                 isActive={template.isActive}
                 initialContent={template.content}
                 initialCustomCode={template.customCode}
+                initialCustomHtml={template.customHtml}
             />
         </div>
     );

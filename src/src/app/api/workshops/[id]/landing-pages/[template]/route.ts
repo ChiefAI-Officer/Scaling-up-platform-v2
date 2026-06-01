@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { validateCustomCode } from "@/lib/templates/interpolate-custom-code";
+import { buildWorkshopVariables } from "@/lib/templates/template-interpolation";
+import { interpolateContentForHtml } from "@/lib/templates/interpolate-content-html";
+import { sanitizeCustomHtml } from "@/lib/templates/sanitize-custom-html";
 import { z } from "zod";
 
 const VALID_TEMPLATES = ["BIO_PAGE", "SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] as const;
 type TemplateType = typeof VALID_TEMPLATES[number];
+
+// TEMPLATE-02: eligibility filter — only SOLO_LANDING / DUO_LANDING may carry customHtml.
+const ELIGIBLE_CUSTOM_HTML: readonly TemplateType[] = ["SOLO_LANDING", "DUO_LANDING"] as const;
 
 interface RouteParams {
   params: Promise<{ id: string; template: string }>;
@@ -23,6 +29,9 @@ const updateLandingPageBodySchema = z.object({
   // Coach role attempts get 403. parse5 validation runs server-side via
   // validateCustomCode (CHG-03). Pass null to clear.
   customCode: z.string().nullable().optional(),
+  // Fix-1: customHtml is intentionally NOT accepted from this route's body.
+  // The route is coach-accessible (canManageCoachData), so admin-blessed HTML
+  // would be reachable by every coach. Edits live on /api/page-templates/[id].
 });
 
 function normalizeTemplate(template: string): TemplateType | null {
@@ -207,6 +216,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           // ENH-MAY6-5: only set customCode when explicitly provided.
           // Undefined keeps existing value; null clears.
           ...(customCode !== undefined ? { customCode } : {}),
+          // Fix-1: customHtml is not writable from this route. Build-time copy is preserved.
         },
       });
     } else {
@@ -216,6 +226,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       // CHG-03: copy customCode from the matching admin-blessed PageTemplate
       // (category-scoped wins over global; falls back to all-active when
       // category match is empty — same precedence as auto-build).
+      // TEMPLATE-02: also copy customHtml (eligibility-filtered + interpolated).
       const candidateTemplates = await db.pageTemplate.findMany({
         where: {
           templateType: normalizedTemplate,
@@ -225,15 +236,33 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
             { categoryId: null },
           ],
         },
-        select: { customCode: true, categoryId: true },
+        select: { customCode: true, customHtml: true, categoryId: true },
       });
-      let chosenTemplate = candidateTemplates.find((t) => t.categoryId !== null) ?? candidateTemplates[0] ?? null;
+      let chosenTemplate:
+        | { customCode: string | null; customHtml: string | null; categoryId: string | null }
+        | null = candidateTemplates.find((t) => t.categoryId !== null) ?? candidateTemplates[0] ?? null;
       if (!chosenTemplate && workshop.categoryId) {
         const fallback = await db.pageTemplate.findFirst({
           where: { templateType: normalizedTemplate, isActive: true },
-          select: { customCode: true },
+          select: { customCode: true, customHtml: true },
         });
-        if (fallback) chosenTemplate = { customCode: fallback.customCode, categoryId: null };
+        if (fallback) chosenTemplate = { customCode: fallback.customCode, customHtml: fallback.customHtml, categoryId: null };
+      }
+
+      // TEMPLATE-02: eligibility filter — only SOLO_LANDING / DUO_LANDING carry customHtml.
+      // Fix-2: post-interpolation strict re-sanitize catches malicious substitutions
+      // (e.g. virtualLink="javascript:alert(1)") even after admin-blessed save.
+      let templateCustomHtml: string | null = null;
+      if (
+        chosenTemplate?.customHtml &&
+        chosenTemplate.customHtml.trim().length > 0 &&
+        ELIGIBLE_CUSTOM_HTML.includes(normalizedTemplate)
+      ) {
+        const variables = await buildWorkshopVariables(id);
+        const interpolated = variables
+          ? interpolateContentForHtml(chosenTemplate.customHtml, variables)
+          : chosenTemplate.customHtml;
+        templateCustomHtml = sanitizeCustomHtml(interpolated, { allowTokenUris: false }).sanitized;
       }
 
       landingPage = await db.landingPage.create({
@@ -246,6 +275,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           publishedAt: status === "PUBLISHED" ? new Date() : null,
           // ENH-MAY6-5: explicit body customCode wins over template-default.
           customCode: customCode ?? chosenTemplate?.customCode ?? null,
+          // Fix-1: body customHtml dropped; only the template copy is stored.
+          customHtml: templateCustomHtml,
         },
       });
     }

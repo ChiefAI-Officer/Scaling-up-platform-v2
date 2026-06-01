@@ -630,6 +630,10 @@ model LandingPage {
   // affiliate tracking. Copied at build time from the source PageTemplate;
   // never accepted from request bodies on coach-accessible routes.
   customCode       String?
+  // TEMPLATE-02 (Jun 3 2026): sanitized raw HTML override copied from
+  // PageTemplate.customHtml at build-time (variables HTML-escaped + interpolated).
+  // SOLO_LANDING + DUO_LANDING only; null on every other template type.
+  customHtml       String?
   publishedAt      DateTime?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
@@ -653,6 +657,7 @@ model PageTemplate {
   categoryId   String?             // null = global template (applies to all categories)
   content      String              // JSON string with {{variable}} placeholders (TEXT column)
   customCode   String?             // ENH-06: affiliate / tracking code (stored only, not rendered)
+  customHtml   String?             // TEMPLATE-02 (Jun 3 2026): sanitized raw HTML override. When non-empty, replaces React template at render. SOLO_LANDING + DUO_LANDING only.
   isActive     Boolean             @default(false)
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt

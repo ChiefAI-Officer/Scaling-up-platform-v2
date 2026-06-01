@@ -5,6 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+
+// TEMPLATE-02: customHtml is only exposed on these template types
+const ELIGIBLE_CUSTOM_HTML = ["SOLO_LANDING", "DUO_LANDING"] as const;
 import { TEMPLATE_PREVIEW_DATA } from "@/lib/templates/template-preview";
 import { interpolateContent } from "@/lib/templates/template-interpolation-core";
 import {
@@ -42,6 +47,7 @@ interface Props {
     isActive: boolean;
     initialContent: string;
     initialCustomCode?: string | null;
+    initialCustomHtml?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -56,6 +62,7 @@ export function TemplateContentEditor({
     isActive,
     initialContent,
     initialCustomCode,
+    initialCustomHtml,
 }: Props) {
     // Parse initial content, merging over defaults for the active type only (I-1 fix)
     const parsed = safeJsonParse(initialContent);
@@ -79,8 +86,14 @@ export function TemplateContentEditor({
             : THANKYOU_DEFAULTS
     );
     const [customCode, setCustomCode] = useState<string | null>(initialCustomCode ?? null);
+    const [customHtml, setCustomHtml] = useState<string>(initialCustomHtml ?? "");
+    const [customHtmlSanitizedNotice, setCustomHtmlSanitizedNotice] = useState<boolean>(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
+
+    const showCustomHtmlSection = ELIGIBLE_CUSTOM_HTML.includes(
+        templateType as (typeof ELIGIBLE_CUSTOM_HTML)[number]
+    );
 
     // Get current form data based on template type
     function getCurrentData(): Record<string, unknown> {
@@ -111,14 +124,21 @@ export function TemplateContentEditor({
     const handleSave = async () => {
         setSaving(true);
         setMessage("");
+        setCustomHtmlSanitizedNotice(false);
 
         try {
             const currentData = getCurrentData();
             const content = JSON.stringify(currentData);
+            // TEMPLATE-02: customHtml in save payload (null when blank/whitespace)
+            const normalizedCustomHtml = customHtml.trim() ? customHtml : null;
             const res = await fetch(`/api/page-templates/${templateId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ content, customCode }),
+                body: JSON.stringify({
+                    content,
+                    customCode,
+                    customHtml: normalizedCustomHtml,
+                }),
             });
             // CHG-03: surface validation errors (e.g. customCode rejected) inline
             // instead of the generic "Server returned 400".
@@ -135,6 +155,9 @@ export function TemplateContentEditor({
             if (data.success) {
                 setSavedSnapshot(currentData); // Reset dirty state
                 setMessage("Saved successfully");
+                if (data.customHtmlSanitized === true) {
+                    setCustomHtmlSanitizedNotice(true);
+                }
             } else {
                 setMessage(`Error: ${data.error}`);
             }
@@ -165,6 +188,114 @@ export function TemplateContentEditor({
                     </p>
                 </div>
             </div>
+
+            {/* TEMPLATE-02: customHtml override section (SOLO_LANDING + DUO_LANDING only) */}
+            {showCustomHtmlSection && (
+                <Card className={customHtml.trim() ? "border-primary" : ""}>
+                    <CardHeader>
+                        <div className="flex items-center justify-between gap-3">
+                            <CardTitle>Custom HTML</CardTitle>
+                            <Badge variant={customHtml.trim() ? "default" : "secondary"}>
+                                {customHtml.trim()
+                                    ? "Active · overrides fields below"
+                                    : "Empty — fields below render"}
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <Alert>
+                            <AlertDescription>
+                                When this box has any content, your HTML is rendered directly to visitors.
+                                Leave it empty to use the field-based editor below.{" "}
+                                <strong>Paste BODY HTML only</strong> — no &lt;!doctype&gt; /
+                                &lt;html&gt; / &lt;head&gt; / &lt;title&gt; / &lt;link&gt; tags. Use
+                                &lt;style&gt; blocks inline. Variables like{" "}
+                                <code>{"{{workshop_title}}"}</code>, <code>{"{{coach_name}}"}</code>,{" "}
+                                <code>{"{{event_date}}"}</code>, <code>{"{{registration_url}}"}</code>{" "}
+                                are replaced when a workshop is approved.{" "}
+                                <em>
+                                    Live workshop fields (venue, virtual link, format) update only if
+                                    you reference their {"{{tokens}}"} — Custom HTML does not get the
+                                    live overlay the React templates use.
+                                </em>
+                            </AlertDescription>
+                        </Alert>
+
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr,260px] gap-4 mt-4">
+                            <div>
+                                <Label htmlFor="customHtml" className="sr-only">
+                                    Custom HTML
+                                </Label>
+                                <textarea
+                                    id="customHtml"
+                                    aria-label="Custom HTML"
+                                    rows={24}
+                                    value={customHtml}
+                                    onChange={(e) => setCustomHtml(e.target.value)}
+                                    className="font-mono text-sm w-full border border-input rounded-md p-2 bg-background"
+                                    placeholder="Paste your HTML here..."
+                                    spellCheck={false}
+                                />
+                            </div>
+                            <div className="text-sm space-y-1">
+                                <h4 className="font-semibold">Available variables</h4>
+                                <ul className="list-disc list-inside text-xs space-y-0.5">
+                                    <li><code>{"{{workshop_title}}"}</code> — workshop title</li>
+                                    <li><code>{"{{workshop_description}}"}</code></li>
+                                    <li><code>{"{{coach_name}}"}</code></li>
+                                    <li><code>{"{{coach_first_name}}"}</code></li>
+                                    <li><code>{"{{coach_company}}"}</code></li>
+                                    <li><code>{"{{coach_title}}"}</code></li>
+                                    <li><code>{"{{coach_bio}}"}</code> — HTML-escaped at build time</li>
+                                    <li><code>{"{{coach_photo}}"}</code> — image URL</li>
+                                    <li><code>{"{{event_day}}"}</code></li>
+                                    <li><code>{"{{event_date}}"}</code></li>
+                                    <li><code>{"{{event_time}}"}</code></li>
+                                    <li><code>{"{{workshop_format}}"}</code> — VIRTUAL / IN_PERSON / HYBRID</li>
+                                    <li><code>{"{{venue_name}}"}</code></li>
+                                    <li><code>{"{{venue_address}}"}</code></li>
+                                    <li><code>{"{{virtual_link}}"}</code></li>
+                                    <li><code>{"{{price}}"}</code></li>
+                                    <li><code>{"{{registration_url}}"}</code> — absolute, empty when no REGISTRATION template</li>
+                                    <li><code>{"{{category_name}}"}</code></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        {customHtmlSanitizedNotice && (
+                            <Alert
+                                variant="default"
+                                className="mt-3 border-yellow-500 bg-yellow-50 text-yellow-900"
+                            >
+                                <AlertDescription>
+                                    Saved. Some HTML was sanitized for safety — view the rendered
+                                    landing page to verify.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+
+                        {/* Save button for DUO_LANDING (which uses the JSON fallback below) */}
+                        {!isVisual && (
+                            <div className="mt-4 flex items-center gap-3">
+                                <Button onClick={handleSave} disabled={saving}>
+                                    {saving ? "Saving..." : "Save Template"}
+                                </Button>
+                                {message && (
+                                    <p
+                                        className={`text-sm ${
+                                            message.startsWith("Error") || message.startsWith("Network")
+                                                ? "text-destructive"
+                                                : "text-success"
+                                        }`}
+                                    >
+                                        {message}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Variable info banner */}
             {isVisual && (
