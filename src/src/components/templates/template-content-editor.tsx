@@ -377,18 +377,38 @@ export function TemplateContentEditor({
                     <div className="col-span-3 sticky top-4 self-start">
                         <Card className="overflow-hidden">
                             <CardHeader className="bg-muted border-b py-2">
-                                <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
+                                <CardTitle className="text-sm font-medium">
+                                    Live Preview
+                                    {showCustomHtmlSection && customHtml.trim() && (
+                                        <span className="ml-2 text-xs font-normal text-primary">· Custom HTML</span>
+                                    )}
+                                </CardTitle>
                             </CardHeader>
                             <CardContent className="p-0">
                                 <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
-                                    {templateType === "SOLO_LANDING" && (
-                                        <SoloPreview data={soloData} />
-                                    )}
-                                    {templateType === "REGISTRATION" && (
-                                        <RegistrationPreview data={regData} />
-                                    )}
-                                    {templateType === "THANK_YOU" && (
-                                        <ThankYouPreview data={tyData} />
+                                    {/* TEMPLATE-02: when customHtml is non-empty (and template is eligible),
+                                        the public render uses it instead of the React templates — preview
+                                        the actual output via a sandboxed iframe with sample-data interpolation. */}
+                                    {showCustomHtmlSection && customHtml.trim() ? (
+                                        <iframe
+                                            title="Custom HTML preview"
+                                            sandbox="allow-same-origin"
+                                            className="w-full border-0"
+                                            style={{ height: "calc(100vh - 220px)", background: "#fff" }}
+                                            srcDoc={`<!doctype html><html><head><meta charset="utf-8"><base target="_blank"></head><body>${previewValue(customHtml)}</body></html>`}
+                                        />
+                                    ) : (
+                                        <>
+                                            {templateType === "SOLO_LANDING" && (
+                                                <SoloPreview data={soloData} />
+                                            )}
+                                            {templateType === "REGISTRATION" && (
+                                                <RegistrationPreview data={regData} />
+                                            )}
+                                            {templateType === "THANK_YOU" && (
+                                                <ThankYouPreview data={tyData} />
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             </CardContent>
