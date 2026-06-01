@@ -3,6 +3,10 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { validateCustomCode } from "@/lib/templates/interpolate-custom-code";
+import { sanitizeCustomHtml } from "@/lib/templates/sanitize-custom-html";
+
+const CUSTOM_HTML_ELIGIBLE_TYPES = new Set(["SOLO_LANDING", "DUO_LANDING"]);
+const CUSTOM_HTML_MAX_LENGTH = 500_000;
 
 export async function GET(
     _request: NextRequest,
@@ -42,18 +46,33 @@ export async function PATCH(
     } catch {
         return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
-    const { name, content, categoryId, isActive, customCode } = body as {
+    const { name, content, categoryId, isActive, customCode, customHtml } = body as {
         name?: string;
         content?: string;
         categoryId?: string | null;
         isActive?: boolean;
         customCode?: string | null;
+        customHtml?: string | null;
     };
 
-    // Validate template content has {{placeholders}} — prevent corruption
+    // TEMPLATE-02: eligibility + empty-string normalization + per-call sanitize
+    if (typeof customHtml === "string" && customHtml.length > CUSTOM_HTML_MAX_LENGTH) {
+        return NextResponse.json(
+            { error: "Custom HTML exceeds 500,000 character limit" },
+            { status: 400 }
+        );
+    }
+
+    const customHtmlIsNonEmpty =
+        typeof customHtml === "string" && customHtml.trim().length > 0;
+
+    // Validate template content has {{placeholders}} — prevent corruption.
+    // Customers using customHtml don't need placeholders in content, so a
+    // non-empty customHtml is an explicit escape hatch.
     if (content !== undefined) {
         const hasPlaceholders = /\{\{[^}]+\}\}/.test(content);
-        if (!hasPlaceholders && !(body as Record<string, unknown>).forceNoPlaceholders) {
+        const forceNoPlaceholders = (body as Record<string, unknown>).forceNoPlaceholders;
+        if (!hasPlaceholders && !customHtmlIsNonEmpty && !forceNoPlaceholders) {
             return NextResponse.json(
                 { error: "Template content has no {{placeholders}}. Auto-build requires placeholders to interpolate workshop data." },
                 { status: 400 }
@@ -74,6 +93,24 @@ export async function PATCH(
     const existing = await db.pageTemplate.findUnique({ where: { id } });
     if (!existing) {
         return NextResponse.json({ error: "Template not found" }, { status: 404 });
+    }
+
+    if (customHtmlIsNonEmpty && !CUSTOM_HTML_ELIGIBLE_TYPES.has(existing.templateType)) {
+        return NextResponse.json(
+            { error: "Custom HTML is only supported on SOLO_LANDING and DUO_LANDING templates" },
+            { status: 400 }
+        );
+    }
+
+    let normalizedCustomHtml: string | null | undefined;
+    let sanitizeResult: ReturnType<typeof sanitizeCustomHtml> | undefined;
+    if (customHtml !== undefined) {
+        if (customHtml === null || (typeof customHtml === "string" && customHtml.trim() === "")) {
+            normalizedCustomHtml = null;
+        } else {
+            sanitizeResult = sanitizeCustomHtml(customHtml);
+            normalizedCustomHtml = sanitizeResult.sanitized;
+        }
     }
 
     // Activation flow: deactivate competitors in the same slot
@@ -102,6 +139,7 @@ export async function PATCH(
                     ...(content !== undefined ? { content } : {}),
                     ...(categoryId !== undefined ? { categoryId } : {}),
                     ...(customCode !== undefined ? { customCode } : {}),
+                    ...(customHtml !== undefined ? { customHtml: normalizedCustomHtml } : {}),
                 },
             });
         });
@@ -115,6 +153,7 @@ export async function PATCH(
                 ...(categoryId !== undefined ? { categoryId } : {}),
                 ...(isActive !== undefined ? { isActive } : {}),
                 ...(customCode !== undefined ? { customCode } : {}),
+                ...(customHtml !== undefined ? { customHtml: normalizedCustomHtml } : {}),
             },
         });
     }
@@ -135,10 +174,24 @@ export async function PATCH(
             ...(categoryId !== undefined ? { categoryId } : {}),
             ...(content !== undefined ? { contentUpdated: true } : {}),
             ...(customCode !== undefined ? { customCode } : {}),
+            ...(customHtml !== undefined
+                ? {
+                      customHtmlChanged: true,
+                      customHtmlLength: normalizedCustomHtml?.length ?? 0,
+                      strippedTags: sanitizeResult?.strippedTags ?? [],
+                      strippedAttrs: sanitizeResult?.strippedAttrs ?? [],
+                  }
+                : {}),
         },
     });
 
-    return NextResponse.json({ success: true, data: updated });
+    return NextResponse.json({
+        success: true,
+        data: updated,
+        ...(customHtml !== undefined
+            ? { customHtmlSanitized: sanitizeResult?.didStripContent ?? false }
+            : {}),
+    });
 }
 
 export async function DELETE(
