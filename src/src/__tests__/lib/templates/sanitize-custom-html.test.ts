@@ -162,6 +162,62 @@ describe("sanitizeCustomHtml", () => {
     expect(a.strippedAttrs).not.toBe(b.strippedAttrs);
   });
 
+  // TEMPLATE-02 BLOCK-2: token URIs preserved in default (save-time) mode,
+  // stripped in strict (post-interpolation re-sanitize) mode.
+  describe("allowTokenUris option", () => {
+    it("21. preserves {{registration_url}} in href when default mode (allowTokenUris=true)", () => {
+      const result = sanitizeCustomHtml('<a href="{{registration_url}}">link</a>');
+      expect(result.sanitized).toContain('href="{{registration_url}}"');
+    });
+
+    it("22. preserves {{ registration_url }} (spaced) in href when default mode", () => {
+      const result = sanitizeCustomHtml('<a href="{{ registration_url }}">link</a>');
+      expect(result.sanitized).toContain("href=");
+      expect(result.sanitized).toMatch(/\{\{\s*registration_url\s*\}\}/);
+    });
+
+    it("23. strips {{registration_url}} href when allowTokenUris=false (strict mode)", () => {
+      const result = sanitizeCustomHtml(
+        '<a href="{{registration_url}}">link</a>',
+        { allowTokenUris: false }
+      );
+      expect(result.sanitized).toContain("<a");
+      expect(result.sanitized).not.toContain("{{registration_url}}");
+      expect(result.sanitized).not.toContain("href=");
+    });
+
+    it("24. https URL survives both default and strict modes", () => {
+      const loose = sanitizeCustomHtml('<a href="https://example.com">x</a>');
+      const strict = sanitizeCustomHtml(
+        '<a href="https://example.com">x</a>',
+        { allowTokenUris: false }
+      );
+      expect(loose.sanitized).toContain('href="https://example.com"');
+      expect(strict.sanitized).toContain('href="https://example.com"');
+    });
+
+    it("25. javascript: href stripped in both modes", () => {
+      const loose = sanitizeCustomHtml('<a href="javascript:alert(1)">x</a>');
+      const strict = sanitizeCustomHtml(
+        '<a href="javascript:alert(1)">x</a>',
+        { allowTokenUris: false }
+      );
+      expect(loose.sanitized).not.toContain("javascript:");
+      expect(strict.sanitized).not.toContain("javascript:");
+    });
+
+    it("26. {{coach_photo}} <img src> survives default mode, stripped in strict mode", () => {
+      const loose = sanitizeCustomHtml('<img src="{{coach_photo}}">');
+      const strict = sanitizeCustomHtml(
+        '<img src="{{coach_photo}}">',
+        { allowTokenUris: false }
+      );
+      expect(loose.sanitized).toContain('src="{{coach_photo}}"');
+      expect(strict.sanitized).toContain("<img");
+      expect(strict.sanitized).not.toContain("{{coach_photo}}");
+    });
+  });
+
   it("FRAME_SRC_ALLOWLIST is exported and contains expected hosts", () => {
     expect(Array.isArray(FRAME_SRC_ALLOWLIST)).toBe(true);
     expect(FRAME_SRC_ALLOWLIST.length).toBeGreaterThanOrEqual(4);

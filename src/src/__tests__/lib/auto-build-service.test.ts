@@ -522,6 +522,149 @@ describe("runAutoBuild", () => {
       expect(soloCall![0].data.customHtml).toBeNull();
     });
 
+    // BLOCK-2: build-time sanitize re-runs in strict mode after interpolation,
+    // so malicious substituted URLs (e.g. javascript:) get stripped even if the
+    // raw token was admin-blessed.
+    it("strips javascript: substituted into a token-href on build (strict re-sanitize)", async () => {
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue(mockWorkshop);
+      (buildWorkshopVariables as jest.Mock).mockResolvedValue({
+        ...mockVariables,
+        virtual_link: "javascript:alert(1)",
+      });
+      (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "tpl-solo",
+          templateType: "SOLO_LANDING",
+          content: '{"heading":"{{workshop_title}}"}',
+          categoryId: null,
+          customCode: null,
+          customHtml: '<a href="{{virtual_link}}">Join</a>',
+        },
+      ]);
+      (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+      (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+        Promise.resolve({ id: "lp-new", ...args.data })
+      );
+      (db.workflow.findMany as jest.Mock).mockResolvedValue([]);
+      (db.landingPage.findFirst as jest.Mock).mockResolvedValue({ slug: "solo-slug" });
+      (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
+      (db.workshop.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      await runAutoBuild("ws-1");
+
+      const createCalls = (db.landingPage.create as jest.Mock).mock.calls;
+      const soloCall = createCalls.find((c) => c[0].data.template === "SOLO_LANDING");
+      expect(soloCall).toBeDefined();
+      const customHtml: string = soloCall![0].data.customHtml;
+      expect(customHtml).toContain("<a");
+      expect(customHtml).not.toContain("javascript:");
+    });
+
+    it("preserves https registration_url through strict re-sanitize", async () => {
+      (templateHasPlaceholders as jest.Mock).mockReturnValue(true);
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue(mockWorkshop);
+      (buildWorkshopVariables as jest.Mock).mockResolvedValue(mockVariables);
+      (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "tpl-reg",
+          templateType: "REGISTRATION",
+          content: '{"heading":"Register"}',
+          categoryId: null,
+          customCode: null,
+          customHtml: null,
+        },
+        {
+          id: "tpl-solo",
+          templateType: "SOLO_LANDING",
+          content: '{"heading":"{{workshop_title}}"}',
+          categoryId: null,
+          customCode: null,
+          customHtml: '<a href="{{registration_url}}">Sign up</a>',
+        },
+      ]);
+      (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+      (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+        Promise.resolve({ id: `lp-${args.data.template}`, slug: args.data.slug })
+      );
+      (db.workflow.findMany as jest.Mock).mockResolvedValue([]);
+      (db.landingPage.findFirst as jest.Mock).mockImplementation((args: any) => {
+        const tpl = args?.where?.template;
+        const createCalls = (db.landingPage.create as jest.Mock).mock.calls;
+        const match = createCalls.find((c) => c[0].data.template === tpl);
+        if (match) {
+          return Promise.resolve({ id: `lp-${tpl}`, slug: match[0].data.slug, content: match[0].data.content });
+        }
+        return Promise.resolve(null);
+      });
+      (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
+      (db.workshop.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      await runAutoBuild("ws-1");
+
+      const createCalls = (db.landingPage.create as jest.Mock).mock.calls;
+      const regCall = createCalls.find((c) => c[0].data.template === "REGISTRATION");
+      const soloCall = createCalls.find((c) => c[0].data.template === "SOLO_LANDING");
+      const regSlug: string = regCall![0].data.slug;
+      const customHtml: string = soloCall![0].data.customHtml;
+      expect(customHtml).toContain(`https://example.test/workshop/${regSlug}`);
+    });
+
+    // Fix-3: HIGH-2 partial-rebuild path — REGISTRATION exists; SOLO_LANDING still needs its URL.
+    it("uses existing REGISTRATION slug when REGISTRATION LandingPage already exists (partial rebuild)", async () => {
+      (templateHasPlaceholders as jest.Mock).mockReturnValue(true);
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue(mockWorkshop);
+      (buildWorkshopVariables as jest.Mock).mockResolvedValue(mockVariables);
+      (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "tpl-reg",
+          templateType: "REGISTRATION",
+          content: '{"heading":"Register"}',
+          categoryId: null,
+          customCode: null,
+          customHtml: null,
+        },
+        {
+          id: "tpl-solo",
+          templateType: "SOLO_LANDING",
+          content: '{"heading":"{{workshop_title}}"}',
+          categoryId: null,
+          customCode: null,
+          customHtml: '<a href="{{registration_url}}">Sign up</a>',
+        },
+      ]);
+      // landingPage.findUnique returns existing for REGISTRATION (preserving prior slug),
+      // null for SOLO_LANDING so the buildOnePage proceeds.
+      (db.landingPage.findUnique as jest.Mock).mockImplementation((args: any) => {
+        if (args.where.workshopId_template?.template === "REGISTRATION") {
+          return Promise.resolve({
+            id: "lp-existing-reg",
+            workshopId: "ws-1",
+            template: "REGISTRATION",
+            slug: "preexisting-reg-slug",
+          });
+        }
+        return Promise.resolve(null);
+      });
+      (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+        Promise.resolve({ id: `lp-${args.data.template}`, slug: args.data.slug })
+      );
+      (db.workflow.findMany as jest.Mock).mockResolvedValue([]);
+      (db.landingPage.findFirst as jest.Mock).mockResolvedValue({ slug: "solo-slug" });
+      (db.workshop.update as jest.Mock).mockResolvedValue({ id: "ws-1" });
+      (db.workshop.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      await runAutoBuild("ws-1");
+
+      const createCalls = (db.landingPage.create as jest.Mock).mock.calls;
+      const soloCall = createCalls.find((c) => c[0].data.template === "SOLO_LANDING");
+      expect(soloCall).toBeDefined();
+      const customHtml: string = soloCall![0].data.customHtml;
+      expect(customHtml).toContain("https://example.test/workshop/preexisting-reg-slug");
+      expect(customHtml).not.toContain("{{registration_url}}");
+      // And it must not be empty either
+      expect(customHtml).not.toBe('<a href="">Sign up</a>');
+    });
+
     it("writes customHtml=null on THANK_YOU LandingPage even if source PageTemplate has customHtml (eligibility filter)", async () => {
       (db.workshop.findUnique as jest.Mock).mockResolvedValue(mockWorkshop);
       (buildWorkshopVariables as jest.Mock).mockResolvedValue(mockVariables);

@@ -1,3 +1,4 @@
+// Using dompurify directly + per-call JSDOM window so the Next/Jest test runner doesn't choke on isomorphic-dompurify's ESM-only transitive dep.
 import createDOMPurify from "dompurify";
 
 export const FRAME_SRC_ALLOWLIST: RegExp[] = [
@@ -26,7 +27,22 @@ function getWindow(): Window {
 
 const PARSER_DROPPED_TAGS = ["script", "noscript", "noembed", "noframes"];
 
-export function sanitizeCustomHtml(input: string): SanitizeResult {
+// Save-time: allow {{token}} (with optional spaces) literals through the URI gate
+// so admin-blessed HTML with placeholder href/src survives storage.
+const URI_REGEXP_WITH_TOKENS = /^(https:\/\/|mailto:|tel:|#|\/[^\/]|\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\})/i;
+// Post-interpolation: strict — no token form allowed, so malicious substitutions
+// (e.g. virtualLink="javascript:alert(1)") get caught on the re-sanitize pass.
+const URI_REGEXP_STRICT = /^(https:\/\/|mailto:|tel:|#|\/[^\/])/i;
+
+export interface SanitizeOptions {
+  allowTokenUris?: boolean;
+}
+
+export function sanitizeCustomHtml(
+  input: string,
+  options: SanitizeOptions = {}
+): SanitizeResult {
+  const allowTokenUris = options.allowTokenUris !== false;
   const strippedTags: string[] = [];
   const strippedAttrs: string[] = [];
 
@@ -76,7 +92,7 @@ export function sanitizeCustomHtml(input: string): SanitizeResult {
     ADD_TAGS: ["iframe"],
     ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "loading"],
     FORBID_ATTR: ["srcdoc"],
-    ALLOWED_URI_REGEXP: /^(https:\/\/|mailto:|tel:|#|\/[^\/])/i,
+    ALLOWED_URI_REGEXP: allowTokenUris ? URI_REGEXP_WITH_TOKENS : URI_REGEXP_STRICT,
     FORCE_BODY: true,
   }) as string;
 

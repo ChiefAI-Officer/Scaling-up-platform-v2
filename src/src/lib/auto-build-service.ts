@@ -11,6 +11,7 @@
 import { db } from "@/lib/db";
 import { buildWorkshopVariables, interpolateContent, templateHasPlaceholders, findRemainingPlaceholders } from "@/lib/templates/template-interpolation";
 import { interpolateContentForHtml } from "@/lib/templates/interpolate-content-html";
+import { sanitizeCustomHtml } from "@/lib/templates/sanitize-custom-html";
 import { sendWorkshopBuiltEmail } from "@/services/notifications";
 import { inngest } from "@/inngest/client";
 import { findAutoAttachWorkflow } from "@/lib/workflows/find-auto-attach-workflow";
@@ -187,10 +188,15 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
         const slug = `${titleBase}-${templateSuffix}-${Date.now().toString(36)}`;
 
         // TEMPLATE-02: eligibility filter — only SOLO_LANDING / DUO_LANDING carry customHtml.
+        // Two-stage sanitize: PATCH save was loose (token URIs preserved); after interpolation
+        // we strict-re-sanitize so any malicious substituted URL (e.g. javascript:) gets stripped.
         const interpolatedCustomHtml =
             tpl.customHtml && tpl.customHtml.trim().length > 0 &&
             (ELIGIBLE_CUSTOM_HTML as readonly string[]).includes(tpl.templateType)
-                ? interpolateContentForHtml(tpl.customHtml, enrichedVars)
+                ? sanitizeCustomHtml(
+                    interpolateContentForHtml(tpl.customHtml, enrichedVars),
+                    { allowTokenUris: false }
+                  ).sanitized
                 : null;
 
         await db.landingPage.create({
@@ -216,9 +222,23 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
     }
 
     // Pass 1: build REGISTRATION first (if present) so its slug seeds {{registration_url}}.
+    // If a prior partial build already created the REGISTRATION row, buildOnePage returns null
+    // (existingPage skip). Fall back to the stored slug so SOLO_LANDING still gets a real URL.
     const regTemplate = activeTemplates.find((t) => t.templateType === "REGISTRATION");
     if (regTemplate) {
         regPageSlug = await buildOnePage(regTemplate, variables);
+    }
+    if (!regPageSlug) {
+        const existingReg = await db.landingPage.findUnique({
+            where: {
+                workshopId_template: {
+                    workshopId: workshop.id,
+                    template: "REGISTRATION",
+                },
+            },
+            select: { slug: true },
+        });
+        if (existingReg) regPageSlug = existingReg.slug;
     }
 
     // Build enriched variable map with absolute registration_url (or empty string).

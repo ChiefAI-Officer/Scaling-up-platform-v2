@@ -498,7 +498,11 @@ describe("PUT /api/workshops/[id]/landing-pages/[template]", () => {
       expect(created.data.customHtml).toBeNull();
     });
 
-    it("admin-supplied customHtml in request body wins over template copy on SOLO_LANDING CREATE", async () => {
+    // Fix-1: customHtml from coach-accessible PUT request body is REMOVED.
+    // The PUT route is gated by canManageCoachData, not isPrivilegedRole — so
+    // any coach could otherwise stuff sanitized HTML into their LandingPage row.
+    // Custom HTML is admin-controlled via the page-templates PATCH route only.
+    it("ignores customHtml in request body — only template-copy survives on SOLO_LANDING CREATE", async () => {
       (getApiActor as jest.Mock).mockResolvedValue(adminActor);
       (canManageCoachData as jest.Mock).mockReturnValue(true);
       (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
@@ -525,29 +529,39 @@ describe("PUT /api/workshops/[id]/landing-pages/[template]", () => {
 
       expect(response.status).toBe(200);
       const created = (db.landingPage.create as jest.Mock).mock.calls[0][0];
-      // Body override (sanitized passthrough in our mock) is stored, not the template copy
-      expect(created.data.customHtml).toBe("<p>FROM BODY</p>");
+      // Body customHtml is silently dropped; only the admin-blessed template copy is stored.
+      expect(created.data.customHtml).toBe("<p>FROM TEMPLATE</p>");
     });
 
-    it("rejects request body customHtml on REGISTRATION with 400 (eligibility filter)", async () => {
+    it("ignores customHtml in request body on UPDATE — customHtml column not written", async () => {
       (getApiActor as jest.Mock).mockResolvedValue(adminActor);
       (canManageCoachData as jest.Mock).mockReturnValue(true);
       (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
-      (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
-
-      const response = await PUT(
-        buildPutRequest("workshop-1", "REGISTRATION", {
-          content: { hero: "x" },
-          status: "DRAFT",
-          customHtml: "<p>not eligible</p>",
-        }),
-        routeParams("workshop-1", "REGISTRATION")
+      (db.landingPage.findUnique as jest.Mock).mockResolvedValue({
+        id: "lp-1",
+        workshopId: "workshop-1",
+        template: "SOLO_LANDING",
+        slug: "x",
+        content: "{}",
+        status: "DRAFT",
+        publishedAt: null,
+      });
+      (db.landingPage.update as jest.Mock).mockImplementation((args: any) =>
+        Promise.resolve({ id: "lp-1", ...args.data })
       );
 
-      expect(response.status).toBe(400);
-      const body = await response.json();
-      expect(body.success).toBe(false);
-      expect(String(body.error).toLowerCase()).toMatch(/customhtml|eligibl/);
+      const response = await PUT(
+        buildPutRequest("workshop-1", "SOLO_LANDING", {
+          content: { hero: "x" },
+          status: "DRAFT",
+          customHtml: "<p>FROM BODY</p>",
+        }),
+        routeParams("workshop-1", "SOLO_LANDING")
+      );
+
+      expect(response.status).toBe(200);
+      const updated = (db.landingPage.update as jest.Mock).mock.calls[0][0];
+      expect(updated.data).not.toHaveProperty("customHtml");
     });
   });
 });

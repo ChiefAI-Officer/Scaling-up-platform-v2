@@ -29,9 +29,9 @@ const updateLandingPageBodySchema = z.object({
   // Coach role attempts get 403. parse5 validation runs server-side via
   // validateCustomCode (CHG-03). Pass null to clear.
   customCode: z.string().nullable().optional(),
-  // TEMPLATE-02: admin can override the template-default customHtml. Eligibility
-  // gated below (only SOLO_LANDING / DUO_LANDING). Sanitized server-side.
-  customHtml: z.string().max(500_000).nullable().optional(),
+  // Fix-1: customHtml is intentionally NOT accepted from this route's body.
+  // The route is coach-accessible (canManageCoachData), so admin-blessed HTML
+  // would be reachable by every coach. Edits live on /api/page-templates/[id].
 });
 
 function normalizeTemplate(template: string): TemplateType | null {
@@ -153,7 +153,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { content, status, customCode, customHtml } = bodyValidation.data;
+    const { content, status, customCode } = bodyValidation.data;
 
     // ENH-MAY6-5: customCode editing is admin/staff only. Coach attempts
     // (including via crafted PUT bodies) are rejected. validateCustomCode is
@@ -174,28 +174,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           );
         }
       }
-    }
-
-    // TEMPLATE-02: eligibility filter — reject inbound customHtml on ineligible template types.
-    if (
-      customHtml !== undefined &&
-      customHtml !== null &&
-      !ELIGIBLE_CUSTOM_HTML.includes(normalizedTemplate)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `customHtml is not eligible for template ${normalizedTemplate} (allowed: ${ELIGIBLE_CUSTOM_HTML.join(", ")})`,
-        },
-        { status: 400 }
-      );
-    }
-
-    // TEMPLATE-02: sanitize admin-supplied customHtml override defense-in-depth
-    // (PATCH on PageTemplate sanitizes too, but PUT may receive raw HTML).
-    let sanitizedCustomHtml: string | null | undefined = customHtml;
-    if (typeof customHtml === "string" && customHtml.length > 0) {
-      sanitizedCustomHtml = sanitizeCustomHtml(customHtml).sanitized;
     }
 
     // Check if workshop exists
@@ -238,9 +216,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           // ENH-MAY6-5: only set customCode when explicitly provided.
           // Undefined keeps existing value; null clears.
           ...(customCode !== undefined ? { customCode } : {}),
-          // TEMPLATE-02: only set customHtml when explicitly provided. Eligibility
-          // checked above; sanitized value used.
-          ...(customHtml !== undefined ? { customHtml: sanitizedCustomHtml } : {}),
+          // Fix-1: customHtml is not writable from this route. Build-time copy is preserved.
         },
       });
     } else {
@@ -274,6 +250,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       }
 
       // TEMPLATE-02: eligibility filter — only SOLO_LANDING / DUO_LANDING carry customHtml.
+      // Fix-2: post-interpolation strict re-sanitize catches malicious substitutions
+      // (e.g. virtualLink="javascript:alert(1)") even after admin-blessed save.
       let templateCustomHtml: string | null = null;
       if (
         chosenTemplate?.customHtml &&
@@ -281,9 +259,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         ELIGIBLE_CUSTOM_HTML.includes(normalizedTemplate)
       ) {
         const variables = await buildWorkshopVariables(id);
-        templateCustomHtml = variables
+        const interpolated = variables
           ? interpolateContentForHtml(chosenTemplate.customHtml, variables)
           : chosenTemplate.customHtml;
+        templateCustomHtml = sanitizeCustomHtml(interpolated, { allowTokenUris: false }).sanitized;
       }
 
       landingPage = await db.landingPage.create({
@@ -296,9 +275,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           publishedAt: status === "PUBLISHED" ? new Date() : null,
           // ENH-MAY6-5: explicit body customCode wins over template-default.
           customCode: customCode ?? chosenTemplate?.customCode ?? null,
-          // TEMPLATE-02: explicit body customHtml (sanitized) > template-copy (interpolated) > null.
-          customHtml:
-            sanitizedCustomHtml !== undefined ? sanitizedCustomHtml : templateCustomHtml,
+          // Fix-1: body customHtml dropped; only the template copy is stored.
+          customHtml: templateCustomHtml,
         },
       });
     }
