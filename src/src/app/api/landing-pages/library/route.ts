@@ -8,6 +8,9 @@ import { z } from "zod";
 const TEMPLATE_OPTIONS = ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] as const;
 type TemplateType = (typeof TEMPLATE_OPTIONS)[number];
 
+// TEMPLATE-02: eligibility filter — only SOLO_LANDING / DUO_LANDING may carry customHtml.
+const ELIGIBLE_CUSTOM_HTML: readonly TemplateType[] = ["SOLO_LANDING", "DUO_LANDING"] as const;
+
 const landingPageLibraryQuerySchema = z.object({
   template: z.string().trim().optional(),
   activeOnly: z.string().optional(),
@@ -265,6 +268,11 @@ export async function POST(request: NextRequest) {
             // pages keep their iDev pixel. Coach-accessible routes never
             // accept customCode from request bodies.
             customCode: sourcePage.customCode ?? null,
+            // TEMPLATE-02: eligibility filter — clone customHtml only into
+            // SOLO_LANDING / DUO_LANDING destinations.
+            customHtml: ELIGIBLE_CUSTOM_HTML.includes(targetTemplateRaw)
+              ? sourcePage.customHtml ?? null
+              : null,
           },
         });
 

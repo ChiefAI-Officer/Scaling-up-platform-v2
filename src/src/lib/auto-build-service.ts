@@ -10,9 +10,13 @@
 
 import { db } from "@/lib/db";
 import { buildWorkshopVariables, interpolateContent, templateHasPlaceholders, findRemainingPlaceholders } from "@/lib/templates/template-interpolation";
+import { interpolateContentForHtml } from "@/lib/templates/interpolate-content-html";
 import { sendWorkshopBuiltEmail } from "@/services/notifications";
 import { inngest } from "@/inngest/client";
 import { findAutoAttachWorkflow } from "@/lib/workflows/find-auto-attach-workflow";
+
+// TEMPLATE-02: eligibility filter — only these template types may carry customHtml.
+const ELIGIBLE_CUSTOM_HTML = ["SOLO_LANDING", "DUO_LANDING"] as const;
 
 export interface AutoBuildResult {
     success: boolean;
@@ -88,7 +92,8 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
     let activeTemplates = await db.pageTemplate.findMany({
         where: { isActive: true, ...categoryFilter },
         // CHG-03: include customCode so it copies through to LandingPage at build time.
-        select: { id: true, templateType: true, content: true, categoryId: true, customCode: true },
+        // TEMPLATE-02: include customHtml so it copies through (eligibility-filtered below).
+        select: { id: true, templateType: true, content: true, categoryId: true, customCode: true, customHtml: true },
     });
 
     // Deduplicate — prefer category-scoped over global for same template type
@@ -106,16 +111,20 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
         activeTemplates = await db.pageTemplate.findMany({
             where: { isActive: true },
             // CHG-03: include customCode so it copies through to LandingPage at build time.
-            select: { id: true, templateType: true, content: true, categoryId: true, customCode: true },
+            // TEMPLATE-02: include customHtml so it copies through (eligibility-filtered below).
+            select: { id: true, templateType: true, content: true, categoryId: true, customCode: true, customHtml: true },
         });
     }
 
     // Filter OUT corrupted templates (no placeholders = corrupted content)
+    // TEMPLATE-02: keep templates whose customHtml is populated even if content is placeholder-less.
     activeTemplates = activeTemplates.filter(tpl => {
-        if (!templateHasPlaceholders(tpl.content)) {
+        const hasCustomHtml = !!tpl.customHtml && tpl.customHtml.trim().length > 0;
+        if (!templateHasPlaceholders(tpl.content) && !hasCustomHtml) {
             console.error(
-                `[auto-build-service] SKIPPING PageTemplate ${tpl.id} (${tpl.templateType}) — no {{placeholders}}. ` +
-                `Content may be corrupted. Re-run: npx tsx prisma/seed-templates.ts`
+                `[auto-build-service] SKIPPING PageTemplate ${tpl.id} (${tpl.templateType}) — no {{placeholders}} ` +
+                `and customHtml is empty. Content may be corrupted. ` +
+                `Re-run: npx tsx prisma/seed-templates.ts`
             );
             return false;
         }
@@ -139,25 +148,33 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
         };
     }
 
-    // Step 4: Create landing pages
+    // Step 4: Create landing pages — TEMPLATE-02 two-pass interpolation.
+    // Pass 1 builds REGISTRATION first so its slug is known when interpolating
+    // {{registration_url}} into SOLO_LANDING / DUO_LANDING customHtml in Pass 2.
     const created: string[] = [];
     let primarySlug: string | null = null;
+    let regPageSlug: string | null = null;
 
-    for (const tpl of activeTemplates) {
-        // Check if this workshop already has a page for this template type
+    const titleBase = workshop.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+
+    async function buildOnePage(
+        tpl: (typeof activeTemplates)[number],
+        enrichedVars: Record<string, string | null | undefined>
+    ): Promise<string | null> {
         const existingPage = await db.landingPage.findUnique({
             where: {
                 workshopId_template: {
-                    workshopId: workshop.id,
+                    workshopId: workshop!.id,
                     template: tpl.templateType,
                 },
             },
         });
+        if (existingPage) return null;
 
-        if (existingPage) continue; // Don't overwrite manually created pages
-
-        // Interpolate variables in content
-        const interpolatedContent = interpolateContent(tpl.content, variables);
+        const interpolatedContent = interpolateContent(tpl.content, enrichedVars as Record<string, string>);
 
         const remaining = findRemainingPlaceholders(interpolatedContent);
         if (remaining.length > 0) {
@@ -166,17 +183,19 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
             );
         }
 
-        // Generate unique slug
-        const base = workshop.title
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)/g, "");
         const templateSuffix = tpl.templateType.toLowerCase().replace(/_/g, "-");
-        const slug = `${base}-${templateSuffix}-${Date.now().toString(36)}`;
+        const slug = `${titleBase}-${templateSuffix}-${Date.now().toString(36)}`;
+
+        // TEMPLATE-02: eligibility filter — only SOLO_LANDING / DUO_LANDING carry customHtml.
+        const interpolatedCustomHtml =
+            tpl.customHtml && tpl.customHtml.trim().length > 0 &&
+            (ELIGIBLE_CUSTOM_HTML as readonly string[]).includes(tpl.templateType)
+                ? interpolateContentForHtml(tpl.customHtml, enrichedVars)
+                : null;
 
         await db.landingPage.create({
             data: {
-                workshopId: workshop.id,
+                workshopId: workshop!.id,
                 template: tpl.templateType,
                 slug,
                 content: interpolatedContent,
@@ -186,14 +205,40 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
                 // CHG-03: copy admin-blessed customCode through at build time.
                 // Coach-accessible routes never accept customCode from request bodies.
                 customCode: tpl.customCode ?? null,
+                // TEMPLATE-02: customHtml two-pass interpolation (null on ineligible templates).
+                customHtml: interpolatedCustomHtml,
             },
         });
 
         created.push(tpl.templateType);
         if (!primarySlug) primarySlug = slug;
+        return slug;
+    }
+
+    // Pass 1: build REGISTRATION first (if present) so its slug seeds {{registration_url}}.
+    const regTemplate = activeTemplates.find((t) => t.templateType === "REGISTRATION");
+    if (regTemplate) {
+        regPageSlug = await buildOnePage(regTemplate, variables);
+    }
+
+    // Build enriched variable map with absolute registration_url (or empty string).
+    const registrationUrl = regPageSlug
+        ? `${process.env.APP_URL}/workshop/${regPageSlug}`
+        : "";
+    const enrichedVars: Record<string, string | null | undefined> = {
+        ...variables,
+        registration_url: registrationUrl,
+        registrationUrl, // camelCase alias for templates that prefer that form
+    };
+
+    // Pass 2: build all OTHER templates with enrichedVars.
+    for (const tpl of activeTemplates) {
+        if (tpl.templateType === "REGISTRATION") continue;
+        await buildOnePage(tpl, enrichedVars);
     }
 
     // Step 4b: Link SOLO_LANDING registrationUrl → REGISTRATION page
+    // TODO TEMPLATE-02 follow-up: remove redundant post-patch once content interpolation is verified
     if (created.includes("SOLO_LANDING") && created.includes("REGISTRATION")) {
         const regPage = await db.landingPage.findFirst({
             where: { workshopId, template: "REGISTRATION" },
@@ -223,7 +268,7 @@ export async function runAutoBuild(workshopId: string): Promise<AutoBuildResult>
 
     // Step 6: Update workshop status to PRE_EVENT
     // Prefer SOLO_LANDING slug for the main landing page URL
-    let landingPageSlug = primarySlug;
+    let landingPageSlug: string | null = primarySlug;
     if (created.length > 0) {
         const soloPage = await db.landingPage.findFirst({
             where: { workshopId, template: "SOLO_LANDING" },

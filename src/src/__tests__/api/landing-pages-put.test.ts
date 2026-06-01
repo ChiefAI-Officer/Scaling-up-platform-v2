@@ -36,6 +36,56 @@ jest.mock("@/lib/db", () => ({
 jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
   canManageCoachData: jest.fn(),
+  isPrivilegedRole: (role: string) => role === "ADMIN" || role === "STAFF",
+}));
+
+// TEMPLATE-02: buildWorkshopVariables drives the customHtml interpolation
+jest.mock("@/lib/templates/template-interpolation", () => ({
+  buildWorkshopVariables: jest.fn().mockResolvedValue({
+    workshop_title: "Test Workshop",
+    coach_name: "Test Coach",
+  }),
+}));
+
+// TEMPLATE-02: real escape-and-substitute so XSS-safe interpolation is observable
+jest.mock("@/lib/templates/interpolate-content-html", () => {
+  const escapeHtml = (value: string): string =>
+    value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;");
+  return {
+    interpolateContentForHtml: jest.fn(
+      (template: string, variables: Record<string, string | null | undefined>) => {
+        let out = template;
+        for (const [key, raw] of Object.entries(variables)) {
+          const value = raw == null ? "" : raw;
+          const escaped = escapeHtml(value);
+          out = out.split(`{{${key}}}`).join(escaped);
+          out = out.split(`{{ ${key} }}`).join(escaped);
+        }
+        return out;
+      }
+    ),
+  };
+});
+
+// TEMPLATE-02: sanitize is invoked on inbound customHtml override
+jest.mock("@/lib/templates/sanitize-custom-html", () => ({
+  sanitizeCustomHtml: jest.fn((input: string) => ({
+    sanitized: input,
+    didStripContent: false,
+    strippedTags: [],
+    strippedAttrs: [],
+  })),
+  FRAME_SRC_ALLOWLIST: [],
+}));
+
+// validateCustomCode is invoked only when customCode is sent — stub harmless
+jest.mock("@/lib/templates/interpolate-custom-code", () => ({
+  validateCustomCode: jest.fn(() => ({ valid: true })),
 }));
 
 import { PUT } from "@/app/api/workshops/[id]/landing-pages/[template]/route";
@@ -383,6 +433,121 @@ describe("PUT /api/workshops/[id]/landing-pages/[template]", () => {
       );
 
       expect(response.status).toBe(404);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // TEMPLATE-02: customHtml copy-through + eligibility + admin override
+  // -------------------------------------------------------------------------
+  describe("TEMPLATE-02 customHtml", () => {
+    it("copies + interpolates customHtml from matching PageTemplate on SOLO_LANDING CREATE", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (canManageCoachData as jest.Mock).mockReturnValue(true);
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
+      (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+      (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([
+        {
+          customCode: null,
+          customHtml: "<p>Hello {{workshop_title}}</p>",
+          categoryId: null,
+        },
+      ]);
+      (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+        Promise.resolve({ id: "lp-1", ...args.data })
+      );
+
+      const response = await PUT(
+        buildPutRequest("workshop-1", "SOLO_LANDING", {
+          content: { hero: "x" },
+          status: "DRAFT",
+        }),
+        routeParams("workshop-1", "SOLO_LANDING")
+      );
+
+      expect(response.status).toBe(200);
+      const created = (db.landingPage.create as jest.Mock).mock.calls[0][0];
+      expect(created.data.customHtml).toBe("<p>Hello Test Workshop</p>");
+    });
+
+    it("writes customHtml=null on REGISTRATION CREATE even if PageTemplate has customHtml (eligibility filter)", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (canManageCoachData as jest.Mock).mockReturnValue(true);
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
+      (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+      (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([
+        {
+          customCode: null,
+          customHtml: "<p>not eligible</p>",
+          categoryId: null,
+        },
+      ]);
+      (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+        Promise.resolve({ id: "lp-reg", ...args.data })
+      );
+
+      const response = await PUT(
+        buildPutRequest("workshop-1", "REGISTRATION", {
+          content: { hero: "x" },
+          status: "DRAFT",
+        }),
+        routeParams("workshop-1", "REGISTRATION")
+      );
+
+      expect(response.status).toBe(200);
+      const created = (db.landingPage.create as jest.Mock).mock.calls[0][0];
+      expect(created.data.customHtml).toBeNull();
+    });
+
+    it("admin-supplied customHtml in request body wins over template copy on SOLO_LANDING CREATE", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (canManageCoachData as jest.Mock).mockReturnValue(true);
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
+      (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+      (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([
+        {
+          customCode: null,
+          customHtml: "<p>FROM TEMPLATE</p>",
+          categoryId: null,
+        },
+      ]);
+      (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+        Promise.resolve({ id: "lp-1", ...args.data })
+      );
+
+      const response = await PUT(
+        buildPutRequest("workshop-1", "SOLO_LANDING", {
+          content: { hero: "x" },
+          status: "DRAFT",
+          customHtml: "<p>FROM BODY</p>",
+        }),
+        routeParams("workshop-1", "SOLO_LANDING")
+      );
+
+      expect(response.status).toBe(200);
+      const created = (db.landingPage.create as jest.Mock).mock.calls[0][0];
+      // Body override (sanitized passthrough in our mock) is stored, not the template copy
+      expect(created.data.customHtml).toBe("<p>FROM BODY</p>");
+    });
+
+    it("rejects request body customHtml on REGISTRATION with 400 (eligibility filter)", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (canManageCoachData as jest.Mock).mockReturnValue(true);
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
+      (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+
+      const response = await PUT(
+        buildPutRequest("workshop-1", "REGISTRATION", {
+          content: { hero: "x" },
+          status: "DRAFT",
+          customHtml: "<p>not eligible</p>",
+        }),
+        routeParams("workshop-1", "REGISTRATION")
+      );
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(String(body.error).toLowerCase()).toMatch(/customhtml|eligibl/);
     });
   });
 });
