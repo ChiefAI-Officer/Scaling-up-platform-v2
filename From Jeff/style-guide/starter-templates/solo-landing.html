@@ -1,0 +1,300 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+
+  .su-root { font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1a1322; line-height: 1.6; background: #ffffff; -webkit-font-smoothing: antialiased; }
+  .su-root *, .su-root *::before, .su-root *::after { box-sizing: border-box; }
+  .su-root a { color: inherit; text-decoration: none; }
+  .su-root a:focus-visible, .su-root .su-cta:focus-visible { outline: 3px solid #f7a600; outline-offset: 3px; }
+  .su-h1, .su-h2, .su-h3 { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; letter-spacing: -0.01em; margin: 0; color: #1a1322; }
+  .su-h1 { font-size: 36px; line-height: 1.04; letter-spacing: -0.025em; }
+  .su-h2 { font-size: 26px; line-height: 1.15; }
+  .su-h3 { font-size: 18px; line-height: 1.25; }
+  .su-mono { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; font-size: 11px; }
+  .su-wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  /* Hero — purple dominant, asymmetric, no stock gradient */
+  .su-hero { background: #522583; color: #ffffff; position: relative; overflow: hidden; padding: 48px 0 56px; }
+  .su-hero::before { content: ""; position: absolute; right: -120px; top: -80px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, rgba(247,166,0,0.22), transparent 60%); pointer-events: none; }
+  .su-hero::after { content: ""; position: absolute; left: -100px; bottom: -160px; width: 360px; height: 360px; border-radius: 50%; background: radial-gradient(circle at 60% 40%, rgba(149,193,31,0.18), transparent 65%); pointer-events: none; }
+  .su-hero-inner { position: relative; display: grid; grid-template-columns: 1fr; gap: 24px; }
+
+  /* Brandbar with a CSS-recreated S-curve submark (no SVG) */
+  .su-brandbar { display: flex; align-items: center; gap: 14px; }
+  .su-mark { position: relative; width: 40px; height: 40px; flex-shrink: 0; border-radius: 4px; overflow: hidden; background: #ffffff; }
+  .su-mark-q { position: absolute; width: 50%; height: 50%; }
+  .su-mark-q.a { left: 0; top: 0; background: #f7a600; border-bottom-right-radius: 100%; }
+  .su-mark-q.b { right: 0; top: 0; background: #946b36; border-bottom-left-radius: 100%; }
+  .su-mark-q.c { left: 0; bottom: 0; background: #008bd2; border-top-right-radius: 100%; }
+  .su-mark-q.d { right: 0; bottom: 0; background: #95c11f; border-top-left-radius: 100%; }
+  .su-wordmark { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.22em; color: #ffffff; display: block; }
+  .su-tag { font-size: 10px; letter-spacing: 0.24em; opacity: 0.72; color: #ffffff; margin-top: 3px; display: block; }
+  .su-cat { display: inline-block; padding: 6px 12px; border: 1px solid rgba(255,255,255,0.4); border-radius: 999px; color: #ffffff; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; align-self: flex-start; }
+  .su-title { color: #ffffff; line-height: 1.02; letter-spacing: -0.025em; max-width: 22ch; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; margin: 0; }
+  .su-lede { color: rgba(255,255,255,0.88); font-size: 16px; line-height: 1.65; max-width: 60ch; margin: 0; }
+
+  .su-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; margin-top: 8px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.18); }
+  .su-meta-item { display: flex; flex-direction: column; gap: 4px; }
+  .su-meta-label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.62); font-weight: 500; }
+  .su-meta-val { font-size: 15px; color: #ffffff; font-weight: 500; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+
+  .su-cta-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-top: 8px; }
+  .su-cta { display: inline-block; background: #f7a600; color: #1a1322; padding: 16px 28px; border-radius: 4px; font-weight: 700; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+  .su-cta:hover { background: #ffb822; color: #1a1322; }
+  .su-price-tag { color: #ffffff; font-size: 14px; }
+  .su-price-tag b { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; font-size: 20px; }
+
+  /* Decisions intro on Light Grey #e4e4e4 (brand-declared primary) */
+  .su-decisions-intro { background: #e4e4e4; padding: 32px 0; border-top: 6px solid #522583; }
+  .su-decisions-intro-row { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: end; }
+  .su-decisions-eyebrow { color: #522583; }
+  .su-decisions-lead { font-size: 16px; color: #1a1322; max-width: 70ch; margin: 0; }
+  .su-decisions-lead b { color: #522583; }
+
+  /* Four Decisions pillars — semantic color mapping */
+  .su-pillars { background: #e4e4e4; padding: 0 0 8px; }
+  .su-pillars-grid { display: grid; grid-template-columns: 1fr; gap: 18px; padding: 28px 0 48px; }
+  .su-pillar { background: #ffffff; border-left: 8px solid #888; padding: 26px 24px 24px; position: relative; }
+  .su-pillar-num { position: absolute; right: 18px; top: 14px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; font-size: 44px; line-height: 1; opacity: 0.12; color: #1a1322; }
+  .su-pillar-label { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; margin-bottom: 8px; }
+  .su-pillar-h { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; font-size: 20px; line-height: 1.22; color: #1a1322; margin: 0 0 12px; }
+  .su-pillar-body { font-size: 16px; color: #2a1f3a; line-height: 1.6; margin: 0; }
+  .su-pillar.people { border-left-color: #f7a600; }
+  .su-pillar.people .su-pillar-label { color: #f7a600; }
+  .su-pillar.strategy { border-left-color: #008bd2; }
+  .su-pillar.strategy .su-pillar-label { color: #008bd2; }
+  .su-pillar.execution { border-left-color: #946b36; }
+  .su-pillar.execution .su-pillar-label { color: #946b36; }
+  .su-pillar.cash { border-left-color: #95c11f; }
+  .su-pillar.cash .su-pillar-label { color: #6a8a16; }
+
+  /* Mid-page CTA band — solves the "no CTA between hero and final" gap */
+  .su-midcta { background: #1a1322; color: #ffffff; padding: 28px 0; }
+  .su-midcta-row { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: center; }
+  .su-midcta-text { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 17px; font-weight: 500; line-height: 1.4; color: #ffffff; margin: 0; }
+  .su-midcta-text b { color: #f7a600; }
+
+  /* Logistics + Coach split */
+  .su-mid { background: #ffffff; padding: 56px 0; }
+  .su-mid-grid { display: grid; grid-template-columns: 1fr; gap: 36px; }
+  .su-logistics { background: #1a1322; color: #ffffff; padding: 32px 28px; border-radius: 4px; position: relative; }
+  .su-logistics .su-h2 { color: #ffffff; margin-bottom: 18px; }
+  .su-logistics-rule { height: 2px; width: 40px; background: #f7a600; margin-bottom: 18px; }
+  .su-log-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .su-log-item:last-child { border-bottom: 0; }
+  .su-log-key { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.55); width: 88px; flex-shrink: 0; padding-top: 3px; font-weight: 500; }
+  .su-log-val { font-size: 16px; color: #ffffff; line-height: 1.55; }
+  .su-log-val a { color: #95c11f; text-decoration: underline; word-break: break-word; }
+  .su-format-pill { display: inline-block; padding: 4px 10px; background: rgba(247,166,0,0.18); color: #f7a600; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; border-radius: 999px; margin-bottom: 14px; font-weight: 500; }
+  .su-format-note { font-size: 13px; color: rgba(255,255,255,0.6); margin: 0 0 14px; line-height: 1.45; }
+
+  /* Coach card */
+  .su-coach { background: #ffffff; border: 1px solid #e4e4e4; padding: 28px; }
+  .su-coach-eyebrow { color: #522583; display: block; margin-bottom: 14px; }
+  .su-coach-top { display: grid; grid-template-columns: 96px 1fr; gap: 18px; align-items: center; margin-bottom: 18px; }
+  .su-coach-photo { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; background: #e4e4e4; display: block; border: 2px solid #522583; }
+  .su-coach-name { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 700; font-size: 22px; color: #1a1322; line-height: 1.15; margin: 0; }
+  .su-coach-meta { font-size: 14px; color: #4a3f5a; margin-top: 4px; }
+  .su-coach-meta b { color: #522583; font-weight: 700; }
+  .su-coach-bio { font-size: 16px; color: #2a1f3a; line-height: 1.7; margin: 0; }
+
+  /* Final CTA with vertical 4-stripe brand signature */
+  .su-final { background: #522583; color: #ffffff; padding: 56px 0; position: relative; overflow: hidden; }
+  .su-final::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 8px; background: linear-gradient(to bottom, #f7a600 0%, #f7a600 25%, #008bd2 25%, #008bd2 50%, #946b36 50%, #946b36 75%, #95c11f 75%, #95c11f 100%); }
+  .su-final-grid { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: center; }
+  .su-final h2 { color: #ffffff; font-size: 28px; line-height: 1.1; max-width: 20ch; margin: 0 0 12px; }
+  .su-final p { color: rgba(255,255,255,0.88); font-size: 16px; max-width: 50ch; margin: 0; }
+  .su-final .su-cta { background: #95c11f; color: #1a1322; }
+  .su-final .su-cta:hover { background: #a8d128; color: #1a1322; }
+
+  /* Footer */
+  .su-foot { background: #1a1322; color: rgba(255,255,255,0.6); padding: 28px 0; font-size: 12px; }
+  .su-foot-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; align-items: center; }
+  .su-foot-tag { letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.45); font-size: 10px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 500; }
+
+  @media (min-width: 640px) {
+    .su-hero { padding: 64px 0 72px; }
+    .su-title, .su-h1 { font-size: 48px; }
+    .su-meta { grid-template-columns: repeat(4, 1fr); gap: 18px 28px; }
+    .su-pillars-grid { grid-template-columns: 1fr 1fr; }
+    .su-decisions-intro-row { grid-template-columns: 220px 1fr; gap: 32px; }
+    .su-midcta-row { grid-template-columns: 1fr auto; gap: 28px; }
+    .su-final-grid { grid-template-columns: 1.4fr 1fr; }
+    .su-h2 { font-size: 32px; }
+    .su-final h2 { font-size: 36px; }
+  }
+  @media (min-width: 768px) {
+    .su-title, .su-h1 { font-size: 60px; }
+    .su-pillars-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .su-pillar { padding: 28px 22px 26px; }
+    .su-pillar-h { font-size: 19px; }
+    .su-mid-grid { grid-template-columns: 1.05fr 1fr; gap: 48px; }
+    .su-h1 { font-size: 64px; }
+  }
+</style>
+
+<article class="su-root" data-custom-html-render="four-decisions-pillars" data-format="{{workshop_format}}" lang="en">
+
+  <header class="su-hero">
+    <div class="su-wrap su-hero-inner">
+      <div class="su-brandbar">
+        <span class="su-mark">
+          <span class="su-mark-q a"></span><span class="su-mark-q b"></span><span class="su-mark-q c"></span><span class="su-mark-q d"></span>
+        </span>
+        <span>
+          <span class="su-wordmark">SCALING UP</span>
+          <span class="su-tag">GROWING LEADERS — GROWING COMPANIES</span>
+        </span>
+      </div>
+
+      <span class="su-cat">{{category_name}}</span>
+
+      <h1 class="su-title">{{workshop_title}}</h1>
+      <p class="su-lede">{{workshop_description}}</p>
+
+      <div class="su-meta">
+        <div class="su-meta-item">
+          <span class="su-meta-label">Day</span>
+          <span class="su-meta-val">{{event_day}}</span>
+        </div>
+        <div class="su-meta-item">
+          <span class="su-meta-label">Date</span>
+          <span class="su-meta-val">{{event_date}}</span>
+        </div>
+        <div class="su-meta-item">
+          <span class="su-meta-label">Time</span>
+          <span class="su-meta-val">{{event_time}}</span>
+        </div>
+        <div class="su-meta-item">
+          <span class="su-meta-label">Format</span>
+          <span class="su-meta-val">{{workshop_format}}</span>
+        </div>
+      </div>
+
+      <div class="su-cta-row">
+        <a class="su-cta" href="{{registration_url}}">Reserve Your Seat</a>
+        <span class="su-price-tag">Investment <b>{{price}}</b></span>
+      </div>
+    </div>
+  </header>
+
+  <section class="su-decisions-intro">
+    <div class="su-wrap su-decisions-intro-row">
+      <div>
+        <span class="su-mono su-decisions-eyebrow">The Four Decisions</span>
+        <h2 class="su-h2" style="margin-top:4px;">Every scale-up is decided here.</h2>
+      </div>
+      <p class="su-decisions-lead">Growing companies must get four decisions right: <b>People, Strategy, Execution, and Cash</b>. Here is the lens {{coach_first_name}} will apply to <b>{{workshop_title}}</b> with you and your leadership team.</p>
+    </div>
+  </section>
+
+  <section class="su-pillars">
+    <div class="su-wrap su-pillars-grid">
+
+      <div class="su-pillar people">
+        <span class="su-pillar-num">01</span>
+        <div class="su-pillar-label">People</div>
+        <h3 class="su-pillar-h">The right team, in the right seats.</h3>
+        <p class="su-pillar-body">Attract, retain, and develop the A-players your next stage of growth requires — and make the hard calls earlier, with a {{coach_company}}-grade rhythm of leadership review.</p>
+      </div>
+
+      <div class="su-pillar strategy">
+        <span class="su-pillar-num">02</span>
+        <div class="su-pillar-label">Strategy</div>
+        <h3 class="su-pillar-h">Clarity, vision, and direction.</h3>
+        <p class="su-pillar-body">Sharpen your core customer, your differentiating "X-factor," and a 3–5 year thesis your whole company can repeat — pressure-tested in the room with {{coach_first_name}}.</p>
+      </div>
+
+      <div class="su-pillar execution">
+        <span class="su-pillar-num">03</span>
+        <div class="su-pillar-label">Execution</div>
+        <h3 class="su-pillar-h">The discipline of getting things done.</h3>
+        <p class="su-pillar-body">Install the meeting rhythm, priorities, and metrics that turn a smart plan into shipped quarterly outcomes — not another binder on the shelf.</p>
+      </div>
+
+      <div class="su-pillar cash">
+        <span class="su-pillar-num">04</span>
+        <div class="su-pillar-label">Cash</div>
+        <h3 class="su-pillar-h">Fund your own growth.</h3>
+        <p class="su-pillar-body">Shorten your cash conversion cycle and find the working-capital levers that let growth pay for itself — without dilution or another line of credit.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="su-midcta">
+    <div class="su-wrap su-midcta-row">
+      <p class="su-midcta-text">Ready to install the system? <b>{{event_day}}, {{event_date}}</b> — seats are limited so the room stays a working session.</p>
+      <a class="su-cta" href="{{registration_url}}">Reserve Your Seat — {{price}}</a>
+    </div>
+  </section>
+
+  <section class="su-mid">
+    <div class="su-wrap su-mid-grid">
+
+      <aside class="su-logistics">
+        <span class="su-format-pill">{{workshop_format}}</span>
+        <h2 class="su-h2">The Details</h2>
+        <div class="su-logistics-rule"></div>
+        <p class="su-format-note">For an in-person session keep the Venue row. For a virtual session keep the Join Link row. For HYBRID keep both.</p>
+
+        <div class="su-log-item">
+          <span class="su-log-key">When</span>
+          <span class="su-log-val">{{event_day}}, {{event_date}} · {{event_time}}</span>
+        </div>
+
+        <div class="su-log-item su-venue">
+          <span class="su-log-key">Venue</span>
+          <span class="su-log-val"><b>{{venue_name}}</b><br>{{venue_address}}</span>
+        </div>
+
+        <div class="su-log-item su-virtual">
+          <span class="su-log-key">Join Link</span>
+          <span class="su-log-val"><a href="{{virtual_link}}" target="_blank" rel="noopener noreferrer">Open the live session</a></span>
+        </div>
+
+        <div class="su-log-item">
+          <span class="su-log-key">Investment</span>
+          <span class="su-log-val">{{price}}</span>
+        </div>
+
+        <div class="su-log-item">
+          <span class="su-log-key">Track</span>
+          <span class="su-log-val">{{category_name}}</span>
+        </div>
+      </aside>
+
+      <div class="su-coach">
+        <span class="su-mono su-coach-eyebrow">Your Coach</span>
+        <div class="su-coach-top">
+          <img class="su-coach-photo" src="{{coach_photo}}" alt="{{coach_name}}" loading="lazy" width="96" height="96">
+          <div>
+            <h3 class="su-coach-name">{{coach_name}}</h3>
+            <div class="su-coach-meta">{{coach_title}} · <b>{{coach_company}}</b></div>
+          </div>
+        </div>
+        <p class="su-coach-bio">{{coach_bio}}</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="su-final">
+    <div class="su-wrap su-final-grid">
+      <div>
+        <h2 class="su-h2">Decide once. Scale for years.</h2>
+        <p>Join {{coach_first_name}} and the {{coach_company}} cohort for {{workshop_title}}. A working session, not a lecture — bring your full leadership team.</p>
+      </div>
+      <div>
+        <a class="su-cta" href="{{registration_url}}">Reserve Your Seat — {{price}}</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="su-foot">
+    <div class="su-wrap su-foot-row">
+      <span class="su-foot-tag">Scaling Up · Growing Leaders — Growing Companies</span>
+      <span class="su-foot-tag">{{workshop_title}} · {{event_date}} · {{workshop_format}}</span>
+    </div>
+  </footer>
+
+</article>
