@@ -1,36 +1,49 @@
 /**
  * Seed: Quarterly Session Prep v2 Assessment Template
  *
- * Creates an AssessmentTemplate (alias "qsp-v2") plus its immutable v1
- * AssessmentTemplateVersion (language "enUS") with 2 sections and 10 questions
- * (6 SLIDER_LIKERT retrospective + 4 forward-looking: 1 SLIDER_LIKERT + 3 TEXT).
+ * Creates an AssessmentTemplate (alias "qsp-v2") plus a new DRAFT
+ * AssessmentTemplateVersion (language "enUS") with the REAL Esperto content:
+ * 5 parts (sections), 17 questions:
+ *   - 1 NUMBER (P1 overall rating)
+ *   - 6 SLIDER_LIKERT (5-item P1 matrix + P2 personal check-in)
+ *   - 10 TEXT (P1 explain + P1 leadership rocks + 3 P1 core-values boxes +
+ *             3 P1 start/stop/continue + P2 explain + 3 P3 + 2 P4 + P5)
+ * Aggregation-only scoring (single neutral tier, passThreshold 0).
  *
- * Idempotency / safety model (6 explicit states):
- *   A — nothing found:            create template + v1 atomically.
- *   B — exact match (hash same):  no-op; log idempotent success and return.
- *   C — mismatch (hash differs):  THROW with a friendly message before the
- *                                 immutability trigger blocks us.
- *   D — half-baked heal:          template exists but v1 missing → create v1.
- *   E — orphan:                   v1 exists without a template → THROW.
- *   F — duplicate v1 rows:        defensive paranoia → THROW.
+ * Content is sourced verbatim from adversarially-verified transcription of
+ * the 14 Esperto survey screenshots (image9–image22) embedded in
+ * "From Jeff/APP_scaling up assessemnt/APP_qtr session prep v2/qtr session prep v2.xlsx"
+ * (image1–8 are Add-Campaign wizard + invitation email — skipped).
+ * Confirmed against three personal report PDFs + one Group report PDF.
  *
- * Concurrency: wrapped in a single Prisma interactive transaction whose first
- * statement acquires `pg_advisory_xact_lock(hashtext('assessment-qsp-v2-seed'))`.
- * That serializes concurrent prod seed attempts so two callers can't race the
- * create.
+ * Idempotency model (delegated to ensureTemplateVersionContent):
+ *   - Latest version hash matches → no-op.
+ *   - Latest version is a DRAFT with different hash → throws unless
+ *     forceSupersedeDraft: true (protects reviewer edits).
+ *   - Latest version is published with different hash → appends new DRAFT vN+1.
+ *   - No versions yet → creates template + v1 DRAFT.
+ *
+ * Concurrency: first statement inside the transaction acquires
+ * pg_try_advisory_xact_lock(hashtext('assessment-qsp-v2-seed')).
+ * If the lock is not acquired another session holds it → log + exit 1.
  *
  * Run: npx tsx prisma/seed-qsp-v2-assessment.ts
  */
 
 import { PrismaClient } from "@prisma/client";
 import { createHash } from "crypto";
+import {
+  ensureTemplateVersionContent,
+  type SeedContent,
+  type SeedResult as VersionSeedResult,
+} from "../src/lib/assessments/seed-template-version";
 
 const db = new PrismaClient();
 
 const TEMPLATE_ALIAS = "qsp-v2";
 const ADVISORY_LOCK_KEY = "assessment-qsp-v2-seed";
 
-// ─── Verbatim content ─────────────────────────────────────────────────────
+// ─── Template-level metadata (kept from original placeholder seed) ────────
 
 const TEMPLATE_NAME = "Quarterly Session Prep v2";
 const TEMPLATE_DESCRIPTION =
@@ -38,246 +51,390 @@ const TEMPLATE_DESCRIPTION =
 
 const INVITATION_SUBJECT = "Please complete your Quarterly Session Prep";
 
-// ─── Question definitions ─────────────────────────────────────────────────
+const INVITATION_BODY_MARKDOWN = `Hi {{respondentFirstName}},
 
-interface SectionDef {
-  name: string;
-  description: string;
-  questions: Array<{
-    label: string;
-    helpText: string;
-    type: "SLIDER_LIKERT" | "TEXT";
-  }>;
-}
+{{organizationName}} has invited you to complete the Quarterly Session Prep survey in preparation for the upcoming quarterly strategy session.
 
-const SECTIONS: SectionDef[] = [
-  {
-    name: "Quarterly Retrospective",
-    description: "Rate your progress over the past quarter",
-    questions: [
-      {
-        label: "How well did you achieve your quarterly priorities?",
-        helpText: "Consider your top 3 priorities for the quarter",
-        type: "SLIDER_LIKERT",
-      },
-      {
-        label: "How effectively did your team execute against the plan?",
-        helpText: "Consider team performance and delivery",
-        type: "SLIDER_LIKERT",
-      },
-      {
-        label: "How strong was your cash flow and financial performance?",
-        helpText: "Consider revenue, margins, and cash position",
-        type: "SLIDER_LIKERT",
-      },
-      {
-        label: "How well did you serve your customers this quarter?",
-        helpText: "Consider NPS, retention, and customer feedback",
-        type: "SLIDER_LIKERT",
-      },
-      {
-        label: "How effectively did you develop your people this quarter?",
-        helpText: "Consider hiring, coaching, and team development",
-        type: "SLIDER_LIKERT",
-      },
-      {
-        label:
-          "Overall, how would you rate the health of your business this quarter?",
-        helpText: "Your holistic view of the business",
-        type: "SLIDER_LIKERT",
-      },
-    ],
-  },
-  {
-    name: "Next Quarter Planning",
-    description: "Set your priorities for the coming quarter",
-    questions: [
-      {
-        label: "What is your #1 priority for the next quarter?",
-        helpText: "Your single most important objective",
-        type: "TEXT",
-      },
-      {
-        label: "How confident are you in achieving your top priority?",
-        helpText: "1 = very uncertain, 10 = fully committed",
-        type: "SLIDER_LIKERT",
-      },
-      {
-        label: "What is your biggest risk or obstacle this quarter?",
-        helpText: "Your primary concern heading into the quarter",
-        type: "TEXT",
-      },
-      {
-        label: "What support do you need from your coach?",
-        helpText: "Be specific about what would be most valuable",
-        type: "TEXT",
-      },
-    ],
-  },
-];
+Please take a few minutes to reflect on the past quarter and share your thoughts:
 
-// Scoring config — only SLIDER_LIKERT questions contribute to the score.
-// TEXT questions are filtered out before passing to scoreSubmission (the engine
-// is SLIDER_LIKERT-only in v1).
+{{invitationUrl}}
+
+Your responses will be aggregated and shared with your facilitator to prepare the session.`;
+
+// ─── Scale constant (used by every SLIDER_LIKERT question) ───────────────
 //
-// Engine contract: tierMetric must be one of "countAchieved" | "overallTotal"
-// | "overallAvg"; tier ranges use minMetric/maxMetric, top tier omits maxMetric
-// for open-ended above; fractional domains require touching tiers (b.minMetric
-// === a.maxMetric).
-const SCORING_CONFIG = {
-  tierMetric: "overallAvg",
-  passThreshold: 7,
-  scale: { min: 1, max: 10 },
+// Sliders show emoji-only anchors (sad-face low / happy-face high).
+// Emoji → empty strings per contract (no scaleLabels).
+
+const SLIDER_SCALE = {
+  min: 1,
+  max: 10,
+  step: 1,
+  anchorMin: "",
+  anchorMax: "",
+} as const;
+
+// ─── Aggregation-only scoring config (single neutral tier) ────────────────
+//
+// The real Esperto QSP v2 report is a pure aggregation — it shows each rating
+// plus a Mean across the leadership team. There are NO tier labels, NO
+// recommendation messages, and NO pass/fail threshold anywhere in the reports.
+// We use a single covering tier and passThreshold: 0 to satisfy the engine's
+// contract while carrying no semantic scoring.
+
+export const SCORING_CONFIG = {
+  tierMetric: "overallAvg" as const,
+  passThreshold: 0,
   tiers: [
     {
-      label: "At Risk",
       minMetric: 1,
-      maxMetric: 5,
+      maxMetric: 10,
+      label: "Submitted",
       message:
-        "Your quarterly performance signals real strain. Use this session to align on the most pressing fixes.",
-    },
-    {
-      label: "Needs Work",
-      minMetric: 5,
-      maxMetric: 7,
-      message:
-        "Pockets of weakness are pulling your quarter down. Identify two or three high-leverage corrections.",
-    },
-    {
-      label: "On Track",
-      minMetric: 7,
-      maxMetric: 9,
-      message:
-        "Solid quarter overall. Use the session to lock in what worked and tune the gaps.",
-    },
-    {
-      label: "Strong",
-      minMetric: 9,
-      message:
-        "Excellent quarter. Use the session to compound the wins and set bolder priorities.",
+        "Thank you — your responses have been recorded and shared with your facilitator to prepare the quarterly session.",
     },
   ],
 } as const;
 
-// ─── Derived structures ──────────────────────────────────────────────────
+// ─── Section payload type ─────────────────────────────────────────────────
 
-interface SectionPayload {
+export interface SectionPayload {
   stableKey: string;
   sortOrder: number;
   name: string;
-  description: string;
+  description?: string;
+  partLabel?: string;
 }
 
-interface QuestionPayload {
+// ─── Question payload types ───────────────────────────────────────────────
+
+export interface SliderLikertPayload {
   stableKey: string;
   sortOrder: number;
-  type: "SLIDER_LIKERT" | "TEXT";
+  type: "SLIDER_LIKERT";
   label: string;
-  helpText: string;
   sectionStableKey: string;
-  isRequired: true;
-  scale?: {
-    min: 1;
-    max: 10;
-    step: 1;
-    anchorMin: string;
-    anchorMax: string;
+  isRequired: boolean;
+  scale: typeof SLIDER_SCALE;
+}
+
+export interface NumberPayload {
+  stableKey: string;
+  sortOrder: number;
+  type: "NUMBER";
+  label: string;
+  sectionStableKey: string;
+  isRequired: boolean;
+}
+
+export interface TextPayload {
+  stableKey: string;
+  sortOrder: number;
+  type: "TEXT";
+  label: string;
+  sectionStableKey: string;
+  isRequired: boolean;
+}
+
+export type QuestionPayload = SliderLikertPayload | NumberPayload | TextPayload;
+
+// ─── Content interface ────────────────────────────────────────────────────
+
+export interface QspV2Content extends Omit<SeedContent, "sections" | "questions" | "scoringConfig"> {
+  sections: SectionPayload[];
+  questions: QuestionPayload[];
+  scoringConfig: typeof SCORING_CONFIG;
+}
+
+// ─── Content builder ──────────────────────────────────────────────────────
+//
+// Returns the REAL Esperto content transcribed verbatim from image9–22.
+// All 17 questions are stored; the scoring engine filters to SLIDER_LIKERT
+// internally (TEXT/NUMBER are pass-through, never scored).
+
+export function buildQspV2Content(): QspV2Content {
+  const sections: SectionPayload[] = [
+    {
+      stableKey: "P1_retrospective",
+      sortOrder: 1,
+      name: "PART 1: The Retrospective",
+      description: "Looking back at the past 90 days.",
+    },
+    {
+      stableKey: "P2_personal_checkin",
+      sortOrder: 2,
+      name: "PART 2: The Personal Check-in",
+      description: "Assessing personal alignment and energy.",
+    },
+    {
+      stableKey: "P3_growth_challenge",
+      sortOrder: 3,
+      name: "PART 3: The Growth Challenge",
+      description: "Identifying the biggest roadblocks.",
+    },
+    {
+      stableKey: "P4_focus",
+      sortOrder: 4,
+      name: "PART 4: The Focus for Next Quarter",
+      description: "Setting the stage for execution.",
+    },
+    {
+      stableKey: "P5_closing",
+      sortOrder: 5,
+      name: "PART 5: Closing",
+    },
+  ];
+
+  const questions: QuestionPayload[] = [
+    // ── P1: The Retrospective ────────────────────────────────────────────
+
+    // image10: numeric Rating field (text input, label "Rating *")
+    {
+      stableKey: "P1_overall_rating",
+      sortOrder: 1,
+      type: "NUMBER",
+      label: "How would you rate the past Quarter? (1-10) (with 1 decimal)",
+      sectionStableKey: "P1_retrospective",
+      isRequired: true,
+    },
+
+    // image11: free-text explain
+    {
+      stableKey: "P1_rating_explanation",
+      sortOrder: 2,
+      type: "TEXT",
+      label: "Please explain your rating.",
+      sectionStableKey: "P1_retrospective",
+      isRequired: true,
+    },
+
+    // image12: 5-item 1-10 slider matrix (CONFIRMED: no "The way you have performed")
+    {
+      stableKey: "P1_rate_success_rocks",
+      sortOrder: 3,
+      type: "SLIDER_LIKERT",
+      label: "Success in reaching the quarterly goals (rocks)",
+      sectionStableKey: "P1_retrospective",
+      isRequired: true,
+      scale: SLIDER_SCALE,
+    },
+    {
+      stableKey: "P1_rate_leadership_team",
+      sortOrder: 4,
+      type: "SLIDER_LIKERT",
+      label: "The functioning of the leadership team",
+      sectionStableKey: "P1_retrospective",
+      isRequired: true,
+      scale: SLIDER_SCALE,
+    },
+    {
+      stableKey: "P1_rate_core_values",
+      sortOrder: 5,
+      type: "SLIDER_LIKERT",
+      label: "The way core values of the company have been lived",
+      sectionStableKey: "P1_retrospective",
+      isRequired: true,
+      scale: SLIDER_SCALE,
+    },
+    {
+      stableKey: "P1_rate_atmosphere",
+      sortOrder: 6,
+      type: "SLIDER_LIKERT",
+      label: "The overall atmosphere within the organization",
+      sectionStableKey: "P1_retrospective",
+      isRequired: true,
+      scale: SLIDER_SCALE,
+    },
+    {
+      stableKey: "P1_rate_pride",
+      sortOrder: 7,
+      type: "SLIDER_LIKERT",
+      label: "How proud you are of the company",
+      sectionStableKey: "P1_retrospective",
+      isRequired: true,
+      scale: SLIDER_SCALE,
+    },
+
+    // image13: leadership team rocks view
+    {
+      stableKey: "P1_leadership_rocks_view",
+      sortOrder: 8,
+      type: "TEXT",
+      label: "What is your view on the results of past quarters' leadership team rocks?",
+      sectionStableKey: "P1_retrospective",
+      isRequired: true,
+    },
+
+    // image14: 3 TEXT boxes for core-values stories (no asterisk = optional)
+    {
+      stableKey: "P1_core_values_story_1",
+      sortOrder: 9,
+      type: "TEXT",
+      label: "Which employees have demonstrated that they live the core values? Why? Share the stories.",
+      sectionStableKey: "P1_retrospective",
+      isRequired: false,
+    },
+    {
+      stableKey: "P1_core_values_story_2",
+      sortOrder: 10,
+      type: "TEXT",
+      label: "Which employees have demonstrated that they live the core values? Why? Share the stories.",
+      sectionStableKey: "P1_retrospective",
+      isRequired: false,
+    },
+    {
+      stableKey: "P1_core_values_story_3",
+      sortOrder: 11,
+      type: "TEXT",
+      label: "Which employees have demonstrated that they live the core values? Why? Share the stories.",
+      sectionStableKey: "P1_retrospective",
+      isRequired: false,
+    },
+
+    // image15: company START (no asterisk = not required per verdict)
+    {
+      stableKey: "P1_company_start",
+      sortOrder: 12,
+      type: "TEXT",
+      label: "Please list the activities which you feel that the company should START doing next quarter.",
+      sectionStableKey: "P1_retrospective",
+      isRequired: false,
+    },
+
+    // image16: company STOP (no asterisk = not required per verdict)
+    {
+      stableKey: "P1_company_stop",
+      sortOrder: 13,
+      type: "TEXT",
+      label: "Please list the activities which you feel that the company should STOP doing next quarter.",
+      sectionStableKey: "P1_retrospective",
+      isRequired: false,
+    },
+
+    // image17: company CONTINUE (no asterisk = not required per verdict)
+    {
+      stableKey: "P1_company_continue",
+      sortOrder: 14,
+      type: "TEXT",
+      label: "Please list the activities which you feel that the company should CONTINUE doing next quarter.",
+      sectionStableKey: "P1_retrospective",
+      isRequired: false,
+    },
+
+    // ── P2: The Personal Check-in (image18) ─────────────────────────────
+
+    {
+      stableKey: "P2_checkin_slider",
+      sortOrder: 15,
+      type: "SLIDER_LIKERT",
+      label: "How aligned and energized do you feel regarding your current role and responsibilities?",
+      sectionStableKey: "P2_personal_checkin",
+      isRequired: true,
+      scale: SLIDER_SCALE,
+    },
+    {
+      stableKey: "P2_checkin_explain",
+      sortOrder: 16,
+      type: "TEXT",
+      label: "Please explain your rating. How are you truly feeling about your work right now?",
+      sectionStableKey: "P2_personal_checkin",
+      isRequired: true,
+    },
+
+    // ── P3: The Growth Challenge (image19) ───────────────────────────────
+
+    {
+      stableKey: "P3_growth_challenge",
+      sortOrder: 17,
+      type: "TEXT",
+      label: "What is in your view the company's biggest growth challenge right now?",
+      sectionStableKey: "P3_growth_challenge",
+      isRequired: true,
+    },
+    {
+      stableKey: "P3_why_challenge",
+      sortOrder: 18,
+      type: "TEXT",
+      label: "Why is this the biggest challenge?",
+      sectionStableKey: "P3_growth_challenge",
+      isRequired: true,
+    },
+    {
+      stableKey: "P3_solution",
+      sortOrder: 19,
+      type: "TEXT",
+      label: "Where do you believe the solution lies?",
+      sectionStableKey: "P3_growth_challenge",
+      isRequired: true,
+    },
+
+    // ── P4: The Focus for Next Quarter (image20) ─────────────────────────
+
+    {
+      stableKey: "P4_critical_number",
+      sortOrder: 20,
+      type: "TEXT",
+      label: "Critical Number Identification: What is the ONE area of the business where significant improvement would have the greatest impact next quarter?",
+      sectionStableKey: "P4_focus",
+      isRequired: false,
+    },
+    {
+      stableKey: "P4_top_priorities",
+      sortOrder: 21,
+      type: "TEXT",
+      label: "Top Priorities: What specific improved outcome or priority would drive breakthrough results for this Critical Number?",
+      sectionStableKey: "P4_focus",
+      isRequired: false,
+    },
+
+    // ── P5: Closing (image21) ─────────────────────────────────────────────
+
+    {
+      stableKey: "P5_closing",
+      sortOrder: 22,
+      type: "TEXT",
+      label: "Any other remarks, thoughts, concerns, or ideas for the upcoming Quarterly session?",
+      sectionStableKey: "P5_closing",
+      isRequired: false,
+    },
+  ];
+
+  return {
+    alias: TEMPLATE_ALIAS,
+    name: TEMPLATE_NAME,
+    description: TEMPLATE_DESCRIPTION,
+    invitationSubject: INVITATION_SUBJECT,
+    invitationBodyMarkdown: INVITATION_BODY_MARKDOWN,
+    language: "enUS",
+    sections,
+    questions,
+    scoringConfig: SCORING_CONFIG,
+    reportConfig: null,
   };
 }
 
-function buildSectionsAndQuestions(): {
-  sections: SectionPayload[];
-  questions: QuestionPayload[];
-} {
-  const sections: SectionPayload[] = [];
-  const questions: QuestionPayload[] = [];
-  let questionSortOrder = 0;
-
-  SECTIONS.forEach((section, idx) => {
-    const sectionNumber = idx + 1;
-    const sectionStableKey = `S${sectionNumber}`;
-    sections.push({
-      stableKey: sectionStableKey,
-      sortOrder: sectionNumber,
-      name: section.name,
-      description: section.description,
-    });
-
-    section.questions.forEach((q, qIdx) => {
-      const questionNumber = qIdx + 1;
-      questionSortOrder += 1;
-
-      const questionPayload: QuestionPayload = {
-        stableKey: `${sectionStableKey}_Q${questionNumber}`,
-        sortOrder: questionSortOrder,
-        type: q.type,
-        label: q.label,
-        helpText: q.helpText,
-        sectionStableKey,
-        isRequired: true,
-      };
-
-      // Only attach scale for SLIDER_LIKERT questions.
-      if (q.type === "SLIDER_LIKERT") {
-        questionPayload.scale = {
-          min: 1,
-          max: 10,
-          step: 1,
-          anchorMin: "Strongly disagree",
-          anchorMax: "Strongly agree",
-        };
-      }
-
-      questions.push(questionPayload);
-    });
-  });
-
-  return { sections, questions };
-}
-
-// ─── Engine-shaped template content (exported for tests) ─────────────────
+// ─── BC-compat: legacy exports used by existing test suites ──────────────
 //
-// Returns the SLIDER_LIKERT-only structure that `scoreSubmission` accepts. TEXT
-// questions are stored on the AssessmentTemplateVersion but are filtered here
-// because the scoring engine is SLIDER_LIKERT-only in v1.
-export function buildTemplateContent(): {
-  sections: SectionPayload[];
-  questions: Array<
-    Omit<QuestionPayload, "type" | "scale"> & {
-      type: "SLIDER_LIKERT";
-      scale: NonNullable<QuestionPayload["scale"]>;
-    }
-  >;
-  scoringConfig: typeof SCORING_CONFIG;
-} {
-  const { sections, questions } = buildSectionsAndQuestions();
-  const sliderQuestions = questions
-    .filter(
-      (q): q is QuestionPayload & {
-        type: "SLIDER_LIKERT";
-        scale: NonNullable<QuestionPayload["scale"]>;
-      } => q.type === "SLIDER_LIKERT" && q.scale !== undefined
-    )
-    .map((q, idx) => ({
-      ...q,
-      // Re-number sortOrder so the SLIDER_LIKERT-only subset is contiguous.
-      sortOrder: idx + 1,
-    }));
-  return { sections, questions: sliderQuestions, scoringConfig: SCORING_CONFIG };
-}
+// qsp-seeds.test.ts imports runSeed + computeContentHash from this file.
+// scoring.test.ts imports buildTemplateContent from this file (expects the
+// same shape: { sections, questions, scoringConfig }).
+// Keep all three to avoid breaking existing tests.
 
-// ─── Content hash ────────────────────────────────────────────────────────
-// Deterministic across runs: build the input object with a fixed key order,
-// serialize without whitespace, sha256, hex.
+/**
+ * BC-compat alias — scoring.test.ts imports this as `buildTemplateContent`.
+ * Returns the full content including all question types (not just SLIDER_LIKERT).
+ * The scoring engine filters internally.
+ */
+export const buildTemplateContent = buildQspV2Content;
+
 export function computeContentHash(input: {
-  questions: QuestionPayload[];
-  sections: SectionPayload[];
+  questions: unknown[];
+  sections: unknown[];
   scoringConfig: unknown;
   reportConfig: null;
   invitationSubject: string;
   invitationBodyMarkdown: string | null;
 }): string {
-  // Explicit key order — DO NOT pretty-print, DO NOT sort, DO NOT add whitespace.
   const canonical = {
     questions: input.questions,
     sections: input.sections,
@@ -289,27 +446,78 @@ export function computeContentHash(input: {
   return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
 
-// ─── System user resolution ───────────────────────────────────────────────
-const SYSTEM_SEED_EMAIL = "system-seed@scalingup.platform";
-
-async function resolveSystemUser(
-  tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]
-): Promise<{ id: string }> {
-  return tx.user.upsert({
-    where: { email: SYSTEM_SEED_EMAIL },
-    create: {
-      email: SYSTEM_SEED_EMAIL,
-      role: "STAFF",
-      name: "System Seed",
-    },
-    update: {},
-    select: { id: true },
-  });
+export interface SeedResult {
+  state: "A" | "B" | "C" | "D";
+  templateId: string;
+  versionId: string;
+  sectionCount: number;
+  questionCount: number;
+  contentHash: string;
 }
 
-// ─── ensureAccessGroupAndTemplateLink ─────────────────────────────────────
+export async function runSeed(client: PrismaClient): Promise<SeedResult> {
+  const content = buildQspV2Content();
+
+  const result = await client.$transaction(async (tx) => {
+    const lockRows = await tx.$queryRawUnsafe<Array<{ acquired: boolean }>>(
+      `SELECT pg_try_advisory_xact_lock(hashtext('${ADVISORY_LOCK_KEY}')) AS acquired`
+    );
+    const acquired = lockRows[0]?.acquired ?? false;
+    if (!acquired) {
+      throw new Error(
+        `[seed-qsp-v2-assessment] Could not acquire advisory lock ` +
+          `"${ADVISORY_LOCK_KEY}" — another seed run is in progress. ` +
+          `Try again after the other session completes.`
+      );
+    }
+
+    const sys = await tx.user.upsert({
+      where: { email: "system-seed@scalingup.platform" },
+      create: {
+        email: "system-seed@scalingup.platform",
+        role: "STAFF",
+        name: "System Seed",
+      },
+      update: {},
+      select: { id: true },
+    });
+
+    const seedResult: VersionSeedResult = await ensureTemplateVersionContent(
+      tx as unknown as Parameters<typeof ensureTemplateVersionContent>[0],
+      sys.id,
+      content,
+      { forceSupersedeDraft: true }
+    );
+
+    await ensureAccessGroupAndTemplateLink(
+      tx as unknown as Parameters<typeof ensureAccessGroupAndTemplateLink>[0],
+      seedResult.templateId,
+      "Scaling Up Coaches",
+      sys.id
+    );
+
+    return {
+      state: seedResult.action === "created" ? ("A" as const) : ("B" as const),
+      templateId: seedResult.templateId,
+      versionId: seedResult.versionId,
+      sectionCount: content.sections.length,
+      questionCount: content.questions.length,
+      contentHash: seedResult.contentHash,
+    };
+  }, {
+    maxWait: 30_000,
+    timeout: 60_000,
+  });
+
+  return result;
+}
+
+// ─── System user helpers ──────────────────────────────────────────────────
+
+type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+
 async function ensureAccessGroupAndTemplateLink(
-  tx: Parameters<Parameters<typeof db.$transaction>[0]>[0],
+  tx: Tx,
   templateId: string,
   groupName: string,
   systemUserId: string,
@@ -338,9 +546,7 @@ async function ensureAccessGroupAndTemplateLink(
       throw new Error(
         `[seed-qsp-v2-assessment] AccessGroup "${groupName}" exists ` +
           `but is soft-deleted (deletedAt=${existingGroup.deletedAt.toISOString()}). ` +
-          `Refusing to silently un-archive. ` +
-          `Operator must un-archive the group via admin UI or set ` +
-          `deletedAt = NULL manually before re-seeding.`
+          `Refusing to silently un-archive.`
       );
     }
     groupId = existingGroup.id;
@@ -383,204 +589,6 @@ async function ensureAccessGroupAndTemplateLink(
   }
 }
 
-// ─── Core seed logic (exported for testing) ──────────────────────────────
-
-export interface SeedResult {
-  state: "A" | "B" | "C" | "D";
-  templateId: string;
-  versionId: string;
-  sectionCount: number;
-  questionCount: number;
-  contentHash: string;
-}
-
-export async function runSeed(
-  client: PrismaClient
-): Promise<SeedResult> {
-  const { sections, questions } = buildSectionsAndQuestions();
-
-  const contentHash = computeContentHash({
-    questions,
-    sections,
-    scoringConfig: SCORING_CONFIG,
-    reportConfig: null,
-    invitationSubject: INVITATION_SUBJECT,
-    invitationBodyMarkdown: "",
-  });
-
-  const result = await client.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(
-      `SELECT pg_advisory_xact_lock(hashtext('${ADVISORY_LOCK_KEY}'))`
-    );
-
-    const systemUser = await resolveSystemUser(tx);
-
-    const existingTemplate = await tx.assessmentTemplate.findUnique({
-      where: { alias: TEMPLATE_ALIAS },
-      select: { id: true, createdBy: true },
-    });
-
-    if (!existingTemplate) {
-      // STATE E — orphan defensive check.
-      const orphanedV1s = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-        `SELECT v.id
-           FROM assessment_template_versions v
-           LEFT JOIN assessment_templates t ON t.id = v."templateId"
-           WHERE v."versionNumber" = 1
-             AND v.language = 'enUS'
-             AND t.id IS NULL`
-      );
-      if (orphanedV1s.length > 0) {
-        throw new Error(
-          `[seed-qsp-v2-assessment] Found ${orphanedV1s.length} orphaned ` +
-            `v1/enUS AssessmentTemplateVersion row(s) with no matching template ` +
-            `(IDs: ${orphanedV1s.map((r) => r.id).join(", ")}). ` +
-            `Database invariant violation — the FK to assessment_templates is broken. ` +
-            `Investigate before proceeding.`
-        );
-      }
-
-      // STATE A — nothing found: create template + v1 atomically.
-      const template = await tx.assessmentTemplate.create({
-        data: {
-          name: TEMPLATE_NAME,
-          alias: TEMPLATE_ALIAS,
-          description: TEMPLATE_DESCRIPTION,
-          invitationSubject: INVITATION_SUBJECT,
-          invitationBodyMarkdown: "",
-          aggregationMode: "FULL_VISIBILITY",
-          createdBy: systemUser.id,
-        },
-        select: { id: true },
-      });
-
-      const version = await tx.assessmentTemplateVersion.create({
-        data: {
-          templateId: template.id,
-          versionNumber: 1,
-          language: "enUS",
-          questions: questions as unknown as object,
-          sections: sections as unknown as object,
-          scoringConfig: SCORING_CONFIG as unknown as object,
-          reportConfig: undefined,
-          contentHash,
-          publishedAt: new Date(),
-          publishedBy: systemUser.id,
-        },
-        select: { id: true },
-      });
-
-      await ensureAccessGroupAndTemplateLink(
-        tx,
-        template.id,
-        "Scaling Up Coaches",
-        systemUser.id
-      );
-
-      return {
-        state: "A" as const,
-        templateId: template.id,
-        versionId: version.id,
-        sectionCount: sections.length,
-        questionCount: questions.length,
-        contentHash,
-      };
-    }
-
-    // Template exists — look for v1 / enUS rows.
-    const v1Rows = await tx.assessmentTemplateVersion.findMany({
-      where: {
-        templateId: existingTemplate.id,
-        versionNumber: 1,
-        language: "enUS",
-      },
-      select: { id: true, contentHash: true },
-    });
-
-    if (v1Rows.length > 1) {
-      // STATE F — duplicate v1 rows.
-      throw new Error(
-        `[seed-qsp-v2-assessment] Found ${v1Rows.length} v1/enUS rows ` +
-          `for template ${existingTemplate.id}. Database invariant violation: ` +
-          `the unique constraint (templateId, versionNumber, language) is broken. ` +
-          `Investigate before proceeding.`
-      );
-    }
-
-    if (v1Rows.length === 0) {
-      // STATE D — half-baked heal.
-      const version = await tx.assessmentTemplateVersion.create({
-        data: {
-          templateId: existingTemplate.id,
-          versionNumber: 1,
-          language: "enUS",
-          questions: questions as unknown as object,
-          sections: sections as unknown as object,
-          scoringConfig: SCORING_CONFIG as unknown as object,
-          reportConfig: undefined,
-          contentHash,
-          publishedAt: new Date(),
-          publishedBy: systemUser.id,
-        },
-        select: { id: true },
-      });
-
-      await ensureAccessGroupAndTemplateLink(
-        tx,
-        existingTemplate.id,
-        "Scaling Up Coaches",
-        systemUser.id
-      );
-
-      return {
-        state: "D" as const,
-        templateId: existingTemplate.id,
-        versionId: version.id,
-        sectionCount: sections.length,
-        questionCount: questions.length,
-        contentHash,
-      };
-    }
-
-    // Exactly one v1 row.
-    const existingVersion = v1Rows[0];
-
-    if (existingVersion.contentHash === contentHash) {
-      // STATE B — exact match. Idempotent no-op.
-      await ensureAccessGroupAndTemplateLink(
-        tx,
-        existingTemplate.id,
-        "Scaling Up Coaches",
-        systemUser.id
-      );
-
-      return {
-        state: "B" as const,
-        templateId: existingTemplate.id,
-        versionId: existingVersion.id,
-        sectionCount: sections.length,
-        questionCount: questions.length,
-        contentHash,
-      };
-    }
-
-    // STATE C — mismatch.
-    throw new Error(
-      `[seed-qsp-v2-assessment] Existing v1/enUS version ` +
-        `(${existingVersion.id}) has contentHash=${existingVersion.contentHash} ` +
-        `which does not match the seed's computed contentHash=${contentHash}. ` +
-        `Published assessment versions are immutable. ` +
-        `To change v1 content, publish a NEW versionNumber instead of mutating v1. ` +
-        `Refusing to silently mutate the immutable published row.`
-    );
-  }, {
-    maxWait: 30_000,
-    timeout: 60_000,
-  });
-
-  return result;
-}
-
 // ─── Main ────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -597,10 +605,8 @@ async function main(): Promise<void> {
       questionCount: result.questionCount,
       message:
         result.state === "A"
-          ? "Created template + v1."
-          : result.state === "B"
-            ? "Idempotent no-op — exact match."
-            : "Healed missing v1 on existing template.",
+          ? "Created template + version."
+          : "Idempotent no-op — exact match.",
     })
   );
 }

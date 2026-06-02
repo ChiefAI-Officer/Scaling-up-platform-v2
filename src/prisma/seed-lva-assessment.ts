@@ -1,33 +1,54 @@
 /**
- * Seed: Leadership Vision Alignment (LVA) Assessment Template (v1)
+ * Seed: Leadership Vision Alignment (LVA) Assessment Template
  *
- * Creates an AssessmentTemplate (alias "leadership-vision-alignment") plus its
- * immutable v1 AssessmentTemplateVersion (language "enUS") with 9 sections and
- * 54 questions (NUMBER, TEXT, SLIDER_LIKERT, MULTI_CHOICE).
+ * Creates an AssessmentTemplate (alias "leadership-vision-alignment") plus a
+ * new DRAFT AssessmentTemplateVersion (language "enUS") with 8 sections and
+ * 51 questions (9 NUMBER, 8+2 TEXT required, 16+16 TEXT optional, 16
+ * SLIDER_LIKERT, 1 MULTI_CHOICE) via the shared `ensureTemplateVersionContent`
+ * helper (version-aware append model).
  *
- * Scoring note: only the 16 SLIDER_LIKERT questions in Section 4 (scale 1–3)
- * are scored. Tier thresholds are PLACEHOLDER — Jeff must confirm messaging
- * before the template is published via the admin editor.
+ * Content sourced verbatim from:
+ *   "From Jeff/APP_scaling up assessemnt/APP_leadership vision alignment assessment/
+ *    leadership visin alignment assement.xlsx"
+ * Adversarially verified against individual + group Esperto reports.
  *
- * Idempotency / safety model (6 explicit states):
- *   A — nothing found:            create template + v1 atomically.
- *   B — exact match (hash same):  no-op; log idempotent success and return.
- *   C — mismatch (hash differs):  THROW with a friendly message before the
- *                                 immutability trigger blocks us.
- *   D — half-baked heal:          template exists but v1 missing → create v1.
- *   E — orphan:                   v1 exists without a template → THROW.
- *   F — duplicate v1 rows:        defensive paranoia → THROW.
+ * ─── Structure ────────────────────────────────────────────────────────────
+ * S0 Welcome              — no questions (intro only)
+ * S1 Company in 3 Years   — 9 NUMBER (THREE-YEAR ASPIRATIONAL figures)
+ * S2 Vision on Future     — 8 TEXT required (xlsx trailing *)
+ * S3 Org Strengths        — 16 SLIDER_LIKERT, scale 1-3 (Weak/Strong)
+ * S4 Biggest Obstacles    — 1 MULTI_CHOICE, maxChoices 3
+ * S5 Obstacles Explained  — 16 TEXT optional (one per factor) + 2 TEXT required
+ * S6 Focus Areas          — 1 NUMBER optional + 14 TEXT required
+ * S7 Completion           — no questions (final page only)
  *
- * Concurrency: wrapped in a single Prisma interactive transaction whose first
- * statement acquires `pg_advisory_xact_lock(hashtext('assessment-lva-v1-seed'))`.
- * That serializes concurrent prod seed attempts so two callers can't race the
- * create.
+ * ─── Scoring ─────────────────────────────────────────────────────────────
+ * Only the 16 SLIDER_LIKERT questions in S3 are scored (1-3 scale). No
+ * tier/band system exists in the source material — the seed uses a single
+ * NEUTRAL "Submitted" tier covering the full 1-3 range (passThreshold: 0).
+ * The fabricated Developing/Building/Scaling tiers from the previous seed
+ * have been removed.
+ *
+ * ─── Idempotency model (delegated to helper) ──────────────────────────────
+ *   - Latest version hash matches seed hash → no-op.
+ *   - Latest version is a DRAFT with different hash → throws unless
+ *     `forceSupersedeDraft: true` is set (protects reviewer edits).
+ *   - Latest version is published with different hash → appends new DRAFT vN+1.
+ *   - No versions yet → creates template + v1 DRAFT.
+ *
+ * Concurrency: first statement inside the transaction acquires
+ * `pg_try_advisory_xact_lock(hashtext('assessment-lva-v1-seed'))`.
+ * If the lock is not acquired (another session holds it), the seed logs and
+ * exits with code 1.
  *
  * Run: npx tsx prisma/seed-lva-assessment.ts
  */
 
 import { PrismaClient } from "@prisma/client";
-import { createHash } from "crypto";
+import {
+  ensureTemplateVersionContent,
+  type SeedContent,
+} from "../src/lib/assessments/seed-template-version";
 
 const db = new PrismaClient();
 
@@ -53,41 +74,95 @@ Click the link below to begin:
 
 Your responses are confidential and shared only with your coach.`;
 
-// ─── Scoring config (placeholder — Jeff to confirm before publish) ────────
+// ─── Scoring config ───────────────────────────────────────────────────────
+//
+// No tier/band system exists in any source file (xlsx, individual reports,
+// or group report). A single NEUTRAL "Submitted" tier covers the full 1-3
+// slider range. passThreshold: 0 means every submission "passes" (i.e. no
+// gating on score). This replaces the fabricated Developing/Building/Scaling
+// placeholder tiers from the previous seed.
 
 const SCORING_CONFIG = {
-  tierMetric: "overallAvg",
-  passThreshold: 2,
+  tierMetric: "overallAvg" as const,
+  passThreshold: 0,
   tiers: [
     {
-      order: 1,
-      minMetric: 1.0,
-      maxMetric: 1.67,
-      label: "Developing",
+      minMetric: 1,
+      maxMetric: 3,
+      label: "Submitted",
       message:
-        "TODO: confirm tier messaging with Jeff before publishing.",
-      action: "TODO: confirm with Jeff",
-    },
-    {
-      order: 2,
-      minMetric: 1.67,
-      maxMetric: 2.34,
-      label: "Building",
-      message:
-        "TODO: confirm tier messaging with Jeff before publishing.",
-      action: "TODO: confirm with Jeff",
-    },
-    {
-      order: 3,
-      minMetric: 2.34,
-      maxMetric: 3.0,
-      label: "Scaling",
-      message:
-        "TODO: confirm tier messaging with Jeff before publishing.",
-      action: "TODO: confirm with Jeff",
+        "Thank you — your responses have been recorded for your leadership team's vision-alignment review.",
     },
   ],
 } as const;
+
+// ─── The 16 organisational factors (verbatim from xlsx sharedStrings) ─────
+//
+// Used in both the SLIDER_LIKERT matrix (S3) and the MULTI_CHOICE obstacle
+// question (S4). Declared once to prevent drift.
+//
+// Note: the MULTI_CHOICE checkbox list uses "The Leadership" (capital L, xlsx
+// index 49) while the matrix row uses "The leadership" (lowercase l, xlsx
+// index 34). Both are intentional — they reference the same factor but the
+// xlsx stores distinct strings in the two locations. We mirror the source.
+
+const FACTORS_FOR_MATRIX = [
+  "Recruitment of new employees",
+  "Retaining staff",
+  "Leadership Team",
+  "The leadership",
+  "Culture",
+  "Internal communications",
+  "Strategy",
+  "Execution and operational processes",
+  "Marketing",
+  "Sales",
+  "Technology",
+  "Scalability",
+  "Innovation",
+  "Financial processes",
+  "Cash",
+  "Growth Financing",
+] as const;
+
+const FACTORS_FOR_CHECKBOX = [
+  "Recruitment of new employees",
+  "Retaining staff",
+  "Leadership Team",
+  "The Leadership",
+  "Culture",
+  "Internal communications",
+  "Strategy",
+  "Execution and operational processes",
+  "Marketing",
+  "Sales",
+  "Technology",
+  "Scalability",
+  "Innovation",
+  "Financial processes",
+  "Cash",
+  "Growth Financing",
+] as const;
+
+// Stable-key slugs for the 16 factors (used in S5 "why" optional questions).
+const FACTOR_STABLE_KEYS = [
+  "recruitment",
+  "retaining_staff",
+  "leadership_team",
+  "the_leadership",
+  "culture",
+  "internal_comms",
+  "strategy",
+  "execution",
+  "marketing",
+  "sales",
+  "technology",
+  "scalability",
+  "innovation",
+  "financial_processes",
+  "cash",
+  "growth_financing",
+] as const;
 
 // ─── Question type shapes ─────────────────────────────────────────────────
 
@@ -113,7 +188,7 @@ interface TextQuestion {
   type: "TEXT";
   label: string;
   sectionStableKey: string;
-  isRequired: false;
+  isRequired: boolean;
 }
 
 interface NumberQuestion {
@@ -121,8 +196,9 @@ interface NumberQuestion {
   sortOrder: number;
   type: "NUMBER";
   label: string;
+  helpText?: string;
   sectionStableKey: string;
-  isRequired: false;
+  isRequired: boolean;
 }
 
 interface MultiChoiceOption {
@@ -155,549 +231,405 @@ interface SectionPayload {
 
 // ─── Content builder ──────────────────────────────────────────────────────
 
+export interface LvaContent
+  extends Omit<SeedContent, "sections" | "questions" | "scoringConfig"> {
+  sections: SectionPayload[];
+  questions: QuestionPayload[];
+  scoringConfig: typeof SCORING_CONFIG;
+}
+
+export function buildLvaContent(): LvaContent {
+  const { sections, questions } = buildSectionsAndQuestions();
+  return {
+    alias: TEMPLATE_ALIAS,
+    name: TEMPLATE_NAME,
+    description: TEMPLATE_DESCRIPTION,
+    invitationSubject: INVITATION_SUBJECT,
+    invitationBodyMarkdown: INVITATION_BODY_MARKDOWN,
+    language: "enUS",
+    sections,
+    questions,
+    scoringConfig: SCORING_CONFIG,
+    reportConfig: null,
+  };
+}
+
 function buildSectionsAndQuestions(): {
   sections: SectionPayload[];
   questions: QuestionPayload[];
 } {
   const sections: SectionPayload[] = [
-    { stableKey: "S1", sortOrder: 1, name: "Company Financials & Scale" },
-    { stableKey: "S2", sortOrder: 2, name: "Business Context" },
-    { stableKey: "S3", sortOrder: 3, name: "Future Vision" },
-    { stableKey: "S4", sortOrder: 4, name: "Organizational Strengths" },
-    { stableKey: "S5", sortOrder: 5, name: "Obstacles to Growth" },
-    { stableKey: "S6", sortOrder: 6, name: "Obstacle Details" },
-    { stableKey: "S7", sortOrder: 7, name: "Leadership & Culture" },
-    { stableKey: "S8", sortOrder: 8, name: "Strategy & Execution" },
-    { stableKey: "S9", sortOrder: 9, name: "KPIs & Leadership" },
+    { stableKey: "S0_welcome",    sortOrder: 1, name: "Welcome" },
+    { stableKey: "S1_financials", sortOrder: 2, name: "The Company in Three Years — Financials & Scale" },
+    { stableKey: "S2_vision",     sortOrder: 3, name: "Vision on the Future" },
+    { stableKey: "S3_strengths",  sortOrder: 4, name: "Organizational Strengths and Weaknesses" },
+    { stableKey: "S4_obstacles",  sortOrder: 5, name: "Biggest Obstacles to Growth" },
+    { stableKey: "S5_explained",  sortOrder: 6, name: "Obstacles and Challenges Explained" },
+    { stableKey: "S6_focus",      sortOrder: 7, name: "Important Focus Areas" },
+    { stableKey: "S7_completion", sortOrder: 8, name: "Completion" },
   ];
 
   let sortOrder = 0;
+  const questions: QuestionPayload[] = [];
 
-  const questions: QuestionPayload[] = [
-    // ── Section 1: Company Financials & Scale (9 NUMBER questions) ──────
-    {
-      stableKey: "S1_Q1",
-      sortOrder: ++sortOrder,
-      type: "NUMBER",
-      label: "What is the company's annual revenue? (millions)",
-      sectionStableKey: "S1",
-      isRequired: false,
-    },
-    {
-      stableKey: "S1_Q2",
-      sortOrder: ++sortOrder,
-      type: "NUMBER",
-      label: "What is the gross margin? (millions)",
-      sectionStableKey: "S1",
-      isRequired: false,
-    },
-    {
-      stableKey: "S1_Q3",
-      sortOrder: ++sortOrder,
-      type: "NUMBER",
-      label: "What is the relative net profit? (%)",
-      sectionStableKey: "S1",
-      isRequired: false,
-    },
-    {
-      stableKey: "S1_Q4",
-      sortOrder: ++sortOrder,
-      type: "NUMBER",
-      label: "How many customers does the company have?",
-      sectionStableKey: "S1",
-      isRequired: false,
-    },
-    {
-      stableKey: "S1_Q5",
-      sortOrder: ++sortOrder,
-      type: "NUMBER",
-      label: "How many total employees does the company have?",
-      sectionStableKey: "S1",
-      isRequired: false,
-    },
-    {
-      stableKey: "S1_Q6",
-      sortOrder: ++sortOrder,
-      type: "NUMBER",
-      label: "How many permanent employees (FTE)?",
-      sectionStableKey: "S1",
-      isRequired: false,
-    },
-    {
-      stableKey: "S1_Q7",
-      sortOrder: ++sortOrder,
-      type: "NUMBER",
-      label: "How many part-time / contract employees (FTE)?",
-      sectionStableKey: "S1",
-      isRequired: false,
-    },
-    {
-      stableKey: "S1_Q8",
-      sortOrder: ++sortOrder,
-      type: "NUMBER",
-      label: "How many branches does the company have?",
-      sectionStableKey: "S1",
-      isRequired: false,
-    },
-    {
-      stableKey: "S1_Q9",
-      sortOrder: ++sortOrder,
-      type: "NUMBER",
-      label:
-        "In how many countries does the company provide products or services?",
-      sectionStableKey: "S1",
-      isRequired: false,
-    },
+  // ── S0 Welcome: no questions ─────────────────────────────────────────────
 
-    // ── Section 2: Business Context (6 TEXT questions) ───────────────────
+  // ── S1 The Company in Three Years — 9 NUMBER (aspirational, not current) ─
+  // Labels verbatim from xlsx sharedStrings (indices 2,5,7,9,11,13,15,16,18).
+  // The reports render these as "in three years" figures (e.g. "Company's
+  // revenue in three years (in million)"). helpText carries the unit hint.
+  questions.push(
     {
-      stableKey: "S2_Q1",
+      stableKey: "S1_revenue",
+      sortOrder: ++sortOrder,
+      type: "NUMBER",
+      label: "What is the company's revenue in three years?",
+      helpText: "million (for example enter 2.4)",
+      sectionStableKey: "S1_financials",
+      isRequired: false,
+    },
+    {
+      stableKey: "S1_gross_margin",
+      sortOrder: ++sortOrder,
+      type: "NUMBER",
+      label: "What is the gross margin (revenue - / - direct (purchase) cost) in three years?",
+      helpText: "million (for example enter 0.3)",
+      sectionStableKey: "S1_financials",
+      isRequired: false,
+    },
+    {
+      stableKey: "S1_net_profit_pct",
+      sortOrder: ++sortOrder,
+      type: "NUMBER",
+      label: "What is the relative net profit in three years?",
+      helpText: "%",
+      sectionStableKey: "S1_financials",
+      isRequired: false,
+    },
+    {
+      stableKey: "S1_customers",
+      sortOrder: ++sortOrder,
+      type: "NUMBER",
+      label: "How many customers does the company have in three years?",
+      helpText: "customers",
+      sectionStableKey: "S1_financials",
+      isRequired: false,
+    },
+    {
+      stableKey: "S1_total_employees",
+      sortOrder: ++sortOrder,
+      type: "NUMBER",
+      label: "How many total employees does the company have in three years?",
+      helpText: "employees",
+      sectionStableKey: "S1_financials",
+      isRequired: false,
+    },
+    {
+      stableKey: "S1_permanent_fte",
+      sortOrder: ++sortOrder,
+      type: "NUMBER",
+      label: "How many permanent employees in three years? (FTE)",
+      helpText: "FTE",
+      sectionStableKey: "S1_financials",
+      isRequired: false,
+    },
+    {
+      stableKey: "S1_parttime_fte",
+      sortOrder: ++sortOrder,
+      type: "NUMBER",
+      label: "How many part-time / hiring in three years? (FTE)",
+      helpText: "FTE",
+      sectionStableKey: "S1_financials",
+      isRequired: false,
+    },
+    {
+      stableKey: "S1_branches",
+      sortOrder: ++sortOrder,
+      type: "NUMBER",
+      label: "How many branches does the company then have in three years?",
+      helpText: "branches",
+      sectionStableKey: "S1_financials",
+      isRequired: false,
+    },
+    {
+      stableKey: "S1_countries",
+      sortOrder: ++sortOrder,
+      type: "NUMBER",
+      label: "In how many countries does the company provide its products or services in three years?",
+      helpText: "countries",
+      sectionStableKey: "S1_financials",
+      isRequired: false,
+    }
+  );
+
+  // ── S2 Vision on the Future — 8 TEXT required ────────────────────────────
+  // Labels verbatim from xlsx sharedStrings (indices 20-27), trailing NBSP+*
+  // stripped (the * indicates required in the xlsx).
+  questions.push(
+    {
+      stableKey: "S2_main_products",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label: "What are the main products or services?",
-      sectionStableKey: "S2",
-      isRequired: false,
+      label: "What are the main products?",
+      sectionStableKey: "S2_vision",
+      isRequired: true,
     },
     {
-      stableKey: "S2_Q2",
+      stableKey: "S2_main_partners",
       sortOrder: ++sortOrder,
       type: "TEXT",
       label: "Who are the main business partners?",
-      sectionStableKey: "S2",
-      isRequired: false,
+      sectionStableKey: "S2_vision",
+      isRequired: true,
     },
     {
-      stableKey: "S2_Q3",
+      stableKey: "S2_main_competitors",
       sortOrder: ++sortOrder,
       type: "TEXT",
       label: "Who are the main competitors?",
-      sectionStableKey: "S2",
-      isRequired: false,
+      sectionStableKey: "S2_vision",
+      isRequired: true,
     },
     {
-      stableKey: "S2_Q4",
+      stableKey: "S2_media",
       sortOrder: ++sortOrder,
       type: "TEXT",
       label: "What do the media write about the company?",
-      sectionStableKey: "S2",
-      isRequired: false,
+      sectionStableKey: "S2_vision",
+      isRequired: true,
     },
     {
-      stableKey: "S2_Q5",
+      stableKey: "S2_reason_success",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label: "What is the main reason behind the company's success?",
-      sectionStableKey: "S2",
-      isRequired: false,
+      label: "What is the main reason behind the success?",
+      sectionStableKey: "S2_vision",
+      isRequired: true,
     },
     {
-      stableKey: "S2_Q6",
+      stableKey: "S2_employees_say",
       sortOrder: ++sortOrder,
       type: "TEXT",
       label: "What do employees say about the company?",
-      sectionStableKey: "S2",
-      isRequired: false,
+      sectionStableKey: "S2_vision",
+      isRequired: true,
     },
+    {
+      stableKey: "S2_major_initiatives",
+      sortOrder: ++sortOrder,
+      type: "TEXT",
+      label: "What are the major initiatives in the coming years to achieve these goals and success?",
+      sectionStableKey: "S2_vision",
+      isRequired: true,
+    },
+    {
+      stableKey: "S2_reason_not_reach",
+      sortOrder: ++sortOrder,
+      type: "TEXT",
+      label: "What could be the key reason to NOT reach this ambition?",
+      sectionStableKey: "S2_vision",
+      isRequired: true,
+    }
+  );
 
-    // ── Section 3: Future Vision (2 TEXT questions) ──────────────────────
-    {
-      stableKey: "S3_Q1",
-      sortOrder: ++sortOrder,
-      type: "TEXT",
-      label:
-        "What are the major initiatives in the coming years to achieve your goals?",
-      sectionStableKey: "S3",
-      isRequired: false,
-    },
-    {
-      stableKey: "S3_Q2",
-      sortOrder: ++sortOrder,
-      type: "TEXT",
-      label: "What could be the key reason for NOT reaching this ambition?",
-      sectionStableKey: "S3",
-      isRequired: false,
-    },
+  // ── S3 Organizational Strengths and Weaknesses — 16 SLIDER_LIKERT 1-3 ───
+  // Labels verbatim from xlsx sharedStrings (indices 31-46).
+  // Scale: 1=Weak, 2=Average (implied), 3=Strong. No scaleLabels field.
+  const SLIDER_SCALE = { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" } as const;
 
-    // ── Section 4: Organizational Strengths (16 SLIDER_LIKERT 1–3) ──────
-    {
-      stableKey: "S4_Q1",
+  for (let i = 0; i < FACTORS_FOR_MATRIX.length; i++) {
+    questions.push({
+      stableKey: `S3_${FACTOR_STABLE_KEYS[i]}`,
       sortOrder: ++sortOrder,
       type: "SLIDER_LIKERT",
-      label: "Recruitment of new employees",
-      sectionStableKey: "S4",
+      label: FACTORS_FOR_MATRIX[i],
+      sectionStableKey: "S3_strengths",
       isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q2",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Retaining staff",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q3",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Leadership Team",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q4",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "The leadership",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q5",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Culture",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q6",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Internal communications",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q7",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Strategy",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q8",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Execution and operational processes",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q9",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Marketing",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q10",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Sales",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q11",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Technology",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q12",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Scalability",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q13",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Innovation",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q14",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Financial processes",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q15",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Cash",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
-    {
-      stableKey: "S4_Q16",
-      sortOrder: ++sortOrder,
-      type: "SLIDER_LIKERT",
-      label: "Growth Financing",
-      sectionStableKey: "S4",
-      isRequired: true,
-      scale: { min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" },
-    },
+      scale: SLIDER_SCALE,
+    });
+  }
 
-    // ── Section 5: Obstacles to Growth (1 MULTI_CHOICE, maxChoices:3) ───
-    {
-      stableKey: "S5_Q1",
-      sortOrder: ++sortOrder,
-      type: "MULTI_CHOICE",
-      label:
-        "Which three factors are the biggest obstacles to achieving your growth targets?",
-      sectionStableKey: "S5",
-      isRequired: false,
-      maxChoices: 3,
-      options: [
-        { key: "S4_Q1", label: "Recruitment of new employees" },
-        { key: "S4_Q2", label: "Retaining staff" },
-        { key: "S4_Q3", label: "Leadership Team" },
-        { key: "S4_Q4", label: "The leadership" },
-        { key: "S4_Q5", label: "Culture" },
-        { key: "S4_Q6", label: "Internal communications" },
-        { key: "S4_Q7", label: "Strategy" },
-        { key: "S4_Q8", label: "Execution and operational processes" },
-        { key: "S4_Q9", label: "Marketing" },
-        { key: "S4_Q10", label: "Sales" },
-        { key: "S4_Q11", label: "Technology" },
-        { key: "S4_Q12", label: "Scalability" },
-        { key: "S4_Q13", label: "Innovation" },
-        { key: "S4_Q14", label: "Financial processes" },
-        { key: "S4_Q15", label: "Cash" },
-        { key: "S4_Q16", label: "Growth Financing" },
-      ],
-    },
+  // ── S4 Biggest Obstacles — 1 MULTI_CHOICE, maxChoices: 3 ─────────────────
+  // Label verbatim from xlsx sharedString index 47.
+  // Options use the checkbox list (index 49 for "The Leadership" with capital L).
+  questions.push({
+    stableKey: "S4_biggest_obstacles",
+    sortOrder: ++sortOrder,
+    type: "MULTI_CHOICE",
+    label: "Can you indicate what three factors you see as the biggest obstacle to achieving the growth targets?",
+    sectionStableKey: "S4_obstacles",
+    isRequired: false,
+    maxChoices: 3,
+    options: FACTORS_FOR_CHECKBOX.map((label, i) => ({
+      key: FACTOR_STABLE_KEYS[i],
+      label,
+    })),
+  });
 
-    // ── Section 6: Obstacle Details (5 TEXT questions) ───────────────────
-    {
-      stableKey: "S6_Q1",
+  // ── S5 Obstacles Explained — 16 optional TEXT (one per factor) + 2 required
+  // Since the platform has no conditional logic, all 16 per-factor follow-ups
+  // are seeded as OPTIONAL TEXT. The two always-shown questions are REQUIRED
+  // (marked with * in xlsx, indices 56 and 57).
+  for (let i = 0; i < FACTORS_FOR_MATRIX.length; i++) {
+    questions.push({
+      stableKey: `S5_why_${FACTOR_STABLE_KEYS[i]}`,
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label: "Why is your biggest obstacle a hindrance to growth?",
-      sectionStableKey: "S6",
+      label: `Why is ${FACTORS_FOR_MATRIX[i]} a hindrance?`,
+      sectionStableKey: "S5_explained",
       isRequired: false,
-    },
+    });
+  }
+  // Two always-on questions (verbatim from xlsx indices 56, 57).
+  questions.push(
     {
-      stableKey: "S6_Q2",
+      stableKey: "S5_other_factor",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label: "Why is your second biggest obstacle a hindrance to growth?",
-      sectionStableKey: "S6",
-      isRequired: false,
+      label: "Is another factor hindering your growth? If so, which?",
+      sectionStableKey: "S5_explained",
+      isRequired: true,
     },
     {
-      stableKey: "S6_Q3",
+      stableKey: "S5_change_one_thing",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label: "Why is your third obstacle a hindrance to growth?",
-      sectionStableKey: "S6",
-      isRequired: false,
-    },
-    {
-      stableKey: "S6_Q4",
-      sortOrder: ++sortOrder,
-      type: "TEXT",
-      label:
-        "Is there another factor hindering your growth? If so, which one?",
-      sectionStableKey: "S6",
-      isRequired: false,
-    },
-    {
-      stableKey: "S6_Q5",
-      sortOrder: ++sortOrder,
-      type: "TEXT",
-      label:
-        "If you could change one thing within your company, what would it be?",
-      sectionStableKey: "S6",
-      isRequired: false,
-    },
+      label: "If you could change one thing within your company? What would it be?",
+      sectionStableKey: "S5_explained",
+      isRequired: true,
+    }
+  );
 
-    // ── Section 7: Leadership & Culture (1 NUMBER + 5 TEXT) ──────────────
+  // ── S6 Important Focus Areas — 1 NUMBER + 14 TEXT ────────────────────────
+  // NUMBER: rehire % (xlsx index 59), NOT marked required (no trailing *).
+  // All 14 TEXT questions ARE required (trailing * in xlsx, indices 65-92).
+  questions.push(
     {
-      stableKey: "S7_Q1",
+      stableKey: "S6_rehire_pct",
       sortOrder: ++sortOrder,
       type: "NUMBER",
-      label:
-        "Approximately what percentage of people in the organization would you enthusiastically hire again? (%)",
-      sectionStableKey: "S7",
+      label: "Approximately what percentage of people in the organization would you enthusiastically hire again?",
+      helpText: "%",
+      sectionStableKey: "S6_focus",
       isRequired: false,
     },
     {
-      stableKey: "S7_Q2",
+      stableKey: "S6_bhag",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label: "What is the long-term goal of the organization (> 15 years / BHAG)?",
-      sectionStableKey: "S7",
-      isRequired: false,
+      label: "What is the long-term goal of the organization (> 15 years)? (Sometimes referred to as BHAG).",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
     {
-      stableKey: "S7_Q3",
+      stableKey: "S6_core_purpose",
       sortOrder: ++sortOrder,
       type: "TEXT",
       label: "What is the core purpose (mission) of the company?",
-      sectionStableKey: "S7",
-      isRequired: false,
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
     {
-      stableKey: "S7_Q4",
+      stableKey: "S6_core_values",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label:
-        "What are the core values of the organization? Mention at least three.",
-      sectionStableKey: "S7",
-      isRequired: false,
+      label: "What do you think are the core values of the organization? Mention at least three.",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
     {
-      stableKey: "S7_Q5",
+      stableKey: "S6_market_focus",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label:
-        "Is there a clear market focus — what is the exact playfield ('sandbox')?",
-      sectionStableKey: "S7",
-      isRequired: false,
+      label: "Is there a clear market focus, what is the exact playfield? (sometimes referred to as 'sandbox').",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
     {
-      stableKey: "S7_Q6",
+      stableKey: "S6_core_customer",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label:
-        "What is the defined 'core customer'? Is marketing and sales effectively aimed at that customer?",
-      sectionStableKey: "S7",
-      isRequired: false,
+      label: "What is the defined 'core customer'? Is marketing and sales effectively aimed at the customer? Explain.",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
-
-    // ── Section 8: Strategy & Execution (6 TEXT questions) ───────────────
     {
-      stableKey: "S8_Q1",
+      stableKey: "S6_strategy_one_sentence",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label: "Describe the company's strategy in one sentence.",
-      sectionStableKey: "S8",
-      isRequired: false,
+      label: "Describe the company's strategy in one sentence:",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
     {
-      stableKey: "S8_Q2",
+      stableKey: "S6_strategy_implementation",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label:
-        "Does the company manage to implement the strategy effectively and efficiently?",
-      sectionStableKey: "S8",
-      isRequired: false,
+      label: "Does the company manage to implement the strategy effectively and efficiently? Explain.",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
     {
-      stableKey: "S8_Q3",
+      stableKey: "S6_goals_clear",
       sortOrder: ++sortOrder,
       type: "TEXT",
       label: "Are the goals for the year and quarter clear?",
-      sectionStableKey: "S8",
-      isRequired: false,
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
     {
-      stableKey: "S8_Q4",
+      stableKey: "S6_priority_org",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label:
-        "What is, in your opinion, the overall number one priority for the organization?",
-      sectionStableKey: "S8",
-      isRequired: false,
+      label: "What is in your opinion the overall number one priority for the organization?",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
     {
-      stableKey: "S8_Q5",
+      stableKey: "S6_priority_year",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label: "What is the most important thing to achieve this year's goals?",
-      sectionStableKey: "S8",
-      isRequired: false,
+      label: "What is in your opinion the most important thing to achieve this year's goals?",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
     {
-      stableKey: "S8_Q6",
+      stableKey: "S6_priority_quarter",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label:
-        "What is the number one priority this quarter to meet the targets?",
-      sectionStableKey: "S8",
-      isRequired: false,
+      label: "What is in your opinion the number one priority this quarter to meet the targets?",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
     },
+    {
+      stableKey: "S6_dept_kpis",
+      sortOrder: ++sortOrder,
+      type: "TEXT",
+      label: "What are the three most important department KPI's?",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
+    },
+    {
+      stableKey: "S6_constructive_discussions",
+      sortOrder: ++sortOrder,
+      type: "TEXT",
+      label: "Is the leadership team able to conduct constructive discussions and do all team members feel comfortable to participate? Explain your answer briefly.",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
+    },
+    {
+      stableKey: "S6_add_leadership_position",
+      sortOrder: ++sortOrder,
+      type: "TEXT",
+      label: "What leadership position would you prefer to add tomorrow to the existing team? Explain your answer briefly.",
+      sectionStableKey: "S6_focus",
+      isRequired: true,
+    }
+  );
 
-    // ── Section 9: KPIs & Leadership (3 TEXT questions) ──────────────────
-    {
-      stableKey: "S9_Q1",
-      sortOrder: ++sortOrder,
-      type: "TEXT",
-      label: "What are the three most important KPIs for the key departments?",
-      sectionStableKey: "S9",
-      isRequired: false,
-    },
-    {
-      stableKey: "S9_Q2",
-      sortOrder: ++sortOrder,
-      type: "TEXT",
-      label:
-        "Is the leadership team able to conduct constructive discussions where all members feel comfortable to participate?",
-      sectionStableKey: "S9",
-      isRequired: false,
-    },
-    {
-      stableKey: "S9_Q3",
-      sortOrder: ++sortOrder,
-      type: "TEXT",
-      label:
-        "What leadership position would you most want to add to the existing team?",
-      sectionStableKey: "S9",
-      isRequired: false,
-    },
-  ];
+  // ── S7 Completion: no questions ──────────────────────────────────────────
 
   return { sections, questions };
-}
-
-// ─── Content hash ────────────────────────────────────────────────────────
-// Deterministic across runs: build the input object with a fixed key order,
-// serialize without whitespace, sha256, hex.
-function computeContentHash(input: {
-  questions: QuestionPayload[];
-  sections: SectionPayload[];
-  scoringConfig: unknown;
-  reportConfig: null;
-  invitationSubject: string;
-  invitationBodyMarkdown: string;
-}): string {
-  // Explicit key order — DO NOT pretty-print, DO NOT sort, DO NOT add whitespace.
-  const canonical = {
-    questions: input.questions,
-    sections: input.sections,
-    scoringConfig: input.scoringConfig,
-    reportConfig: input.reportConfig,
-    invitationSubject: input.invitationSubject,
-    invitationBodyMarkdown: input.invitationBodyMarkdown,
-  };
-  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
 
 // ─── System user resolution ───────────────────────────────────────────────
@@ -797,222 +729,54 @@ async function ensureAccessGroupAndTemplateLink(
 // ─── Main ────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const { sections, questions } = buildSectionsAndQuestions();
-
-  // Validate counts before touching the DB.
-  if (sections.length !== 9) {
-    throw new Error(
-      `[seed-lva-assessment] Expected 9 sections, got ${sections.length}`
-    );
-  }
-  if (questions.length !== 54) {
-    throw new Error(
-      `[seed-lva-assessment] Expected 54 questions, got ${questions.length}`
-    );
-  }
-
-  // Pre-compute everything outside the tx so it's identical inside.
-  const contentHash = computeContentHash({
-    questions,
-    sections,
-    scoringConfig: SCORING_CONFIG,
-    reportConfig: null,
-    invitationSubject: INVITATION_SUBJECT,
-    invitationBodyMarkdown: INVITATION_BODY_MARKDOWN,
-  });
+  const content = buildLvaContent();
 
   const result = await db.$transaction(async (tx) => {
-    // Serialize concurrent seed attempts deterministically.
-    await tx.$executeRawUnsafe(
-      `SELECT pg_advisory_xact_lock(hashtext('${ADVISORY_LOCK_KEY}'))`
+    const lockRows = await tx.$queryRawUnsafe<Array<{ acquired: boolean }>>(
+      `SELECT pg_try_advisory_xact_lock(hashtext('${ADVISORY_LOCK_KEY}')) AS acquired`
     );
-
-    const systemUser = await resolveSystemUser(tx);
-
-    // Find existing template (by unique alias).
-    const existingTemplate = await tx.assessmentTemplate.findUnique({
-      where: { alias: TEMPLATE_ALIAS },
-      select: { id: true, createdBy: true },
-    });
-
-    if (!existingTemplate) {
-      // STATE E — orphan defensive check.
-      const orphanedV1s = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-        `SELECT v.id
-           FROM assessment_template_versions v
-           LEFT JOIN assessment_templates t ON t.id = v."templateId"
-           WHERE v."versionNumber" = 1
-             AND v.language = 'enUS'
-             AND t.id IS NULL`
-      );
-      if (orphanedV1s.length > 0) {
-        throw new Error(
-          `[seed-lva-assessment] Found ${orphanedV1s.length} orphaned ` +
-            `v1/enUS AssessmentTemplateVersion row(s) with no matching template ` +
-            `(IDs: ${orphanedV1s.map((r) => r.id).join(", ")}). ` +
-            `Database invariant violation — the FK to assessment_templates is broken. ` +
-            `Investigate before proceeding.`
-        );
-      }
-
-      // STATE A — nothing found: create template + v1 atomically.
-      const template = await tx.assessmentTemplate.create({
-        data: {
-          name: TEMPLATE_NAME,
-          alias: TEMPLATE_ALIAS,
-          description: TEMPLATE_DESCRIPTION,
-          invitationSubject: INVITATION_SUBJECT,
-          invitationBodyMarkdown: INVITATION_BODY_MARKDOWN,
-          aggregationMode: "FULL_VISIBILITY",
-          createdBy: systemUser.id,
-        },
-        select: { id: true },
-      });
-
-      const version = await tx.assessmentTemplateVersion.create({
-        data: {
-          templateId: template.id,
-          versionNumber: 1,
-          language: "enUS",
-          questions: questions as unknown as object,
-          sections: sections as unknown as object,
-          scoringConfig: SCORING_CONFIG as unknown as object,
-          reportConfig: undefined, // null in DB
-          contentHash,
-          // Intentionally NOT published — Jeff must confirm tier messaging
-          // before operators publish via the admin editor.
-          publishedAt: null,
-          publishedBy: null,
-        },
-        select: { id: true },
-      });
-
-      await ensureAccessGroupAndTemplateLink(
-        tx,
-        template.id,
-        "Scaling Up Coaches",
-        systemUser.id
-      );
-
-      return {
-        state: "A" as const,
-        templateId: template.id,
-        versionId: version.id,
-        sectionCount: sections.length,
-        questionCount: questions.length,
-        contentHash,
-      };
-    }
-
-    // Template exists — look for v1 / enUS rows.
-    const v1Rows = await tx.assessmentTemplateVersion.findMany({
-      where: {
-        templateId: existingTemplate.id,
-        versionNumber: 1,
-        language: "enUS",
-      },
-      select: { id: true, contentHash: true },
-    });
-
-    if (v1Rows.length > 1) {
-      // STATE F — duplicate v1 rows.
+    const acquired = lockRows[0]?.acquired ?? false;
+    if (!acquired) {
       throw new Error(
-        `[seed-lva-assessment] Found ${v1Rows.length} v1/enUS rows ` +
-          `for template ${existingTemplate.id}. Database invariant violation: ` +
-          `the unique constraint (templateId, versionNumber, language) is broken. ` +
-          `Investigate before proceeding.`
+        `[seed-lva-assessment] Could not acquire advisory lock ` +
+          `"${ADVISORY_LOCK_KEY}" — another seed run is in progress. ` +
+          `Try again after the other session completes.`
       );
     }
 
-    if (v1Rows.length === 0) {
-      // STATE D — half-baked heal.
-      const version = await tx.assessmentTemplateVersion.create({
-        data: {
-          templateId: existingTemplate.id,
-          versionNumber: 1,
-          language: "enUS",
-          questions: questions as unknown as object,
-          sections: sections as unknown as object,
-          scoringConfig: SCORING_CONFIG as unknown as object,
-          reportConfig: undefined,
-          contentHash,
-          publishedAt: null,
-          publishedBy: null,
-        },
-        select: { id: true },
-      });
+    const sys = await resolveSystemUser(tx);
 
-      await ensureAccessGroupAndTemplateLink(
-        tx,
-        existingTemplate.id,
-        "Scaling Up Coaches",
-        systemUser.id
-      );
-
-      return {
-        state: "D" as const,
-        templateId: existingTemplate.id,
-        versionId: version.id,
-        sectionCount: sections.length,
-        questionCount: questions.length,
-        contentHash,
-      };
-    }
-
-    // Exactly one v1 row.
-    const existingVersion = v1Rows[0];
-
-    if (existingVersion.contentHash === contentHash) {
-      // STATE B — exact match. Still run access-group linking to heal
-      // pre-amendment deploys that skipped this step.
-      await ensureAccessGroupAndTemplateLink(
-        tx,
-        existingTemplate.id,
-        "Scaling Up Coaches",
-        systemUser.id
-      );
-
-      return {
-        state: "B" as const,
-        templateId: existingTemplate.id,
-        versionId: existingVersion.id,
-        sectionCount: sections.length,
-        questionCount: questions.length,
-        contentHash,
-      };
-    }
-
-    // STATE C — mismatch. Throw before the immutability trigger blocks us.
-    throw new Error(
-      `[seed-lva-assessment] Existing v1/enUS version ` +
-        `(${existingVersion.id}) has contentHash=${existingVersion.contentHash} ` +
-        `which does not match the seed's computed contentHash=${contentHash}. ` +
-        `Published assessment versions are immutable. ` +
-        `To change v1 content, publish a NEW versionNumber instead of mutating v1. ` +
-        `Refusing to silently mutate the immutable published row.`
+    const seedResult = await ensureTemplateVersionContent(
+      tx as unknown as Parameters<typeof ensureTemplateVersionContent>[0],
+      sys.id,
+      content
     );
+
+    await ensureAccessGroupAndTemplateLink(
+      tx,
+      seedResult.templateId,
+      "Scaling Up Coaches",
+      sys.id
+    );
+
+    return { ...seedResult };
   }, {
-    // Neon pooler adds per-query latency; default 5s timeout is too tight.
     maxWait: 30_000,
     timeout: 60_000,
   });
 
-  // Log a single JSON line on success.
   console.log(
     JSON.stringify({
       seed: "lva-assessment",
-      state: result.state,
+      action: result.action,
       templateId: result.templateId,
       versionId: result.versionId,
+      versionNumber: result.versionNumber,
       contentHash: result.contentHash,
-      sectionCount: result.sectionCount,
-      questionCount: result.questionCount,
       message:
-        result.state === "A"
-          ? "Created template + v1 (DRAFT — publish after Jeff confirms tier messaging)."
-          : result.state === "B"
-            ? "Idempotent no-op — exact match."
-            : "Healed missing v1 on existing template.",
+        result.action === "created"
+          ? `Appended DRAFT v${result.versionNumber}.`
+          : `No-op — latest v${result.versionNumber} already matches.`,
     })
   );
 }

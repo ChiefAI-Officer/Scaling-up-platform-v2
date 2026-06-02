@@ -39,6 +39,8 @@
     "seed:qsp-v1": "npx tsx prisma/seed-qsp-v1-assessment.ts",
     "seed:qsp-v2": "npx tsx prisma/seed-qsp-v2-assessment.ts",
     "seed:scaling-up-full": "npx tsx prisma/seed-scaling-up-full-assessment.ts",
+    "db:seed-assessments": "node scripts/safe-seed.mjs all",
+    "verify:seeded-assessments": "node scripts/verify-seeded-versions.mjs",
     "db:studio": "prisma studio",
     "db:reset": "node scripts/safe-prisma.mjs migrate reset",
     "postinstall": "prisma generate",

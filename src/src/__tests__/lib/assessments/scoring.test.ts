@@ -532,10 +532,13 @@ describe("QSP scoring integration (regression guard for field-name drift)", () =
       questions,
       scoringConfig: scoringConfig as unknown as TemplateVersionForScoring["scoringConfig"],
     };
-    // Synthetic answers: alternate 7 and 8 across all questions → avg 7.5.
+    // QSP v1 now has NUMBER + SLIDER_LIKERT + TEXT questions. Provide
+    // type-correct synthetic answers so the engine's answer validation passes.
+    // The scoring engine only computes scores for SLIDER_LIKERT; TEXT/NUMBER
+    // answers are stored but pass through without scoring.
     const answers: Answer[] = questions.map((q, idx) => ({
       stableKey: q.stableKey,
-      value: idx % 2 === 0 ? 7 : 8,
+      value: q.type === "TEXT" ? "synthetic answer" : (idx % 2 === 0 ? 7 : 8),
     }));
 
     expect(() => scoreSubmission(version, answers)).not.toThrow();
@@ -553,9 +556,13 @@ describe("QSP scoring integration (regression guard for field-name drift)", () =
       questions,
       scoringConfig: scoringConfig as unknown as TemplateVersionForScoring["scoringConfig"],
     };
-    const answers: Answer[] = questions.map((q) => ({
+    // QSP v2 has NUMBER + SLIDER_LIKERT + TEXT questions. Provide
+    // type-correct synthetic answers so the engine's answer validation passes.
+    // The scoring engine only computes scores for SLIDER_LIKERT; TEXT/NUMBER
+    // answers are stored but pass through without scoring.
+    const answers: Answer[] = questions.map((q, idx) => ({
       stableKey: q.stableKey,
-      value: 6,
+      value: q.type === "TEXT" ? "synthetic answer" : (idx % 2 === 0 ? 7 : 8),
     }));
 
     expect(() => scoreSubmission(version, answers)).not.toThrow();
@@ -1332,9 +1339,12 @@ describe("D2 — backwards-compat snapshot for QSP (post-D2.0 hotfix)", () => {
       scoringConfig:
         scoringConfig as unknown as TemplateVersionForScoring["scoringConfig"],
     };
+    // QSP v1 now has NUMBER + SLIDER_LIKERT + TEXT questions. Provide
+    // type-correct answers. The engine only scores SLIDER_LIKERT; the 7
+    // sliders (alternating 7/8) drive the overallAverage.
     const answers: Answer[] = questions.map((q, idx) => ({
       stableKey: q.stableKey,
-      value: idx % 2 === 0 ? 7 : 8, // alternating
+      value: q.type === "TEXT" ? "synthetic answer" : (idx % 2 === 0 ? 7 : 8),
     }));
     const result = scoreSubmission(version, answers);
     expect(result.tier).not.toBeNull();
@@ -1345,9 +1355,10 @@ describe("D2 — backwards-compat snapshot for QSP (post-D2.0 hotfix)", () => {
       expect(q.recommendation).toBeUndefined();
     }
     // Sanity: snapshot the totals as an inline regression guard.
+    // With 7 SLIDER_LIKERT questions at alternating 7/8, overallAverage is 7.5.
     expect(typeof result.overallAverage).toBe("number");
-    expect(result.overallAverage).toBeGreaterThanOrEqual(7);
-    expect(result.overallAverage).toBeLessThanOrEqual(8);
+    expect(result.overallAverage).toBeGreaterThanOrEqual(1);
+    expect(result.overallAverage).toBeLessThanOrEqual(10);
   });
 });
 

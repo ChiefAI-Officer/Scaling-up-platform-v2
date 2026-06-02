@@ -444,7 +444,11 @@ export type ScoringValidationCode =
   | "NON_INTEGER"
   | "INVALID_TYPE"
   | "DUPLICATE_STABLE_KEY"
-  | "INVALID_SCORING_CONFIG";
+  | "INVALID_SCORING_CONFIG"
+  | "ANSWER_TOO_LONG"
+  | "INVALID_OPTION_KEY"
+  | "DUPLICATE_OPTION_KEY"
+  | "TOO_MANY_CHOICES";
 
 export class ScoringValidationError extends Error {
   constructor(
@@ -456,6 +460,118 @@ export class ScoringValidationError extends Error {
     this.name = "ScoringValidationError";
     // Restore prototype chain for `instanceof` across compilation targets.
     Object.setPrototypeOf(this, ScoringValidationError.prototype);
+  }
+}
+
+// ─── Answer value validation ──────────────────────────────────────────────
+
+/** Maximum character length accepted for a TEXT answer. */
+export const MAX_TEXT_ANSWER_LENGTH = 10_000;
+
+/**
+ * Validates the runtime value of a single answer against its question's type
+ * and constraints. Returns a `ScoringValidationError` if invalid, or `null`
+ * if the value is acceptable. Does NOT check required-presence (that is
+ * handled separately in `scoreSubmission`); call this when a key IS present.
+ *
+ * One source of truth — used inside `scoreSubmission` and can be called
+ * independently from route handlers for early rejection.
+ */
+export function validateAnswerValues(
+  question: z.infer<typeof QuestionBase>,
+  value: unknown
+): ScoringValidationError | null {
+  const { stableKey } = question;
+
+  switch (question.type) {
+    case "SLIDER_LIKERT": {
+      // SLIDER validation is handled inline in scoreSubmission (existing code path).
+      // This branch is a no-op so the function stays the single source-of-truth
+      // callable from both places without duplicating the slider logic.
+      return null;
+    }
+
+    case "TEXT": {
+      if (typeof value !== "string") {
+        return new ScoringValidationError("INVALID_TYPE", {
+          stableKey,
+          expectedType: "string",
+          gotType: Array.isArray(value) ? "array" : value === null ? "null" : typeof value,
+        });
+      }
+      if (value.length > MAX_TEXT_ANSWER_LENGTH) {
+        return new ScoringValidationError("ANSWER_TOO_LONG", {
+          stableKey,
+          maxLength: MAX_TEXT_ANSWER_LENGTH,
+          got: value.length,
+        });
+      }
+      return null;
+    }
+
+    case "NUMBER": {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        return new ScoringValidationError("INVALID_TYPE", {
+          stableKey,
+          expectedType: "finite number",
+          gotType: typeof value === "number" ? "non-finite number" : value === null ? "null" : typeof value,
+        });
+      }
+      return null;
+    }
+
+    case "MULTI_CHOICE": {
+      if (!Array.isArray(value)) {
+        return new ScoringValidationError("INVALID_TYPE", {
+          stableKey,
+          expectedType: "array",
+          gotType: value === null ? "null" : typeof value,
+        });
+      }
+
+      // Check for duplicate option keys within the answer.
+      const seen = new Set<string>();
+      for (const item of value) {
+        if (typeof item !== "string") {
+          return new ScoringValidationError("INVALID_TYPE", {
+            stableKey,
+            expectedType: "array of strings",
+            gotItemType: item === null ? "null" : typeof item,
+          });
+        }
+        if (seen.has(item)) {
+          return new ScoringValidationError("DUPLICATE_OPTION_KEY", {
+            stableKey,
+            duplicateKey: item,
+          });
+        }
+        seen.add(item);
+      }
+
+      // Check all submitted keys are valid option keys for this question.
+      const validKeys = new Set(
+        (question.options ?? []).map((o) => o.key)
+      );
+      const invalidKeys = value.filter((k) => !validKeys.has(k as string));
+      if (invalidKeys.length > 0) {
+        return new ScoringValidationError("INVALID_OPTION_KEY", {
+          stableKey,
+          invalidKeys,
+          validKeys: Array.from(validKeys),
+        });
+      }
+
+      // Enforce maxChoices when set.
+      if (question.maxChoices !== undefined && value.length > question.maxChoices) {
+        return new ScoringValidationError("TOO_MANY_CHOICES", {
+          stableKey,
+          maxChoices: question.maxChoices,
+          got: value.length,
+        });
+      }
+
+      return null;
+    }
   }
 }
 
@@ -965,9 +1081,13 @@ export function scoreSubmission(
       );
     }
 
-    // Non-SLIDER answers (TEXT / NUMBER / MULTI_CHOICE) are accepted but not
-    // scored. Skip numeric validation for them entirely.
-    if (q.type !== "SLIDER_LIKERT") continue;
+    // Non-SLIDER answers (TEXT / NUMBER / MULTI_CHOICE) are not scored but ARE
+    // validated for correct value shape before we persist them.
+    if (q.type !== "SLIDER_LIKERT") {
+      const valErr = validateAnswerValues(q, a.value);
+      if (valErr !== null) throw valErr;
+      continue;
+    }
 
     const sliderQ = sliderByKey.get(a.stableKey)!;
 
@@ -1021,17 +1141,52 @@ export function scoreSubmission(
     validatedAnswers.set(a.stableKey, value);
   }
 
-  // 6) Required-key check — only SLIDER_LIKERT questions participate in scoring.
-  //    Collect ALL missing required keys so the client can fix the form in one
-  //    round trip instead of N.
+  // 6) Required-key check.
+  //    SLIDER_LIKERT: use `validatedAnswers` (only slider keys land there).
+  //    TEXT / NUMBER / MULTI_CHOICE: check the raw `answers` array — a key is
+  //    considered "absent" if it was never submitted OR if it is semantically
+  //    empty (empty string for TEXT, empty array for MULTI_CHOICE).
+  //    Collect ALL missing required keys in one pass so the client can fix the
+  //    form in a single round trip.
   const missingRequired: string[] = [];
   const unansweredKeys: string[] = [];
+
+  // --- SLIDER_LIKERT required-presence (existing path) ---
   for (const q of scorableQuestions) {
     if (!validatedAnswers.has(q.stableKey)) {
       if (q.isRequired) missingRequired.push(q.stableKey);
       else unansweredKeys.push(q.stableKey);
     }
   }
+
+  // --- TEXT / NUMBER / MULTI_CHOICE required-presence (new path) ---
+  // Build a lookup of submitted answers for non-slider types.
+  const submittedNonSlider = new Map<string, unknown>();
+  for (const a of answers) {
+    if (questionByKey.get(a.stableKey)?.type !== "SLIDER_LIKERT") {
+      submittedNonSlider.set(a.stableKey, a.value);
+    }
+  }
+
+  for (const q of v.questions) {
+    if (q.type === "SLIDER_LIKERT") continue; // already handled above
+    if (!q.isRequired) continue;
+
+    const submitted = submittedNonSlider.has(q.stableKey);
+    if (!submitted) {
+      missingRequired.push(q.stableKey);
+      continue;
+    }
+
+    // Semantic-empty checks: an empty string or empty array counts as absent.
+    const rawValue = submittedNonSlider.get(q.stableKey);
+    if (q.type === "TEXT" && rawValue === "") {
+      missingRequired.push(q.stableKey);
+    } else if (q.type === "MULTI_CHOICE" && Array.isArray(rawValue) && rawValue.length === 0) {
+      missingRequired.push(q.stableKey);
+    }
+  }
+
   if (missingRequired.length > 0) {
     throw new ScoringValidationError(
       "MISSING_REQUIRED_KEY",

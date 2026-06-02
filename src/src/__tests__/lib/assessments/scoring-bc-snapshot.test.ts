@@ -75,12 +75,16 @@ describe("scoring BC snapshot — Rockefeller", () => {
     const serialized = stableStringify(result);
     const sha = createHash("sha256").update(serialized).digest("hex");
 
-    // ROCKEFELLER_BC_SNAPSHOT_SHA — locked at D2.1.0. Any drift = engine
-    // regression on the legacy code path. To intentionally update this
-    // snapshot, run the test, copy the "Received" SHA, and explain the
-    // change in the commit message.
+    // ROCKEFELLER_BC_SNAPSHOT_SHA — re-locked 2026-06-02 for the content
+    // re-seed (Task 2): the Rockefeller seed content changed (invented slider
+    // anchors "Not true"/"Completely true" → "" to match the source which has
+    // none; Q1_1 trailing period dropped; section-7 straight quotes), which
+    // flows into the per-question ScoreResult. The scoring ENGINE is unchanged
+    // — this drift is from the intentional verbatim content fix, not an engine
+    // regression. Prior SHA (pre-reseed): b5997e68…fc50.
+    // To intentionally update again: run the test, copy "Received", explain it.
     const EXPECTED_SHA =
-      "b5997e68bf0379f149b16e14056bb4807fad491e161c5d3cb10c183a7379fc50";
+      "3831c5470e6ec77968e6d7ff1ab0b30e1542f2f7cbd1879bcdfd54bd62907200";
 
     if (sha !== EXPECTED_SHA) {
       // eslint-disable-next-line no-console
