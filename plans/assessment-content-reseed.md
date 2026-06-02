@@ -44,16 +44,21 @@ npx dotenv-cli -e .env.production.local -- npx tsx -e '
 import { PrismaClient } from "@prisma/client";
 const db = new PrismaClient();
 const aliases = ["RockHabits","qsp-v1","qsp-v2","leadership-vision-alignment","scaling-up-full"];
-await db.$executeRawUnsafe("SET TRANSACTION READ ONLY"); // fail-fast if the role attempts a write
-for (const alias of aliases) {
-  const t = await db.assessmentTemplate.findUnique({ where: { alias }, select: { id: true } });
-  if (!t) { console.log(alias, "MISSING"); continue; }
-  const all = await db.assessmentTemplateVersion.findMany({ where: { templateId: t.id, language: "enUS" }, select: { versionNumber: true, publishedAt: true, questions: true }, orderBy: { versionNumber: "desc" } });
-  const pub = all.find(v => v.publishedAt);
-  console.log(alias, "versions:", JSON.stringify(all.map(v => ({ v: v.versionNumber, published: !!v.publishedAt }))));
-  if (pub) console.log(alias, "PUBLISHED v"+pub.versionNumber, "keys:", JSON.stringify((pub.questions as any[]).map((q:any)=>({k:q.stableKey,l:q.label}))));
-  else console.log(alias, "NO PUBLISHED VERSION (draft only)");
-}
+// Enforce read-only: prefer a read-only Neon role/branch; AND wrap in ONE
+// interactive transaction whose first statement is SET TRANSACTION READ ONLY
+// (a standalone SET does not persist across separate Prisma queries — round-3 fix).
+await db.$transaction(async (tx) => {
+  await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
+  for (const alias of aliases) {
+    const t = await tx.assessmentTemplate.findUnique({ where: { alias }, select: { id: true } });
+    if (!t) { console.log(alias, "MISSING"); continue; }
+    const all = await tx.assessmentTemplateVersion.findMany({ where: { templateId: t.id, language: "enUS" }, select: { versionNumber: true, publishedAt: true, questions: true }, orderBy: { versionNumber: "desc" } });
+    const pub = all.find(v => v.publishedAt);
+    console.log(alias, "versions:", JSON.stringify(all.map(v => ({ v: v.versionNumber, published: !!v.publishedAt }))));
+    if (pub) console.log(alias, "PUBLISHED v"+pub.versionNumber, "keys:", JSON.stringify((pub.questions as any[]).map((q:any)=>({k:q.stableKey,l:q.label}))));
+    else console.log(alias, "NO PUBLISHED VERSION (draft only)");
+  }
+});
 await db.$disconnect();
 '
 ```
@@ -249,7 +254,7 @@ export async function ensureTemplateVersionContent(
 - [ ] **Step 4: Run tests, verify pass** → PASS. Add tests for: fail-closed on edited unpublished draft (latest draft, differing hash, no force → throws); `forceSupersedeDraft: true` appends anyway; soft-deleted template throws; existing-template path does NOT call `assessmentTemplate.update` (no live invitation mutation) and hashes against stored invitation; `assertSeedContentIntegrity` throws on duplicate keys / dangling sectionStableKey / duplicate option keys; an audit row is created on append.
 - [ ] **Step 5: Commit** — `feat(assessment): version-aware seeder helper (latest-only no-op, fail-closed drafts, integrity, audit, no live-invite mutation)`
 
-> **Caller contract (every seed `main()`):** open an interactive transaction, `SELECT pg_advisory_xact_lock(hashtext('assessment-<alias>-seed'))` first, call `ensureTemplateVersionContent(tx, sys.id, build<Name>Content())`, then `ensureAccessGroupAndTemplateLink(...)` (preserve the existing access-group link + soft-delete safeguards). Catch a unique-constraint conflict on `(templateId, versionNumber, language)` by re-reading and no-oping/retrying (M4).
+> **Caller contract (every seed `main()`):** open an interactive transaction and FIRST acquire the per-template lock with `SELECT pg_try_advisory_xact_lock(hashtext('assessment-<alias>-seed'))` (try-lock + a statement_timeout, so the operator gets a clear "another seed run holds the lock" failure rather than an indefinite block — round-3 R3-L). Then call `ensureTemplateVersionContent(tx, sys.id, build<Name>Content())`, then `ensureAccessGroupAndTemplateLink(...)` (preserve the existing access-group link + soft-delete safeguards). Catch a unique-constraint conflict on `(templateId, versionNumber, language)` by re-reading and no-oping/retrying (M4). The advisory lock only serializes concurrent *seed* callers — it does not block admin edits/publish or live campaigns (verified safe: campaigns + quiz use only published versions; active campaigns pin a fixed `versionId`).
 
 ---
 
@@ -512,6 +517,20 @@ DRAFT versions can't render via the public quiz route (rejects `publishedAt = nu
 
 ---
 
+## Task 9: Production-run safety (guarded runner + verifier + rollback)
+
+**Files:** Create `src/scripts/safe-seed.mjs` + test; create `src/scripts/verify-seeded-versions.mjs`; update `docs/specs/v7.6/04-deploy-runbook.md` + `docs/specs/v7.6/09b-publish-review-checklist.md`.
+
+The append-only DRAFT model is prod-safe for live respondents (campaigns + quiz use only published versions; active campaigns pin a fixed `versionId`), but the operator process is not yet enforceable. The Vercel build does **NOT** run these seeds (build = `prisma generate && prisma migrate deploy && next build`); prod seeding is **manual-only** via the guarded runner below.
+
+- [ ] **Step 1: Guarded seed runner.** `safe-seed.mjs` mirrors `safe-prisma.mjs` + `db-fingerprint.ts`: refuses to run any `prisma/seed-*.ts` against a Neon/prod host unless `--i-know-this-is-prod` AND the DB host matches `ASSESSMENT_PROD_EXPECTED_HOST`; and refuses a "dev/preview dry-run" invocation when the connected host IS prod. Unit-test both guard paths (mirror the existing safe-prisma tests). `npm run db:seed-assessments` routes through it.
+- [ ] **Step 2: Ordered prod runner + manifest.** A single command runs the 5 seeds in fixed order (Rockefeller → QSP v1 → QSP v2 → LVA → SU Full), **stop-on-error** (do not continue past a failure), capturing per-seed JSON `{ alias, action, versionNumber, contentHash }` under one shared `seedRunId`, written to a run-log file.
+- [ ] **Step 3: Post-run verifier.** `verify-seeded-versions.mjs` (read-only, same read-only-transaction guard as Task 0) asserts each of the 5 aliases has the intended latest DRAFT `versionNumber` + `contentHash` from the manifest, and that the prior published version is unchanged. Its output is REQUIRED in the run log before declaring success.
+- [ ] **Step 4: Rollback procedure** (document in `09b`): capture a Neon PITR timestamp BEFORE the prod run (backstop). To undo a bad DRAFT: confirm `publishedAt IS NULL` AND no `AssessmentCampaign.versionId` references it, then delete that version row by the id recorded in the manifest. **Never** delete a published version. Repeated `forceSupersedeDraft` runs proliferate drafts — prefer rollback-then-reseed over stacking drafts.
+- [ ] **Step 5: Commit** — `feat(assessment): guarded seed runner + post-run verifier + rollback procedure`
+
+---
+
 ## Changelog
 
 ### Round 1 (Codex senior-engineer review — high 5 / medium 4 / low 2): all findings accepted
@@ -539,3 +558,13 @@ DRAFT versions can't render via the public quiz route (rejects `publishedAt = nu
 - **[MED] Task 0 baseline doc-only** — ACCEPTED. Task 0 emits committed `published-keys-<alias>.json` fixtures; per-slice key-continuity tests assert reuse/non-reuse against them.
 - **[MED] Read-only baseline unenforced** — ACCEPTED. Task 0 prefers a read-only role + wraps the query in `SET TRANSACTION READ ONLY` (fail-fast on write).
 - **[LOW] Missing-template path skips access-group/soft-delete safeguards** — ACCEPTED. Helper guards against soft-deleted templates; caller preserves `ensureAccessGroupAndTemplateLink` (create path only fires on a genuine fresh DB).
+
+### Round 3 (Codex Ops/SRE review — focused pass; loop runner timed out, re-run as a direct Codex call): all findings accepted
+
+Codex confirmed the append-only DRAFT model is **prod-safe for live respondents** (campaigns + public quiz use only published versions; active campaigns pin a fixed `versionId`). Remaining risk was operator-process safety — now made executable in **Task 9**:
+- **[HIGH] No guarded runner for `tsx prisma/seed-*.ts`** (safe-prisma only guards migrate/push) — ACCEPTED. Task 9 adds `safe-seed.mjs` (refuses prod without `--i-know-this-is-prod` + fingerprint; refuses dev dry-run against a prod host).
+- **[HIGH] No prod rollback for a bad DRAFT** — ACCEPTED. Task 9 Step 4: PITR timestamp backstop + delete-unpublished-version-by-manifest-id (only if no campaign references it); never delete published.
+- **[MED] Read-only baseline ineffective** (`SET TRANSACTION READ ONLY` outside a Prisma tx) — ACCEPTED. Task 0 now wraps reads in one `db.$transaction` with the SET as first statement (+ prefer a read-only role).
+- **[MED] Partial-failure / verification not choreographed** — ACCEPTED. Task 9 adds an ordered stop-on-error runner with a `seedRunId` manifest + a required post-run verifier.
+- **[MED] Build auto-run ambiguity** — RESOLVED. Confirmed the Vercel build does NOT run seeds; prod seeding is manual-only (stated in Task 9).
+- **[LOW] Advisory-lock operator clarity** — ACCEPTED. Caller contract switched to `pg_try_advisory_xact_lock` + timeout; confirmed no live-traffic contention.
