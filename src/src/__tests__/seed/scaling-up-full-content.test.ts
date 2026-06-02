@@ -137,40 +137,51 @@ describe("buildScalingUpFullContent() — scaleUpScore + rollup", () => {
 // ─── 5. Per-question recommendations preserved ───────────────────────────
 
 describe("buildScalingUpFullContent() — recommendations preserved", () => {
-  it("every question has exactly 3 recommendation bands", () => {
+  it("every question has exactly 5 recommendation bands", () => {
     for (const q of content.questions as Array<{
       recommendations?: unknown[];
       stableKey: string;
     }>) {
-      expect(q.recommendations).toHaveLength(3);
+      expect(q.recommendations).toHaveLength(5);
     }
   });
 
-  it("Q01 (Effective recruitment process) low band contains 'process, attention and time'", () => {
+  it("Q01 (Effective recruitment process) s0 band starts with expected recruitment narrative", () => {
     const q01 = (content.questions as Array<{
       stableKey: string;
       recommendations: Array<{ minScore: number; maxScore: number; text: string }>;
     }>).find((q) => q.stableKey === "Q01");
     expect(q01).toBeDefined();
-    // The low band (minScore 0, maxScore 3) should contain the recruitment narrative
-    const low = q01!.recommendations.find((b) => b.minScore === 0);
-    expect(low).toBeDefined();
-    expect(low!.text).toContain("process, attention and time");
+    // The s0 band (minScore 0, maxScore 2) contains the worst-score narrative
+    const s0 = q01!.recommendations.find((b) => b.minScore === 0);
+    expect(s0).toBeDefined();
+    expect(s0!.text).toContain("In order to grow, you continuously need new");
   });
 
-  it("Q01 bands cover [0-3], [4-6], [7-10] (integer touching, full 0-10 coverage)", () => {
+  it("Q02 (High staff retention) s10 band starts with 'Your employee turnover is very little / none'", () => {
+    const q02 = (content.questions as Array<{
+      stableKey: string;
+      recommendations: Array<{ minScore: number; maxScore: number; text: string }>;
+    }>).find((q) => q.stableKey === "Q02");
+    expect(q02).toBeDefined();
+    const s10 = q02!.recommendations.find((b) => b.maxScore === 10);
+    expect(s10).toBeDefined();
+    expect(s10!.text).toContain("Your employee turnover is very little / none");
+  });
+
+  it("Q01 5 bands tile [0-2], [3-4], [5-6], [7-9], [10-10] (integer touching, full 0-10 coverage)", () => {
     const q01 = (content.questions as Array<{
       stableKey: string;
       recommendations: Array<{ minScore: number; maxScore: number; text: string }>;
     }>).find((q) => q.stableKey === "Q01");
     expect(q01).toBeDefined();
     const sorted = [...q01!.recommendations].sort((a, b) => a.minScore - b.minScore);
-    expect(sorted[0].minScore).toBe(0);
-    expect(sorted[0].maxScore).toBe(3);
-    expect(sorted[1].minScore).toBe(4);
-    expect(sorted[1].maxScore).toBe(6);
-    expect(sorted[2].minScore).toBe(7);
-    expect(sorted[2].maxScore).toBe(10);
+    expect(sorted).toHaveLength(5);
+    expect(sorted[0]).toMatchObject({ minScore: 0, maxScore: 2 });
+    expect(sorted[1]).toMatchObject({ minScore: 3, maxScore: 4 });
+    expect(sorted[2]).toMatchObject({ minScore: 5, maxScore: 6 });
+    expect(sorted[3]).toMatchObject({ minScore: 7, maxScore: 9 });
+    expect(sorted[4]).toMatchObject({ minScore: 10, maxScore: 10 });
   });
 });
 
