@@ -10,7 +10,7 @@
  *   4. Cross-seed uniqueness: SU Full hash differs from Rockefeller + QSP.
  *   5. Extraction audit: buildTemplateContent() yields the expected
  *      structure (5 domains, 10 sections, 50–70 questions, every question
- *      0-10 SLIDER_LIKERT with 3 bands, rollup + scaleUpScore enabled).
+ *      0-10 SLIDER_LIKERT with 5 bands, rollup + scaleUpScore enabled).
  *   6. Runtime schema validation: the seed content passes the engine's
  *      runtime Zod schema unconditionally.
  *   7. Publish schema validation: passes outright OR fails ONLY due to text
@@ -276,14 +276,14 @@ describe("seed-scaling-up-full-assessment extraction audit", () => {
     }
   });
 
-  it("every question is SLIDER_LIKERT 0-10 with 3 recommendation bands", () => {
+  it("every question is SLIDER_LIKERT 0-10 with 5 recommendation bands", () => {
     const content = buildSU();
     for (const q of content.questions) {
       expect(q.type).toBe("SLIDER_LIKERT");
       expect(q.scale.min).toBe(0);
       expect(q.scale.max).toBe(10);
       expect(q.scale.step).toBe(1);
-      expect(q.recommendations).toHaveLength(3);
+      expect(q.recommendations).toHaveLength(5);
     }
   });
 
