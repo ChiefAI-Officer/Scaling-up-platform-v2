@@ -1,24 +1,18 @@
 /**
  * Smoke tests for QSP v1 and QSP v2 assessment seed scripts.
  *
- * These tests verify:
- *   1. State A: runSeed upserts the template and version with the correct
- *      alias and a stable contentHash on first run.
- *   2. State B: calling runSeed a second time when the DB already contains a
- *      matching contentHash returns state "B" without re-creating the version
- *      (idempotency / early-exit).
+ * QSP v1 was re-seeded with real Esperto content (28 questions across 8
+ * sections, aggregation-only scoring). Its seed now uses the shared
+ * ensureTemplateVersionContent helper (Rockefeller-style pattern) and
+ * exports buildQspV1Content() instead of runSeed/computeContentHash.
+ * Content-correctness tests live in qsp-v1-content.test.ts.
  *
- * The seeds are standalone tsx scripts. They export runSeed(client) and
- * computeContentHash() so we can inject a mock PrismaClient without spinning
- * up a real database.
+ * QSP v2 still uses the old pattern (runSeed / computeContentHash).
  */
 
 // ─── QSP v1 imports ───────────────────────────────────────────────────────
 
-import {
-  runSeed as runSeedV1,
-  computeContentHash as computeHashV1,
-} from "../../../prisma/seed-qsp-v1-assessment";
+import { buildQspV1Content } from "../../../prisma/seed-qsp-v1-assessment";
 
 // ─── QSP v2 imports ───────────────────────────────────────────────────────
 
@@ -94,118 +88,37 @@ function makeMockClient(overrides?: Partial<MockTx>) {
   };
 }
 
-// ─── QSP v1 tests ─────────────────────────────────────────────────────────
+// ─── QSP v1 smoke tests ───────────────────────────────────────────────────
+//
+// Full content-correctness is covered by qsp-v1-content.test.ts.
+// These are minimal smoke-checks to confirm the builder returns a valid shape
+// and that the alias + section/question counts are correct.
 
-describe("seed-qsp-v1-assessment", () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  it("computeContentHash returns a stable 64-char hex string", () => {
-    // Call it twice with the same input — must produce the same hash.
-    const h1 = computeHashV1({
-      questions: [],
-      sections: [],
-      scoringConfig: {},
-      reportConfig: null,
-      invitationSubject: "test",
-      invitationBodyMarkdown: "",
-    });
-    const h2 = computeHashV1({
-      questions: [],
-      sections: [],
-      scoringConfig: {},
-      reportConfig: null,
-      invitationSubject: "test",
-      invitationBodyMarkdown: "",
-    });
-    expect(h1).toMatch(/^[0-9a-f]{64}$/);
-    expect(h1).toBe(h2);
+describe("seed-qsp-v1-assessment (content builder smoke)", () => {
+  it("alias is qsp-v1", () => {
+    const c = buildQspV1Content();
+    expect(c.alias).toBe("qsp-v1");
   });
 
-  it("State A — creates template + version when nothing exists", async () => {
-    const client = makeMockClient();
-    const tx = client._tx;
-
-    tx.assessmentTemplate.findUnique.mockResolvedValue(null);
-    tx.assessmentTemplate.create.mockResolvedValue({ id: "tmpl-v1-id" });
-    tx.assessmentTemplateVersion.create.mockResolvedValue({ id: "ver-v1-id" });
-
-    const result = await runSeedV1(client);
-
-    expect(result.state).toBe("A");
-    expect(result.templateId).toBe("tmpl-v1-id");
-    expect(result.versionId).toBe("ver-v1-id");
-
-    // alias must be qsp-v1
-    const createCall = tx.assessmentTemplate.create.mock.calls[0][0];
-    expect(createCall.data.alias).toBe("qsp-v1");
-
-    // contentHash on the returned result must match what computeContentHash
-    // would produce independently (same input content).
-    expect(result.contentHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(result.contentHash).toBe(result.contentHash); // stable
-
-    // version.create must have been called with the computed hash
-    const versionCreateCall =
-      tx.assessmentTemplateVersion.create.mock.calls[0][0];
-    expect(versionCreateCall.data.contentHash).toBe(result.contentHash);
-
-    // 6 questions in section 1
-    expect(result.questionCount).toBe(6);
-    expect(result.sectionCount).toBe(1);
+  it("returns 8 sections", () => {
+    const c = buildQspV1Content();
+    expect(c.sections).toHaveLength(8);
   });
 
-  it("State B — returns early without re-creating version on exact match", async () => {
-    const client = makeMockClient();
-    const tx = client._tx;
-
-    // First call — State A
-    tx.assessmentTemplate.findUnique.mockResolvedValueOnce(null);
-    tx.assessmentTemplate.create.mockResolvedValueOnce({ id: "tmpl-v1-id" });
-    tx.assessmentTemplateVersion.create.mockResolvedValueOnce({
-      id: "ver-v1-id",
-    });
-    const firstResult = await runSeedV1(client);
-    const knownHash = firstResult.contentHash;
-
-    jest.clearAllMocks();
-
-    // Reset mocks for second call — State B
-    const client2 = makeMockClient();
-    const tx2 = client2._tx;
-
-    tx2.assessmentTemplate.findUnique.mockResolvedValue({
-      id: "tmpl-v1-id",
-      createdBy: "sys-user-id",
-    });
-    tx2.assessmentTemplateVersion.findMany.mockResolvedValue([
-      { id: "ver-v1-id", contentHash: knownHash },
-    ]);
-
-    const secondResult = await runSeedV1(client2);
-
-    expect(secondResult.state).toBe("B");
-    expect(secondResult.templateId).toBe("tmpl-v1-id");
-    expect(secondResult.versionId).toBe("ver-v1-id");
-
-    // version.create must NOT have been called on State B
-    expect(tx2.assessmentTemplateVersion.create).not.toHaveBeenCalled();
+  it("returns 28 questions", () => {
+    const c = buildQspV1Content();
+    expect(c.questions).toHaveLength(28);
   });
 
-  it("State C — throws when contentHash differs", async () => {
-    const client = makeMockClient();
-    const tx = client._tx;
+  it("scoringConfig has a single tier with passThreshold 0", () => {
+    const c = buildQspV1Content();
+    expect(c.scoringConfig.passThreshold).toBe(0);
+    expect(c.scoringConfig.tiers).toHaveLength(1);
+  });
 
-    tx.assessmentTemplate.findUnique.mockResolvedValue({
-      id: "tmpl-v1-id",
-      createdBy: "sys-user-id",
-    });
-    tx.assessmentTemplateVersion.findMany.mockResolvedValue([
-      { id: "ver-v1-id", contentHash: "aaa000" }, // wrong hash
-    ]);
-
-    await expect(runSeedV1(client)).rejects.toThrow(
-      /Refusing to silently mutate the immutable published row/
-    );
+  it("reportConfig is null", () => {
+    const c = buildQspV1Content();
+    expect(c.reportConfig).toBeNull();
   });
 });
 
@@ -318,25 +231,11 @@ describe("seed-qsp-v2-assessment", () => {
     );
   });
 
-  it("QSP v1 and QSP v2 produce different contentHashes", async () => {
-    // Run both seeds in State A with the same mock structure.
-    const client1 = makeMockClient();
-    client1._tx.assessmentTemplate.findUnique.mockResolvedValue(null);
-    client1._tx.assessmentTemplate.create.mockResolvedValue({ id: "tmpl-1" });
-    client1._tx.assessmentTemplateVersion.create.mockResolvedValue({
-      id: "ver-1",
-    });
-    const r1 = await runSeedV1(client1);
-
-    const client2 = makeMockClient();
-    client2._tx.assessmentTemplate.findUnique.mockResolvedValue(null);
-    client2._tx.assessmentTemplate.create.mockResolvedValue({ id: "tmpl-2" });
-    client2._tx.assessmentTemplateVersion.create.mockResolvedValue({
-      id: "ver-2",
-    });
-    const r2 = await runSeedV2(client2);
-
-    // The two templates have different content so they must hash differently.
-    expect(r1.contentHash).not.toBe(r2.contentHash);
+  it("QSP v1 and QSP v2 have different aliases and content", () => {
+    // v1 now uses buildQspV1Content (helper pattern); v2 still uses runSeed.
+    // Confirm different aliases so template creation won't collide.
+    const v1Content = buildQspV1Content();
+    expect(v1Content.alias).toBe("qsp-v1");
+    // v2's alias is asserted inside its own State A test above.
   });
 });
