@@ -36,6 +36,10 @@
 
 import { PrismaClient } from "@prisma/client";
 import { createHash } from "crypto";
+import {
+  ensureTemplateVersionContent,
+  type SeedContent,
+} from "../src/lib/assessments/seed-template-version";
 
 const db = new PrismaClient();
 
@@ -68,44 +72,53 @@ Your coach will review the results with you afterward.`;
 
 // ─── Tier definitions ────────────────────────────────────────────────────
 //
-// Placeholder thresholds pending Jeff's confirmation. Tiles [0, 10] without
-// gaps and without overlap — the engine requires "touching" tier boundaries
-// (b.minMetric === a.maxMetric) so fractional rollup values resolve cleanly.
-// Tier resolution is first-match-wins: a value equal to a boundary lands in
-// the LOWER tier.
+// GLOBAL tiers resolve against the 0-10 rollup value (meanOfDomains).
+// Cutoffs are PROVISIONAL — confirmed bands from Esperto sample reports:
+//   score 3/19/28 (of 100) → "Not ready" (≤28 confirmed LOW)
+//   score 47/62   (of 100) → "On the way" (47-62 confirmed GOOD)
+//   score 73/107  (of 100) → "Exemplary"  (≥73 confirmed TOP)
+// Dividing by 10 for the 0-10 rollup:
+//   cutoff LOW→GOOD lies in (2.8, 4.7] — interpolated as 4.0 (provisional)
+//   cutoff GOOD→TOP lies in (6.2, 7.3] — interpolated as 6.5 (provisional)
+// Band messages are VERBATIM from the Esperto-rendered sample PDFs.
+// Tier boundaries use fractional touching semantics (b.minMetric === a.maxMetric).
 const TIERS = [
   {
     minMetric: 0,
-    maxMetric: 3,
-    label: "Critical",
+    maxMetric: 4.0,
+    label: "Not ready",
     message:
-      "Significant gaps across this area. Most fundamentals are not yet in place; this is where the biggest leverage is right now.",
+      "You have still a lot of focus areas on which you can work within your company. If you want to grow quickly, then your organization is probably not ready yet.",
   },
   {
-    minMetric: 3,
-    maxMetric: 5,
-    label: "At Risk",
+    minMetric: 4.0,
+    maxMetric: 6.5,
+    label: "On the way",
     message:
-      "Foundations are partially in place but inconsistent. Focused work over the next quarter will move the needle quickly.",
+      "A great score. You are pretty well on the way to becoming a strong growth organization.",
   },
   {
-    minMetric: 5,
-    maxMetric: 7,
-    label: "On Track",
-    message:
-      "Solid footing with clear room to strengthen. Pick the two or three sub-areas that drag the average down and tighten them.",
-  },
-  {
-    minMetric: 7,
+    minMetric: 6.5,
     maxMetric: 10,
-    label: "Strong",
+    label: "Exemplary",
     message:
-      "This area is well-developed. Continue to invest in maintaining excellence while focusing your incremental energy elsewhere.",
+      "You are doing extremely well and are perhaps an example for others! However, in order to reach the next phase, there is still room for improvement.",
   },
 ] as const;
 
-// Domains use the same tier shape as the global rollup.
-const DOMAIN_TIERS = TIERS;
+// Per-domain tier — single NEUTRAL tier covering the full 0-10 domain.
+// Per-domain cutoffs are NOT confirmed in any source file; a single neutral
+// tier ensures no fabricated thresholds appear in the admin editor.
+// Admins may refine these via the editor UI once Esperto's weighting spec
+// is available.
+const NEUTRAL_DOMAIN_TIER = [
+  { minMetric: 0, maxMetric: 10, label: "—", message: "" },
+] as const;
+
+// Keep DOMAIN_TIERS as an alias so any downstream code that references it
+// still compiles. The neutral single-tier replaces the old per-domain
+// Critical/At Risk/On Track/Strong fabricated tiers.
+const DOMAIN_TIERS = NEUTRAL_DOMAIN_TIER;
 
 // ─── Section + domain structure ──────────────────────────────────────────
 //
@@ -224,7 +237,10 @@ const SCORING_CONFIG = {
   // Legacy tierMetric retained for BC; superseded by rollup.overall for the
   // global tier resolution.
   tierMetric: "overallAvg",
-  passThreshold: 7,
+  // passThreshold: 0 — no hard pass/fail threshold for this assessment;
+  // the three global tiers (Not ready / On the way / Exemplary) carry the
+  // full interpretive weight.
+  passThreshold: 0,
   tiers: TIERS,
   rollup: { overall: "meanOfDomains" },
   scaleUpScore: true,
@@ -760,6 +776,28 @@ export function buildTemplateContent(): {
   return { sections, questions, scoringConfig: SCORING_CONFIG };
 }
 
+// ─── SeedContent builder (new helper-pattern export) ─────────────────────
+//
+// Returns a SeedContent compatible with ensureTemplateVersionContent().
+// This is the canonical export for the new main() and for the
+// scaling-up-full-content.test.ts publish-schema assertion.
+export function buildScalingUpFullContent(): SeedContent {
+  const { sections, questions } = buildSectionsAndQuestions();
+  return {
+    alias: ALIAS,
+    name: NAME,
+    description: TEMPLATE_DESCRIPTION,
+    invitationSubject: INVITATION_SUBJECT,
+    invitationBodyMarkdown: INVITATION_BODY_MARKDOWN,
+    language: LANGUAGE,
+    sections,
+    questions,
+    scoringConfig: SCORING_CONFIG,
+    reportConfig: null,
+    aggregationMode: "FULL_VISIBILITY",
+  };
+}
+
 // ─── Content hash (deterministic) ────────────────────────────────────────
 
 export function computeContentHash(input: {
@@ -1179,31 +1217,65 @@ export function runExtractionAudit(): {
   };
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────
+// ─── Main (helper-pattern, mirrors sibling seeds) ────────────────────────
+//
+// Uses the shared ensureTemplateVersionContent helper for version-aware
+// append semantics (no-op on hash match, append DRAFT vN+1 on published
+// mismatch, fail-closed on edited unpublished DRAFT).
+// The legacy runSeed() and its STATE A–F model are retained as exports for
+// backward compatibility with existing tests; they do not run via this main().
 
 async function main(): Promise<void> {
-  // Pre-write extraction audit. Throws if structure is broken.
-  const audit = runExtractionAudit();
+  const content = buildScalingUpFullContent();
 
-  const result = await runSeed(db);
+  const result = await db.$transaction(async (tx) => {
+    // Try to acquire advisory lock. pg_try_advisory_xact_lock returns false
+    // (not throws) when another session holds it.
+    const lockRows = await tx.$queryRawUnsafe<Array<{ acquired: boolean }>>(
+      `SELECT pg_try_advisory_xact_lock(hashtext('${ADVISORY_LOCK_KEY}')) AS acquired`
+    );
+    const acquired = lockRows[0]?.acquired ?? false;
+    if (!acquired) {
+      throw new Error(
+        `[seed-scaling-up-full-assessment] Could not acquire advisory lock ` +
+          `"${ADVISORY_LOCK_KEY}" — another seed run is in progress. ` +
+          `Try again after the other session completes.`
+      );
+    }
+
+    const sys = await resolveSystemUser(tx);
+
+    const seedResult = await ensureTemplateVersionContent(
+      tx as unknown as Parameters<typeof ensureTemplateVersionContent>[0],
+      sys.id,
+      content
+    );
+
+    await ensureAccessGroupAndTemplateLink(
+      tx,
+      seedResult.templateId,
+      "Scaling Up Coaches",
+      sys.id
+    );
+
+    return { ...seedResult };
+  }, {
+    maxWait: 30_000,
+    timeout: 60_000,
+  });
 
   console.log(
     JSON.stringify({
       seed: "scaling-up-full-assessment",
-      state: result.state,
+      action: result.action,
       templateId: result.templateId,
       versionId: result.versionId,
+      versionNumber: result.versionNumber,
       contentHash: result.contentHash,
-      sectionCount: result.sectionCount,
-      questionCount: result.questionCount,
-      domainCount: audit.domainCount,
-      published: false,
       message:
-        result.state === "A"
-          ? "Created template + v1 (DRAFT — operator must verify + publish)."
-          : result.state === "B"
-            ? "Idempotent no-op — exact match (still DRAFT)."
-            : "Healed missing v1 on existing template (DRAFT).",
+        result.action === "created"
+          ? `Appended DRAFT v${result.versionNumber}.`
+          : `No-op — latest v${result.versionNumber} already matches.`,
     })
   );
 }
