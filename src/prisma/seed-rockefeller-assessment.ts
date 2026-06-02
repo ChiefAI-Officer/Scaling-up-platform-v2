@@ -1,29 +1,31 @@
 /**
- * Seed: Rockefeller Habits Checklist Assessment Template (v1)
+ * Seed: Rockefeller Habits Checklist Assessment Template
  *
- * Creates an AssessmentTemplate (alias "RockHabits") plus its immutable v1
+ * Creates an AssessmentTemplate (alias "RockHabits") plus a new DRAFT
  * AssessmentTemplateVersion (language "enUS") with 10 sections and 40
- * SLIDER_LIKERT questions.
+ * SLIDER_LIKERT questions via the shared `ensureTemplateVersionContent`
+ * helper (version-aware append model).
  *
- * Idempotency / safety model (6 explicit states):
- *   A — nothing found:            create template + v1 atomically.
- *   B — exact match (hash same):  no-op; log idempotent success and return.
- *   C — mismatch (hash differs):  THROW with a friendly message before the
- *                                 immutability trigger blocks us.
- *   D — half-baked heal:          template exists but v1 missing → create v1.
- *   E — orphan:                   v1 exists without a template → THROW.
- *   F — duplicate v1 rows:        defensive paranoia → THROW.
+ * Idempotency model (delegated to helper):
+ *   - Latest version hash matches seed hash → no-op.
+ *   - Latest version is a DRAFT with different hash → throws unless
+ *     `forceSupersedeDraft: true` is set (protects reviewer edits).
+ *   - Latest version is published with different hash → appends new DRAFT vN+1.
+ *   - No versions yet → creates template + v1 DRAFT.
  *
- * Concurrency: wrapped in a single Prisma interactive transaction whose first
- * statement acquires `pg_advisory_xact_lock(hashtext('assessment-rockefeller-v1-seed'))`.
- * That serializes concurrent prod seed attempts so two callers can't race the
- * create.
+ * Concurrency: first statement inside the transaction acquires
+ * `pg_try_advisory_xact_lock(hashtext('assessment-rockefeller-v1-seed'))`.
+ * If the lock is not acquired (another session holds it), the seed logs and
+ * exits with code 1.
  *
  * Run: npx tsx prisma/seed-rockefeller-assessment.ts
  */
 
 import { PrismaClient } from "@prisma/client";
-import { createHash } from "crypto";
+import {
+  ensureTemplateVersionContent,
+  type SeedContent,
+} from "../src/lib/assessments/seed-template-version";
 
 const db = new PrismaClient();
 
@@ -54,11 +56,15 @@ interface SectionDef {
   questions: string[];
 }
 
+// Question labels are verbatim from the xlsx (col A, rows 1–40).
+// Section names are verbatim from the xlsx (col C, rows 1/5/9/13/17/21/25/29/33/37).
+// Q1_1: no trailing period (xlsx row 1 has none).
+// Section 7: straight ASCII double-quotes around "alive" (xlsx cell C25).
 const SECTIONS: SectionDef[] = [
   {
     name: "The executive team is healthy and aligned.",
     questions: [
-      "Team members understand each other's differences, priorities, and styles.",
+      "Team members understand each other's differences, priorities, and styles",
       "The team meets frequently (weekly is best) for strategic thinking.",
       "The team participates in ongoing executive education (monthly recommended).",
       "The team is able to engage in constructive debates and all members feel comfortable participating.",
@@ -110,7 +116,7 @@ const SECTIONS: SectionDef[] = [
     ],
   },
   {
-    name: "Core Values and Purpose are 'alive' in the organization.",
+    name: 'Core Values and Purpose are "alive" in the organization.',
     questions: [
       "Core Values are discovered, Purpose is articulated, and both are known by all employees.",
       "All executives and middle managers refer back to the Core Values and Purpose when giving praise or reprimands.",
@@ -139,7 +145,7 @@ const SECTIONS: SectionDef[] = [
   {
     name: "The company's plans and performance are visible to everyone.",
     questions: [
-      "A \"situation room\" is established for weekly meetings (physical or virtual).",
+      'A "situation room" is established for weekly meetings (physical or virtual).',
       "Core Values, Purpose and Priorities are posted throughout the company.",
       "Scoreboards are up everywhere displaying current progress on KPIs and Critical Numbers.",
       "There is a system in place for tracking and managing the cascading Priorities and KPIs.",
@@ -192,8 +198,8 @@ interface QuestionPayload {
     min: 0;
     max: 3;
     step: 1;
-    anchorMin: "Not true";
-    anchorMax: "Completely true";
+    anchorMin: "";
+    anchorMax: "";
   };
 }
 
@@ -228,8 +234,8 @@ function buildSectionsAndQuestions(): {
           min: 0,
           max: 3,
           step: 1,
-          anchorMin: "Not true",
-          anchorMax: "Completely true",
+          anchorMin: "",
+          anchorMax: "",
         },
       });
     });
@@ -240,42 +246,32 @@ function buildSectionsAndQuestions(): {
 
 // ─── Public content builder (for tests + cross-file reuse) ───────────────
 //
-// Returns the same structure the seed writes to AssessmentTemplateVersion.
-// Used by the BC snapshot test so any future engine change can be regressed
-// against the byte-identical pre-D2 Rockefeller ScoreResult output.
-export function buildTemplateContent(): {
+// Returns a SeedContent object compatible with ensureTemplateVersionContent.
+// Used by the verbatim guard tests so any accidental content mutation is
+// caught before it reaches the DB.
+export interface RockefellerContent extends Omit<SeedContent, "sections" | "questions" | "scoringConfig"> {
   sections: SectionPayload[];
   questions: QuestionPayload[];
   scoringConfig: typeof SCORING_CONFIG;
-} {
+}
+
+export function buildRockefellerContent(): RockefellerContent {
   const { sections, questions } = buildSectionsAndQuestions();
-  return { sections, questions, scoringConfig: SCORING_CONFIG };
-}
-
-// ─── Content hash ────────────────────────────────────────────────────────
-// Deterministic across runs: build the input object with a fixed key order,
-// serialize without whitespace, sha256, hex.
-function computeContentHash(input: {
-  questions: QuestionPayload[];
-  sections: SectionPayload[];
-  scoringConfig: unknown;
-  reportConfig: null;
-  invitationSubject: string;
-  invitationBodyMarkdown: string;
-}): string {
-  // Explicit key order — DO NOT pretty-print, DO NOT sort, DO NOT add whitespace.
-  const canonical = {
-    questions: input.questions,
-    sections: input.sections,
-    scoringConfig: input.scoringConfig,
-    reportConfig: input.reportConfig,
-    invitationSubject: input.invitationSubject,
-    invitationBodyMarkdown: input.invitationBodyMarkdown,
+  return {
+    alias: TEMPLATE_ALIAS,
+    name: TEMPLATE_NAME,
+    description: TEMPLATE_DESCRIPTION,
+    invitationSubject: INVITATION_SUBJECT,
+    invitationBodyMarkdown: INVITATION_BODY_MARKDOWN,
+    language: "enUS",
+    sections,
+    questions,
+    scoringConfig: SCORING_CONFIG,
+    reportConfig: null,
   };
-  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
 
-// ─── System user resolution (v7.6 — Round 3 M-4) ─────────────────────────
+// ─── System user resolution ───────────────────────────────────────────────
 //
 // AccessGroup.createdBy, AccessGroupCoach.addedBy, AccessGroupTemplate.addedBy
 // are FKs to User.id. The literal string "system-seed" is NOT a valid User.id
@@ -283,9 +279,6 @@ function computeContentHash(input: {
 // (verify-assessment-foundation.ts) expects this exact canonical email AND
 // matches createdBy / addedBy against this exact user, so we MUST NOT fall
 // back to first ADMIN (would diverge from the gate).
-//
-// AssessmentTemplate.createdBy (existing) and AssessmentTemplateVersion.publishedBy
-// (existing free-text column) ALSO use this resolved id for traceability.
 const SYSTEM_SEED_EMAIL = "system-seed@scalingup.platform";
 
 async function resolveSystemUser(
@@ -304,7 +297,7 @@ async function resolveSystemUser(
   });
 }
 
-// ─── ensureAccessGroupAndTemplateLink (v7.6 — Round 3 L-2) ───────────────
+// ─── ensureAccessGroupAndTemplateLink ─────────────────────────────────────
 //
 // Upserts the "Scaling Up Coaches" AccessGroup by name and the
 // (group, template) join row. Runs inside the SAME advisory-locked
@@ -400,240 +393,82 @@ async function ensureAccessGroupAndTemplateLink(
 // ─── Main ────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const { sections, questions } = buildSectionsAndQuestions();
-
-  // Pre-compute everything outside the tx so it's identical inside.
-  const contentHash = computeContentHash({
-    questions,
-    sections,
-    scoringConfig: SCORING_CONFIG,
-    reportConfig: null,
-    invitationSubject: INVITATION_SUBJECT,
-    invitationBodyMarkdown: INVITATION_BODY_MARKDOWN,
-  });
+  const content = buildRockefellerContent();
 
   const result = await db.$transaction(async (tx) => {
-    // Serialize concurrent seed attempts deterministically.
-    await tx.$executeRawUnsafe(
-      `SELECT pg_advisory_xact_lock(hashtext('${ADVISORY_LOCK_KEY}'))`
+    // Try to acquire the advisory lock. pg_try_advisory_xact_lock returns
+    // false (not throws) when another session holds the lock, so we check
+    // the return value and exit non-zero if we can't acquire.
+    const lockRows = await tx.$queryRawUnsafe<Array<{ acquired: boolean }>>(
+      `SELECT pg_try_advisory_xact_lock(hashtext('${ADVISORY_LOCK_KEY}')) AS acquired`
     );
+    const acquired = lockRows[0]?.acquired ?? false;
+    if (!acquired) {
+      throw new Error(
+        `[seed-rockefeller-assessment] Could not acquire advisory lock ` +
+          `"${ADVISORY_LOCK_KEY}" — another seed run is in progress. ` +
+          `Try again after the other session completes.`
+      );
+    }
 
-    // Long-running interactive transaction; Neon pooler adds latency per query.
-    // Default Prisma timeout (5s) is too tight; we set both maxWait + timeout below.
-
-    // v7.6: resolve the canonical system user FIRST. AccessGroup rows
+    // Resolve the canonical system user first. AccessGroup rows
     // (createdBy / addedBy) reference User.id; the post-deploy gate also
     // verifies this exact user, so any divergence (e.g. first-ADMIN fallback)
-    // breaks the gate. Same id is used for AssessmentTemplate.createdBy and
-    // AssessmentTemplateVersion.publishedBy below.
-    const systemUser = await resolveSystemUser(tx);
+    // breaks the gate.
+    const sys = await resolveSystemUser(tx);
 
-    // Find existing template (by unique alias).
-    const existingTemplate = await tx.assessmentTemplate.findUnique({
-      where: { alias: TEMPLATE_ALIAS },
-      select: { id: true, createdBy: true },
-    });
-
-    if (!existingTemplate) {
-      // STATE E — orphan defensive check. The DB FK on
-      // AssessmentTemplateVersion.templateId → AssessmentTemplate.id should
-      // make this impossible, but we cross-check explicitly: look up any v1
-      // row whose template has been deleted/missing. We can't pivot on alias
-      // (alias is on the template, not the version), so we instead look for a
-      // version pointing at a templateId that no longer exists. This requires
-      // a raw query because Prisma can't express "left join finds null".
-      const orphanedV1s = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-        `SELECT v.id
-           FROM assessment_template_versions v
-           LEFT JOIN assessment_templates t ON t.id = v."templateId"
-           WHERE v."versionNumber" = 1
-             AND v.language = 'enUS'
-             AND t.id IS NULL`
-      );
-      if (orphanedV1s.length > 0) {
-        throw new Error(
-          `[seed-rockefeller-assessment] Found ${orphanedV1s.length} orphaned ` +
-            `v1/enUS AssessmentTemplateVersion row(s) with no matching template ` +
-            `(IDs: ${orphanedV1s.map((r) => r.id).join(", ")}). ` +
-            `Database invariant violation — the FK to assessment_templates is broken. ` +
-            `Investigate before proceeding.`
-        );
-      }
-
-      // STATE A — nothing found: create template + v1 atomically.
-      const template = await tx.assessmentTemplate.create({
-        data: {
-          name: TEMPLATE_NAME,
-          alias: TEMPLATE_ALIAS,
-          description: TEMPLATE_DESCRIPTION,
-          invitationSubject: INVITATION_SUBJECT,
-          invitationBodyMarkdown: INVITATION_BODY_MARKDOWN,
-          aggregationMode: "FULL_VISIBILITY",
-          createdBy: systemUser.id,
-        },
-        select: { id: true },
-      });
-
-      const version = await tx.assessmentTemplateVersion.create({
-        data: {
-          templateId: template.id,
-          versionNumber: 1,
-          language: "enUS",
-          questions: questions as unknown as object,
-          sections: sections as unknown as object,
-          scoringConfig: SCORING_CONFIG as unknown as object,
-          reportConfig: undefined, // null in DB
-          contentHash,
-          publishedAt: new Date(),
-          publishedBy: systemUser.id, // v7.6: was "system-seed" literal
-        },
-        select: { id: true },
-      });
-
-      // v7.6: ensure the default access group + group→template link exist.
-      await ensureAccessGroupAndTemplateLink(
-        tx,
-        template.id,
-        "Scaling Up Coaches",
-        systemUser.id
-      );
-
-      return {
-        state: "A" as const,
-        templateId: template.id,
-        versionId: version.id,
-        sectionCount: sections.length,
-        questionCount: questions.length,
-        contentHash,
-      };
-    }
-
-    // Template exists — look for v1 / enUS rows.
-    const v1Rows = await tx.assessmentTemplateVersion.findMany({
-      where: {
-        templateId: existingTemplate.id,
-        versionNumber: 1,
-        language: "enUS",
-      },
-      select: { id: true, contentHash: true },
-    });
-
-    if (v1Rows.length > 1) {
-      // STATE F — duplicate v1 rows. Should be impossible (unique
-      // (templateId, versionNumber, language)) but defend anyway.
-      throw new Error(
-        `[seed-rockefeller-assessment] Found ${v1Rows.length} v1/enUS rows ` +
-          `for template ${existingTemplate.id}. Database invariant violation: ` +
-          `the unique constraint (templateId, versionNumber, language) is broken. ` +
-          `Investigate before proceeding.`
-      );
-    }
-
-    if (v1Rows.length === 0) {
-      // STATE D — half-baked heal. Template was created (perhaps by a partial
-      // prior run, or admin-side bootstrap) but the v1 version is missing.
-      const version = await tx.assessmentTemplateVersion.create({
-        data: {
-          templateId: existingTemplate.id,
-          versionNumber: 1,
-          language: "enUS",
-          questions: questions as unknown as object,
-          sections: sections as unknown as object,
-          scoringConfig: SCORING_CONFIG as unknown as object,
-          reportConfig: undefined,
-          contentHash,
-          publishedAt: new Date(),
-          publishedBy: systemUser.id, // v7.6: was "system-seed" literal
-        },
-        select: { id: true },
-      });
-
-      // v7.6: ensure the default access group + group→template link exist.
-      await ensureAccessGroupAndTemplateLink(
-        tx,
-        existingTemplate.id,
-        "Scaling Up Coaches",
-        systemUser.id
-      );
-
-      return {
-        state: "D" as const,
-        templateId: existingTemplate.id,
-        versionId: version.id,
-        sectionCount: sections.length,
-        questionCount: questions.length,
-        contentHash,
-      };
-    }
-
-    // Exactly one v1 row.
-    const existingVersion = v1Rows[0];
-
-    if (existingVersion.contentHash === contentHash) {
-      // STATE B — exact match. Idempotent no-op for the template + version.
-      //
-      // v7.6 (Round 1 H-3): the access-group seeding STILL runs on B. If a
-      // deploy shipped the Rockefeller seed BEFORE this amendment landed
-      // (state A pre-amendment), the next run lands in state B (hash matches)
-      // and would otherwise skip group linking entirely, leaving "Scaling Up
-      // Coaches" unlinked to Rockefeller. The helper is idempotent and cheap,
-      // so running it on B is correct.
-      await ensureAccessGroupAndTemplateLink(
-        tx,
-        existingTemplate.id,
-        "Scaling Up Coaches",
-        systemUser.id
-      );
-
-      return {
-        state: "B" as const,
-        templateId: existingTemplate.id,
-        versionId: existingVersion.id,
-        sectionCount: sections.length,
-        questionCount: questions.length,
-        contentHash,
-      };
-    }
-
-    // STATE C — mismatch. Throw with a friendly message rather than let the
-    // immutability trigger reject the update later.
-    throw new Error(
-      `[seed-rockefeller-assessment] Existing v1/enUS version ` +
-        `(${existingVersion.id}) has contentHash=${existingVersion.contentHash} ` +
-        `which does not match the seed's computed contentHash=${contentHash}. ` +
-        `Published assessment versions are immutable. ` +
-        `To change v1 content, publish a NEW versionNumber instead of mutating v1. ` +
-        `Refusing to silently mutate the immutable published row.`
+    // Delegate template + version upsert to the shared version-aware helper.
+    // The helper handles: create-fresh, no-op on hash match, append-DRAFT-vN+1
+    // on published-hash-mismatch, fail-closed on edited unpublished DRAFT.
+    const seedResult = await ensureTemplateVersionContent(
+      // The helper uses a duck-typed PrismaTx interface; the full Prisma tx
+      // client is structurally compatible but TS can't prove it without the
+      // intermediate unknown cast.
+      tx as unknown as Parameters<typeof ensureTemplateVersionContent>[0],
+      sys.id,
+      content
     );
+
+    // Always ensure the access group + template link regardless of action,
+    // so a deploy that shipped before this amendment gets healed on next run.
+    await ensureAccessGroupAndTemplateLink(
+      tx,
+      seedResult.templateId,
+      "Scaling Up Coaches",
+      sys.id
+    );
+
+    return { ...seedResult };
   }, {
     // Neon pooler adds per-query latency; default 5s timeout is too tight.
     maxWait: 30_000,
     timeout: 60_000,
   });
 
-  // Log a single JSON line on success.
   console.log(
     JSON.stringify({
       seed: "rockefeller-assessment",
-      state: result.state,
+      action: result.action,
       templateId: result.templateId,
       versionId: result.versionId,
+      versionNumber: result.versionNumber,
       contentHash: result.contentHash,
-      sectionCount: result.sectionCount,
-      questionCount: result.questionCount,
       message:
-        result.state === "A"
-          ? "Created template + v1."
-          : result.state === "B"
-            ? "Idempotent no-op — exact match."
-            : "Healed missing v1 on existing template.",
+        result.action === "created"
+          ? `Appended DRAFT v${result.versionNumber}.`
+          : `No-op — latest v${result.versionNumber} already matches.`,
     })
   );
 }
 
+// ─── Backwards-compatible alias ───────────────────────────────────────────
+//
+// scoring-bc-snapshot.test.ts imports buildTemplateContent (the pre-refactor
+// export name). Keep this re-export so that test continues to compile without
+// requiring a separate PR.
+export const buildTemplateContent = buildRockefellerContent;
+
 // Only run when executed directly (not when imported by tests).
-// Mirrors the QSP seed pattern so `import { buildTemplateContent }` from
-// scoring tests does not trigger the seed main() against the live DB.
 if (require.main === module) {
   main()
     .catch((err) => {
