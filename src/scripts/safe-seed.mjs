@@ -77,7 +77,9 @@ const ALL_ALIASES = Object.keys(SEED_MAP);
 export function parseHost(url) {
   if (!url) return "";
   const noProto = url.replace(/^[a-z]+:\/\//i, "");
-  const afterAt = noProto.includes("@") ? noProto.split("@")[1] : noProto;
+  // Use the LAST "@" so a password containing "@" doesn't corrupt the host.
+  const atIdx = noProto.lastIndexOf("@");
+  const afterAt = atIdx >= 0 ? noProto.slice(atIdx + 1) : noProto;
   const hostPort = (afterAt ?? "").split("/")[0];
   return hostPort.split(":")[0] ?? "";
 }

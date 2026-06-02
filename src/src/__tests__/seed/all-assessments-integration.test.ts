@@ -113,8 +113,16 @@ function assertTemplateValid(
   });
 
   if (!parsed.success) {
+    // Suppress ONLY the expected empty-recommendation-text issue for DRAFT
+    // seeds (publish-time content check, not a structural error). A structural
+    // shape error on a recommendations path must still surface.
     const structuralIssues = parsed.error.issues.filter(
-      (iss) => !iss.path.includes("recommendations")
+      (iss) =>
+        !(
+          iss.path.includes("recommendations") &&
+          (iss.code === "too_small" ||
+            iss.message.toLowerCase().includes("string must contain"))
+        )
     );
     if (structuralIssues.length > 0) {
       throw new Error(

@@ -121,11 +121,12 @@ function main() {
       continue;
     }
 
-    const guardArgs = ["node", safeSeedScript, alias];
-    if (hasOverride) guardArgs.push(OVERRIDE_FLAG);
+    // Single source of truth for the spawn args, used by BOTH the dry-run
+    // display and the actual spawnSync below — so they can never diverge.
+    const seedArgs = [safeSeedScript, alias, ...(hasOverride ? [OVERRIDE_FLAG] : [])];
 
     if (process.env.SAFE_SEED_DRY_RUN === "1") {
-      console.log(`WOULD RUN: ${guardArgs.join(" ")}`);
+      console.log(`WOULD RUN: node ${seedArgs.join(" ")}`);
       results.push({ alias, status: "ok", action: "dry-run" });
       continue;
     }
@@ -134,7 +135,7 @@ function main() {
 
     const result = spawnSync(
       "node",
-      [safeSeedScript, alias, ...(hasOverride ? [OVERRIDE_FLAG] : [])],
+      seedArgs,
       {
         stdio: ["inherit", "pipe", "inherit"],
         env: process.env,

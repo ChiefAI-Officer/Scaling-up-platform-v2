@@ -46,6 +46,14 @@ describe("parseHost()", () => {
   it("handles URL without credentials (no @ sign)", () => {
     expect(parseHost("postgresql://localhost:5432/dbname")).toBe("localhost");
   });
+
+  it("uses the host after the LAST @ when the password contains @", () => {
+    // Regression: a literal "@" in the password must not corrupt the host
+    // (split on first "@" would return "ss@my-neon-host.neon.tech...").
+    expect(
+      parseHost("postgresql://user:p@ss@my-neon-host.neon.tech:5432/dbname")
+    ).toBe("my-neon-host.neon.tech");
+  });
 });
 
 // ---------------------------------------------------------------------------
