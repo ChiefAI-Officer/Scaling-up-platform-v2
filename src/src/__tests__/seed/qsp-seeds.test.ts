@@ -19,6 +19,7 @@ import { buildQspV1Content } from "../../../prisma/seed-qsp-v1-assessment";
 import {
   runSeed as runSeedV2,
   computeContentHash as computeHashV2,
+  buildQspV2Content,
 } from "../../../prisma/seed-qsp-v2-assessment";
 
 // ─── Mock builder ─────────────────────────────────────────────────────────
@@ -36,6 +37,7 @@ type MockTx = {
     findMany: jest.Mock;
     create: jest.Mock;
   };
+  auditLog: { create: jest.Mock };
   accessGroup: { findFirst: jest.Mock; create: jest.Mock };
   accessGroupTemplate: { upsert: jest.Mock };
   accessGroupCoach: { upsert: jest.Mock };
@@ -45,7 +47,8 @@ type MockTx = {
 function makeMockClient(overrides?: Partial<MockTx>) {
   const tx: MockTx = {
     $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
-    $queryRawUnsafe: jest.fn().mockResolvedValue([]), // no orphans
+    // Returns lock-acquired=true by default (advisory lock check).
+    $queryRawUnsafe: jest.fn().mockResolvedValue([{ acquired: true }]),
     user: {
       upsert: jest.fn().mockResolvedValue({ id: "sys-user-id" }),
     },
@@ -56,6 +59,9 @@ function makeMockClient(overrides?: Partial<MockTx>) {
     assessmentTemplateVersion: {
       findMany: jest.fn(),
       create: jest.fn(),
+    },
+    auditLog: {
+      create: jest.fn().mockResolvedValue({ id: "audit-id" }),
     },
     accessGroup: {
       findFirst: jest.fn().mockResolvedValue(null), // group doesn't exist
@@ -152,8 +158,10 @@ describe("seed-qsp-v2-assessment", () => {
     const client = makeMockClient();
     const tx = client._tx;
 
+    // ensureTemplateVersionContent: template not found → create template + v1
     tx.assessmentTemplate.findUnique.mockResolvedValue(null);
     tx.assessmentTemplate.create.mockResolvedValue({ id: "tmpl-v2-id" });
+    tx.assessmentTemplateVersion.findMany.mockResolvedValue([]); // no versions
     tx.assessmentTemplateVersion.create.mockResolvedValue({ id: "ver-v2-id" });
 
     const result = await runSeedV2(client);
@@ -172,36 +180,39 @@ describe("seed-qsp-v2-assessment", () => {
       tx.assessmentTemplateVersion.create.mock.calls[0][0];
     expect(versionCreateCall.data.contentHash).toBe(result.contentHash);
 
-    // 10 questions across 2 sections
-    expect(result.questionCount).toBe(10);
-    expect(result.sectionCount).toBe(2);
+    // 22 questions across 5 parts (real Esperto content)
+    expect(result.questionCount).toBe(22);
+    expect(result.sectionCount).toBe(5);
   });
 
-  it("State B — returns early without re-creating version on exact match", async () => {
-    const client = makeMockClient();
-    const tx = client._tx;
-
-    // First call — State A
-    tx.assessmentTemplate.findUnique.mockResolvedValueOnce(null);
-    tx.assessmentTemplate.create.mockResolvedValueOnce({ id: "tmpl-v2-id" });
-    tx.assessmentTemplateVersion.create.mockResolvedValueOnce({
-      id: "ver-v2-id",
+  it("State B — returns early without re-creating version on exact hash match", async () => {
+    // Compute the expected hash using the real seed content with the stored
+    // invitation values (ensureTemplateVersionContent hashes using STORED values).
+    const v2Content = buildQspV2Content();
+    const { computeTemplateContentHash } = await import(
+      "../../lib/assessments/template-content-hash"
+    );
+    const knownHash = computeTemplateContentHash({
+      questions: v2Content.questions,
+      sections: v2Content.sections,
+      scoringConfig: v2Content.scoringConfig,
+      reportConfig: null,
+      invitationSubject: v2Content.invitationSubject,
+      invitationBodyMarkdown: v2Content.invitationBodyMarkdown,
     });
-    const firstResult = await runSeedV2(client);
-    const knownHash = firstResult.contentHash;
 
-    jest.clearAllMocks();
-
-    // Second call — State B
+    // Second call — template + version exist, same hash → no-op
     const client2 = makeMockClient();
     const tx2 = client2._tx;
 
     tx2.assessmentTemplate.findUnique.mockResolvedValue({
       id: "tmpl-v2-id",
-      createdBy: "sys-user-id",
+      deletedAt: null,
+      invitationSubject: v2Content.invitationSubject,
+      invitationBodyMarkdown: v2Content.invitationBodyMarkdown,
     });
     tx2.assessmentTemplateVersion.findMany.mockResolvedValue([
-      { id: "ver-v2-id", contentHash: knownHash },
+      { id: "ver-v2-id", versionNumber: 1, contentHash: knownHash, publishedAt: new Date() },
     ]);
 
     const secondResult = await runSeedV2(client2);
@@ -214,21 +225,33 @@ describe("seed-qsp-v2-assessment", () => {
     expect(tx2.assessmentTemplateVersion.create).not.toHaveBeenCalled();
   });
 
-  it("State C — throws when contentHash differs", async () => {
+  it("State A (re-seed) — creates new version when existing published version has different hash", async () => {
     const client = makeMockClient();
     const tx = client._tx;
 
+    // Template exists, published version exists with a different hash
     tx.assessmentTemplate.findUnique.mockResolvedValue({
       id: "tmpl-v2-id",
-      createdBy: "sys-user-id",
+      deletedAt: null,
+      invitationSubject: "Please complete your Quarterly Session Prep",
+      invitationBodyMarkdown: "",
     });
     tx.assessmentTemplateVersion.findMany.mockResolvedValue([
-      { id: "ver-v2-id", contentHash: "bbb111" }, // wrong hash
+      {
+        id: "old-ver-id",
+        versionNumber: 1,
+        contentHash: "old-hash-value-that-differs",
+        publishedAt: new Date(),
+      },
     ]);
+    tx.assessmentTemplateVersion.create.mockResolvedValue({ id: "ver-v2-new-id" });
 
-    await expect(runSeedV2(client)).rejects.toThrow(
-      /Refusing to silently mutate the immutable published row/
-    );
+    // With forceSupersedeDraft: true, a hash mismatch on a published version
+    // creates a new DRAFT version (no throw).
+    const result = await runSeedV2(client);
+    expect(result.state).toBe("A");
+    expect(result.versionId).toBe("ver-v2-new-id");
+    expect(tx.assessmentTemplateVersion.create).toHaveBeenCalled();
   });
 
   it("QSP v1 and QSP v2 have different aliases and content", () => {

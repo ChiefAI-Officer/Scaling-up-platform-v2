@@ -556,9 +556,13 @@ describe("QSP scoring integration (regression guard for field-name drift)", () =
       questions,
       scoringConfig: scoringConfig as unknown as TemplateVersionForScoring["scoringConfig"],
     };
-    const answers: Answer[] = questions.map((q) => ({
+    // QSP v2 has NUMBER + SLIDER_LIKERT + TEXT questions. Provide
+    // type-correct synthetic answers so the engine's answer validation passes.
+    // The scoring engine only computes scores for SLIDER_LIKERT; TEXT/NUMBER
+    // answers are stored but pass through without scoring.
+    const answers: Answer[] = questions.map((q, idx) => ({
       stableKey: q.stableKey,
-      value: 6,
+      value: q.type === "TEXT" ? "synthetic answer" : (idx % 2 === 0 ? 7 : 8),
     }));
 
     expect(() => scoreSubmission(version, answers)).not.toThrow();
