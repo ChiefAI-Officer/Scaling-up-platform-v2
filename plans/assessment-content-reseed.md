@@ -8,53 +8,60 @@
 
 **Tech Stack:** TypeScript, Prisma 6 (Neon Postgres), Zod (scoring schema), Jest. Seeds run via `npx tsx prisma/seed-<name>.ts` from `src/`. Spec: [docs/specs/v7.6/09-assessment-content-reseed.md](docs/specs/v7.6/09-assessment-content-reseed.md). Decisions: ADR-0001/0002/0003. Domain language: CONTEXT.md.
 
-**Verified source-of-truth:** Per-assessment question lists, types, scales, and scoring were extracted and adversarially verified (spec §4). Implementers MUST transcribe verbatim question text from the cited source files in `From Jeff/APP_scaling up assessemnt/` (not paraphrase), and lock the transcription with the per-task verification assertions below. Question *content* is sourced data verified by tests; this plan specifies the *logic, structure, scoring, and counts* in full.
+**Verified source-of-truth:** Per-assessment question lists, types, scales, and scoring were extracted and adversarially verified (spec §4). Implementers MUST transcribe verbatim question text from the cited source files in `From Jeff/APP_scaling up assessemnt/` (not paraphrase), and lock it with **full expected-array / verbatim-message assertions** (not just counts — see "Test rigor").
+
+**Schema facts the plan obeys (verified against `src/src/lib/assessments/scoring.ts`):**
+- `SliderLikertScaleSchema` requires **all** of `{ min, max, step, anchorMin, anchorMax }` (step `int().positive()`; anchors `z.string()` — empty string allowed). There is **no** `scaleLabels` field.
+- `ScoringConfigBase` requires `tierMetric` + **`passThreshold` (required)** + `tiers.min(1)`. `DomainDefSchema` requires `tiers.min(1)` per domain.
+- `scaleUpScore: true` requires `rollup.overall` set **and** every question on a 0–10 scale; the **global tier resolves against the 0–10 rollup value**, not a 0–100 score. The 0–100 ScaleUp Score is emitted separately for display.
+- `scoreSubmission`'s required-answer check (scoring.ts ~L1024-1037) only collects missing **SLIDER_LIKERT** required keys — qualitative required answers are not enforced server-side (Task 1b fixes this).
+- Public quiz page + submit route reject `publishedAt = null`; campaign creation selects only published versions — so DRAFT verification is component/scorer/publish-schema level, not the live route (Task 7).
+- Shared hash: `computeTemplateContentHash()` in `src/src/lib/assessments/template-content-hash.ts` hashes `{questions, sections, scoringConfig, reportConfig, invitationSubject, invitationBodyMarkdown}` — the seeder reuses it.
+
+**Test rigor (every slice):** content tests assert the **complete** ordered array of question labels per section (or a sha256 checksum of it), the **exact** option lists, and the **verbatim** tier/recommendation messages — not just counts/types. A swapped or paraphrased question must fail a test.
 
 ---
 
 ## File structure
 
-- **Create** `src/src/lib/assessments/seed-template-version.ts` — shared `ensureTemplateVersionContent()` helper (append-DRAFT-vN+1-on-change; access-group link). One responsibility: idempotent version creation.
-- **Create** `src/src/__tests__/seed/seed-template-version.test.ts` — unit tests for the helper (mock Prisma tx).
-- **Modify** the 5 seed scripts (rework content + call the helper):
-  - `src/prisma/seed-rockefeller-assessment.ts`
-  - `src/prisma/seed-qsp-v1-assessment.ts`
-  - `src/prisma/seed-qsp-v2-assessment.ts`
-  - `src/prisma/seed-lva-assessment.ts`
-  - `src/prisma/seed-scaling-up-full-assessment.ts`
-- **Create/extend** per-assessment content tests in `src/src/__tests__/seed/`.
-- **Create** `docs/specs/v7.6/09b-publish-review-checklist.md` — items Jeff confirms at publish (Task 8).
+- **Create** `src/src/lib/assessments/seed-template-version.ts` — `ensureTemplateVersionContent()` (append-DRAFT-only-when-latest-differs; reuses `computeTemplateContentHash`; syncs template metadata).
+- **Create** `src/src/__tests__/seed/seed-template-version.test.ts`.
+- **Modify** `src/src/lib/assessments/scoring.ts` (Task 1b: extend required-answer check to all types) + its test.
+- **Modify** the 5 seed scripts + add per-assessment content tests in `src/src/__tests__/seed/`.
+- **Create** `docs/specs/v7.6/09b-publish-review-checklist.md` (Task 0 baseline + Task 8 Jeff checklist).
 
-No Prisma migration (`scoringConfig`/`questions`/`sections` are `Json`). No engine change (`TEXT`/`NUMBER`/`MULTI_CHOICE` + per-question recommendations already supported).
+No Prisma migration (`scoringConfig`/`questions`/`sections` are `Json`).
 
 ---
 
 ## Task 0: Read-only prod verification (no code; gather facts)
 
-**Goal:** Per template, learn the current latest `versionNumber`, its `publishedAt`, and the existing `stableKey` set — so the helper appends the correct next number and Rockefeller reuses its published keys (ADR-0001).
+**Goal:** Per template, learn the latest `versionNumber` + `publishedAt`, AND dump the **stableKey→label map of the latest PUBLISHED version for all five templates** (ADR-0001 needs the published mapping to prove unchanged questions reuse keys and changed ones don't).
 
-- [ ] **Step 1: Run a read-only query against prod** (via `dotenv-cli` + `.env.production.local`; do NOT mutate). From `src/`:
+- [ ] **Step 1: Read-only prod query.** Prefer a **read-only DB role/URL** if one exists (see `docs/runbooks/database-protection.md`); regardless, wrap the read in a read-only transaction so a write can't slip through. From `src/`:
 ```bash
 npx dotenv-cli -e .env.production.local -- npx tsx -e '
 import { PrismaClient } from "@prisma/client";
 const db = new PrismaClient();
 const aliases = ["RockHabits","qsp-v1","qsp-v2","leadership-vision-alignment","scaling-up-full"];
+await db.$executeRawUnsafe("SET TRANSACTION READ ONLY"); // fail-fast if the role attempts a write
 for (const alias of aliases) {
   const t = await db.assessmentTemplate.findUnique({ where: { alias }, select: { id: true } });
   if (!t) { console.log(alias, "MISSING"); continue; }
-  const vs = await db.assessmentTemplateVersion.findMany({ where: { templateId: t.id, language: "enUS" }, select: { versionNumber: true, publishedAt: true, questions: true }, orderBy: { versionNumber: "desc" } });
-  console.log(alias, JSON.stringify(vs.map(v => ({ v: v.versionNumber, published: !!v.publishedAt }))));
-  if (alias === "RockHabits" && vs[0]) console.log("RockHabits stableKeys:", (vs[0].questions as any[]).map((q:any)=>q.stableKey).join(","));
+  const all = await db.assessmentTemplateVersion.findMany({ where: { templateId: t.id, language: "enUS" }, select: { versionNumber: true, publishedAt: true, questions: true }, orderBy: { versionNumber: "desc" } });
+  const pub = all.find(v => v.publishedAt);
+  console.log(alias, "versions:", JSON.stringify(all.map(v => ({ v: v.versionNumber, published: !!v.publishedAt }))));
+  if (pub) console.log(alias, "PUBLISHED v"+pub.versionNumber, "keys:", JSON.stringify((pub.questions as any[]).map((q:any)=>({k:q.stableKey,l:q.label}))));
+  else console.log(alias, "NO PUBLISHED VERSION (draft only)");
 }
 await db.$disconnect();
 '
 ```
-Expected: prints latest versionNumber + published flag per template, and Rockefeller's existing stableKeys.
 
-- [ ] **Step 2: Record findings** in `docs/specs/v7.6/09b-publish-review-checklist.md` (create it) under "Prod baseline (read-only)". Commit:
+- [ ] **Step 2: Emit machine-readable fixtures + record.** Write one committed fixture per template at `src/src/__tests__/seed/fixtures/published-keys-<alias>.json` = the latest-published `[{ key, label }]` array (empty array if no published version). These drive per-slice key-continuity tests (Tasks 2–6): unchanged label ⇒ same key; changed/new label ⇒ new key; no key reused for a different label (or an explicit reviewed allowlist entry). Also record per template — starting versionNumber, publish state — in `docs/specs/v7.6/09b-publish-review-checklist.md` (create it) under "Prod baseline (read-only)". Commit:
 ```bash
-git add docs/specs/v7.6/09b-publish-review-checklist.md
-git commit -m "docs(assessment): record prod version baseline before re-seed"
+git add docs/specs/v7.6/09b-publish-review-checklist.md src/src/__tests__/seed/fixtures/published-keys-*.json
+git commit -m "docs(assessment): record prod version + stableKey baseline (fixtures) before re-seed"
 ```
 
 ---
@@ -63,129 +70,220 @@ git commit -m "docs(assessment): record prod version baseline before re-seed"
 
 **Files:** Create `src/src/lib/assessments/seed-template-version.ts`; Test `src/src/__tests__/seed/seed-template-version.test.ts`.
 
-Replaces the per-seed "STATE A creates v1 / STATE C throws on hash mismatch" logic with: **append the next `versionNumber` as DRAFT when no existing version matches the content hash; no-op when one matches.** Never updates or deletes a version.
+Appends the next `versionNumber` as DRAFT **only when the LATEST (highest-numbered) version's hash differs** — an abandoned lower-numbered draft with a matching hash must not suppress a fresh latest draft. Reuses `computeTemplateContentHash`. Keeps template-level metadata in sync (the hash includes invitation fields).
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Failing test**
 ```ts
 // src/src/__tests__/seed/seed-template-version.test.ts
 import { ensureTemplateVersionContent } from "@/lib/assessments/seed-template-version";
+import { computeTemplateContentHash } from "@/lib/assessments/template-content-hash";
 
 function makeTx(opts: { template?: { id: string } | null; versions?: Array<{ versionNumber: number; contentHash: string; publishedAt: Date | null }>; }) {
-  const created: any[] = [];
-  return {
-    created,
-    tx: {
-      $executeRawUnsafe: async () => 0,
-      assessmentTemplate: {
-        findUnique: async () => opts.template ?? null,
-        create: async ({ data }: any) => ({ id: "tmpl-new", ...data }),
-      },
-      assessmentTemplateVersion: {
-        findMany: async () => opts.versions ?? [],
-        create: async ({ data }: any) => { created.push(data); return { id: "ver-new", ...data }; },
-      },
-    } as any,
-  };
+  const created: any[] = []; const updated: any[] = [];
+  return { created, updated, tx: {
+    $executeRawUnsafe: async () => 0,
+    assessmentTemplate: {
+      findUnique: async () => opts.template ?? null,
+      create: async ({ data }: any) => ({ id: "tmpl-new", ...data }),
+      update: async ({ data }: any) => { updated.push(data); return { id: "tmpl-1", ...data }; },
+    },
+    assessmentTemplateVersion: {
+      findMany: async () => opts.versions ?? [],
+      create: async ({ data }: any) => { created.push(data); return { id: "ver-new", ...data }; },
+    },
+  } as any };
 }
 
 const CONTENT = {
   alias: "X", name: "X", description: "d", invitationSubject: "s", invitationBodyMarkdown: "b", language: "enUS",
-  sections: [{ stableKey: "S1", title: "S1", order: 0 }],
-  questions: [{ stableKey: "Q1", type: "SLIDER_LIKERT", label: "L", sectionKey: "S1", order: 0, scale: { min: 0, max: 3 } }],
+  sections: [{ stableKey: "S1", title: "S1", sortOrder: 0 }],
+  questions: [{ stableKey: "Q1", type: "SLIDER_LIKERT", label: "L", sectionStableKey: "S1", sortOrder: 0, isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "", anchorMax: "" } }],
   scoringConfig: { tierMetric: "countAchieved", passThreshold: 2, tiers: [{ minMetric: 0, maxMetric: 1, label: "x", message: "m" }] },
+  reportConfig: null,
 };
+const HASH = computeTemplateContentHash(CONTENT as any);
 
-test("appends versionNumber 2 as DRAFT when latest published version has a different hash", async () => {
-  const { tx, created } = makeTx({ template: { id: "tmpl-1" }, versions: [{ versionNumber: 1, contentHash: "OLDHASH", publishedAt: new Date() }] });
-  const res = await ensureTemplateVersionContent(tx as any, "sys-user", CONTENT as any);
-  expect(res.action).toBe("created");
-  expect(res.versionNumber).toBe(2);
-  expect(created).toHaveLength(1);
+test("appends versionNumber 2 as DRAFT when the LATEST version has a different hash", async () => {
+  const { tx, created } = makeTx({ template: { id: "tmpl-1" }, versions: [{ versionNumber: 1, contentHash: "OLD", publishedAt: new Date() }] });
+  const res = await ensureTemplateVersionContent(tx as any, "sys", CONTENT as any);
+  expect(res.action).toBe("created"); expect(res.versionNumber).toBe(2);
   expect(created[0].publishedAt).toBeNull();
-  expect(created[0].versionNumber).toBe(2);
 });
 
-test("no-ops when an existing version already matches the content hash", async () => {
-  const first = makeTx({ template: { id: "t" }, versions: [] });
-  const r1 = await ensureTemplateVersionContent(first.tx as any, "sys", CONTENT as any);
-  const second = makeTx({ template: { id: "t" }, versions: [{ versionNumber: 1, contentHash: r1.contentHash, publishedAt: new Date() }] });
-  const r2 = await ensureTemplateVersionContent(second.tx as any, "sys", CONTENT as any);
-  expect(r2.action).toBe("noop");
-  expect(second.created).toHaveLength(0);
+test("no-ops only when the LATEST version already matches the hash", async () => {
+  const { tx, created } = makeTx({ template: { id: "t" }, versions: [{ versionNumber: 2, contentHash: HASH, publishedAt: null }, { versionNumber: 1, contentHash: "OLD", publishedAt: new Date() }] });
+  const res = await ensureTemplateVersionContent(tx as any, "sys", CONTENT as any);
+  expect(res.action).toBe("noop"); expect(created).toHaveLength(0);
+});
+
+test("still appends a fresh latest draft when only an ABANDONED LOWER version matches", async () => {
+  const { tx, created } = makeTx({ template: { id: "t" }, versions: [
+    { versionNumber: 3, contentHash: "NEWER", publishedAt: null },
+    { versionNumber: 1, contentHash: HASH, publishedAt: null },
+  ] });
+  const res = await ensureTemplateVersionContent(tx as any, "sys", CONTENT as any);
+  expect(res.action).toBe("created"); expect(res.versionNumber).toBe(4);
+});
+
+test("syncs template-level invitation metadata on an existing template", async () => {
+  const { tx, updated } = makeTx({ template: { id: "tmpl-1" }, versions: [{ versionNumber: 1, contentHash: "OLD", publishedAt: new Date() }] });
+  await ensureTemplateVersionContent(tx as any, "sys", CONTENT as any);
+  expect(updated[0]).toMatchObject({ invitationSubject: "s", invitationBodyMarkdown: "b" });
 });
 
 test("creates version 1 when the template does not exist yet", async () => {
   const { tx, created } = makeTx({ template: null, versions: [] });
   const res = await ensureTemplateVersionContent(tx as any, "sys", CONTENT as any);
-  expect(res.versionNumber).toBe(1);
-  expect(created[0].publishedAt).toBeNull();
+  expect(res.versionNumber).toBe(1); expect(created[0].publishedAt).toBeNull();
 });
 ```
 
-- [ ] **Step 2: Run test, verify it fails** — `npx jest src/__tests__/seed/seed-template-version.test.ts` → FAIL (not found).
+- [ ] **Step 2: Run, verify fails** — `npx jest src/__tests__/seed/seed-template-version.test.ts` → FAIL (not found).
 
-- [ ] **Step 3: Implement the helper**
+- [ ] **Step 3: Implement** (`assertSeedContentIntegrity` covers round-2 H3; invitation handling covers H1; fail-closed covers M5; audit covers M6; soft-delete covers L9)
 ```ts
 // src/src/lib/assessments/seed-template-version.ts
-import { createHash } from "crypto";
+import { computeTemplateContentHash } from "./template-content-hash";
 
 export interface SeedContent {
   alias: string; name: string; description: string;
   invitationSubject: string; invitationBodyMarkdown: string;
-  language: string; sections: unknown[]; questions: unknown[];
+  language: string; sections: any[]; questions: any[];
   scoringConfig: unknown; reportConfig?: unknown; aggregationMode?: string;
 }
-export interface SeedResult {
-  action: "created" | "noop"; templateId: string; versionId: string; versionNumber: number; contentHash: string;
+export interface SeedResult { action: "created" | "noop"; templateId: string; versionId: string; versionNumber: number; contentHash: string; }
+
+// H3 — referential integrity: throw before persisting bad content.
+export function assertSeedContentIntegrity(c: SeedContent): void {
+  const sKeys = c.sections.map((s) => s.stableKey);
+  if (new Set(sKeys).size !== sKeys.length) throw new Error(`[seed:${c.alias}] duplicate section stableKey`);
+  const qKeys = c.questions.map((q) => q.stableKey);
+  if (new Set(qKeys).size !== qKeys.length) throw new Error(`[seed:${c.alias}] duplicate question stableKey`);
+  const orders = c.questions.map((q) => q.sortOrder);
+  if (new Set(orders).size !== orders.length) throw new Error(`[seed:${c.alias}] duplicate question sortOrder`);
+  const sectionSet = new Set(sKeys);
+  for (const q of c.questions) {
+    if (q.sectionStableKey && !sectionSet.has(q.sectionStableKey)) throw new Error(`[seed:${c.alias}] dangling sectionStableKey ${q.sectionStableKey}`);
+    if (q.type === "MULTI_CHOICE" && q.options) {
+      const ok = q.options.map((o: any) => o.key);
+      if (new Set(ok).size !== ok.length) throw new Error(`[seed:${c.alias}] duplicate option key in ${q.stableKey}`);
+    }
+  }
 }
 
-export function computeContentHash(c: SeedContent): string {
-  const canonical = {
+// Caller contract: run inside an interactive transaction that FIRST acquires
+// pg_advisory_xact_lock(hashtext('assessment-<alias>-seed')) — serializes
+// concurrent seed/deploy/admin callers (M4). Catch a unique-constraint
+// conflict on (templateId, versionNumber, language) by re-reading + retrying.
+export async function ensureTemplateVersionContent(
+  tx: any, systemUserId: string, c: SeedContent,
+  opts: { forceSupersedeDraft?: boolean; seedRunId?: string } = {},
+): Promise<SeedResult> {
+  assertSeedContentIntegrity(c);
+
+  const template = await tx.assessmentTemplate.findUnique({
+    where: { alias: c.alias },
+    select: { id: true, deletedAt: true, invitationSubject: true, invitationBodyMarkdown: true },
+  });
+  if (template?.deletedAt) throw new Error(`[seed:${c.alias}] template is soft-deleted; refusing to append (L9).`);
+
+  // H1 — invitation subject/body are TEMPLATE-level and feed LIVE campaign
+  // invite/reminder emails. NEVER mutate them on a draft append. Hash the
+  // version against the STORED invitation for existing templates (so the
+  // hash reflects reality + matches admin's computeTemplateContentHash, with
+  // no drift and no live-email change). Use the seed's invitation copy ONLY
+  // when first creating the template.
+  const invitationSubject = template ? template.invitationSubject : c.invitationSubject;
+  const invitationBodyMarkdown = template ? template.invitationBodyMarkdown : c.invitationBodyMarkdown;
+  const contentHash = computeTemplateContentHash({
     questions: c.questions, sections: c.sections, scoringConfig: c.scoringConfig,
-    reportConfig: c.reportConfig ?? null, invitationSubject: c.invitationSubject, invitationBodyMarkdown: c.invitationBodyMarkdown,
-  };
-  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
-}
+    reportConfig: c.reportConfig ?? null, invitationSubject, invitationBodyMarkdown,
+  } as any);
 
-export async function ensureTemplateVersionContent(tx: any, systemUserId: string, c: SeedContent): Promise<SeedResult> {
-  const contentHash = computeContentHash(c);
-  let template = await tx.assessmentTemplate.findUnique({ where: { alias: c.alias }, select: { id: true } });
+  let templateId: string;
   if (!template) {
-    template = await tx.assessmentTemplate.create({
+    const created = await tx.assessmentTemplate.create({
       data: {
         name: c.name, alias: c.alias, description: c.description,
         invitationSubject: c.invitationSubject, invitationBodyMarkdown: c.invitationBodyMarkdown,
         aggregationMode: c.aggregationMode ?? "FULL_VISIBILITY", createdBy: systemUserId,
       }, select: { id: true },
     });
+    templateId = created.id;
+  } else {
+    templateId = template.id; // do NOT update template-level invitation fields
   }
+
   const versions = await tx.assessmentTemplateVersion.findMany({
-    where: { templateId: template.id, language: c.language },
+    where: { templateId, language: c.language },
     select: { versionNumber: true, contentHash: true, publishedAt: true },
     orderBy: { versionNumber: "desc" },
   });
-  const match = versions.find((v: any) => v.contentHash === contentHash);
-  if (match) return { action: "noop", templateId: template.id, versionId: "", versionNumber: match.versionNumber, contentHash };
-
-  const nextNumber = versions.length === 0 ? 1 : versions[0].versionNumber + 1;
+  const latest = versions[0];
+  if (latest && latest.contentHash === contentHash) {
+    return { action: "noop", templateId, versionId: "", versionNumber: latest.versionNumber, contentHash };
+  }
+  // M5 — fail closed if the latest is an unpublished DRAFT that differs: it may
+  // hold human review edits we'd silently bury. Require an explicit override.
+  if (latest && !latest.publishedAt && !opts.forceSupersedeDraft) {
+    throw new Error(`[seed:${c.alias}] latest version v${latest.versionNumber} is an unpublished DRAFT with different content (possible reviewer edits). Re-run with forceSupersedeDraft to append a new draft and supersede it.`);
+  }
+  const nextNumber = latest ? latest.versionNumber + 1 : 1;
   const version = await tx.assessmentTemplateVersion.create({
     data: {
-      templateId: template.id, versionNumber: nextNumber, language: c.language,
+      templateId, versionNumber: nextNumber, language: c.language,
       questions: c.questions as object, sections: c.sections as object, scoringConfig: c.scoringConfig as object,
       reportConfig: (c.reportConfig as object) ?? undefined, contentHash, publishedAt: null, publishedBy: null,
     }, select: { id: true },
   });
-  return { action: "created", templateId: template.id, versionId: version.id, versionNumber: nextNumber, contentHash };
+  // M6 — audit provenance in the same transaction (append "ASSESSMENT_VERSION_SEEDED"
+  // to the AuditAction union in lib/audit.ts if it is a closed union).
+  await tx.auditLog.create({ data: {
+    entityType: "AssessmentTemplateVersion", entityId: version.id, action: "ASSESSMENT_VERSION_SEEDED", performedBy: systemUserId,
+    metadata: { alias: c.alias, versionNumber: nextNumber, previousLatest: latest?.versionNumber ?? null, contentHash, seedRunId: opts.seedRunId ?? null },
+  } });
+  return { action: "created", templateId, versionId: version.id, versionNumber: nextNumber, contentHash };
 }
 ```
 
-- [ ] **Step 4: Run tests, verify pass** — `npx jest src/__tests__/seed/seed-template-version.test.ts` → PASS (3/3).
+- [ ] **Step 4: Run tests, verify pass** → PASS. Add tests for: fail-closed on edited unpublished draft (latest draft, differing hash, no force → throws); `forceSupersedeDraft: true` appends anyway; soft-deleted template throws; existing-template path does NOT call `assessmentTemplate.update` (no live invitation mutation) and hashes against stored invitation; `assertSeedContentIntegrity` throws on duplicate keys / dangling sectionStableKey / duplicate option keys; an audit row is created on append.
+- [ ] **Step 5: Commit** — `feat(assessment): version-aware seeder helper (latest-only no-op, fail-closed drafts, integrity, audit, no live-invite mutation)`
 
-- [ ] **Step 5: Commit**
-```bash
-git add src/src/lib/assessments/seed-template-version.ts src/src/__tests__/seed/seed-template-version.test.ts
-git commit -m "feat(assessment): version-aware seeder helper (append DRAFT vN+1 on content change)"
+> **Caller contract (every seed `main()`):** open an interactive transaction, `SELECT pg_advisory_xact_lock(hashtext('assessment-<alias>-seed'))` first, call `ensureTemplateVersionContent(tx, sys.id, build<Name>Content())`, then `ensureAccessGroupAndTemplateLink(...)` (preserve the existing access-group link + soft-delete safeguards). Catch a unique-constraint conflict on `(templateId, versionNumber, language)` by re-reading and no-oping/retrying (M4).
+
+---
+
+## Task 1b: Server-side answer validation for ALL question types (required + value-shape)
+
+**Files:** Modify `src/src/lib/assessments/scoring.ts` (required-answer check ~L1024-1037) AND the quiz + org-survey submit routes (`src/src/app/api/quiz/[campaignAlias]/submit/route.ts`, `src/src/app/api/organizations/.../me` submit, `src/src/app/api/surveys/[id]/submit/route.ts`); Test `src/src/__tests__/lib/assessments/scoring-required-all-types.test.ts` + submit-route tests.
+
+The re-seed (a) marks many qualitative questions `isRequired` and (b) introduces `MULTI_CHOICE` with `maxChoices` + `NUMBER` intake — but the current missing-required check only collects SLIDER_LIKERT keys, and the submit routes accept `value: unknown`. Two gaps:
+1. **Required presence** — extend the missing-required check to every `isRequired` question (present = key in answer set with a non-empty string / non-empty array / finite number).
+2. **Value shape (H2 — adversarial)** — before scoring/storage, validate each answer against its question: TEXT = string with a sane max length; NUMBER = finite number within any declared bounds; MULTI_CHOICE = array of **allowed option keys**, length ≤ `maxChoices`, no duplicates; SLIDER_LIKERT = integer within `scale.min..max`. Reject (422) otherwise. Cap total payload size. Cover adversarial payloads (object/array where a scalar is expected, unknown option key, over-`maxChoices`, oversized text, non-finite number) in BOTH the public and invited submit routes.
+
+- [ ] **Step 1: Failing test**
+```ts
+// src/src/__tests__/lib/assessments/scoring-required-all-types.test.ts
+import { scoreSubmission } from "@/lib/assessments/scoring";
+const version = {
+  language: "enUS",
+  sections: [{ stableKey: "S1", title: "S1", sortOrder: 0 }],
+  questions: [
+    { stableKey: "T1", type: "TEXT", label: "req text", sectionStableKey: "S1", sortOrder: 0, isRequired: true },
+    { stableKey: "SL1", type: "SLIDER_LIKERT", label: "s", sectionStableKey: "S1", sortOrder: 1, isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "", anchorMax: "" } },
+  ],
+  scoringConfig: { tierMetric: "countAchieved", passThreshold: 2, tiers: [{ minMetric: 0, maxMetric: 2, label: "x", message: "m" }] },
+} as any;
+test("missing required TEXT answer is reported (not just SLIDER_LIKERT)", () => {
+  const res = scoreSubmission(version, [{ stableKey: "SL1", value: 3 }]);
+  expect(JSON.stringify(res)).toContain("T1");
+});
 ```
+
+- [ ] **Step 2: Run, verify fails** (T1 not reported).
+- [ ] **Step 3: Implement** — extend the required-key collection to all `isRequired` questions regardless of type, preserving the `MISSING_REQUIRED_KEY` shape. Keep one source of truth (scorer OR submit route).
+- [ ] **Step 4: Run tests + build gate** → PASS / clean.
+- [ ] **Step 5: Commit** — `fix(assessment): enforce required answers for TEXT/NUMBER/MULTI_CHOICE`
 
 ---
 
@@ -193,28 +291,26 @@ git commit -m "feat(assessment): version-aware seeder helper (append DRAFT vN+1 
 
 **Files:** Modify `src/prisma/seed-rockefeller-assessment.ts`; add `src/src/__tests__/seed/rockefeller-content.test.ts`.
 
-**Reality (spec §4.1):** questions + 0–3 scale + 3 scoring bands with verbatim messages are ALREADY correct. Fixes: (a) drop invented `anchorMin: "Not true"` / `anchorMax: "Completely true"`, (b) drop the trailing period on Q1_1 ("…priorities, and styles"), (c) section-7 straight double quotes around "alive". Reuse the existing published stableKeys (Task 0). Band edges 0–16/17–32/33–40 stay (provisional). Switch the script to `ensureTemplateVersionContent` (anchor removal changes the hash → appends DRAFT vN+1). Source: `From Jeff/APP_scaling up assessemnt/APP_Rockerfeller/Rockerfeller questions.xlsx`.
+**Reality (spec §4.1):** 40 questions, 10 sections, scale 0–3, 3 bands with verbatim messages — already correct. Fixes: (a) source has no worded anchors but the schema requires them → `anchorMin: ""`, `anchorMax: ""`, `step: 1` (faithful: no invented labels; do NOT remove the fields); (b) drop trailing period on Q1_1 ("…priorities, and styles"); (c) section-7 straight double quotes around "alive". **Reuse the published stableKeys** (Task 0). Band edges 0–16/17–32/33–40 stay (provisional). Switch to `ensureTemplateVersionContent`. Source: `From Jeff/APP_scaling up assessemnt/APP_Rockerfeller/Rockerfeller questions.xlsx`.
 
-- [ ] **Step 1: Write the failing content test**
+- [ ] **Step 1: Failing content test**
 ```ts
 // src/src/__tests__/seed/rockefeller-content.test.ts
 import { buildRockefellerContent } from "@/../prisma/seed-rockefeller-assessment";
 
-test("Rockefeller content: 10 sections, 40 questions, 0-3 scale, no worded anchors", () => {
+test("Rockefeller: 10 sections, 40 questions, 0-3 scale w/ empty anchors + step 1, no scaleLabels", () => {
   const c = buildRockefellerContent();
   expect(c.sections).toHaveLength(10);
   expect(c.questions).toHaveLength(40);
   for (const q of c.questions as any[]) {
     expect(q.type).toBe("SLIDER_LIKERT");
-    expect(q.scale).toEqual({ min: 0, max: 3 });
-    expect(q.anchorMin).toBeUndefined();
-    expect(q.anchorMax).toBeUndefined();
+    expect(q.scale).toEqual({ min: 0, max: 3, step: 1, anchorMin: "", anchorMax: "" });
+    expect("scaleLabels" in q).toBe(false);
   }
-  const q11 = (c.questions as any[]).find((q) => q.stableKey === "Q1_1");
-  expect(q11.label.endsWith("styles")).toBe(true);
+  expect((c.questions as any[]).find((q) => q.stableKey === "Q1_1").label.endsWith("styles")).toBe(true);
 });
 
-test("Rockefeller scoring: countAchieved, 3 verbatim-message tiers", () => {
+test("Rockefeller scoring: countAchieved, passThreshold 2, 3 verbatim tiers", () => {
   const sc = buildRockefellerContent().scoringConfig as any;
   expect(sc.tierMetric).toBe("countAchieved");
   expect(sc.passThreshold).toBe(2);
@@ -224,21 +320,18 @@ test("Rockefeller scoring: countAchieved, 3 verbatim-message tiers", () => {
     "That is a great overall score.",
   ]);
 });
+
+test("Rockefeller: full ordered label array matches the xlsx fixture (verbatim guard)", () => {
+  const expected = require("./fixtures/rockefeller-labels.json"); // 40 labels, in order, from the xlsx
+  expect((buildRockefellerContent().questions as any[]).map((q) => q.label)).toEqual(expected);
+});
 ```
 
-- [ ] **Step 2: Run, verify fails** — `npx jest src/__tests__/seed/rockefeller-content.test.ts` → FAIL (`buildRockefellerContent` not exported).
-
-- [ ] **Step 3: Refactor the seed script.** Export a pure `buildRockefellerContent(): SeedContent`. Remove `anchorMin`/`anchorMax` from `QuestionPayload` + `buildSectionsAndQuestions`. Fix the Q1_1 label + section-7 quotes verbatim per the xlsx. Replace the `main()` STATE A–F block with: acquire advisory lock → `resolveSystemUser` → `ensureTemplateVersionContent(tx, sys.id, buildRockefellerContent())` → `ensureAccessGroupAndTemplateLink`. Keep stableKeys identical to the prod baseline (Task 0).
-
-- [ ] **Step 4: Run tests + build gate** — `npx jest src/__tests__/seed/` → PASS; `CI=true npx next build --turbopack` → clean.
-
-- [ ] **Step 5: Dry-run the seed against a dev/preview DB** (NOT prod): `npx tsx prisma/seed-rockefeller-assessment.ts` → appends DRAFT v(N+1); re-run is a no-op. Verify the new version has `publishedAt = null` and the prior published version is untouched.
-
-- [ ] **Step 6: Commit**
-```bash
-git add src/prisma/seed-rockefeller-assessment.ts src/src/__tests__/seed/rockefeller-content.test.ts
-git commit -m "feat(assessment): Rockefeller real-content fixes + version-aware seeder (DRAFT vN+1)"
-```
+- [ ] **Step 2: Run, verify fails.**
+- [ ] **Step 3: Refactor seed** — export `buildRockefellerContent()`; empty-string anchors + step 1; fix Q1_1 + section-7 quotes; build `fixtures/rockefeller-labels.json` from the xlsx; reuse published stableKeys; replace STATE A–F with `ensureTemplateVersionContent`.
+- [ ] **Step 4: Run tests + build gate.**
+- [ ] **Step 5: Dry-run on dev/preview DB** (NOT prod) → appends DRAFT v(N+1); re-run no-op; published version untouched.
+- [ ] **Step 6: Commit** — `feat(assessment): Rockefeller real-content fixes + version-aware seeder (DRAFT vN+1)`
 
 ---
 
@@ -246,46 +339,37 @@ git commit -m "feat(assessment): Rockefeller real-content fixes + version-aware 
 
 **Files:** Modify `src/prisma/seed-qsp-v1-assessment.ts`; add `src/src/__tests__/seed/qsp-v1-content.test.ts`.
 
-**Reality (spec §4.2):** ~8 sections; 1 `NUMBER` (overall rating 1–10, 1 decimal) + 7 `SLIDER_LIKERT` (six-item 1–10 grid + 1 methodology slider; emoji/no-text anchors) + TEXT, with the core-values question as **3 separate TEXT boxes**. **No scoring** → neutral tier (ADR-0002). Transcribe verbatim from the 18 screenshots in `qtr session prep v1.xlsx` (`xl/media/image1–18.png`).
+**Reality (spec §4.2):** ~8 sections; 1 `NUMBER` (overall rating 1–10) + 7 `SLIDER_LIKERT` (`scale: { min:1, max:10, step:1, anchorMin:"", anchorMax:"" }`) + TEXT, core-values "role models" = **3 TEXT boxes**. **No scoring** → neutral tier. Transcribe verbatim from `qtr session prep v1.xlsx` (`xl/media/image1–18.png`).
+
+Neutral `scoringConfig` (`passThreshold` REQUIRED):
+```ts
+const SCORING_CONFIG = {
+  tierMetric: "overallAvg",
+  passThreshold: 0,
+  tiers: [{ minMetric: 1, maxMetric: 10, label: "Submitted",
+    message: "Thank you — your responses have been recorded and shared with your facilitator to prepare the quarterly session." }],
+} as const;
+```
 
 - [ ] **Step 1: Failing content test**
 ```ts
 // src/src/__tests__/seed/qsp-v1-content.test.ts
 import { buildQspV1Content } from "@/../prisma/seed-qsp-v1-assessment";
-
-test("QSP v1: mixed types, single neutral tier", () => {
+test("QSP v1: NUMBER+SLIDER(1-10,step1,empty anchors)+TEXT; single neutral tier w/ passThreshold 0", () => {
   const c = buildQspV1Content();
   const types = new Set((c.questions as any[]).map((q) => q.type));
-  expect(types.has("NUMBER")).toBe(true);
-  expect(types.has("SLIDER_LIKERT")).toBe(true);
-  expect(types.has("TEXT")).toBe(true);
-  const sc = c.scoringConfig as any;
-  expect(sc.tiers).toHaveLength(1);
-  expect(sc.tiers[0].minMetric).toBe(1);
-  expect(sc.tiers[0].maxMetric).toBe(10);
+  expect(types.has("NUMBER") && types.has("SLIDER_LIKERT") && types.has("TEXT")).toBe(true);
+  for (const q of (c.questions as any[]).filter((q) => q.type === "SLIDER_LIKERT"))
+    expect(q.scale).toEqual({ min: 1, max: 10, step: 1, anchorMin: "", anchorMax: "" });
+  expect((c.scoringConfig as any).tiers).toHaveLength(1);
+  expect((c.scoringConfig as any).passThreshold).toBe(0);
 });
-
-test("QSP v1: core-values stories modeled as 3 TEXT boxes", () => {
-  const cv = (buildQspV1Content().questions as any[]).filter((q) => q.stableKey.startsWith("S4_core_values_role_model"));
-  expect(cv).toHaveLength(3);
+test("QSP v1: core-values stories = 3 TEXT boxes", () => {
+  expect((buildQspV1Content().questions as any[]).filter((q) => q.stableKey.startsWith("S4_core_values_role_model"))).toHaveLength(3);
 });
 ```
 
-- [ ] **Step 2: Run, verify fails.**
-
-- [ ] **Step 3: Rewrite the seed.** Replace fabricated content with the verbatim QSP v1 structure (spec §4.2). Neutral `scoringConfig`:
-```ts
-const SCORING_CONFIG = {
-  tierMetric: "overallAvg",
-  tiers: [{ minMetric: 1, maxMetric: 10, label: "Submitted",
-    message: "Thank you — your responses have been recorded and shared with your facilitator to prepare the quarterly session." }],
-} as const;
-```
-Export `buildQspV1Content()`; wire `main()` to `ensureTemplateVersionContent`. Emoji sliders → omit anchor labels. NUMBER overall-rating uses the existing NUMBER question shape.
-
-- [ ] **Step 4: Run tests + build gate** → PASS / clean.
-- [ ] **Step 5: Dry-run seed on dev DB** → appends DRAFT v(N+1).
-- [ ] **Step 6: Commit** — `feat(assessment): QSP v1 real content (aggregation-only, neutral tier)`
+- [ ] **Step 2-6:** verify fails → rewrite seed verbatim + neutral config + wire helper → tests + build gate → dry-run → commit `feat(assessment): QSP v1 real content (aggregation-only, neutral tier)`.
 
 ---
 
@@ -293,33 +377,28 @@ Export `buildQspV1Content()`; wire `main()` to `ensureTemplateVersionContent`. E
 
 **Files:** Modify `src/prisma/seed-qsp-v2-assessment.ts`; add `src/src/__tests__/seed/qsp-v2-content.test.ts`.
 
-**Reality (spec §4.3):** ONE instrument, Parts 1–5, ~12–13 questions. ⚠️ Transcribe verbatim from the **correctly-numbered** survey screens `image9`–`image22` in `qtr session prep v2.xlsx` (the rejected first-pass map mis-numbered them — do NOT reuse it). Structure: P1 (NUMBER rating + TEXT explain + **5**-item slider matrix using "rocks" wording, **no** "the way you have performed" + TEXT leadership-rocks view + 3-box core-values) · Start/Stop/Continue (3 company TEXT, no department) · P2 Personal Check-in (slider + TEXT) · P3 Growth Challenge (3 TEXT incl. "Where do you believe the solution lies?") · P4 Focus (Critical Number + Top Priorities) · P5 Closing (1 TEXT). **No scoring** → neutral tier.
+**Reality (spec §4.3):** ONE instrument, Parts 1–5, ~12–13 questions. ⚠️ Transcribe verbatim from the **correctly-numbered** screens `image9`–`image22` in `qtr session prep v2.xlsx` (rejected first-pass map mis-numbered them). P1 (NUMBER rating + TEXT explain + **5**-item slider matrix using "rocks" wording, **no** "the way you have performed" + TEXT leadership-rocks view + 3-box core-values) · Start/Stop/Continue (3 company TEXT) · P2 Personal Check-in (slider + TEXT) · P3 Growth Challenge (3 TEXT incl. "Where do you believe the solution lies?") · P4 Focus (Critical Number + Top Priorities) · P5 Closing (1 TEXT). Sliders `scale: { min:1, max:10, step:1, anchorMin:"", anchorMax:"" }`. **No scoring** → neutral config (`passThreshold: 0`), same as Task 3.
 
 - [ ] **Step 1: Failing content test**
 ```ts
 // src/src/__tests__/seed/qsp-v2-content.test.ts
 import { buildQspV2Content } from "@/../prisma/seed-qsp-v2-assessment";
-
-test("QSP v2: P1 matrix has exactly 5 sliders (no self-performance item)", () => {
+test("QSP v2: P1 matrix has exactly 5 sliders (no self-performance)", () => {
   const matrix = (buildQspV2Content().questions as any[]).filter((q) => q.stableKey.startsWith("P1_rate_"));
   expect(matrix).toHaveLength(5);
   expect(matrix.some((q) => /you have performed/i.test(q.label))).toBe(false);
 });
-
-test("QSP v2: no department start/stop/continue, no Rockefeller-methodology block, single neutral tier", () => {
+test("QSP v2: no department start/stop/continue, no methodology block, single neutral tier w/ passThreshold 0", () => {
   const c = buildQspV2Content();
   const labels = (c.questions as any[]).map((q) => q.label.toLowerCase());
   expect(labels.some((l) => l.includes("your department should"))).toBe(false);
-  expect(labels.some((l) => l.includes("rockefeller habits/scaling up methodology now serving"))).toBe(false);
+  expect(labels.some((l) => l.includes("methodology now serving"))).toBe(false);
   expect((c.scoringConfig as any).tiers).toHaveLength(1);
+  expect((c.scoringConfig as any).passThreshold).toBe(0);
 });
 ```
 
-- [ ] **Step 2: Run, verify fails.**
-- [ ] **Step 3: Rewrite the seed** with verbatim Parts 1–5 content (transcribed from image9–22) + the neutral `scoringConfig` shape from Task 3. Export `buildQspV2Content()`; wire to `ensureTemplateVersionContent`.
-- [ ] **Step 4: Run tests + build gate.**
-- [ ] **Step 5: Dry-run seed on dev DB.**
-- [ ] **Step 6: Commit** — `feat(assessment): QSP v2 real content (Parts 1-5, neutral tier)`
+- [ ] **Step 2-6:** verify fails → rewrite verbatim from image9–22 + neutral config + wire helper → tests + build gate → dry-run → commit `feat(assessment): QSP v2 real content (Parts 1-5, neutral tier)`.
 
 ---
 
@@ -327,39 +406,35 @@ test("QSP v2: no department start/stop/continue, no Rockefeller-methodology bloc
 
 **Files:** Modify `src/prisma/seed-lva-assessment.ts`; add `src/src/__tests__/seed/lva-content.test.ts`.
 
-**Reality (spec §4.4, ADR-0003):** 9 `NUMBER` labeled **"in three years"** + 8 future-vision `TEXT` (required) + 16-factor matrix as **16 `SLIDER_LIKERT` 1–3** (scaleLabels Weak/Average/Strong) + 1 `MULTI_CHOICE` obstacle (pick 3 of 16) + 16 optional `TEXT` "Why is {factor} a hindrance?" + 2 always-on obstacle `TEXT` + 1 rehire-% `NUMBER` + 14 focus-area `TEXT` (required). **No overall tiers** → neutral tier; group factor-bar report out of scope. Transcribe verbatim from `leadership visin alignment assement.xlsx`.
+**Reality (spec §4.4, ADR-0003):** 9 `NUMBER` labeled **"in three years"** + 8 future-vision `TEXT` (required) + 16-factor matrix as **16 `SLIDER_LIKERT`** with `scale: { min:1, max:3, step:1, anchorMin:"Weak", anchorMax:"Strong" }` (no `scaleLabels` field; 2=Average implied) + 1 `MULTI_CHOICE` obstacle (`options: [{key,label}×16]`, `maxChoices: 3`) + 16 optional `TEXT` "Why is {factor} a hindrance?" + 2 always-on obstacle `TEXT` + 1 rehire-% `NUMBER` + 14 focus-area `TEXT` (required). **No overall tiers** → neutral tier (`passThreshold: 0`); group factor-bar report out of scope. Transcribe verbatim from `leadership visin alignment assement.xlsx`.
 
 - [ ] **Step 1: Failing content test**
 ```ts
 // src/src/__tests__/seed/lva-content.test.ts
 import { buildLvaContent } from "@/../prisma/seed-lva-assessment";
-
-test("LVA: 16-factor matrix as 1-3 sliders with Weak/Average/Strong labels", () => {
+test("LVA: 16-factor matrix as 1-3 sliders with Weak/Strong anchors (no scaleLabels)", () => {
   const matrix = (buildLvaContent().questions as any[]).filter((q) => q.stableKey.startsWith("S4_"));
   expect(matrix).toHaveLength(16);
   for (const q of matrix) {
     expect(q.type).toBe("SLIDER_LIKERT");
-    expect(q.scale).toEqual({ min: 1, max: 3 });
-    expect(q.scaleLabels).toEqual(["Weak", "Average", "Strong"]);
+    expect(q.scale).toEqual({ min: 1, max: 3, step: 1, anchorMin: "Weak", anchorMax: "Strong" });
+    expect("scaleLabels" in q).toBe(false);
   }
 });
-
-test("LVA: financials framed 'in three years'; obstacle MULTI_CHOICE of 16; neutral tier", () => {
+test("LVA: financials 'in three years'; obstacle MULTI_CHOICE of 16 (maxChoices 3); neutral tier", () => {
   const c = buildLvaContent();
   const fin = (c.questions as any[]).filter((q) => q.stableKey.startsWith("S1_"));
   expect(fin.every((q) => q.type === "NUMBER")).toBe(true);
   expect(fin.some((q) => /three years/i.test(q.label))).toBe(true);
   const obstacle = (c.questions as any[]).find((q) => q.type === "MULTI_CHOICE");
   expect(obstacle.options).toHaveLength(16);
+  expect(obstacle.maxChoices).toBe(3);
   expect((c.scoringConfig as any).tiers).toHaveLength(1);
+  expect((c.scoringConfig as any).passThreshold).toBe(0);
 });
 ```
 
-- [ ] **Step 2: Run, verify fails.**
-- [ ] **Step 3: Rewrite the seed** with verbatim LVA content; financials labeled "in three years"; qualitative TEXT `isRequired: true`, NUMBER intake optional; matrix as 16 sliders 1–3 with Weak/Average/Strong; obstacle MULTI_CHOICE (`maxChoices: 3`) + 16 optional why-TEXT; neutral `scoringConfig` (same shape as Task 3, full metric range). Remove the fabricated Developing/Building/Scaling tiers. Export `buildLvaContent()`; wire to helper.
-- [ ] **Step 4: Run tests + build gate.**
-- [ ] **Step 5: Dry-run seed on dev DB.**
-- [ ] **Step 6: Commit** — `feat(assessment): LVA real content (3-year framing, matrix sliders, neutral tier)`
+- [ ] **Step 2-6:** verify fails → rewrite verbatim; financials "in three years"; qualitative TEXT `isRequired:true`, NUMBER optional; matrix sliders 1–3 Weak/Strong; obstacle MULTI_CHOICE + 16 optional why-TEXT; neutral config; remove fabricated tiers → tests + build gate → dry-run → commit `feat(assessment): LVA real content (3-year framing, matrix sliders, neutral tier)`.
 
 ---
 
@@ -367,67 +442,100 @@ test("LVA: financials framed 'in three years'; obstacle MULTI_CHOICE of 16; neut
 
 **Files:** Modify `src/prisma/seed-scaling-up-full-assessment.ts`; add `src/src/__tests__/seed/scaling-up-full-content.test.ts`.
 
-**Reality (spec §4.5, decision §1.5):** 61 `SLIDER_LIKERT` 0–10, 10 sections, 5 domains (People/Strategy/Execution/Cash/You). Keep the verbatim question labels + per-question recommendations already in the seed. **Remove** the fabricated per-domain tiers + `meanOfDomains` rollup. Add the 3 overall ScaleUp Score bands with **provisional** cutoffs + verbatim messages. Flag the Esperto-dependent gaps in Task 8.
+**Reality (spec §4.5, decision §1.5):** 61 `SLIDER_LIKERT` 0–10, 10 sections, 5 domains (People/Strategy/Execution/Cash/You). Keep verbatim labels + per-question `recommendations`. The engine resolves the global tier on the **0–10 rollup** (not 0–100), so the 3 ScaleUp bands are expressed in **0–10 units** (provisional 40/65→4.0/6.5); the 0–100 ScaleUp Score is emitted via `scaleUpScore: true` and is **approximate** (`meanOfDomains×10`, NOT Esperto's weighted score — flagged in Task 8). `meanOfDomains` needs every section to carry a `domain`; each `domains[]` entry needs `tiers.min(1)` → give each domain a single **neutral** `[0,10]` tier. Remove fabricated per-domain Critical/At Risk tiers.
+
+```ts
+const SCORING_CONFIG = {
+  tierMetric: "overallAvg",
+  passThreshold: 0,
+  rollup: { overall: "meanOfDomains" },
+  scaleUpScore: true,
+  // PROVISIONAL global tiers on the 0-10 rollup. Confirmed (of 100): <=28 LOW, 47-62 GOOD, >=73 TOP.
+  // 4.0 / 6.5 are interpolations pending Esperto's weighting spec (Task 8).
+  tiers: [
+    { minMetric: 0,   maxMetric: 4.0, label: "Not ready",
+      message: "You have still a lot of focus areas on which you can work within your company. If you want to grow quickly, then your organization is probably not ready yet." },
+    { minMetric: 4.0, maxMetric: 6.5, label: "On the way",
+      message: "A great score. You are pretty well on the way to becoming a strong growth organization." },
+    { minMetric: 6.5, maxMetric: 10,  label: "Exemplary",
+      message: "You are doing extremely well and are perhaps an example for others! However, in order to reach the next phase, there is still room for improvement." },
+  ],
+  domains: [
+    // one per domain: { key, label, tiers: [{ minMetric: 0, maxMetric: 10, label: "—", message: "" }] }
+  ],
+} as const;
+```
 
 - [ ] **Step 1: Failing content test**
 ```ts
 // src/src/__tests__/seed/scaling-up-full-content.test.ts
 import { buildScalingUpFullContent } from "@/../prisma/seed-scaling-up-full-assessment";
-
 test("SU Full: 61 sliders 0-10 across 5 domains", () => {
   const c = buildScalingUpFullContent();
   expect((c.questions as any[]).filter((q) => q.type === "SLIDER_LIKERT")).toHaveLength(61);
-  const domains = (c.scoringConfig as any).domains.map((d: any) => d.name).sort();
-  expect(domains).toEqual(["Cash", "Execution", "People", "Strategy", "You"]);
+  expect((c.scoringConfig as any).domains.map((d: any) => d.label).sort()).toEqual(["Cash","Execution","People","Strategy","You"]);
 });
-
-test("SU Full: 3 overall ScaleUp tiers; no Critical/At Risk placeholder tiers", () => {
-  const tiers = (buildScalingUpFullContent().scoringConfig as any).tiers;
-  expect(tiers).toHaveLength(3);
-  expect(tiers.some((t: any) => /Critical|At Risk|On Track|Strong/.test(t.label))).toBe(false);
+test("SU Full: 3 global ScaleUp tiers in 0-10 units; scaleUpScore on; no placeholder labels", () => {
+  const sc = buildScalingUpFullContent().scoringConfig as any;
+  expect(sc.tiers).toHaveLength(3);
+  expect(sc.tiers.map((t: any) => t.maxMetric)).toEqual([4.0, 6.5, 10]);
+  expect(sc.scaleUpScore).toBe(true);
+  expect(sc.rollup.overall).toBe("meanOfDomains");
+  expect(sc.tiers.some((t: any) => /Critical|At Risk|On Track|Strong/.test(t.label))).toBe(false);
 });
 ```
 
 - [ ] **Step 2: Run, verify fails.**
-- [ ] **Step 3: Rework the scoringConfig.** Keep questions + per-question `recommendations`. Replace the tier block with the 3 ScaleUp bands (cutoffs labeled provisional):
-```ts
-// PROVISIONAL cutoffs — confirmed: <=28 LOW, 47-62 GOOD, >=73 TOP.
-// 40/65 are interpolations pending Esperto's weighting spec (Task 8).
-const SCALEUP_TIERS = [
-  { minMetric: 0,  maxMetric: 40,  label: "Not ready",
-    message: "You have still a lot of focus areas on which you can work within your company. If you want to grow quickly, then your organization is probably not ready yet." },
-  { minMetric: 40, maxMetric: 65,  label: "On the way",
-    message: "A great score. You are pretty well on the way to becoming a strong growth organization." },
-  { minMetric: 65, maxMetric: 100, label: "Exemplary",
-    message: "You are doing extremely well and are perhaps an example for others! However, in order to reach the next phase, there is still room for improvement." },
-] as const;
-```
-Set `tierMetric`/`rollup` to the form the publish schema accepts for a 0–100 overall metric; verify `validateTierTiling` tiles [0,40)/[40,65)/[65,100]. Export `buildScalingUpFullContent()`; wire to helper.
-
-- [ ] **Step 4: Run tests + build gate; confirm publish-schema validation passes** for the new tiers.
-- [ ] **Step 5: Dry-run seed on dev DB.**
-- [ ] **Step 6: Commit** — `feat(assessment): Scaling Up Full provisional ScaleUp bands + remove placeholder domain tiers`
+- [ ] **Step 3: Rework scoringConfig** as above; keep questions + recommendations; every section carries its `domain`; neutral per-domain tiers. Export `buildScalingUpFullContent()`; wire to helper.
+- [ ] **Step 4: Run tests + build gate; add a test that the config PASSES the publish schema** (`TemplateVersionForPublishSchema` / project publish validator over `{questions, sections, scoringConfig}` → success).
+- [ ] **Step 5: Dry-run on dev DB.**
+- [ ] **Step 6: Commit** — `feat(assessment): Scaling Up Full provisional 0-10 ScaleUp bands + remove placeholder domain tiers`
 
 ---
 
-## Task 7: Integration verification (all 5)
+## Task 7: Integration verification (all 5) — DRAFT-aware
 
-- [ ] **Step 1:** From `src/`, run all 5 seed scripts against a dev/preview DB in order; confirm each appends one DRAFT version and a second run is a no-op (hash match).
-- [ ] **Step 2:** For each new DRAFT version, load it in the admin editor + render the public quiz route; confirm every question/type/scale renders and publish-schema validation passes (tiers tile; recommendations valid).
-- [ ] **Step 3:** Run the affected suite: `npx jest src/__tests__/seed src/__tests__/lib/assessments` → green. Build gate clean.
-- [ ] **Step 4: Commit** test additions — `test(assessment): integration coverage for re-seeded versions`
+DRAFT versions can't render via the public quiz route (rejects `publishedAt = null`) and campaigns need published versions — verify at data/component/schema level:
+
+- [ ] **Step 1:** Run all 5 seeds against a dev/preview DB in order; each appends one DRAFT; a second run no-ops (latest hash matches).
+- [ ] **Step 2:** Assert each new DRAFT version's JSON passes the **publish schema** (`TemplateVersionForPublishSchema` / project validator) — proves it WOULD publish.
+- [ ] **Step 3:** Run `scoreSubmission(draftVersionJson, syntheticAnswers)` on a midpoint submission; assert a tier returns without error (single band for neutral configs).
+- [ ] **Step 4:** Render `PublicQuizClient` (or `QuestionInput`) with the draft JSON **directly** in an RTL test to confirm each type/scale renders — NOT the live `/quiz` route.
+- [ ] **Step 5:** `npx jest src/__tests__/seed src/__tests__/lib/assessments` → green; build gate clean; commit `test(assessment): DRAFT-aware integration coverage (publish-schema + scorer + render)`.
 
 ---
 
 ## Task 8: Publish-review checklist for Jeff
 
-- [ ] **Step 1:** Fill `docs/specs/v7.6/09b-publish-review-checklist.md` with the items Jeff confirms before publishing each DRAFT: Rockefeller exact band edges (17/33); SU Full weighting formula + full 5-stop recommendation text + exact ScaleUp cutoffs (provisional 40/65) + non-scored profile inputs; slider endpoint labels. Note which templates are safe to publish as-is (QSP v1/v2 neutral, LVA neutral) vs need Jeff input (SU Full).
+- [ ] **Step 1:** Fill `docs/specs/v7.6/09b-publish-review-checklist.md`: items Jeff confirms before publishing each DRAFT — Rockefeller exact band edges (17/33); SU Full weighting formula + full 5-stop recommendation text + exact ScaleUp cutoffs (provisional 4.0/6.5 of the 0–10 rollup; 0–100 display is approximate `meanOfDomains×10`) + non-scored profile inputs; slider endpoint labels (currently empty). **Editor limitation:** the admin editor treats TEXT/NUMBER/MULTI_CHOICE config as v1.5/deferred and cannot edit their options/number constraints — mixed-type content fixes are **code-only**; admin UI is **review-only** for those types (Jeff reviews rendered output + scoring). State which templates are safe to publish as-is (QSP v1/v2 neutral, LVA neutral) vs need Jeff input (SU Full; Rockefeller band edges).
 - [ ] **Step 2: Commit** — `docs(assessment): publish-review checklist for Jeff`
 
 ---
 
-## Self-review (writing-plans checklist)
+## Changelog
 
-1. **Spec coverage:** §1 decisions → Tasks 1–6 + neutral-tier (ADR-0002) in Tasks 3/4/5; §3 architecture → Task 1 helper; §4 per-assessment → Tasks 2–6; §5 open items → Task 8; versioning/staged-DRAFT → helper (`publishedAt: null`). ✓
-2. **Placeholder scan:** seeder + scoringConfigs are full code; verbatim question text is intentionally sourced-from-file with verification assertions (content is data, not logic) — called out explicitly. ✓
-3. **Type consistency:** `ensureTemplateVersionContent` / `SeedContent` / `build<Name>Content()` consistent across tasks; `scoringConfig` shapes match `scoring.ts` (`tierMetric`, `tiers[].{minMetric,maxMetric,label,message}`, `domains[]`). ✓
+### Round 1 (Codex senior-engineer review — high 5 / medium 4 / low 2): all findings accepted
+
+- **[HIGH] Slider schema fields / `scaleLabels` invalid** — ACCEPTED. `SliderLikertScaleSchema` requires `{min,max,step,anchorMin,anchorMax}`, no `scaleLabels`. Rockefeller keeps schema-valid **empty-string** anchors (faithful) instead of dropping them; LVA matrix uses `anchorMin:"Weak"/anchorMax:"Strong"`; all sliders carry `step:1`. Tests assert exact `scale` shape + absence of `scaleLabels`.
+- **[HIGH] `passThreshold` required** — ACCEPTED. Every neutral config sets `passThreshold: 0`; tests assert it.
+- **[HIGH] SU Full 0-100 tiers don't fit the engine** — ACCEPTED. Global tiers re-expressed in 0–10 rollup units (provisional 4.0/6.5), `rollup.overall:"meanOfDomains"`, `scaleUpScore:true` for the approximate 0–100 display; per-domain neutral tiers satisfy `DomainDefSchema`. Added publish-schema assertions.
+- **[HIGH] Helper no-op suppression bug** — ACCEPTED. No-op only when the **latest** version's hash matches; otherwise append `max+1`. New abandoned-lower-draft test.
+- **[HIGH] Stable-key continuity under-specified** — ACCEPTED. Task 0 dumps latest-**published** key→label maps for **all five** templates; slices reuse keys for unchanged questions, fresh otherwise.
+- **[MED] Tests only check counts** — ACCEPTED. Added "Test rigor" rule + full ordered-label-array / verbatim-message assertions (Rockefeller fixture; same pattern per slice).
+- **[MED] Required qualitative answers unenforced** — ACCEPTED. New **Task 1b** extends the required-answer check to TEXT/NUMBER/MULTI_CHOICE.
+- **[MED] DRAFT can't render via public quiz** — ACCEPTED. Task 7 verifies via publish-schema + `scoreSubmission` + direct `PublicQuizClient` render, not the live route.
+- **[MED] Editor can't edit mixed-type config** — ACCEPTED. Task 8 notes mixed-type fixes are code-only; admin UI is review-only for those types.
+- **[LOW] Reimplemented hashing** — ACCEPTED. Helper imports `computeTemplateContentHash`.
+- **[LOW] Invitation metadata divergence** — ACCEPTED, then **superseded by round-2 H1** (see below): the round-1 "sync template invitation fields" fix was reversed because it leaks into live campaign emails.
+
+### Round 2 (Codex security & data-integrity review — high 3 / medium 5 / low 1): all findings accepted
+
+- **[HIGH] Draft append mutating template invitation → live-campaign email change** — ACCEPTED; **reverses round-1 [LOW]**. Helper now NEVER updates template-level invitation on an existing template; it hashes the version against the **stored** invitation (no drift, no live-email change) and uses the seed's invitation copy only on first create.
+- **[HIGH] Submit routes accept `value: unknown`** — ACCEPTED. Task 1b expanded from presence-only to full question-aware **value validation** (type, bounds, allowed MULTI_CHOICE keys, `maxChoices`, length/payload-size) in both public + invited submit routes, with adversarial-payload tests.
+- **[HIGH] No stable-key / section referential integrity** — ACCEPTED. New `assertSeedContentIntegrity()` (unique section/question stableKeys, unique sortOrders, every `sectionStableKey` resolves, unique option keys) runs in the helper before persist + is unit-tested.
+- **[MED] No advisory lock / conflict handling** — ACCEPTED. Caller-contract note: each seed `main()` runs the helper inside an interactive transaction with `pg_advisory_xact_lock(hashtext('assessment-<alias>-seed'))`, catching unique-version conflicts by re-read/no-op/retry.
+- **[MED] Edited latest draft silently superseded** — ACCEPTED. Helper fails closed when the latest version is an unpublished DRAFT that differs (possible reviewer edits), unless `forceSupersedeDraft` is passed.
+- **[MED] Seed drafts bypass audit** — ACCEPTED. Helper writes an `ASSESSMENT_VERSION_SEEDED` audit row (alias, versionNumber, previousLatest, contentHash, seedRunId) in the same transaction.
+- **[MED] Task 0 baseline doc-only** — ACCEPTED. Task 0 emits committed `published-keys-<alias>.json` fixtures; per-slice key-continuity tests assert reuse/non-reuse against them.
+- **[MED] Read-only baseline unenforced** — ACCEPTED. Task 0 prefers a read-only role + wraps the query in `SET TRANSACTION READ ONLY` (fail-fast on write).
+- **[LOW] Missing-template path skips access-group/soft-delete safeguards** — ACCEPTED. Helper guards against soft-deleted templates; caller preserves `ensureAccessGroupAndTemplateLink` (create path only fires on a genuine fresh DB).
