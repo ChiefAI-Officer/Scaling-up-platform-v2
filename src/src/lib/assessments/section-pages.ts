@@ -42,8 +42,8 @@ export function buildSectionPages(sections: PagerSection[], questions: PagerQues
   return pages;
 }
 
-export function isAnswered(value: number | string | string[] | undefined): boolean {
-  if (value === undefined) return false;
+export function isAnswered(value: number | string | string[] | null | undefined): boolean {
+  if (value === undefined || value === null) return false;
   if (typeof value === "string") return value.trim() !== "";
   if (Array.isArray(value)) return value.length > 0;
   return true; // number — incl 0

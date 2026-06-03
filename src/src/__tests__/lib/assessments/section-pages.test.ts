@@ -54,6 +54,14 @@ describe("buildSectionPages", () => {
     expect(allOrphan).toHaveLength(1);
     expect(allOrphan[0].isOther).toBe(true);
   });
+
+  it("sorts multiple orphans by sortOrder within the Other page", () => {
+    const pages = buildSectionPages(
+      [],
+      [q("z", 3, undefined), q("a", 1, undefined), q("m", 2, undefined)],
+    );
+    expect(pages[0].questions.map((x) => x.stableKey)).toEqual(["a", "m", "z"]);
+  });
 });
 
 describe("isAnswered", () => {
@@ -68,5 +76,8 @@ describe("isAnswered", () => {
     expect(isAnswered(3)).toBe(true);
     expect(isAnswered("x")).toBe(true);
     expect(isAnswered(["a"])).toBe(true);
+  });
+  it("treats null as NOT answered", () => {
+    expect(isAnswered(null)).toBe(false);
   });
 });
