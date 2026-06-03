@@ -36,7 +36,7 @@ A non-question screen shown before a section's questions, rendering that section
 _Avoid_: "title slide" as a distinct object, or a `SECTION_INTRO` question type (see ADR-0004).
 
 **Section pager** (one-section-at-a-time):
-The way a respondent answers an assessment: **exactly one section per screen** (optionally preceded by that section's **intro slide**), with Back/Next navigation, a "Section N of M" label, and a progress bar by questions answered — replacing the legacy single long-scroll form. Both the public (`/quiz`) and invited (`/me`) experiences use it.
+The way a respondent answers an assessment: **exactly one section per screen** (optionally preceded by that section's **intro slide**), with Back/Next navigation, a "Section N of M" label, and a progress bar by questions answered — replacing the legacy single long-scroll form. Both the public (`/quiz/[campaignAlias]`) and invited (`/org-survey/[campaignAlias]`) experiences use it. (`/me` is the invited flow's data API endpoint, not its page route.)
 _Avoid_: "page" (a section is not a route), "step" for the intro slide (the intro slide is a sub-view of a section, not a counted step).
 
 ### Results & scoring (three distinct "band"-like concepts — do not conflate)
