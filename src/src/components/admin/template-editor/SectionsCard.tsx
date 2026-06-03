@@ -42,6 +42,9 @@ export interface SectionDraft {
   uid: string;
   stableKey: string;
   name: string;
+  description?: string;
+  partLabel?: string;
+  domain?: string;
 }
 
 export interface SectionsCardProps {
