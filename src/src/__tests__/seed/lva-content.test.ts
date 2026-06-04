@@ -26,6 +26,27 @@ const EXPECTED_SLIDER_SCALE = {
   anchorMax: "Strong",
 };
 
+// Verbatim section intro-slide copy (body text rendered under the section
+// name on the one-section pager), keyed by section stableKey.
+const EXPECTED_SECTION_DESCRIPTIONS: Record<string, string> = {
+  S0_welcome:
+    "Welcome. This Leadership Vision Alignment assessment captures how you see the company's future — its financials, vision, strengths, obstacles, and focus areas. There are no right answers; please respond candidly.",
+  S1_financials:
+    "Picture the company three years from now. These questions capture your view of its financial scale — revenue, margins, people, and reach.",
+  S2_vision:
+    "Describe where the business is headed: its products, market, competitors, and what will drive its success over the next three years.",
+  S3_strengths:
+    "Rate the organization across key factors, from weak to strong, to surface where it's solid and where it needs work.",
+  S4_obstacles:
+    "Identify the factors most holding the company back from its growth ambitions.",
+  S5_explained:
+    "Explain the obstacles you selected — the reasoning behind each — and the one thing you would change.",
+  S6_focus:
+    "Capture the priorities, goals, and strategic focus areas that matter most for the period ahead.",
+  S7_completion:
+    "That's everything — thank you for sharing your perspective. Review your answers and submit when you're ready.",
+};
+
 describe("buildLvaContent()", () => {
   let content: LvaContent;
 
@@ -58,6 +79,19 @@ describe("buildLvaContent()", () => {
       .map((s) => s.sortOrder)
       .sort((a, b) => a - b);
     expect(orders).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it("every section has a non-empty description (intro-slide copy)", () => {
+    for (const s of content.sections) {
+      expect(typeof s.description).toBe("string");
+      expect(s.description!.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("each section description matches the verbatim copy by stableKey", () => {
+    for (const s of content.sections) {
+      expect(s.description).toBe(EXPECTED_SECTION_DESCRIPTIONS[s.stableKey]);
+    }
   });
 
   it("Welcome section (S0_welcome) has no questions assigned to it", () => {

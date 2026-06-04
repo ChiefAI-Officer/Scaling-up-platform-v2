@@ -53,6 +53,7 @@ Your coach will review the results with you afterward.`;
 
 interface SectionDef {
   name: string;
+  description: string;
   questions: string[];
 }
 
@@ -63,6 +64,8 @@ interface SectionDef {
 const SECTIONS: SectionDef[] = [
   {
     name: "The executive team is healthy and aligned.",
+    description:
+      "A healthy, aligned leadership team is the foundation for scaling. Rate how well your executive team trusts one another, debates openly, and operates as a genuine team.",
     questions: [
       "Team members understand each other's differences, priorities, and styles",
       "The team meets frequently (weekly is best) for strategic thinking.",
@@ -72,6 +75,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     name: "Everyone is aligned with the #1 thing that needs to be accomplished this quarter to move the company forward.",
+    description:
+      "Rate how clearly the team is aligned on the single most important priority for this quarter — and whether everyone could actually name it.",
     questions: [
       "The Critical Number is identified to move the company ahead this quarter.",
       "3-5 Priorities (Rocks) that support the Critical Number are identified and ranked for the quarter.",
@@ -81,6 +86,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     name: "Communication rhythm is established and information moves through organization accurately and quickly.",
+    description:
+      "A predictable meeting rhythm keeps information moving quickly. Rate how well your daily, weekly, monthly, and quarterly cadence is working.",
     questions: [
       "All employees are in a daily huddle that lasts less than 15 minutes.",
       "All teams have a weekly meeting.",
@@ -90,6 +97,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     name: "Every facet of the organization has a person assigned with accountability for ensuring goals are met.",
+    description:
+      "Every function and process should have one clear owner. Rate how completely accountability is assigned across the organization.",
     questions: [
       "The Function Accountability Chart (FACe) is completed (right person, doing the right things, right).",
       "Financial statements have a person assigned to each line item.",
@@ -99,6 +108,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     name: "Ongoing employee input is collected to identify obstacles and opportunities.",
+    description:
+      "Frontline employees see obstacles and opportunities first. Rate how consistently you collect and act on their input.",
     questions: [
       "All executives (and middle managers) have a Start/Stop/Keep conversation with at least one employee weekly.",
       "The insights from employee conversations are shared at the weekly executive team meeting.",
@@ -108,6 +119,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     name: "Reporting and analysis of customer feedback data is as frequent and accurate as financial data.",
+    description:
+      "Customer insight should be as timely and rigorous as your financials. Rate how well you gather, analyze, and act on customer feedback.",
     questions: [
       "All executives (and middle managers) have a 4Q conversation with at least one end user weekly.",
       "The insights from customer conversations are shared at the weekly executive team meeting.",
@@ -117,6 +130,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     name: 'Core Values and Purpose are "alive" in the organization.',
+    description:
+      "Core Values and Purpose should guide real decisions, not just sit on a wall. Rate how 'alive' they are in day-to-day work.",
     questions: [
       "Core Values are discovered, Purpose is articulated, and both are known by all employees.",
       "All executives and middle managers refer back to the Core Values and Purpose when giving praise or reprimands.",
@@ -126,6 +141,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     name: "Employees can articulate the following key components of the company's strategy accurately.",
+    description:
+      "Everyone should describe the company's strategy the same way. Rate how clearly the strategy is understood across the team.",
     questions: [
       "Big Hairy Audacious Goal (BHAG) – Progress is tracked and visible.",
       "Core Customer(s) – Their profile in 25 words or less.",
@@ -135,6 +152,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     name: "All employees can answer quantitatively whether they had a good day or week (Column 7 of the One-Page Strategic Plan).",
+    description:
+      "People do their best when they know whether they're winning. Rate whether employees can quantitatively tell if they had a good day or week.",
     questions: [
       "1 or 2 Key Performance Indicators (KPIs) are reported on weekly for each role/person.",
       "Each employee has 1 Critical Number that aligns with the company's Critical Number for the quarter (clear line of sight).",
@@ -144,6 +163,8 @@ const SECTIONS: SectionDef[] = [
   },
   {
     name: "The company's plans and performance are visible to everyone.",
+    description:
+      "Visible plans and metrics keep everyone rowing in the same direction. Rate how transparent your plans and performance are to the whole company.",
     questions: [
       'A "situation room" is established for weekly meetings (physical or virtual).',
       "Core Values, Purpose and Priorities are posted throughout the company.",
@@ -185,6 +206,7 @@ interface SectionPayload {
   stableKey: string;
   sortOrder: number;
   name: string;
+  description: string;
 }
 
 interface QuestionPayload {
@@ -218,6 +240,7 @@ function buildSectionsAndQuestions(): {
       stableKey: sectionStableKey,
       sortOrder: sectionNumber,
       name: section.name,
+      description: section.description,
     });
 
     section.questions.forEach((label, qIdx) => {
