@@ -1161,9 +1161,9 @@
 
 /* Assessment participant brand scope — purple #522583 + Roboto. NOT on .wf-scope (admin/coach share it). */
 .su-assessment-brand {
-  --primary: 271 56% 33%;          /* #522583 */
+  --primary: 269 56% 33%;          /* #522583 */
   --primary-foreground: 0 0% 100%;
-  --ring: 271 56% 33%;
+  --ring: 269 56% 33%;
   font-family: var(--font-assessment-body), Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 .su-assessment-brand h1, .su-assessment-brand h2, .su-assessment-brand h3 {

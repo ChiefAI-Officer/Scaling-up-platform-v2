@@ -7,7 +7,6 @@ import { QuestionInput } from "@/components/assessments/question-input";
 type AnswersMap = Record<string, number | string | string[]>;
 interface SectionPagerProps {
   pages: SectionPage[];
-  totalQuestions: number;
   answers: AnswersMap;
   onAnswerChange: (stableKey: string, value: number | string | string[]) => void;
   onSubmit: () => void;
@@ -20,7 +19,7 @@ function pageHasIntro(p: SectionPage): boolean {
   return (p.description?.trim()?.length ?? 0) > 0 || !hasQuestions;
 }
 
-export function SectionPager({ pages, totalQuestions, answers, onAnswerChange, onSubmit, submitting, onExit }: SectionPagerProps) {
+export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit }: SectionPagerProps) {
   const [sectionIndex, setSectionIndex] = React.useState(0);
   const page = pages[sectionIndex];
   const [view, setView] = React.useState<"intro" | "questions">(page && pageHasIntro(page) ? "intro" : "questions");
@@ -40,8 +39,14 @@ export function SectionPager({ pages, totalQuestions, answers, onAnswerChange, o
   const hasIntro = pageHasIntro(page);
   const isLast = sectionIndex === pages.length - 1;
   const answeredCount = pages.flatMap((p) => p.questions).filter((q) => isAnswered(answers[q.stableKey])).length;
+  const total = pages.flatMap((p) => p.questions).length;
 
   function focusHeading() { requestAnimationFrame(() => headingRef.current?.focus()); }
+
+  function handleAnswerChange(stableKey: string, value: number | string | string[]) {
+    setShowGateError(false);
+    onAnswerChange(stableKey, value);
+  }
 
   function goToSection(idx: number) {
     const next = pages[idx];
@@ -75,8 +80,8 @@ export function SectionPager({ pages, totalQuestions, answers, onAnswerChange, o
   return (
     <div className="su-assessment-brand survey-section">
       <p aria-live="polite">Section {sectionIndex + 1} of {pages.length}</p>
-      <div role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={totalQuestions} aria-valuenow={answeredCount} className="survey-progress">
-        <div className="survey-progress-fill" style={{ width: totalQuestions ? `${(answeredCount / totalQuestions) * 100}%` : "0%" }} />
+      <div role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={answeredCount} className="survey-progress">
+        <div className="survey-progress-fill" style={{ width: total ? `${(answeredCount / total) * 100}%` : "0%" }} />
       </div>
       <h2 ref={headingRef} tabIndex={-1} className="survey-section-title">
         {page.partLabel ? `${page.partLabel}: ` : ""}{page.name}
@@ -99,7 +104,7 @@ export function SectionPager({ pages, totalQuestions, answers, onAnswerChange, o
                   {q.label}{q.isRequired ? <span className="survey-required" aria-hidden="true"> *</span> : null}
                 </label>
                 {q.helpText ? <p className="survey-question-help">{q.helpText}</p> : null}
-                <QuestionInput question={q} value={answers[q.stableKey]} onChange={onAnswerChange} disabled={submitting} />
+                <QuestionInput question={q} value={answers[q.stableKey]} onChange={handleAnswerChange} disabled={submitting} />
               </li>
             ))}
           </ul>

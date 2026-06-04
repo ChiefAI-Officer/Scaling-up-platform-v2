@@ -17,7 +17,7 @@ function setup(extra: Partial<React.ComponentProps<typeof SectionPager>> = {}) {
   const onExit = jest.fn();
   const pages = buildSectionPages(sections, questions);
   const utils = render(
-    <SectionPager pages={pages} totalQuestions={questions.length} answers={extra.answers ?? {}}
+    <SectionPager pages={pages} answers={extra.answers ?? {}}
       onAnswerChange={onAnswerChange} onSubmit={onSubmit} onExit={onExit} submitting={false} {...extra} />,
   );
   return { onAnswerChange, onSubmit, onExit, ...utils };
@@ -46,7 +46,7 @@ describe("SectionPager", () => {
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText(/please answer/i)).toBeInTheDocument();
     const pages = buildSectionPages(sections, questions);
-    rerender(<SectionPager pages={pages} totalQuestions={1} answers={{ q1: 0 }} onAnswerChange={onAnswerChange} onSubmit={onSubmit} submitting={false} />);
+    rerender(<SectionPager pages={pages} answers={{ q1: 0 }} onAnswerChange={onAnswerChange} onSubmit={onSubmit} submitting={false} />);
     fireEvent.click(screen.getByRole("button", { name: /submit/i }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
@@ -68,5 +68,28 @@ describe("SectionPager", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: /start/i }));
     expect(screen.getByRole("slider", { name: "Q1" })).toBeInTheDocument();
+  });
+
+  it("Back across an empty welcome section lands on that section's intro", () => {
+    setup(); // S0 (empty, has description) + S1 (questions)
+    fireEvent.click(screen.getByRole("button", { name: /start/i })); // S0 intro → S1 questions
+    expect(screen.getByText("Q1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /back/i }));  // back across empty S0 → its intro
+    expect(screen.getByRole("heading", { name: "Welcome" })).toBeInTheDocument();
+    expect(screen.getByText("Intro copy")).toBeInTheDocument();
+    expect(screen.getByText(/section 1 of 2/i)).toBeInTheDocument();
+  });
+
+  it("a section with BOTH a description and questions: intro → Start → questions → Back → intro", () => {
+    const secs = [{ stableKey: "S1", sortOrder: 1, name: "Strategy", description: "Strategy intro" }];
+    const qs = [{ stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } }];
+    const pages = buildSectionPages(secs as any, qs as any);
+    render(<SectionPager pages={pages} answers={{}} onAnswerChange={jest.fn()} onSubmit={jest.fn()} submitting={false} />);
+    // intro shown
+    expect(screen.getByText("Strategy intro")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /start/i }));
+    expect(screen.getByText("Q1")).toBeInTheDocument(); // questions
+    fireEvent.click(screen.getByRole("button", { name: /back/i }));
+    expect(screen.getByText("Strategy intro")).toBeInTheDocument(); // back to intro
   });
 });
