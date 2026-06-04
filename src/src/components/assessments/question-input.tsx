@@ -50,14 +50,16 @@ export function QuestionInput({
   disabled,
 }: QuestionInputProps) {
   if (q.type === "SLIDER_LIKERT" && q.scale) {
-    const { min, max, step } = q.scale;
+    const { min, max, step, anchorMin, anchorMax } = q.scale;
     const answered = typeof value === "number";
     const numVal = answered ? value : min;
+    const values: number[] = [];
+    for (let v = min; v <= max; v += step) values.push(v);
     const commit = (e: SyntheticEvent<HTMLInputElement>) =>
       onChange(q.stableKey, Number(e.currentTarget.value));
     const MOVE_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"];
     return (
-      <div className="survey-slider-wrap">
+      <div className={`survey-slider-wrap${answered ? "" : " is-unanswered"}`}>
         <input
           id={`q-${q.stableKey}`}
           type="range"
@@ -75,14 +77,23 @@ export function QuestionInput({
           onKeyUp={(e) => { if (MOVE_KEYS.includes(e.key)) commit(e); }}
           disabled={disabled}
         />
-        <div className="survey-slider-anchors">
-          <span>{q.scale.anchorMin}</span>
-          <span className="survey-slider-value">{answered ? value : "—"}</span>
-          <span>{q.scale.anchorMax}</span>
+        <div className="survey-slider-ticks" aria-hidden="true">
+          {values.map((v) => (
+            <span
+              key={v}
+              className={`survey-slider-tick${answered && value === v ? " is-current" : ""}`}
+            >
+              {v}
+            </span>
+          ))}
         </div>
-        {!answered ? (
-          <p className="survey-slider-hint">Tap or drag the slider to rate.</p>
-        ) : null}
+        <div className="survey-slider-anchors">
+          <span>{anchorMin}</span>
+          <span>{anchorMax}</span>
+        </div>
+        <p className="survey-slider-status">
+          {answered ? `Your rating: ${value}` : "Tap or drag the slider to rate."}
+        </p>
       </div>
     );
   }

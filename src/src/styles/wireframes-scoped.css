@@ -1166,9 +1166,12 @@
 
 /* Range slider Likert control (branded participant UI) */
 .su-assessment-brand .survey-slider { width: 100%; accent-color: hsl(var(--primary)); cursor: pointer; }
-.wf-scope .survey-slider-anchors { display: flex; justify-content: space-between; margin-top: 0.45rem; font-size: 0.8rem; color: hsl(var(--muted-foreground)); }
-.wf-scope .survey-slider-value { font-weight: 600; color: hsl(var(--foreground)); }
-.su-assessment-brand .survey-slider-hint { margin: 0.35rem 0 0; font-size: 0.8rem; font-style: italic; color: hsl(var(--muted-foreground)); }
+.su-assessment-brand .survey-slider-ticks { display: flex; justify-content: space-between; margin-top: 0.4rem; padding: 0 1px; }
+.su-assessment-brand .survey-slider-tick { min-width: 1.25rem; text-align: center; font-size: 0.85rem; font-weight: 600; color: hsl(var(--muted-foreground)); }
+.su-assessment-brand .survey-slider-tick.is-current { color: hsl(var(--primary)); }
+.wf-scope .survey-slider-anchors { display: flex; justify-content: space-between; margin-top: 0.3rem; font-size: 0.8rem; color: hsl(var(--muted-foreground)); }
+.su-assessment-brand .survey-slider-status { margin: 0.5rem 0 0; font-size: 0.85rem; text-align: center; color: hsl(var(--muted-foreground)); }
+.su-assessment-brand .survey-slider-wrap.is-unanswered .survey-slider-status { font-style: italic; }
 /* Question cards — group + space the per-section questions (currently a flat cramped stack) */
 .su-assessment-brand .survey-question-list { list-style: none; margin: 0; padding: 0; }
 .su-assessment-brand .survey-question {
