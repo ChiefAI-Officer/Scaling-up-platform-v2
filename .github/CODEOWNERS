@@ -1,0 +1,28 @@
+# CODEOWNERS — auto-requests @MonksKoala as reviewer on changes to the
+# protection-critical paths below (the database schema, migrations, build/deploy
+# config, and the guard scripts that prevent production data wipes).
+#
+# Review model: branch protection on `main` is "CI required, no required review"
+# (see docs/runbooks/branch-protection-setup.md). require_code_owner_reviews is
+# OFF, so these owners are AUTO-REQUESTED but their approval is NOT a merge
+# blocker — the CI status checks gate the merge, and Greptile + operator approval
+# handle code review. This file documents ownership and surfaces the right
+# reviewer; flip require_code_owner_reviews to true later to make it blocking.
+#
+# Code owners must have write access to the repo. @MonksKoala qualifies (push).
+
+# Database schema + migrations — a destructive migration is the wipe vector.
+/src/prisma/schema.prisma                 @MonksKoala
+/src/prisma/migrations/                   @MonksKoala
+
+# Build + deploy config — these run `prisma migrate deploy` on every deploy.
+/src/vercel.json                          @MonksKoala
+/src/package.json                         @MonksKoala
+
+# The guard scripts themselves — must not be silently weakened/removed.
+/src/scripts/safe-prisma.mjs              @MonksKoala
+/src/scripts/check-migration-safety.mjs   @MonksKoala
+/src/scripts/snapshot-prod-tables.ts      @MonksKoala
+
+# CI workflows + this CODEOWNERS file — protect the guardrails from quiet edits.
+/.github/                                 @MonksKoala

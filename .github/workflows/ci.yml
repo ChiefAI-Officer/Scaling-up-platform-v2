@@ -1,0 +1,91 @@
+name: CI
+
+# Activated at the REPO ROOT so GitHub actually discovers it. The older copies
+# under src/.github/workflows/ are never run by GitHub (workflows are only
+# discovered in .github/workflows/ at the repository root). The app lives under
+# src/, so every step runs with working-directory: src.
+#
+# IMPORTANT — CI must NEVER hold the production DATABASE_URL. The build step runs
+# `next build` directly (NOT `npm run build`, which also runs
+# `prisma migrate deploy` against whatever DATABASE_URL is set). Giving CI the
+# prod DB URL would let CI mutate / migrate production on every run and
+# reintroduce exactly the wipe risk this repo is hardening against. The dummy
+# URLs below only satisfy `prisma generate` + Prisma client instantiation; they
+# never connect.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: src
+
+env:
+  # Non-connecting placeholders. Real DB access must not happen in CI.
+  DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci?schema=public"
+  DIRECT_URL: "postgresql://ci:ci@localhost:5432/ci?schema=public"
+  NEXTAUTH_SECRET: "ci-placeholder-secret-not-used-at-runtime"
+
+jobs:
+  lint-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: src/.nvmrc
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run type-check
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: src/.nvmrc
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+      - run: npm ci
+      - run: npm run test -- --passWithNoTests
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: src/.nvmrc
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+      - run: npm ci
+      # Generate the Prisma client (reads the schema; does NOT connect).
+      - run: npx prisma generate
+      # Matches the local pre-push gate. `next build` runs eslint + tsc too.
+      # NOTE: if a statically-generated page queries the DB at build time, this
+      # step will fail against the dummy URL. The fix is a PREVIEW (non-prod)
+      # DATABASE_URL secret pointing at a throwaway Neon branch — NEVER the prod DB.
+      - name: Build (next build, no migrate deploy)
+        run: CI=true npx next build --turbopack
+
+  migration-safety:
+    name: Migration Safety Gate
+    runs-on: ubuntu-latest
+    # Runs on EVERY PR (not just migration-touching ones) on purpose: if this is
+    # a required status check (branch protection), a path-filtered job would stay
+    # "pending" forever on PRs that don't touch migrations and block every merge.
+    # The check only greps migration SQL files — it's instant and needs no DB.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: src/.nvmrc
+      - run: node scripts/check-migration-safety.mjs
