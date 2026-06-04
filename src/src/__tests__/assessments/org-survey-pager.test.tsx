@@ -121,8 +121,8 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     expect(screen.getByText("Q1")).toBeInTheDocument();
     expect(screen.queryByText("Orphan Q")).not.toBeInTheDocument();
 
-    // Answer the required slider, then advance.
-    fireEvent.change(screen.getByLabelText(/Q1/i), { target: { value: "2" } });
+    // Answer the required scale by clicking the radio for value 2, then advance.
+    fireEvent.click(screen.getByRole("radio", { name: "2" }));
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
 
     // The "Other" page now renders the orphan question (previously invisible).
@@ -137,7 +137,7 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     await reachPager();
 
     await screen.findByText(/section 1 of 2/i);
-    fireEvent.change(screen.getByLabelText(/Q1/i), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("radio", { name: "2" }));
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
 
     await screen.findByText(/section 2 of 2/i);
@@ -180,10 +180,11 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     await reachPager();
     await screen.findByText(/section 1 of 2/i);
 
-    // The slider reflects the restored value 3 (draft hydrated once /me loaded
-    // the respondentKey and the draftKey transitioned null → value).
-    const slider = screen.getByLabelText(/Q1/i) as HTMLInputElement;
-    expect(slider.value).toBe("3");
+    // The scale reflects the restored value 3 (draft hydrated once /me loaded
+    // the respondentKey and the draftKey transitioned null → value): the radio
+    // for value 3 (max, anchored "hi") is checked.
+    const radio3 = screen.getByRole("radio", { name: /^3/ }) as HTMLInputElement;
+    expect(radio3.checked).toBe(true);
 
     // Advance to the Other page and confirm the orphan textarea restored.
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
@@ -204,9 +205,10 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     await reachPager();
     await screen.findByText(/section 1 of 2/i);
 
-    // The slider stays empty — the alias-keyed draft was NOT loaded.
-    const slider = screen.getByLabelText(/Q1/i) as HTMLInputElement;
-    expect(slider.value).not.toBe("3");
+    // The scale stays empty — the alias-keyed draft was NOT loaded, so the
+    // radio for value 3 is not checked (nothing is selected).
+    const radio3 = screen.getByRole("radio", { name: /^3/ }) as HTMLInputElement;
+    expect(radio3.checked).toBe(false);
   });
 
   it("keys the autosaved draft by the per-respondent invitedDraftKey(respondentKey)", async () => {
@@ -214,7 +216,7 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     await screen.findByText(/section 1 of 2/i);
 
     // Answer and let the 500ms debounced autosave flush.
-    fireEvent.change(screen.getByLabelText(/Q1/i), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("radio", { name: "2" }));
 
     await waitFor(() => {
       expect(localStorage.getItem(invitedDraftKey(RESPONDENT_KEY))).not.toBeNull();

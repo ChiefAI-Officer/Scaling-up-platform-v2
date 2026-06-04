@@ -1038,19 +1038,6 @@
   color: hsl(var(--muted-foreground));
   margin: 0;
 }
-.wf-scope .survey-slider {
-  width: 100%;
-}
-.wf-scope .survey-slider-anchors {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  color: hsl(var(--muted-foreground));
-}
-.wf-scope .survey-slider-value {
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
 .wf-scope .survey-submit-row {
   display: flex;
   justify-content: center;
@@ -1176,3 +1163,43 @@
    hardcodes a blue; inside the brand scope we darken the purple --primary instead. */
 .su-assessment-brand .wf-btn-primary:hover { background: hsl(269 56% 27%); }
 .wf-scope .survey-error { color: hsl(var(--destructive)); font-size: 0.875rem; margin-top: 0.75rem; }
+
+/* Discrete Likert scale control (replaces the range slider in the branded participant UI) */
+.su-assessment-brand .survey-scale { margin-top: 0.6rem; }
+.su-assessment-brand .survey-scale-options {
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+}
+.su-assessment-brand .survey-scale-option {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  flex: 1 1 44px; min-width: 44px;
+  min-height: 48px; padding: 0 0.25rem;
+  border: 1.5px solid hsl(var(--border)); border-radius: 10px; background: #fff;
+  font-weight: 600; font-size: 1rem; color: hsl(var(--foreground)); cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  user-select: none;
+}
+.su-assessment-brand .survey-scale-option:hover {
+  border-color: hsl(var(--primary)); background: hsl(var(--primary) / 0.06);
+}
+.su-assessment-brand .survey-scale-option.is-selected {
+  background: hsl(var(--primary)); border-color: hsl(var(--primary)); color: #fff;
+  box-shadow: 0 1px 4px hsl(var(--primary) / 0.35);
+}
+.su-assessment-brand .survey-scale-option:has(.survey-scale-radio:focus-visible) {
+  outline: 2px solid hsl(var(--ring)); outline-offset: 2px;
+}
+.su-assessment-brand .survey-scale-radio {
+  position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none;
+}
+.su-assessment-brand .survey-scale-anchors {
+  display: flex; justify-content: space-between; margin-top: 0.45rem;
+  font-size: 0.8rem; color: hsl(var(--muted-foreground));
+}
+/* Question cards — group + space the per-section questions (currently a flat cramped stack) */
+.su-assessment-brand .survey-question-list { list-style: none; margin: 0; padding: 0; }
+.su-assessment-brand .survey-question {
+  background: #fff; border: 1px solid hsl(var(--border)); border-radius: 14px;
+  padding: 1.15rem 1.25rem 1.1rem; margin-bottom: 1rem;
+}
+.su-assessment-brand .survey-question-label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
+.su-assessment-brand .survey-question-help { margin: 0.1rem 0 0.2rem; }

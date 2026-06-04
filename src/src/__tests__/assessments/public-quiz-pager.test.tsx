@@ -116,15 +116,13 @@ describe("PublicQuizClient — SectionPager wiring", () => {
 
     reachFormStep();
 
-    // Section 1 — answer q1 via the shared range input, then Next.
-    const q1Input = screen.getByLabelText(/Question One/i) as HTMLInputElement;
-    fireEvent.change(q1Input, { target: { value: "2" } });
+    // Section 1 — answer q1 by clicking the discrete radio for value 2, then Next.
+    fireEvent.click(screen.getByRole("radio", { name: "2" }));
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
 
-    // Section 2 — answer q2, then Submit.
+    // Section 2 — answer q2 (max value 3, anchored "hi"), then Submit.
     expect(screen.getByText(/section 2 of 2/i)).toBeInTheDocument();
-    const q2Input = screen.getByLabelText(/Question Two/i) as HTMLInputElement;
-    fireEvent.change(q2Input, { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("radio", { name: /^3/ }));
     fireEvent.click(screen.getByRole("button", { name: /submit/i }));
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));

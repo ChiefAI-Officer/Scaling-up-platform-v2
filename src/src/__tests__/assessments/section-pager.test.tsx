@@ -64,10 +64,25 @@ describe("SectionPager", () => {
     expect(bar).toHaveAttribute("aria-valuemax", "1");
   });
 
-  it("renders the SLIDER_LIKERT with an accessible name equal to the question label", () => {
+  it("renders the SLIDER_LIKERT as a radiogroup with an accessible name equal to the question label", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: /start/i }));
-    expect(screen.getByRole("slider", { name: "Q1" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Q1" })).toBeInTheDocument();
+  });
+
+  it("selecting the MINIMUM value (0) reports it and satisfies the required gate", () => {
+    const { onSubmit, onAnswerChange, rerender } = setup();
+    fireEvent.click(screen.getByRole("button", { name: /start/i }));
+    // Click the radio for the minimum value 0 — the previously-unselectable case.
+    fireEvent.click(screen.getByRole("radio", { name: /^0/ }));
+    // The change is reported with the literal 0 (not undefined / no-op).
+    expect(onAnswerChange).toHaveBeenCalledWith("q1", 0);
+    // SectionPager is controlled: the parent now feeds the recorded answer back.
+    const pages = buildSectionPages(sections, questions);
+    rerender(<SectionPager pages={pages} answers={{ q1: 0 }} onAnswerChange={onAnswerChange} onSubmit={onSubmit} submitting={false} />);
+    // 0 satisfies the required gate → Submit fires.
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
   it("Back across an empty welcome section lands on that section's intro", () => {
@@ -81,9 +96,9 @@ describe("SectionPager", () => {
   });
 
   it("a section with BOTH a description and questions: intro → Start → questions → Back → intro", () => {
-    const secs = [{ stableKey: "S1", sortOrder: 1, name: "Strategy", description: "Strategy intro" }];
-    const qs = [{ stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } }];
-    const pages = buildSectionPages(secs as any, qs as any);
+    const secs: PagerSection[] = [{ stableKey: "S1", sortOrder: 1, name: "Strategy", description: "Strategy intro" }];
+    const qs: PagerQuestion[] = [{ stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } }];
+    const pages = buildSectionPages(secs, qs);
     render(<SectionPager pages={pages} answers={{}} onAnswerChange={jest.fn()} onSubmit={jest.fn()} submitting={false} />);
     // intro shown
     expect(screen.getByText("Strategy intro")).toBeInTheDocument();
