@@ -11,6 +11,7 @@ import { DuoLandingPageTemplate, DuoContent } from "@/components/templates/duo-l
 import { stripPlaceholders } from "@/lib/templates/template-utils";
 import { formatVenueAddress, normalizeVideoUrl } from "@/lib/templates/landing-page-overlay";
 import { resolveCustomCodeRenderer } from "@/lib/templates/resolve-custom-code-renderer";
+import { isApprovedWorkshopStatus } from "@/lib/registration-service";
 
 // CHG-03: paid thank-you path needs fresh data on every request. Stripe SDK
 // uses native fetch; Next.js 16 caches SC fetches by default and stale
@@ -51,6 +52,7 @@ interface WorkshopData {
 interface WorkshopFallbackData {
   id: string;
   title: string;
+  status: string;
   description: string | null;
   eventDate: Date;
   eventTime: string | null;
@@ -139,6 +141,14 @@ export default async function LandingPageView({ params, searchParams }: PageProp
       notFound();
     }
 
+    // Block registration before approval: if the underlying workshop is not in
+    // an approved stage (PRE_EVENT / POST_EVENT / COMPLETED), render the clean
+    // "not open" state INSTEAD of the customHtml / template / registration form.
+    // HTTP 200, friendly message — not a 404.
+    if (!isApprovedWorkshopStatus(landingPage.workshop.status)) {
+      return <WorkshopNotOpenView status={landingPage.workshop.status} />;
+    }
+
     // TEMPLATE-02: customHtml override. DOMPurify sanitized at save-time
     // (PATCH /api/page-templates/[id]); variables HTML-escaped + interpolated
     // at build-time (auto-build). Render is a trusted echo of the stored
@@ -209,7 +219,37 @@ export default async function LandingPageView({ params, searchParams }: PageProp
     notFound();
   }
 
+  // Same pre-approval guard on the no-landing-page fallback path: block the
+  // default template + registration form until the workshop is approved.
+  if (!isApprovedWorkshopStatus(workshop.status)) {
+    return <WorkshopNotOpenView status={workshop.status} />;
+  }
+
   return <DefaultWorkshopTemplate workshop={workshop} />;
+}
+
+/**
+ * Clean, centered "not open" state shown when a workshop's landing page is
+ * reached before the workshop has been approved for registration (or after it
+ * was canceled). Returned with HTTP 200 — this is a friendly message, NOT a
+ * 404. Approved workshops (PRE_EVENT / POST_EVENT / COMPLETED) never see this.
+ */
+function WorkshopNotOpenView({ status }: { status: string }) {
+  const isCanceled = status === "CANCELED";
+  const title = isCanceled ? "This workshop is no longer available." : "Registration isn't open yet";
+  const subline = isCanceled
+    ? "This workshop has been canceled."
+    : "This workshop hasn't been approved for registration yet. Please check back soon.";
+
+  return (
+    <div className="min-h-screen bg-muted flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md bg-card rounded-xl shadow-sm border border-border p-8 text-center space-y-3">
+        <p className="text-sm font-semibold tracking-wide text-primary uppercase">Workshop</p>
+        <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+        <p className="text-muted-foreground">{subline}</p>
+      </div>
+    </div>
+  );
 }
 
 function DefaultWorkshopTemplate({ workshop }: { workshop: WorkshopFallbackData }) {

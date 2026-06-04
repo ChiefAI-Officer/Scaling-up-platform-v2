@@ -30,6 +30,7 @@ jest.mock("@/lib/db", () => ({
     coach: { findFirst: jest.fn() },
     registration: { update: jest.fn() },
     landingPage: { findFirst: jest.fn() },
+    workshop: { findUnique: jest.fn() },
   },
 }));
 
@@ -52,8 +53,12 @@ jest.mock("@/lib/registration-service", () => {
     }
   }
 
+  const APPROVED = ["PRE_EVENT", "POST_EVENT", "COMPLETED"];
+
   return {
     createWorkshopRegistration: jest.fn(),
+    isApprovedWorkshopStatus: (status: string) => APPROVED.includes(status),
+    APPROVED_WORKSHOP_STATUSES: APPROVED,
     RegistrationServiceError: MockRegistrationServiceError,
   };
 });
@@ -236,6 +241,10 @@ describe("POST /api/workshops/[id]/register", () => {
     // Default: no published THANK_YOU LandingPage → helper falls back to
     // `/registration/success`. Individual tests can override per-test.
     (db.landingPage.findFirst as jest.Mock).mockResolvedValue(null);
+
+    // Default: workshop is approved (PRE_EVENT) so the pre-approval guard
+    // passes. Individual tests override status to exercise the 403 guard.
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue({ status: "PRE_EVENT" });
   });
 
   /* ======================================================================== */
@@ -709,6 +718,67 @@ describe("POST /api/workshops/[id]/register", () => {
       expect(response.status).toBe(400);
       expect(body.success).toBe(false);
       expect(body.error).toBe("Workshop is not open for registration");
+    });
+  });
+
+  /* ======================================================================== */
+  /*  6b. Pre-approval registration guard (block registrations before approval)*/
+  /* ======================================================================== */
+
+  describe("pre-approval registration guard", () => {
+    it("returns 403 when workshop status is AWAITING_APPROVAL (before any capacity/duplicate/Stripe logic)", async () => {
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({
+        status: "AWAITING_APPROVAL",
+      });
+
+      const response = await POST(buildJsonRequest(validPayload), routeParams("ws-1"));
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body.success).toBe(false);
+      expect(body.error).toBe("Registration is not open for this workshop");
+      // The guard fires BEFORE the registration service runs.
+      expect(createWorkshopRegistration).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 when workshop status is CANCELED", async () => {
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({
+        status: "CANCELED",
+      });
+
+      const response = await POST(buildJsonRequest(validPayload), routeParams("ws-1"));
+      const body = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(body.success).toBe(false);
+      expect(body.error).toBe("Registration is not open for this workshop");
+      expect(createWorkshopRegistration).not.toHaveBeenCalled();
+    });
+
+    it("allows registration when workshop status is PRE_EVENT (approved)", async () => {
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({ status: "PRE_EVENT" });
+      const workshop = makeFreeWorkshop();
+      const registration = makeRegistration();
+      (createWorkshopRegistration as jest.Mock).mockResolvedValue({
+        registration,
+        workshop,
+      });
+
+      const response = await POST(buildJsonRequest(validPayload), routeParams("ws-1"));
+
+      expect(response.status).toBe(201);
+      expect(createWorkshopRegistration).toHaveBeenCalled();
+    });
+
+    it("returns 404 when the workshop does not exist", async () => {
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue(null);
+
+      const response = await POST(buildJsonRequest(validPayload), routeParams("ws-1"));
+      const body = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(body.success).toBe(false);
+      expect(createWorkshopRegistration).not.toHaveBeenCalled();
     });
   });
 

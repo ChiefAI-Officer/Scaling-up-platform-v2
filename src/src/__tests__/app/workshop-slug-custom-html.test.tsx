@@ -55,6 +55,7 @@ type FoundLanding = {
   status: string;
   workshop: {
     id: string;
+    status: string;
     format: string;
     venueName: string | null;
     venueAddress: string | null;
@@ -80,6 +81,7 @@ function landingFixture(overrides: Partial<FoundLanding> = {}): FoundLanding {
     status: "PUBLISHED",
     workshop: {
       id: "wks-1",
+      status: "PRE_EVENT",
       format: "VIRTUAL",
       venueName: null,
       venueAddress: null,
@@ -158,5 +160,77 @@ describe("workshop slug customHtml render path", () => {
 
     expect(markup).toContain("data-custom-html-render");
     expect(markup).toContain("<p>Hi</p>");
+  });
+});
+
+describe("workshop slug pre-approval guard", () => {
+  it("renders the 'not open yet' state instead of customHtml when workshop is AWAITING_APPROVAL (landing-page path)", async () => {
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValueOnce(
+      landingFixture({
+        customHtml: "<p>Custom hello</p>",
+        workshop: { ...landingFixture().workshop, status: "AWAITING_APPROVAL" },
+      })
+    );
+
+    const node = await LandingPageView(await Promise.resolve(makeProps("solo-slug")));
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain("Registration isn&#x27;t open yet");
+    expect(markup).not.toContain("data-custom-html-render");
+    expect(markup).not.toContain("Custom hello");
+  });
+
+  it("renders the canceled state when workshop is CANCELED (landing-page path)", async () => {
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValueOnce(
+      landingFixture({
+        workshop: { ...landingFixture().workshop, status: "CANCELED" },
+      })
+    );
+
+    const node = await LandingPageView(await Promise.resolve(makeProps("solo-slug")));
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain("This workshop is no longer available.");
+    expect(markup).not.toContain("solo:React title");
+  });
+
+  it("renders the React template when approved (PRE_EVENT, landing-page path)", async () => {
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValueOnce(
+      landingFixture({
+        workshop: { ...landingFixture().workshop, status: "PRE_EVENT" },
+      })
+    );
+
+    const node = await LandingPageView(await Promise.resolve(makeProps("solo-slug")));
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain("solo:React title");
+  });
+
+  it("renders the 'not open yet' state on the no-landing-page fallback path when not approved", async () => {
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValueOnce(null);
+    (db.workshop.findUnique as jest.Mock).mockResolvedValueOnce({
+      id: "wks-1",
+      title: "Pending Workshop",
+      status: "REQUESTED",
+      description: null,
+      eventDate: new Date("2026-04-15T00:00:00Z"),
+      eventTime: null,
+      timezone: "America/New_York",
+      format: "IN_PERSON",
+      venueName: null,
+      venueAddress: null,
+      isFree: true,
+      priceCents: null,
+      earlyBirdPriceCents: null,
+      coach: { firstName: "Jane", lastName: "Coach" },
+    });
+
+    const node = await LandingPageView(await Promise.resolve(makeProps("pending-slug")));
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain("Registration isn&#x27;t open yet");
+    // The default template + registration form must NOT render.
+    expect(markup).not.toContain("Pending Workshop");
   });
 });

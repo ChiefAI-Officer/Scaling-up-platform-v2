@@ -310,9 +310,17 @@ export default async function WorkshopDetailPage({
               )}
 
               {(() => {
+                // Only surface the public landing-page copy/open link once the
+                // workshop is approved (PRE_EVENT / POST_EVENT / COMPLETED) —
+                // mirrors the coach detail page. Before approval the public
+                // page renders a "not open" state, so the link would be dead.
+                // Admins still preview via the template editor.
+                const isApproved = ["PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(
+                  workshop.status
+                );
                 const soloPage = workshop.landingPages?.find((p) => p.template === "SOLO_LANDING");
                 const copySlug = soloPage?.slug ?? workshop.landingPageSlug;
-                return copySlug ? (
+                return isApproved && copySlug ? (
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Landing Page</p>
                     <div className="flex items-center gap-2">

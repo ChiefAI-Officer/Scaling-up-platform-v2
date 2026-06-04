@@ -7,6 +7,17 @@ import {
 } from "@prisma/client";
 import { db } from "@/lib/db";
 
+// JV-02: A workshop is "approved" — and therefore eligible to accept public
+// registrations — only once it reaches one of these post-approval stages.
+// Anything else (REQUESTED / AWAITING_APPROVAL / INFO_REQUESTED / DENIED /
+// CANCELED) is NOT open. Shared with the public register route + landing page
+// render guards so the rule lives in exactly one place.
+export const APPROVED_WORKSHOP_STATUSES = ["PRE_EVENT", "POST_EVENT", "COMPLETED"] as const;
+
+export function isApprovedWorkshopStatus(status: string): boolean {
+  return (APPROVED_WORKSHOP_STATUSES as readonly string[]).includes(status);
+}
+
 // JV-02: PRE_EVENT is when registration is open in Jeff's 6-stage model
 const OPEN_REGISTRATION_STATUSES = new Set(["PRE_EVENT"]);
 
