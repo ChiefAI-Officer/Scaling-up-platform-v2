@@ -40,6 +40,12 @@ describe("useAnswerDraft", () => {
     expect(localStorage.length).toBe(0);
   });
 
+  it("ignores a corrupt (non-JSON) stored draft", () => {
+    localStorage.setItem("k1", "not-json");
+    render(<Harness storageKey="k1" />);
+    expect(screen.getByTestId("ans").textContent).toBe("{}");
+  });
+
   it("publicDraftKey isolates two sessions via a sessionStorage UUID", () => {
     const k1 = publicDraftKey("camp");
     sessionStorage.clear(); // simulate a different session
