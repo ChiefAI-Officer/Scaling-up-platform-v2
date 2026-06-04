@@ -222,4 +222,38 @@ describe("QuestionInput", () => {
     fireEvent.click(slider);
     expect(onChange).toHaveBeenCalledWith("S1_Q0", 0);
   });
+
+  test("11. SLIDER_LIKERT unanswered renders ticks for each value + prompt; answered shows 'Your rating: N'", () => {
+    const tickQuestion: QuestionForInput = {
+      stableKey: "tick_q",
+      type: "SLIDER_LIKERT",
+      label: "Tick test",
+      isRequired: true,
+      scale: { min: 0, max: 3, step: 1, anchorMin: "Low", anchorMax: "High" },
+    };
+
+    // --- Unanswered ---
+    const { unmount } = render(
+      <QuestionInput question={tickQuestion} value={undefined} onChange={jest.fn()} />
+    );
+    // All tick values should be visible (0,1,2,3)
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+    // Unanswered status prompt
+    expect(screen.getByText("Tap or drag the slider to rate.")).toBeInTheDocument();
+    // "—" must NOT be present
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+    unmount();
+
+    // --- Answered with value=2 ---
+    render(
+      <QuestionInput question={tickQuestion} value={2} onChange={jest.fn()} />
+    );
+    expect(screen.getByText("Your rating: 2")).toBeInTheDocument();
+    // Ticks still visible
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
 });
