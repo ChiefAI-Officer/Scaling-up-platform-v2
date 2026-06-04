@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { SectionPager } from "./section-pager";
 import {
   buildSectionPages,
+  isAnswered,
   type PagerSection,
   type PagerQuestion,
 } from "@/lib/assessments/section-pages";
@@ -313,12 +314,7 @@ export function PublicQuizClient({
   // The submit endpoint rejects an empty `answers` array (Zod `.min(1)`), so an
   // all-optional quiz must still have at least one answered question before we
   // allow a POST — otherwise the server 400s on a zero-answer payload.
-  const answeredCount = Object.entries(answers).filter(([, v]) => {
-    if (v === undefined) return false;
-    if (typeof v === "string" && v.trim() === "") return false;
-    if (Array.isArray(v) && v.length === 0) return false;
-    return true;
-  }).length;
+  const answeredCount = Object.values(answers).filter((v) => isAnswered(v)).length;
   const canSubmit = missingRequired.length === 0 && answeredCount > 0;
 
   async function handleSubmit() {
@@ -403,7 +399,9 @@ export function PublicQuizClient({
                 margin: 0,
               }}
             >
-              Please answer all required questions before submitting.
+              {missingRequired.length > 0
+                ? "Please answer all required questions before submitting."
+                : "Please answer at least one question before submitting."}
             </p>
           )}
         </div>
