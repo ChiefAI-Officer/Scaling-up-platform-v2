@@ -64,17 +64,18 @@ describe("SectionPager", () => {
     expect(bar).toHaveAttribute("aria-valuemax", "1");
   });
 
-  it("renders the SLIDER_LIKERT as a radiogroup with an accessible name equal to the question label", () => {
+  it("renders the SLIDER_LIKERT as a slider with an accessible name equal to the question label", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: /start/i }));
-    expect(screen.getByRole("radiogroup", { name: "Q1" })).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: "Q1" })).toBeInTheDocument();
   });
 
   it("selecting the MINIMUM value (0) reports it and satisfies the required gate", () => {
     const { onSubmit, onAnswerChange, rerender } = setup();
     fireEvent.click(screen.getByRole("button", { name: /start/i }));
-    // Click the radio for the minimum value 0 — the previously-unselectable case.
-    fireEvent.click(screen.getByRole("radio", { name: /^0/ }));
+    // Click the slider at its default minimum (0) — the previously-unrecordable
+    // case where the thumb sits at min and a plain click fired nothing.
+    fireEvent.click(screen.getByRole("slider", { name: "Q1" }));
     // The change is reported with the literal 0 (not undefined / no-op).
     expect(onAnswerChange).toHaveBeenCalledWith("q1", 0);
     // SectionPager is controlled: the parent now feeds the recorded answer back.
