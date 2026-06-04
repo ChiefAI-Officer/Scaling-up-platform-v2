@@ -20,6 +20,21 @@ const EXPECTED_SCORING_MESSAGES = [
   "That is a great overall score.",
 ];
 
+// Verbatim section intro-slide copy (body text rendered under the section
+// name on the one-section pager). Indexed S1..S10 by section order.
+const EXPECTED_SECTION_DESCRIPTIONS = [
+  "A healthy, aligned leadership team is the foundation for scaling. Rate how well your executive team trusts one another, debates openly, and operates as a genuine team.",
+  "Rate how clearly the team is aligned on the single most important priority for this quarter — and whether everyone could actually name it.",
+  "A predictable meeting rhythm keeps information moving quickly. Rate how well your daily, weekly, monthly, and quarterly cadence is working.",
+  "Every function and process should have one clear owner. Rate how completely accountability is assigned across the organization.",
+  "Frontline employees see obstacles and opportunities first. Rate how consistently you collect and act on their input.",
+  "Customer insight should be as timely and rigorous as your financials. Rate how well you gather, analyze, and act on customer feedback.",
+  "Core Values and Purpose should guide real decisions, not just sit on a wall. Rate how 'alive' they are in day-to-day work.",
+  "Everyone should describe the company's strategy the same way. Rate how clearly the strategy is understood across the team.",
+  "People do their best when they know whether they're winning. Rate whether employees can quantitatively tell if they had a good day or week.",
+  "Visible plans and metrics keep everyone rowing in the same direction. Rate how transparent your plans and performance are to the whole company.",
+];
+
 describe("buildRockefellerContent()", () => {
   let content: RockefellerContent;
 
@@ -66,6 +81,21 @@ describe("buildRockefellerContent()", () => {
     expect(s7!.name).toContain('"alive"');
     // Must NOT use smart/curly quotes or single quotes around alive
     expect(s7!.name).not.toContain("'alive'");
+  });
+
+  it("every section has a non-empty description (intro-slide copy)", () => {
+    for (const s of content.sections) {
+      expect(typeof s.description).toBe("string");
+      expect(s.description!.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("section descriptions in order (S1..S10) match the verbatim copy", () => {
+    const actual = content.sections
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((s) => s.description);
+    expect(actual).toEqual(EXPECTED_SECTION_DESCRIPTIONS);
   });
 
   it("scoringConfig.tierMetric === 'countAchieved'", () => {

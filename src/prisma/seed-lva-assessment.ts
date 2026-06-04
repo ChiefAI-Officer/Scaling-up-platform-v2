@@ -227,6 +227,7 @@ interface SectionPayload {
   stableKey: string;
   sortOrder: number;
   name: string;
+  description: string;
 }
 
 // ─── Content builder ──────────────────────────────────────────────────────
@@ -259,14 +260,62 @@ function buildSectionsAndQuestions(): {
   questions: QuestionPayload[];
 } {
   const sections: SectionPayload[] = [
-    { stableKey: "S0_welcome",    sortOrder: 1, name: "Welcome" },
-    { stableKey: "S1_financials", sortOrder: 2, name: "The Company in Three Years — Financials & Scale" },
-    { stableKey: "S2_vision",     sortOrder: 3, name: "Vision on the Future" },
-    { stableKey: "S3_strengths",  sortOrder: 4, name: "Organizational Strengths and Weaknesses" },
-    { stableKey: "S4_obstacles",  sortOrder: 5, name: "Biggest Obstacles to Growth" },
-    { stableKey: "S5_explained",  sortOrder: 6, name: "Obstacles and Challenges Explained" },
-    { stableKey: "S6_focus",      sortOrder: 7, name: "Important Focus Areas" },
-    { stableKey: "S7_completion", sortOrder: 8, name: "Completion" },
+    {
+      stableKey: "S0_welcome",
+      sortOrder: 1,
+      name: "Welcome",
+      description:
+        "Welcome. This Leadership Vision Alignment assessment captures how you see the company's future — its financials, vision, strengths, obstacles, and focus areas. There are no right answers; please respond candidly.",
+    },
+    {
+      stableKey: "S1_financials",
+      sortOrder: 2,
+      name: "The Company in Three Years — Financials & Scale",
+      description:
+        "Picture the company three years from now. These questions capture your view of its financial scale — revenue, margins, people, and reach.",
+    },
+    {
+      stableKey: "S2_vision",
+      sortOrder: 3,
+      name: "Vision on the Future",
+      description:
+        "Describe where the business is headed: its products, market, competitors, and what will drive its success over the next three years.",
+    },
+    {
+      stableKey: "S3_strengths",
+      sortOrder: 4,
+      name: "Organizational Strengths and Weaknesses",
+      description:
+        "Rate the organization across key factors, from weak to strong, to surface where it's solid and where it needs work.",
+    },
+    {
+      stableKey: "S4_obstacles",
+      sortOrder: 5,
+      name: "Biggest Obstacles to Growth",
+      description:
+        "Identify the factors most holding the company back from its growth ambitions.",
+    },
+    {
+      stableKey: "S5_explained",
+      sortOrder: 6,
+      name: "Obstacles and Challenges Explained",
+      description:
+        "Explain the obstacles you selected — the reasoning behind each — and the one thing you would change.",
+    },
+    {
+      stableKey: "S6_focus",
+      sortOrder: 7,
+      name: "Important Focus Areas",
+      description:
+        "Capture the priorities, goals, and strategic focus areas that matter most for the period ahead.",
+    },
+    {
+      stableKey: "S7_completion",
+      sortOrder: 8,
+      name: "Completion",
+      description:
+        "That's everything — thank you for sharing your perspective. Review your answers and submit when you're ready.",
+    },
   ];
 
   let sortOrder = 0;
