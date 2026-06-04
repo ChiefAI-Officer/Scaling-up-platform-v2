@@ -39,18 +39,21 @@ const zeroBasedSliderQuestion: QuestionForInput = {
 const textQuestion: QuestionForInput = {
   stableKey: "S1_Q2",
   type: "TEXT",
+  label: "Text question",
   isRequired: false,
 };
 
 const numberQuestion: QuestionForInput = {
   stableKey: "S1_Q3",
   type: "NUMBER",
+  label: "Number question",
   isRequired: false,
 };
 
 const multiQuestion: QuestionForInput = {
   stableKey: "S1_Q4",
   type: "MULTI_CHOICE",
+  label: "Multi question",
   isRequired: false,
   options: [
     { key: "opt_a", label: "Option A" },

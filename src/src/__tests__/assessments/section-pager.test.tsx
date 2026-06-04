@@ -96,9 +96,9 @@ describe("SectionPager", () => {
   });
 
   it("a section with BOTH a description and questions: intro → Start → questions → Back → intro", () => {
-    const secs = [{ stableKey: "S1", sortOrder: 1, name: "Strategy", description: "Strategy intro" }];
-    const qs = [{ stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } }];
-    const pages = buildSectionPages(secs as any, qs as any);
+    const secs: PagerSection[] = [{ stableKey: "S1", sortOrder: 1, name: "Strategy", description: "Strategy intro" }];
+    const qs: PagerQuestion[] = [{ stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } }];
+    const pages = buildSectionPages(secs, qs);
     render(<SectionPager pages={pages} answers={{}} onAnswerChange={jest.fn()} onSubmit={jest.fn()} submitting={false} />);
     // intro shown
     expect(screen.getByText("Strategy intro")).toBeInTheDocument();

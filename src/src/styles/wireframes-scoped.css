@@ -1038,19 +1038,6 @@
   color: hsl(var(--muted-foreground));
   margin: 0;
 }
-.wf-scope .survey-slider {
-  width: 100%;
-}
-.wf-scope .survey-slider-anchors {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  color: hsl(var(--muted-foreground));
-}
-.wf-scope .survey-slider-value {
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
 .wf-scope .survey-submit-row {
   display: flex;
   justify-content: center;
@@ -1180,10 +1167,11 @@
 /* Discrete Likert scale control (replaces the range slider in the branded participant UI) */
 .su-assessment-brand .survey-scale { margin-top: 0.6rem; }
 .su-assessment-brand .survey-scale-options {
-  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0.5rem;
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
 }
 .su-assessment-brand .survey-scale-option {
   position: relative; display: flex; align-items: center; justify-content: center;
+  flex: 1 1 44px; min-width: 44px;
   min-height: 48px; padding: 0 0.25rem;
   border: 1.5px solid hsl(var(--border)); border-radius: 10px; background: #fff;
   font-weight: 600; font-size: 1rem; color: hsl(var(--foreground)); cursor: pointer;
