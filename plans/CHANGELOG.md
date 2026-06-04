@@ -6,6 +6,18 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-06-04 — Assessment Likert slider restored + default/min value selectable <!-- ENTRY_ISO:2026-06-04 ENTRY_SLUG:assessment-slider-restore -->
+
+**PR #34** (squash `34cf5af`; prod deploy `54dcyj1gb`). Course-correction on PR #33 after the user clarified the intent: keep the **slider**, just fix its bug — PR #33 had replaced it with discrete buttons, which was not wanted.
+
+**Reverted** the SLIDER_LIKERT control (`src/src/components/assessments/question-input.tsx`) from the radiogroup back to a native `<input type="range">`, branded purple (`accent-color: hsl(var(--primary))`). **Bug fixed:** the range only fired `onChange` on a value *change*, so when a respondent's answer was the minimum/leftmost, leaving the thumb at its default (value display "—") recorded nothing and the per-section required gate blocked submission — forcing a drag-away-and-back. The fix wires a single `commit(e) => onChange(stableKey, Number(e.currentTarget.value))` to `onChange` (drag, live), `onClick` (click/tap — fires even when the value is unchanged, so clicking at the minimum reads the DOM value = min and records it; reads `currentTarget`, not React state, so no stale-value race), and `onKeyUp` gated to slider-moving keys only (`ArrowLeft/Right/Up/Down`, `Home/End`, `PageUp/Down`). Critically, an **untouched** slider (no click, no drag, no move-key) never fires any commit, so a skipped question stays `undefined` and the required gate still catches it — no silent auto-answer, no bad data. `Tab`/hover/scroll/wheel commit nothing. When unanswered: value shows "—", a "Tap or drag the slider to rate." hint renders, `aria-valuenow` is omitted and `aria-valuetext="Not yet answered"` is exposed. Because this is the shared `QuestionInput` used by the shared `<SectionPager>`, the fix applies to every assessment.
+
+**Kept** (unchanged from PR #32/#33): the one-section pager, per-section question cards, scoped `.su-assessment-brand` purple + Roboto, branded intro eyebrow. **Removed** the now-unused `.survey-scale*` discrete-control CSS; restored `.survey-slider*` (purple).
+
+**Verification:** TDD bug-lock test (`fireEvent.click` on a default-min slider → `onChange(key, 0)`) + drag test; pager/control suites migrated radiogroup→slider; 27 control/pager + 40 regression tests green; `CI=true npx next build --turbopack` clean. Spec-compliance + code-quality reviewed — the code-quality pass **empirically verified the gesture in real Chrome 145 (Playwright)**: click-at-min commits min for both `min=0` and `min=1`; the click+change double-commit on click-to-move is idempotent/last-write-correct; and Tab/hover/scroll/wheel never auto-answer. **Follow-up (noted, not blocking):** add a Playwright E2E so the click-at-min gesture has permanent CI coverage (jsdom can't reproduce native range pointer semantics). Zero migrations.
+
+---
+
 ### 2026-06-04 — Assessment Likert control fix + survey brand polish <!-- ENTRY_ISO:2026-06-04 ENTRY_SLUG:assessment-likert-control-fix -->
 
 **PR #33** (squash `584aeb9`; prod deploy `cvh3sdc30`). Follow-up to the section-stepper (PR #32) after live testing surfaced a blocker + visual roughness.
