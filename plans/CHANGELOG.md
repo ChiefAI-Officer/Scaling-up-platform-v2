@@ -6,6 +6,18 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-06-04 — Assessment Likert control fix + survey brand polish <!-- ENTRY_ISO:2026-06-04 ENTRY_SLUG:assessment-likert-control-fix -->
+
+**PR #33** (squash `584aeb9`; prod deploy `cvh3sdc30`). Follow-up to the section-stepper (PR #32) after live testing surfaced a blocker + visual roughness.
+
+**Blocker fixed:** the participant SLIDER_LIKERT control (`src/src/components/assessments/question-input.tsx`) was a native `<input type="range">` whose thumb defaults to `scale.min` and records an answer only on a *change* event — so the minimum value (`0` = "Not true") was **unselectable** (already at 0 → dragging to 0 is no change → never recorded), leaving the answer `undefined` and the per-section required gate permanently blocking submission. Reported on Rockefeller, reproduced on QSP v1. Replaced the range with a **discrete radiogroup**: `role="radiogroup"` named by the question label, one native `role="radio"` per scale value `min..max step` (named `q-<stableKey>` → free arrow-key roving focus + single tab stop), each firing `onChange(stableKey, v)` on selection, selected value `checked`, endpoints' `aria-label` carrying the anchor text. Clicking `0` now records it; `isAnswered(0)` is true; the gate passes. Because this is the shared control used by the shared `<SectionPager>`, the fix **cascades to every assessment** (Rockefeller, QSP v1/v2, LVA, SU Full) — no per-assessment UI. TEXT/NUMBER/MULTI_CHOICE branches unchanged.
+
+**Brand polish:** purple `#522583` selected state on the control; per-section **question cards** (white, bordered, spaced — replacing the flat stack); branded the assessment **intro card** by adding `.su-assessment-brand` to both participant layout wrappers (`(public)/quiz/layout.tsx` + `(public)/org-survey/layout.tsx`) so the whole page (intro + pager) inherits purple `--primary` — the intro `.hero-eyebrow` already used the `--primary` token, so it turned purple with no client edit. All new CSS scoped under `.su-assessment-brand` (ADR-0005 — verified no leak into admin/coach). The control uses `flex-wrap` (≥44px targets) so wide 1–10 scales (QSP v2) wrap cleanly on mobile instead of cramping. Removed the now-dead `.survey-slider*` CSS.
+
+**Process:** TDD — a bug-lock test (click value `0` → `onChange(key, 0)`) + a SectionPager gate test (select the minimum → Next/Submit advances), plus the pager/control suites migrated from `slider`→`radiogroup` interactions (same scenarios). 66 assessment tests across the control + pager + util + integration suites green; `CI=true npx next build --turbopack` clean. Built via the frontend-design skill with a controlled brand-scoped spec; spec-compliance + code-quality reviewed (no Critical/Important; a few Minors applied — mobile wrap, dead-CSS removal, lint-clean of touched tests). Zero migrations. **Still deferred:** real intro-slide copy for Rockefeller/LVA (name-only sections — pending Jeff's source wording); the Ask-2 Esperto-import memo stays gated.
+
+---
+
 ### 2026-06-04 — Assessment section-stepper + intro slides (one-section participant UX) <!-- ENTRY_ISO:2026-06-04 ENTRY_SLUG:assessment-section-stepper -->
 
 **PR #32** (squash `3d72cef`; prod deploy `a4oqh407j`, live on `scaling-up-platform-v2.vercel.app`). Closes Jeff's June 2 ask: present each assessment **one section at a time** (Esperto-style) with a short **intro slide** before each section's questions, branded.
