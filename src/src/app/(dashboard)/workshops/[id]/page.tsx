@@ -544,10 +544,10 @@ export default async function WorkshopDetailPage({
                             const status = execution?.status ?? "PENDING";
                             const isCompleted = ["SENT", "SKIPPED", "FAILED"].includes(status);
                             return (
-                              <div key={step.id} className="flex items-center text-sm gap-2">
+                              <div key={step.id} className="flex items-start text-sm gap-2">
                                 <span className="text-muted-foreground shrink-0">{index + 1}.</span>
                                 <div className="flex-1 min-w-0">
-                                  <span className="text-foreground truncate block">
+                                  <span className="text-foreground block whitespace-normal break-words">
                                     {formatStepLabel(step)}
                                   </span>
                                   {isCompleted && execution?.scheduledFor && (
