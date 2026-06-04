@@ -1,10 +1,12 @@
 "use client";
 
+import type { SyntheticEvent } from "react";
+
 /**
  * Phase C — QuestionInput shared component.
  *
  * Renders the appropriate input control for each question type:
- *   SLIDER_LIKERT  → discrete radiogroup (one radio per scale value) with anchor labels
+ *   SLIDER_LIKERT  → range slider with anchor labels
  *   TEXT           → <textarea>
  *   NUMBER         → <input type="number">
  *   MULTI_CHOICE   → checkbox group (respects maxChoices)
@@ -48,41 +50,39 @@ export function QuestionInput({
   disabled,
 }: QuestionInputProps) {
   if (q.type === "SLIDER_LIKERT" && q.scale) {
-    const { min, max, step, anchorMin, anchorMax } = q.scale;
-    const values: number[] = [];
-    for (let v = min; v <= max; v += step) values.push(v);
-    const selected = typeof value === "number" ? value : undefined;
+    const { min, max, step } = q.scale;
+    const answered = typeof value === "number";
+    const numVal = answered ? value : min;
+    const commit = (e: SyntheticEvent<HTMLInputElement>) =>
+      onChange(q.stableKey, Number(e.currentTarget.value));
+    const MOVE_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"];
     return (
-      <div className="survey-scale" role="radiogroup" aria-label={q.label}>
-        <div className="survey-scale-options">
-          {values.map((v) => {
-            const isSel = selected === v;
-            const ariaLabel =
-              v === min ? `${v} — ${anchorMin}` : v === max ? `${v} — ${anchorMax}` : String(v);
-            return (
-              <label
-                key={v}
-                className={`survey-scale-option${isSel ? " is-selected" : ""}`}
-              >
-                <input
-                  type="radio"
-                  name={`q-${q.stableKey}`}
-                  className="survey-scale-radio"
-                  value={v}
-                  checked={isSel}
-                  aria-label={ariaLabel}
-                  onChange={() => onChange(q.stableKey, v)}
-                  disabled={disabled}
-                />
-                <span className="survey-scale-num" aria-hidden="true">{v}</span>
-              </label>
-            );
-          })}
+      <div className="survey-slider-wrap">
+        <input
+          id={`q-${q.stableKey}`}
+          type="range"
+          className="survey-slider"
+          min={min}
+          max={max}
+          step={step}
+          value={numVal}
+          aria-valuemin={min}
+          aria-valuemax={max}
+          aria-valuenow={answered ? value : undefined}
+          aria-valuetext={answered ? String(value) : "Not yet answered"}
+          onChange={commit}
+          onClick={commit}
+          onKeyUp={(e) => { if (MOVE_KEYS.includes(e.key)) commit(e); }}
+          disabled={disabled}
+        />
+        <div className="survey-slider-anchors">
+          <span>{q.scale.anchorMin}</span>
+          <span className="survey-slider-value">{answered ? value : "—"}</span>
+          <span>{q.scale.anchorMax}</span>
         </div>
-        <div className="survey-scale-anchors">
-          <span>{anchorMin}</span>
-          <span>{anchorMax}</span>
-        </div>
+        {!answered ? (
+          <p className="survey-slider-hint">Tap or drag the slider to rate.</p>
+        ) : null}
       </div>
     );
   }

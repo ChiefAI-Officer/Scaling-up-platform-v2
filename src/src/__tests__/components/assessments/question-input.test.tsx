@@ -2,8 +2,8 @@
  * Phase C — QuestionInput component (TDD red phase first).
  *
  * Tests:
- *  1. Renders SLIDER_LIKERT as a discrete radiogroup (named by label) with one
- *     radio per scale value + anchor labels
+ *  1. Renders SLIDER_LIKERT as a native range slider (named by label) with
+ *     aria-valuemin/max + anchor labels
  *  2. Renders TEXT with textarea
  *  3. Renders NUMBER with number input
  *  4. Renders MULTI_CHOICE with checkboxes
@@ -11,8 +11,10 @@
  *  6. MULTI_CHOICE onChange fires with correct string[] value
  *  7. TEXT onChange fires with string value
  *  8. NUMBER onChange fires with number value
- *  9. SLIDER_LIKERT min value (0) is selectable — clicking it fires onChange(key, 0)
- *     [regression lock for the unselectable-minimum bug]
+ *  9. SLIDER_LIKERT dragging fires onChange with the changed value
+ * 10. SLIDER_LIKERT clicking at the default minimum (0) commits 0 — fires
+ *     onChange(key, 0) even though no "change" event fired
+ *     [regression lock for the unselectable-minimum / drag-dance bug]
  */
 
 import React from "react";
@@ -64,7 +66,7 @@ const multiQuestion: QuestionForInput = {
 };
 
 describe("QuestionInput", () => {
-  test("1. renders SLIDER_LIKERT as a discrete radiogroup with one radio per value + anchors", () => {
+  test("1. renders SLIDER_LIKERT as a native range slider with aria-valuemin/max + anchors", () => {
     render(
       <QuestionInput
         question={sliderQuestion}
@@ -72,16 +74,15 @@ describe("QuestionInput", () => {
         onChange={jest.fn()}
       />
     );
-    // The control is a radiogroup named by the question label.
-    const group = screen.getByRole("radiogroup", { name: "How true is this?" });
-    expect(group).toBeInTheDocument();
-    // One radio per scale value (1..5 step 1 = 5 radios).
-    const radios = screen.getAllByRole("radio");
-    expect(radios).toHaveLength(5);
-    // The radio matching the current value (3) is checked.
-    const selected = radios.find((r) => (r as HTMLInputElement).checked);
-    expect(selected).toBeChecked();
-    expect(selected).toHaveAttribute("value", "3");
+    // The control is a native range slider (role="slider").
+    const slider = screen.getByRole("slider");
+    expect(slider).toBeInTheDocument();
+    expect(slider).toHaveAttribute("type", "range");
+    expect(slider).toHaveAttribute("aria-valuemin", "1");
+    expect(slider).toHaveAttribute("aria-valuemax", "5");
+    // The current value (3) is reflected.
+    expect((slider as HTMLInputElement).value).toBe("3");
+    expect(slider).toHaveAttribute("aria-valuenow", "3");
     // Anchor labels render.
     expect(screen.getByText("Never")).toBeInTheDocument();
     expect(screen.getByText("Always")).toBeInTheDocument();
@@ -188,7 +189,7 @@ describe("QuestionInput", () => {
     expect(onChange).toHaveBeenCalledWith("S1_Q3", 7);
   });
 
-  test("9. SLIDER_LIKERT minimum value (0) is selectable — clicking it fires onChange(key, 0)", () => {
+  test("9. SLIDER_LIKERT dragging fires onChange with the changed value", () => {
     const onChange = jest.fn();
     render(
       <QuestionInput
@@ -197,11 +198,28 @@ describe("QuestionInput", () => {
         onChange={onChange}
       />
     );
-    // Regression lock: the minimum (0) was unreachable on the old range slider
-    // because the thumb defaulted to min and "changing" to min fired nothing.
-    // Anchor regex to the start so it doesn't also match "10 — Always true".
-    const zeroRadio = screen.getByRole("radio", { name: /^0 —/ });
-    fireEvent.click(zeroRadio);
+    const slider = screen.getByRole("slider");
+    // Drag = a native `change` event carrying the new value.
+    fireEvent.change(slider, { target: { value: "2" } });
+    expect(onChange).toHaveBeenCalledWith("S1_Q0", 2);
+  });
+
+  test("10. SLIDER_LIKERT clicking at the default minimum (0) commits 0 — no drag-dance", () => {
+    const onChange = jest.fn();
+    render(
+      <QuestionInput
+        question={zeroBasedSliderQuestion}
+        value={undefined}
+        onChange={onChange}
+      />
+    );
+    // Regression lock for the unselectable-minimum bug: the thumb defaults to
+    // min (0) and a plain click does NOT fire `change`. The component must
+    // commit the slider's CURRENT DOM value on click, so a click at the default
+    // minimum records 0 (instead of the user being forced to drag away + back).
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+    expect(slider.value).toBe("0"); // thumb sits at min when unanswered
+    fireEvent.click(slider);
     expect(onChange).toHaveBeenCalledWith("S1_Q0", 0);
   });
 });

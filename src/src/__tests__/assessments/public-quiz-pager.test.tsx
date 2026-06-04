@@ -116,13 +116,13 @@ describe("PublicQuizClient — SectionPager wiring", () => {
 
     reachFormStep();
 
-    // Section 1 — answer q1 by clicking the discrete radio for value 2, then Next.
-    fireEvent.click(screen.getByRole("radio", { name: "2" }));
+    // Section 1 — answer q1 by dragging the slider to value 2, then Next.
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
 
     // Section 2 — answer q2 (max value 3, anchored "hi"), then Submit.
     expect(screen.getByText(/section 2 of 2/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: /^3/ }));
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "3" } });
     fireEvent.click(screen.getByRole("button", { name: /submit/i }));
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
