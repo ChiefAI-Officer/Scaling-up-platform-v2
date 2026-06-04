@@ -7,7 +7,7 @@
 import { sendEmailViaSMTP, type SmtpAttachment } from "@/lib/smtp-transport";
 import { db } from "@/lib/db";
 import { generateIcsContent, buildLocationString } from "@/lib/ics-generator";
-import { formatEventDateUTC } from "@/lib/utils";
+import { formatEventDateUTC, formatTimeWithZone } from "@/lib/utils";
 import { composeRegistrationConfirmationEmail } from "@/lib/notifications/transactional-email-template";
 
 // ============================================
@@ -751,7 +751,7 @@ export async function sendWorkshopDateChangeEmail({
         html: `
         <p>Hi ${escapeHtml(registrant.firstName ?? "")},</p>
         <p>The date or time for <strong>${workshopTitle}</strong> (${workshopCode}) has been updated.</p>
-        <p><strong>New date:</strong> ${formattedDate}${eventTime ? ` at ${eventTime}` : ""}</p>
+        <p><strong>New date:</strong> ${formattedDate}${eventTime ? ` at ${formatTimeWithZone(eventTime, eventDate, timezone)}` : ""}</p>
         <p>We've attached an updated calendar invite. Open it to update the event in your calendar.</p>
         ${landingPageUrl ? `<p><a href="${landingPageUrl}">View workshop details</a></p>` : ""}
         <p>Questions? Reply to this email or contact your workshop organizer.</p>

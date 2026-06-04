@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { requireCoach } from "@/lib/auth/authorization";
+import { formatTimeWithZone } from "@/lib/utils";
 import Link from "next/link";
 import { StatusPill } from "@/components/ui/status-pill";
 import { FadeUp, StaggerContainer, StaggerItem } from "@/components/ui/animated";
@@ -144,7 +145,8 @@ export default async function CoachDashboardPage() {
                           year: "numeric",
                           timeZone: "UTC",
                         })}
-                        {workshop.eventTime && ` at ${workshop.eventTime}`}
+                        {workshop.eventTime &&
+                          ` at ${formatTimeWithZone(workshop.eventTime, workshop.eventDate, workshop.timezone)}`}
                       </p>
                     </div>
                     <div className="text-right">

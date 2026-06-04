@@ -239,6 +239,7 @@ export interface WorkflowContext {
   workshopCode: string;
   workshopDate: string;
   workshopTime: string;
+  workshopTimezone?: string;
   workshopLocation: string;
   workshopUrl: string;
   workshopFormat: string | null;
@@ -258,6 +259,7 @@ export function interpolateTemplate(template: string, context: WorkflowContext):
     .replace(/\{\{workshopCode\}\}/g, context.workshopCode ?? "")
     .replace(/\{\{workshopDate\}\}/g, context.workshopDate ?? "")
     .replace(/\{\{workshopTime\}\}/g, context.workshopTime ?? "")
+    .replace(/\{\{timezone\}\}/g, context.workshopTimezone ?? "")
     .replace(/\{\{workshopLocation\}\}/g, context.workshopLocation ?? "")
     .replace(/\{\{workshopUrl\}\}/g, context.workshopUrl ?? "")
     .replace(/\{\{workshopFormat\}\}/g, context.workshopFormat ?? "")
@@ -273,6 +275,7 @@ export function interpolateTemplate(template: string, context: WorkflowContext):
     .replace(/\{\{workshop_code\}\}/g, context.workshopCode ?? "")
     .replace(/\{\{workshop_date\}\}/g, context.workshopDate ?? "")
     .replace(/\{\{workshop_time\}\}/g, context.workshopTime ?? "")
+    .replace(/\{\{workshop_timezone\}\}/g, context.workshopTimezone ?? "")
     .replace(/\{\{workshop_location\}\}/g, context.workshopLocation ?? "")
     .replace(/\{\{workshop_url\}\}/g, context.workshopUrl ?? "")
     .replace(/\{\{workshop_format\}\}/g, context.workshopFormat ?? "")

@@ -1,7 +1,7 @@
 "use client";
 
 import { stripPlaceholders } from "@/lib/templates/template-utils";
-import { formatVenueAddress } from "@/lib/utils";
+import { formatVenueAddress, formatTimeWithZone } from "@/lib/utils";
 import { normalizeVideoUrl } from "@/lib/templates/landing-page-overlay";
 import {
   buildGoogleCalendarUrl,
@@ -147,7 +147,9 @@ export function ThankYouPageTemplate({
                 <div>
                   <p className="font-medium text-foreground">{eventDate}</p>
                   <p className="text-sm text-muted-foreground">
-                    {workshop.eventTime || "Time TBA"} {workshop.timezone}
+                    {workshop.eventTime
+                      ? formatTimeWithZone(workshop.eventTime, workshop.eventDate, workshop.timezone)
+                      : "Time TBA"}
                   </p>
                 </div>
               </div>

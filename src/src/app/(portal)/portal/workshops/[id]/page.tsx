@@ -12,7 +12,7 @@ import { CounterOfferCard } from "@/components/workshops/counter-offer-card";
 import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import { InlineEditDescription } from "@/components/workshops/inline-edit-description";
 import { getSessionDownloadPath } from "@/lib/files/file-download-path";
-import { getWorkshopStatusExplanation, formatTimestamp, formatEventDateUTC } from "@/lib/utils";
+import { getWorkshopStatusExplanation, formatTimestamp, formatEventDateUTC, formatTimeWithZone } from "@/lib/utils";
 import { formatStepLabel } from "@/lib/workflows/workflow-types";
 import {
   calculateWorkshopRevenueSplit,
@@ -233,7 +233,8 @@ export default async function WorkshopDetailsPage({
               {formatEventDateUTC(workshop.eventDate)}
             </p>
             <p>
-              <span className="font-medium">Time:</span> {workshop.eventTime || "TBD"}
+              <span className="font-medium">Time:</span>{" "}
+              {formatTimeWithZone(workshop.eventTime, workshop.eventDate, workshop.timezone)}
             </p>
             <p>
               <span className="font-medium">Format:</span> {workshop.format}
@@ -270,7 +271,8 @@ export default async function WorkshopDetailsPage({
               </p>
             )}
           </div>
-          {(workshop.landingPageSlug || fallbackLandingPage?.slug) && (
+          {["PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(workshop.status) &&
+            (workshop.landingPageSlug || fallbackLandingPage?.slug) && (
             <div className="mt-3 pt-3 border-t border-border">
               <p className="text-xs font-medium text-muted-foreground mb-1">Landing Page URL</p>
               <div className="flex items-center gap-2">

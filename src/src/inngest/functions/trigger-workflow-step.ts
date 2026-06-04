@@ -21,6 +21,7 @@ import {
     finalizeParentRollup,
 } from "@/lib/workflows/recipient-execution";
 import { buildLocationString } from "@/lib/ics-generator";
+import { formatTimeWithZone, formatZoneAbbrev } from "@/lib/utils";
 import {
     buildProtectedEmailAttachments,
     canDeliverWorkflowAttachments,
@@ -131,7 +132,19 @@ export const triggerWorkflowStep = inngest.createFunction(
                 day: "numeric",
                 timeZone: "UTC",
             }),
-            workshopTime: workshop.eventTime || "TBD",
+            // Carry the DST-aware zone abbreviation (e.g. "9:00 AM EDT"). Anchor on
+            // the RAW stored workshop.eventDate (midnight UTC of the event day), NOT
+            // the resolved start-moment above — formatZoneAbbrev derives the correct
+            // DST offset from the event's UTC calendar date.
+            workshopTime: formatTimeWithZone(
+                workshop.eventTime,
+                new Date(workshop.eventDate),
+                workshop.timezone,
+            ),
+            workshopTimezone: formatZoneAbbrev(
+                new Date(workshop.eventDate),
+                workshop.timezone,
+            ),
             workshopLocation: workshop.format === "VIRTUAL"
                 ? (workshop.virtualLink ?? "")
                 : buildLocationString(workshop),

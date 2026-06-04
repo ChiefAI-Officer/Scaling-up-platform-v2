@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import {
   formatTimestamp,
   formatEventDateUTC,
+  formatTimeWithZone,
   formatCurrency,
   getWorkshopStatusColor,
   getWorkshopStatusLabel,
@@ -197,7 +198,9 @@ export default async function WorkshopDetailPage({
               <p className="text-sm text-muted-foreground">Event Date</p>
               <p className="text-xl font-semibold">{formatEventDateUTC(workshop.eventDate)}</p>
               {workshop.eventTime && (
-                <p className="text-muted-foreground">{workshop.eventTime}</p>
+                <p className="text-muted-foreground">
+                  {formatTimeWithZone(workshop.eventTime, workshop.eventDate, workshop.timezone)}
+                </p>
               )}
             </CardContent>
           </Card>

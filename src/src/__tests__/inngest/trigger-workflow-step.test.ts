@@ -684,6 +684,34 @@ describe("triggerWorkflowStep Inngest function", () => {
         });
     });
 
+    // ------------------------------------------
+    // Timezone wiring: workshopTime carries the DST-aware zone abbreviation
+    // ------------------------------------------
+    describe("workshopTime context: carries timezone abbreviation", () => {
+        it("interpolates workshopTime with the zone abbrev and sets workshopTimezone", async () => {
+            (db.workshop.findUnique as jest.Mock).mockResolvedValue(
+                makeWorkshop({
+                    eventDate: new Date("2026-06-01T00:00:00.000Z"),
+                    eventTime: "9:00 AM",
+                    timezone: "America/New_York", // EDT in June
+                })
+            );
+
+            await capturedHandler({ event: buildEvent(), step: mockStep });
+
+            const interpolateCalls = (interpolateTemplate as jest.Mock).mock.calls;
+            const ctxCalls = interpolateCalls.filter(
+                ([, ctx]: [unknown, { workshopTime?: string } | undefined]) =>
+                    ctx && typeof ctx.workshopTime === "string"
+            );
+            expect(ctxCalls.length).toBeGreaterThan(0);
+            for (const [, ctx] of ctxCalls) {
+                expect(ctx.workshopTime).toMatch(/9:00 AM (EDT|EST)/);
+                expect(ctx.workshopTimezone).toMatch(/^(EDT|EST)$/);
+            }
+        });
+    });
+
     // ----------------------------------------------------------------
     // Wave 6 follow-on: per-recipient parity with execute-workflow.ts
     // ----------------------------------------------------------------

@@ -29,13 +29,19 @@ jest.mock("@/lib/ics-generator", () => ({
   buildLocationString: jest.fn().mockReturnValue("Test Venue"),
 }));
 
-jest.mock("@/lib/utils", () => ({
-  formatTimestamp: jest.fn().mockReturnValue("May 1, 2026"),
-  formatEventDateUTC: jest.fn().mockReturnValue("Oct 1, 2026"),
-  formatCurrency: jest.fn(),
-  generateSlug: jest.fn(),
-  getWorkshopStatusLabel: jest.fn(),
-}));
+jest.mock("@/lib/utils", () => {
+  const actual = jest.requireActual("@/lib/utils");
+  return {
+    formatTimestamp: jest.fn().mockReturnValue("May 1, 2026"),
+    formatEventDateUTC: jest.fn().mockReturnValue("Oct 1, 2026"),
+    formatCurrency: jest.fn(),
+    generateSlug: jest.fn(),
+    getWorkshopStatusLabel: jest.fn(),
+    // Real DST-aware zone helpers — used by the date-change email body.
+    formatTimeWithZone: actual.formatTimeWithZone,
+    formatZoneAbbrev: actual.formatZoneAbbrev,
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Imports (after mocks — Jest hoists mock() calls above these)
@@ -220,5 +226,17 @@ describe("sendWorkshopDateChangeEmail", () => {
 
     const callArgs = mockSendEmailViaSMTP.mock.calls[0][0];
     expect(callArgs.html).not.toContain("View workshop details");
+  });
+
+  it("appends the DST-aware zone abbreviation to the event time in the body", async () => {
+    mockFindMany.mockResolvedValue([
+      { email: "henry@example.com", firstName: "Henry", lastName: "Ford" },
+    ]);
+
+    // baseParams: eventDate 2026-05-01 (EDT), eventTime "09:00", America/New_York
+    await sendWorkshopDateChangeEmail(baseParams);
+
+    const callArgs = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(callArgs.html).toMatch(/at 09:00 (EDT|EST)/);
   });
 });

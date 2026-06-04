@@ -100,4 +100,40 @@ describe('PortalWorkshopList', () => {
       expect(within(row).getAllByText('—').length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe('Landing CTA gated on approval (coach-only)', () => {
+    it('coach + pre-approval workshop WITH landingPageUrl → shows "Available after approval", NOT the copy button', () => {
+      const workshop = makeWorkshop({
+        status: 'AWAITING_APPROVAL',
+        landingPageUrl: 'https://app.example.com/workshop/test-slug',
+      });
+      render(<PortalWorkshopList workshops={[workshop]} isAdmin={false} />);
+      const row = screen.getByText('Test Workshop').closest('tr')!;
+      expect(within(row).getByText('Available after approval')).toBeInTheDocument();
+      // CopyUrlButton renders a <button>; within a row it is the only button element.
+      expect(within(row).queryByRole('button')).not.toBeInTheDocument();
+    });
+
+    it('coach + approved workshop (PRE_EVENT) WITH landingPageUrl → shows the copy button', () => {
+      const workshop = makeWorkshop({
+        status: 'PRE_EVENT',
+        landingPageUrl: 'https://app.example.com/workshop/test-slug',
+      });
+      render(<PortalWorkshopList workshops={[workshop]} isAdmin={false} />);
+      const row = screen.getByText('Test Workshop').closest('tr')!;
+      expect(within(row).getByRole('button')).toBeInTheDocument();
+      expect(within(row).queryByText('Available after approval')).not.toBeInTheDocument();
+    });
+
+    it('admin + pre-approval workshop WITH landingPageUrl → still shows the copy button (admin unchanged)', () => {
+      const workshop = makeWorkshop({
+        status: 'AWAITING_APPROVAL',
+        landingPageUrl: 'https://app.example.com/workshop/test-slug',
+      });
+      render(<PortalWorkshopList workshops={[workshop]} isAdmin={true} />);
+      const row = screen.getByText('Test Workshop').closest('tr')!;
+      expect(within(row).getByRole('button')).toBeInTheDocument();
+      expect(within(row).queryByText('Available after approval')).not.toBeInTheDocument();
+    });
+  });
 });

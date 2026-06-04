@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SoloLandingPageTemplate, SAMPLE_WORKSHOP_SOLO } from "@/components/templates/solo-landing-page-template";
+import { formatZoneAbbrev, formatTimeWithZone } from "@/lib/utils";
 
 interface SoloLandingData {
   coachPhoto: string;
@@ -130,8 +131,8 @@ export default function SoloLandingEditor() {
             coachPhoto: w.coach.profileImage || "",
             eventDay: eventDate.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" }),
             eventDate: eventDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }),
-            eventTime: w.eventTime || "12:00 PM - 1:00 PM",
-            eventTimezone: w.timezone?.split("/")[1] || "EST",
+            eventTime: formatTimeWithZone(w.eventTime || "12:00 PM - 1:00 PM", w.eventDate, w.timezone),
+            eventTimezone: formatZoneAbbrev(w.eventDate, w.timezone),
             registrationUrl: `/workshop/${workshopId}/register`,
           }));
         }

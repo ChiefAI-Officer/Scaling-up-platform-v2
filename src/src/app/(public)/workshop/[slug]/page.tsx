@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
 import { RegistrationForm } from "./registration-form";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatTimeWithZone } from "@/lib/utils";
 import { ThankYouPageTemplate } from "@/components/templates/thank-you-page-template";
 import { RegistrationPageTemplate } from "@/components/templates/registration-page-template";
 import { BioPageTemplate, BioContent } from "@/components/templates/bio-page-template";
@@ -256,7 +256,7 @@ function DefaultWorkshopTemplate({ workshop }: { workshop: WorkshopFallbackData 
             <div className="rounded-lg border border-border bg-muted p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time</p>
               <p className="mt-1 text-sm text-foreground">
-                {workshop.eventTime || "TBD"} {workshop.timezone}
+                {formatTimeWithZone(workshop.eventTime, workshop.eventDate, workshop.timezone)}
               </p>
             </div>
             <div className="sm:col-span-2 rounded-lg border border-border bg-muted p-4">

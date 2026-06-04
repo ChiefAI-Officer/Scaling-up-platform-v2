@@ -7,6 +7,7 @@ import {
   formatCurrency,
   formatTimestamp,
   formatEventDateUTC,
+  formatTimeWithZone,
   getWorkshopStatusColor,
   getWorkshopStatusLabel,
 } from "@/lib/utils";
@@ -91,13 +92,19 @@ async function getWorkshops(
   return { workshops, total };
 }
 
-function formatStartTime(eventTime: string | null): string {
+function formatStartTime(
+  eventTime: string | null,
+  eventDate: Date | string,
+  timezone: string | null,
+): string {
   if (!eventTime) return "TBD";
+  let start = eventTime;
   if (eventTime.includes("-")) {
-    const [start] = eventTime.split("-").map((v) => v.trim());
-    return start || eventTime;
+    const [s] = eventTime.split("-").map((v) => v.trim());
+    start = s || eventTime;
   }
-  return eventTime;
+  // Append the DST-aware zone abbreviation (e.g. "CDT") to the extracted start time.
+  return formatTimeWithZone(start, eventDate, timezone);
 }
 
 function costLabel(workshop: {
@@ -313,7 +320,7 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                       {formatEventDateUTC(workshop.eventDate)}
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground">
-                      {formatStartTime(workshop.eventTime)}
+                      {formatStartTime(workshop.eventTime, workshop.eventDate, workshop.timezone)}
                     </td>
                     <td className="px-4 py-4 text-sm text-foreground">
                       {workshop.pricingTier?.name ?? <span className="text-muted-foreground">—</span>}
@@ -340,7 +347,7 @@ export default async function WorkshopsPage({ searchParams }: PageProps) {
                       )}
                     </td>
                     <td className="px-4 py-4">
-                      <Badge className={getWorkshopStatusColor(workshop.status)} variant="secondary">
+                      <Badge className={`${getWorkshopStatusColor(workshop.status)} inline-block whitespace-normal break-words max-w-[8rem]`} variant="secondary">
                         {getWorkshopStatusLabel(workshop.status)}
                       </Badge>
                     </td>
