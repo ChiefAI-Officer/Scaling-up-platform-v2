@@ -2,8 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
-import { QuestionInput } from "./question-input";
+import { SectionPager } from "./section-pager";
+import {
+  buildSectionPages,
+  type PagerSection,
+  type PagerQuestion,
+} from "@/lib/assessments/section-pages";
+import { useAnswerDraft, publicDraftKey } from "@/lib/assessments/use-answer-draft";
 
 interface SectionDef {
   stableKey: string;
@@ -93,13 +98,6 @@ export function PublicQuizClient({
     () => [...sections].sort((a, b) => a.sortOrder - b.sortOrder),
     [sections],
   );
-  const sectionByKey = useMemo(() => {
-    const out: Record<string, SectionDef> = {};
-    sortedSections.forEach((s) => {
-      out[s.stableKey] = s;
-    });
-    return out;
-  }, [sortedSections]);
 
   const [step, setStep] = useState<Step>(isOpen ? "intro" : "error");
   const [firstName, setFirstName] = useState("");
@@ -108,6 +106,11 @@ export function PublicQuizClient({
   const [answers, setAnswers] = useState<Record<string, number | string | string[]>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // localStorage autosave (anonymous public draft, keyed per browser session).
+  // Hook must run unconditionally at the top level, before any early return.
+  const draftKey = useMemo(() => publicDraftKey(campaignAlias), [campaignAlias]);
+  const { clearDraft } = useAnswerDraft(draftKey, answers, setAnswers);
 
   if (!isOpen || step === "error") {
     return (
@@ -307,7 +310,16 @@ export function PublicQuizClient({
     if (Array.isArray(v) && v.length === 0) return true;
     return false;
   });
-  const canSubmit = missingRequired.length === 0;
+  // The submit endpoint rejects an empty `answers` array (Zod `.min(1)`), so an
+  // all-optional quiz must still have at least one answered question before we
+  // allow a POST — otherwise the server 400s on a zero-answer payload.
+  const answeredCount = Object.entries(answers).filter(([, v]) => {
+    if (v === undefined) return false;
+    if (typeof v === "string" && v.trim() === "") return false;
+    if (Array.isArray(v) && v.length === 0) return false;
+    return true;
+  }).length;
+  const canSubmit = missingRequired.length === 0 && answeredCount > 0;
 
   async function handleSubmit() {
     if (submitting || !canSubmit) return;
@@ -333,6 +345,7 @@ export function PublicQuizClient({
       if (!res.ok || body.success === false) {
         throw new Error(body.error || `HTTP ${res.status}`);
       }
+      clearDraft();
       router.push(body.data.redirectUrl);
     } catch (err) {
       setSubmitError(
@@ -343,101 +356,43 @@ export function PublicQuizClient({
     }
   }
 
-  // Group questions by section for rendering.
-  const groups = sortedSections.map((s) => ({
-    section: s,
-    questions: sortedQuestions.filter((q) => q.sectionStableKey === s.stableKey),
-  }));
-  const unsectioned = sortedQuestions.filter((q) => !q.sectionStableKey);
+  // One section per screen via the shared SectionPager. It derives total
+  // questions + progress internally and renders each question through the
+  // accessible QuestionInput; we own the answer state and the submit POST.
+  const pages = buildSectionPages(
+    sortedSections as PagerSection[],
+    sortedQuestions as PagerQuestion[],
+  );
 
   return (
     <div className="ty-page">
       <header className="ty-header">
         <span className="ty-brand">Scaling Up</span>
-        <span>
-          {Object.keys(answers).length} of {sortedQuestions.length} answered
-          {missingRequired.length > 0
-            ? ` · ${missingRequired.length} required remaining`
-            : ""}
-        </span>
+        <span>{campaignName}</span>
       </header>
       <main className="survey-body">
         <div className="survey-form">
-          <section className="ty-card">
-            <span className="hero-eyebrow">Quiz</span>
-            <h1 className="ty-title">{campaignName}</h1>
-          </section>
-
-          {groups.map(({ section, questions: qs }) => (
-            <section
-              key={section.stableKey}
-              className="ty-card survey-section"
-              data-testid={`quiz-section-${section.stableKey}`}
-            >
-              {section.partLabel && (
-                <span className="hero-eyebrow">{section.partLabel}</span>
-              )}
-              <h2 className="survey-section-title">{section.name}</h2>
-              {section.description && (
-                <p className="survey-section-desc">{section.description}</p>
-              )}
-              {qs.map((q) => (
-                <QuestionRow
-                  key={q.stableKey}
-                  question={q}
-                  value={answers[q.stableKey]}
-                  onChange={(v) => setAnswer(q.stableKey, v)}
-                  disabled={submitting}
-                />
-              ))}
-            </section>
-          ))}
-
-          {unsectioned.length > 0 && (
-            <section className="ty-card survey-section">
-              {unsectioned.map((q) => (
-                <QuestionRow
-                  key={q.stableKey}
-                  question={q}
-                  value={answers[q.stableKey]}
-                  onChange={(v) => setAnswer(q.stableKey, v)}
-                  disabled={submitting}
-                />
-              ))}
-            </section>
-          )}
-
           {submitError && (
-            <div className="wf-intersection-banner" style={{ background: "hsl(var(--destructive) / 0.1)", borderColor: "hsl(var(--destructive) / 0.3)", color: "hsl(var(--destructive))" }}>
+            <div
+              className="wf-intersection-banner"
+              style={{
+                background: "hsl(var(--destructive) / 0.1)",
+                borderColor: "hsl(var(--destructive) / 0.3)",
+                color: "hsl(var(--destructive))",
+              }}
+            >
               {submitError}
             </div>
           )}
 
-          <div className="hero-cta-row" style={{ justifyContent: "space-between" }}>
-            <button
-              type="button"
-              onClick={() => setStep("info")}
-              disabled={submitting}
-              className="wf-btn wf-btn-secondary"
-              style={{ opacity: submitting ? 0.5 : 1 }}
-            >
-              Back
-            </button>
-        <button
-          type="button"
-              onClick={handleSubmit}
-              disabled={!canSubmit || submitting}
-              className="wf-btn wf-btn-primary"
-              style={{
-                opacity: !canSubmit || submitting ? 0.5 : 1,
-                cursor: !canSubmit || submitting ? "not-allowed" : "pointer",
-              }}
-              data-testid="quiz-submit"
-            >
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              Submit
-            </button>
-          </div>
+          <SectionPager
+            pages={pages}
+            answers={answers}
+            onAnswerChange={(k, v) => setAnswer(k, v)}
+            onSubmit={handleSubmit}
+            submitting={submitting}
+            onExit={() => setStep("info")}
+          />
 
           {!canSubmit && (
             <p
@@ -451,92 +406,9 @@ export function PublicQuizClient({
               Please answer all required questions before submitting.
             </p>
           )}
-
-          {/* Keep a hidden anchor of section names so the template name is reachable */}
-          <span className="sr-only">{sectionByKey ? "" : ""}</span>
         </div>
       </main>
       <footer className="ty-footer">Powered by Scaling Up</footer>
-    </div>
-  );
-}
-
-function QuestionRow({
-  question,
-  value,
-  onChange,
-  disabled,
-}: {
-  question: QuestionDef;
-  value: number | string | string[] | undefined;
-  onChange: (v: number | string | string[]) => void;
-  disabled?: boolean;
-}) {
-  // For SLIDER_LIKERT, keep the existing button-style picker for quiz UX.
-  // For all other types, delegate to QuestionInput.
-  if (question.type === "SLIDER_LIKERT" && question.scale) {
-    const { scale } = question;
-    const options: number[] = [];
-    for (let v = scale.min; v <= scale.max; v += scale.step) options.push(v);
-    const numVal = typeof value === "number" ? value : undefined;
-
-    return (
-      <div className="space-y-2" data-testid={`quiz-question-${question.stableKey}`}>
-        <p className="text-sm font-medium text-foreground">
-          {question.label}
-          {question.isRequired && (
-            <span className="text-destructive ml-1">*</span>
-          )}
-        </p>
-        {question.helpText && (
-          <p className="text-xs text-muted-foreground">{question.helpText}</p>
-        )}
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            {options.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => onChange(opt)}
-                disabled={disabled}
-                className={`min-w-[44px] px-3 py-2 text-sm rounded-md border transition-colors ${
-                  numVal === opt
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background border-border text-foreground hover:bg-muted"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-                data-testid={`quiz-answer-${question.stableKey}-${opt}`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-          <div className="flex justify-between text-[11px] text-muted-foreground">
-            <span>{scale.anchorMin}</span>
-            <span>{scale.anchorMax}</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Non-SLIDER question types — use the shared QuestionInput component.
-  return (
-    <div className="space-y-2" data-testid={`quiz-question-${question.stableKey}`}>
-      <p className="text-sm font-medium text-foreground">
-        {question.label}
-        {question.isRequired && (
-          <span className="text-destructive ml-1">*</span>
-        )}
-      </p>
-      {question.helpText && (
-        <p className="text-xs text-muted-foreground">{question.helpText}</p>
-      )}
-      <QuestionInput
-        question={question}
-        value={value}
-        onChange={(_sk, v) => onChange(v)}
-        disabled={disabled}
-      />
     </div>
   );
 }
