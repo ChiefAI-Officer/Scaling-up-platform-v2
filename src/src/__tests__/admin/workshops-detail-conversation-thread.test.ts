@@ -51,3 +51,21 @@ describe("BUG-MAY6-5: admin workshop detail conversation thread parity", () => {
     expect(source).toMatch(/perspective=["']admin["']/);
   });
 });
+
+describe("pre-approval guard on the admin landing-page link", () => {
+  let source: string;
+  beforeAll(() => {
+    source = fs.readFileSync(ADMIN_WORKSHOP_DETAIL, "utf8");
+  });
+
+  it("gates the public landing-page copy/open block behind the approved status set", () => {
+    // The IIFE that renders the "Landing Page" copy/open link must compute an
+    // approved-status flag from PRE_EVENT / POST_EVENT / COMPLETED and require
+    // it before rendering the link.
+    expect(source).toMatch(
+      /\["PRE_EVENT",\s*"POST_EVENT",\s*"COMPLETED"\]\.includes\(\s*workshop\.status\s*\)/
+    );
+    // The Open ↗ link must be guarded by the approved flag (isApproved && copySlug).
+    expect(source).toMatch(/isApproved\s*&&\s*copySlug/);
+  });
+});

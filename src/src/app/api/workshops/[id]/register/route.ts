@@ -4,6 +4,7 @@ import { createCheckoutSession, StripeDiscountCodeError } from "@/services/strip
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import {
   createWorkshopRegistration,
+  isApprovedWorkshopStatus,
   RegistrationServiceError,
 } from "@/lib/registration-service";
 import { inngest } from "@/inngest/client";
@@ -150,6 +151,27 @@ export async function POST(
   const isJsonResponse = wantsJsonResponse(request);
 
   try {
+    // Block registrations until the workshop is approved. A workshop in any
+    // pre-approval state (REQUESTED / AWAITING_APPROVAL / INFO_REQUESTED /
+    // DENIED) or CANCELED must NOT accept registrations even if someone has the
+    // public URL. Enforced here BEFORE any capacity / duplicate / Stripe logic.
+    const workshopStatusRow = await db.workshop.findUnique({
+      where: { id: workshopId },
+      select: { status: true },
+    });
+
+    if (!workshopStatusRow) {
+      return jsonError("Workshop not found", 404, rateLimit.headers);
+    }
+
+    if (!isApprovedWorkshopStatus(workshopStatusRow.status)) {
+      return jsonError(
+        "Registration is not open for this workshop",
+        403,
+        rateLimit.headers
+      );
+    }
+
     const input = await parseRegistrationInput(request);
     if (!input) {
       return jsonError("Missing required registration fields", 400, rateLimit.headers);

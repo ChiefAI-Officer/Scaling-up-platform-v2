@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import {
   formatTimestamp,
   formatEventDateUTC,
+  formatTimeWithZone,
   formatCurrency,
   getWorkshopStatusColor,
   getWorkshopStatusLabel,
@@ -197,7 +198,9 @@ export default async function WorkshopDetailPage({
               <p className="text-sm text-muted-foreground">Event Date</p>
               <p className="text-xl font-semibold">{formatEventDateUTC(workshop.eventDate)}</p>
               {workshop.eventTime && (
-                <p className="text-muted-foreground">{workshop.eventTime}</p>
+                <p className="text-muted-foreground">
+                  {formatTimeWithZone(workshop.eventTime, workshop.eventDate, workshop.timezone)}
+                </p>
               )}
             </CardContent>
           </Card>
@@ -307,9 +310,17 @@ export default async function WorkshopDetailPage({
               )}
 
               {(() => {
+                // Only surface the public landing-page copy/open link once the
+                // workshop is approved (PRE_EVENT / POST_EVENT / COMPLETED) —
+                // mirrors the coach detail page. Before approval the public
+                // page renders a "not open" state, so the link would be dead.
+                // Admins still preview via the template editor.
+                const isApproved = ["PRE_EVENT", "POST_EVENT", "COMPLETED"].includes(
+                  workshop.status
+                );
                 const soloPage = workshop.landingPages?.find((p) => p.template === "SOLO_LANDING");
                 const copySlug = soloPage?.slug ?? workshop.landingPageSlug;
-                return copySlug ? (
+                return isApproved && copySlug ? (
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Landing Page</p>
                     <div className="flex items-center gap-2">
@@ -541,10 +552,10 @@ export default async function WorkshopDetailPage({
                             const status = execution?.status ?? "PENDING";
                             const isCompleted = ["SENT", "SKIPPED", "FAILED"].includes(status);
                             return (
-                              <div key={step.id} className="flex items-center text-sm gap-2">
+                              <div key={step.id} className="flex items-start text-sm gap-2">
                                 <span className="text-muted-foreground shrink-0">{index + 1}.</span>
                                 <div className="flex-1 min-w-0">
-                                  <span className="text-foreground truncate block">
+                                  <span className="text-foreground block whitespace-normal break-words">
                                     {formatStepLabel(step)}
                                   </span>
                                   {isCompleted && execution?.scheduledFor && (

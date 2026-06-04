@@ -220,10 +220,16 @@ export function PortalWorkshopList({ workshops, isAdmin = false }: PortalWorksho
                                             ) : null}
                                         </td>
                                         <td className="px-6 py-4">
-                                            {workshop.landingPageUrl ? (
+                                            {isAdmin ? (
+                                                workshop.landingPageUrl ? (
+                                                    <CopyUrlButton url={workshop.landingPageUrl} />
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">Not published</span>
+                                                )
+                                            ) : isApproved && workshop.landingPageUrl ? (
                                                 <CopyUrlButton url={workshop.landingPageUrl} />
                                             ) : (
-                                                <span className="text-xs text-muted-foreground">Not published</span>
+                                                <span className="text-xs text-muted-foreground">Available after approval</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4">

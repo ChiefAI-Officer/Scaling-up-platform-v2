@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { formatEventDateUTC, parseJsonField, VenueAddress } from "@/lib/utils";
+import { formatEventDateUTC, formatTimeWithZone, parseJsonField, VenueAddress } from "@/lib/utils";
 import { retrieveCheckoutSession } from "@/services/stripe";
 import {
   buildGoogleCalendarUrl,
@@ -187,7 +187,11 @@ async function SuccessContent({ searchParams }: SuccessPageProps) {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Time</p>
                   <p className="text-foreground">
-                    {registration.workshop.eventTime}
+                    {formatTimeWithZone(
+                      registration.workshop.eventTime,
+                      registration.workshop.eventDate,
+                      registration.workshop.timezone,
+                    )}
                   </p>
                 </div>
               )}

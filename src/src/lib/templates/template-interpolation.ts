@@ -4,6 +4,7 @@
  */
 
 import { db } from "@/lib/db";
+import { formatTimeWithZone, formatZoneAbbrev } from "@/lib/utils";
 
 export { interpolateContent, rewriteIdentityFields, templateHasPlaceholders, findRemainingPlaceholders } from "@/lib/templates/template-interpolation-core";
 
@@ -74,6 +75,12 @@ export async function buildWorkshopVariables(workshopId: string): Promise<Record
 
     const formattedDate = formatWorkshopDate(workshop.eventDate);
 
+    // DST-aware zoned time (e.g. "9:00 AM CDT") + the bare abbreviation ("CDT").
+    // Reuses lib/utils helpers (parser-independent, never throws). The raw stored
+    // workshop.eventDate (midnight UTC of the event day) is the correct DST anchor.
+    const zonedTime = formatTimeWithZone(workshop.eventTime, workshop.eventDate, workshop.timezone);
+    const zoneAbbrev = formatZoneAbbrev(workshop.eventDate, workshop.timezone);
+
     const coachFullName = `${workshop.coach.firstName} ${workshop.coach.lastName}`;
 
     return {
@@ -84,7 +91,12 @@ export async function buildWorkshopVariables(workshopId: string): Promise<Record
         event_day: formatWorkshopDay(workshop.eventDate),
         event_date: formattedDate,
         event_date_no_weekday: formatWorkshopDateNoWeekday(workshop.eventDate),
-        workshop_time: workshop.eventTime || "",
+        // event_time is the token used by Solo Landing customHtml + SOLO_DEFAULTS;
+        // previously absent -> rendered literal "{{event_time}}". workshop_time +
+        // eventTime mirror the same zoned value for consistency.
+        event_time: zonedTime,
+        workshop_time: zonedTime,
+        workshop_timezone: zoneAbbrev,
         workshop_format: workshop.format,
         workshop_code: workshop.workshopCode,
         venue_name: workshop.venueName || "",
@@ -112,7 +124,7 @@ export async function buildWorkshopVariables(workshopId: string): Promise<Record
         coach_title: workshop.coach.title || workshop.coach.company || "Scaling Up Certified Coach",
         workshopTitle: workshop.title,
         eventDate: formattedDate,
-        eventTime: workshop.eventTime || "",
+        eventTime: zonedTime,
         // camelCase venue aliases (match template preview data)
         venueName: workshop.venueName || "",
         venueAddress: formatVenueAddress(workshop.venueAddress),

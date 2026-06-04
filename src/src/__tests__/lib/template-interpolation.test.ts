@@ -1,4 +1,11 @@
-import { interpolateContent, rewriteIdentityFields, templateHasPlaceholders, findRemainingPlaceholders, formatVenueAddress, formatWorkshopDate, formatWorkshopDay, formatWorkshopDateNoWeekday } from "@/lib/templates/template-interpolation";
+import { interpolateContent, rewriteIdentityFields, templateHasPlaceholders, findRemainingPlaceholders, formatVenueAddress, formatWorkshopDate, formatWorkshopDay, formatWorkshopDateNoWeekday, buildWorkshopVariables } from "@/lib/templates/template-interpolation";
+import { db } from "@/lib/db";
+
+jest.mock("@/lib/db", () => ({
+  db: {
+    workshop: { findUnique: jest.fn() },
+  },
+}));
 
 describe("interpolateContent", () => {
   it("replaces {{variable}} placeholders with values", () => {
@@ -175,6 +182,83 @@ describe("date formatting with UTC timezone", () => {
 
     it("formatWorkshopDateNoWeekday returns date without weekday in UTC", () => {
         expect(formatWorkshopDateNoWeekday(julyFirst)).toBe("July 1, 2026");
+    });
+});
+
+describe("buildWorkshopVariables — event_time / timezone wiring", () => {
+    const findUnique = db.workshop.findUnique as jest.Mock;
+
+    function mockWorkshop(overrides: Record<string, unknown> = {}) {
+        return {
+            id: "ws-1",
+            title: "Scaling Up Workshop",
+            description: "A great workshop",
+            workshopCode: "WS-2026-TEST",
+            // June 15 2026 in America/Chicago is CDT
+            eventDate: new Date("2026-06-15T00:00:00.000Z"),
+            eventTime: "9:00 AM",
+            timezone: "America/Chicago",
+            format: "IN_PERSON",
+            venueName: null,
+            venueAddress: null,
+            venueInstructions: null,
+            virtualLink: null,
+            isFree: false,
+            priceCents: null,
+            landingPageSlug: "scaling-up",
+            coach: {
+                firstName: "John",
+                lastName: "Smith",
+                bio: null,
+                profileImage: null,
+                company: null,
+                title: null,
+            },
+            workshopCategory: null,
+            pricingTier: null,
+            ...overrides,
+        };
+    }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it("emits an event_time key carrying the DST-aware zone abbreviation", async () => {
+        findUnique.mockResolvedValue(mockWorkshop());
+        const vars = await buildWorkshopVariables("ws-1");
+        expect(vars).not.toBeNull();
+        expect(vars!.event_time).toMatch(/CDT|CST/);
+        expect(vars!.event_time).toContain("9:00 AM");
+    });
+
+    it("sets workshop_time and eventTime to the same zoned value as event_time", async () => {
+        findUnique.mockResolvedValue(mockWorkshop());
+        const vars = await buildWorkshopVariables("ws-1");
+        expect(vars!.workshop_time).toBe(vars!.event_time);
+        expect(vars!.eventTime).toBe(vars!.event_time);
+    });
+
+    it("emits workshop_timezone as the bare zone abbreviation", async () => {
+        findUnique.mockResolvedValue(mockWorkshop());
+        const vars = await buildWorkshopVariables("ws-1");
+        expect(vars!.workshop_timezone).toMatch(/^(CDT|CST)$/);
+    });
+
+    it("resolves a literal {{event_time}} token in content to the zoned time (not left literal)", async () => {
+        findUnique.mockResolvedValue(mockWorkshop());
+        const vars = await buildWorkshopVariables("ws-1");
+        const content = '{"time":"{{event_time}}"}';
+        const result = interpolateContent(content, vars!);
+        const parsed = JSON.parse(result);
+        expect(parsed.time).not.toBe("{{event_time}}");
+        expect(parsed.time).toMatch(/CDT|CST/);
+    });
+
+    it("returns null when the workshop is not found", async () => {
+        findUnique.mockResolvedValue(null);
+        const vars = await buildWorkshopVariables("missing");
+        expect(vars).toBeNull();
     });
 });
 

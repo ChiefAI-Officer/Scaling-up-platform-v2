@@ -62,6 +62,61 @@ export function formatTimestampDateTime(date: Date | string): string {
   }).format(new Date(date));
 }
 
+/**
+ * Returns the DST-aware short timezone abbreviation (e.g. "CDT", "CST", "MST", "HST")
+ * for an IANA timezone evaluated on a workshop's UTC calendar date.
+ *
+ * PARSER-INDEPENDENT: it derives the abbreviation from a noon-UTC instant on the
+ * event's UTC calendar date. `Workshop.eventDate` is stored as midnight UTC of the
+ * event day, so its UTC components ARE the event day; noon UTC maps to 02:00–08:00
+ * local across all 9 Americas/Pacific zones (same calendar date, safely past the
+ * 2 AM DST transition), so the abbreviation is DST-correct without parsing eventTime.
+ *
+ * MUST NEVER THROW (it runs in SSR render): returns "" on any error
+ * (invalid IANA -> RangeError, invalid date, etc.).
+ */
+export function formatZoneAbbrev(eventDate: Date | string, timezone: string | null | undefined): string {
+  if (!timezone) return "";
+  try {
+    const d = new Date(eventDate);
+    if (isNaN(d.getTime())) return "";
+    const noon = new Date(
+      Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0),
+    );
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      timeZoneName: "short",
+    }).formatToParts(noon);
+    const zonePart = parts.find((p) => p.type === "timeZoneName");
+    return zonePart?.value ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Appends a DST-aware short timezone abbreviation to a workshop's free-form
+ * `eventTime` string (e.g. "9:00 AM" -> "9:00 AM CDT"). See `formatZoneAbbrev`
+ * for how the abbreviation is derived (parser-independent, never throws).
+ *
+ * - Empty / "TBD" (case-insensitive) eventTime is returned as-is with NO zone.
+ * - null / undefined eventTime is returned as "TBD" with NO zone.
+ * - Missing timezone (or a zone that yields no abbreviation) returns the time
+ *   unchanged with NO zone.
+ */
+export function formatTimeWithZone(
+  eventTime: string | null | undefined,
+  eventDate: Date | string,
+  timezone: string | null | undefined,
+): string {
+  const time = (eventTime ?? "TBD").trim();
+  if (time === "" || time.toLowerCase() === "tbd") {
+    return time === "" ? "" : eventTime ?? "TBD";
+  }
+  const abbr = formatZoneAbbrev(eventDate, timezone);
+  return abbr ? `${time} ${abbr}` : time;
+}
+
 export function generateSlug(title: string, id?: string): string {
   const baseSlug = title
     .toLowerCase()

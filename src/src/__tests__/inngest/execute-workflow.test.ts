@@ -735,7 +735,9 @@ describe("execute-workflow Inngest function", () => {
         workshopCode: "WS-001",
         coachName: "John Smith",
         coachEmail: "coach@example.com",
-        workshopTime: "9:00 AM",
+        // workshopTime now carries the DST-aware zone abbreviation
+        workshopTime: expect.stringMatching(/9:00 AM (EDT|EST)/),
+        workshopTimezone: expect.stringMatching(/^(EDT|EST)$/),
       })
     );
     expect(mockInterpolate).toHaveBeenCalledWith(

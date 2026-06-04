@@ -109,9 +109,29 @@ describe("ThankYouPageTemplate", () => {
       expect(screen.getByText("Scaling Up Masterclass")).toBeInTheDocument();
     });
 
-    it("renders event time and timezone", () => {
+    it("renders event time with a DST-aware zone abbreviation (not the raw IANA name)", () => {
+      // 2026-06-18 America/New_York is EDT (summer DST)
       render(<ThankYouPageTemplate content={baseContent} workshop={baseWorkshop} />);
-      expect(screen.getByText(/09:00 - 17:00/)).toBeInTheDocument();
+      expect(screen.getByText(/09:00 - 17:00 EDT/)).toBeInTheDocument();
+      // The raw IANA name must NOT appear anywhere
+      expect(document.body.innerHTML).not.toContain("America/New_York");
+    });
+
+    it("renders a winter (non-DST) zone abbreviation for a January Chicago workshop", () => {
+      const workshop = {
+        ...baseWorkshop,
+        eventDate: new Date("2026-01-15"),
+        eventTime: "9:00 AM",
+        timezone: "America/Chicago",
+      };
+      render(<ThankYouPageTemplate content={baseContent} workshop={workshop} />);
+      expect(screen.getByText(/9:00 AM CST/)).toBeInTheDocument();
+    });
+
+    it("shows 'Time TBA' (no zone) when eventTime is empty", () => {
+      const workshop = { ...baseWorkshop, eventTime: "" };
+      render(<ThankYouPageTemplate content={baseContent} workshop={workshop} />);
+      expect(screen.getByText("Time TBA")).toBeInTheDocument();
     });
 
     it("shows Virtual Workshop label for virtual format", () => {

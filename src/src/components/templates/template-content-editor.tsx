@@ -250,7 +250,8 @@ export function TemplateContentEditor({
                                     <li><code>{"{{coach_photo}}"}</code> — image URL</li>
                                     <li><code>{"{{event_day}}"}</code></li>
                                     <li><code>{"{{event_date}}"}</code></li>
-                                    <li><code>{"{{event_time}}"}</code></li>
+                                    <li><code>{"{{event_time}}"}</code> — includes timezone, e.g. "9:00 AM CDT"</li>
+                                    <li><code>{"{{workshop_timezone}}"}</code> — zone abbreviation only, e.g. "CDT"</li>
                                     <li><code>{"{{workshop_format}}"}</code> — VIRTUAL / IN_PERSON / HYBRID</li>
                                     <li><code>{"{{venue_name}}"}</code></li>
                                     <li><code>{"{{venue_address}}"}</code></li>

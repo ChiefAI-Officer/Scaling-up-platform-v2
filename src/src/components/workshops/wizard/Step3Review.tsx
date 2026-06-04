@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatTimeWithZone } from "@/lib/utils";
 import { workshopTypes } from "./Step1Details";
 
 interface PricingTier {
@@ -81,7 +82,7 @@ export function Step3Review() {
                         </div>
                         <div>
                             <p className="text-sm font-medium text-muted-foreground">When & Where</p>
-                            <p className="font-medium text-foreground">{formattedDate} at {formData.eventTime}</p>
+                            <p className="font-medium text-foreground">{formattedDate} at {formatTimeWithZone(formData.eventTime, formData.eventDate, formData.timezone)}</p>
                             <p className="text-sm text-foreground">{locationDisplay}</p>
                             <p className="text-xs text-muted-foreground mt-1">{formatLabel}</p>
                         </div>
