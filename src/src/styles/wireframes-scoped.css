@@ -1010,6 +1010,7 @@
   font-size: 0.875rem;
   color: hsl(var(--muted-foreground));
   margin: 0;
+  white-space: pre-line;
 }
 .wf-scope .survey-question-list {
   list-style: none;
@@ -1157,3 +1158,21 @@
 .wf-scope .wf-stepper-item.is-done:not(:last-child)::after {
   background: hsl(var(--primary));
 }
+
+/* Assessment participant brand scope — purple #522583 + Roboto. NOT on .wf-scope (admin/coach share it). */
+.su-assessment-brand {
+  --primary: 269 56% 33%;          /* #522583 */
+  --primary-foreground: 0 0% 100%;
+  --ring: 269 56% 33%;
+  font-family: var(--font-assessment-body), Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.su-assessment-brand h1, .su-assessment-brand h2, .su-assessment-brand h3 {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.wf-scope .survey-progress { height: 8px; border-radius: 9999px; background: hsl(var(--muted)); overflow: hidden; margin: 0.5rem 0 1rem; }
+.wf-scope .survey-progress-fill { height: 100%; background: hsl(var(--primary)); transition: width 200ms ease; }
+.wf-scope .survey-nav { display: flex; justify-content: space-between; gap: 0.75rem; margin-top: 1.5rem; }
+/* Keep branded pager primary buttons purple on hover — the shared .wf-btn-primary:hover
+   hardcodes a blue; inside the brand scope we darken the purple --primary instead. */
+.su-assessment-brand .wf-btn-primary:hover { background: hsl(269 56% 27%); }
+.wf-scope .survey-error { color: hsl(var(--destructive)); font-size: 0.875rem; margin-top: 0.75rem; }

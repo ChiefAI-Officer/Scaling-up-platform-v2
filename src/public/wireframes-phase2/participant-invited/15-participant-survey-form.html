@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=1280, initial-scale=1">
-  <title>New 07 — INVITED Participant Survey Form (Phase 2)</title>
+  <title>WF-15 — INVITED Participant Survey Form · One-Section-at-a-Time (Phase 2, v7.6)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../_shared.css">
   <style>
-    /* ---------- Page-level chrome (the host page that holds both frames) ---------- */
+    /* ---------- Page-level chrome ---------- */
     body { background: hsl(220 14% 96%); }
 
     .page-head {
@@ -31,12 +31,24 @@
     }
 
     /* ===========================================================
-       Participant-facing chrome
-       NO admin sidebar, NO breadcrumb, NO admin topbar.
-       Just Scaling Up logo + org name in a sticky header.
+       .su-assessment-brand — scoped SU brand (ADR-0005)
+       Only applied inside the participant shell.
+       --su-primary: SU purple #522583
+       Four Decisions accent palette (borders/chips only, never text-on-white)
        =========================================================== */
-    .survey-shell {
-      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    .su-assessment-brand {
+      --su-primary:        #522583;
+      --su-primary-light:  #6d3a9c;
+      --su-primary-muted:  hsl(271 56% 95%);
+
+      /* Four Decisions domain accent colours */
+      --su-people:     #f7a600;  /* orange  */
+      --su-strategy:   #008bd2;  /* blue    */
+      --su-execution:  #946b36;  /* brown   */
+      --su-cash:       #95c11f;  /* green   */
+      --su-you:        #522583;  /* purple  */
+
+      font-family: Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
       background: hsl(var(--background));
       color: hsl(var(--foreground));
       min-height: 100%;
@@ -44,7 +56,9 @@
       flex-direction: column;
     }
 
-    /* Sticky participant header */
+    /* ===========================================================
+       Participant header — sticky, SU wordmark + org name
+       =========================================================== */
     .survey-header {
       position: sticky;
       top: 0;
@@ -61,26 +75,32 @@
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      font-weight: 800;
-      letter-spacing: -0.01em;
-      color: hsl(var(--primary));
-      font-size: 0.9375rem;
       text-decoration: none;
     }
+    /* SU wordmark — purple square, NO drop-shadow */
     .survey-logo__mark {
-      width: 28px;
-      height: 28px;
-      border-radius: 7px;
-      background: linear-gradient(135deg, hsl(224 76% 48%), hsl(271 81% 56%));
-      color: white;
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      background: #522583;
+      color: #fff;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       font-weight: 800;
       font-size: 0.75rem;
       letter-spacing: 0.02em;
+      flex-shrink: 0;
     }
-    .survey-logo__text { line-height: 1.1; }
+    .survey-logo__text {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      color: #522583;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+    }
     .survey-logo__sub {
       display: block;
       font-size: 0.625rem;
@@ -108,6 +128,7 @@
       font-weight: 600;
       font-size: 0.8125rem;
     }
+    /* localStorage autosave badge — real feature as of v7.6 */
     .autosave {
       display: inline-flex;
       align-items: center;
@@ -127,43 +148,11 @@
     }
 
     /* ===========================================================
-       Hero (compact title block under header)
-       =========================================================== */
-    .survey-hero {
-      padding: 1rem 1.25rem 0.5rem;
-    }
-    .survey-hero__title {
-      font-size: 1.0625rem;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      margin: 0 0 0.25rem;
-      line-height: 1.3;
-    }
-    .survey-hero__sub {
-      font-size: 0.75rem;
-      color: hsl(var(--muted-foreground));
-      margin: 0;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem 0.75rem;
-      align-items: center;
-    }
-    .survey-hero__sub strong { color: hsl(var(--foreground)); font-weight: 600; }
-    .survey-hero__dot {
-      display: inline-block;
-      width: 3px;
-      height: 3px;
-      border-radius: 50%;
-      background: hsl(var(--muted-foreground));
-      opacity: 0.6;
-    }
-
-    /* ===========================================================
-       Progress indicator (sticky-top on mobile)
+       Section progress bar + "Section N of M" label (sticky)
        =========================================================== */
     .survey-progress {
       position: sticky;
-      top: 49px; /* below the survey-header */
+      top: 49px;
       z-index: 9;
       background: hsl(var(--card));
       border-bottom: 1px solid hsl(var(--border));
@@ -188,7 +177,7 @@
     }
     .survey-progress__fill {
       height: 100%;
-      background: linear-gradient(90deg, hsl(224 76% 48%), hsl(224 76% 58%));
+      background: #522583;
       border-radius: 9999px;
     }
     .survey-progress__pct {
@@ -200,7 +189,75 @@
     }
 
     /* ===========================================================
-       Question card — main content
+       Section intro slide
+       =========================================================== */
+    .section-intro {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.25rem;
+      text-align: center;
+    }
+    /* Left-edge accent stripe — domain colour as border only */
+    .section-intro__card {
+      background: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+      border-left: 4px solid #008bd2; /* Strategy blue accent — border only */
+      border-radius: 12px;
+      padding: 2rem 1.75rem 1.75rem;
+      max-width: 520px;
+      width: 100%;
+      text-align: left;
+    }
+    .section-intro__badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.25rem 0.625rem;
+      border-radius: 9999px;
+      background: hsl(271 56% 95%);
+      color: #522583;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+    .section-intro__heading {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 1.375rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.25;
+      margin: 0 0 0.875rem;
+      color: hsl(var(--foreground));
+    }
+    .section-intro__body {
+      font-size: 0.875rem;
+      color: hsl(var(--muted-foreground));
+      line-height: 1.6;
+      margin: 0 0 1.5rem;
+      white-space: pre-line;
+    }
+    .section-intro__start {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.6875rem 1.5rem;
+      background: #522583;
+      color: #fff;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9375rem;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* ===========================================================
+       Section questions view — main card
        =========================================================== */
     .survey-body {
       padding: 1.25rem;
@@ -213,60 +270,67 @@
       padding: 1.25rem 1.25rem 1.5rem;
       box-shadow: var(--shadow-xs);
     }
+    /* Strategy-domain accent (top border stripe) */
+    .question-card--strategy {
+      border-top: 3px solid #008bd2;
+    }
     .question-section {
       font-size: 0.6875rem;
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: hsl(var(--muted-foreground));
-      margin: 0 0 0.5rem;
+      margin: 0 0 0.875rem;
     }
+
+    /* Individual question row */
+    .question-row {
+      padding: 1rem 0;
+      border-bottom: 1px solid hsl(var(--border));
+    }
+    .question-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .question-row:first-child { padding-top: 0; }
+
     .question-text {
-      font-size: 1.25rem;
-      font-weight: 600;
-      line-height: 1.4;
-      letter-spacing: -0.01em;
-      margin: 0 0 1.5rem;
+      font-size: 1rem;
+      font-weight: 500;
+      line-height: 1.45;
+      margin: 0 0 1rem;
       color: hsl(var(--foreground));
     }
 
-    /* ---------- Slider ---------- */
-    .slider-wrap {
-      margin-top: 0.5rem;
-    }
+    /* ---------- Slider (0–3 scale) ---------- */
+    .slider-wrap { margin-top: 0.25rem; }
     .slider-answer {
       display: flex;
       justify-content: center;
-      margin-bottom: 0.625rem;
+      margin-bottom: 0.5rem;
     }
     .slider-answer__chip {
       display: inline-flex;
       align-items: center;
       gap: 0.375rem;
-      padding: 0.3125rem 0.75rem;
+      padding: 0.25rem 0.625rem;
       border-radius: 9999px;
-      background: hsl(var(--primary) / 0.1);
-      color: hsl(var(--primary));
+      background: hsl(271 56% 95%);
+      color: #522583;
       font-size: 0.75rem;
       font-weight: 600;
-      letter-spacing: 0.01em;
     }
     .slider-answer__chip strong {
       font-size: 0.9375rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
     }
-
     .slider-track {
       position: relative;
-      height: 44px; /* touch target */
+      height: 40px;
       display: flex;
       align-items: center;
     }
     .slider-track__rail {
       position: absolute;
-      left: 0;
-      right: 0;
+      left: 0; right: 0;
       top: 50%;
       transform: translateY(-50%);
       height: 6px;
@@ -276,55 +340,23 @@
     }
     .slider-track__fill {
       position: absolute;
-      top: 0;
-      left: 0;
-      bottom: 0;
-      width: 66.66%; /* value 2 of max 3 */
-      background: linear-gradient(90deg, hsl(224 76% 48%), hsl(224 76% 58%));
+      top: 0; left: 0; bottom: 0;
+      width: 66.66%; /* value 2 of 3 */
+      background: #522583;
       border-radius: 9999px;
-    }
-    .slider-track__ticks {
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 50%;
-      transform: translateY(-50%);
-      height: 6px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      pointer-events: none;
-    }
-    .slider-tick {
-      width: 2px;
-      height: 12px;
-      background: hsl(var(--border));
-      border-radius: 1px;
-    }
-    .slider-tick--active {
-      background: hsl(var(--primary));
     }
     .slider-thumb {
       position: absolute;
       top: 50%;
       left: 66.66%;
       transform: translate(-50%, -50%);
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
       background: hsl(var(--card));
-      border: 3px solid hsl(var(--primary));
-      box-shadow: var(--shadow-md);
+      border: 3px solid #522583;
       z-index: 2;
     }
-    /* invisible touch-target around the thumb (44px) for mobile-friendliness */
-    .slider-thumb::before {
-      content: "";
-      position: absolute;
-      inset: -10px;
-      border-radius: 50%;
-    }
-
     .slider-tickrow {
       display: flex;
       justify-content: space-between;
@@ -336,38 +368,22 @@
       font-weight: 600;
       color: hsl(var(--muted-foreground));
       font-variant-numeric: tabular-nums;
-      width: 12px;
+      width: 14px;
       text-align: center;
     }
-    .slider-tickrow span.active {
-      color: hsl(var(--primary));
-      font-weight: 700;
-    }
-
+    .slider-tickrow span.active { color: #522583; font-weight: 700; }
     .slider-anchors {
       display: flex;
       justify-content: space-between;
-      margin-top: 0.625rem;
-      gap: 1rem;
+      margin-top: 0.5rem;
+      gap: 0.5rem;
     }
-    .slider-anchor {
-      font-size: 0.75rem;
-      color: hsl(var(--muted-foreground));
-      font-weight: 500;
-      max-width: 45%;
-    }
+    .slider-anchor { font-size: 0.75rem; color: hsl(var(--muted-foreground)); font-weight: 500; max-width: 45%; }
     .slider-anchor--right { text-align: right; }
-    .slider-anchor strong {
-      display: block;
-      color: hsl(var(--foreground));
-      font-weight: 600;
-      font-size: 0.75rem;
-    }
+    .slider-anchor strong { display: block; color: hsl(var(--foreground)); font-weight: 600; }
 
     /* ===========================================================
        Nav buttons
-       Mobile: stacked, full-width
-       Desktop: right-aligned inline
        =========================================================== */
     .survey-nav {
       margin-top: 1.25rem;
@@ -380,79 +396,85 @@
       padding: 0.75rem 1rem;
       font-size: 0.9375rem;
     }
+    .wf-btn-su-primary {
+      background: #522583;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .wf-btn-su-primary:hover { background: #6d3a9c; }
 
-    /* Desktop frame: override nav to inline right-aligned */
+    /* Desktop overrides */
+    .desktop-frame .survey-header { padding: 0.75rem 2rem; }
+    .desktop-frame .survey-progress { top: 53px; }
+    .desktop-frame .survey-progress,
+    .desktop-frame .survey-body,
+    .desktop-frame .section-intro { max-width: 720px; margin-left: auto; margin-right: auto; }
+    .desktop-frame .section-intro { padding: 2rem 0; width: 100%; }
+    .desktop-frame .section-intro__card { max-width: 580px; }
+    .desktop-frame .question-text { font-size: 1.0625rem; }
     .desktop-frame .survey-nav {
       flex-direction: row;
       justify-content: flex-end;
       gap: 0.625rem;
+      margin-top: 1.5rem;
     }
     .desktop-frame .survey-nav .wf-btn {
       width: auto;
       padding: 0.5rem 1.25rem;
       font-size: 0.875rem;
     }
-    /* Visual order on desktop: Previous on left, Next on right */
-    .desktop-frame .survey-nav .wf-btn-primary { order: 2; }
+    .desktop-frame .survey-nav .wf-btn-su-primary { order: 2; }
     .desktop-frame .survey-nav .wf-btn-secondary { order: 1; }
-    /* Mobile order: Previous on top, Next below (per spec). Use DOM order. */
 
-    /* ===========================================================
-       Desktop frame body — center content with max-width 720px,
-       progress shown inline with question count.
-       =========================================================== */
-    .desktop-frame .survey-hero,
-    .desktop-frame .survey-progress,
-    .desktop-frame .survey-body {
-      max-width: 720px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .desktop-frame .survey-progress {
-      top: 53px;
-    }
-    .desktop-frame .question-text {
-      font-size: 1.375rem;
-    }
-    .desktop-frame .slider-track__rail,
-    .desktop-frame .slider-track__ticks {
-      /* slider naturally fills 720px - 2*1.25rem padding = ~680px wide */
-    }
-    .desktop-frame .survey-hero {
-      padding: 1.25rem 1.25rem 0.75rem;
-    }
-
-    /* ===========================================================
-       Mobile frame tweaks
-       =========================================================== */
+    /* Mobile overrides */
     .mobile-frame .survey-header { padding: 0.625rem 1rem; }
-    .mobile-frame .survey-hero { padding: 0.875rem 1rem 0.5rem; }
-    .mobile-frame .survey-hero__title { font-size: 1rem; }
-    .mobile-frame .survey-progress { padding: 0.5rem 1rem; top: 49px; }
+    .mobile-frame .survey-progress { padding: 0.5rem 1rem; }
     .mobile-frame .survey-body { padding: 1rem; }
     .mobile-frame .question-card { padding: 1rem 1rem 1.25rem; }
-    .mobile-frame .question-text { font-size: 1.0625rem; }
-    .mobile-frame .survey-header-org { font-size: 0.6875rem; }
-    .mobile-frame .survey-header-org strong { font-size: 0.75rem; }
-    .mobile-frame .autosave { font-size: 0.625rem; padding: 0.1875rem 0.4375rem; }
+    .mobile-frame .section-intro { padding: 1.5rem 1rem; }
+    .mobile-frame .section-intro__card { padding: 1.5rem 1.25rem; }
+    .mobile-frame .section-intro__heading { font-size: 1.1875rem; }
+
+    /* ===========================================================
+       "State label" annotation strip — wireframe only
+       =========================================================== */
+    .state-label {
+      background: hsl(271 56% 95%);
+      border-top: 2px dashed #522583;
+      text-align: center;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #522583;
+      padding: 0.3rem 0;
+    }
   </style>
 </head>
 <body>
 
   <!-- Wireframe banner -->
   <div class="wf-banner">
-    <span><strong>WIREFRAME</strong> — Not functional. v7.4 spec reference: Wave 1 Task 7 (INVITED participant survey form, mobile + desktop).</span>
+    <span><strong>WIREFRAME</strong> — Not functional. v7.6 spec reference: Task 8 (section-stepper + intro slides). INVITED participant survey form — mobile + desktop. Replaces the old one-question-at-a-time pager.</span>
     <a href="../index.html" class="wf-back-to-index">← Back to Phase 2 index</a>
   </div>
 
-  <!-- Page header — explains what's being rendered -->
+  <!-- Page header -->
   <div class="page-head">
-    <h1>New 07 — INVITED Participant: Survey Form</h1>
+    <h1>WF-15 — INVITED Participant: Survey Form · One-Section-at-a-Time</h1>
     <p>
-      Mobile (390 × 844) and desktop (1280 × 800) previews rendered side-by-side.
-      The page a respondent sees after clicking their magic-link invite.
-      Sticky participant header (logo + org), sticky progress bar, 0–3 SLIDER_LIKERT only.
-      Both viewports show the same mock: Q8 of 40, section S2, current value 2.
+      Mobile (390 × 844) and desktop (1280 × 800) previews side-by-side.
+      Each shows TWO stacked mock screens: (A) the <strong>section intro slide</strong> and (B) the <strong>section questions view</strong>.
+      INVITED flow: sticky header shows SU wordmark + company name ("Acme Corp").
+      Progress bar advances by questions answered (not by section). 0–3 SLIDER_LIKERT scale.
+      "Saved" badge reflects real localStorage autosave (new in v7.6). "Section N of M" label.
+      Back/Next navigation; Next becomes Submit on the last section.
     </p>
   </div>
 
@@ -468,9 +490,11 @@
         <span class="viewport-frame__chrome">390 × 844 · iPhone-size</span>
       </div>
       <div class="viewport-frame__body">
-        <div class="survey-shell screen">
 
-          <!-- Participant header (sticky) -->
+        <!-- ── SCREEN A: Section intro slide ──────────────────── -->
+        <div class="state-label">Screen A — Section intro slide</div>
+        <div class="su-assessment-brand screen" style="min-height: auto;">
+
           <header class="survey-header">
             <a class="survey-logo" href="#" aria-label="Scaling Up home">
               <span class="survey-logo__mark">SU</span>
@@ -480,7 +504,7 @@
               </span>
             </a>
             <div class="survey-header-right">
-              <span class="autosave" aria-live="polite">Saved · 12s ago</span>
+              <span class="autosave" aria-live="polite">Saved</span>
               <div class="survey-header-org" aria-label="Organization">
                 <strong>Acme Corp</strong>
                 <span>Invitation</span>
@@ -488,84 +512,120 @@
             </div>
           </header>
 
-          <!-- Compact hero -->
-          <div class="survey-hero">
-            <h1 class="survey-hero__title">Rockefeller Habits Checklist — Q2 2026 Check-in</h1>
-            <p class="survey-hero__sub">
-              <span>Sent by <strong>Sarah</strong>, your coach</span>
-              <span class="survey-hero__dot"></span>
-              <span>~3 min</span>
-            </p>
-          </div>
-
-          <!-- Sticky progress -->
-          <div class="survey-progress" role="progressbar" aria-valuemin="0" aria-valuemax="40" aria-valuenow="8" aria-label="Progress through survey">
-            <span class="survey-progress__label">Question 8 of 40</span>
+          <!-- Section progress — "Section 2 of 5" -->
+          <div class="survey-progress" role="progressbar" aria-valuemin="0" aria-valuemax="40" aria-valuenow="8" aria-label="8 of 40 questions answered">
+            <span class="survey-progress__label">Section 2 of 5</span>
             <div class="survey-progress__bar">
               <div class="survey-progress__fill" style="width: 20%;"></div>
             </div>
             <span class="survey-progress__pct">20%</span>
           </div>
 
-          <!-- Question card -->
+          <!-- Section intro card -->
+          <div class="section-intro" style="justify-content: flex-start; padding-top: 1.5rem;">
+            <div class="section-intro__card" aria-labelledby="intro-heading-m">
+              <span class="section-intro__badge">Section 2 of 5</span>
+              <h2 class="section-intro__heading" id="intro-heading-m">Strategy</h2>
+              <p class="section-intro__body">This section explores how clearly your organisation has defined its long-term strategy and whether your leadership team is aligned on the path forward.
+
+Rate each statement from 0 (Not true) to 3 (Completely true) based on what is actually happening in your company today.</p>
+              <button class="section-intro__start" type="button">Start →</button>
+            </div>
+          </div>
+
+        </div><!-- /screen A mobile -->
+
+        <!-- ── SCREEN B: Section questions view ───────────────── -->
+        <div class="state-label" style="margin-top: 1rem;">Screen B — Section questions</div>
+        <div class="su-assessment-brand screen" style="min-height: auto;">
+
+          <header class="survey-header">
+            <a class="survey-logo" href="#" aria-label="Scaling Up home">
+              <span class="survey-logo__mark">SU</span>
+              <span class="survey-logo__text">
+                Scaling Up
+                <span class="survey-logo__sub">Assessment</span>
+              </span>
+            </a>
+            <div class="survey-header-right">
+              <span class="autosave" aria-live="polite">Saved</span>
+              <div class="survey-header-org" aria-label="Organization">
+                <strong>Acme Corp</strong>
+                <span>Invitation</span>
+              </div>
+            </div>
+          </header>
+
+          <div class="survey-progress" role="progressbar" aria-valuemin="0" aria-valuemax="40" aria-valuenow="11" aria-label="11 of 40 questions answered">
+            <span class="survey-progress__label">Section 2 of 5</span>
+            <div class="survey-progress__bar">
+              <div class="survey-progress__fill" style="width: 27%;"></div>
+            </div>
+            <span class="survey-progress__pct">27%</span>
+          </div>
+
           <main class="survey-body">
-            <section class="question-card" aria-labelledby="q8-text">
-              <p class="question-section">S2 — Everyone is aligned with the #1 thing</p>
-              <h2 class="question-text" id="q8-text">
-                Q2_1: The Critical Number is identified to move the company ahead this quarter.
-              </h2>
+            <section class="question-card question-card--strategy" aria-label="Strategy section questions">
+              <p class="question-section">Strategy — 8 questions</p>
 
-              <div class="slider-wrap" role="group" aria-label="Rate from 0 to 3">
-                <!-- Current selection chip -->
-                <div class="slider-answer">
-                  <span class="slider-answer__chip" aria-live="polite">
-                    Your answer: <strong>2</strong>
-                  </span>
-                </div>
-
-                <!-- Slider track w/ thumb + ticks -->
-                <div class="slider-track" aria-hidden="true">
-                  <div class="slider-track__rail"></div>
-                  <div class="slider-track__fill"></div>
-                  <div class="slider-track__ticks">
-                    <span class="slider-tick slider-tick--active"></span>
-                    <span class="slider-tick slider-tick--active"></span>
-                    <span class="slider-tick slider-tick--active"></span>
-                    <span class="slider-tick"></span>
+              <!-- Q1 in section -->
+              <div class="question-row">
+                <p class="question-text" id="qm-s2-1">S2_1: The company has a clearly defined 3–5 year BHAG that the whole team knows.</p>
+                <div class="slider-wrap" role="group" aria-labelledby="qm-s2-1">
+                  <div class="slider-answer">
+                    <span class="slider-answer__chip" aria-live="polite">Answer: <strong>2</strong></span>
                   </div>
-                  <div class="slider-thumb" role="slider" aria-valuemin="0" aria-valuemax="3" aria-valuenow="2" aria-label="Rating"></div>
-                </div>
-
-                <!-- Numeric tick row -->
-                <div class="slider-tickrow" aria-hidden="true">
-                  <span>0</span>
-                  <span>1</span>
-                  <span class="active">2</span>
-                  <span>3</span>
-                </div>
-
-                <!-- Anchor labels -->
-                <div class="slider-anchors">
-                  <div class="slider-anchor">
-                    <strong>0 — Not true</strong>
+                  <div class="slider-track" aria-hidden="true">
+                    <div class="slider-track__rail">
+                      <div class="slider-track__fill" style="width: 66.66%;"></div>
+                    </div>
+                    <div class="slider-thumb" style="left: 66.66%;"></div>
                   </div>
-                  <div class="slider-anchor slider-anchor--right">
-                    <strong>3 — Completely true</strong>
+                  <div class="slider-tickrow" aria-hidden="true">
+                    <span>0</span><span>1</span><span class="active">2</span><span>3</span>
+                  </div>
+                  <div class="slider-anchors">
+                    <div class="slider-anchor"><strong>0 — Not true</strong></div>
+                    <div class="slider-anchor slider-anchor--right"><strong>3 — Completely true</strong></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Q2 in section (unanswered) -->
+              <div class="question-row">
+                <p class="question-text" id="qm-s2-2">S2_2: We have a clear Annual Initiative and our team can articulate it.</p>
+                <div class="slider-wrap" role="group" aria-labelledby="qm-s2-2">
+                  <div class="slider-answer">
+                    <span class="slider-answer__chip" aria-live="polite" style="background: hsl(var(--muted)); color: hsl(var(--muted-foreground));">Answer: <strong style="color: hsl(var(--muted-foreground));">—</strong></span>
+                  </div>
+                  <div class="slider-track" aria-hidden="true">
+                    <div class="slider-track__rail">
+                      <div class="slider-track__fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="slider-thumb" style="left: 0%;"></div>
+                  </div>
+                  <div class="slider-tickrow" aria-hidden="true">
+                    <span>0</span><span>1</span><span>2</span><span>3</span>
+                  </div>
+                  <div class="slider-anchors">
+                    <div class="slider-anchor"><strong>0 — Not true</strong></div>
+                    <div class="slider-anchor slider-anchor--right"><strong>3 — Completely true</strong></div>
                   </div>
                 </div>
               </div>
 
               <!-- Nav -->
               <div class="survey-nav">
-                <button class="wf-btn wf-btn-secondary" type="button">← Previous</button>
-                <button class="wf-btn wf-btn-primary" type="button">Next →</button>
+                <button class="wf-btn wf-btn-secondary" type="button">← Back</button>
+                <button class="wf-btn wf-btn-su-primary" type="button">Next →</button>
               </div>
             </section>
           </main>
 
-        </div>
+        </div><!-- /screen B mobile -->
+
       </div>
-    </div>
+    </div><!-- /mobile-frame -->
 
     <!-- ============================================================
          DESKTOP FRAME (1280 × 800)
@@ -576,9 +636,11 @@
         <span class="viewport-frame__chrome">1280 × 800</span>
       </div>
       <div class="viewport-frame__body">
-        <div class="survey-shell screen">
 
-          <!-- Participant header (sticky) -->
+        <!-- ── SCREEN A: Section intro slide ──────────────────── -->
+        <div class="state-label">Screen A — Section intro slide</div>
+        <div class="su-assessment-brand screen" style="min-height: auto;">
+
           <header class="survey-header" style="padding: 0.75rem 2rem;">
             <a class="survey-logo" href="#" aria-label="Scaling Up home">
               <span class="survey-logo__mark">SU</span>
@@ -588,7 +650,7 @@
               </span>
             </a>
             <div class="survey-header-right">
-              <span class="autosave" aria-live="polite">Saved · 12s ago</span>
+              <span class="autosave" aria-live="polite">Saved</span>
               <div class="survey-header-org" aria-label="Organization">
                 <strong>Acme Corporation</strong>
                 <span>Invitation from your coach</span>
@@ -596,83 +658,120 @@
             </div>
           </header>
 
-          <!-- Compact hero (centered, max-width 720) -->
-          <div class="survey-hero">
-            <h1 class="survey-hero__title">Rockefeller Habits Checklist — Q2 2026 Check-in</h1>
-            <p class="survey-hero__sub">
-              <span>Sent by <strong>Sarah</strong>, your coach</span>
-              <span class="survey-hero__dot"></span>
-              <span>Estimated time: ~3 min</span>
-              <span class="survey-hero__dot"></span>
-              <span>40 questions total</span>
-            </p>
-          </div>
-
-          <!-- Sticky progress (inline with count on desktop) -->
-          <div class="survey-progress" role="progressbar" aria-valuemin="0" aria-valuemax="40" aria-valuenow="8" aria-label="Progress through survey">
-            <span class="survey-progress__label">Question 8 of 40</span>
+          <div class="survey-progress" role="progressbar" aria-valuemin="0" aria-valuemax="40" aria-valuenow="8" aria-label="8 of 40 questions answered">
+            <span class="survey-progress__label">Section 2 of 5</span>
             <div class="survey-progress__bar">
               <div class="survey-progress__fill" style="width: 20%;"></div>
             </div>
             <span class="survey-progress__pct">20% complete</span>
           </div>
 
-          <!-- Question card -->
+          <div class="section-intro" style="padding: 2.5rem 0; align-items: center; width: 100%; max-width: 720px; margin: 0 auto;">
+            <div class="section-intro__card" aria-labelledby="intro-heading-d">
+              <span class="section-intro__badge">Section 2 of 5</span>
+              <h2 class="section-intro__heading" id="intro-heading-d" style="font-size: 1.625rem;">Strategy</h2>
+              <p class="section-intro__body">This section explores how clearly your organisation has defined its long-term strategy and whether your leadership team is aligned on the path forward.
+
+Rate each statement from 0 (Not true) to 3 (Completely true) based on what is actually happening in your company today.</p>
+              <button class="section-intro__start" type="button" style="font-size: 1rem; padding: 0.75rem 2rem;">Start →</button>
+            </div>
+          </div>
+
+        </div><!-- /screen A desktop -->
+
+        <!-- ── SCREEN B: Section questions view ───────────────── -->
+        <div class="state-label" style="margin-top: 1rem;">Screen B — Section questions</div>
+        <div class="su-assessment-brand screen" style="min-height: auto;">
+
+          <header class="survey-header" style="padding: 0.75rem 2rem;">
+            <a class="survey-logo" href="#" aria-label="Scaling Up home">
+              <span class="survey-logo__mark">SU</span>
+              <span class="survey-logo__text">
+                Scaling Up
+                <span class="survey-logo__sub">Assessment</span>
+              </span>
+            </a>
+            <div class="survey-header-right">
+              <span class="autosave" aria-live="polite">Saved</span>
+              <div class="survey-header-org" aria-label="Organization">
+                <strong>Acme Corporation</strong>
+                <span>Invitation from your coach</span>
+              </div>
+            </div>
+          </header>
+
+          <div class="survey-progress" role="progressbar" aria-valuemin="0" aria-valuemax="40" aria-valuenow="11" aria-label="11 of 40 questions answered" style="max-width: 720px; margin: 0 auto;">
+            <span class="survey-progress__label">Section 2 of 5</span>
+            <div class="survey-progress__bar">
+              <div class="survey-progress__fill" style="width: 27%;"></div>
+            </div>
+            <span class="survey-progress__pct">27% complete</span>
+          </div>
+
           <main class="survey-body">
-            <section class="question-card" aria-labelledby="q8-text-d">
-              <p class="question-section">S2 — Everyone is aligned with the #1 thing</p>
-              <h2 class="question-text" id="q8-text-d">
-                Q2_1: The Critical Number is identified to move the company ahead this quarter.
-              </h2>
+            <section class="question-card question-card--strategy" aria-label="Strategy section questions">
+              <p class="question-section">Strategy — 8 questions · Section 2 of 5</p>
 
-              <div class="slider-wrap" role="group" aria-label="Rate from 0 to 3">
-                <div class="slider-answer">
-                  <span class="slider-answer__chip" aria-live="polite">
-                    Your answer: <strong>2</strong>
-                  </span>
-                </div>
-
-                <div class="slider-track" aria-hidden="true">
-                  <div class="slider-track__rail"></div>
-                  <div class="slider-track__fill"></div>
-                  <div class="slider-track__ticks">
-                    <span class="slider-tick slider-tick--active"></span>
-                    <span class="slider-tick slider-tick--active"></span>
-                    <span class="slider-tick slider-tick--active"></span>
-                    <span class="slider-tick"></span>
+              <!-- Q1 in section -->
+              <div class="question-row">
+                <p class="question-text" id="qd-s2-1">S2_1: The company has a clearly defined 3–5 year BHAG that the whole team knows.</p>
+                <div class="slider-wrap" role="group" aria-labelledby="qd-s2-1">
+                  <div class="slider-answer">
+                    <span class="slider-answer__chip" aria-live="polite">Answer: <strong>2</strong></span>
                   </div>
-                  <div class="slider-thumb" role="slider" aria-valuemin="0" aria-valuemax="3" aria-valuenow="2" aria-label="Rating"></div>
-                </div>
-
-                <div class="slider-tickrow" aria-hidden="true">
-                  <span>0</span>
-                  <span>1</span>
-                  <span class="active">2</span>
-                  <span>3</span>
-                </div>
-
-                <div class="slider-anchors">
-                  <div class="slider-anchor">
-                    <strong>0 — Not true</strong>
+                  <div class="slider-track" aria-hidden="true">
+                    <div class="slider-track__rail">
+                      <div class="slider-track__fill" style="width: 66.66%;"></div>
+                    </div>
+                    <div class="slider-thumb" style="left: 66.66%;"></div>
                   </div>
-                  <div class="slider-anchor slider-anchor--right">
-                    <strong>3 — Completely true</strong>
+                  <div class="slider-tickrow" aria-hidden="true">
+                    <span>0</span><span>1</span><span class="active">2</span><span>3</span>
+                  </div>
+                  <div class="slider-anchors">
+                    <div class="slider-anchor"><strong>0 — Not true</strong></div>
+                    <div class="slider-anchor slider-anchor--right"><strong>3 — Completely true</strong></div>
                   </div>
                 </div>
               </div>
 
-              <!-- Nav (right-aligned inline on desktop) -->
+              <!-- Q2 in section -->
+              <div class="question-row">
+                <p class="question-text" id="qd-s2-2">S2_2: We have a clear Annual Initiative and our team can articulate it.</p>
+                <div class="slider-wrap" role="group" aria-labelledby="qd-s2-2">
+                  <div class="slider-answer">
+                    <span class="slider-answer__chip" aria-live="polite">Answer: <strong>1</strong></span>
+                  </div>
+                  <div class="slider-track" aria-hidden="true">
+                    <div class="slider-track__rail">
+                      <div class="slider-track__fill" style="width: 33.33%;"></div>
+                    </div>
+                    <div class="slider-thumb" style="left: 33.33%;"></div>
+                  </div>
+                  <div class="slider-tickrow" aria-hidden="true">
+                    <span>0</span><span class="active">1</span><span>2</span><span>3</span>
+                  </div>
+                  <div class="slider-anchors">
+                    <div class="slider-anchor"><strong>0 — Not true</strong></div>
+                    <div class="slider-anchor slider-anchor--right"><strong>3 — Completely true</strong></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Nav (right-aligned on desktop) -->
               <div class="survey-nav">
-                <button class="wf-btn wf-btn-secondary" type="button">← Previous</button>
-                <button class="wf-btn wf-btn-primary" type="button">Next →</button>
+                <button class="wf-btn wf-btn-secondary" type="button">← Back</button>
+                <button class="wf-btn wf-btn-su-primary" type="button">Next →</button>
               </div>
             </section>
           </main>
 
-        </div>
-      </div>
-    </div>
+        </div><!-- /screen B desktop -->
 
-  </div>
+      </div>
+    </div><!-- /desktop-frame -->
+
+  </div><!-- /viewport-pair -->
+
 </body>
 </html>

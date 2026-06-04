@@ -332,6 +332,26 @@ function checkDomainAssignment(
   }
 }
 
+function checkSectionRefsResolve(
+  sections: Array<z.infer<typeof SectionBase>>,
+  questions: Array<z.infer<typeof QuestionBase>>,
+  ctx: z.RefinementCtx,
+): void {
+  const known = new Set(sections.map((s) => s.stableKey));
+  for (let qi = 0; qi < questions.length; qi++) {
+    const raw = questions[qi].sectionStableKey;
+    const key = typeof raw === "string" ? raw.trim() : "";
+    if (key.length === 0) continue; // keyless → tolerated (Other fallback), not a publish error
+    if (!known.has(key)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["questions", qi, "sectionStableKey"],
+        message: `question references unknown section "${key}" — it does not resolve to a defined section`,
+      });
+    }
+  }
+}
+
 // Runtime schema — permissive on band coverage (BC for existing seeds) but
 // strict on new opt-ins (scaleUpScore requires rollup.overall + 0-10 scale).
 export const TemplateVersionForScoringSchema = z
@@ -356,6 +376,7 @@ export const TemplateVersionForPublishSchema =
     checkRecommendationsPublish(data.questions, ctx);
     checkDomainAssignment(data.sections, data.scoringConfig, ctx);
     checkPerDomainTierTiling(data.sections, data.questions, data.scoringConfig, ctx);
+    checkSectionRefsResolve(data.sections, data.questions, ctx);
   });
 
 /**

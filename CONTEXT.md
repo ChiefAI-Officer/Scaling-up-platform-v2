@@ -18,6 +18,9 @@ _Avoid_: revision, draft (a draft is just a version with `publishedAt = null`).
 One of the five top-level categories a Scaling Up Full question rolls up into: **People, Strategy, Execution, Cash, You**.
 _Avoid_: section (a section is a finer grouping within a domain), category, pillar.
 
+**Four Decisions colors** (brand mapping):
+The participant UI tints each section by its **Domain** using the Scaling Up brand's Four Decisions palette: **People = orange `#f7a600`, Strategy = blue `#008bd2`, Execution = brown `#946b36`, Cash = green `#95c11f`**. The fifth domain, **You**, has no Four Decisions color and uses the brand primary **purple `#522583`**. Templates without domains (Rockefeller, Quarterly Session Prep, LVA) use a neutral purple accent for every section. This mapping is brand-canonical — do not invent other section colors.
+
 ### Sending & answering
 
 **Campaign**:
@@ -27,6 +30,14 @@ _Avoid_: assessment instance, test, run.
 **Respondent**:
 A person in a company's roster (`OrgRespondent`) who can be invited to answer. Distinct from a **Participant** — the record of a respondent's inclusion in a *specific* campaign (`AssessmentCampaignParticipant`).
 _Avoid_: using "participant" and "respondent" interchangeably — a respondent exists in the roster independent of any campaign.
+
+**Section intro slide**:
+A non-question screen shown before a section's questions, rendering that section's own `name` (heading) and `description` (body) with a "Start" affordance. It is **not** a separate entity or a question — it is a presentation of the section's existing fields. A section with no `description` simply has no intro copy to show.
+_Avoid_: "title slide" as a distinct object, or a `SECTION_INTRO` question type (see ADR-0004).
+
+**Section pager** (one-section-at-a-time):
+The way a respondent answers an assessment: **exactly one section per screen** (optionally preceded by that section's **intro slide**), with Back/Next navigation, a "Section N of M" label, and a progress bar by questions answered — replacing the legacy single long-scroll form. Both the public (`/quiz/[campaignAlias]`) and invited (`/org-survey/[campaignAlias]`) experiences use it. (`/me` is the invited flow's data API endpoint, not its page route.)
+_Avoid_: "page" (a section is not a route), "step" for the intro slide (the intro slide is a sub-view of a section, not a counted step).
 
 ### Results & scoring (three distinct "band"-like concepts — do not conflate)
 

@@ -58,6 +58,11 @@ import {
 import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 import {
+  buildSectionsPayload,
+  genUid,
+  hydrateSectionsFromJson,
+} from "@/components/admin/template-editor/sections-serialization";
+import {
   QuestionsTab,
   hydrateQuestionsFromJson,
   genNewQuestionStableKey,
@@ -175,30 +180,6 @@ function resolveTabFromUrl(param: string | null): TabId {
   return "metadata";
 }
 
-function genUid(): string {
-  return `u${Math.random().toString(36).slice(2, 10)}`;
-}
-
-/**
- * Hydrate the version.sections JSON payload into UI-editable SectionDraft
- * rows. Tolerant of partial / unknown shapes per the canonical pattern in
- * AssessmentVersionEditor.
- */
-function hydrateSectionsFromJson(raw: unknown): SectionDraft[] {
-  const arr = Array.isArray(raw) ? raw : [];
-  return arr.map((s, idx) => {
-    const r = s as { stableKey?: unknown; name?: unknown };
-    return {
-      uid: genUid(),
-      stableKey:
-        typeof r.stableKey === "string" && r.stableKey.length > 0
-          ? r.stableKey
-          : `S${idx + 1}`,
-      name: typeof r.name === "string" ? r.name : "",
-    };
-  });
-}
-
 // ────────────────────────────────────────────────────────────────────────
 // Component
 // ────────────────────────────────────────────────────────────────────────
@@ -294,6 +275,12 @@ export function TemplateEditorTabbed({
   // during serialization (matches AssessmentVersionEditor's pattern).
   const rawQuestionsRef = React.useRef<unknown[]>(
     Array.isArray(version.questions) ? (version.questions as unknown[]) : [],
+  );
+  // Raw stored section rows — pass-through so a no-change save round-trips
+  // byte-for-byte (content-hash stable) and unknown/future fields + domain
+  // survive an edit to an unrelated surface (see sections-serialization.ts).
+  const rawSectionsRef = React.useRef<unknown[]>(
+    Array.isArray(version.sections) ? (version.sections as unknown[]) : [],
   );
   const scoringConfigRef = React.useRef<unknown>(version.scoringConfig ?? {});
   const reportConfigRef = React.useRef<unknown>(version.reportConfig ?? null);
@@ -614,13 +601,15 @@ export function TemplateEditorTabbed({
         Boolean(dirtyFlags.scoringConfig);
 
       if (needsVersionPatch) {
-        const sectionsPayload = sections.map((s, idx) => ({
-          stableKey:
-            s.stableKey && s.stableKey.length > 0
-              ? s.stableKey
-              : `S${idx + 1}`,
-          name: s.name,
-        }));
+        // Serialize sections. When not dirty, pass rawSectionsRef through
+        // byte-for-byte (content-hash stable). When dirty, each row is
+        // rebuilt by spreading the matching raw row FIRST so description /
+        // partLabel / domain + any unknown fields survive (preserves SU
+        // Full's per-domain scoring even on a questions-only save).
+        const sectionsPayload = buildSectionsPayload(sections, {
+          sectionsDirty: Boolean(dirtyFlags.sections),
+          rawSections: rawSectionsRef.current,
+        });
 
         // F3 — Serialize questions. When questions are dirty, rebuild
         // each row from the draft, looking up the raw row by stableKey
