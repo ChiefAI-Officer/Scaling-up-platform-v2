@@ -58,6 +58,10 @@ interface Section {
 }
 
 interface SurveyData {
+  // Opaque per-respondent id (the invitation cuid) surfaced by /me. Used ONLY
+  // to key the localStorage autosave draft per-respondent so two invitees of
+  // the same campaign on a shared device never cross-hydrate each other.
+  respondentKey?: string;
   campaign: { name: string; alias: string };
   version: { language: string };
   sections: Section[];
@@ -79,8 +83,20 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
 
   // localStorage autosave for the invited respondent. The hook must run
   // unconditionally at the top level (Rules of Hooks), before any phase-based
-  // early return.
-  const draftKey = invitedDraftKey(campaignAlias);
+  // early return. Key the draft by the OPAQUE per-respondent id from /me (the
+  // invitation cuid) — NOT the campaign alias — so two invitees of the same
+  // campaign on a shared device never collide. draftKey is null until /me
+  // loads; the hook no-ops while null and hydrates on the null → value
+  // transition.
+  const surveyData =
+    phase.kind === "intro" ||
+    phase.kind === "ready" ||
+    phase.kind === "submitting"
+      ? phase.data
+      : null;
+  const draftKey = surveyData?.respondentKey
+    ? invitedDraftKey(surveyData.respondentKey)
+    : null;
   const { clearDraft } = useAnswerDraft(draftKey, answers, setAnswers);
 
   useEffect(() => {

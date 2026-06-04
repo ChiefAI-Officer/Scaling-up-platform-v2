@@ -40,10 +40,15 @@ import { OrgSurveyClient } from "@/components/assessments/org-survey-client";
 import { invitedDraftKey } from "@/lib/assessments/use-answer-draft";
 
 const ALIAS = "team-invited";
+const RESPONDENT_KEY = "resp-123";
 
 const surveyData = {
   campaign: { name: "Invited Assessment", alias: ALIAS },
   version: { language: "en" },
+  // Opaque per-respondent id (the invitation cuid) surfaced by /me so the
+  // localStorage draft is keyed per-respondent, not per-campaign — two
+  // invitees of the same campaign on a shared device must not collide.
+  respondentKey: RESPONDENT_KEY,
   sections: [{ stableKey: "S1", sortOrder: 1, name: "One" }],
   questions: [
     {
@@ -167,15 +172,16 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     );
   });
 
-  it("hydrates answers from invitedDraftKey(alias) localStorage on mount", async () => {
-    // Seed a draft BEFORE mount.
-    const key = invitedDraftKey(ALIAS);
+  it("hydrates answers from the per-respondent invitedDraftKey(respondentKey) localStorage on mount", async () => {
+    // Seed a draft BEFORE mount, under the per-RESPONDENT key (not the alias).
+    const key = invitedDraftKey(RESPONDENT_KEY);
     localStorage.setItem(key, JSON.stringify({ q1: 3, orphanReq: "restored" }));
 
     await reachPager();
     await screen.findByText(/section 1 of 2/i);
 
-    // The slider reflects the restored value 3.
+    // The slider reflects the restored value 3 (draft hydrated once /me loaded
+    // the respondentKey and the draftKey transitioned null → value).
     const slider = screen.getByLabelText(/Q1/i) as HTMLInputElement;
     expect(slider.value).toBe("3");
 
@@ -184,5 +190,41 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     await screen.findByText(/section 2 of 2/i);
     const orphanField = screen.getByLabelText(/Orphan Q/i) as HTMLTextAreaElement;
     expect(orphanField.value).toBe("restored");
+  });
+
+  it("does NOT hydrate a draft keyed by the campaign alias (per-respondent isolation)", async () => {
+    // A draft stored under the OLD per-campaign key must be ignored — proves
+    // the key is now per-respondent, so two invitees on a shared device never
+    // cross-hydrate each other's answers.
+    localStorage.setItem(
+      invitedDraftKey(ALIAS),
+      JSON.stringify({ q1: 3, orphanReq: "leaked from another respondent" }),
+    );
+
+    await reachPager();
+    await screen.findByText(/section 1 of 2/i);
+
+    // The slider stays empty — the alias-keyed draft was NOT loaded.
+    const slider = screen.getByLabelText(/Q1/i) as HTMLInputElement;
+    expect(slider.value).not.toBe("3");
+  });
+
+  it("keys the autosaved draft by the per-respondent invitedDraftKey(respondentKey)", async () => {
+    await reachPager();
+    await screen.findByText(/section 1 of 2/i);
+
+    // Answer and let the 500ms debounced autosave flush.
+    fireEvent.change(screen.getByLabelText(/Q1/i), { target: { value: "2" } });
+
+    await waitFor(() => {
+      expect(localStorage.getItem(invitedDraftKey(RESPONDENT_KEY))).not.toBeNull();
+    });
+    // The legacy per-campaign-alias key must never be written.
+    expect(localStorage.getItem(invitedDraftKey(ALIAS))).toBeNull();
+
+    const saved = JSON.parse(
+      localStorage.getItem(invitedDraftKey(RESPONDENT_KEY)) as string,
+    );
+    expect(saved.q1).toBe(2);
   });
 });

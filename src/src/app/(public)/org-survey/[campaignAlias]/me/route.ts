@@ -87,6 +87,12 @@ export async function GET(
       {
         success: true,
         data: {
+          // Opaque per-respondent id (the invitation cuid) for keying the
+          // client-side localStorage draft. The invitation id is scoped to
+          // THIS respondent's own authenticated session, so returning it to
+          // that same respondent is not a leak (localStorage is per-origin/
+          // per-browser anyway). NOT PII — never the email/name.
+          respondentKey: invitation.id,
           campaign: {
             name: invitation.campaign.name,
             alias: invitation.campaign.alias,

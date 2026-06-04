@@ -1172,4 +1172,7 @@
 .wf-scope .survey-progress { height: 8px; border-radius: 9999px; background: hsl(var(--muted)); overflow: hidden; margin: 0.5rem 0 1rem; }
 .wf-scope .survey-progress-fill { height: 100%; background: hsl(var(--primary)); transition: width 200ms ease; }
 .wf-scope .survey-nav { display: flex; justify-content: space-between; gap: 0.75rem; margin-top: 1.5rem; }
+/* Keep branded pager primary buttons purple on hover — the shared .wf-btn-primary:hover
+   hardcodes a blue; inside the brand scope we darken the purple --primary instead. */
+.su-assessment-brand .wf-btn-primary:hover { background: hsl(269 56% 27%); }
 .wf-scope .survey-error { color: hsl(var(--destructive)); font-size: 0.875rem; margin-top: 0.75rem; }

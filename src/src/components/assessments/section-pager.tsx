@@ -30,7 +30,7 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     return (
       <div className="su-assessment-brand survey-section">
         <p>Nothing to answer yet.</p>
-        <button type="button" onClick={onSubmit} disabled={submitting}>Submit</button>
+        <button type="button" className="wf-btn wf-btn-primary" onClick={onSubmit} disabled={submitting}>Submit</button>
       </div>
     );
   }
@@ -91,8 +91,8 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
         <>
           {page.description ? <p className="survey-section-desc">{page.description}</p> : null}
           <div className="survey-nav">
-            <button type="button" onClick={handleBack}>Back</button>
-            <button type="button" onClick={handleForwardFromIntro} disabled={submitting}>{introForwardLabel}</button>
+            <button type="button" className="wf-btn wf-btn-secondary" onClick={handleBack}>Back</button>
+            <button type="button" className="wf-btn wf-btn-primary" onClick={handleForwardFromIntro} disabled={submitting}>{introForwardLabel}</button>
           </div>
         </>
       ) : (
@@ -110,8 +110,8 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
           </ul>
           {showGateError ? <p role="alert" className="survey-error">Please answer all required questions before continuing.</p> : null}
           <div className="survey-nav">
-            <button type="button" onClick={handleBack}>Back</button>
-            <button type="button" onClick={handleNext} disabled={submitting}>{isLast ? "Submit" : "Next"}</button>
+            <button type="button" className="wf-btn wf-btn-secondary" onClick={handleBack}>Back</button>
+            <button type="button" className="wf-btn wf-btn-primary" onClick={handleNext} disabled={submitting}>{isLast ? "Submit" : "Next"}</button>
           </div>
         </>
       )}
