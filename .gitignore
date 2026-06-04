@@ -40,3 +40,6 @@ Thumbs.db
 
 # Git worktrees (local isolation — never commit these)
 .worktrees/
+
+# Playwright MCP session artifacts (console logs + page snapshots — regenerate on use)
+.playwright-mcp/
