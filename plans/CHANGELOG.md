@@ -6,6 +6,12 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-06-04 — Assessment section intro-slide copy (Rockefeller + LVA) <!-- ENTRY_ISO:2026-06-04 ENTRY_SLUG:assessment-intro-copy -->
+
+**PR #36** (squash `b1e9ba0`). Authored real intro-slide body copy for the two assessments that were section-name-only. Added a `description` to all **10 Rockefeller** sections (S1–S10, framing each Rockefeller Habit) and all **8 LVA** sections (S0_welcome…S7_completion) in `src/prisma/seed-rockefeller-assessment.ts` + `src/prisma/seed-lva-assessment.ts` — so the one-section participant pager (from PR #32) renders a written intro before each section's questions instead of a bare heading. (QSP v1/v2 and SU Full already carried section descriptions.) `SectionSchema` already declared `description` optional, so no schema/scoring change; the Rockefeller `scoring-bc-snapshot` test was verified UNCHANGED (it hashes `scoreSubmission` output, which is independent of section text — no re-lock needed). TDD: per-section description tests for both seeds; 89 targeted + 372 broader seed/scoring tests green; `CI=true npx next build --turbopack` clean. **Seed-only — no prod data touched.** The copy reaches respondents only after the guarded `safe-seed.mjs` creates new DRAFT versions in prod AND an admin publishes them (existing campaigns keep their pinned version, per the immutable-published-version model). Closes the deferred "real intro copy for Rockefeller/LVA" follow-up from the section-stepper work.
+
+---
+
 ### 2026-06-04 — Registration + Thank-You pages branded to match the Solo Landing <!-- ENTRY_ISO:2026-06-04 ENTRY_SLUG:reg-thankyou-brand -->
 
 Follow-on from the user (June 4): make the Registration and Thank-You workshop pages share the Solo Landing theme. Shipped to `main` as commit `7f397eb`.
