@@ -4,7 +4,7 @@
  * Phase C — QuestionInput shared component.
  *
  * Renders the appropriate input control for each question type:
- *   SLIDER_LIKERT  → <input type="range"> with anchor labels
+ *   SLIDER_LIKERT  → discrete radiogroup (one radio per scale value) with anchor labels
  *   TEXT           → <textarea>
  *   NUMBER         → <input type="number">
  *   MULTI_CHOICE   → checkbox group (respects maxChoices)
@@ -48,31 +48,42 @@ export function QuestionInput({
   disabled,
 }: QuestionInputProps) {
   if (q.type === "SLIDER_LIKERT" && q.scale) {
-    const numVal = typeof value === "number" ? value : q.scale.min;
+    const { min, max, step, anchorMin, anchorMax } = q.scale;
+    const values: number[] = [];
+    for (let v = min; v <= max; v += step) values.push(v);
+    const selected = typeof value === "number" ? value : undefined;
     return (
-      <>
-        <input
-          id={`q-${q.stableKey}`}
-          type="range"
-          min={q.scale.min}
-          max={q.scale.max}
-          step={q.scale.step}
-          value={numVal}
-          onChange={(e) => onChange(q.stableKey, Number(e.target.value))}
-          className="survey-slider"
-          aria-valuemin={q.scale.min}
-          aria-valuemax={q.scale.max}
-          aria-valuenow={numVal}
-          disabled={disabled}
-        />
-        <div className="survey-slider-anchors">
-          <span>{q.scale.anchorMin}</span>
-          <span className="survey-slider-value">
-            {typeof value === "number" ? value : "—"}
-          </span>
-          <span>{q.scale.anchorMax}</span>
+      <div className="survey-scale" role="radiogroup" aria-label={q.label}>
+        <div className="survey-scale-options">
+          {values.map((v) => {
+            const isSel = selected === v;
+            const ariaLabel =
+              v === min ? `${v} — ${anchorMin}` : v === max ? `${v} — ${anchorMax}` : String(v);
+            return (
+              <label
+                key={v}
+                className={`survey-scale-option${isSel ? " is-selected" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name={`q-${q.stableKey}`}
+                  className="survey-scale-radio"
+                  value={v}
+                  checked={isSel}
+                  aria-label={ariaLabel}
+                  onChange={() => onChange(q.stableKey, v)}
+                  disabled={disabled}
+                />
+                <span className="survey-scale-num" aria-hidden="true">{v}</span>
+              </label>
+            );
+          })}
         </div>
-      </>
+        <div className="survey-scale-anchors">
+          <span>{anchorMin}</span>
+          <span>{anchorMax}</span>
+        </div>
+      </div>
     );
   }
 
