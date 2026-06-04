@@ -1,0 +1,169 @@
+/*
+ * su-public-brand.css
+ *
+ * Scaling Up public brand theme for the React-rendered Registration + Thank You
+ * workshop pages, making them visual siblings of the Solo Landing customHtml
+ * theme (purple #522583 hero, official white SU logo, Four Decisions accents,
+ * Roboto/Helvetica type, orange/green CTAs).
+ *
+ * SCOPE: every rule is nested under `.su-public-brand`. Nothing here applies
+ * unless an ancestor carries that class — the blue admin/coach UI and the
+ * global design tokens are NEVER affected (same principle as the assessment
+ * `.su-assessment-brand` scope, ADR-0005). The two template components
+ * (registration-page-template / thank-you-page-template) import this file and
+ * wrap their output in `.su-public-brand`, so it loads on both the public
+ * workshop route and the admin template-editor preview without touching the
+ * global stylesheet.
+ *
+ * Palette + component CSS is ported from the canonical Solo Landing starter
+ * (From Jeff/style-guide/starter-templates/solo-landing.html).
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap");
+
+/* ── Root + reset (scoped) ───────────────────────────────────────────────── */
+.su-public-brand {
+  font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #1a1322;
+  line-height: 1.6;
+  background: #ffffff;
+  -webkit-font-smoothing: antialiased;
+}
+.su-public-brand *,
+.su-public-brand *::before,
+.su-public-brand *::after { box-sizing: border-box; }
+.su-public-brand a { color: inherit; text-decoration: none; }
+.su-public-brand a:focus-visible,
+.su-public-brand .su-cta:focus-visible { outline: 3px solid #f7a600; outline-offset: 3px; }
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+.su-public-brand .su-h1,
+.su-public-brand .su-h2,
+.su-public-brand .su-h3 { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; letter-spacing: -0.01em; margin: 0; color: #1a1322; }
+.su-public-brand .su-h1 { font-size: 36px; line-height: 1.04; letter-spacing: -0.025em; }
+.su-public-brand .su-h2 { font-size: 26px; line-height: 1.15; }
+.su-public-brand .su-h3 { font-size: 18px; line-height: 1.25; }
+.su-public-brand .su-mono { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; font-size: 11px; }
+.su-public-brand .su-wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+/* ── Brand signature stripes (Four Decisions) ────────────────────────────── */
+.su-public-brand .su-stripe-v { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; z-index: 2;
+  background: linear-gradient(to bottom, #f7a600 0 25%, #008bd2 25% 50%, #946b36 50% 75%, #95c11f 75% 100%); }
+.su-public-brand .su-stripe-h { height: 6px;
+  background: linear-gradient(to right, #f7a600 0 25%, #008bd2 25% 50%, #946b36 50% 75%, #95c11f 75% 100%); }
+
+/* ── Brandbar / logo / category pill ─────────────────────────────────────── */
+.su-public-brand .su-brandbar { display: flex; align-items: center; gap: 14px; }
+.su-public-brand .su-logo { display: block; height: 24px; width: auto; }
+.su-public-brand .su-cat { display: inline-block; padding: 6px 12px; border: 1px solid rgba(255,255,255,0.4); border-radius: 999px; color: #ffffff; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; align-self: flex-start; }
+
+/* ── Hero shared (purple, radial glows) ──────────────────────────────────── */
+.su-public-brand .su-title { color: #ffffff; line-height: 1.04; letter-spacing: -0.025em; max-width: 22ch; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; margin: 0; font-size: 32px; }
+.su-public-brand .su-lede { color: rgba(255,255,255,0.88); font-size: 16px; line-height: 1.65; max-width: 60ch; margin: 0; }
+.su-public-brand .su-glow-tr { content: ""; position: absolute; right: -120px; top: -80px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, rgba(247,166,0,0.22), transparent 60%); pointer-events: none; }
+.su-public-brand .su-glow-bl { content: ""; position: absolute; left: -100px; bottom: -160px; width: 360px; height: 360px; border-radius: 50%; background: radial-gradient(circle at 60% 40%, rgba(149,193,31,0.18), transparent 65%); pointer-events: none; }
+
+/* ── Meta row (DAY / DATE / TIME / FORMAT) ───────────────────────────────── */
+.su-public-brand .su-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; margin-top: 8px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.18); }
+.su-public-brand .su-meta-item { display: flex; flex-direction: column; gap: 4px; }
+.su-public-brand .su-meta-label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.62); font-weight: 500; }
+.su-public-brand .su-meta-val { font-size: 15px; color: #ffffff; font-weight: 500; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; }
+
+/* ── CTAs ────────────────────────────────────────────────────────────────── */
+.su-public-brand .su-cta { display: inline-block; background: #f7a600; color: #1a1322; padding: 16px 28px; border-radius: 4px; font-weight: 700; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; border: 0; cursor: pointer; text-align: center; }
+.su-public-brand .su-cta:hover:not(:disabled) { background: #ffb822; color: #1a1322; }
+.su-public-brand .su-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 15px 24px; border: 1.5px solid #522583; color: #522583; border-radius: 4px; font-weight: 700; font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: #fff; cursor: pointer; }
+.su-public-brand .su-btn-outline:hover:not(:disabled) { background: #f4eefb; }
+
+/* ════════════ REGISTRATION — two-column split ═══════════════════════════ */
+.su-public-brand .su-reg { display: grid; grid-template-columns: 1fr; min-height: 100vh; background: #fff; }
+.su-public-brand .su-reg-hero { background: #522583; color: #fff; position: relative; overflow: hidden; padding: 48px 32px; display: flex; flex-direction: column; gap: 22px; justify-content: center; }
+.su-public-brand .su-reg-hero > * { position: relative; z-index: 1; }
+.su-public-brand .su-reg-coach { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 16px 18px; display: flex; gap: 14px; align-items: center; }
+.su-public-brand .su-reg-coach img { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.45); flex-shrink: 0; }
+.su-public-brand .su-reg-coach .su-rc-ey { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.62); display: block; margin-bottom: 6px; font-weight: 600; }
+.su-public-brand .su-reg-coach .su-rc-nm { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 15px; }
+.su-public-brand .su-reg-coach .su-rc-mt { font-size: 13px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+.su-public-brand .su-reg-meta-row { display: flex; align-items: center; gap: 12px; font-size: 14px; color: rgba(255,255,255,0.92); }
+.su-public-brand .su-reg-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 8px; background: rgba(255,255,255,0.1); display: inline-flex; align-items: center; justify-content: center; }
+
+.su-public-brand .su-reg-form-panel { background: #fff; padding: 44px 28px; display: flex; align-items: center; justify-content: center; }
+.su-public-brand .su-form-card { width: 100%; max-width: 440px; }
+.su-public-brand .su-form-eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #5f5a6b; font-weight: 600; display: block; margin-bottom: 6px; }
+.su-public-brand .su-form-title { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 26px; color: #1a1322; margin: 0 0 4px; letter-spacing: -0.015em; }
+.su-public-brand .su-form-sub { color: #4a3f5a; font-size: 15px; margin: 0 0 20px; }
+.su-public-brand .su-priceline { display: flex; align-items: baseline; gap: 8px; margin: 0 0 14px; }
+.su-public-brand .su-priceline .su-pl-lbl { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #5f5a6b; font-weight: 600; }
+.su-public-brand .su-priceline .su-pl-amt { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 22px; color: #522583; }
+
+/* Form field theming (overrides shadcn Input/Button/Label within the scope) */
+.su-public-brand .su-form label { color: #4a3f5a; font-weight: 600; font-size: 13px; }
+.su-public-brand .su-form input:not([type="checkbox"]),
+.su-public-brand .su-form select,
+.su-public-brand .su-form textarea { border-color: #d6d0de; border-radius: 6px; }
+.su-public-brand .su-form input:not([type="checkbox"]):focus,
+.su-public-brand .su-form input:not([type="checkbox"]):focus-visible,
+.su-public-brand .su-form select:focus,
+.su-public-brand .su-form textarea:focus { border-color: #522583; outline: none; box-shadow: 0 0 0 3px rgba(82,37,131,0.15); }
+.su-public-brand .su-form input[type="checkbox"] { accent-color: #522583; }
+/* Phone field paints its visible border on a wrapper <div class="PhoneInput">,
+   not the inner <input> (which globals.css zeroes with border:none !important). */
+.su-public-brand .su-form .PhoneInput { border-color: #d6d0de; border-radius: 6px; }
+.su-public-brand .su-form .PhoneInput--focus,
+.su-public-brand .su-form .PhoneInput:focus-within { border-color: #522583; box-shadow: 0 0 0 3px rgba(82,37,131,0.15); }
+.su-public-brand .su-form .PhoneInputInput:focus { box-shadow: none; }
+.su-public-brand .su-form button[type="submit"] { background: #f7a600; color: #1a1322; border-radius: 4px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.su-public-brand .su-form button[type="submit"]:hover:not(:disabled) { background: #ffb822; color: #1a1322; }
+.su-public-brand .su-privacy { font-size: 12px; color: #6b6577; text-align: center; margin-top: 14px; line-height: 1.5; }
+.su-public-brand .su-form-foot { font-size: 12px; color: #6b6577; text-align: center; margin-top: 14px; }
+
+/* ════════════ THANK YOU — branded confirmation ═════════════════════════ */
+.su-public-brand .su-ty { background: #fff; min-height: 100vh; }
+.su-public-brand .su-ty-hero { background: #522583; color: #fff; position: relative; overflow: hidden; padding: 52px 0 46px; text-align: center; }
+.su-public-brand .su-ty-hero > * { position: relative; z-index: 1; }
+.su-public-brand .su-ty-hero .su-brandbar { justify-content: center; margin-bottom: 22px; }
+.su-public-brand .su-check { width: 72px; height: 72px; border-radius: 50%; background: rgba(149,193,31,0.22); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 18px; border: 1px solid rgba(149,193,31,0.5); }
+.su-public-brand .su-check svg { width: 38px; height: 38px; }
+.su-public-brand .su-ty-h1 { color: #fff; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 36px; letter-spacing: -0.02em; line-height: 1.05; margin: 0 0 10px; }
+.su-public-brand .su-ty-sub { color: rgba(255,255,255,0.88); font-size: 17px; line-height: 1.6; max-width: 48ch; margin: 0 auto; }
+.su-public-brand .su-ty-body { max-width: 680px; margin: 0 auto; padding: 38px 24px 0; }
+.su-public-brand .su-ty-msg { background: #e4e4e4; border-left: 6px solid #522583; padding: 16px 18px; border-radius: 4px; font-size: 15px; color: #1a1322; line-height: 1.6; margin: 22px 0 0; }
+.su-public-brand .su-ty-video { margin: 24px 0 0; border-radius: 4px; overflow: hidden; border: 1px solid #d6d0de; }
+.su-public-brand .su-ty-video iframe { width: 100%; aspect-ratio: 16 / 9; display: block; border: 0; }
+.su-public-brand .su-ty-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 24px; }
+.su-public-brand .su-ty-actions .su-cta,
+.su-public-brand .su-ty-actions .su-btn-outline { display: inline-flex; align-items: center; gap: 8px; }
+.su-public-brand .su-ty-foot { margin-top: 40px; }
+
+/* ── Logistics / details card (dark, mirrors landing) ────────────────────── */
+.su-public-brand .su-logistics { background: #1a1322; color: #ffffff; padding: 32px 28px; border-radius: 4px; position: relative; }
+.su-public-brand .su-logistics .su-h2 { color: #ffffff; margin-bottom: 18px; }
+.su-public-brand .su-logistics-rule { height: 2px; width: 40px; background: #f7a600; margin-bottom: 18px; }
+.su-public-brand .su-log-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.su-public-brand .su-log-item:last-child { border-bottom: 0; }
+.su-public-brand .su-log-key { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.55); width: 96px; flex-shrink: 0; padding-top: 3px; font-weight: 500; }
+.su-public-brand .su-log-val { font-size: 16px; color: #ffffff; line-height: 1.55; }
+.su-public-brand .su-log-val a { color: #95c11f; text-decoration: underline; word-break: break-word; }
+.su-public-brand .su-format-pill { display: inline-block; padding: 4px 10px; background: rgba(247,166,0,0.18); color: #f7a600; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; border-radius: 999px; margin-bottom: 14px; font-weight: 500; }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.su-public-brand .su-foot { background: #1a1322; color: rgba(255,255,255,0.6); padding: 28px 0; font-size: 12px; }
+.su-public-brand .su-foot-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; align-items: center; }
+.su-public-brand .su-foot-tag { letter-spacing: 0.22em; text-transform: uppercase; color: rgba(255,255,255,0.5); font-size: 10px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 500; }
+
+/* ── Preview banner ──────────────────────────────────────────────────────── */
+.su-public-brand .su-preview-banner { background: #e4e4e4; border-bottom: 1px solid #d6d0de; padding: 4px 16px; text-align: center; }
+.su-public-brand .su-preview-banner span { font-size: 11px; color: #5f5a6b; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (min-width: 640px) {
+  .su-public-brand .su-title { font-size: 40px; }
+  .su-public-brand .su-meta { grid-template-columns: repeat(2, 1fr); }
+  .su-public-brand .su-ty-h1 { font-size: 44px; }
+  .su-public-brand .su-h2 { font-size: 32px; }
+}
+@media (min-width: 900px) {
+  .su-public-brand .su-reg { grid-template-columns: 1.02fr 0.98fr; }
+  .su-public-brand .su-reg-hero { padding: 64px 56px; }
+  .su-public-brand .su-reg-form-panel { padding: 64px 56px; }
+}
