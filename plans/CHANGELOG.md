@@ -6,6 +6,18 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-06-04 — Assessment Likert slider: visible numbered scale + clear unanswered state <!-- ENTRY_ISO:2026-06-04 ENTRY_SLUG:assessment-slider-ticks -->
+
+**PR #35** (squash `8b58038`; prod deploy `bytjwxy6i`). Refines the participant Likert **slider** after the user asked to research professional slider UX (we'd cycled several times on the control).
+
+**Research finding** (survey-methodology literature): a pre-filled slider handle **biases responses** toward the start position, and respondents often leave it there — so a default becomes a fake answer indistinguishable from a real one; the recommended pattern is **no recorded value until the respondent moves the handle**, with the discrete scale shown. (Sliders also underperform radio/discrete buttons for rating scales — more missing data, slower, worse on mobile/low-literacy — but the user wants the slider, so it stays. The discrete-button control from PR #33 was actually the research-preferred option.) Sources: [MeasuringU](https://measuringu.com/uxlite-numeric-slider-desktop-mobile/), ["Where Should I Start?" slider-defaults study](https://www.researchgate.net/publication/323263106_Where_Should_I_Start_On_Default_Values_for_Slider_Questions_in_Web_Surveys), [Qualtrics slider docs](https://www.qualtrics.com/support/survey-platform/survey-module/editing-questions/question-types-guide/standard-content/slider/), [QuestionPro start-position bias](https://www.questionpro.com/blog/setting-the-start-position-of-sliding-scale/), [GESIS "Are sliders too slick?"](https://mda.gesis.org/index.php/mda/article/download/2015.013/42).
+
+**Change** (`src/src/components/assessments/question-input.tsx` + `wireframes-scoped.css`): keep the native range slider with **no default** (commit-on-`onClick`/`onChange`/`onKeyUp` behavior from PR #34 unchanged — a single tap records any value incl. the minimum; an untouched slider stays `undefined` so the required gate still catches skips). Added: **numbered ticks `0..N`** rendered under the track (`.survey-slider-ticks`, `aria-hidden`), endpoint anchor words, the **selected tick highlighted** purple (`.is-current`), and a **status line** (`.survey-slider-status`) reading "Tap or drag the slider to rate." (italic, when unanswered) or "Your rating: N" (answered) — replacing the cryptic middle "—" (the `.survey-slider-value` span + the old `.survey-slider-hint` removed). All new CSS scoped under `.su-assessment-brand` (ADR-0005). Kept `0` (it is a scored value on the Rockefeller 0–3 scale, `passThreshold: 2` — dropping it would change Esperto's scale + scoring). Per-question control via the shared `QuestionInput` → applies to every assessment.
+
+**Decisions confirmed with the user:** (1) no pre-filled default (vs default-at-min/middle) — chose the best-practice no-default + visible-scale; (2) keep `0`. **Verification:** TDD test for ticks-render + status text (unanswered vs "Your rating: N"); the PR #34 click-commits-min bug-lock + role="slider" tests unchanged; 28 control/pager + 40 regression tests green; `CI=true npx next build --turbopack` clean. Zero migrations.
+
+---
+
 ### 2026-06-04 — Assessment Likert slider restored + default/min value selectable <!-- ENTRY_ISO:2026-06-04 ENTRY_SLUG:assessment-slider-restore -->
 
 **PR #34** (squash `34cf5af`; prod deploy `54dcyj1gb`). Course-correction on PR #33 after the user clarified the intent: keep the **slider**, just fix its bug — PR #33 had replaced it with discrete buttons, which was not wanted.
