@@ -138,7 +138,7 @@ export function assertSeedContentIntegrity(c: SeedContent): void {
 
   // 4. sectionStableKey must resolve to an existing section
   for (const q of questions) {
-    if (q.sectionStableKey == null) continue;
+    if (q.sectionStableKey == null || (typeof q.sectionStableKey === "string" && q.sectionStableKey.trim() === "")) continue;
     if (!seenSectionKeys.has(q.sectionStableKey)) {
       throw new Error(
         `assertSeedContentIntegrity: question "${q.stableKey ?? "(no stableKey)"}" has unknown sectionStableKey "${q.sectionStableKey}" — not found in sections`

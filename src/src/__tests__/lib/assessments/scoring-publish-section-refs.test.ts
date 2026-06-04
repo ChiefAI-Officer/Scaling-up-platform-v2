@@ -16,6 +16,7 @@ it("rejects a question whose sectionStableKey does not resolve to a defined sect
 });
 
 it("allows a question with NO section key (renders in Other fallback) — not a publish error", () => {
+  // NOTE: this minimal fixture may fail OTHER publish checks (tier tiling); we assert only that NO section-ref issue is raised.
   const res = TemplateVersionForPublishSchema.safeParse({ ...base, questions: [slider("q1", undefined)] });
   const sectionRefIssues = res.success ? [] : res.error.issues.filter((i) => /resolve|unknown section/i.test(i.message));
   expect(sectionRefIssues).toEqual([]);
