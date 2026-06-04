@@ -16,7 +16,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { QuestionInput } from "./question-input";
+import { SectionPager } from "./section-pager";
+import {
+  buildSectionPages,
+  isAnswered,
+  type PagerSection,
+  type PagerQuestion,
+} from "@/lib/assessments/section-pages";
+import {
+  useAnswerDraft,
+  invitedDraftKey,
+} from "@/lib/assessments/use-answer-draft";
 
 interface ScaleConfig {
   min: number;
@@ -66,6 +76,12 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "exchanging" });
   const [answers, setAnswers] = useState<Record<string, number | string | string[]>>({});
+
+  // localStorage autosave for the invited respondent. The hook must run
+  // unconditionally at the top level (Rules of Hooks), before any phase-based
+  // early return.
+  const draftKey = invitedDraftKey(campaignAlias);
+  const { clearDraft } = useAnswerDraft(draftKey, answers, setAnswers);
 
   useEffect(() => {
     let cancelled = false;
@@ -153,43 +169,41 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     return [...phase.data.sections].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [phase]);
 
-  const questionsBySection = useMemo<Map<string, Question[]>>(() => {
-    const out = new Map<string, Question[]>();
+  const sortedQuestions = useMemo<Question[]>(() => {
     if (
       phase.kind !== "intro" &&
       phase.kind !== "ready" &&
       phase.kind !== "submitting"
     )
-      return out;
-    const sorted = [...phase.data.questions].sort(
-      (a, b) => a.sortOrder - b.sortOrder
-    );
-    for (const q of sorted) {
-      const key = q.sectionStableKey ?? "__unassigned";
-      if (!out.has(key)) out.set(key, []);
-      out.get(key)!.push(q);
-    }
-    return out;
+      return [];
+    return [...phase.data.questions].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [phase]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     if (phase.kind !== "ready") return;
 
     const required = phase.data.questions.filter((q) => q.isRequired);
     const missing = required
-      .filter((q) => {
-        const v = answers[q.stableKey];
-        if (v === undefined) return true;
-        if (typeof v === "string" && v.trim() === "") return true;
-        if (Array.isArray(v) && v.length === 0) return true;
-        return false;
-      })
+      .filter((q) => !isAnswered(answers[q.stableKey]))
       .map((q) => q.label);
     if (missing.length > 0) {
       setPhase({
         kind: "error",
         message: `Please answer all required questions before submitting (${missing.length} missing).`,
+      });
+      return;
+    }
+
+    // The submit route rejects an empty `answers` array (EMPTY_ANSWERS 400),
+    // so even an all-optional survey must have ≥1 answered question before we
+    // POST. Mirrors the public quiz client guard.
+    const answeredCount = Object.values(answers).filter((v) =>
+      isAnswered(v)
+    ).length;
+    if (answeredCount === 0) {
+      setPhase({
+        kind: "error",
+        message: "Please answer at least one question before submitting.",
       });
       return;
     }
@@ -214,6 +228,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         setPhase({ kind: "error", message });
         return;
       }
+      clearDraft();
       router.push(`/org-survey/${campaignAlias}/thank-you`);
     } catch (err) {
       console.error("[org-survey] submit failed", err);
@@ -302,6 +317,16 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   const submitting = phase.kind === "submitting";
   const data = phase.data;
 
+  // One section per screen via the shared SectionPager. buildSectionPages
+  // renders EVERY section (incl. empty ones, as intro/closing slides) AND
+  // collects orphan questions (no/blank sectionStableKey) into a trailing
+  // "Other" page — so a required orphan is now answerable instead of an
+  // invisible submit dead-end.
+  const pages = buildSectionPages(
+    sortedSections as PagerSection[],
+    sortedQuestions as PagerQuestion[]
+  );
+
   return (
     <div className="ty-page">
       <header className="ty-header">
@@ -309,7 +334,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         <span>{data.campaign.name}</span>
       </header>
       <main className="survey-body">
-        <form onSubmit={handleSubmit} className="survey-form">
+        <div className="survey-form">
           <section className="ty-card" aria-labelledby="survey-title">
             <span className="hero-eyebrow">Survey</span>
             <h1 className="ty-title" id="survey-title">
@@ -320,58 +345,17 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             </p>
           </section>
 
-          {sortedSections.map((section) => {
-            const list = questionsBySection.get(section.stableKey) ?? [];
-            if (list.length === 0) return null;
-            return (
-              <section key={section.stableKey} className="ty-card survey-section">
-                <h2 className="survey-section-title">
-                  {section.partLabel ? `${section.partLabel}: ` : ""}
-                  {section.name}
-                </h2>
-                {section.description ? (
-                  <p className="survey-section-desc">{section.description}</p>
-                ) : null}
-                <ul className="survey-question-list">
-                  {list.map((q) => (
-                    <li key={q.stableKey} className="survey-question">
-                      <label
-                        htmlFor={`q-${q.stableKey}`}
-                        className="survey-question-label"
-                      >
-                        {q.label}
-                        {q.isRequired ? (
-                          <span className="survey-required"> *</span>
-                        ) : null}
-                      </label>
-                      {q.helpText ? (
-                        <p className="survey-question-help">{q.helpText}</p>
-                      ) : null}
-                      <QuestionInput
-                        question={q}
-                        value={answers[q.stableKey]}
-                        onChange={(sk, v) =>
-                          setAnswers((prev) => ({ ...prev, [sk]: v }))
-                        }
-                        disabled={submitting}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-
-          <div className="survey-submit-row">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="wf-btn wf-btn-primary"
-            >
-              {submitting ? "Submitting…" : "Submit"}
-            </button>
-          </div>
-        </form>
+          <SectionPager
+            pages={pages}
+            answers={answers}
+            onAnswerChange={(k, v) =>
+              setAnswers((prev) => ({ ...prev, [k]: v }))
+            }
+            onSubmit={handleSubmit}
+            submitting={submitting}
+            onExit={() => setPhase({ kind: "intro", data: phase.data })}
+          />
+        </div>
       </main>
       <footer className="ty-footer">Powered by Scaling Up</footer>
     </div>
