@@ -151,8 +151,10 @@ test("1. owning coach + submission → status:ok, all fields populated, provenan
   expect(report.jobTitle).toBe("CEO");
   expect(report.companyName).toBe("Acme Corp");
 
-  // Assessment name uses campaign.name when present
-  expect(report.assessmentName).toBe("Acme Q1 Campaign");
+  // assessmentName is ALWAYS the instrument/template name
+  expect(report.assessmentName).toBe("Rockefeller");
+  // campaignLabel is the coach's label when present
+  expect(report.campaignLabel).toBe("Acme Q1 Campaign");
 
   // Submission/result fields
   expect(report.submittedAt).toEqual(new Date("2026-01-15T10:00:00Z"));
@@ -342,7 +344,7 @@ test("7. db.$transaction is invoked and the fetch happens within its callback", 
   );
 });
 
-test("assessmentName falls back to template.name when campaign.name is empty/null", async () => {
+test("assessmentName is always template.name; campaignLabel is null when campaign.name is empty", async () => {
   mockCanManageCampaign.mockResolvedValue(true);
 
   const noNameSubmission = {
@@ -365,4 +367,26 @@ test("assessmentName falls back to template.name when campaign.name is empty/nul
   expect(result.status).toBe("ok");
   if (result.status !== "ok") return;
   expect(result.report.assessmentName).toBe("Rockefeller");
+  expect(result.report.campaignLabel).toBeNull();
+});
+
+test("assessmentName === template.name and campaignLabel === campaign.name when they differ", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+
+  const { $transaction } = makeMockDb(GOOD_SUBMISSION);
+
+  const result = await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  expect(result.status).toBe("ok");
+  if (result.status !== "ok") return;
+  // Template name is the instrument
+  expect(result.report.assessmentName).toBe("Rockefeller");
+  // Campaign label is the coach's own label (differs from template name)
+  expect(result.report.campaignLabel).toBe("Acme Q1 Campaign");
+  expect(result.report.campaignLabel).not.toBe(result.report.assessmentName);
 });

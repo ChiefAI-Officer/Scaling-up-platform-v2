@@ -138,9 +138,11 @@ export interface BrandedReportProps {
   report: RespondentReport;
   /** Optional override; falls back to report.assessmentName. */
   assessmentName?: string;
+  /** Optional override; falls back to report.campaignLabel. */
+  campaignLabel?: string | null;
 }
 
-export function BrandedReport({ report, assessmentName }: BrandedReportProps) {
+export function BrandedReport({ report, assessmentName, campaignLabel }: BrandedReportProps) {
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
   const perQuestion: PerQuestionResult[] = Array.isArray(result.perQuestion)
     ? result.perQuestion
@@ -151,6 +153,11 @@ export function BrandedReport({ report, assessmentName }: BrandedReportProps) {
   const perDomain = Array.isArray(result.perDomain) ? result.perDomain : null;
 
   const title = assessmentName ?? report.assessmentName;
+  // Show the coach's campaign label as a subtitle ONLY when it differs from the title.
+  const resolvedCampaignLabel =
+    campaignLabel !== undefined ? campaignLabel : report.campaignLabel ?? null;
+  const showCampaignSubtitle =
+    !!resolvedCampaignLabel && resolvedCampaignLabel !== title;
 
   const sections = parseSections(report.sections);
   const sectionByKey = new Map<string, ParsedSection>();
@@ -285,6 +292,14 @@ export function BrandedReport({ report, assessmentName }: BrandedReportProps) {
             />
           </div>
           <h1 className="su-h1 su-report-title">{title}</h1>
+          {showCampaignSubtitle && (
+            <p
+              className="su-report-campaign-label"
+              data-testid="report-campaign-label"
+            >
+              {resolvedCampaignLabel}
+            </p>
+          )}
           <div className="su-report-cover-meta">
             <div className="su-report-for">
               Report for: {report.respondentName}

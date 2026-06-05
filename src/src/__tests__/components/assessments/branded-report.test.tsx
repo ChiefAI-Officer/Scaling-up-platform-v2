@@ -21,6 +21,7 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     jobTitle: "Chief Executive Officer",
     companyName: "Northwind Logistics",
     assessmentName: "Rockefeller Habits Checklist",
+    campaignLabel: null,
     submittedAt: new Date("2026-06-05T10:00:00Z"),
     result: {} as ScoreResult,
     sections: [],
@@ -291,6 +292,34 @@ describe("BrandedReport — cover", () => {
     const { container } = render(<BrandedReport report={rockefellerReport()} />);
     const root = container.querySelector(".su-public-brand.su-report");
     expect(root).toBeInTheDocument();
+  });
+
+  it("cover title shows the instrument name (template.name), not the campaign label", () => {
+    const report = rockefellerReport();
+    // assessmentName = instrument; campaignLabel = coach's distinct label
+    report.campaignLabel = "Acme Corp Q2 2026";
+    render(<BrandedReport report={report} />);
+    const cover = screen.getByTestId("report-cover");
+    expect(cover.textContent).toContain("Rockefeller Habits Checklist");
+    // Campaign label appears as subtitle
+    expect(screen.getByTestId("report-campaign-label").textContent).toBe(
+      "Acme Corp Q2 2026",
+    );
+  });
+
+  it("campaign-label subtitle is absent when campaignLabel is null", () => {
+    const report = rockefellerReport();
+    report.campaignLabel = null;
+    render(<BrandedReport report={report} />);
+    expect(screen.queryByTestId("report-campaign-label")).not.toBeInTheDocument();
+  });
+
+  it("campaign-label subtitle is absent when campaignLabel equals assessmentName (no redundant duplicate)", () => {
+    const report = rockefellerReport();
+    // Same string as assessmentName — should be suppressed
+    report.campaignLabel = "Rockefeller Habits Checklist";
+    render(<BrandedReport report={report} />);
+    expect(screen.queryByTestId("report-campaign-label")).not.toBeInTheDocument();
   });
 });
 

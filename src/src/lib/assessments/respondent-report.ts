@@ -92,8 +92,10 @@ export interface RespondentReport {
   jobTitle: string | null;
   /** campaign.organization.name */
   companyName: string;
-  /** campaign.name if non-empty, else template.name */
+  /** template.name — the instrument title (e.g. "Rockefeller Habits Checklist") */
   assessmentName: string;
+  /** campaign.name — the coach's label; null when absent or empty */
+  campaignLabel: string | null;
   submittedAt: Date;
   /** Frozen ScoreResult from submission.result — NEVER re-scored */
   result: ScoreResult;
@@ -264,17 +266,19 @@ export async function getRespondentReport(
     const degraded = !isScoreResult(submission.result);
     const result = submission.result as ScoreResult; // cast; caller checks degraded
 
-    // assessmentName: campaign.name if non-empty, else template.name
-    const assessmentName =
+    // assessmentName = instrument name (template.name); campaignLabel = coach's label
+    const assessmentName = submission.campaign.template.name;
+    const campaignLabel =
       submission.campaign.name && submission.campaign.name.trim() !== ""
         ? submission.campaign.name
-        : submission.campaign.template.name;
+        : null;
 
     const report: RespondentReport = {
       respondentName: `${submission.respondent.firstName} ${submission.respondent.lastName}`,
       jobTitle: submission.respondent.jobTitle ?? null,
       companyName: submission.campaign.organization.name,
       assessmentName,
+      campaignLabel,
       submittedAt: submission.submittedAt,
       result,
       sections: submission.campaign.version.sections,
