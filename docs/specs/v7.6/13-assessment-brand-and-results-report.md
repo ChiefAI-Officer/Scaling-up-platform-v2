@@ -62,7 +62,7 @@ A polished, branded, Esperto-anatomy **per-respondent** report for a single comp
 
 ### Anatomy (mirrors the real Esperto personal report; see mockup)
 
-1. **Cover** — Four-Decisions stripe (`.su-stripe-h`) → purple hero → white primary logo (G7) → big Helvetica Neue title (assessment name) → "Report for: <name> · <job title>" → company + date → S-curve swoosh.
+1. **Cover** — Four-Decisions stripe (`.su-stripe-h`) → purple hero → white primary logo (G7) → big Helvetica Neue title = the **instrument name** (`template.name`, e.g. "Rockefeller Habits Checklist") → "Report for: <name> · <job title>" → company + date → S-curve swoosh. The coach's **campaign label** (`campaign.name`, e.g. "Acme Corp Q2 2026") renders as a small subtitle **only when it differs** from the instrument name (Greptile P2 — title is always the instrument, never the coach's label).
 2. **Overall result** — banner driven by the template's `tierMetric` (G2): Rockefeller → `countAchieved` + Low/OK/Great band + a one-line **lede** (G8); QSP/LVA → `overallAvg` under a neutral "Submitted" header (no fabricated band); SU Full → ScaleUp ring / mean-of-domains. Plus a short stats row.
 3. **Section breakdown** — cards in a grid; domain-colored headers **when the template defines domains** (SU Full), else flat. Each card lists the section's questions with the respondent's **rating** always, and the green-check "achieved" affordance **only when `passThreshold > 0`** (G2).
 4. **Scores table** — `section | your score | your per-item average | (rollup/Total)`. **No team/cohort average** (G3).
@@ -80,7 +80,7 @@ The frozen [`ScoreResult`](../../../src/src/lib/assessments/scoring.ts) already 
 | Company name + date | `respondent` + `submittedAt` present; company missing | Add `campaign.organization.name` to the select. |
 | Domains / ScaleUp score | present when defined (`perDomain`, `scaleUpScore`) | Render when present; degrade otherwise. |
 | Per-item average ("Average" column) | `result.perSection[].averagePoints` (frozen) | Already present; no new computation. |
-| **Assessment name** (cover title) | not selected | Add `campaign.name` + `campaign.template.name` to the loader select (round-1 #5). |
+| **Cover title = instrument name** + coach label subtitle | not selected | Select both; `assessmentName = template.name` (the title), `campaignLabel = campaign.name` (subtitle, shown only when ≠ instrument). Resolves Greptile P2 / round-1 #5. |
 | **Non-slider answers** (TEXT/NUMBER/MULTI_CHOICE) | only in raw `AssessmentSubmission.answers` | Select raw `answers` + use `version.questions[].type/label` for the "Additional responses" section (H9). |
 
 ### Graceful degradation across the 5 live templates
