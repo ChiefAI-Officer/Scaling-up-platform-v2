@@ -1,6 +1,6 @@
 # 11 — Esperto historical-data import: feasibility memo (GATED)
 
-> **Status:** 🔴 **Feasibility gate — DO NOT BUILD.** This memo scopes the question and lists what we need from Jeff. The verdict (feasible / which path / not worth it) is written **only after Jeff sends sample Esperto JSON files.**
+> **Status:** ✅ **RESOLVED → see [12-esperto-historical-import.md](./12-esperto-historical-import.md).** Jeff's June 4 identity-bearing exports flipped the verdict: QSP v2 is a viable identified (Path A) import; SU Full is parked. This memo is retained as the original feasibility scoping; the approved design lives in spec 12.
 > **Scope:** Importing ~1-year-old Esperto historical assessment responses into the new platform. No code, no schema, no migration until the sample is inspected and a path is approved.
 > **Related:** [CONTEXT.md](../../../CONTEXT.md) (entities), [09 content-reseed](./09-assessment-content-reseed.md) (the reseeded questions this import would attach to).
 

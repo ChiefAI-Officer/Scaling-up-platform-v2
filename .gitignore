@@ -43,3 +43,6 @@ Thumbs.db
 
 # Playwright MCP session artifacts (console logs + page snapshots — regenerate on use)
 .playwright-mcp/
+
+# Esperto raw exports (Jeff-supplied artifacts — never commit raw, use sanitized test fixtures)
+From Jeff/Exports/
