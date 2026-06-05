@@ -44,5 +44,9 @@ Thumbs.db
 # Playwright MCP session artifacts (console logs + page snapshots — regenerate on use)
 .playwright-mcp/
 
-# Esperto raw exports (Jeff-supplied artifacts — never commit raw, use sanitized test fixtures)
-From Jeff/Exports/
+# Jeff-supplied raw artifacts — never commit (PII; use sanitized test fixtures only).
+# Broad pattern prevents future PII additions anywhere under "From Jeff/" (greptile P1).
+# NOTE: files ALREADY committed here remain in git history — a `git filter-repo` scrub
+# is required and tracked separately (see spec 12 §14); this ignore does NOT resolve it.
+From Jeff/*
+!From Jeff/style-guide/
