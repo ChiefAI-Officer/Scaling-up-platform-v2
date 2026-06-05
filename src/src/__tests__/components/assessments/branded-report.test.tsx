@@ -376,6 +376,10 @@ describe("BrandedReport — section breakdown", () => {
     expect(achievedMarks.length).toBe(3);
     // rating always shown
     expect(breakdown.textContent).toContain("3");
+    // section chip present when achievement is meaningful (passThreshold > 0)
+    expect(
+      breakdown.querySelectorAll(".su-report-card-chip").length,
+    ).toBeGreaterThan(0);
   });
 
   it("neutral (passThreshold===0): shows ratings, NO checkmarks", () => {
@@ -383,6 +387,9 @@ describe("BrandedReport — section breakdown", () => {
     const breakdown = screen.getByTestId("report-sections");
     expect(breakdown.textContent).toContain("We have a clear top priority");
     expect(within(breakdown).queryAllByTestId("achieved-marker").length).toBe(0);
+    // Greptile P1: the section chip (achievedCount/totalCount) is also suppressed
+    // for neutral templates — otherwise it shows a meaningless "N / N".
+    expect(breakdown.querySelectorAll(".su-report-card-chip").length).toBe(0);
   });
 
   it("Rockefeller has NO domain-colored card headers (no perDomain)", () => {

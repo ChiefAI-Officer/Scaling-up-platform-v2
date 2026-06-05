@@ -377,9 +377,11 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
                   <h3 className="su-report-card-title">
                     {parsed?.name ?? ps.name ?? ps.stableKey}
                   </h3>
-                  <span className="su-report-card-chip">
-                    {ps.achievedCount} / {ps.totalCount}
-                  </span>
+                  {showCheckmarks && (
+                    <span className="su-report-card-chip">
+                      {ps.achievedCount} / {ps.totalCount}
+                    </span>
+                  )}
                 </div>
                 <ul className="su-report-card-list">
                   {rows.length === 0 ? (
