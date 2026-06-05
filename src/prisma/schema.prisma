@@ -1211,6 +1211,7 @@ model AssessmentCampaign {
   organizationId      String
   language            String
   alias               String                       @unique
+  externalId          String?                      @unique // Esperto historical-import provenance + idempotency; stored namespaced "esperto:<campaignid>". Prisma full-unique replaced with partial WHERE NOT NULL via raw SQL (see migration add_external_id_to_campaign), mirroring Organization.externalId.
   name                String
   description         String?
   status              AssessmentCampaignStatus     @default(DRAFT)

@@ -105,6 +105,20 @@ export async function POST(
       );
     }
 
+    // Defense-in-depth: a closed campaign or one historically imported from
+    // Esperto (externalId set, namespaced "esperto:<id>" per ADR-0006) must
+    // never send invitation email. Refuse BEFORE any invitation row is
+    // written or any email is sent.
+    if (campaign.status === "CLOSED" || campaign.externalId != null) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Cannot send invitations for a closed or imported campaign",
+        },
+        { status: 409 }
+      );
+    }
+
     let body: unknown = {};
     try {
       body = await request.json();

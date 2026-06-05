@@ -1,0 +1,38 @@
+[
+  {
+    "memberid": "mWSw2H9f6E",
+    "title": "CEO",
+    "firstname": "Test",
+    "middlename": "",
+    "lastname": "CEO",
+    "email": "ceo@example.com",
+    "status": "active",
+    "level": "ceofounderwithteam",
+    "testuser": false,
+    "extra": []
+  },
+  {
+    "memberid": "CVMmsiWPTP",
+    "title": "CFO",
+    "firstname": "Test",
+    "middlename": "",
+    "lastname": "CFO",
+    "email": "cfo@example.com",
+    "status": "active",
+    "level": "teamleader",
+    "testuser": false,
+    "extra": []
+  },
+  {
+    "memberid": "MxRWB1GIwu",
+    "title": "Professional Services",
+    "firstname": "Test",
+    "middlename": "",
+    "lastname": "Service",
+    "email": "svc@example.com",
+    "status": "active",
+    "level": "teamleader",
+    "testuser": false,
+    "extra": []
+  }
+]

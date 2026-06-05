@@ -39,6 +39,26 @@ _Avoid_: "title slide" as a distinct object, or a `SECTION_INTRO` question type 
 The way a respondent answers an assessment: **exactly one section per screen** (optionally preceded by that section's **intro slide**), with Back/Next navigation, a "Section N of M" label, and a progress bar by questions answered — replacing the legacy single long-scroll form. Both the public (`/quiz/[campaignAlias]`) and invited (`/org-survey/[campaignAlias]`) experiences use it. (`/me` is the invited flow's data API endpoint, not its page route.)
 _Avoid_: "page" (a section is not a route), "step" for the intro slide (the intro slide is a sub-view of a section, not a counted step).
 
+### Historical import (Esperto)
+
+**Historical import** (a.k.a. **Esperto import**):
+Bringing a company's pre-existing Esperto ("Scaling Up Toolkit") assessment data into the platform so coaches see past results alongside new ones. It runs in two phases: a **Roster import** (the people) followed by a **Results import** (their past answers + result). It is admin-operated and staging-first — a parsed preview is always reviewed before anything is committed.
+_Avoid_: "migration" (that means a database schema change here), "sync" (it is a one-directional, point-in-time load, not an ongoing two-way sync).
+
+**Roster import** (Historical import, phase 1):
+Loading a company + its members from an Esperto Members export into one **Organization** with its **Respondents**. The Esperto member id is retained on each Respondent as the cross-phase join key. Carries no past answers — it only populates who exists.
+
+**Results import** (Historical import, phase 2):
+Loading a company's past Esperto responses for one assessment into an **Imported campaign**, attaching each person's answers via that template's **crosswalk**. Requires the **Roster import** to have run first (it resolves people by their Esperto member id).
+
+**Imported campaign**:
+A **Campaign** reconstructed from Esperto history rather than sent fresh from the platform. It is born **CLOSED** and back-dated to the original Esperto response dates, and — because the people already answered in Esperto — **no invitation is ever emailed**. It is identified by its originating Esperto campaign id.
+_Avoid_: treating an Imported campaign as live — it never sends mail, never accepts new responses, and exists only to display historical results.
+
+**Crosswalk** (import):
+The hand-authored, per-template map from Esperto's question codes (e.g. `Q3_1`, `Q12_10`) to our **stableKeys**, used by a **Results import** to attach historical answers to the right questions. Because Esperto exports carry no question text, a template's crosswalk must be reviewed and locked (against a rendered Esperto report or the survey screenshots) before that template's Results import is enabled.
+_Avoid_: assuming Esperto's codes equal our stableKeys — they never do; the crosswalk is the bridge.
+
 ### Results & scoring (three distinct "band"-like concepts — do not conflate)
 
 **Scoring tier** (a.k.a. band):
