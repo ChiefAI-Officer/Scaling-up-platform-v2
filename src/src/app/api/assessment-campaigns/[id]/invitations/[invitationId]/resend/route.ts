@@ -86,6 +86,8 @@ export async function POST(
             name: true,
             alias: true,
             closeAt: true,
+            status: true,
+            externalId: true,
             template: {
               select: {
                 invitationSubject: true,
@@ -120,6 +122,22 @@ export async function POST(
         {
           success: false,
           error: `Cannot resend invitation in status ${invitation.status}`,
+        },
+        { status: 409 }
+      );
+    }
+    // Defense-in-depth: a closed campaign or one historically imported from
+    // Esperto (externalId set, namespaced "esperto:<id>" per ADR-0006) must
+    // never re-send invitation email. Refuse BEFORE the token is rotated or
+    // any email is sent.
+    if (
+      invitation.campaign.status === "CLOSED" ||
+      invitation.campaign.externalId != null
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Cannot send invitations for a closed or imported campaign",
         },
         { status: 409 }
       );

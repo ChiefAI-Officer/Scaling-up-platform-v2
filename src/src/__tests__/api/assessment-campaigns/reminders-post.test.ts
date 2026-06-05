@@ -63,6 +63,7 @@ const baseCampaign = {
   templateId: "tpl-1",
   createdByCoachId: "coach-1",
   status: "ACTIVE" as const,
+  externalId: null as string | null,
   alias: "demo",
   name: "Demo",
   closeAt: null as Date | null,
@@ -209,7 +210,7 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     expect(body.code).toBe("CAMPAIGN_NOT_ACTIVE");
   });
 
-  it("409 CAMPAIGN_NOT_ACTIVE when campaign is CLOSED", async () => {
+  it("409 when campaign is CLOSED — no email sent (defense-in-depth)", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation(
       (args) => {
@@ -225,6 +226,43 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     );
     const res = await POST(emptyReq() as never, detailParams("c1"));
     expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe(
+      "Cannot send invitations for a closed or imported campaign"
+    );
+    expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
+    expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
+  });
+
+  it("409 when campaign was imported (externalId set) — no email sent", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation(
+      (args) => {
+        if (args?.include) {
+          return Promise.resolve({
+            ...baseCampaign,
+            status: "ACTIVE",
+            externalId: "esperto:ABC123",
+            participants: ACTIVE_PARTICIPANTS,
+          });
+        }
+        return Promise.resolve({
+          ...baseCampaign,
+          status: "ACTIVE",
+          externalId: "esperto:ABC123",
+        });
+      }
+    );
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toBe(
+      "Cannot send invitations for a closed or imported campaign"
+    );
+    expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
+    expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
   });
 
   it("happy bulk path: reminds all non-submitted participants", async () => {
