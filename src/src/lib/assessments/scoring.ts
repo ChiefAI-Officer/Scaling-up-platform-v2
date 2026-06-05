@@ -981,7 +981,8 @@ function resolveTier(tiers: Tier[], value: number): Tier | null {
 
 export function scoreSubmission(
   version: TemplateVersionForScoring,
-  answers: Answer[]
+  answers: Answer[],
+  options?: { allowMissingRequired?: boolean }
 ): ScoreResult {
   // 1) Validate the version shape with Zod first so downstream code can
   //    trust the shape.
@@ -1209,10 +1210,26 @@ export function scoreSubmission(
   }
 
   if (missingRequired.length > 0) {
-    throw new ScoringValidationError(
-      "MISSING_REQUIRED_KEY",
-      { stableKeys: missingRequired }
-    );
+    if (options?.allowMissingRequired === true) {
+      // Historical-import mode: do NOT reject the submission for missing
+      // required keys (year-old Esperto data may lack a now-required answer).
+      // Route the missing-required keys into `unansweredKeys` — appended after
+      // the existing optional-unanswered keys, deduped, preserving order — so
+      // the scorer returns a normal ScoreResult computed over whatever WAS
+      // answered.
+      const seen = new Set(unansweredKeys);
+      for (const k of missingRequired) {
+        if (!seen.has(k)) {
+          seen.add(k);
+          unansweredKeys.push(k);
+        }
+      }
+    } else {
+      throw new ScoringValidationError(
+        "MISSING_REQUIRED_KEY",
+        { stableKeys: missingRequired }
+      );
+    }
   }
 
   // 7) Compute results.
