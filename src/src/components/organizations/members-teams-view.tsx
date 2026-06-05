@@ -13,7 +13,8 @@
  */
 
 import React, { useState, useCallback, useRef } from "react";
-import { ChevronRight, ChevronDown, Building2, Users, UserPlus, Upload, FolderPlus, Pencil } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, ChevronDown, Building2, Users, UserPlus, Upload, FolderPlus, Pencil, FileDown } from "lucide-react";
 import { levelLabel } from "@/lib/assessments/respondent-levels";
 import { AddTeamModal } from "./add-team-modal";
 import type { CreatedResult } from "./add-team-modal";
@@ -581,6 +582,17 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
             {panelTitle ? `Members — ${panelTitle}` : "Members"}
           </h2>
           <div className="flex items-center gap-1">
+            {/* Import historical data from Esperto (own lane / page) */}
+            <Link
+              href="/portal/members/import"
+              title="Import from Esperto"
+              aria-label="Import from Esperto"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <FileDown className="w-4 h-4" />
+              Import from Esperto
+            </Link>
+
             {/* Import members (bulk CSV) */}
             <button
               type="button"

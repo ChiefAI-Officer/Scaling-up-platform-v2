@@ -494,4 +494,16 @@ describe("MembersTeamsView", () => {
       expect(screen.queryByRole("heading", { name: /import members/i })).not.toBeInTheDocument();
     });
   });
+
+  /**
+   * (l) The Members & Teams lane exposes an "Import from Esperto" link that
+   *     navigates to the coach Esperto import page.
+   */
+  test("(l) renders an 'Import from Esperto' link to /portal/members/import", () => {
+    render(<MembersTeamsView initialOrganizations={[ORG_1]} />);
+
+    const link = screen.getByRole("link", { name: /import from esperto/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute("href", "/portal/members/import");
+  });
 });

@@ -1,12 +1,18 @@
 "use client";
 
 /**
- * Esperto historical import — admin workflow client (Slice 7c).
+ * Esperto historical import — workflow client (Slice 7c).
  *
- * Drives POST /api/admin/assessments/import (already built). Two kinds:
- *   - "roster"  → people. Requires an owning coach + a company name.
+ * Drives the Esperto import endpoint. Two kinds:
+ *   - "roster"  → people. Requires a company name (+ an owning coach in admin).
  *   - "results" → past answers. Org is resolved server-side by member-id join,
  *                 so no coach/company fields are shown.
+ *
+ * Two variants:
+ *   - "admin" (default): renders an owning-coach picker (fetched from
+ *     /api/coaches) and POSTs to /api/admin/assessments/import with ownerCoachId.
+ *   - "coach": NO coach picker (the owning coach is the logged-in user, resolved
+ *     server-side) and POSTs to /api/assessments/import with NO ownerCoachId.
  *
  * Two-step gate (staging-first): Preview (mode:"preview", no writes) then
  * Commit (mode:"commit"). Commit is enabled ONLY after a successful preview
@@ -14,7 +20,7 @@
  * keep Commit disabled. Everything renders defensively — a missing count or
  * array never crashes the panel.
  *
- * Brand-neutral admin theme (no .su-assessment-brand / participant purple).
+ * Brand-neutral theme (no .su-assessment-brand / participant purple).
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -64,7 +70,7 @@ interface CommitState {
   counts: Record<string, unknown>;
 }
 
-const IMPORT_URL = "/api/admin/assessments/import";
+export type EspertoImportVariant = "admin" | "coach";
 
 function coachLabel(c: Coach): string {
   const name = [c.firstName, c.lastName].filter(Boolean).join(" ").trim();
@@ -101,7 +107,16 @@ function issueText(issue: PlanIssue): string {
   return why || id || JSON.stringify(issue);
 }
 
-export function EspertoImportClient() {
+export function EspertoImportClient({
+  variant = "admin",
+}: {
+  variant?: EspertoImportVariant;
+} = {}) {
+  const isCoach = variant === "coach";
+  const apiPath = isCoach
+    ? "/api/assessments/import"
+    : "/api/admin/assessments/import";
+
   const [kind, setKind] = useState<ImportKind>("roster");
 
   // ── File / payload state ──────────────────────────────────────────────
@@ -126,8 +141,11 @@ export function EspertoImportClient() {
 
   const inFlight = previewLoading || commitLoading;
 
-  // Fetch coaches on mount (roster picker source).
+  // Fetch coaches on mount (roster picker source) — admin variant only.
+  // In the coach variant the owning coach is the logged-in user (resolved
+  // server-side), so there is no picker and we never touch /api/coaches.
   useEffect(() => {
+    if (isCoach) return;
     let cancelled = false;
     (async () => {
       try {
@@ -148,7 +166,7 @@ export function EspertoImportClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isCoach]);
 
   function resetResults() {
     setPreview(null);
@@ -192,16 +210,21 @@ export function EspertoImportClient() {
   const canPreview = useMemo(() => {
     if (!payload || inFlight) return false;
     if (kind === "roster") {
-      return !!ownerCoachId && !!companyName.trim();
+      // Admin must also pick an owning coach; for a coach it's implicit.
+      const coachReady = isCoach ? true : !!ownerCoachId;
+      return coachReady && !!companyName.trim();
     }
     return true;
-  }, [payload, inFlight, kind, ownerCoachId, companyName]);
+  }, [payload, inFlight, kind, ownerCoachId, companyName, isCoach]);
 
   function buildBody(mode: "preview" | "commit") {
     const body: Record<string, unknown> = { mode, kind, payload };
     if (kind === "roster") {
-      body.ownerCoachId = ownerCoachId;
       body.companyName = companyName.trim();
+      // ownerCoachId is admin-only — the coach route derives it server-side.
+      if (!isCoach) {
+        body.ownerCoachId = ownerCoachId;
+      }
     }
     return body;
   }
@@ -210,7 +233,7 @@ export function EspertoImportClient() {
     resetResults();
     setPreviewLoading(true);
     try {
-      const res = await fetch(IMPORT_URL, {
+      const res = await fetch(apiPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildBody("preview")),
@@ -249,7 +272,7 @@ export function EspertoImportClient() {
     setCommitResult(null);
     setCommitLoading(true);
     try {
-      const res = await fetch(IMPORT_URL, {
+      const res = await fetch(apiPath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildBody("commit")),
@@ -315,7 +338,9 @@ export function EspertoImportClient() {
           <CardDescription>
             Upload the raw Esperto JSON export
             {kind === "roster"
-              ? " (a Members file) and pick the owning coach + company."
+              ? isCoach
+                ? " (a Members file) and name the company it belongs to."
+                : " (a Members file) and pick the owning coach + company."
               : " (a Report file). The company is matched automatically by member id."}
           </CardDescription>
         </CardHeader>
@@ -345,30 +370,32 @@ export function EspertoImportClient() {
 
           {kind === "roster" ? (
             <>
-              <div className="space-y-2">
-                <Label htmlFor="owner-coach">Owning coach</Label>
-                <select
-                  id="owner-coach"
-                  value={ownerCoachId}
-                  onChange={(e) => {
-                    setOwnerCoachId(e.target.value);
-                    resetResults();
-                  }}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  <option value="">Select a coach…</option>
-                  {coaches.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {coachLabel(c)}
-                    </option>
-                  ))}
-                </select>
-                {coachesError ? (
-                  <p role="alert" className="text-sm text-destructive">
-                    {coachesError}
-                  </p>
-                ) : null}
-              </div>
+              {!isCoach ? (
+                <div className="space-y-2">
+                  <Label htmlFor="owner-coach">Owning coach</Label>
+                  <select
+                    id="owner-coach"
+                    value={ownerCoachId}
+                    onChange={(e) => {
+                      setOwnerCoachId(e.target.value);
+                      resetResults();
+                    }}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Select a coach…</option>
+                    {coaches.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {coachLabel(c)}
+                      </option>
+                    ))}
+                  </select>
+                  {coachesError ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      {coachesError}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="space-y-2">
                 <Label htmlFor="company-name">Company name</Label>

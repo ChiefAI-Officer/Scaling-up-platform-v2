@@ -385,4 +385,118 @@ describe("EspertoImportClient", () => {
     );
     expect(importCalls).toHaveLength(0);
   });
+
+  it("admin variant (default) renders the coach picker and posts to the admin route", async () => {
+    // This re-asserts the admin invariant alongside the coach variant below,
+    // so a regression in either path is caught here.
+    mockCoachesOk();
+    render(<EspertoImportClient variant="admin" />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("option", { name: /Casey Coach/i }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText(/Owning coach/i)).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/coaches"),
+    );
+
+    await uploadFile(jsonFile(ROSTER_PAYLOAD));
+    fireEvent.change(screen.getByLabelText(/Owning coach/i), {
+      target: { value: "coach-1" },
+    });
+
+    mockJsonResponse(true, 200, {
+      success: true,
+      data: {
+        plan: { creates: [], backfills: [], skips: [], blocks: [] },
+        summary: { orgAction: "create", creates: 1, backfills: 0, skips: 0, blocks: 0 },
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Preview$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("preview-panel")).toBeInTheDocument(),
+    );
+
+    const adminCall = (global.fetch as jest.Mock).mock.calls.find(
+      ([url]) => url === "/api/admin/assessments/import",
+    );
+    expect(adminCall).toBeTruthy();
+    // The coach route was never hit in admin mode.
+    expect(
+      (global.fetch as jest.Mock).mock.calls.some(
+        ([url]) => url === "/api/assessments/import",
+      ),
+    ).toBe(false);
+    const body = JSON.parse(adminCall![1].body);
+    expect(body.ownerCoachId).toBe("coach-1");
+  });
+
+  describe('variant="coach"', () => {
+    it("does NOT render the coach picker and does NOT fetch /api/coaches", async () => {
+      render(<EspertoImportClient variant="coach" />);
+
+      // Mode switch + file input still present.
+      expect(
+        screen.getByRole("radio", { name: /Roster \(people\)/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/Esperto export/i)).toBeInTheDocument();
+
+      // Company name is still required for roster…
+      expect(screen.getByLabelText(/Company name/i)).toBeInTheDocument();
+      // …but there is NO owning-coach picker.
+      expect(screen.queryByLabelText(/Owning coach/i)).not.toBeInTheDocument();
+
+      // /api/coaches is never requested in the coach variant.
+      const coachFetches = (global.fetch as jest.Mock).mock.calls.filter(
+        ([url]) =>
+          typeof url === "string" && url.includes("/api/coaches"),
+      );
+      expect(coachFetches).toHaveLength(0);
+    });
+
+    it("roster preview posts to /api/assessments/import with NO ownerCoachId", async () => {
+      render(<EspertoImportClient variant="coach" />);
+
+      await uploadFile(jsonFile(ROSTER_PAYLOAD));
+      // No coach to pick — company name auto-fills from the filename ("Acme").
+
+      mockJsonResponse(true, 200, {
+        success: true,
+        data: {
+          plan: { creates: [], backfills: [], skips: [], blocks: [] },
+          summary: { orgAction: "create", creates: 2, backfills: 0, skips: 0, blocks: 0 },
+        },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: /^Preview$/i }));
+
+      await waitFor(() =>
+        expect(screen.getByTestId("preview-panel")).toBeInTheDocument(),
+      );
+
+      // Posted to the COACH route, never the admin route.
+      const coachCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([url]) => url === "/api/assessments/import",
+      );
+      expect(coachCall).toBeTruthy();
+      expect(
+        (global.fetch as jest.Mock).mock.calls.some(
+          ([url]) => url === "/api/admin/assessments/import",
+        ),
+      ).toBe(false);
+
+      const body = JSON.parse(coachCall![1].body);
+      expect(body).toMatchObject({
+        mode: "preview",
+        kind: "roster",
+        companyName: "Acme",
+      });
+      // The coach is implicit (server-derived) — never sent from the client.
+      expect(body).not.toHaveProperty("ownerCoachId");
+      expect(body.payload).toEqual(ROSTER_PAYLOAD);
+    });
+  });
 });
