@@ -1,0 +1,730 @@
+/*
+ * su-report.css
+ *
+ * Branded Results Report — screen + print styles for the BrandedReport component.
+ *
+ * SCOPE: every rule is nested under `.su-public-brand .su-report` (ADR-0005).
+ * Nothing here applies unless an ancestor carries both classes — the blue
+ * admin/coach UI and global design tokens are NEVER affected.
+ *
+ * The root of BrandedReport renders:
+ *   <div class="su-public-brand su-report">
+ *
+ * All brand primitives (su-stripe-h, su-logo, su-brandbar, su-h1/h2/h3,
+ * su-cta, purple vars, Helvetica Neue / Roboto fonts) come from su-public-brand.css
+ * which is already loaded by the parent layout.  This file adds only the
+ * report-specific layout + report-class styles.
+ *
+ * Brand palette (mirrored from su-public-brand.css for readability):
+ *   purple        #522583   purple-deep  #3f1c66   purple-tint  #f4f0fa
+ *   ink           #1a1322   muted        #6b6480   grey         #e4e4e4
+ *   orange        #f7a600   blue         #008bd2   brown        #946b36
+ *   green         #95c11f
+ *
+ * Class inventory (confirmed against BrandedReport.tsx):
+ *   su-report-degraded, su-report-cover, su-report-cover-inner,
+ *   su-brandbar, su-logo, su-stripe-h (reused),
+ *   su-report-title, su-report-campaign-label,
+ *   su-report-cover-meta, su-report-for, su-report-sub,
+ *   su-report-overall, su-report-eyebrow, su-report-overall-main,
+ *   su-report-headline, su-report-status, su-report-band,
+ *   su-report-lede, su-report-stats, su-report-stat,
+ *   su-report-stat-v, su-report-stat-l,
+ *   su-report-sections, su-report-sec-title, su-report-grid,
+ *   su-report-card, su-report-card-head, su-report-card-title,
+ *   su-report-card-chip, su-report-card-list, su-report-card-empty,
+ *   su-report-q, su-report-ck (+ .yes / .no), su-report-q-label,
+ *   su-report-unmapped, su-report-q-rate,
+ *   su-report-orphan-list,
+ *   su-report-scores, su-report-table, su-report-num,
+ *   su-report-score, su-report-avg, su-report-dot, su-report-total,
+ *   su-report-recs, su-report-rec-group, su-report-rec-section,
+ *   su-report-rec,
+ *   su-report-additional, su-report-dl, su-report-dl-row,
+ *   su-report-dl-q, su-report-dl-a,
+ *   su-report-conclusion, su-report-conclude-title, su-report-cta-text,
+ *   su-report-footer, su-report-provenance, su-report-confidential,
+ *   no-print (screen-only utility — hides PrintReportButton on print)
+ */
+
+/* ── Report root ─────────────────────────────────────────────────────────── */
+.su-public-brand.su-report {
+  background: #ffffff;
+  color: #1a1322;
+  font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+/* ── Degraded notice ─────────────────────────────────────────────────────── */
+.su-public-brand .su-report-degraded {
+  background: #fff8e1;
+  border-left: 5px solid #f7a600;
+  padding: 14px 20px;
+  font-size: 14px;
+  color: #3a2400;
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 0;
+}
+
+/* ── Print button (screen-only utility) ──────────────────────────────────── */
+.su-public-brand .su-report-print-btn {
+  /* Inherits .su-cta styles from su-public-brand.css */
+  position: fixed;
+  top: 18px;
+  right: 24px;
+  z-index: 50;
+  box-shadow: 0 6px 20px rgba(40, 20, 70, 0.22);
+  font-size: 13px;
+  padding: 11px 18px;
+  border-radius: 8px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   1. COVER
+   ══════════════════════════════════════════════════════════════════════════ */
+.su-public-brand .su-report-cover {
+  background: #522583;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  padding-bottom: 64px;
+}
+
+/* .su-stripe-h rule already in su-public-brand.css — reused here as-is */
+
+.su-public-brand .su-report-cover-inner {
+  position: relative;
+  z-index: 2;
+  padding: 48px 60px 0;
+}
+
+/* S-curve swoosh — pure CSS decorative blob behind the cover text */
+.su-public-brand .su-report-cover-inner::after {
+  content: "";
+  position: absolute;
+  right: -60px;
+  top: 20px;
+  width: 520px;
+  height: 480px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at 60% 40%,
+    rgba(255, 255, 255, 0.09) 0%,
+    transparent 65%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.su-public-brand .su-report-cover .su-brandbar {
+  margin-bottom: 60px;
+}
+
+/* Cover title — inherits .su-h1 from su-public-brand.css but overrides color */
+.su-public-brand .su-report-title {
+  font-size: 52px;
+  line-height: 1.02;
+  color: #ffffff;
+  max-width: 18ch;
+  position: relative;
+  z-index: 1;
+}
+
+.su-public-brand .su-report-campaign-label {
+  font-size: 18px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.88);
+  margin-top: 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.su-public-brand .su-report-cover-meta {
+  margin-top: 80px;
+  position: relative;
+  z-index: 1;
+}
+
+.su-public-brand .su-report-for {
+  font-weight: 700;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 20px;
+  color: #ffffff;
+}
+
+.su-public-brand .su-report-sub {
+  color: rgba(255, 255, 255, 0.82);
+  font-style: italic;
+  font-size: 15px;
+  margin-top: 4px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2. OVERALL RESULT BANNER
+   ══════════════════════════════════════════════════════════════════════════ */
+.su-public-brand .su-report-overall {
+  padding: 40px 60px 36px;
+}
+
+.su-public-brand .su-report-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #008bd2;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.su-public-brand .su-report-overall-main {
+  background: linear-gradient(120deg, #522583, #3f1c66);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 28px 32px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.su-public-brand .su-report-headline {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 34px;
+  line-height: 1.05;
+  flex: 1 1 auto;
+}
+
+.su-public-brand .su-report-band {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  padding: 6px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.su-public-brand .su-report-status {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.82);
+  font-style: italic;
+  flex-shrink: 0;
+}
+
+.su-public-brand .su-report-lede {
+  font-size: 15px;
+  color: #3a3346;
+  margin: 14px 0 0;
+  max-width: 68ch;
+  line-height: 1.65;
+}
+
+/* Stats row */
+.su-public-brand .su-report-stats {
+  display: flex;
+  gap: 14px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.su-public-brand .su-report-stat {
+  flex: 1 1 0;
+  min-width: 120px;
+  background: #ffffff;
+  border: 1px solid #e4e4e4;
+  border-radius: 10px;
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.su-public-brand .su-report-stat-v {
+  display: block;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 32px;
+  color: #522583;
+  line-height: 1;
+}
+
+.su-public-brand .su-report-stat-l {
+  display: block;
+  font-size: 11px;
+  color: #6b6480;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 6px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3. SECTION BREAKDOWN — card grid
+   ══════════════════════════════════════════════════════════════════════════ */
+.su-public-brand .su-report-sections {
+  padding: 6px 60px 40px;
+}
+
+.su-public-brand .su-report-sec-title {
+  color: #522583;
+  margin: 6px 0 20px;
+}
+
+/* Two-column card grid */
+.su-public-brand .su-report-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Individual section card */
+.su-public-brand .su-report-card {
+  border: 1px solid #e4e4e4;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+/* Card header — default purple; domain color applied via inline backgroundColor */
+.su-public-brand .su-report-card-head {
+  background: #522583;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.su-public-brand .su-report-card-title {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.25;
+  flex: 1;
+  color: #ffffff;
+  margin: 0;
+}
+
+.su-public-brand .su-report-card-chip {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 3px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Question list inside a card */
+.su-public-brand .su-report-card-list {
+  list-style: none;
+  padding: 12px 16px 14px;
+  margin: 0;
+}
+
+.su-public-brand .su-report-card-empty {
+  font-size: 13px;
+  color: #6b6480;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+/* Per-question row */
+.su-public-brand .su-report-q {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13px;
+  color: #3a3346;
+  padding: 5px 0;
+  border-bottom: 1px solid #f4f0fa;
+}
+
+.su-public-brand .su-report-q:last-child {
+  border-bottom: 0;
+}
+
+/* Checkmark / cross affordance (G2 — only when passThreshold > 0) */
+.su-public-brand .su-report-ck {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  margin-top: 1px;
+  font-weight: 700;
+}
+
+.su-public-brand .su-report-ck.yes {
+  background: rgba(149, 193, 31, 0.18);
+  color: #4a7a00;
+}
+
+.su-public-brand .su-report-ck.no {
+  background: rgba(216, 35, 42, 0.12);
+  color: #b01b20;
+}
+
+.su-public-brand .su-report-q-label {
+  flex: 1;
+  line-height: 1.45;
+}
+
+.su-public-brand .su-report-unmapped {
+  font-size: 11px;
+  color: #6b6480;
+  font-style: italic;
+}
+
+.su-public-brand .su-report-q-rate {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #6b6480;
+  font-weight: 500;
+  white-space: nowrap;
+  padding-left: 8px;
+}
+
+/* Orphan questions (not claimed by any section) */
+.su-public-brand .su-report-orphan-list {
+  list-style: none;
+  padding: 0;
+  margin: 24px 0 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   4. SCORES TABLE
+   ══════════════════════════════════════════════════════════════════════════ */
+.su-public-brand .su-report-scores {
+  padding: 40px 60px;
+  background: #f9f8fc;
+  border-top: 1px solid #e4e4e4;
+}
+
+.su-public-brand .su-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.su-public-brand .su-report-table thead th {
+  text-align: left;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  color: #6b6480;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 10px 12px;
+  border-bottom: 2px solid #522583;
+}
+
+.su-public-brand .su-report-table tbody td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #e4e4e4;
+  vertical-align: middle;
+}
+
+.su-public-brand .su-report-num {
+  text-align: center;
+}
+
+/* Domain color dot in the table */
+.su-public-brand .su-report-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+.su-public-brand .su-report-score {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  color: #522583;
+}
+
+.su-public-brand .su-report-avg {
+  color: #6b6480;
+}
+
+/* Total row */
+.su-public-brand .su-report-total td {
+  border-top: 2px solid #522583;
+  border-bottom: none;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   5. RECOMMENDATIONS
+   ══════════════════════════════════════════════════════════════════════════ */
+.su-public-brand .su-report-recs {
+  padding: 40px 60px;
+  border-top: 1px solid #e4e4e4;
+}
+
+.su-public-brand .su-report-rec-group {
+  margin-bottom: 28px;
+}
+
+.su-public-brand .su-report-rec-section {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  color: #522583;
+  margin: 0 0 12px;
+}
+
+.su-public-brand .su-report-rec {
+  border-left: 5px solid #f7a600;
+  background: #f4f0fa;
+  border-radius: 0 10px 10px 0;
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+
+.su-public-brand .su-report-rec p {
+  font-size: 14px;
+  color: #3a3346;
+  margin: 0;
+  line-height: 1.65;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   6. ADDITIONAL (non-slider) RESPONSES
+   ══════════════════════════════════════════════════════════════════════════ */
+.su-public-brand .su-report-additional {
+  padding: 40px 60px;
+  background: #f9f8fc;
+  border-top: 1px solid #e4e4e4;
+}
+
+.su-public-brand .su-report-dl {
+  margin: 0;
+}
+
+.su-public-brand .su-report-dl-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #e4e4e4;
+}
+
+.su-public-brand .su-report-dl-row:last-child {
+  border-bottom: 0;
+}
+
+.su-public-brand .su-report-dl-q {
+  font-weight: 600;
+  font-size: 14px;
+  color: #3a3346;
+  line-height: 1.5;
+}
+
+.su-public-brand .su-report-dl-a {
+  font-size: 14px;
+  color: #1a1322;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7. CONCLUSION
+   ══════════════════════════════════════════════════════════════════════════ */
+.su-public-brand .su-report-conclusion {
+  background: #f4f0fa;
+  border-top: 1px solid #e4e4e4;
+  padding: 40px 60px;
+  text-align: center;
+}
+
+.su-public-brand .su-report-conclude-title {
+  font-size: 26px;
+  color: #522583;
+  margin: 0 0 14px;
+}
+
+.su-public-brand .su-report-conclusion p {
+  font-size: 15px;
+  color: #3a3346;
+  max-width: 52ch;
+  margin: 0 auto;
+  line-height: 1.65;
+}
+
+.su-public-brand .su-report-cta-text {
+  margin-top: 16px !important;
+  font-weight: 700;
+  color: #522583 !important;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   8. FOOTER
+   ══════════════════════════════════════════════════════════════════════════ */
+.su-public-brand .su-report-footer {
+  background: #522583;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 18px 60px;
+}
+
+.su-public-brand .su-report-footer .su-logo {
+  /* override the default 24px height to the print-appropriate 22px */
+  height: 22px;
+}
+
+.su-public-brand .su-report-provenance {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.su-public-brand .su-report-confidential {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  font-style: italic;
+  margin-left: auto;
+}
+
+/* ── Responsive (screen) ─────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .su-public-brand .su-report-cover-inner { padding: 36px 24px 0; }
+  .su-public-brand .su-report-title { font-size: 34px; }
+  .su-public-brand .su-report-overall { padding: 28px 24px; }
+  .su-public-brand .su-report-overall-main { padding: 20px 22px; }
+  .su-public-brand .su-report-headline { font-size: 24px; }
+  .su-public-brand .su-report-sections { padding: 6px 24px 32px; }
+  .su-public-brand .su-report-grid { grid-template-columns: 1fr; }
+  .su-public-brand .su-report-scores { padding: 32px 24px; }
+  .su-public-brand .su-report-recs { padding: 32px 24px; }
+  .su-public-brand .su-report-additional { padding: 32px 24px; }
+  .su-public-brand .su-report-conclusion { padding: 32px 24px; }
+  .su-public-brand .su-report-footer { padding: 16px 24px; flex-direction: column; align-items: flex-start; }
+  .su-public-brand .su-report-dl-row { grid-template-columns: 1fr; gap: 6px; }
+  .su-public-brand .su-report-print-btn { position: static; margin: 16px auto; display: block; width: fit-content; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PRINT — @media print  (spec G5 / H5)
+   Produces a clean "document" PDF when the user clicks Print / Download PDF.
+   ══════════════════════════════════════════════════════════════════════════ */
+@media print {
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 14mm;
+    /*
+     * Page numbers via margin-box counter (best-effort — Chrome 112+).
+     * Comment out the lines below if the @counter-style / @page margin-box
+     * causes issues in a given environment.
+     *
+     * @bottom-center {
+     *   content: counter(page);
+     *   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+     *   font-size: 10pt;
+     *   color: rgba(82, 37, 131, 0.6);
+     * }
+     */
+  }
+
+  /* Hide screen-only controls */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Remove screen shadow / centering from any wrapping .page container */
+  body {
+    background: #ffffff !important;
+  }
+
+  /* Report container fills the page */
+  .su-public-brand.su-report {
+    max-width: none;
+    width: 100%;
+    box-shadow: none !important;
+  }
+
+  /* Cover breaks to its own page */
+  .su-public-brand .su-report-cover {
+    break-after: page;
+  }
+
+  /* Prevent awkward mid-card / mid-section splits */
+  .su-public-brand .su-report-card {
+    break-inside: avoid;
+  }
+
+  .su-public-brand .su-report-overall,
+  .su-public-brand .su-report-sections,
+  .su-public-brand .su-report-scores,
+  .su-public-brand .su-report-recs,
+  .su-public-brand .su-report-additional,
+  .su-public-brand .su-report-conclusion {
+    break-inside: avoid;
+  }
+
+  .su-public-brand .su-report-rec {
+    break-inside: avoid;
+  }
+
+  .su-public-brand .su-report-dl-row {
+    break-inside: avoid;
+  }
+
+  /* Footer: keep together; add reserved top padding so it never bleeds into
+     the page margin.  Uses a simple block — no position:fixed (which is
+     unreliable for repeating footers across print pages). */
+  .su-public-brand .su-report-footer {
+    break-inside: avoid;
+    padding-top: 20px;
+    margin-top: 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  /* Ensure the fixed print-button is gone (belt + suspenders) */
+  .su-public-brand .su-report-print-btn {
+    display: none !important;
+  }
+
+  /* Keep stats row together */
+  .su-public-brand .su-report-stats {
+    break-inside: avoid;
+  }
+
+  /* Keep overall main banner together */
+  .su-public-brand .su-report-overall-main {
+    break-inside: avoid;
+  }
+
+  /* Score table header stays with first data row */
+  .su-public-brand .su-report-table thead {
+    display: table-header-group;
+  }
+
+  .su-public-brand .su-report-table tr {
+    break-inside: avoid;
+  }
+}
