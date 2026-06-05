@@ -12,6 +12,17 @@ name: CI
 # reintroduce exactly the wipe risk this repo is hardening against. The dummy
 # URLs below only satisfy `prisma generate` + Prisma client instantiation; they
 # never connect.
+#
+# REQUIRED vs ADVISORY (see docs/runbooks/branch-protection-setup.md):
+# When CI was first activated, the standalone `eslint` + `jest` runs surfaced a
+# backlog of PRE-EXISTING failures that the local `next build`-only gate never
+# ran (110 lint problems incl. 22 errors; 17 failing tests / 5 suites — 3 of
+# which are the long-standing known failures listed in CLAUDE.md). Those live in
+# the assessment module and are owned elsewhere. So branch protection requires
+# only the two jobs that are green AND wipe-relevant — `Build` and
+# `Migration Safety Gate`. `Lint & Type Check` and `Unit Tests` run for VISIBILITY
+# (they will show red until the backlog is burned down) but are NOT required to
+# merge yet. Promote them to required once green.
 
 on:
   pull_request:

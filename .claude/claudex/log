@@ -1044,3 +1044,8 @@ The plan at `PLAN.md...
 [2026-05-12T23:04:32Z] Active loop: 20260512-205638-67f324
 [2026-05-12T23:04:32Z] State: mode=plan phase=done round=2/1 signal=no-material-findings
 [2026-05-12T23:04:32Z] APPROVE: plan loop already done
+[2026-06-04T23:53:23Z] Hook fired. Input bytes: 4948
+[2026-06-04T23:53:23Z] Active loop: 20260512-205638-67f324
+[2026-06-04T23:53:23Z] State: mode=plan phase=done round=2/1 signal=no-material-findings
+[2026-06-04T23:53:23Z] cwd mismatch (state=/Users/diushianstand/Scaling-up-platform-v2, here=/Users/diushianstand/Scaling-up-platform-v2/.worktrees/github-guardrails); fail-open
+[2026-06-04T23:53:23Z] APPROVE: cwd mismatch

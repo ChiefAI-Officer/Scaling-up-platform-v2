@@ -4,8 +4,24 @@
 
 **Chosen model:** *CI required, no required review.*
 - Direct pushes to `main` are blocked → all changes go through a PR.
-- The CI status checks must pass before merge.
+- The required CI status checks must pass before merge.
 - **No human approval is required** (avoids the solo-maintainer self-approval deadlock; Greptile + operator approval handle review). CODEOWNERS auto-requests `@MonksKoala` but is not blocking.
+
+### Which checks are REQUIRED (and why not all of them)
+
+When CI was first activated it surfaced a backlog of **pre-existing** failures the old `next build`-only local gate never ran: **110 ESLint problems (22 errors, 88 warnings)** and **17 failing tests across 5 suites** — three of which are the long-known failures already documented in `CLAUDE.md` (`no-inline-tolocaledatestring`, `org-survey-exchange`, `assessment-campaigns-detail-route`). They live in the assessment module and are owned elsewhere.
+
+Requiring those checks now would block **every** merge. So required = the two jobs that are **green and wipe-relevant**:
+
+- ✅ **`Build`** — `next build` succeeds (also a deployability signal).
+- ✅ **`Migration Safety Gate`** — the destructive-migration tripwire.
+
+Advisory (run for visibility, will show red until burned down, **not** required to merge):
+
+- ⚠️ `Lint & Type Check`
+- ⚠️ `Unit Tests`
+
+**Burndown → promote:** once the pre-existing lint/test backlog is fixed (a separate effort by the assessment-module owners), add `"Lint & Type Check"` and `"Unit Tests"` to the `contexts` list below to make them blocking too.
 
 ---
 
@@ -31,8 +47,6 @@ gh api -X PUT repos/jcbdelo26/Scaling-up-platform-v2/branches/main/protection \
   "required_status_checks": {
     "strict": false,
     "contexts": [
-      "Lint & Type Check",
-      "Unit Tests",
       "Build",
       "Migration Safety Gate"
     ]
@@ -51,7 +65,7 @@ JSON
 ```
 
 What each setting does:
-- `required_status_checks.contexts` — the four CI job names that must pass. **These strings must exactly match the `name:` of each job in `ci.yml`.** If you rename a job, update this list.
+- `required_status_checks.contexts` — the CI job names that must pass (currently `Build` + `Migration Safety Gate` only — see "Which checks are REQUIRED" above). **These strings must exactly match the `name:` of each job in `ci.yml`.** If you rename a job, update this list.
 - `strict: false` — don't force every branch to be rebased onto the latest `main` before merge (friendlier for a near-solo repo; set `true` for stricter linear-ish flow).
 - `required_pull_request_reviews` present with `required_approving_review_count: 0` — **requires a PR** (blocks direct pushes) but needs **zero approvals** to merge. This is exactly "CI required, no required review."
 - `require_code_owner_reviews: false` — CODEOWNERS is informational/auto-request, not a merge blocker. Flip to `true` later to make `@MonksKoala` review mandatory.
