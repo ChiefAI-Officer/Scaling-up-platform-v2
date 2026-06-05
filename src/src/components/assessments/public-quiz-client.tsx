@@ -225,10 +225,11 @@ export function PublicQuizClient({
           >
             <span className="hero-eyebrow">About you</span>
             <h1 className="ty-title" id="quiz-info-title">
-              Tell us where to send your results
+              About you
             </h1>
             <p className="ty-sub">
-              We&apos;ll email your scoring summary as soon as you submit.
+              We use your email to match your responses; your facilitator
+              will follow up with your results.
             </p>
             <div className="survey-question">
               <label className="wf-label" htmlFor="quiz-first-name-input">
@@ -388,6 +389,7 @@ export function PublicQuizClient({
             onSubmit={handleSubmit}
             submitting={submitting}
             onExit={() => setStep("info")}
+            assessmentName={templateName}
           />
 
           {!canSubmit && (

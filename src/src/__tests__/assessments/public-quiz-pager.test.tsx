@@ -159,4 +159,15 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(screen.getByTestId("quiz-last-name")).toBeInTheDocument();
     expect(screen.getByTestId("quiz-email")).toBeInTheDocument();
   });
+
+  it("info step does NOT promise emailed results (D3 policy)", () => {
+    render(<PublicQuizClient {...baseProps} />);
+    fireEvent.click(screen.getByTestId("quiz-start"));
+    // Old false promises must be absent
+    expect(screen.queryByText(/send your results to the email/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/email your scoring summary/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/check your spam/i)).not.toBeInTheDocument();
+    // Accurate copy must be present
+    expect(screen.getByText(/facilitator will follow up with your results/i)).toBeInTheDocument();
+  });
 });

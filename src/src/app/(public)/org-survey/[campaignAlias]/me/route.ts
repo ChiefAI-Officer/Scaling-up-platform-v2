@@ -7,7 +7,7 @@
  * the respondent needs to render the form.
  *
  * Returns:
- *   { campaign: { name, alias }, version: { language }, sections, questions }
+ *   { campaign: { name, alias, organizationName }, version: { language }, sections, questions }
  *
  * Any lifecycle-gate failure → 410. No session → 401.
  */
@@ -44,6 +44,7 @@ export async function GET(
       include: {
         campaign: {
           include: {
+            organization: { select: { name: true } },
             version: {
               select: {
                 id: true,
@@ -96,6 +97,7 @@ export async function GET(
           campaign: {
             name: invitation.campaign.name,
             alias: invitation.campaign.alias,
+            organizationName: invitation.campaign.organization?.name ?? null,
           },
           version: { language: invitation.campaign.version.language },
           sections: invitation.campaign.version.sections,

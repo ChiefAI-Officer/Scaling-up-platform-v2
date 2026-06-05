@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Download,
+  FileText,
   Loader2,
   Mail,
   Eye,
@@ -1332,19 +1333,41 @@ export function CampaignDetail({
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex items-center gap-2">
                           {row.hasSubmission && (
+                            // PRIMARY results action: the branded report.
+                            // H6 — a PLAIN <a> (NOT a Next <Link>): a Link would
+                            // prefetch every visible respondent's full PII report
+                            // into the client cache on render. target="_blank"
+                            // opens the report in its own tab; rel guards the opener.
+                            <a
+                              href={`/assessments/${campaign.id}/respondents/${row.respondent.id}/report`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90"
+                              data-testid={`view-report-link-${row.respondent.id}`}
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              View report
+                            </a>
+                          )}
+                          {row.hasSubmission && (
+                            // Phase-1 fallback: the legacy inline raw-data view,
+                            // de-emphasized to a muted secondary control. Removal
+                            // is Phase 2 (gated on telemetry). Keeps resultsCache
+                            // lazy-fetch intact.
                             <button
                               type="button"
                               onClick={() => handleToggleResult(row)}
                               disabled={loading}
-                              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                               data-testid={`view-result-btn-${row.respondent.id}`}
+                              title="View the raw scored answers inline"
                             >
                               {loading ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <Loader2 className="w-3 h-3 animate-spin" />
                               ) : (
-                                <Eye className="w-3.5 h-3.5" />
+                                <Eye className="w-3 h-3" />
                               )}
-                              {expanded ? "Hide results" : "View results"}
+                              {expanded ? "Hide raw data" : "Raw data"}
                             </button>
                           )}
                           {row.hasSubmission && (

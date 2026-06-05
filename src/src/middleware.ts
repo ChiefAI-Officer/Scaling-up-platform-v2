@@ -102,7 +102,13 @@ export default withAuth(
       }
     }
 
-    return withRateLimitHeaders(NextResponse.next(), rateLimitHeaders);
+    // H15: the branded results report page renders a respondent's PII (scores,
+    // answers). Force no-store so it isn't cached by the browser/proxies.
+    const passthrough = NextResponse.next();
+    if (/^\/assessments\/[^/]+\/respondents\/[^/]+\/report\/?$/.test(pathname)) {
+      passthrough.headers.set("Cache-Control", "no-store, private");
+    }
+    return withRateLimitHeaders(passthrough, rateLimitHeaders);
   },
   {
     callbacks: {
