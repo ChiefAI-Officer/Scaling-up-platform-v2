@@ -52,10 +52,10 @@ function versionFromCrosswalk(c: Crosswalk) {
 // ── QSP v2 crosswalk content ────────────────────────────────────────────────
 
 describe("qspV2Crosswalk", () => {
-  it("targets the qsp-v2 template alias + QuartSessPrepv2 variant, unlocked", () => {
+  it("targets the qsp-v2 template alias + QuartSessPrepv2 variant, LOCKED (confirmed 2026-06-05)", () => {
     expect(qspV2Crosswalk.templateAlias).toBe("qsp-v2");
     expect(qspV2Crosswalk.espertoVariant).toBe("QuartSessPrepv2");
-    expect(qspV2Crosswalk.locked).toBe(false);
+    expect(qspV2Crosswalk.locked).toBe(true);
   });
 
   it("has exactly the 22 expected map entries (espertoKey → stableKey + type)", () => {

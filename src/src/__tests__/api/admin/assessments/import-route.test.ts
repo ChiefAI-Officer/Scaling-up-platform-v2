@@ -78,6 +78,7 @@ const reportFixture = JSON.parse(
 
 /** A locked copy of the real crosswalk for happy-path results tests. */
 const lockedQspV2 = { ...qspV2Crosswalk, locked: true };
+const unlockedQspV2 = { ...qspV2Crosswalk, locked: false }; // real QSP is now locked:true; force-unlocked to exercise the gate
 
 /** The 3 fixture memberids → resolved roster respondents in one org. */
 const FIXTURE_MEMBERIDS = ["MxRWB1GIwu", "CVMmsiWPTP", "mWSw2H9f6E"];
@@ -421,7 +422,8 @@ describe("POST /api/admin/assessments/import — results", () => {
   });
 
   it("preview with the REAL (locked:false) crosswalk surfaces a crosswalk-not-locked block", async () => {
-    // Use the real registry lookup (default beforeEach) — QSP v2 is locked:false.
+    // QSP v2 is now locked:true; force an unlocked copy to exercise the not-locked gate.
+    (getCrosswalkByVariant as jest.Mock).mockReturnValue(unlockedQspV2);
     const res = await POST(
       req({ mode: "preview", kind: "results", payload: reportFixture }),
     );
@@ -434,7 +436,8 @@ describe("POST /api/admin/assessments/import — results", () => {
   });
 
   it("409 on COMMIT when the plan has blocks (not-locked crosswalk)", async () => {
-    // Real locked:false crosswalk → plan blocks → commit refused, no tx.
+    // Force an unlocked crosswalk → plan blocks → commit refused, no tx.
+    (getCrosswalkByVariant as jest.Mock).mockReturnValue(unlockedQspV2);
     const res = await POST(
       req({ mode: "commit", kind: "results", payload: reportFixture }),
     );

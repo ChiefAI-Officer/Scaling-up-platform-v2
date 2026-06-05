@@ -53,7 +53,7 @@ describe("buildResultsImportPlan — locked gate (§7)", () => {
   it("refuses a not-locked crosswalk: blocks crosswalk-not-locked, no campaigns", () => {
     const plan = buildResultsImportPlan({
       parsedReport: loadReport(),
-      crosswalk: qspV2Crosswalk, // real, still locked:false
+      crosswalk: { ...qspV2Crosswalk, locked: false }, // force-unlocked to exercise the gate (real QSP is now locked:true)
       targetOrgId: TARGET_ORG,
       respondents: fullRoster(),
     });
