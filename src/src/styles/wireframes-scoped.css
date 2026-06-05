@@ -1164,22 +1164,157 @@
 .su-assessment-brand .wf-btn-primary:hover { background: hsl(269 56% 27%); }
 .wf-scope .survey-error { color: hsl(var(--destructive)); font-size: 0.875rem; margin-top: 0.75rem; }
 
-/* Range slider Likert control (branded participant UI) */
-.su-assessment-brand .survey-slider { width: 100%; accent-color: hsl(var(--primary)); cursor: pointer; }
-.su-assessment-brand .survey-slider-ticks { display: flex; justify-content: space-between; margin-top: 0.4rem; padding: 0 1px; }
-.su-assessment-brand .survey-slider-tick { min-width: 1.25rem; text-align: center; font-size: 0.85rem; font-weight: 600; color: hsl(var(--muted-foreground)); }
-.su-assessment-brand .survey-slider-tick.is-current { color: hsl(var(--primary)); }
+/* ===========================================================
+   Range slider Likert control + question card — polished "app feel".
+   Task 9: CSS-first restyle. Keeps <input type="range"> + all class
+   names / data hooks the tests rely on. D4 — slider is NOT replaced.
+   =========================================================== */
+
+/* ---- Slider track + thumb — polished brand purple ---- */
+.su-assessment-brand .survey-slider {
+  width: 100%;
+  cursor: pointer;
+  /* accent-color drives thumb + filled track in modern browsers */
+  accent-color: #522583;
+  /* Custom track height for a meatier feel */
+  height: 6px;
+  border-radius: 3px;
+  /* Firefox track override */
+  -moz-range-track: none;
+}
+/* WebKit: track */
+.su-assessment-brand .survey-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #522583 0%, #522583 var(--pct, 0%), #e4e4e4 var(--pct, 0%), #e4e4e4 100%);
+}
+/* WebKit: thumb */
+.su-assessment-brand .survey-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #522583;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(82, 37, 131, 0.35);
+  cursor: pointer;
+  margin-top: -8px; /* vertically centre on the 6px track */
+  transition: box-shadow 0.12s, transform 0.1s;
+}
+.su-assessment-brand .survey-slider::-webkit-slider-thumb:hover,
+.su-assessment-brand .survey-slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 6px rgba(82, 37, 131, 0.16), 0 2px 8px rgba(82, 37, 131, 0.35);
+  transform: scale(1.08);
+}
+/* Firefox: track */
+.su-assessment-brand .survey-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: #e4e4e4;
+}
+.su-assessment-brand .survey-slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 3px 0 0 3px;
+  background: #522583;
+}
+/* Firefox: thumb */
+.su-assessment-brand .survey-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #522583;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(82, 37, 131, 0.35);
+  cursor: pointer;
+  transition: box-shadow 0.12s;
+}
+
+/* ---- Numbered ticks row ---- */
+.su-assessment-brand .survey-slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.6rem;
+  padding: 0 2px;
+}
+.su-assessment-brand .survey-slider-tick {
+  min-width: 1.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #9b8bb4;          /* muted purple-grey */
+  line-height: 1;
+  transition: color 0.1s, transform 0.1s;
+}
+/* Selected tick — purple + slightly larger */
+.su-assessment-brand .survey-slider-tick.is-current {
+  color: #522583;
+  font-size: 0.875rem;
+  transform: scale(1.15);
+}
+
+/* ---- Anchor labels (Low / High) ---- */
+.su-assessment-brand .survey-slider-anchors {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b6480;
+  letter-spacing: 0.02em;
+}
+/* Override the non-scoped rule above */
 .wf-scope .survey-slider-anchors { display: flex; justify-content: space-between; margin-top: 0.3rem; font-size: 0.8rem; color: hsl(var(--muted-foreground)); }
-.su-assessment-brand .survey-slider-status { margin: 0.5rem 0 0; font-size: 0.85rem; text-align: center; color: hsl(var(--muted-foreground)); }
-.su-assessment-brand .survey-slider-wrap.is-unanswered .survey-slider-status { font-style: italic; }
-/* Question cards — group + space the per-section questions (currently a flat cramped stack) */
+
+/* ---- Status line ("Your rating: N" / unanswered prompt) ---- */
+.su-assessment-brand .survey-slider-status {
+  margin: 0.9rem 0 0;
+  font-size: 0.8125rem;
+  text-align: center;
+  color: #6b6480;
+  font-style: normal;
+  min-height: 1.6rem;  /* prevent layout shift between states */
+}
+/* Unanswered — italic prompt */
+.su-assessment-brand .survey-slider-wrap.is-unanswered .survey-slider-status {
+  font-style: italic;
+  color: #9b8bb4;
+}
+/* Answered — badge-style pill */
+.su-assessment-brand .survey-slider-wrap:not(.is-unanswered) .survey-slider-status {
+  display: inline-block;
+  background: rgba(82, 37, 131, 0.09);
+  color: #522583;
+  font-weight: 700;
+  font-style: normal;
+  padding: 0.2rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.8125rem;
+}
+
+/* ---- Question cards — polished card with shadow ---- */
 .su-assessment-brand .survey-question-list { list-style: none; margin: 0; padding: 0; }
 .su-assessment-brand .survey-question {
-  background: #fff; border: 1px solid hsl(var(--border)); border-radius: 14px;
-  padding: 1.15rem 1.25rem 1.1rem; margin-bottom: 1rem;
+  background: #fff;
+  border: 1px solid #e8e2f2;   /* soft purple-tinted border */
+  border-radius: 14px;
+  padding: 1.5rem 1.75rem 1.4rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 10px rgba(82, 37, 131, 0.07);
+  transition: box-shadow 0.15s;
 }
-.su-assessment-brand .survey-question-label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
-.su-assessment-brand .survey-question-help { margin: 0.1rem 0 0.2rem; }
+.su-assessment-brand .survey-question:focus-within {
+  border-color: #b9a9d6;
+  box-shadow: 0 4px 18px rgba(82, 37, 131, 0.13);
+}
+.su-assessment-brand .survey-question-label {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #231535;              /* deep ink from mockup */
+  margin-bottom: 1rem;
+}
+.su-assessment-brand .survey-question-help { margin: -0.5rem 0 0.75rem; font-size: 0.875rem; color: #6b6480; }
 
 /* Participant app-shell header (AssessmentShellHeader) — purple appbar + white
    logo + Four-Decisions segmented progress strip. Matches the approved
