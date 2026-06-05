@@ -60,6 +60,7 @@ const ADMIN_ENTRIES: SidebarEntry[] = [
     label: "Public Quizzes",
     placeholder: true,
   },
+  { href: "/admin/assessments/import", label: "Import" },
   { href: "/admin/assessments/aggregate", label: "Aggregate Report" },
 ];
 
