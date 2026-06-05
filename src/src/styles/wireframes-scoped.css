@@ -1207,3 +1207,131 @@
   .su-assessment-brand .su-shell-seg-item { width: 16px; }
   .su-assessment-brand .su-shell-where { white-space: normal; }
 }
+
+/* ===========================================================
+   Section intro slide — purple hero with S-curve motif.
+   Matches /tmp/su-assessment-mockups/quiz.html .slide block.
+   Scoped inside .su-assessment-brand only.
+   =========================================================== */
+.su-assessment-brand .su-intro-slide {
+  position: relative;
+  background: hsl(var(--primary));       /* #522583 purple */
+  color: #fff;
+  border-radius: 14px;
+  padding: 3.25rem 3rem 2.5rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 360px;
+  margin-bottom: 0;
+}
+
+/* S-curve SVG motif — absolute, bottom-right, decorative */
+.su-assessment-brand .su-intro-swoosh {
+  position: absolute;
+  right: -40px;
+  bottom: -60px;
+  width: 480px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Section number + part label row */
+.su-assessment-brand .su-intro-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 0.75rem;
+}
+.su-assessment-brand .su-intro-num {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 4rem;
+  line-height: 0.9;
+  color: var(--fd-orange, #f7a600);       /* Four Decisions orange accent */
+  letter-spacing: -0.02em;
+}
+.su-assessment-brand .su-intro-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Section title heading */
+.su-assessment-brand .su-intro-title {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 2.25rem;
+  line-height: 1.08;
+  max-width: 600px;
+  margin: 0 0 0.9rem;
+  color: #fff;
+  position: relative;
+  z-index: 1;
+}
+
+/* Intro description paragraph — from section.description (ADR-0004) */
+.su-assessment-brand .su-intro-desc {
+  max-width: 540px;
+  font-size: 1rem;
+  line-height: 1.6;
+  opacity: 0.92;
+  margin: 0 0 1.5rem;
+  white-space: pre-line;
+  position: relative;
+  z-index: 1;
+}
+
+/* Begin button + question-count estimate row */
+.su-assessment-brand .su-intro-meta {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  position: relative;
+  z-index: 1;
+}
+.su-assessment-brand .su-intro-begin {
+  background: var(--fd-orange, #f7a600);
+  color: #3a2400;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  border: none;
+  border-radius: 9px;
+  padding: 0.8rem 1.75rem;
+  cursor: pointer;
+  transition: opacity 0.12s;
+  white-space: nowrap;
+}
+.su-assessment-brand .su-intro-begin:hover { opacity: 0.88; }
+.su-assessment-brand .su-intro-begin:disabled { opacity: 0.45; cursor: not-allowed; }
+.su-assessment-brand .su-intro-estimate {
+  font-size: 0.8125rem;
+  opacity: 0.8;
+}
+
+/* Back nav row — ghost link below the hero content */
+.su-assessment-brand .su-intro-back-row {
+  position: relative;
+  z-index: 1;
+  margin-top: 1.5rem;
+  justify-content: flex-start;
+}
+.su-assessment-brand .su-intro-back {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.875rem;
+}
+.su-assessment-brand .su-intro-back:hover { color: #fff; background: transparent; }
+
+@media (max-width: 640px) {
+  .su-assessment-brand .su-intro-slide { padding: 2.25rem 1.5rem 2rem; min-height: 280px; }
+  .su-assessment-brand .su-intro-num { font-size: 2.75rem; }
+  .su-assessment-brand .su-intro-title { font-size: 1.625rem; }
+  .su-assessment-brand .su-intro-swoosh { width: 280px; right: -20px; bottom: -40px; }
+}

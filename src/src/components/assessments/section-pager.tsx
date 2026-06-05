@@ -80,7 +80,8 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     focusHeading();
   }
 
-  const introForwardLabel = isLast && !hasQuestions ? "Submit" : "Start";
+  const introForwardLabel = isLast && !hasQuestions ? "Submit" : "Begin section →";
+  const questionCount = page.questions.length;
 
   return (
     <div className="su-assessment-brand survey-section">
@@ -93,20 +94,52 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
       <div role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={answeredCount} className="survey-progress">
         <div className="survey-progress-fill" style={{ width: total ? `${(answeredCount / total) * 100}%` : "0%" }} />
       </div>
-      <h2 ref={headingRef} tabIndex={-1} className="survey-section-title">
-        {page.partLabel ? `${page.partLabel}: ` : ""}{page.name}
-      </h2>
 
       {view === "intro" ? (
-        <>
-          {page.description ? <p className="survey-section-desc">{page.description}</p> : null}
-          <div className="survey-nav">
-            <button type="button" className="wf-btn wf-btn-secondary" onClick={handleBack}>Back</button>
-            <button type="button" className="wf-btn wf-btn-primary" onClick={handleForwardFromIntro} disabled={submitting}>{introForwardLabel}</button>
+        <section className="su-intro-slide" aria-labelledby="su-intro-heading">
+          {/* S-curve brand motif */}
+          <svg className="su-intro-swoosh" viewBox="0 0 480 420" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M500 30 C 300 30 350 220 200 270 C 90 305 80 420 -30 440 L 560 440 L 560 30 Z" fill="rgba(255,255,255,0.10)" />
+          </svg>
+          <div className="su-intro-kicker">
+            <span className="su-intro-num" aria-hidden="true">{String(sectionIndex + 1).padStart(2, "0")}</span>
+            {page.partLabel ? <span className="su-intro-label">{page.partLabel}</span> : null}
           </div>
-        </>
+          <h2
+            id="su-intro-heading"
+            ref={headingRef}
+            tabIndex={-1}
+            className="su-intro-title"
+          >
+            {page.name}
+          </h2>
+          {page.description ? (
+            <p className="su-intro-desc">{page.description}</p>
+          ) : null}
+          <div className="su-intro-meta">
+            <button
+              type="button"
+              className="su-intro-begin"
+              onClick={handleForwardFromIntro}
+              disabled={submitting}
+            >
+              {introForwardLabel}
+            </button>
+            {questionCount > 0 ? (
+              <span className="su-intro-estimate">
+                {questionCount} question{questionCount !== 1 ? "s" : ""}
+              </span>
+            ) : null}
+          </div>
+          <div className="survey-nav su-intro-back-row">
+            <button type="button" className="wf-btn wf-btn-ghost su-intro-back" onClick={handleBack}>← Back</button>
+          </div>
+        </section>
       ) : (
         <>
+          <h2 ref={headingRef} tabIndex={-1} className="survey-section-title">
+            {page.partLabel ? `${page.partLabel}: ` : ""}{page.name}
+          </h2>
           <ul className="survey-question-list">
             {page.questions.map((q) => (
               <li key={q.stableKey} className="survey-question">
