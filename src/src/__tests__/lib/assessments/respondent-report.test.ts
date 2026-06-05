@@ -59,7 +59,20 @@ const GOOD_VERSION = {
   contentHash: "abc123",
   sections: [{ stableKey: "s1", name: "Section One" }],
   questions: [
-    { stableKey: "q1", label: "Question One", type: "SLIDER_LIKERT" },
+    {
+      stableKey: "q1",
+      label: "Question One",
+      type: "SLIDER_LIKERT",
+      sectionStableKey: "s1",
+      scale: { min: 0, max: 3 },
+    },
+    {
+      stableKey: "q2",
+      label: "Open Question",
+      type: "TEXT",
+      sectionStableKey: "s1",
+      // no scale — qualitative question
+    },
   ],
   scoringConfig: { tiers: [] },
 };
@@ -149,11 +162,26 @@ test("1. owning coach + submission → status:ok, all fields populated, provenan
   expect(report.rawAnswers).toEqual(GOOD_SUBMISSION.answers);
 
   // Question maps
-  expect(report.questionByKey).toEqual({ q1: "Question One" });
+  expect(report.questionByKey["q1"]).toBe("Question One");
+  expect(report.questionByKey["q2"]).toBe("Open Question");
+
+  // Slider question: sectionStableKey + min/max populated
   expect(report.questionsByKey["q1"]).toEqual({
     type: "SLIDER_LIKERT",
     label: "Question One",
+    sectionStableKey: "s1",
+    min: 0,
+    max: 3,
   });
+
+  // Qualitative question (TEXT, no scale): sectionStableKey present, no min/max
+  expect(report.questionsByKey["q2"]).toEqual({
+    type: "TEXT",
+    label: "Open Question",
+    sectionStableKey: "s1",
+  });
+  expect(report.questionsByKey["q2"].min).toBeUndefined();
+  expect(report.questionsByKey["q2"].max).toBeUndefined();
 
   // Provenance
   expect(report.provenance.submissionId).toBe("sub-1");
@@ -239,7 +267,7 @@ test("5. duplicate stableKey in version.questions → first-wins, no throw", asy
     },
   };
 
-  const { $transaction } = makeMockDb(dupQuestionsSubmission);
+  const { $transaction } = makeMockDb(dupQuestionsSubmission as typeof GOOD_SUBMISSION);
   const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
 
   const result = await getRespondentReport(

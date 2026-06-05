@@ -85,9 +85,9 @@ function rockefellerReport(): RespondentReport {
       q3: "All employees collect customer data",
     },
     questionsByKey: {
-      q1: { type: "SLIDER_LIKERT", label: "Members understand each other's styles" },
-      q2: { type: "SLIDER_LIKERT", label: "Insights shared at weekly exec meeting" },
-      q3: { type: "SLIDER_LIKERT", label: "All employees collect customer data" },
+      q1: { type: "SLIDER_LIKERT", label: "Members understand each other's styles", sectionStableKey: "s1", min: 0, max: 3 },
+      q2: { type: "SLIDER_LIKERT", label: "Insights shared at weekly exec meeting", sectionStableKey: "s1", min: 0, max: 3 },
+      q3: { type: "SLIDER_LIKERT", label: "All employees collect customer data", sectionStableKey: "s1", min: 0, max: 3 },
     },
     rawAnswers: [
       { stableKey: "q1", value: 3 },
@@ -374,6 +374,100 @@ describe("BrandedReport — section breakdown", () => {
     expect(youHead).toHaveStyle({ backgroundColor: "#522583" });
     const peopleHead = within(breakdown).getByTestId("section-head-s_people");
     expect(peopleHead).toHaveStyle({ backgroundColor: "#f7a600" });
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// value / max rendering + sectionStableKey-based grouping
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("BrandedReport — value/max + sectionStableKey grouping", () => {
+  it("renders 'value / max' when questionsByKey carries a max (e.g. 2 / 3)", () => {
+    render(<BrandedReport report={rockefellerReport()} />);
+    const breakdown = screen.getByTestId("report-sections");
+    // q1=3, q2=1, q3=2 with max=3 each → "3 / 3", "1 / 3", "2 / 3"
+    expect(breakdown.textContent).toContain("3 / 3");
+    expect(breakdown.textContent).toContain("1 / 3");
+    expect(breakdown.textContent).toContain("2 / 3");
+  });
+
+  it("renders plain value (no 'value / max') in per-question cells when questionsByKey has no max", () => {
+    const report = rockefellerReport();
+    // Strip max from all entries
+    report.questionsByKey = {
+      q1: { type: "SLIDER_LIKERT", label: "Members understand each other's styles", sectionStableKey: "s1" },
+      q2: { type: "SLIDER_LIKERT", label: "Insights shared at weekly exec meeting", sectionStableKey: "s1" },
+      q3: { type: "SLIDER_LIKERT", label: "All employees collect customer data", sectionStableKey: "s1" },
+    };
+    render(<BrandedReport report={report} />);
+    // Check that per-question rating cells show plain numbers without a denominator.
+    // We look for the rate spans specifically — q1=3, q2=1, q3=2.
+    // The section chip "achievedCount / totalCount" is expected; we only care
+    // that the rate cells themselves don't have "3 / 3" etc.
+    const rateSpans = document.querySelectorAll(".su-report-q-rate");
+    for (const span of rateSpans) {
+      expect(span.textContent).not.toMatch(/\/ \d+/);
+    }
+    // Numeric values still appear in rate spans
+    const rateTexts = Array.from(rateSpans).map((s) => s.textContent);
+    expect(rateTexts).toContain("3");
+    expect(rateTexts).toContain("1");
+    expect(rateTexts).toContain("2");
+  });
+
+  it("groups questions under their section card via sectionStableKey (no sections[].questions needed)", () => {
+    // Build a report where sections[] has NO embedded questions arrays,
+    // but questionsByKey has sectionStableKey set — grouping must still work.
+    const result: ScoreResult = {
+      perQuestion: [
+        { stableKey: "q1", value: 2, achieved: true },
+        { stableKey: "q2", value: 1, achieved: false },
+      ],
+      perSection: [
+        {
+          stableKey: "sec_a",
+          name: "Section A",
+          totalPoints: 3,
+          averagePoints: 1.5,
+          achievedCount: 1,
+          totalCount: 2,
+        },
+      ],
+      overallTotal: 3,
+      overallAverage: 1.5,
+      countAchieved: 1,
+      tier: { label: "OK", message: "" },
+      tierMetricValue: 1.5,
+      unansweredKeys: [],
+    };
+    const report = baseReport({
+      result,
+      // sections has NO questions array — grouping must use sectionStableKey
+      sections: [{ stableKey: "sec_a", name: "Section A" }],
+      questionByKey: {
+        q1: "Alpha question",
+        q2: "Beta question",
+      },
+      questionsByKey: {
+        q1: { type: "SLIDER_LIKERT", label: "Alpha question", sectionStableKey: "sec_a", min: 0, max: 5 },
+        q2: { type: "SLIDER_LIKERT", label: "Beta question", sectionStableKey: "sec_a", min: 0, max: 5 },
+      },
+      rawAnswers: [
+        { stableKey: "q1", value: 2 },
+        { stableKey: "q2", value: 1 },
+      ],
+      scoringConfig: { tierMetric: "overallAvg", passThreshold: 0, tiers: [{ minMetric: 0, label: "OK", message: "" }] },
+    });
+    render(<BrandedReport report={report} />);
+    const breakdown = screen.getByTestId("report-sections");
+    // Both questions should appear grouped under section "sec_a"
+    expect(breakdown.textContent).toContain("Alpha question");
+    expect(breakdown.textContent).toContain("Beta question");
+    // Ratings rendered as value/max
+    expect(breakdown.textContent).toContain("2 / 5");
+    expect(breakdown.textContent).toContain("1 / 5");
+    // Orphan list should be empty (no questions outside a section)
+    expect(breakdown.querySelector(".su-report-orphan-list")).toBeNull();
   });
 });
 

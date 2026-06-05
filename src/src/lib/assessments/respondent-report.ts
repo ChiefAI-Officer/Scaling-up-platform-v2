@@ -74,6 +74,9 @@ interface RawSubmission {
 export interface QuestionMeta {
   type: string;
   label: string;
+  sectionStableKey?: string;
+  min?: number;
+  max?: number;
 }
 
 export interface ReportProvenance {
@@ -120,10 +123,17 @@ export type RespondentReportOutcome =
 
 // ─── Guard helpers ────────────────────────────────────────────────────────
 
+interface RawScale {
+  min?: number;
+  max?: number;
+}
+
 interface RawQuestion {
   stableKey: string;
   label: string;
   type?: string;
+  sectionStableKey?: string;
+  scale?: RawScale;
 }
 
 function isRawQuestion(v: unknown): v is RawQuestion {
@@ -236,10 +246,18 @@ export async function getRespondentReport(
       }
       seenKeys.add(q.stableKey);
       questionByKey[q.stableKey] = q.label;
-      questionsByKey[q.stableKey] = {
+      const meta: QuestionMeta = {
         type: typeof q.type === "string" ? q.type : "UNKNOWN",
         label: q.label,
       };
+      if (typeof q.sectionStableKey === "string") {
+        meta.sectionStableKey = q.sectionStableKey;
+      }
+      if (q.scale && typeof q.scale === "object") {
+        if (typeof q.scale.min === "number") meta.min = q.scale.min;
+        if (typeof q.scale.max === "number") meta.max = q.scale.max;
+      }
+      questionsByKey[q.stableKey] = meta;
     }
 
     // Guard the frozen result — degraded if it doesn't look like ScoreResult (H10)

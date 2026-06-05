@@ -187,12 +187,32 @@ export function BrandedReport({ report, assessmentName }: BrandedReportProps) {
   }
 
   // ── Section breakdown: group per-question rows under their section ────────
-  // Question→section mapping comes from the parsed sections' questionKeys.
+  // Primary source: questionsByKey[key].sectionStableKey → group by that value.
+  // Fallback (when sectionStableKey absent on a question): parsed section's
+  // questionKeys list from version.sections[].questions.
   // perQuestion entries with no known section fall into an "Other" bucket.
+
+  // Build sectionStableKey → set of question keys from questionsByKey meta.
+  const qKeysBySection = new Map<string, Set<string>>();
+  for (const pq of perQuestion) {
+    const meta = report.questionsByKey?.[pq.stableKey];
+    if (meta?.sectionStableKey) {
+      const s = qKeysBySection.get(meta.sectionStableKey) ?? new Set<string>();
+      s.add(pq.stableKey);
+      qKeysBySection.set(meta.sectionStableKey, s);
+    }
+  }
+  // Whether any question has sectionStableKey populated at all.
+  const hasSectionMeta = qKeysBySection.size > 0;
+
   const assignedQuestionKeys = new Set<string>();
   const sectionCards = perSection.map((ps) => {
     const parsed = sectionByKey.get(ps.stableKey);
-    const qKeys = parsed?.questionKeys ?? [];
+    // Use sectionStableKey-based grouping when available; fall back to
+    // parsed section's embedded questionKeys list.
+    const qKeys: string[] = hasSectionMeta
+      ? Array.from(qKeysBySection.get(ps.stableKey) ?? [])
+      : (parsed?.questionKeys ?? []);
     const rows = qKeys
       .map((qk) => {
         assignedQuestionKeys.add(qk);
@@ -380,7 +400,14 @@ export function BrandedReport({ report, assessmentName }: BrandedReportProps) {
                               </span>
                             )}
                           </span>
-                          <span className="su-report-q-rate">{r.value}</span>
+                          <span className="su-report-q-rate">
+                            {(() => {
+                              const qmax = report.questionsByKey?.[r.stableKey]?.max;
+                              return qmax !== undefined
+                                ? `${r.value} / ${qmax}`
+                                : r.value;
+                            })()}
+                          </span>
                         </li>
                       );
                     })
@@ -412,7 +439,12 @@ export function BrandedReport({ report, assessmentName }: BrandedReportProps) {
                       <span className="su-report-unmapped"> (unmapped)</span>
                     )}
                   </span>
-                  <span className="su-report-q-rate">{r.value}</span>
+                  <span className="su-report-q-rate">
+                    {(() => {
+                      const qmax = report.questionsByKey?.[r.stableKey]?.max;
+                      return qmax !== undefined ? `${r.value} / ${qmax}` : r.value;
+                    })()}
+                  </span>
                 </li>
               );
             })}
