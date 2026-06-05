@@ -2,8 +2,8 @@
  * Assessment v7.6 — PUBLIC quiz thank-you page.
  *
  * Generic confirmation shown after a successful PUBLIC submission. We do not
- * surface the score here for the MVP — public results delivery via a
- * resultsToken email is a follow-on slice.
+ * surface the score here for the MVP — auto-emailing results to respondents
+ * (D3 policy) is deferred; results are delivered by the facilitator/coach.
  */
 
 import type { Metadata } from "next";
@@ -31,9 +31,8 @@ export default function PublicQuizThankYouPage() {
           </h1>
           <p className="ty-lede">Your responses have been recorded.</p>
           <p className="ty-sub">
-            We&apos;ll send your results to the email you provided. If you
-            don&apos;t see anything in your inbox within a few minutes,
-            check your spam folder.
+            Thanks for completing the assessment — your responses have been
+            recorded. Your facilitator will follow up with the results.
           </p>
         </section>
       </main>
