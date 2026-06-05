@@ -96,6 +96,37 @@ describe("SectionPager", () => {
     expect(screen.getByText(/section 1 of 2/i)).toBeInTheDocument();
   });
 
+  it("renders the branded shell header (logo) above the pager", () => {
+    setup({ assessmentName: "Rockefeller Habits", companyName: "Northwind Logistics" });
+    const logo = screen.getByRole("img", { name: /scaling up/i });
+    expect(logo).toBeInTheDocument();
+    expect(logo).toHaveAttribute("src", "/brand/su-logo-white.svg");
+    expect(screen.getByText(/rockefeller habits/i)).toBeInTheDocument();
+    expect(screen.getByText(/northwind logistics/i)).toBeInTheDocument();
+  });
+
+  it("the shell header's Section N of M + active-segment count track the pager's OWN state through next/back (single source)", () => {
+    const { container } = setup(); // S0 (empty intro) + S1 (questions)
+    // The shell header label lives in the appbar; it shows the pager's section.
+    const headerLabel = () => container.querySelector(".su-shell-where")?.textContent ?? "";
+    const activeSegs = () => container.querySelectorAll(".su-shell-seg-item.is-active").length;
+
+    // On the first section's intro: Section 1 of 2, 1 active segment.
+    expect(headerLabel()).toMatch(/section 1 of 2/i);
+    expect(activeSegs()).toBe(1);
+    expect(container.querySelectorAll(".su-shell-seg-item")).toHaveLength(2);
+
+    // Start → advances to S1 (S0 empty) → Section 2 of 2, 2 active segments.
+    fireEvent.click(screen.getByRole("button", { name: /start/i }));
+    expect(headerLabel()).toMatch(/section 2 of 2/i);
+    expect(activeSegs()).toBe(2);
+
+    // Back across the empty welcome → back to its intro → Section 1 of 2 again.
+    fireEvent.click(screen.getByRole("button", { name: /back/i }));
+    expect(headerLabel()).toMatch(/section 1 of 2/i);
+    expect(activeSegs()).toBe(1);
+  });
+
   it("a section with BOTH a description and questions: intro → Start → questions → Back → intro", () => {
     const secs: PagerSection[] = [{ stableKey: "S1", sortOrder: 1, name: "Strategy", description: "Strategy intro" }];
     const qs: PagerQuestion[] = [{ stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } }];

@@ -389,6 +389,7 @@ export function PublicQuizClient({
             onSubmit={handleSubmit}
             submitting={submitting}
             onExit={() => setStep("info")}
+            assessmentName={templateName}
           />
 
           {!canSubmit && (

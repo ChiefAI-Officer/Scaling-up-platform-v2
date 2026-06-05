@@ -3,6 +3,7 @@
 import React from "react";
 import { isAnswered, type SectionPage } from "@/lib/assessments/section-pages";
 import { QuestionInput } from "@/components/assessments/question-input";
+import { AssessmentShellHeader } from "@/components/assessments/AssessmentShellHeader";
 
 type AnswersMap = Record<string, number | string | string[]>;
 interface SectionPagerProps {
@@ -12,6 +13,10 @@ interface SectionPagerProps {
   onSubmit: () => void;
   submitting?: boolean;
   onExit?: () => void;
+  /** Assessment / campaign / template name shown in the branded shell header. */
+  assessmentName?: string;
+  /** Company / organization name shown in the shell header (invited flow only). */
+  companyName?: string;
 }
 
 function pageHasIntro(p: SectionPage): boolean {
@@ -19,7 +24,7 @@ function pageHasIntro(p: SectionPage): boolean {
   return (p.description?.trim()?.length ?? 0) > 0 || !hasQuestions;
 }
 
-export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit }: SectionPagerProps) {
+export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName }: SectionPagerProps) {
   const [sectionIndex, setSectionIndex] = React.useState(0);
   const page = pages[sectionIndex];
   const [view, setView] = React.useState<"intro" | "questions">(page && pageHasIntro(page) ? "intro" : "questions");
@@ -79,7 +84,12 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
 
   return (
     <div className="su-assessment-brand survey-section">
-      <p aria-live="polite">Section {sectionIndex + 1} of {pages.length}</p>
+      <AssessmentShellHeader
+        currentSection={sectionIndex + 1}
+        totalSections={pages.length}
+        assessmentName={assessmentName}
+        companyName={companyName}
+      />
       <div role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={answeredCount} className="survey-progress">
         <div className="survey-progress-fill" style={{ width: total ? `${(answeredCount / total) * 100}%` : "0%" }} />
       </div>

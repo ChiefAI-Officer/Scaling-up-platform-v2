@@ -62,7 +62,7 @@ interface SurveyData {
   // to key the localStorage autosave draft per-respondent so two invitees of
   // the same campaign on a shared device never cross-hydrate each other.
   respondentKey?: string;
-  campaign: { name: string; alias: string };
+  campaign: { name: string; alias: string; organizationName?: string | null };
   version: { language: string };
   sections: Section[];
   questions: Question[];
@@ -370,6 +370,8 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             onSubmit={handleSubmit}
             submitting={submitting}
             onExit={() => setPhase({ kind: "intro", data: phase.data })}
+            assessmentName={data.campaign.name}
+            companyName={data.campaign.organizationName ?? undefined}
           />
         </div>
       </main>

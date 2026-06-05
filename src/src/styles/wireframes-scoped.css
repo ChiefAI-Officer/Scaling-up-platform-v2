@@ -1180,3 +1180,30 @@
 }
 .su-assessment-brand .survey-question-label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
 .su-assessment-brand .survey-question-help { margin: 0.1rem 0 0.2rem; }
+
+/* Participant app-shell header (AssessmentShellHeader) — purple appbar + white
+   logo + Four-Decisions segmented progress strip. Matches the approved
+   /tmp/su-assessment-mockups/quiz.html .appbar. Scoped to the brand root. */
+.su-assessment-brand .su-shell-header {
+  display: flex; align-items: center; gap: 1rem;
+  background: hsl(var(--primary)); color: #fff;
+  padding: 0.75rem 1.25rem; border-radius: 12px;
+  margin: 0 0 1.25rem;
+}
+.su-assessment-brand .su-shell-logo { height: 26px; width: auto; display: block; flex: 0 0 auto; }
+.su-assessment-brand .su-shell-where {
+  font-size: 0.8rem; opacity: 0.95; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; min-width: 0;
+}
+.su-assessment-brand .su-shell-company { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; }
+.su-assessment-brand .su-shell-section { opacity: 0.9; }
+.su-assessment-brand .su-shell-seg { display: flex; gap: 4px; margin-left: auto; flex: 0 0 auto; }
+.su-assessment-brand .su-shell-seg-item {
+  display: block; width: 26px; height: 6px; border-radius: 3px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.su-assessment-brand .su-shell-seg-item.is-active { background: var(--fd-orange, #f7a600); }
+@media (max-width: 640px) {
+  .su-assessment-brand .su-shell-seg-item { width: 16px; }
+  .su-assessment-brand .su-shell-where { white-space: normal; }
+}
