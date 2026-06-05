@@ -54,6 +54,20 @@ export async function GET(
       );
     }
 
+    // DEPRECATION (Task 5, Phase 1): the branded report
+    // (/assessments/[id]/respondents/[respondentId]/report) is now the PRIMARY
+    // way coaches/admins view a completed submission. This raw-result API + its
+    // inline AssessmentResultView are kept as a Phase-1 fallback only. This
+    // structured marker gates the Phase-2 removal on real usage telemetry — once
+    // this stops firing in prod, the route + inline view can be deleted.
+    console.info(
+      JSON.stringify({
+        marker: "assessment.report.old_result_api.hit",
+        campaignId,
+        respondentId,
+      })
+    );
+
     const submission = await db.assessmentSubmission.findFirst({
       where: { campaignId, respondentId },
       select: {
