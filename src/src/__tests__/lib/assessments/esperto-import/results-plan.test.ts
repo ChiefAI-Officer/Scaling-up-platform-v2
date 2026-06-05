@@ -245,3 +245,37 @@ describe("buildResultsImportPlan — skips & blocks", () => {
     expect(plan.campaigns[0].rows).toHaveLength(0);
   });
 });
+
+describe("buildResultsImportPlan — answer-value-anomaly (Codex final review)", () => {
+  it("BLOCKS a present-but-wrong-type value instead of silently omitting it", () => {
+    const report = loadReport();
+    // Q1 → P1_overall_rating (NUMBER): inject a non-numeric, non-blank value.
+    (report.personal[0] as Record<string, unknown>).raw_Q1 = "not-a-number";
+    // Q2 → P1_rating_explanation (TEXT): inject a non-string, non-blank value.
+    (report.personal[1] as Record<string, unknown>).raw_Q2 = 42;
+    const plan = buildResultsImportPlan({
+      parsedReport: report,
+      crosswalk: lockedCrosswalk,
+      targetOrgId: TARGET_ORG,
+      respondents: fullRoster(),
+    });
+    const anomalies = plan.blocks.filter((b) => b.reason === "answer-value-anomaly");
+    expect(anomalies.length).toBeGreaterThanOrEqual(2);
+    expect(anomalies.some((b) => b.detail?.includes("P1_overall_rating"))).toBe(true);
+    expect(anomalies.some((b) => b.detail?.includes("P1_rating_explanation"))).toBe(true);
+  });
+
+  it("does NOT flag legitimate blanks/0 (empty string, 0, missing → omitted, no block)", () => {
+    const report = loadReport();
+    // Legitimate unanswered states must NOT become anomalies.
+    (report.personal[0] as Record<string, unknown>).raw_Q2 = ""; // blank TEXT
+    (report.personal[0] as Record<string, unknown>).raw_Q1 = 0; // 0 NUMBER (unanswered sentinel)
+    const plan = buildResultsImportPlan({
+      parsedReport: report,
+      crosswalk: lockedCrosswalk,
+      targetOrgId: TARGET_ORG,
+      respondents: fullRoster(),
+    });
+    expect(plan.blocks.filter((b) => b.reason === "answer-value-anomaly")).toHaveLength(0);
+  });
+});
