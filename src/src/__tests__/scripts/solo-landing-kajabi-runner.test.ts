@@ -50,7 +50,9 @@ const WS = {
 
 function injectedReinterpolate(): jest.Mock {
   // Returns the rendered string for whatever template it is given, per workshop.
-  return jest.fn(async (workshopId: string, tpl: string) => {
+  // Third param (registrationUrl) is accepted but unused — runner passes it in (Fix 3).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  return jest.fn(async (workshopId: string, tpl: string, _registrationUrl: string) => {
     const vars = (WS as Record<string, Record<string, string>>)[workshopId];
     if (!vars) return null;
     return clean(render(tpl, vars));
@@ -545,24 +547,68 @@ describe("Script 2 — restoreBackfill", () => {
     ],
   };
 
-  it("restores rows still on the value we wrote (newSha)", async () => {
+  const restoreUpdatedAt = new Date("2026-05-01T00:00:00Z");
+
+  it("restores rows still on the value we wrote (newSha) using CAS updateMany", async () => {
     const { db, auditCreate } = backfillDb([]);
-    (db.landingPage.findUnique as jest.Mock).mockResolvedValue({ customHtml: render(NEW_TPL, WS.ws1) });
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue({
+      customHtml: render(NEW_TPL, WS.ws1),
+      updatedAt: restoreUpdatedAt,
+    });
     const r = await restoreBackfill(db, backup, { operator: "o", runId: "r3" });
     expect(r).toEqual({ restored: 1, skipped: 0 });
-    expect(db.landingPage.update).toHaveBeenCalledWith({
-      where: { id: "lp1" },
+    // Fix 2: must use CAS updateMany (not unconditional update)
+    expect(db.landingPage.update).not.toHaveBeenCalled();
+    expect(db.landingPage.updateMany).toHaveBeenCalledWith({
+      where: { id: "lp1", updatedAt: restoreUpdatedAt },
       data: { customHtml: render(OLD_TPL, WS.ws1) },
     });
     expect(auditCreate.mock.calls[0][0].data.action).toBe("SOLO_LANDING_BACKFILL_RESTORE");
   });
 
-  it("skips a row edited after our apply (no clobber)", async () => {
+  it("skips a row edited after our apply (SHA mismatch — no clobber)", async () => {
     const { db } = backfillDb([]);
-    (db.landingPage.findUnique as jest.Mock).mockResolvedValue({ customHtml: "<div>edited later</div>" });
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue({
+      customHtml: "<div>edited later</div>",
+      updatedAt: restoreUpdatedAt,
+    });
     const r = await restoreBackfill(db, backup, { operator: "o", runId: "r3" });
     expect(r).toEqual({ restored: 0, skipped: 1 });
     expect(db.landingPage.update).not.toHaveBeenCalled();
+    expect(db.landingPage.updateMany).not.toHaveBeenCalled();
+  });
+
+  // Fix 1 (P1): fail-safe CAS — falsy newSha in backup → skip, never write.
+  it("skips a row when entry.newSha is empty/falsy (corrupt backup — fail-safe)", async () => {
+    const corruptBackup: KajabiBackupFile = {
+      ...backup,
+      entries: [{ ...backup.entries[0], newSha: "" }],
+    };
+    const { db } = backfillDb([]);
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue({
+      customHtml: render(NEW_TPL, WS.ws1),
+      updatedAt: restoreUpdatedAt,
+    });
+    const r = await restoreBackfill(db, corruptBackup, { operator: "o", runId: "r3" });
+    expect(r).toEqual({ restored: 0, skipped: 1 });
+    expect(db.landingPage.update).not.toHaveBeenCalled();
+    expect(db.landingPage.updateMany).not.toHaveBeenCalled();
+  });
+
+  // Fix 2 (P1): TOCTOU guard — concurrent edit between findUnique and updateMany → skipped.
+  it("skips a row when updateMany matches 0 rows (concurrent edit between read and write)", async () => {
+    const { db, auditCreate } = backfillDb([]);
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue({
+      customHtml: render(NEW_TPL, WS.ws1),
+      updatedAt: restoreUpdatedAt,
+    });
+    // Simulate concurrent edit: CAS updateMany finds nothing (updatedAt already changed)
+    (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+    const r = await restoreBackfill(db, backup, { operator: "o", runId: "r3" });
+    expect(r).toEqual({ restored: 0, skipped: 1 });
+    expect(db.landingPage.update).not.toHaveBeenCalled();
+    // Audit log is still written (with skipped=1, restored=0)
+    expect(auditCreate.mock.calls[0][0].data.action).toBe("SOLO_LANDING_BACKFILL_RESTORE");
   });
 
   it("rejects a malformed backup", async () => {

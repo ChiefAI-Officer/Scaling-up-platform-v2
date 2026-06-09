@@ -72,7 +72,7 @@ export interface DbClient {
   };
   landingPage: {
     findMany(args: unknown): Promise<LandingPageRow[]>;
-    findUnique(args: unknown): Promise<{ customHtml?: string | null } | null>;
+    findUnique(args: unknown): Promise<{ customHtml?: string | null; updatedAt?: Date } | null>;
     updateMany(args: {
       where: { id: string; updatedAt: Date };
       data: { customHtml: string };
@@ -103,10 +103,15 @@ export interface SanitizeOutcome {
  * two-pass auto-build pipeline. Injected so tests can stub it without loading
  * buildWorkshopVariables / interpolate / sanitize. Returns null when the
  * workshop has no variables (not found).
+ *
+ * Fix 3 (P2): `registrationUrl` is now passed in by the runner so the
+ * implementation can skip its own REGISTRATION lookup — avoids a duplicate
+ * db.landingPage.findUnique per workshop (resolveFacts already fetched it).
  */
 export type Reinterpolate = (
   workshopId: string,
   templateCustomHtml: string,
+  registrationUrl: string,
 ) => Promise<SanitizeOutcome | null>;
 
 /** Resolve the per-workshop preflight facts (DB-backed). Injected for tests. */
@@ -372,8 +377,10 @@ export async function buildBackfillPlans(
 
   for (const page of pages) {
     const facts = await resolveFacts(page.workshopId);
-    const oldOutcome = await reinterpolate(page.workshopId, input.oldTemplateCustomHtml);
-    const newOutcome = await reinterpolate(page.workshopId, input.newTemplateCustomHtml);
+    // Fix 3 (P2): pass the pre-resolved registrationUrl so reinterpolate can skip its own lookup.
+    const regUrl = facts?.registrationUrl ?? "";
+    const oldOutcome = await reinterpolate(page.workshopId, input.oldTemplateCustomHtml, regUrl);
+    const newOutcome = await reinterpolate(page.workshopId, input.newTemplateCustomHtml, regUrl);
 
     // Workshop variables missing (workshop not found) → skip.
     if (!facts || !oldOutcome || !newOutcome) {
@@ -615,21 +622,30 @@ export async function restoreBackfill(
   for (const entry of backup.entries as KajabiBackupEntry[]) {
     const current = await db.landingPage.findUnique({
       where: { id: entry.landingPageId },
-      select: { customHtml: true },
+      select: { customHtml: true, updatedAt: true },
     });
     if (!current) {
       skipped++;
       continue;
     }
     const currentSha = sha256(current.customHtml ?? "");
-    if (entry.newSha && currentSha !== entry.newSha) {
+    // Fix 1 (P1): fail-safe — skip unless newSha is present AND the live SHA matches it.
+    // Previously: `if (entry.newSha && currentSha !== entry.newSha) skip` which
+    // fell through to an unconditional write when newSha was falsy (corrupt backup).
+    if (!entry.newSha || currentSha !== entry.newSha) {
       skipped++;
       continue;
     }
-    await db.landingPage.update({
-      where: { id: entry.landingPageId },
+    // Fix 2 (P1): CAS on updatedAt (mirrors applyBackfillPlans) to prevent TOCTOU.
+    const res = await db.landingPage.updateMany({
+      where: { id: entry.landingPageId, updatedAt: current.updatedAt as Date },
       data: { customHtml: entry.oldCustomHtml },
     });
+    if (res.count === 0) {
+      // Concurrent edit between findUnique and updateMany — skip, do not clobber.
+      skipped++;
+      continue;
+    }
     restored++;
     restoredIds.push(entry.landingPageId);
   }

@@ -97,18 +97,19 @@ const DEFAULT_ARTIFACT = join(REPO_ROOT, "docs/specs/master-class-landing-kajabi
  * Re-interpolate a template's customHtml for a workshop, exactly as auto-build's
  * Pass 2 does: buildWorkshopVariables → enrichedVars (+ registration_url two-pass
  * from the EXISTING REGISTRATION slug) → interpolate → STRICT sanitize.
+ *
+ * Fix 3 (P2): accepts a pre-resolved registrationUrl so the caller (resolveWorkshopFacts)
+ * does the single REGISTRATION lookup and passes the result in — eliminates the
+ * duplicate db.landingPage.findUnique that was happening once here and once in
+ * resolveWorkshopFacts for every candidate workshop.
  */
 async function reinterpolate(
   workshopId: string,
   templateCustomHtml: string,
+  registrationUrl: string,
 ): Promise<SanitizeOutcome | null> {
   const variables = await buildWorkshopVariables(workshopId);
   if (!variables) return null;
-  const existingReg = await db.landingPage.findUnique({
-    where: { workshopId_template: { workshopId, template: "REGISTRATION" } },
-    select: { slug: true },
-  });
-  const registrationUrl = existingReg?.slug ? `${process.env.APP_URL}/workshop/${existingReg.slug}` : "";
   const enrichedVars: Record<string, string | null | undefined> = {
     ...variables,
     registration_url: registrationUrl,
@@ -132,6 +133,7 @@ async function resolveWorkshopFacts(workshopId: string): Promise<WorkshopFacts |
   });
   if (!workshop) return null;
 
+  // Single REGISTRATION lookup — result is shared with reinterpolate (Fix 3).
   const reg = await db.landingPage.findUnique({
     where: { workshopId_template: { workshopId, template: "REGISTRATION" } },
     select: { slug: true, status: true },
