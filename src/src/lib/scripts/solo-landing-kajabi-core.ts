@@ -258,7 +258,6 @@ export function hasCoachPhoto(profileImage: string | null | undefined): boolean 
 
 export type SkipReason =
   | "bespoke-or-category-scoped" // current customHtml != expected old render
-  | "source-template-mismatch" // sourceTemplateId != old global template id
   | "missing-coach-photo"
   | "cta-preflight-failed"
   | "price-preflight-failed"
@@ -284,25 +283,28 @@ export interface TargetingInput {
   newRender: string;
   /** This LandingPage row's sourceTemplateId (may be null on legacy rows). */
   sourceTemplateId: string | null | undefined;
-  /** The OLD global SOLO_LANDING PageTemplate id (from Script 1's backup). */
-  oldGlobalTemplateId: string;
 }
 
 /**
  * Decide whether a single SOLO_LANDING LandingPage row is a backfill TARGET.
  *
- * Targeting precisely (claudex R2-High1, R3-High1):
+ * Targeting is based entirely on design-hash matching (claudex R2-High1, R3-High1):
  *   1. If the row has no current customHtml → SKIP (nothing to compare/replace).
- *   2. If sourceTemplateId is set AND != the old global template id → SKIP
- *      (this page was cloned from a DIFFERENT template — bespoke/category).
- *      A null sourceTemplateId is permitted (legacy rows) and falls through to
- *      the content check, which is the authoritative signal.
- *   3. Compute sha(currentCustomHtml). If it equals sha(newRender) → NO-OP
+ *   2. Compute sha(currentCustomHtml). If it equals sha(newRender) → NO-OP
  *      (already on the new design — idempotent).
- *   4. If it equals sha(expectedOldRender) → TARGET (still on the old global
+ *   3. If it equals sha(expectedOldRender) → TARGET (still on the old global
  *      design rendered for THIS workshop).
- *   5. Otherwise → SKIP "bespoke-or-category-scoped" (hand-edited / different
+ *   4. Otherwise → SKIP "bespoke-or-category-scoped" (hand-edited / different
  *      design — we must NEVER clobber it).
+ *
+ * NOTE: sourceTemplateId is intentionally NOT used as a gate. Prod investigation
+ * found every existing SOLO_LANDING LandingPage has a stale sourceTemplateId
+ * (all point at an empty "Standard" template) even when the page actually renders
+ * the old global design. Gating on sourceTemplateId therefore wrongly skips real
+ * targets. The design-hash match against the per-workshop expectedOldRender is
+ * the authoritative, safe signal — it prevents clobbering bespoke pages without
+ * the false-negative of a stale FK. sourceTemplateId is kept on TargetingInput
+ * for operator visibility in the per-row report only.
  *
  * The preflights (coach photo / CTA / price / new-value validity) are applied by
  * the runner AFTER a row is decided a TARGET; they can downgrade a target to a
@@ -312,18 +314,6 @@ export function decideRow(input: TargetingInput): RowDecision {
   const current = input.currentCustomHtml;
   if (!current || current.trim().length === 0) {
     return { kind: "skip", reason: "empty-current-customhtml" };
-  }
-
-  if (
-    input.sourceTemplateId &&
-    input.sourceTemplateId.trim().length > 0 &&
-    input.sourceTemplateId !== input.oldGlobalTemplateId
-  ) {
-    return {
-      kind: "skip",
-      reason: "source-template-mismatch",
-      detail: `sourceTemplateId=${input.sourceTemplateId} != old global ${input.oldGlobalTemplateId}`,
-    };
   }
 
   const currentSha = sha256(current);
