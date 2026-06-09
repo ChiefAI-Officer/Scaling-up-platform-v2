@@ -85,7 +85,6 @@ function makeAuditDb(extra: Partial<DbClient> = {}): { db: DbClient; auditCreate
       findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn().mockResolvedValue(null),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      update: jest.fn().mockResolvedValue({}),
     },
     auditLog: { create: auditCreate },
     ...extra,
@@ -146,7 +145,7 @@ describe("Script 1 — applyTemplateUpdate", () => {
         findUnique: jest.fn(),
         updateMany,
       },
-      landingPage: { findMany: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn(), update: jest.fn() },
+      landingPage: { findMany: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
       auditLog: { create: auditCreate },
     } as DbClient;
     return { db, updateMany, auditCreate };
@@ -238,7 +237,7 @@ describe("Script 1 — restoreTemplateFromBackup", () => {
         }),
         updateMany,
       },
-      landingPage: { findMany: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn(), update: jest.fn() },
+      landingPage: { findMany: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
       auditLog: { create: auditCreate },
     } as DbClient;
     const r = await restoreTemplateFromBackup(db, backup, { operator: "o", runId: "r2" });
@@ -264,7 +263,7 @@ describe("Script 1 — restoreTemplateFromBackup", () => {
         }),
         updateMany,
       },
-      landingPage: { findMany: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn(), update: jest.fn() },
+      landingPage: { findMany: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
       auditLog: { create: jest.fn() },
     } as DbClient;
     const r = await restoreTemplateFromBackup(db, backup, { operator: "o", runId: "r2" });
@@ -286,7 +285,6 @@ function backfillDb(pages: unknown[]): { db: DbClient; updateMany: jest.Mock; au
       findMany: jest.fn().mockResolvedValue(pages),
       findUnique: jest.fn().mockResolvedValue(null),
       updateMany,
-      update: jest.fn().mockResolvedValue({}),
     },
     auditLog: { create: auditCreate },
   } as DbClient;
@@ -557,8 +555,6 @@ describe("Script 2 — restoreBackfill", () => {
     });
     const r = await restoreBackfill(db, backup, { operator: "o", runId: "r3" });
     expect(r).toEqual({ restored: 1, skipped: 0 });
-    // Fix 2: must use CAS updateMany (not unconditional update)
-    expect(db.landingPage.update).not.toHaveBeenCalled();
     expect(db.landingPage.updateMany).toHaveBeenCalledWith({
       where: { id: "lp1", updatedAt: restoreUpdatedAt },
       data: { customHtml: render(OLD_TPL, WS.ws1) },
@@ -574,7 +570,6 @@ describe("Script 2 — restoreBackfill", () => {
     });
     const r = await restoreBackfill(db, backup, { operator: "o", runId: "r3" });
     expect(r).toEqual({ restored: 0, skipped: 1 });
-    expect(db.landingPage.update).not.toHaveBeenCalled();
     expect(db.landingPage.updateMany).not.toHaveBeenCalled();
   });
 
@@ -591,7 +586,6 @@ describe("Script 2 — restoreBackfill", () => {
     });
     const r = await restoreBackfill(db, corruptBackup, { operator: "o", runId: "r3" });
     expect(r).toEqual({ restored: 0, skipped: 1 });
-    expect(db.landingPage.update).not.toHaveBeenCalled();
     expect(db.landingPage.updateMany).not.toHaveBeenCalled();
   });
 
@@ -606,7 +600,6 @@ describe("Script 2 — restoreBackfill", () => {
     (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
     const r = await restoreBackfill(db, backup, { operator: "o", runId: "r3" });
     expect(r).toEqual({ restored: 0, skipped: 1 });
-    expect(db.landingPage.update).not.toHaveBeenCalled();
     // Audit log is still written (with skipped=1, restored=0)
     expect(auditCreate.mock.calls[0][0].data.action).toBe("SOLO_LANDING_BACKFILL_RESTORE");
   });

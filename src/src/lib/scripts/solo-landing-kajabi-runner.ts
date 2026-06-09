@@ -77,7 +77,6 @@ export interface DbClient {
       where: { id: string; updatedAt: Date };
       data: { customHtml: string };
     }): Promise<{ count: number }>;
-    update(args: { where: { id: string }; data: { customHtml: string } }): Promise<unknown>;
   };
   auditLog: {
     create(args: { data: AuditCreateData }): Promise<unknown>;

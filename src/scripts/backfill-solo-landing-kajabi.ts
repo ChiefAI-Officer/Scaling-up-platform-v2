@@ -73,6 +73,7 @@ import {
   parseKajabiArgs,
   checkExpectedCount,
   toKajabiBackupEntry,
+  NEW_DESIGN_MARKER,
   type KajabiRowPlan,
   type KajabiBackupFile,
   type TemplateBackupFile,
@@ -297,6 +298,28 @@ async function main(): Promise<void> {
   }
   const artifactPath = args.newTemplate ?? DEFAULT_ARTIFACT;
   const newArtifactRaw = await readFile(artifactPath, "utf8");
+  // Mirror Script 1 (update-solo-landing-template.ts → loadSanitizedArtifact):
+  // the template stored in DB is save-time-sanitized with allowTokenUris:true (default).
+  // Targeting hashes must be computed from the SAME sanitized string, not raw.
+  const {
+    sanitized: newArtifactSanitized,
+    didStripContent,
+    strippedTags,
+    strippedAttrs,
+  } = sanitizeCustomHtml(newArtifactRaw);
+  if (didStripContent) {
+    console.error(
+      `Artifact sanitize STRIPPED content — refusing to proceed.\n` +
+        `  strippedTags=[${strippedTags.join(", ")}] strippedAttrs=[${strippedAttrs.join(", ")}]`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+  if (!newArtifactSanitized.includes(NEW_DESIGN_MARKER)) {
+    console.error(`Sanitized artifact does not contain the design marker "${NEW_DESIGN_MARKER}".`);
+    process.exitCode = 1;
+    return;
+  }
   const newGlobalSha = oldBackup.newSha; // SHA of the template we patched live.
 
   const { plans, counts } = await buildBackfillPlans(
@@ -306,7 +329,7 @@ async function main(): Promise<void> {
     {
       oldGlobalTemplateId: oldBackup.templateId,
       oldTemplateCustomHtml: oldBackup.oldCustomHtml,
-      newTemplateCustomHtml: newArtifactRaw,
+      newTemplateCustomHtml: newArtifactSanitized,
       expectedHost: ctaExpectedHost,
       allowPriceWorkshopIds: args.allowPrice,
       slug: args.slug,
