@@ -82,6 +82,13 @@ type RegistrationPaymentCompleted = {
     };
 };
 
+// Task 5 (Quick Assessment): triggers the lead-email outbox drain for a public submission.
+type AssessmentQuickLeadEnqueued = {
+    data: {
+        submissionId: string;
+    };
+};
+
 type Events = {
     "workshop/created": WorkshopCreated;
     "workshop/approved": WorkshopApproved;
@@ -93,6 +100,7 @@ type Events = {
     "workflow/schedule": WorkflowSchedule;
     "workflow/step.execute": WorkflowStepExecute;
     "workflow/step.trigger": WorkflowStepTrigger;
+    "assessment/quick-lead.enqueued": AssessmentQuickLeadEnqueued;
 };
 
 export const schemas = new EventSchemas().fromRecord<Events>();
