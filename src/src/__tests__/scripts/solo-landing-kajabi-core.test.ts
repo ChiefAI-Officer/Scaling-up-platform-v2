@@ -45,8 +45,6 @@ const OLD_TEMPLATE = `<div class="old-design">Old · {{coach_name}} · {{registr
 const NEW_TEMPLATE = `<div class="su-mc" ${NEW_DESIGN_MARKER}>New · {{coach_name}} · <a class="btn" href="{{registration_url}}">Register Here</a></div>`;
 
 describe("targeting: decideRow", () => {
-  const oldGlobalTemplateId = "tpl-old-global";
-
   it("TARGET when current customHtml == per-workshop OLD render", () => {
     const vars = { coach_name: "Ada Lovelace", registration_url: `https://${EXPECTED_HOST}/workshop/ada-reg` };
     const oldRender = fakeRender(OLD_TEMPLATE, vars);
@@ -55,8 +53,7 @@ describe("targeting: decideRow", () => {
       currentCustomHtml: oldRender,
       expectedOldRender: oldRender,
       newRender,
-      sourceTemplateId: oldGlobalTemplateId,
-      oldGlobalTemplateId,
+      sourceTemplateId: "tpl-old-global",
     });
     expect(d.kind).toBe("target");
   });
@@ -70,7 +67,6 @@ describe("targeting: decideRow", () => {
       expectedOldRender: oldRender,
       newRender,
       sourceTemplateId: null,
-      oldGlobalTemplateId,
     });
     expect(d.kind).toBe("no-op");
   });
@@ -82,7 +78,6 @@ describe("targeting: decideRow", () => {
       expectedOldRender: fakeRender(OLD_TEMPLATE, vars),
       newRender: fakeRender(NEW_TEMPLATE, vars),
       sourceTemplateId: null,
-      oldGlobalTemplateId,
     });
     expect(d.kind).toBe("skip");
     if (d.kind === "skip") expect(d.reason).toBe("bespoke-or-category-scoped");
@@ -99,8 +94,7 @@ describe("targeting: decideRow", () => {
       currentCustomHtml: oldRender,
       expectedOldRender: oldRender,
       newRender: fakeRender(NEW_TEMPLATE, vars),
-      sourceTemplateId: "tpl-stale-standard", // stale FK — doesn't match oldGlobalTemplateId
-      oldGlobalTemplateId,
+      sourceTemplateId: "tpl-stale-standard", // stale FK — informational only; design-hash is authoritative
     });
     expect(d.kind).toBe("target");
   });
@@ -111,7 +105,6 @@ describe("targeting: decideRow", () => {
       expectedOldRender: "x",
       newRender: "y",
       sourceTemplateId: null,
-      oldGlobalTemplateId,
     });
     expect(d.kind).toBe("skip");
     if (d.kind === "skip") expect(d.reason).toBe("empty-current-customhtml");
@@ -130,7 +123,6 @@ describe("targeting: decideRow", () => {
 
     // And each workshop's row is correctly targeted against ITS OWN old render,
     // while a cross-applied old render would NOT match (proving per-workshop hashing).
-    const oldGlobalTemplateId = "tpl-old-global";
     const adaNew = fakeRender(NEW_TEMPLATE, {
       coach_name: "Ada Lovelace",
       registration_url: `https://${EXPECTED_HOST}/workshop/ada-reg`,
@@ -140,7 +132,6 @@ describe("targeting: decideRow", () => {
       expectedOldRender: adaOld,
       newRender: adaNew,
       sourceTemplateId: null,
-      oldGlobalTemplateId,
     });
     expect(adaCorrect.kind).toBe("target");
 
@@ -149,7 +140,6 @@ describe("targeting: decideRow", () => {
       expectedOldRender: turingOld, // wrong workshop's render
       newRender: adaNew,
       sourceTemplateId: null,
-      oldGlobalTemplateId,
     });
     expect(adaWrong.kind).toBe("skip");
   });

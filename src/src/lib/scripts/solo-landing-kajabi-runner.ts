@@ -394,7 +394,6 @@ export async function buildBackfillPlans(
       expectedOldRender: oldOutcome.sanitized,
       newRender: newOutcome.sanitized,
       sourceTemplateId: page.sourceTemplateId,
-      oldGlobalTemplateId: input.oldGlobalTemplateId,
     });
 
     if (decision.kind === "no-op") {

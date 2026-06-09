@@ -283,8 +283,6 @@ export interface TargetingInput {
   newRender: string;
   /** This LandingPage row's sourceTemplateId (may be null on legacy rows). */
   sourceTemplateId: string | null | undefined;
-  /** The OLD global SOLO_LANDING PageTemplate id (from Script 1's backup). */
-  oldGlobalTemplateId: string;
 }
 
 /**
