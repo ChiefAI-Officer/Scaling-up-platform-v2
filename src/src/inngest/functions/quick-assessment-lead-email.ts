@@ -150,3 +150,69 @@ export const quickAssessmentLeadEmail = inngest.createFunction(
     return result;
   }
 );
+
+// ---------------------------------------------------------------------------
+// Scheduled cron drain — the durable retry driver
+// ---------------------------------------------------------------------------
+//
+// The event-triggered fn above handles the immediate first attempt. But a row
+// left PENDING (transient SMTP failure, or an inngest.send that never fired
+// because of an outage) would otherwise never be re-attempted — drainLeadOutbox
+// swallows send errors so the step.run succeeds and Inngest's own retries never
+// engage. This cron is what makes the per-row exponential backoff + maxAttempts
+// bookkeeping actually live: every few minutes it finds submissions with PENDING
+// rows that are now due (nextAttemptAt <= now) and re-drains them.
+
+export interface DueScanDb {
+  assessmentEmailOutbox: {
+    findMany(args: unknown): Promise<Array<{ submissionId: string }>>;
+  };
+}
+
+/**
+ * Returns the distinct submissionIds that have at least one PENDING outbox row
+ * due for a (re)send (nextAttemptAt <= now). Bounded by `limit` so a backlog
+ * can't blow up a single cron tick.
+ */
+export async function listSubmissionsWithDueOutbox(
+  db: DueScanDb,
+  now: Date,
+  limit = 200,
+): Promise<string[]> {
+  const rows = await db.assessmentEmailOutbox.findMany({
+    where: { status: "PENDING", nextAttemptAt: { lte: now } },
+    select: { submissionId: true },
+    distinct: ["submissionId"],
+    take: limit,
+  });
+  return rows.map((r) => r.submissionId);
+}
+
+export const quickAssessmentLeadEmailCron = inngest.createFunction(
+  { id: "quick-assessment-lead-email-cron" },
+  { cron: "*/3 * * * *" },
+  async ({ step }) => {
+    const submissionIds = await step.run("scan-due-outbox", () =>
+      listSubmissionsWithDueOutbox(db as unknown as DueScanDb, new Date()),
+    );
+
+    let totalSent = 0;
+    let totalFailed = 0;
+    for (const submissionId of submissionIds) {
+      const r = await step.run(`drain-${submissionId}`, () =>
+        drainLeadOutbox(
+          {
+            db: db as unknown as OutboxDb,
+            sendEmail: ({ to, subject, html }) =>
+              sendEmailViaSMTP({ to, subject, html }),
+          },
+          submissionId,
+        ),
+      );
+      totalSent += r.sent;
+      totalFailed += r.failed;
+    }
+
+    return { submissions: submissionIds.length, totalSent, totalFailed };
+  },
+);

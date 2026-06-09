@@ -9,7 +9,9 @@
 
 import {
   drainLeadOutbox,
+  listSubmissionsWithDueOutbox,
   type DrainDeps,
+  type DueScanDb,
 } from "@/inngest/functions/quick-assessment-lead-email";
 
 // ---------------------------------------------------------------------------
@@ -291,5 +293,45 @@ describe("drainLeadOutbox", () => {
     );
     expect(failCall[0].data.status).toBe("PENDING");
     expect(failCall[0].data.attempts).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// listSubmissionsWithDueOutbox — the cron drain's due-scan
+// ---------------------------------------------------------------------------
+
+describe("listSubmissionsWithDueOutbox", () => {
+  const now = new Date("2026-06-09T12:00:00Z");
+
+  it("queries PENDING rows due now, distinct by submissionId, bounded by limit", async () => {
+    const findMany = jest
+      .fn()
+      .mockResolvedValue([{ submissionId: "sub-a" }, { submissionId: "sub-b" }]);
+    const db: DueScanDb = { assessmentEmailOutbox: { findMany } } as any;
+
+    const ids = await listSubmissionsWithDueOutbox(db, now, 50);
+
+    expect(ids).toEqual(["sub-a", "sub-b"]);
+    expect(findMany).toHaveBeenCalledWith({
+      where: { status: "PENDING", nextAttemptAt: { lte: now } },
+      select: { submissionId: true },
+      distinct: ["submissionId"],
+      take: 50,
+    });
+  });
+
+  it("returns [] when nothing is due", async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const db: DueScanDb = { assessmentEmailOutbox: { findMany } } as any;
+    expect(await listSubmissionsWithDueOutbox(db, now)).toEqual([]);
+  });
+
+  it("defaults the limit to 200", async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const db: DueScanDb = { assessmentEmailOutbox: { findMany } } as any;
+    await listSubmissionsWithDueOutbox(db, now);
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 200 }),
+    );
   });
 });

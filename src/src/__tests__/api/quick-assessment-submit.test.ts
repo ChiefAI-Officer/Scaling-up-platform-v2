@@ -458,7 +458,7 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
     await POST(makeRequest(IDEMPOTENT_BODY) as never, makeParams() as never);
     expect(db.assessmentSubmission.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { idempotencyKey: "client-key-xyz" },
+        where: expect.objectContaining({ idempotencyKey: "client-key-xyz" }),
       }),
     );
   });

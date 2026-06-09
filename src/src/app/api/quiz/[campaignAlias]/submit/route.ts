@@ -295,7 +295,7 @@ export async function POST(
         data.idempotencyKey
       ) {
         const existing = await db.assessmentSubmission.findFirst({
-          where: { idempotencyKey: data.idempotencyKey },
+          where: { idempotencyKey: data.idempotencyKey, campaignId: campaign.id },
           select: { id: true, result: true },
         });
         if (!existing) {
@@ -332,10 +332,21 @@ export async function POST(
       userAgent: request.headers.get("user-agent") ?? undefined,
     });
 
-    await inngest.send({
-      name: "assessment/quick-lead.enqueued",
-      data: { submissionId },
-    });
+    // Best-effort trigger of the immediate drain. If this throws (Inngest
+    // outage/misconfig) the submission is already committed and the outbox
+    // rows persist; the scheduled cron drain (quickAssessmentLeadEmailCron)
+    // picks them up on its next tick, so we must NOT 500 the taker here.
+    try {
+      await inngest.send({
+        name: "assessment/quick-lead.enqueued",
+        data: { submissionId },
+      });
+    } catch (sendErr) {
+      console.error(
+        "quick-lead enqueue send failed (cron drain will retry):",
+        sendErr,
+      );
+    }
 
     // -----------------------------------------------------------------------
     // Response: include full ScoreResult + Cache-Control: no-store
