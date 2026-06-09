@@ -72,7 +72,7 @@ export interface DbClient {
   };
   landingPage: {
     findMany(args: unknown): Promise<LandingPageRow[]>;
-    findUnique(args: unknown): Promise<{ customHtml?: string | null; updatedAt?: Date } | null>;
+    findUnique(args: unknown): Promise<{ customHtml?: string | null; updatedAt: Date } | null>;
     updateMany(args: {
       where: { id: string; updatedAt: Date };
       data: { customHtml: string };
@@ -623,7 +623,10 @@ export async function restoreBackfill(
       where: { id: entry.landingPageId },
       select: { customHtml: true, updatedAt: true },
     });
-    if (!current) {
+    if (!current || current.updatedAt == null) {
+      // Defense-in-depth: a missing record OR a missing updatedAt must skip.
+      // A CAS on `updatedAt: undefined` would let Prisma drop the filter and
+      // reduce the guard to `where:{id}` only, clobbering a legitimately-edited page.
       skipped++;
       continue;
     }
@@ -637,7 +640,7 @@ export async function restoreBackfill(
     }
     // Fix 2 (P1): CAS on updatedAt (mirrors applyBackfillPlans) to prevent TOCTOU.
     const res = await db.landingPage.updateMany({
-      where: { id: entry.landingPageId, updatedAt: current.updatedAt as Date },
+      where: { id: entry.landingPageId, updatedAt: current.updatedAt },
       data: { customHtml: entry.oldCustomHtml },
     });
     if (res.count === 0) {
