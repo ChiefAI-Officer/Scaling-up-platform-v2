@@ -1,0 +1,176 @@
+<div class="su-mc" data-su-mc>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&family=Fira+Sans:ital,wght@0,400;0,500;0,600;0,700;1,700&display=swap');
+
+  .su-mc{--ink:#161E2A;--body:#595959;--muted:#6b6b6b;--cta:#0072EF;--cta-hover:#005fce;
+    --su-purple:#522583;--c-people:#f7a600;--c-strategy:#008bd2;--c-exec:#946b36;--c-cash:#95c11f;
+    font-family:"Open Sans",Helvetica,Arial,sans-serif;color:var(--body);line-height:1.65;font-size:17px;-webkit-font-smoothing:antialiased;background:#fff;}
+  .su-mc *{box-sizing:border-box;}
+  .su-mc h1,.su-mc h2,.su-mc h3,.su-mc h4{font-family:"Fira Sans","Open Sans",Helvetica,Arial,sans-serif;color:var(--ink);font-weight:700;line-height:1.2;}
+  .su-mc .wrap{max-width:920px;margin:0 auto;padding:0 24px;}
+  .su-mc a{color:var(--cta);}
+
+  /* ---------- HERO BANNER (CSS rebuild of the Kajabi graphic) ---------- */
+  .su-mc .hero{max-width:1040px;margin:32px auto 0;padding:0 24px;}
+  .su-mc .hero-card{border-radius:10px;overflow:hidden;box-shadow:0 18px 50px rgba(22,30,42,.18);
+    display:grid;grid-template-columns:1.55fr 1fr;}
+  .su-mc .hero-stripe{height:10px;grid-column:1 / -1;display:flex;}
+  .su-mc .hero-stripe span{flex:1;}
+  .su-mc .hero-left{position:relative;background:#0b0b0d;color:#fff;padding:42px 40px 38px;overflow:hidden;}
+  .su-mc .hero-left::before{content:"";position:absolute;right:-60px;top:-40px;width:280px;height:320px;
+    background:linear-gradient(135deg,#6a2fae 0%,#3d1668 70%);transform:skewX(-14deg);opacity:.55;}
+  .su-mc .hero-logo{position:relative;font-family:"Fira Sans",Helvetica,Arial,sans-serif;font-weight:700;letter-spacing:.06em;font-size:15px;color:#fff;margin-bottom:34px;}
+  .su-mc .hero-logo b{display:inline-block;width:13px;height:13px;background:var(--c-cash);margin-left:6px;vertical-align:middle;}
+  .su-mc h1.hero-title{position:relative;font-size:40px;line-height:1.04;margin:0 0 6px;color:#fff;text-transform:uppercase;letter-spacing:.01em;}
+  .su-mc .hero-tag{position:relative;color:var(--c-people);font-weight:700;font-size:16px;margin:14px 0 24px;}
+  .su-mc .hero-meta{position:relative;display:flex;flex-direction:column;gap:9px;font-size:14px;color:#e8e8ea;}
+  .su-mc .hero-meta div{display:flex;align-items:center;gap:10px;}
+  .su-mc .hero-meta .ico{flex:none;display:inline-block;width:16px;height:16px;position:relative;}
+  /* CSS-drawn icons (inline SVG is stripped by the sanitizer) */
+  .su-mc .ico-cal::before{content:"";position:absolute;inset:1px 0 0;border:2px solid var(--c-people);border-radius:3px;}
+  .su-mc .ico-cal::after{content:"";position:absolute;top:-1px;left:3px;right:3px;height:3px;border-left:2px solid var(--c-people);border-right:2px solid var(--c-people);}
+  .su-mc .ico-clock::before{content:"";position:absolute;inset:1px;border:2px solid var(--c-people);border-radius:50%;}
+  .su-mc .ico-clock::after{content:"";position:absolute;left:7px;top:4px;width:2px;height:5px;background:var(--c-people);box-shadow:1px 4px 0 -1px var(--c-people);}
+  .su-mc .ico-pin::before{content:"";position:absolute;left:2px;top:0;width:12px;height:12px;border:2px solid var(--c-people);border-radius:50% 50% 50% 0;transform:rotate(-45deg);}
+  .su-mc .hero-right{background:#fff;padding:26px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;}
+  .su-mc .hero-right .coachlogo{font-family:"Fira Sans",Helvetica,Arial,sans-serif;font-weight:700;font-size:12px;letter-spacing:.04em;color:var(--ink);margin-bottom:14px;}
+  .su-mc .hero-right .coachlogo span{display:block;font-size:9px;letter-spacing:.22em;color:var(--muted);font-weight:600;}
+  .su-mc .hero-photo{width:138px;height:138px;border-radius:50%;object-fit:cover;border:4px solid var(--su-purple);background:var(--su-purple);display:block;}
+  .su-mc .hero-right .cname{font-family:"Fira Sans",Helvetica,Arial,sans-serif;font-weight:700;color:var(--ink);font-size:20px;margin:14px 0 2px;}
+  .su-mc .hero-right .ctitle{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .su-mc .hero-right .partner{margin-top:18px;padding-top:14px;border-top:1px solid #ececec;font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;}
+
+  /* ---------- INTRO ---------- */
+  .su-mc .intro{text-align:center;padding:54px 24px 10px;}
+  .su-mc .intro .pre{font-size:26px;font-weight:400;font-family:"Fira Sans",Helvetica,Arial,sans-serif;color:var(--ink);}
+  .su-mc .intro .intro-title{font-family:"Fira Sans",Helvetica,Arial,sans-serif;font-weight:700;color:var(--ink);font-size:34px;margin:6px 0 0;line-height:1.2;}
+
+  /* ---------- CONTENT ---------- */
+  .su-mc section{padding:30px 0;}
+  .su-mc section h2{font-size:28px;margin:0 0 14px;}
+  .su-mc p{margin:0 0 16px;}
+  .su-mc .lead b{color:var(--ink);}
+  .su-mc ul.ticks{list-style:none;padding:0;margin:0;}
+  .su-mc ul.ticks li{position:relative;padding:8px 0 8px 34px;border-bottom:1px solid #f0f0f0;}
+  .su-mc ul.ticks li::before{content:"";position:absolute;left:0;top:13px;width:18px;height:18px;border-radius:50%;
+    background:var(--c-cash);}
+  .su-mc ul.ticks li::after{content:"";position:absolute;left:6px;top:17px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);}
+
+  .su-mc .callout{background:#f6f7f9;border-left:4px solid var(--su-purple);border-radius:6px;padding:26px 30px;text-align:center;margin:18px 0;}
+  .su-mc .callout strong{color:var(--ink);font-family:"Fira Sans",Helvetica,Arial,sans-serif;font-size:18px;}
+
+  /* ---------- VIDEO (omitted in v1 — re-add a .video block with a Vimeo/YouTube iframe when a real asset exists) ---------- */
+  .su-mc .video{max-width:760px;margin:30px auto;border-radius:10px;overflow:hidden;box-shadow:0 14px 40px rgba(22,30,42,.16);position:relative;background:#000;aspect-ratio:16/9;}
+  .su-mc .video iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+
+  /* ---------- PRICE / REGISTER CARD ---------- */
+  .su-mc .buybar{max-width:620px;margin:34px auto 60px;border:1px solid #e7e7ea;border-radius:12px;overflow:hidden;box-shadow:0 12px 36px rgba(22,30,42,.10);}
+  .su-mc .buybar .thumb{height:8px;display:flex;}
+  .su-mc .buybar .thumb span{flex:1;}
+  .su-mc .buybar .bbody{padding:24px 28px;text-align:center;}
+  .su-mc .buybar h3{font-size:20px;margin:0 0 6px;}
+  .su-mc .buybar .price{font-family:"Fira Sans",Helvetica,Arial,sans-serif;font-weight:700;color:var(--ink);font-size:30px;margin:8px 0 18px;}
+  .su-mc .btn{display:inline-block;background:var(--cta);color:#fff;font-family:"Open Sans",Helvetica,Arial,sans-serif;font-weight:700;font-size:18px;
+    padding:13px 44px;border-radius:4px;text-decoration:none;width:100%;max-width:420px;}
+  .su-mc .btn:hover{background:var(--cta-hover);}
+
+  /* ---------- FOOTER ---------- */
+  .su-mc .foot{background:#0b0b0d;color:#bcbcc2;text-align:center;padding:34px 24px;font-size:13px;}
+  .su-mc .foot .flogo{font-family:"Fira Sans",Helvetica,Arial,sans-serif;font-weight:700;color:#fff;letter-spacing:.06em;font-size:15px;margin-bottom:8px;}
+
+  @media(max-width:760px){
+    .su-mc .hero-card{grid-template-columns:1fr;}
+    .su-mc h1.hero-title{font-size:30px;}
+    .su-mc .intro .pre{font-size:22px;}
+    .su-mc .intro .intro-title{font-size:26px;}
+  }
+</style>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-card">
+    <div class="hero-stripe">
+      <span style="background:var(--c-people)"></span>
+      <span style="background:var(--c-strategy)"></span>
+      <span style="background:var(--c-exec)"></span>
+      <span style="background:var(--c-cash)"></span>
+    </div>
+    <div class="hero-left">
+      <div class="hero-logo">SCALING UP<b></b></div>
+      <h1 class="hero-title">{{workshop_title}}</h1>
+      <div class="hero-tag">Growing Leaders. Growing Companies.</div>
+      <div class="hero-meta">
+        <div><span class="ico ico-cal" aria-hidden="true"></span> {{event_date}}</div>
+        <div><span class="ico ico-clock" aria-hidden="true"></span> {{event_time}}</div>
+        <div><span class="ico ico-pin" aria-hidden="true"></span> Scaling Up Workshop</div>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="coachlogo">SCALING UP<span>COACHES</span></div>
+      <img class="hero-photo" src="{{coach_photo}}" alt="{{coach_name}}" width="138" height="138">
+      <div class="cname">{{coach_name}}</div>
+      <div class="ctitle">{{coach_title}}</div>
+      <div class="partner">In Partnership With Scaling Up</div>
+    </div>
+  </div>
+</div>
+
+<!-- INTRO -->
+<div class="intro">
+  <div class="pre">Join us for</div>
+  <div class="intro-title">&ldquo;{{workshop_title}}&rdquo;</div>
+</div>
+
+<div class="wrap">
+  <p class="lead" style="text-align:center;max-width:720px;margin:0 auto 10px;">Scaling Up workshops give business leaders the proven tools and frameworks to align their team, sharpen strategy, drive execution, and accelerate growth &mdash; the same methodology used by tens of thousands of companies worldwide.</p>
+
+  <section>
+    <h2>About the Workshop</h2>
+    <p>This session is led by <b>{{coach_name}}</b>, a Scaling Up Certified Coach, and draws on the proven Scaling Up methodology developed by <b>Verne Harnish</b> and used by growth companies around the world.</p>
+    <p>{{workshop_description}}</p>
+  </section>
+
+  <section>
+    <h2>What&rsquo;s Included</h2>
+    <ul class="ticks">
+      <li>The Scaling Up workbook and session materials</li>
+      <li>Proven frameworks and tools you can apply immediately</li>
+      <li>Live Q&amp;A with your Scaling Up Certified Coach</li>
+      <li>Connection with fellow business leaders</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Why Attend?</h2>
+    <ul class="ticks">
+      <li>Align your leadership team and get the right people in the right seats</li>
+      <li>Sharpen a strategy that sets your business apart</li>
+      <li>Build the execution rhythm that turns plans into results</li>
+      <li>Strengthen the cash flow that fuels sustainable growth</li>
+      <li>Leave with a clear action plan you can put to work right away</li>
+    </ul>
+  </section>
+
+  <div class="callout">
+    <strong>Secure your seat today.</strong><br>
+    Take the next step toward building a stronger, faster-growing business &mdash; on your terms. <em>Spots are limited.</em>
+  </div>
+
+  <div class="buybar">
+    <div class="thumb">
+      <span style="background:var(--c-people)"></span><span style="background:var(--c-strategy)"></span><span style="background:var(--c-exec)"></span><span style="background:var(--c-cash)"></span>
+    </div>
+    <div class="bbody">
+      <h3>{{event_date_no_weekday}} &middot; {{workshop_title}} with {{coach_name}}</h3>
+      <div class="price">{{price}}</div>
+      <a class="btn" href="{{registration_url}}">Register Here</a>
+    </div>
+  </div>
+</div>
+
+<div class="foot">
+  <div class="flogo">SCALING UP</div>
+  Growing Leaders &middot; Growing Companies &mdash; {{workshop_title}}, {{event_date_no_weekday}}
+</div>
+
+</div>

@@ -3,7 +3,19 @@
  * the stored DOMPurify-sanitized HTML renders via React's HTML-injection
  * prop and the React template switch is bypassed. Empty / null /
  * whitespace customHtml falls through to the existing switch.
+ *
+ * Task 5 adds a smoke test that uses the real interpolated Kajabi master-class
+ * artifact as the customHtml payload so a regression in the render path for
+ * a realistic payload is caught early.
  */
+import * as fs from "fs";
+import * as path from "path";
+import { interpolateContentForHtml } from "@/lib/templates/interpolate-content-html";
+import { sanitizeCustomHtml } from "@/lib/templates/sanitize-custom-html";
+
+// Repo root is five levels up from src/src/__tests__/app/
+const REPO_ROOT = path.join(__dirname, "..", "..", "..", "..");
+const ARTIFACT_PATH = path.join(REPO_ROOT, "docs", "specs", "master-class-landing-kajabi.html");
 
 jest.mock("@/lib/db", () => ({
   db: {
@@ -232,5 +244,88 @@ describe("workshop slug pre-approval guard", () => {
     expect(markup).toContain("Registration isn&#x27;t open yet");
     // The default template + registration form must NOT render.
     expect(markup).not.toContain("Pending Workshop");
+  });
+});
+
+// ── Task 5 — Render-path smoke: real interpolated artifact ────────────────────
+describe("workshop slug customHtml render path — master-class artifact smoke", () => {
+  it("renders data-custom-html-render wrapper with workshop title and Register anchor when artifact is the customHtml payload", async () => {
+    // Build a realistic, fully-interpolated, sanitized artifact — mirroring
+    // what runAutoBuild stores in LandingPage.customHtml at build time.
+    const raw = fs.readFileSync(ARTIFACT_PATH, "utf8");
+    const interpolated = interpolateContentForHtml(raw, {
+      workshop_title: "Scaling Up Masterclass",
+      workshop_description: "A full-day intensive for growth-focused leaders.",
+      event_date: "Thursday, June 19, 2026",
+      event_date_no_weekday: "June 19, 2026",
+      event_time: "9:00 AM EDT",
+      coach_name: "Alex Johnson",
+      coach_title: "Scaling Up Certified Coach",
+      coach_photo: "https://cdn.example.com/photos/alex.jpg",
+      price: "$349",
+      registration_url: "https://app.example.com/workshop/scaling-up-masterclass",
+    });
+    const { sanitized: storedHtml } = sanitizeCustomHtml(interpolated, { allowTokenUris: false });
+
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValueOnce(
+      landingFixture({
+        template: "SOLO_LANDING",
+        customHtml: storedHtml,
+        workshop: {
+          ...landingFixture().workshop,
+          status: "PRE_EVENT",
+        },
+      })
+    );
+
+    const node = await LandingPageView(await Promise.resolve(makeProps("scaling-up-masterclass")));
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    // Must render the customHtml wrapper — NOT the React SOLO_LANDING template.
+    expect(markup).toContain("data-custom-html-render");
+    expect(markup).not.toContain("solo:React title");
+
+    // Workshop title text must be present (interpolated into multiple locations).
+    expect(markup).toContain("Scaling Up Masterclass");
+
+    // The Register Here anchor must be present with the registration URL.
+    expect(markup).toContain(">Register Here</a>");
+    expect(markup).toContain("https://app.example.com/workshop/scaling-up-masterclass");
+  });
+
+  it("does NOT render the React SOLO_LANDING template when artifact customHtml is present", async () => {
+    const raw = fs.readFileSync(ARTIFACT_PATH, "utf8");
+    const interpolated = interpolateContentForHtml(raw, {
+      workshop_title: "Exit Planning Workshop",
+      workshop_description: "",
+      event_date: "Friday, July 4, 2026",
+      event_date_no_weekday: "July 4, 2026",
+      event_time: "10:00 AM CDT",
+      coach_name: "Sam Rivera",
+      coach_title: "Scaling Up Certified Coach",
+      coach_photo: "https://cdn.example.com/photos/sam.jpg",
+      price: "$299",
+      registration_url: "https://app.example.com/workshop/exit-planning",
+    });
+    const { sanitized: storedHtml } = sanitizeCustomHtml(interpolated, { allowTokenUris: false });
+
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValueOnce(
+      landingFixture({
+        template: "SOLO_LANDING",
+        customHtml: storedHtml,
+        content: JSON.stringify({ heroTitle: "React fallback title" }),
+        workshop: {
+          ...landingFixture().workshop,
+          status: "PRE_EVENT",
+        },
+      })
+    );
+
+    const node = await LandingPageView(await Promise.resolve(makeProps("exit-planning")));
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain("data-custom-html-render");
+    // The React SoloLandingPageTemplate mock renders "solo:<heroTitle>".
+    expect(markup).not.toContain("solo:React fallback title");
   });
 });

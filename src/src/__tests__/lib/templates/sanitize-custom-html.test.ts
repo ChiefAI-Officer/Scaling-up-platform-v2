@@ -1,10 +1,17 @@
 /**
  * @jest-environment jsdom
  */
+import * as fs from "fs";
+import * as path from "path";
 import {
   sanitizeCustomHtml,
   FRAME_SRC_ALLOWLIST,
 } from "@/lib/templates/sanitize-custom-html";
+
+// ── path to the artifact (repo-root relative to this test file) ───────────────
+// src/src/__tests__/lib/templates/ → up 5 → repo-root (where docs/ lives)
+const REPO_ROOT = path.join(__dirname, "..", "..", "..", "..", "..");
+const ARTIFACT_PATH = path.join(REPO_ROOT, "docs", "specs", "master-class-landing-kajabi.html");
 
 describe("sanitizeCustomHtml", () => {
   it("1. passes through plain <p>Hello</p> unchanged", () => {
@@ -230,5 +237,77 @@ describe("sanitizeCustomHtml", () => {
     expect(
       FRAME_SRC_ALLOWLIST.some((r) => r.test("https://www.youtube.com/embed/x"))
     ).toBe(true);
+  });
+});
+
+// ── Task 2 — Artifact survives sanitization ────────────────────────────────────
+describe("master-class artifact survives sanitizeCustomHtml (default mode)", () => {
+  let artifact: string;
+  let result: ReturnType<typeof sanitizeCustomHtml>;
+
+  beforeAll(() => {
+    artifact = fs.readFileSync(ARTIFACT_PATH, "utf8");
+    result = sanitizeCustomHtml(artifact);
+  });
+
+  it("didStripContent is false", () => {
+    expect(result.didStripContent).toBe(false);
+  });
+
+  it("sanitized output contains @import", () => {
+    expect(result.sanitized).toContain("@import");
+  });
+
+  it("sanitized output contains data-su-mc", () => {
+    expect(result.sanitized).toContain("data-su-mc");
+  });
+
+  it("sanitized output contains href=\"{{registration_url}}\"", () => {
+    expect(result.sanitized).toContain('href="{{registration_url}}"');
+  });
+
+  it("sanitized output contains src=\"{{coach_photo}}\"", () => {
+    expect(result.sanitized).toContain('src="{{coach_photo}}"');
+  });
+
+  it("sanitized output contains {{workshop_description}}", () => {
+    expect(result.sanitized).toContain("{{workshop_description}}");
+  });
+
+  it("sanitized output contains .ico-cal", () => {
+    expect(result.sanitized).toContain(".ico-cal");
+  });
+
+  it("sanitized output does NOT contain <svg", () => {
+    expect(result.sanitized).not.toMatch(/<svg\b/i);
+  });
+
+  it("sanitized output does NOT contain <path", () => {
+    expect(result.sanitized).not.toMatch(/<path\b/i);
+  });
+
+  it("sanitized output does NOT contain <rect", () => {
+    expect(result.sanitized).not.toMatch(/<rect\b/i);
+  });
+
+  it("sanitized output does NOT contain <link", () => {
+    expect(result.sanitized).not.toMatch(/<link\b/i);
+  });
+
+  it("sanitized output does NOT contain <iframe", () => {
+    expect(result.sanitized).not.toMatch(/<iframe\b/i);
+  });
+
+  // Defence: verify the raw artifact itself is also free of stripped elements.
+  it("raw artifact contains no <svg tags", () => {
+    expect(artifact).not.toMatch(/<svg\b/i);
+  });
+
+  it("raw artifact contains no <link tags", () => {
+    expect(artifact).not.toMatch(/<link\b/i);
+  });
+
+  it("raw artifact contains no <iframe tags", () => {
+    expect(artifact).not.toMatch(/<iframe\b/i);
   });
 });
