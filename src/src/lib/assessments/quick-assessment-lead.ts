@@ -6,6 +6,7 @@
  */
 
 import { escapeHtml } from "@/lib/templates/interpolate-content-html";
+import { CERTIFIED_STATUS } from "@/lib/auth/coach-status";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -218,4 +219,89 @@ export function resolveLeadRecipients(input: {
   }
 
   return recipients;
+}
+
+// ---------------------------------------------------------------------------
+// findActiveCoachByEmail — open-relay guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal DB interface required by findActiveCoachByEmail.
+ * Accepts the real Prisma client or a mock (for tests).
+ */
+export interface ActiveCoachDb {
+  coach: {
+    findUnique(args: unknown): Promise<{
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      certificationStatus: string;
+      certificationExpiry: Date | null;
+    } | null>;
+  };
+}
+
+/**
+ * Looks up a referring coach by email and returns their basic info ONLY when
+ * they are a KNOWN, ACTIVE (certified) coach whose certification has not expired.
+ *
+ * This is the open-relay guard: the public-quiz lead flow must call this
+ * before routing any notification to a coach email supplied by an end-user.
+ *
+ * - null/undefined/blank email → returns null without touching the DB.
+ * - Email is normalized (trim + lowercase) before the DB query.
+ * - Returns null when the coach is not found, is not ACTIVE, or has an expired
+ *   certificationExpiry (expiry must be strictly after `now`).
+ *
+ * @param db   DB accessor (Prisma client or compatible mock).
+ * @param email Raw email from the quiz submission (untrusted).
+ * @param now  Reference instant for expiry check (defaults to new Date()).
+ */
+export async function findActiveCoachByEmail(
+  db: ActiveCoachDb,
+  email: string | null | undefined,
+  now?: Date,
+): Promise<{ id: string; email: string; firstName: string; lastName: string } | null> {
+  // Guard: blank / missing email — no DB call.
+  const normalized = (email ?? "").trim().toLowerCase();
+  if (normalized.length === 0) {
+    return null;
+  }
+
+  const coach = await db.coach.findUnique({
+    where: { email: normalized },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      certificationStatus: true,
+      certificationExpiry: true,
+    },
+  });
+
+  if (coach === null) {
+    return null;
+  }
+
+  // Status check: must be exactly the canonical ACTIVE value.
+  if (coach.certificationStatus !== CERTIFIED_STATUS) {
+    return null;
+  }
+
+  // Expiry check: null expiry = never expires; otherwise must be strictly future.
+  if (coach.certificationExpiry !== null) {
+    const reference = now ?? new Date();
+    if (coach.certificationExpiry <= reference) {
+      return null;
+    }
+  }
+
+  return {
+    id: coach.id,
+    email: coach.email,
+    firstName: coach.firstName,
+    lastName: coach.lastName,
+  };
 }
