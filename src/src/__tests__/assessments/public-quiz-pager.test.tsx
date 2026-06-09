@@ -100,11 +100,27 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(screen.queryByText("Question Two")).not.toBeInTheDocument();
   });
 
-  it("submits the unchanged payload shape and clears the draft on success", async () => {
+  it("submits the unchanged payload shape and shows results in-place on success (Task 7)", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ success: true, data: { redirectUrl: "/quiz/team-alpha/thank-you" } }),
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_pager_1",
+          scoreResult: {
+            perQuestion: [],
+            perSection: [],
+            overallTotal: 0,
+            overallAverage: 0,
+            countAchieved: 0,
+            tier: null,
+            tierMetricValue: 0,
+            unansweredKeys: [],
+          },
+          redirectUrl: "/quiz/team-alpha/thank-you",
+        },
+      }),
     });
 
     render(<PublicQuizClient {...baseProps} />);
@@ -143,7 +159,11 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     );
     expect(body.answers).toHaveLength(2);
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/quiz/team-alpha/thank-you"));
+    // Task 7: results render in-place; router.push is NOT called.
+    await waitFor(() =>
+      expect(screen.getByTestId("quiz-results")).toBeInTheDocument(),
+    );
+    expect(mockPush).not.toHaveBeenCalled();
 
     // Draft cleared on success.
     expect(localStorage.getItem(key)).toBeNull();
