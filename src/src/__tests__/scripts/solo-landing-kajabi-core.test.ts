@@ -88,19 +88,21 @@ describe("targeting: decideRow", () => {
     if (d.kind === "skip") expect(d.reason).toBe("bespoke-or-category-scoped");
   });
 
-  it("SKIP when sourceTemplateId points at a DIFFERENT template (category-scoped)", () => {
+  it("TARGET when sourceTemplateId is stale/mismatched but current customHtml == expectedOldRender", () => {
+    // Prod reality: every existing SOLO_LANDING page has a stale sourceTemplateId
+    // (points at an empty "Standard" template) even when the page renders the old
+    // global design. Design-hash match is the authoritative signal; sourceTemplateId
+    // is informational only and must NOT block a real target.
     const vars = { coach_name: "Ada", registration_url: `https://${EXPECTED_HOST}/workshop/ada-reg` };
     const oldRender = fakeRender(OLD_TEMPLATE, vars);
     const d = decideRow({
-      // even if the CONTENT happens to match the old render, a foreign source wins.
       currentCustomHtml: oldRender,
       expectedOldRender: oldRender,
       newRender: fakeRender(NEW_TEMPLATE, vars),
-      sourceTemplateId: "tpl-category-scoped",
+      sourceTemplateId: "tpl-stale-standard", // stale FK — doesn't match oldGlobalTemplateId
       oldGlobalTemplateId,
     });
-    expect(d.kind).toBe("skip");
-    if (d.kind === "skip") expect(d.reason).toBe("source-template-mismatch");
+    expect(d.kind).toBe("target");
   });
 
   it("SKIP empty current customHtml", () => {

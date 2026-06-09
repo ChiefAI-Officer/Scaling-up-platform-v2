@@ -415,7 +415,10 @@ describe("Script 2 — buildBackfillPlans targeting + preflights", () => {
     expect(withException.plans[0].decision).toBe("target");
   });
 
-  it("skips a row whose sourceTemplateId points at a different template", async () => {
+  it("targets a row whose sourceTemplateId is stale/mismatched when content matches old design", async () => {
+    // Stale sourceTemplateId no longer gates targeting — design-hash match is
+    // the authoritative signal.  A page with a mismatched FK but old-design
+    // content is a real target and must NOT be skipped.
     const { db } = backfillDb([
       {
         id: "lp1",
@@ -424,11 +427,11 @@ describe("Script 2 — buildBackfillPlans targeting + preflights", () => {
         customHtml: render(OLD_TPL, WS.ws1),
         updatedAt: new Date(),
         categoryId: "cat-x",
-        sourceTemplateId: "tpl-category-scoped",
+        sourceTemplateId: "tpl-stale-standard", // stale FK — doesn't match oldGlobalTemplateId
       },
     ]);
     const { plans } = await buildBackfillPlans(db, injectedReinterpolate(), injectedFacts(), baseInput);
-    expect(plans[0].skipReason).toBe("source-template-mismatch");
+    expect(plans[0].decision).toBe("target");
   });
 });
 
