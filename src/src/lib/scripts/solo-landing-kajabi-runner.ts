@@ -671,22 +671,21 @@ export async function restoreBackfill(
 // ─── Rollback-window inventory (Task 10) ───────────────────────────────────────
 
 export interface InventoryResult {
-  /** Pages currently carrying the new global SHA (post-patch window-aware). */
-  onNewGlobalSha: string[];
+  id: string;
+  slug: string;
+  sha: string;
+  sourceTemplateId: string | null;
 }
 
 /**
- * Find SOLO_LANDING pages whose CURRENT customHtml hashes to the supplied
- * per-workshop new render. Because the new render is per-workshop, the caller
- * supplies a predicate that, for each page, knows the expected new SHA. Here we
- * provide the cheap variant: list all SOLO_LANDING slugs + current SHAs so the
- * operator (or the rollback path) can identify pages created AFTER the template
- * patch that already carry a new-design render (they won't be in any backfill
- * backup). Documented in the runbook.
+ * List every SOLO_LANDING page with its current customHtml SHA + sourceTemplateId,
+ * so the operator (or the rollback path) can identify pages created AFTER the
+ * template patch that already carry a new-design render — these won't be in any
+ * backfill backup. Documented in the runbook (Task 10, rollout-window inventory).
  */
 export async function inventorySoloPages(
   db: DbClient,
-): Promise<Array<{ id: string; slug: string; sha: string; sourceTemplateId: string | null }>> {
+): Promise<InventoryResult[]> {
   const pages: LandingPageRow[] = await db.landingPage.findMany({
     where: { template: "SOLO_LANDING" },
     select: {
