@@ -48,6 +48,7 @@ jest.mock("@/lib/db", () => ({
     },
     assessmentSubmission: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
     coach: {
       findUnique: jest.fn(),
@@ -177,7 +178,7 @@ beforeEach(() => {
   txMock.assessmentSubmission.create.mockResolvedValue({ id: "sub-1" });
   txMock.assessmentEmailOutbox.create.mockResolvedValue({});
   // Default: no existing submission (idempotency)
-  (db.assessmentSubmission.findUnique as jest.Mock).mockResolvedValue(null);
+  (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue(null);
   // Default: audit log succeeds
   (db.auditLog.create as jest.Mock).mockResolvedValue({});
   // Default: inngest.send succeeds
@@ -428,7 +429,7 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
     });
     (db.$transaction as jest.Mock).mockRejectedValue(p2002);
     // findUnique by idempotencyKey returns the existing submission
-    (db.assessmentSubmission.findUnique as jest.Mock).mockResolvedValue(EXISTING_SUB);
+    (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue(EXISTING_SUB);
   });
 
   it("returns 200 with existing submission data (no new create)", async () => {
@@ -455,7 +456,7 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
 
   it("looks up existing submission by idempotencyKey", async () => {
     await POST(makeRequest(IDEMPOTENT_BODY) as never, makeParams() as never);
-    expect(db.assessmentSubmission.findUnique).toHaveBeenCalledWith(
+    expect(db.assessmentSubmission.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { idempotencyKey: "client-key-xyz" },
       }),
@@ -464,7 +465,7 @@ describe("idempotency — duplicate idempotencyKey (P2002)", () => {
 
   it("500s if P2002 fires but no existing row found (idempotencyKey race-lost)", async () => {
     // No existing row → should rethrow as 500
-    (db.assessmentSubmission.findUnique as jest.Mock).mockResolvedValue(null);
+    (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue(null);
     const res = await POST(makeRequest(IDEMPOTENT_BODY) as never, makeParams() as never);
     expect(res.status).toBe(500);
   });

@@ -467,9 +467,33 @@ export function buildQuickAssessmentContent(): SeedContent {
 
 const db = new PrismaClient();
 
+const SYSTEM_SEED_EMAIL = "system-seed@scalingup.platform";
+
+/**
+ * Resolve (or create) the system seed user that owns seeded template versions.
+ * Mirrors seed-scaling-up-full-assessment.ts so seeded provenance is consistent.
+ */
+async function resolveSystemUser(
+  tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
+): Promise<{ id: string }> {
+  return tx.user.upsert({
+    where: { email: SYSTEM_SEED_EMAIL },
+    create: { email: SYSTEM_SEED_EMAIL, role: "STAFF", name: "System Seed" },
+    update: {},
+    select: { id: true },
+  });
+}
+
 export async function runSeed(client: PrismaClient): Promise<SeedResult> {
   const content = buildQuickAssessmentContent();
-  return ensureTemplateVersionContent(client, content);
+  return client.$transaction(async (tx) => {
+    const sys = await resolveSystemUser(tx);
+    return ensureTemplateVersionContent(
+      tx as unknown as Parameters<typeof ensureTemplateVersionContent>[0],
+      sys.id,
+      content,
+    );
+  });
 }
 
 async function main(): Promise<void> {

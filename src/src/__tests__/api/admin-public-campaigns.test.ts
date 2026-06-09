@@ -197,27 +197,29 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
       (getApiActor as jest.Mock).mockResolvedValue(adminActor);
     });
 
+    function omitKey(key: string): Record<string, unknown> {
+      const copy: Record<string, unknown> = { ...validBody };
+      delete copy[key];
+      return copy;
+    }
+
     it("returns 400 when organizationId is missing", async () => {
-      const { organizationId: _o, ...noOrg } = validBody;
-      const res = await createPost(makeCreateRequest(noOrg) as never);
+      const res = await createPost(makeCreateRequest(omitKey("organizationId")) as never);
       expect(res.status).toBe(400);
     });
 
     it("returns 400 when name is missing", async () => {
-      const { name: _n, ...noName } = validBody;
-      const res = await createPost(makeCreateRequest(noName) as never);
+      const res = await createPost(makeCreateRequest(omitKey("name")) as never);
       expect(res.status).toBe(400);
     });
 
     it("returns 400 when templateId is missing", async () => {
-      const { templateId: _t, ...noTemplate } = validBody;
-      const res = await createPost(makeCreateRequest(noTemplate) as never);
+      const res = await createPost(makeCreateRequest(omitKey("templateId")) as never);
       expect(res.status).toBe(400);
     });
 
     it("returns 400 when openAt is missing", async () => {
-      const { openAt: _o, ...noOpenAt } = validBody;
-      const res = await createPost(makeCreateRequest(noOpenAt) as never);
+      const res = await createPost(makeCreateRequest(omitKey("openAt")) as never);
       expect(res.status).toBe(400);
     });
   });

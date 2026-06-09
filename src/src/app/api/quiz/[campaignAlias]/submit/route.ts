@@ -294,7 +294,7 @@ export async function POST(
         txErr.code === "P2002" &&
         data.idempotencyKey
       ) {
-        const existing = await db.assessmentSubmission.findUnique({
+        const existing = await db.assessmentSubmission.findFirst({
           where: { idempotencyKey: data.idempotencyKey },
           select: { id: true, result: true },
         });

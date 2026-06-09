@@ -16,6 +16,7 @@ import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import type { Prisma } from "@prisma/client";
 import {
   CampaignCreateError,
   resolvePublishedTemplateVersion,
@@ -58,7 +59,7 @@ const createPublicCampaignSchema = z.object({
   name: z.string().min(1).max(200),
   openAt: z.string().min(1),
   closeAt: z.string().optional().nullable(),
-  publicConfig: z.record(z.unknown()).optional().nullable(),
+  publicConfig: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
 // ─── POST ─────────────────────────────────────────────────────────────────────
@@ -110,6 +111,9 @@ export async function POST(request: NextRequest) {
 
     const { templateId, organizationId, name, openAt, closeAt, publicConfig } =
       validation.data;
+    const publicConfigJson: Prisma.InputJsonValue | undefined = publicConfig
+      ? (publicConfig as Prisma.InputJsonValue)
+      : undefined;
 
     // Validate openAt is a real date
     const openAtDate = new Date(openAt);
@@ -200,7 +204,7 @@ export async function POST(request: NextRequest) {
           alias: aliasBase,
           status: "DRAFT",
           accessMode: "PUBLIC",
-          publicConfig: publicConfig ?? undefined,
+          publicConfig: publicConfigJson,
           openAt: openAtDate,
           endMode,
           closeAt: closeAtDate,
@@ -228,7 +232,7 @@ export async function POST(request: NextRequest) {
             alias: aliasFallback,
             status: "DRAFT",
             accessMode: "PUBLIC",
-            publicConfig: publicConfig ?? undefined,
+            publicConfig: publicConfigJson,
             openAt: openAtDate,
             endMode,
             closeAt: closeAtDate,
