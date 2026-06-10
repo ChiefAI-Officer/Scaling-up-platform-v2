@@ -27,6 +27,13 @@ import {
   useAnswerDraft,
   invitedDraftKey,
 } from "@/lib/assessments/use-answer-draft";
+import {
+  WelcomeShellHeader,
+  WelcomeExpectations,
+  WelcomeStats,
+  deriveScaleLabel,
+  deriveTimeEstimate,
+} from "@/components/assessments/assessment-welcome";
 
 interface ScaleConfig {
   min: number;
@@ -195,6 +202,13 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     return [...phase.data.questions].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [phase]);
 
+  // Welcome stat chips + expectation copy derive from the ACTUAL data.
+  const scaleLabel = useMemo(() => deriveScaleLabel(sortedQuestions), [sortedQuestions]);
+  const timeEstimate = useMemo(
+    () => deriveTimeEstimate(sortedQuestions.length),
+    [sortedQuestions.length],
+  );
+
   async function handleSubmit() {
     if (phase.kind !== "ready") return;
 
@@ -294,38 +308,52 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   }
 
   if (phase.kind === "intro") {
+    // Screen 1 — de-bared WELCOME / invitation (approved participant mockup).
+    // Branded app-shell header + "what to expect" value-prop list + stat chips
+    // (actual counts + derived scale) + strong purple CTA. INVITED copy: team
+    // framing, shared with the facilitator/coach.
+    const orgName = phase.data.campaign.organizationName ?? undefined;
     return (
-      <div className="ty-page">
-        <header className="ty-header">
-          <span className="ty-brand">Scaling Up</span>
-          <span>You&apos;re invited</span>
-        </header>
-        <main className="ty-body">
-          <section className="ty-card" aria-labelledby="invite-title">
-            <span className="hero-eyebrow">You&apos;re invited</span>
-            <h1 className="ty-title" id="invite-title">
+      <div className="su-welcome-page">
+        <WelcomeShellHeader caption={orgName ?? "Team Assessment"} />
+        <main className="su-welcome-body">
+          <section className="su-welcome-card" aria-labelledby="invite-title">
+            <span className="su-welcome-eyebrow">You&apos;re invited</span>
+            <h1 className="su-welcome-title" id="invite-title">
               {phase.data.campaign.name}
             </h1>
-            <p className="ty-lede">
-              You&apos;ve been invited to take this assessment. Click below
-              when you&apos;re ready to begin.
+            <p className="su-welcome-lede">
+              A quick, confidential check on how your team works together. You
+              can answer in one sitting or come back later — your link stays
+              active.
             </p>
-            <p className="ty-sub">
-              You can answer in one sitting or come back later — your link
-              stays active.
-            </p>
-            <div className="hero-cta-row">
+            <WelcomeExpectations
+              timeLabel={timeEstimate}
+              questionCount={sortedQuestions.length}
+              scaleLabel={scaleLabel}
+              confidentialSub="Your individual answers feed the team picture."
+              scoresSub="See where the team stands across each category."
+            />
+            <WelcomeStats
+              questionCount={sortedQuestions.length}
+              sectionCount={sortedSections.length}
+              scaleLabel={scaleLabel}
+            />
+            <div className="su-welcome-cta-row">
               <button
                 type="button"
                 onClick={() => setPhase({ kind: "ready", data: phase.data })}
-                className="wf-btn wf-btn-primary hero-cta"
+                className="su-welcome-cta"
               >
-                Start Assessment
+                Start the assessment →
               </button>
             </div>
+            <p className="su-welcome-fine">
+              Shared with your facilitator or coach to discuss as a team.
+            </p>
           </section>
         </main>
-        <footer className="ty-footer">Powered by Scaling Up</footer>
+        <footer className="su-welcome-foot">Powered by Scaling Up</footer>
       </div>
     );
   }
