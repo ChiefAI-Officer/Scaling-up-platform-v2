@@ -1296,6 +1296,7 @@ model AssessmentSubmission {
   result                Json // frozen ScoreResult cache
   publicTaker           Json? // {email, firstName, lastName, ...} for PUBLIC
   referringCoachEmail   String?
+  idempotencyKey        String? // PUBLIC submit idempotency; partial-unique via raw SQL
   resultsTokenHash      String?
   resultsTokenIssuedAt  DateTime?
   resultsTokenExpiresAt DateTime?
@@ -1305,6 +1306,7 @@ model AssessmentSubmission {
   campaign   AssessmentCampaign    @relation(fields: [campaignId], references: [id])
   respondent OrgRespondent?        @relation(fields: [respondentId], references: [id])
   invitation AssessmentInvitation? @relation(fields: [invitationId], references: [id])
+  outboxEmails AssessmentEmailOutbox[]
 
   @@index([campaignId])
   @@index([respondentId, submittedAt])
@@ -1312,7 +1314,34 @@ model AssessmentSubmission {
   // Partial unique indexes added via raw SQL:
   //   - (campaignId, respondentId) WHERE respondentId IS NOT NULL
   //   - (resultsTokenHash) WHERE resultsTokenHash IS NOT NULL
+  //   - (idempotencyKey) WHERE idempotencyKey IS NOT NULL
   @@map("assessment_submissions")
+}
+
+/// Durable outbox for Quick Assessment lead/result emails (claudex R2 hardening).
+/// Enqueued in the submit transaction; drained by an Inngest worker with retries.
+model AssessmentEmailOutbox {
+  id             String    @id @default(cuid())
+  submissionId   String
+  recipientEmail String
+  recipientRole  String // "REFERRING_COACH" | "SU_TEAM"
+  emailType      String // "QUICK_ASSESSMENT_LEAD"
+  subject        String
+  bodyHtml       String
+  status         String    @default("PENDING") // PENDING | SENT | FAILED
+  attempts       Int       @default(0)
+  lastError      String?
+  sentAt         DateTime?
+  nextAttemptAt  DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  submission AssessmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, recipientRole]) // idempotent enqueue per role
+  @@index([status, nextAttemptAt])
+  @@index([submissionId])
+  @@map("assessment_email_outbox")
 }
 
 // v7.6: AccessGroup replaces TemplateAccessGrant. Groups grant template

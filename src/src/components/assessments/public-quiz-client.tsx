@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState } from "react";
 import { SectionPager } from "./section-pager";
 import {
   buildSectionPages,
@@ -10,6 +9,9 @@ import {
   type PagerQuestion,
 } from "@/lib/assessments/section-pages";
 import { useAnswerDraft, publicDraftKey } from "@/lib/assessments/use-answer-draft";
+import { BrandedReport } from "@/components/assessments/BrandedReport";
+import type { RespondentReport, QuestionMeta } from "@/lib/assessments/respondent-report";
+import type { ScoreResult } from "@/lib/assessments/scoring";
 
 interface SectionDef {
   stableKey: string;
@@ -73,7 +75,7 @@ interface PublicQuizClientProps {
   questions: unknown;
 }
 
-type Step = "intro" | "info" | "form" | "error";
+type Step = "intro" | "info" | "form" | "results" | "error";
 
 export function PublicQuizClient({
   campaignAlias,
@@ -87,7 +89,6 @@ export function PublicQuizClient({
   sections: rawSections,
   questions: rawQuestions,
 }: PublicQuizClientProps) {
-  const router = useRouter();
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
 
@@ -107,6 +108,10 @@ export function PublicQuizClient({
   const [answers, setAnswers] = useState<Record<string, number | string | string[]>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [results, setResults] = useState<ScoreResult | null>(null);
+  const [submittedId, setSubmittedId] = useState<string>("");
+  // Stable idempotency key — generated once per component mount and reused on retries.
+  const idemRef = useRef<string>("");
 
   // localStorage autosave (anonymous public draft, keyed per browser session).
   // Hook must run unconditionally at the top level, before any early return.
@@ -299,6 +304,49 @@ export function PublicQuizClient({
     );
   }
 
+  // step === "results" — render the branded in-place report.
+  if (step === "results" && results) {
+    const report: RespondentReport = {
+      respondentName: `${firstName.trim()} ${lastName.trim()}`.trim(),
+      jobTitle: null,
+      companyName: "",
+      assessmentName: templateName,
+      campaignLabel: campaignName,
+      submittedAt: new Date(),
+      result: results,
+      sections: rawSections,
+      questionByKey: Object.fromEntries(sortedQuestions.map((q) => [q.stableKey, q.label])),
+      questionsByKey: Object.fromEntries(
+        sortedQuestions.map((q) => [
+          q.stableKey,
+          {
+            type: q.type,
+            label: q.label,
+            sectionStableKey: q.sectionStableKey,
+          } as QuestionMeta,
+        ]),
+      ),
+      rawAnswers: Object.entries(answers).map(([stableKey, value]) => ({ stableKey, value })),
+      scoringConfig: undefined,
+      provenance: {
+        submissionId: submittedId,
+        versionId: "",
+        contentHash: "",
+        templateName,
+      },
+      degraded: false,
+    };
+    return (
+      <main className="survey-body" data-testid="quiz-results">
+        <BrandedReport
+          report={report}
+          assessmentName={templateName}
+          campaignLabel={campaignName}
+        />
+      </main>
+    );
+  }
+
   // step === "form"
   function setAnswer(key: string, value: number | string | string[]) {
     setAnswers((cur) => ({ ...cur, [key]: value }));
@@ -322,6 +370,8 @@ export function PublicQuizClient({
     if (submitting || !canSubmit) return;
     setSubmitError(null);
     setSubmitting(true);
+    // Lazily assign a stable idempotency key for this submission attempt.
+    if (!idemRef.current) idemRef.current = crypto.randomUUID();
     try {
       const res = await fetch(`/api/quiz/${campaignAlias}/submit`, {
         method: "POST",
@@ -336,6 +386,7 @@ export function PublicQuizClient({
             stableKey,
             value,
           })),
+          idempotencyKey: idemRef.current,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -343,7 +394,9 @@ export function PublicQuizClient({
         throw new Error(body.error || `HTTP ${res.status}`);
       }
       clearDraft();
-      router.push(body.data.redirectUrl);
+      setResults(body.data.scoreResult as ScoreResult);
+      setSubmittedId(body.data.submissionId ?? "");
+      setStep("results");
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : "Submission failed. Please try again.",
@@ -391,6 +444,15 @@ export function PublicQuizClient({
             onExit={() => setStep("info")}
             assessmentName={templateName}
           />
+
+          <p
+            className="ty-sub"
+            style={{ fontSize: "0.75rem", textAlign: "center", margin: "0.5rem 0 0" }}
+            data-testid="quiz-consent"
+          >
+            By submitting, you agree that your results will be shown to you and shared with
+            the Scaling Up team and the coach who referred you (if any).
+          </p>
 
           {!canSubmit && (
             <p

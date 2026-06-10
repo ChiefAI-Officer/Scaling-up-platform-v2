@@ -6,11 +6,22 @@
  * create an AssessmentSubmission with respondentId=null + invitationId=null
  * and store {firstName, lastName, email} in the publicTaker JSON column.
  *
+ * Task 6 additions (Quick Assessment lead pipeline):
+ *  (a) Response includes full ScoreResult + Cache-Control: no-store.
+ *  (b) Client-supplied idempotencyKey — duplicate write (P2002) is silently
+ *      de-duped: returns the existing submission without re-auditing or
+ *      re-enqueueing.
+ *  (c) Audit row written after commit (fire-and-forget).
+ *  (d) Lead-notification outbox rows enqueued IN THE SAME TRANSACTION as the
+ *      submission (transactional outbox pattern).
+ *  (e) Inngest event fired after commit to drain the outbox.
+ *
  * Body:
  *   {
  *     publicTaker: { firstName, lastName, email },
  *     answers: Array<{ stableKey, value }>,
- *     referringCoachEmail?: string
+ *     referringCoachEmail?: string,
+ *     idempotencyKey?: string   (NEW — client-supplied; max 200 chars)
  *   }
  *
  * Status outcomes:
@@ -18,7 +29,7 @@
  *   - 403 NOT_PUBLIC — campaign is INVITED-only
  *   - 410 NOT_OPEN — campaign is DRAFT, CLOSED, before openAt, or past closeAt
  *   - 400 — invalid body or scoring validation failure
- *   - 200 { submissionId, redirectUrl }
+ *   - 200 { submissionId, scoreResult, redirectUrl }
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -31,6 +42,18 @@ import {
   ScoringValidationError,
   TemplateVersionForScoringSchema,
 } from "@/lib/assessments/scoring";
+import {
+  findActiveCoachByEmail,
+  resolveLeadRecipients,
+  buildLeadEmail,
+  lowestDecision,
+} from "@/lib/assessments/quick-assessment-lead";
+import { logAudit } from "@/lib/audit";
+import { inngest } from "@/inngest/client";
+
+// ---------------------------------------------------------------------------
+// Request body schema
+// ---------------------------------------------------------------------------
 
 const PublicSubmitBodySchema = z.object({
   publicTaker: z.object({
@@ -47,7 +70,13 @@ const PublicSubmitBodySchema = z.object({
     )
     .min(1),
   referringCoachEmail: z.string().email().max(320).optional().nullable(),
+  // Task 6(b): client-supplied idempotency key (optional)
+  idempotencyKey: z.string().min(1).max(200).optional(),
 });
+
+// ---------------------------------------------------------------------------
+// POST handler
+// ---------------------------------------------------------------------------
 
 export async function POST(
   request: NextRequest,
@@ -74,6 +103,9 @@ export async function POST(
     }
     const data = parsed.data;
 
+    // -----------------------------------------------------------------------
+    // Campaign gate checks
+    // -----------------------------------------------------------------------
     const campaign = await db.assessmentCampaign.findUnique({
       where: { alias: campaignAlias },
       select: {
@@ -84,6 +116,7 @@ export async function POST(
         closeAt: true,
         templateId: true,
         versionId: true,
+        template: { select: { name: true } },
       },
     });
     if (!campaign) {
@@ -118,6 +151,9 @@ export async function POST(
       );
     }
 
+    // -----------------------------------------------------------------------
+    // Version load + scoring schema validation
+    // -----------------------------------------------------------------------
     const version = await db.assessmentTemplateVersion.findUnique({
       where: { id: campaign.versionId },
       select: {
@@ -148,6 +184,9 @@ export async function POST(
       );
     }
 
+    // -----------------------------------------------------------------------
+    // Score the submission (pure, no I/O)
+    // -----------------------------------------------------------------------
     let result;
     try {
       result = scoreSubmission(versionParsed.data, data.answers);
@@ -165,30 +204,165 @@ export async function POST(
       throw err;
     }
 
-    const submission = await db.assessmentSubmission.create({
-      data: {
-        campaignId: campaign.id,
-        respondentId: null,
-        invitationId: null,
-        answers: data.answers as Prisma.InputJsonValue,
-        result: result as unknown as Prisma.InputJsonValue,
-        publicTaker: {
-          firstName: data.publicTaker.firstName,
-          lastName: data.publicTaker.lastName,
-          email: data.publicTaker.email,
-        } as Prisma.InputJsonValue,
-        referringCoachEmail: data.referringCoachEmail ?? null,
-      },
-      select: { id: true },
+    // -----------------------------------------------------------------------
+    // Pre-transaction read: active coach lookup (open-relay guard)
+    // -----------------------------------------------------------------------
+    const coach = await findActiveCoachByEmail(db, data.referringCoachEmail);
+
+    // -----------------------------------------------------------------------
+    // Build outbox payloads (pure helpers, no I/O)
+    // -----------------------------------------------------------------------
+    const assessmentName =
+      campaign.template?.name ?? "Scaling Up Quick Assessment";
+
+    // SU team address: prefer QUICK_ASSESSMENT_TEAM_EMAIL, fall back to
+    // ESCALATION_EMAIL, then ADMIN_EMAIL. Empty string → no SU_TEAM row enqueued.
+    const suTeamAddress =
+      process.env.QUICK_ASSESSMENT_TEAM_EMAIL ||
+      process.env.ESCALATION_EMAIL ||
+      process.env.ADMIN_EMAIL ||
+      "";
+
+    const lowest = lowestDecision(result.perDomain ?? []);
+    const domainInputs = (result.perDomain ?? []).map((d) => ({
+      label: d.label,
+      averagePoints: d.averagePoints,
+    }));
+
+    // Resolve recipients; filter out a blank SU address before building emails.
+    const allRecipients = resolveLeadRecipients({
+      suTeamAddress,
+      activeCoachEmail: coach?.email ?? null,
+    });
+    const recipients = allRecipients.filter((r) => r.email.length > 0);
+
+    const outboxPayloads = recipients.map((r) => {
+      const { subject, bodyHtml } = buildLeadEmail({
+        taker: data.publicTaker,
+        assessmentName,
+        perDomain: domainInputs,
+        lowestLabel: lowest?.label ?? null,
+        recipientRole: r.role,
+      });
+      return { recipient: r, subject, bodyHtml };
     });
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        submissionId: submission.id,
-        redirectUrl: `/quiz/${campaignAlias}/thank-you`,
-      },
+    // -----------------------------------------------------------------------
+    // Transactional write: submission + outbox rows in a single DB transaction
+    // -----------------------------------------------------------------------
+    let submissionId: string;
+    try {
+      submissionId = await db.$transaction(async (tx) => {
+        const sub = await tx.assessmentSubmission.create({
+          data: {
+            campaignId: campaign.id,
+            respondentId: null,
+            invitationId: null,
+            answers: data.answers as Prisma.InputJsonValue,
+            result: result as unknown as Prisma.InputJsonValue,
+            publicTaker: {
+              firstName: data.publicTaker.firstName,
+              lastName: data.publicTaker.lastName,
+              email: data.publicTaker.email,
+            } as Prisma.InputJsonValue,
+            referringCoachEmail: data.referringCoachEmail ?? null,
+            idempotencyKey: data.idempotencyKey ?? null,
+          },
+          select: { id: true },
+        });
+
+        // Enqueue outbox rows inside the same transaction.
+        for (const payload of outboxPayloads) {
+          await tx.assessmentEmailOutbox.create({
+            data: {
+              submissionId: sub.id,
+              recipientEmail: payload.recipient.email,
+              recipientRole: payload.recipient.role,
+              emailType: "QUICK_ASSESSMENT_LEAD",
+              subject: payload.subject,
+              bodyHtml: payload.bodyHtml,
+            },
+          });
+        }
+
+        return sub.id;
+      });
+    } catch (txErr) {
+      // Task 6(b): idempotency — duplicate key (P2002 on idempotencyKey partial-unique index)
+      if (
+        txErr instanceof Prisma.PrismaClientKnownRequestError &&
+        txErr.code === "P2002" &&
+        data.idempotencyKey
+      ) {
+        const existing = await db.assessmentSubmission.findFirst({
+          where: { idempotencyKey: data.idempotencyKey, campaignId: campaign.id },
+          select: { id: true, result: true },
+        });
+        if (!existing) {
+          // Race condition: P2002 but row not found → rethrow as 500.
+          throw txErr;
+        }
+        // Return de-duped response — no audit, no inngest.
+        const redirectUrl = `/quiz/${campaignAlias}/thank-you`;
+        return NextResponse.json(
+          {
+            success: true,
+            data: {
+              submissionId: existing.id,
+              scoreResult: existing.result,
+              redirectUrl,
+            },
+          },
+          { headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      // Any other error → rethrow → outer catch → 500.
+      throw txErr;
+    }
+
+    // -----------------------------------------------------------------------
+    // Post-commit: audit + Inngest (fire-and-forget; outside the transaction)
+    // -----------------------------------------------------------------------
+    await logAudit({
+      entityType: "AssessmentSubmission",
+      entityId: submissionId,
+      action: "CREATE",
+      performedBy: data.publicTaker.email,
+      ipAddress: request.headers.get("x-forwarded-for") ?? undefined,
+      userAgent: request.headers.get("user-agent") ?? undefined,
     });
+
+    // Best-effort trigger of the immediate drain. If this throws (Inngest
+    // outage/misconfig) the submission is already committed and the outbox
+    // rows persist; the scheduled cron drain (quickAssessmentLeadEmailCron)
+    // picks them up on its next tick, so we must NOT 500 the taker here.
+    try {
+      await inngest.send({
+        name: "assessment/quick-lead.enqueued",
+        data: { submissionId },
+      });
+    } catch (sendErr) {
+      console.error(
+        "quick-lead enqueue send failed (cron drain will retry):",
+        sendErr,
+      );
+    }
+
+    // -----------------------------------------------------------------------
+    // Response: include full ScoreResult + Cache-Control: no-store
+    // -----------------------------------------------------------------------
+    const redirectUrl = `/quiz/${campaignAlias}/thank-you`;
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          submissionId,
+          scoreResult: result,
+          redirectUrl,
+        },
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     console.error("Error submitting public quiz:", error);
     return NextResponse.json(

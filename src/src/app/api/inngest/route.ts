@@ -9,6 +9,10 @@ import { workshopDateChange } from "@/inngest/functions/workshop-date-change";
 import { triggerWorkflowStep } from "@/inngest/functions/trigger-workflow-step";
 import { processPaymentCompleted } from "@/inngest/functions/process-payment-completed";
 import { handleRegistrationCreatedFree } from "@/inngest/functions/handle-registration-created-free";
+import {
+  quickAssessmentLeadEmail,
+  quickAssessmentLeadEmailCron,
+} from "@/inngest/functions/quick-assessment-lead-email";
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -22,5 +26,7 @@ export const { GET, POST, PUT } = serve({
         triggerWorkflowStep,
         processPaymentCompleted,
         handleRegistrationCreatedFree,
+        quickAssessmentLeadEmail,
+        quickAssessmentLeadEmailCron,
     ],
 });
