@@ -221,4 +221,19 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     fireEvent.click(screen.getByTestId("quiz-start"));
     expect(screen.queryByTestId("quiz-consent")).not.toBeInTheDocument();
   });
+
+  // ── Public-flow intro copy is accurate (not invited-flow wording) ────────
+  it("uses public lead-magnet intro copy, not invited 'coach who sent this' wording", () => {
+    render(<PublicQuizClient {...baseProps} />);
+
+    // Public, honest eyebrow — not the invited "You're invited".
+    expect(screen.getByText(/free assessment/i)).toBeInTheDocument();
+    expect(screen.queryByText(/you're invited/i)).not.toBeInTheDocument();
+
+    // The misleading invited claims must be gone from the public intro.
+    expect(
+      screen.queryByText(/coach who sent this/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/facilitator will follow up/i)).not.toBeInTheDocument();
+  });
 });
