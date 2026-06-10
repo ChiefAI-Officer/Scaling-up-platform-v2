@@ -27,7 +27,6 @@
  * `logAudit()` helper — Round 2 M-4).
  */
 
-import { Prisma } from "@prisma/client";
 import { AccessChangeError } from "./errors";
 import { getAccessPolicyVersion } from "@/lib/auth/access-policy-version";
 
@@ -99,6 +98,11 @@ export interface AccessChangeTx {
       where?: {
         coachId?: string | { in?: string[] };
         accessGroupId?: string | { in?: string[] };
+      };
+      include?: {
+        accessGroup?:
+          | boolean
+          | { select?: { id?: boolean; deletedAt?: boolean } };
       };
     }) => Promise<
       Array<{
@@ -308,8 +312,11 @@ export async function evaluateAccessChange(
   }
 
   // Build snapshot covering all groups any affected coach belongs to.
+  // MUST include accessGroup — the loops below read r.accessGroup.deletedAt to
+  // skip archived groups; without the include it is undefined and throws.
   const coachGroupRows = await tx.accessGroupCoach.findMany({
     where: { coachId: { in: affectedCoachIds } },
+    include: { accessGroup: { select: { id: true, deletedAt: true } } },
   });
   const allGroupIds = new Set<string>([change.accessGroupId]);
   for (const r of coachGroupRows) {

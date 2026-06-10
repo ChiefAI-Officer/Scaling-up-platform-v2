@@ -85,13 +85,14 @@ function buildTx(state: {
             coachId?: string | { in?: string[] };
             accessGroupId?: string | { in?: string[] };
           };
+          include?: { accessGroup?: unknown };
         }) => {
           const rows = (state.groupCoachRows ?? []).filter(
             (r) => r.accessGroup.deletedAt === null,
           );
           const whereCoachId = args?.where?.coachId;
           const whereGroupId = args?.where?.accessGroupId;
-          return rows.filter((r) => {
+          const filtered = rows.filter((r) => {
             if (typeof whereCoachId === "string" && r.coachId !== whereCoachId)
               return false;
             if (
@@ -114,6 +115,16 @@ function buildTx(state: {
             )
               return false;
             return true;
+          });
+          // Faithful to Prisma: the accessGroup relation is ONLY present when
+          // the caller explicitly includes it. Code that reads
+          // r.accessGroup.deletedAt MUST pass include — else it gets undefined
+          // and throws (the prod bug this guards against).
+          if (args?.include?.accessGroup) return filtered;
+          return filtered.map((r) => {
+            const { accessGroup: _omit, ...rest } = r;
+            void _omit;
+            return rest;
           });
         },
       ),

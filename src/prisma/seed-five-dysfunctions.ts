@@ -612,9 +612,13 @@ interface QuestionPayload {
 }
 
 function buildQuestions(): QuestionPayload[] {
-  return ALL_QUESTION_DEFS.map((q) => ({
+  // sortOrder must be GLOBALLY unique across all questions (the seed integrity
+  // guard rejects duplicates). The per-section `q.sortOrder` fields restart at
+  // 1, so renumber sequentially over the grouped order (Trust → … → Results),
+  // which both preserves display order and guarantees uniqueness.
+  return ALL_QUESTION_DEFS.map((q, i) => ({
     stableKey: q.stableKey,
-    sortOrder: q.sortOrder,
+    sortOrder: i + 1,
     type: "SLIDER_LIKERT" as const,
     label: q.label,
     sectionStableKey: q.sectionStableKey,
