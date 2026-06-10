@@ -157,7 +157,7 @@ export function PublicQuizClient({
         </header>
         <main className="landing-body">
           <section className="hero-card" aria-labelledby="hero-title">
-            <span className="hero-eyebrow">You&apos;re invited</span>
+            <span className="hero-eyebrow">Free assessment</span>
             <h1 className="hero-title" id="hero-title">
               {campaignName}
             </h1>
@@ -167,13 +167,14 @@ export function PublicQuizClient({
               </p>
             ) : (
               <p className="hero-lede">
-                This assessment helps your team see how aligned you are.
-                Your responses are confidential.
+                See how your business scores across the Four Decisions —
+                People, Strategy, Execution, and Cash — and get your results
+                instantly.
               </p>
             )}
             <p className="hero-sub">
-              Most respondents finish in 5–10 minutes. Your responses are
-              shared only with the coach who sent this to you.
+              Most people finish in about 5–10 minutes, and you&apos;ll see
+              your results as soon as you submit.
             </p>
             <div className="hero-stats" aria-label="Assessment details">
               <span>
@@ -196,8 +197,9 @@ export function PublicQuizClient({
               </button>
             </div>
             <p className="hero-fine">
-              Your responses are confidential and shared only with the
-              coach who sent this assessment.
+              Free to take — you&apos;ll get your results on screen. Your
+              responses are also shared with the Scaling Up team and the
+              coach who referred you (if any).
             </p>
           </section>
         </main>
@@ -233,8 +235,9 @@ export function PublicQuizClient({
               About you
             </h1>
             <p className="ty-sub">
-              We use your email to match your responses; your facilitator
-              will follow up with your results.
+              We use your name and email to show you your results and, where
+              applicable, to share them with the Scaling Up team and the
+              coach who referred you.
             </p>
             <div className="survey-question">
               <label className="wf-label" htmlFor="quiz-first-name-input">
