@@ -74,6 +74,11 @@ export function QuestionInput({
           aria-valuetext={answered ? String(value) : "Not yet answered"}
           onChange={commit}
           onClick={commit}
+          // Commit on pointer release too: a tap that registers as a tiny drag
+          // (common on trackpads/touch) fires neither `change` (value unchanged
+          // at the resting minimum) nor `click` (movement cancels it), so the
+          // minimum value would never commit and the user couldn't proceed.
+          onPointerUp={commit}
           onKeyUp={(e) => { if (MOVE_KEYS.includes(e.key)) commit(e); }}
           disabled={disabled}
         />

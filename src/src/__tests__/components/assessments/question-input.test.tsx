@@ -256,4 +256,24 @@ describe("QuestionInput", () => {
     expect(screen.getByText("0")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
   });
+
+  test("12. SLIDER_LIKERT minimum of a 1-based scale commits on pointer release", () => {
+    // Regression for the reported bug: a user who wants to answer the MINIMUM
+    // (e.g. 1 on a 1–5 scale) sees the thumb already resting at 1, but a tap
+    // that the browser treats as a tiny drag fires neither `change` (value
+    // unchanged) nor `click` (movement cancels it) — so 1 never committed and
+    // they couldn't proceed. The component must commit on `pointerup` too.
+    const onChange = jest.fn();
+    render(
+      <QuestionInput
+        question={sliderQuestion}
+        value={undefined}
+        onChange={onChange}
+      />
+    );
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+    expect(slider.value).toBe("1"); // thumb sits at min (1) when unanswered
+    fireEvent.pointerUp(slider);
+    expect(onChange).toHaveBeenCalledWith("S1_Q1", 1);
+  });
 });
