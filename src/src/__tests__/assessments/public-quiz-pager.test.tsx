@@ -187,7 +187,9 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(screen.queryByText(/send your results to the email/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/email your scoring summary/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/check your spam/i)).not.toBeInTheDocument();
-    // Accurate copy must be present
-    expect(screen.getByText(/facilitator will follow up with your results/i)).toBeInTheDocument();
+    // Invited-flow wording must be absent on the public lead-magnet (PR #47).
+    expect(screen.queryByText(/facilitator will follow up/i)).not.toBeInTheDocument();
+    // Accurate public copy must be present.
+    expect(screen.getByText(/show you your results/i)).toBeInTheDocument();
   });
 });
