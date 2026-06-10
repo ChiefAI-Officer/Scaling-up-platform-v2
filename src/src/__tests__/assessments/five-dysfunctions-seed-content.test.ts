@@ -121,6 +121,19 @@ describe("buildFiveDysfunctionsContent() — questions", () => {
     expect(uniqueKeys.size).toBe(stableKeys.length);
   });
 
+  // Guards the seed integrity check: sortOrder must be GLOBALLY unique across
+  // all questions (not restart per section), else ensureTemplateVersionContent
+  // throws "duplicate question sortOrder" at seed time.
+  it("all question sortOrders are globally unique (1..38)", () => {
+    const sortOrders = (
+      content.questions as Array<{ sortOrder: number }>
+    ).map((q) => q.sortOrder);
+    expect(new Set(sortOrders).size).toBe(sortOrders.length);
+    expect([...sortOrders].sort((a, b) => a - b)).toEqual(
+      Array.from({ length: 38 }, (_, i) => i + 1),
+    );
+  });
+
   it("every question's sectionStableKey matches an existing section", () => {
     const sectionStableKeys = new Set(
       (content.sections as Array<{ stableKey: string }>).map((s) => s.stableKey)
