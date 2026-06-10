@@ -21,7 +21,7 @@
  */
 
 import React from "react";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 
 const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
@@ -94,8 +94,8 @@ function mockMeFetch() {
 /** Render + advance through the intro phase into the pager (ready phase). */
 async function reachPager() {
   render(<OrgSurveyClient campaignAlias={ALIAS} />);
-  // intro phase: "Start Assessment"
-  const start = await screen.findByRole("button", { name: /start assessment/i });
+  // intro phase: "Start the assessment →" (approved participant welcome CTA)
+  const start = await screen.findByRole("button", { name: /start the assessment/i });
   fireEvent.click(start);
 }
 
@@ -228,5 +228,24 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
       localStorage.getItem(invitedDraftKey(RESPONDENT_KEY)) as string,
     );
     expect(saved.q1).toBe(2);
+  });
+
+  it("Screen 1 (welcome) renders the value-prop list with INVITED team framing + stat chips from real data", async () => {
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    // Wait for the intro (welcome) phase to render after /me resolves.
+    await screen.findByRole("button", { name: /start the assessment/i });
+
+    const expectations = screen.getByTestId("welcome-expectations");
+    // INVITED team framing — "feed the team picture", NOT the public lead-magnet copy.
+    expect(within(expectations).getByText(/feed the team picture/i)).toBeInTheDocument();
+
+    // Stat chips reflect the real counts (2 questions; 1 defined section) and the
+    // derived 0–3 scale (from the slider question).
+    const stats = screen.getByTestId("welcome-stats");
+    expect(within(stats).getByText("2")).toBeInTheDocument();
+    expect(within(stats).getByText("0–3")).toBeInTheDocument();
+
+    // Invited fine print mentions the facilitator/coach (team framing kept).
+    expect(screen.getByText(/facilitator or coach/i)).toBeInTheDocument();
   });
 });

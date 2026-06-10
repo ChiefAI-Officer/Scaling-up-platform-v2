@@ -65,22 +65,20 @@ export default async function PublicQuizPage({
     campaign.openAt <= now &&
     (campaign.closeAt === null || campaign.closeAt >= now);
 
+  // Render the client directly (no constrained wrapper) so the full-bleed
+  // branded welcome shell matches the org-survey flow + the approved mockup.
   return (
-    <div className="min-h-screen bg-background py-10 px-4">
-      <div className="max-w-2xl mx-auto">
-        <PublicQuizClient
-          campaignAlias={campaignAlias}
-          campaignName={campaign.name}
-          campaignDescription={campaign.description}
-          templateName={campaign.template.name}
-          isOpen={isOpen}
-          status={campaign.status}
-          openAtIso={campaign.openAt.toISOString()}
-          closeAtIso={campaign.closeAt ? campaign.closeAt.toISOString() : null}
-          sections={version.sections as unknown}
-          questions={version.questions as unknown}
-        />
-      </div>
-    </div>
+    <PublicQuizClient
+      campaignAlias={campaignAlias}
+      campaignName={campaign.name}
+      campaignDescription={campaign.description}
+      templateName={campaign.template.name}
+      isOpen={isOpen}
+      status={campaign.status}
+      openAtIso={campaign.openAt.toISOString()}
+      closeAtIso={campaign.closeAt ? campaign.closeAt.toISOString() : null}
+      sections={version.sections as unknown}
+      questions={version.questions as unknown}
+    />
   );
 }

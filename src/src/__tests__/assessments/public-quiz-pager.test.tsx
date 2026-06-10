@@ -12,7 +12,7 @@
  */
 
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
 const mockPush = jest.fn();
 jest.mock("next/navigation", () => ({
@@ -191,5 +191,22 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(screen.queryByText(/facilitator will follow up/i)).not.toBeInTheDocument();
     // Accurate public copy must be present.
     expect(screen.getByText(/show you your results/i)).toBeInTheDocument();
+  });
+
+  it("Screen 1 (welcome) renders the value-prop 'what to expect' list and stat chips from ACTUAL data", () => {
+    render(<PublicQuizClient {...baseProps} />);
+    // The de-bared welcome renders the value-prop expectation list...
+    const expectations = screen.getByTestId("welcome-expectations");
+    expect(expectations).toBeInTheDocument();
+    expect(within(expectations).getByText(/honest & confidential/i)).toBeInTheDocument();
+    // ...and the stat chips reflect the real counts (2 questions, 2 sections)
+    // and the derived 0–3 scale — NOT hardcoded 38/5/1–5.
+    const stats = screen.getByTestId("welcome-stats");
+    // 2 questions + 2 sections → both chips read "2"; the scale chip reads "0–3".
+    expect(within(stats).getAllByText("2")).toHaveLength(2);
+    expect(within(stats).getByText("0–3")).toBeInTheDocument(); // derived from the slider scale
+    expect(within(stats).queryByText("38")).not.toBeInTheDocument();
+    // The expectation row also states the real count + scale.
+    expect(within(expectations).getByText(/2 short statements, rated 0–3\./i)).toBeInTheDocument();
   });
 });

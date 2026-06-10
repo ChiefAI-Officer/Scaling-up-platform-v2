@@ -9,6 +9,13 @@ import {
   type PagerQuestion,
 } from "@/lib/assessments/section-pages";
 import { useAnswerDraft, publicDraftKey } from "@/lib/assessments/use-answer-draft";
+import {
+  WelcomeShellHeader,
+  WelcomeExpectations,
+  WelcomeStats,
+  deriveScaleLabel,
+  deriveTimeEstimate,
+} from "@/components/assessments/assessment-welcome";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import type { RespondentReport, QuestionMeta } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
@@ -101,6 +108,14 @@ export function PublicQuizClient({
     [sections],
   );
 
+  // Welcome stat chips + expectation copy derive from the ACTUAL data (never
+  // hardcoded counts/scale).
+  const scaleLabel = useMemo(() => deriveScaleLabel(sortedQuestions), [sortedQuestions]);
+  const timeEstimate = useMemo(
+    () => deriveTimeEstimate(sortedQuestions.length),
+    [sortedQuestions.length],
+  );
+
   const [step, setStep] = useState<Step>(isOpen ? "intro" : "error");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -148,62 +163,59 @@ export function PublicQuizClient({
   }
 
   if (step === "intro") {
-    // WF17 / participant-public-landing — hero-card layout
+    // Screen 1 — de-bared WELCOME / invitation (approved participant mockup).
+    // Branded app-shell header (white logo) + "what to expect" value-prop list
+    // + stat chips (actual counts + derived scale) + strong purple CTA.
     return (
-      <div className="landing-page">
-        <header className="landing-header">
-          <span className="landing-brand">Scaling Up</span>
-          <span>{templateName}</span>
-        </header>
-        <main className="landing-body">
-          <section className="hero-card" aria-labelledby="hero-title">
-            <span className="hero-eyebrow">Free assessment</span>
-            <h1 className="hero-title" id="hero-title">
+      <div className="su-welcome-page">
+        <WelcomeShellHeader caption={templateName} />
+        <main className="su-welcome-body">
+          <section className="su-welcome-card" aria-labelledby="hero-title">
+            <span className="su-welcome-eyebrow">Free assessment</span>
+            <h1 className="su-welcome-title" id="hero-title">
               {campaignName}
             </h1>
             {campaignDescription ? (
-              <p className="hero-lede" style={{ whiteSpace: "pre-line" }}>
+              <p className="su-welcome-lede" style={{ whiteSpace: "pre-line" }}>
                 {campaignDescription}
               </p>
             ) : (
-              <p className="hero-lede">
+              <p className="su-welcome-lede">
                 See how your business scores across the Four Decisions —
                 People, Strategy, Execution, and Cash — and get your results
                 instantly.
               </p>
             )}
-            <p className="hero-sub">
-              Most people finish in about 5–10 minutes, and you&apos;ll see
-              your results as soon as you submit.
-            </p>
-            <div className="hero-stats" aria-label="Assessment details">
-              <span>
-                <strong>{sortedQuestions.length}</strong> questions
-              </span>
-              <span className="hero-stats__dot" />
-              <span>
-                <strong>{sortedSections.length}</strong>{" "}
-                {sortedSections.length === 1 ? "section" : "sections"}
-              </span>
-            </div>
-            <div className="hero-cta-row">
+            <WelcomeExpectations
+              timeLabel={timeEstimate}
+              questionCount={sortedQuestions.length}
+              scaleLabel={scaleLabel}
+              confidentialSub="Your results are shown to you the moment you submit."
+              scoresSub="See where you stand across each category."
+            />
+            <WelcomeStats
+              questionCount={sortedQuestions.length}
+              sectionCount={sortedSections.length}
+              scaleLabel={scaleLabel}
+            />
+            <div className="su-welcome-cta-row">
               <button
                 type="button"
                 onClick={() => setStep("info")}
-                className="wf-btn wf-btn-primary hero-cta"
+                className="su-welcome-cta"
                 data-testid="quiz-start"
               >
-                Start Assessment
+                Start the assessment →
               </button>
             </div>
-            <p className="hero-fine">
+            <p className="su-welcome-fine">
               Free to take — you&apos;ll get your results on screen. Your
               responses are also shared with the Scaling Up team and the
               coach who referred you (if any).
             </p>
           </section>
         </main>
-        <footer className="landing-footer">Powered by Scaling Up</footer>
+        <footer className="su-welcome-foot">Powered by Scaling Up</footer>
       </div>
     );
   }

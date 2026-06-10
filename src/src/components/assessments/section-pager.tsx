@@ -4,6 +4,7 @@ import React from "react";
 import { isAnswered, type SectionPage } from "@/lib/assessments/section-pages";
 import { QuestionInput } from "@/components/assessments/question-input";
 import { AssessmentShellHeader } from "@/components/assessments/AssessmentShellHeader";
+import { domainColor } from "@/lib/assessments/report-presentation";
 
 type AnswersMap = Record<string, number | string | string[]>;
 interface SectionPagerProps {
@@ -83,6 +84,14 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
   const introForwardLabel = isLast && !hasQuestions ? "Submit" : "Begin section →";
   const questionCount = page.questions.length;
 
+  // Domain accent for the section-intro rail + number badge. Neutral grey when
+  // the section carries no domain (report-presentation handles the fallback).
+  const accent = domainColor(page.domain ?? "");
+  // Step label = the section's own partLabel ("Fundamental 1" in the mockup)
+  // when present. The shell header already carries the canonical "Section N of
+  // M", so we degrade gracefully (omit the step label) rather than duplicate it.
+  const stepLabel = page.partLabel?.trim() ? page.partLabel : null;
+
   return (
     <div className="su-assessment-brand survey-section">
       <AssessmentShellHeader
@@ -96,27 +105,39 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
       </div>
 
       {view === "intro" ? (
-        <section className="su-intro-slide" aria-labelledby="su-intro-heading">
-          {/* S-curve brand motif */}
-          <svg className="su-intro-swoosh" viewBox="0 0 480 420" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M500 30 C 300 30 350 220 200 270 C 90 305 80 420 -30 440 L 560 440 L 560 30 Z" fill="rgba(255,255,255,0.10)" />
-          </svg>
+        <section
+          className="su-intro-slide"
+          aria-labelledby="su-intro-heading"
+          style={{ ["--su-section-accent" as string]: accent }}
+        >
+          {/* Domain accent rail — colored top bar (neutral when no domain). */}
+          <div className="su-intro-rail" aria-hidden="true" />
           <div className="su-intro-kicker">
             <span className="su-intro-num" aria-hidden="true">{String(sectionIndex + 1).padStart(2, "0")}</span>
-            {page.partLabel ? <span className="su-intro-label">{page.partLabel}</span> : null}
+            <span className="su-intro-stepblock">
+              {stepLabel ? <span className="su-intro-label">{stepLabel}</span> : null}
+              <h2
+                id="su-intro-heading"
+                ref={headingRef}
+                tabIndex={-1}
+                className="su-intro-title"
+              >
+                {page.name}
+              </h2>
+            </span>
           </div>
-          <h2
-            id="su-intro-heading"
-            ref={headingRef}
-            tabIndex={-1}
-            className="su-intro-title"
-          >
-            {page.name}
-          </h2>
-          {page.description ? (
-            <p className="su-intro-desc">{page.description}</p>
+          {page.description?.trim() ? (
+            <div className="su-intro-covers">
+              <span className="su-intro-covers-k">What this section covers</span>
+              <p className="su-intro-desc">{page.description}</p>
+            </div>
           ) : null}
           <div className="su-intro-meta">
+            {questionCount > 0 ? (
+              <span className="su-intro-estimate">
+                {questionCount} question{questionCount !== 1 ? "s" : ""}
+              </span>
+            ) : <span />}
             <button
               type="button"
               className="su-intro-begin"
@@ -125,11 +146,6 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
             >
               {introForwardLabel}
             </button>
-            {questionCount > 0 ? (
-              <span className="su-intro-estimate">
-                {questionCount} question{questionCount !== 1 ? "s" : ""}
-              </span>
-            ) : null}
           </div>
           <div className="survey-nav su-intro-back-row">
             <button type="button" className="wf-btn wf-btn-ghost su-intro-back" onClick={handleBack}>← Back</button>

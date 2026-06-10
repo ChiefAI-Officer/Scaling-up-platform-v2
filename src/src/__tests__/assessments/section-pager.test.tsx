@@ -40,6 +40,48 @@ describe("SectionPager", () => {
     expect(container.querySelector(".su-intro-num")).toBeInTheDocument();
   });
 
+  it("Screen 2 is DISTINCT: renders the domain accent rail + a 'What this section covers' callout from section.description", () => {
+    const secs: PagerSection[] = [
+      { stableKey: "S1", sortOrder: 1, name: "People", description: "How you attract and keep the right people.", domain: "People", partLabel: "Decision 1" },
+    ];
+    const qs: PagerQuestion[] = [
+      { stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } },
+    ];
+    const pages = buildSectionPages(secs, qs);
+    const { container } = render(
+      <SectionPager pages={pages} answers={{}} onAnswerChange={jest.fn()} onSubmit={jest.fn()} submitting={false} />,
+    );
+    // Domain accent rail present (the distinct visual hook).
+    expect(container.querySelector(".su-intro-rail")).toBeInTheDocument();
+    // "What this section covers" callout wraps the section description.
+    expect(screen.getByText(/what this section covers/i)).toBeInTheDocument();
+    expect(screen.getByText("How you attract and keep the right people.")).toBeInTheDocument();
+    // The step label uses the section's partLabel ("Decision 1"), not "Section N of M".
+    expect(screen.getByText("Decision 1")).toBeInTheDocument();
+  });
+
+  it("section-intro hides the 'What this section covers' callout when there is no description", () => {
+    // An empty section (no questions) opens on its intro slide even with no
+    // description — the right place to assert the callout degrades gracefully.
+    const secs: PagerSection[] = [
+      { stableKey: "S0", sortOrder: 1, name: "Strategy", domain: "Strategy" },
+      { stableKey: "S1", sortOrder: 2, name: "Section One" },
+    ];
+    const qs: PagerQuestion[] = [
+      { stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } },
+    ];
+    const pages = buildSectionPages(secs, qs);
+    const { container } = render(
+      <SectionPager pages={pages} answers={{}} onAnswerChange={jest.fn()} onSubmit={jest.fn()} submitting={false} />,
+    );
+    // Section title still renders; the covers callout degrades gracefully (absent).
+    expect(screen.getByRole("heading", { name: "Strategy" })).toBeInTheDocument();
+    expect(screen.queryByText(/what this section covers/i)).not.toBeInTheDocument();
+    expect(container.querySelector(".su-intro-covers")).not.toBeInTheDocument();
+    // The accent rail is still present (domain accent always shows).
+    expect(container.querySelector(".su-intro-rail")).toBeInTheDocument();
+  });
+
   it("Begin section advances to that section's questions (S0 has no questions → straight to S1)", () => {
     setup();
     fireEvent.click(screen.getByRole("button", { name: /begin section/i }));
