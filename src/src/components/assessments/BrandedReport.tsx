@@ -41,6 +41,16 @@ import {
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
+// WCAG-AA contrast-safe text colors for the per-decision average numerals.
+// Bright domain colors (People #f7a600 = 2.02:1, Cash #95c11f = 2.12:1) fail
+// the 3.0:1 large-text threshold on white. Use darkened variants per mockup.
+const DOMAIN_TEXT_COLOR: Record<string, string> = {
+  people: "#946b36",    // darkened from #f7a600
+  strategy: "#008bd2",  // already passes (~3.5:1)
+  execution: "#946b36", // already the stripe color — passes
+  cash: "#6f9200",      // darkened from #95c11f
+};
+
 // ── Defensive view of the raw version `sections` JSON ──────────────────────
 // Sections are stored as a flat JSON array of { stableKey, name, domain? }.
 // Some shapes (and the report fixtures) additionally nest the section's
@@ -236,6 +246,27 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
     (pq) => !assignedQuestionKeys.has(pq.stableKey),
   );
 
+  // ── Per-decision domain cards (only when the template defines domains) ────
+  // Esperto/4-Decisions anatomy: a colored card per decision with its average,
+  // a fill bar, and the total points. Domains roll up on a 0–10 item scale, so
+  // the bar width is avg/10 (clamped). Skipped entirely for non-domain
+  // templates (the neutral path renders no cards section).
+  const domainCards = (perDomain ?? []).map((d) => {
+    const color = domainColor(d.key);
+    const avg = typeof d.averagePoints === "number" ? d.averagePoints : null;
+    const pct = avg === null ? 0 : Math.max(0, Math.min(100, avg * 10));
+    // Total points for this domain = sum of its sections' totalPoints, matched
+    // by the section's parsed domain.
+    let points = 0;
+    for (const sc of sectionCards) {
+      if (sc.parsed?.domain && sc.parsed.domain.toLowerCase().trim() === d.key.toLowerCase().trim()) {
+        points += Number.isFinite(sc.ps.totalPoints) ? sc.ps.totalPoints : 0;
+      }
+    }
+    return { key: d.key, label: d.label || d.key, color, avg, pct, points };
+  });
+  const hasDomainCards = domainCards.length > 0;
+
   // ── Recommendations grouped by section (only non-empty) ──────────────────
   const recSections = sectionCards
     .map(({ ps, rows }) => ({
@@ -315,21 +346,46 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
       {/* ── 2. Overall ──────────────────────────────────────────────────── */}
       <section className="su-report-overall" data-testid="report-overall">
         <div className="su-report-eyebrow">Overall result</div>
+        {/* sr-only: announce score + band to screen readers before the decorative ring */}
+        <span className="sr-only">
+          {neutral
+            ? "Submitted"
+            : `Overall score: ${headline.primary}${headline.label ? `, ${headline.label}` : ""}`}
+        </span>
         <div className="su-report-overall-main">
-          <div className="su-report-headline">{headline.primary}</div>
-          {neutral ? (
-            <div className="su-report-status">Submitted</div>
-          ) : (
-            headline.label && (
-              <div className="su-report-band" data-testid="overall-band">
-                {headline.label}
-              </div>
-            )
-          )}
+          {/* aria-hidden: the ring is decorative — the score is in the sr-only span above */}
+          <div className="su-report-ringwrap" aria-hidden="true">
+            {/* Split "58 / 100" → big number + small denominator to avoid crowding */}
+            {(() => {
+              const slashIdx = headline.primary.indexOf("/");
+              if (!neutral && slashIdx !== -1) {
+                const num = headline.primary.slice(0, slashIdx).trim();
+                const den = headline.primary.slice(slashIdx).trim();
+                return (
+                  <>
+                    <div className="su-report-headline su-report-headline-num">{num}</div>
+                    <div className="su-report-headline-den">{den}</div>
+                  </>
+                );
+              }
+              return <div className="su-report-headline">{headline.primary}</div>;
+            })()}
+          </div>
+          <div className="su-report-overall-text">
+            {neutral ? (
+              <div className="su-report-status">Submitted</div>
+            ) : (
+              headline.label && (
+                <div className="su-report-band" data-testid="overall-band">
+                  {headline.label}
+                </div>
+              )
+            )}
+            {!neutral && result.tier?.message && (
+              <p className="su-report-lede">{result.tier.message}</p>
+            )}
+          </div>
         </div>
-        {!neutral && result.tier?.message && (
-          <p className="su-report-lede">{result.tier.message}</p>
-        )}
         {/* small stats row */}
         <div className="su-report-stats">
           <div className="su-report-stat">
@@ -350,6 +406,42 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
           </div>
         </div>
       </section>
+
+      {/* ── 2b. Per-decision cards (domain templates only) ──────────────── */}
+      {hasDomainCards && (
+        <section className="su-report-decisions" data-testid="report-decisions">
+          <div className="su-report-eyebrow">How you scored, by decision</div>
+          <h2 className="su-h2 su-report-sec-title">Your Four Decisions</h2>
+          <div className="su-report-card-grid">
+            {domainCards.map((d) => (
+              <div
+                className="su-report-decision-card"
+                key={d.key}
+                data-testid={`decision-card-${d.key}`}
+                style={{ borderLeftColor: d.color }}
+              >
+                <div className="su-report-decision-head">
+                  <span className="su-report-decision-name">{d.label}</span>
+                  <span
+                    className="su-report-decision-avg"
+                    style={{
+                      color: DOMAIN_TEXT_COLOR[d.key.toLowerCase()] ?? d.color,
+                    }}
+                  >
+                    {d.avg === null ? "—" : formatNumber(d.avg)}
+                  </span>
+                </div>
+                <div className="su-report-decision-bar">
+                  <i style={{ width: `${d.pct}%`, backgroundColor: d.color }} />
+                </div>
+                <div className="su-report-decision-sub">
+                  {formatNumber(d.points)} points
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── 3. Section breakdown ────────────────────────────────────────── */}
       <section className="su-report-sections" data-testid="report-sections">
@@ -570,9 +662,18 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
           You&apos;ve completed your assessment. Turn these results into a
           90-day plan with your coach.
         </p>
-        <p className="su-report-cta-text">
+        {/* CTA: link to the referring coach via mailto, or fall back to the
+            Scaling Up coaches directory. Never crashes when coach is absent. */}
+        <a
+          className="su-report-cta"
+          href={
+            report.referringCoachEmail
+              ? `mailto:${report.referringCoachEmail}`
+              : "https://scalingup.com/coaches"
+          }
+        >
           Talk to your Scaling Up Certified Coach →
-        </p>
+        </a>
       </section>
 
       {/* ── 8. Footer ───────────────────────────────────────────────────── */}

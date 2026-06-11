@@ -350,25 +350,45 @@ describe("new submission — inngest.send", () => {
 /*  Task 6 new behavior: outbox rows                                          */
 /* -------------------------------------------------------------------------- */
 describe("outbox enqueue", () => {
-  it("enqueues 0 outbox rows when SU team address is blank and no coach", async () => {
-    // No env vars set → suTeamAddress = ""
-    await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
-    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
-  });
+  /** Helper: pull recipientRole values from the txMock create calls. */
+  function enqueuedRoles(): string[] {
+    return txMock.assessmentEmailOutbox.create.mock.calls.map(
+      (c: Array<{ data: { recipientRole: string } }>) => c[0].data.recipientRole,
+    );
+  }
 
-  it("enqueues 1 SU_TEAM row when SU address is set and no coach", async () => {
-    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+  it("ALWAYS enqueues a TAKER_COPY row even with blank SU address and no coach (Spec 16 §3)", async () => {
+    // No env vars set → suTeamAddress = ""; no coach → only TAKER_COPY.
     await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
 
     expect(txMock.assessmentEmailOutbox.create).toHaveBeenCalledTimes(1);
     const call = txMock.assessmentEmailOutbox.create.mock.calls[0][0];
-    expect(call.data.recipientRole).toBe("SU_TEAM");
-    expect(call.data.recipientEmail).toBe("team@scalingup.com");
-    expect(call.data.emailType).toBe("QUICK_ASSESSMENT_LEAD");
+    expect(call.data.recipientRole).toBe("TAKER_COPY");
+    expect(call.data.recipientEmail).toBe("jane@example.com");
     expect(call.data.submissionId).toBe("sub-1");
+    expect(call.data.bodyHtml).toContain("<table");
   });
 
-  it("enqueues 2 rows (SU_TEAM + REFERRING_COACH) when SU address set and active coach found", async () => {
+  it("enqueues TAKER_COPY + SU_TEAM when SU address is set and no coach", async () => {
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
+
+    expect(txMock.assessmentEmailOutbox.create).toHaveBeenCalledTimes(2);
+    const roles = enqueuedRoles();
+    expect(roles).toContain("TAKER_COPY");
+    expect(roles).toContain("SU_TEAM");
+    expect(roles).not.toContain("REFERRING_COACH");
+
+    // SU_TEAM row carries the unchanged lead-alert email type + address.
+    const su = txMock.assessmentEmailOutbox.create.mock.calls
+      .map((c: Array<{ data: { recipientRole: string; recipientEmail: string; emailType: string } }>) => c[0].data)
+      .find((d: { recipientRole: string }) => d.recipientRole === "SU_TEAM");
+    expect(su).toBeDefined();
+    expect(su!.recipientEmail).toBe("team@scalingup.com");
+    expect(su!.emailType).toBe("QUICK_ASSESSMENT_LEAD");
+  });
+
+  it("enqueues 3 rows (TAKER_COPY + REFERRING_COACH + SU_TEAM) when SU address set and active coach found", async () => {
     process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
     // Active coach returned by findUnique
     (db.coach.findUnique as jest.Mock).mockResolvedValue({
@@ -386,12 +406,34 @@ describe("outbox enqueue", () => {
     };
     await POST(makeRequest(bodyWithCoach) as never, makeParams() as never);
 
-    expect(txMock.assessmentEmailOutbox.create).toHaveBeenCalledTimes(2);
-    const roles = txMock.assessmentEmailOutbox.create.mock.calls.map(
-      (c: Array<{ data: { recipientRole: string } }>) => c[0].data.recipientRole,
-    );
+    expect(txMock.assessmentEmailOutbox.create).toHaveBeenCalledTimes(3);
+    const roles = enqueuedRoles();
+    expect(roles).toContain("TAKER_COPY");
     expect(roles).toContain("SU_TEAM");
     expect(roles).toContain("REFERRING_COACH");
+
+    // The REFERRING_COACH row is the FULL report (not the lead alert).
+    const coachRow = txMock.assessmentEmailOutbox.create.mock.calls
+      .map((c: Array<{ data: { recipientRole: string; recipientEmail: string; bodyHtml: string } }>) => c[0].data)
+      .find((d: { recipientRole: string }) => d.recipientRole === "REFERRING_COACH");
+    expect(coachRow).toBeDefined();
+    expect(coachRow!.recipientEmail).toBe("coach@example.com");
+    expect(coachRow!.bodyHtml).toContain("<table");
+  });
+
+  it("REFERRING_COACH row is NOT enqueued when the coach is not active (guard returns null)", async () => {
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    // db.coach.findUnique default mock returns null → no active coach.
+    const bodyWithCoach = {
+      ...VALID_BODY,
+      referringCoachEmail: "ghost@example.com",
+    };
+    await POST(makeRequest(bodyWithCoach) as never, makeParams() as never);
+
+    const roles = enqueuedRoles();
+    expect(roles).toContain("TAKER_COPY");
+    expect(roles).toContain("SU_TEAM");
+    expect(roles).not.toContain("REFERRING_COACH");
   });
 
   it("outbox rows are created inside the transaction (via txMock)", async () => {

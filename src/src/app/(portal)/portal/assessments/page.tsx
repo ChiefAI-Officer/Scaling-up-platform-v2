@@ -13,6 +13,7 @@ import { PlusCircle } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireCoach } from "@/lib/auth/authorization";
 import { FadeUp } from "@/components/ui/animated";
+import { CopyUrlButton } from "@/components/ui/copy-url-button";
 import {
   CampaignsListWithFilter,
   type CampaignListItem,
@@ -22,8 +23,37 @@ import {
   type CampaignStatusMetricsInput,
 } from "@/lib/assessments/campaign-status-metrics";
 
+const APP_URL =
+  process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
+
+/**
+ * Spec 16 §4 — resolve the active PUBLIC campaign of the `scaling-up-quick`
+ * template so the coach can copy a per-coach attributed share link
+ * (`${APP_URL}/quiz/<alias>?coach=<coachEmail>`). Returns the campaign alias,
+ * or null when no active PUBLIC quick-assessment campaign exists yet.
+ */
+async function resolvePublicQuickAlias(): Promise<string | null> {
+  const campaign = await db.assessmentCampaign.findFirst({
+    where: {
+      accessMode: "PUBLIC",
+      status: "ACTIVE",
+      template: { alias: "scaling-up-quick" },
+    },
+    select: { alias: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return campaign?.alias ?? null;
+}
+
 export default async function CoachAssessmentsPage() {
   const { coach } = await requireCoach();
+
+  // §4 — per-coach attributed share link for the public Quick Assessment.
+  const publicQuickAlias = await resolvePublicQuickAlias();
+  const coachLink =
+    publicQuickAlias && coach.email
+      ? `${APP_URL}/quiz/${publicQuickAlias}?coach=${encodeURIComponent(coach.email)}`
+      : null;
 
   // Single round-trip: include participants (for respondentId → invitation join)
   // and invitations (for staged-progress metrics).
@@ -104,6 +134,35 @@ export default async function CoachAssessmentsPage() {
           </Link>
         </div>
       </FadeUp>
+
+      {coachLink && (
+        <FadeUp delay={0.05}>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="text-sm font-semibold text-foreground">
+                  Your Quick Assessment link
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Share this link to attribute new Quick Assessment leads to you.
+                  Takers see their results on screen and by email; you receive the
+                  full report.
+                </p>
+                <code
+                  className="mt-2 block truncate text-xs text-muted-foreground"
+                  data-testid="coach-quick-link"
+                  title={coachLink}
+                >
+                  {coachLink}
+                </code>
+              </div>
+              <div className="flex-shrink-0 pt-1">
+                <CopyUrlButton url={coachLink} />
+              </div>
+            </div>
+          </div>
+        </FadeUp>
+      )}
 
       <FadeUp delay={0.1}>
         {items.length === 0 ? (

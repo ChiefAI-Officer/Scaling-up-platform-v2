@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { SectionPager } from "./section-pager";
 import {
   buildSectionPages,
@@ -98,6 +99,17 @@ export function PublicQuizClient({
 }: PublicQuizClientProps) {
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
+
+  // §4 — Per-coach attribution. A `?coach=<ref>` query param (the coach's email
+  // for v1) is forwarded to the submit route as `referringCoachEmail`. The
+  // server's active-coach guard validates it; a blank/missing/inactive ref
+  // silently falls back to SU-team-only. We omit the field entirely when blank.
+  const searchParams = useSearchParams();
+  const referringCoachEmail = useMemo(() => {
+    const raw = searchParams?.get("coach") ?? "";
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }, [searchParams]);
 
   const sortedQuestions = useMemo(
     () => [...questions].sort((a, b) => a.sortOrder - b.sortOrder),
@@ -209,9 +221,10 @@ export function PublicQuizClient({
               </button>
             </div>
             <p className="su-welcome-fine">
-              Free to take — you&apos;ll get your results on screen. Your
-              responses are also shared with the Scaling Up team and the
-              coach who referred you (if any).
+              Free to take — you&apos;ll get your results on screen and a copy
+              by email. Your responses are also shared with the Scaling Up team
+              and the coach who referred you (if any), who receives the full
+              report.
             </p>
           </section>
         </main>
@@ -247,9 +260,10 @@ export function PublicQuizClient({
               About you
             </h1>
             <p className="ty-sub">
-              We use your name and email to show you your results and, where
-              applicable, to share them with the Scaling Up team and the
-              coach who referred you.
+              We use your name and email to show you your results and email you
+              a copy, and, where applicable, to share them with the Scaling Up
+              team and the coach who referred you (who receives the full
+              report).
             </p>
             <div className="survey-question">
               <label className="wf-label" htmlFor="quiz-first-name-input">
@@ -402,6 +416,8 @@ export function PublicQuizClient({
             value,
           })),
           idempotencyKey: idemRef.current,
+          // §4 — include only when a non-blank ?coach= param was present.
+          ...(referringCoachEmail ? { referringCoachEmail } : {}),
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -465,8 +481,9 @@ export function PublicQuizClient({
             style={{ fontSize: "0.75rem", textAlign: "center", margin: "0.5rem 0 0" }}
             data-testid="quiz-consent"
           >
-            By submitting, you agree that your results will be shown to you and shared with
-            the Scaling Up team and the coach who referred you (if any).
+            By submitting, you agree that your results will be shown to you and
+            emailed to you, and shared with the Scaling Up team and the coach who
+            referred you (if any) — who receives the full report.
           </p>
 
           {!canSubmit && (
