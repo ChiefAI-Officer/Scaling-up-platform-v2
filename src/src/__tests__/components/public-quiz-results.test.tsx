@@ -176,6 +176,12 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
       expect(screen.getByTestId("quiz-results")).toBeInTheDocument(),
     );
 
+    // The report MUST be wrapped in `.su-public-brand .su-report` so the scoped
+    // su-report.css applies on-screen (else it renders bare — the in-place CSS bug).
+    expect(
+      screen.getByTestId("quiz-results").querySelector(".su-public-brand.su-report"),
+    ).not.toBeNull();
+
     // BrandedReport renders the assessment name.
     expect(screen.getByText("Scaling Up Full")).toBeInTheDocument();
 
