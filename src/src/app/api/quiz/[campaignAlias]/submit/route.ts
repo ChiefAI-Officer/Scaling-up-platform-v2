@@ -44,10 +44,13 @@ import {
 } from "@/lib/assessments/scoring";
 import {
   findActiveCoachByEmail,
-  resolveLeadRecipients,
   buildLeadEmail,
   lowestDecision,
 } from "@/lib/assessments/quick-assessment-lead";
+import {
+  buildReportEmailHtml,
+  buildRespondentReportFromSubmission,
+} from "@/lib/assessments/report-email";
 import { logAudit } from "@/lib/audit";
 import { inngest } from "@/inngest/client";
 
@@ -229,23 +232,78 @@ export async function POST(
       averagePoints: d.averagePoints,
     }));
 
-    // Resolve recipients; filter out a blank SU address before building emails.
-    const allRecipients = resolveLeadRecipients({
-      suTeamAddress,
-      activeCoachEmail: coach?.email ?? null,
+    // Build the per-respondent report ONCE, server-side, from the data we
+    // already hold (no DB round-trip). Shared by both report emails so the
+    // taker and coach copies are byte-identical (Spec 16 §3).
+    const respondentReport = buildRespondentReportFromSubmission({
+      result,
+      publicTaker: data.publicTaker,
+      assessmentName,
+      campaignLabel: null, // campaignLabel is not rendered in the email body
+      sections: version.sections,
+      questions: allQuestions,
+      scoringConfig: version.scoringConfig,
+      submittedAt: now,
+      submissionId: "", // provenance not rendered in the email body
+      referringCoachEmail: data.referringCoachEmail ?? null,
     });
-    const recipients = allRecipients.filter((r) => r.email.length > 0);
 
-    const outboxPayloads = recipients.map((r) => {
+    // Assemble the outbox payloads. Each entry carries the rendered subject +
+    // bodyHtml so the worker (role-agnostic) can send it verbatim.
+    //   - TAKER_COPY      → always, to the taker; full branded report (§2).
+    //   - REFERRING_COACH → only when an active coach resolved; full report.
+    //   - SU_TEAM         → only when an SU address is configured; lead-alert
+    //                       summary (unchanged from before).
+    const outboxPayloads: Array<{
+      recipient: { role: string; email: string };
+      subject: string;
+      bodyHtml: string;
+    }> = [];
+
+    // TAKER_COPY — always (the taker submitted their own email + consented).
+    {
+      const { subject, bodyHtml } = buildReportEmailHtml({
+        report: respondentReport,
+        recipientRole: "TAKER_COPY",
+      });
+      outboxPayloads.push({
+        recipient: { role: "TAKER_COPY", email: data.publicTaker.email },
+        subject,
+        bodyHtml,
+      });
+    }
+
+    // REFERRING_COACH — full report (upgrade from the old lead alert), only
+    // when the open-relay guard resolved an active coach.
+    const activeCoachEmail = coach?.email?.trim().toLowerCase() ?? "";
+    if (activeCoachEmail.length > 0) {
+      const { subject, bodyHtml } = buildReportEmailHtml({
+        report: respondentReport,
+        recipientRole: "REFERRING_COACH",
+      });
+      outboxPayloads.push({
+        recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
+        subject,
+        bodyHtml,
+      });
+    }
+
+    // SU_TEAM — unchanged lead-alert summary, only when an SU address is set.
+    const suEmail = suTeamAddress.trim().toLowerCase();
+    if (suEmail.length > 0) {
       const { subject, bodyHtml } = buildLeadEmail({
         taker: data.publicTaker,
         assessmentName,
         perDomain: domainInputs,
         lowestLabel: lowest?.label ?? null,
-        recipientRole: r.role,
+        recipientRole: "SU_TEAM",
       });
-      return { recipient: r, subject, bodyHtml };
-    });
+      outboxPayloads.push({
+        recipient: { role: "SU_TEAM", email: suEmail },
+        subject,
+        bodyHtml,
+      });
+    }
 
     // -----------------------------------------------------------------------
     // Transactional write: submission + outbox rows in a single DB transaction

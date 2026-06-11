@@ -116,6 +116,13 @@ export interface RespondentReport {
    * returned so the caller can render a degraded view.
    */
   degraded: boolean;
+  /**
+   * Optional: the email of the coach who referred this taker (from the ?coach=
+   * query param at submission time). Used to build a mailto: CTA in report
+   * emails. Absent on the admin/coach report view (where the coach is known
+   * from context) and on submissions with no ?coach= param.
+   */
+  referringCoachEmail?: string | null;
 }
 
 export type RespondentReportOutcome =

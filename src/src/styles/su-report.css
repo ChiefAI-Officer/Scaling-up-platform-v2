@@ -27,8 +27,12 @@
  *   su-report-title, su-report-campaign-label,
  *   su-report-cover-meta, su-report-for, su-report-sub,
  *   su-report-overall, su-report-eyebrow, su-report-overall-main,
+ *   su-report-ringwrap, su-report-overall-text,
  *   su-report-headline, su-report-status, su-report-band,
  *   su-report-lede, su-report-stats, su-report-stat,
+ *   su-report-decisions, su-report-card-grid, su-report-decision-card,
+ *   su-report-decision-head, su-report-decision-name, su-report-decision-avg,
+ *   su-report-decision-bar, su-report-decision-sub,
  *   su-report-stat-v, su-report-stat-l,
  *   su-report-sections, su-report-sec-title, su-report-grid,
  *   su-report-card, su-report-card-head, su-report-card-title,
@@ -178,53 +182,109 @@
   margin-bottom: 4px;
 }
 
+/* Light overall card: a purple score "ring" on the left, band + message right.
+   (Mockup anatomy — replaces the old purple gradient banner.) */
 .su-public-brand .su-report-overall-main {
-  background: linear-gradient(120deg, #522583, #3f1c66);
-  color: #ffffff;
-  border-radius: 12px;
-  padding: 28px 32px;
+  background: #ffffff;
+  border: 1px solid #ece8f2;
+  color: #1a1322;
+  border-radius: 14px;
+  padding: 24px 28px;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
   flex-wrap: wrap;
   margin-top: 8px;
 }
 
+/* Score ring — conic-gradient donut with the headline metric in the center. */
+.su-public-brand .su-report-ringwrap {
+  flex: 0 0 128px;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: conic-gradient(#522583 0 220deg, #eadff7 220deg 360deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.su-public-brand .su-report-ringwrap::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  background: #ffffff;
+  border-radius: 50%;
+}
+
 .su-public-brand .su-report-headline {
+  position: relative;
+  z-index: 1;
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-weight: 700;
-  font-size: 34px;
+  font-weight: 800;
+  font-size: 26px;
   line-height: 1.05;
-  flex: 1 1 auto;
+  color: #522583;
+  text-align: center;
+  padding: 0 8px;
+}
+
+/* Split ring: big number + small denominator — mirrors approved mockup */
+.su-public-brand .su-report-headline-num {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.su-public-brand .su-report-headline-den {
+  position: relative;
+  z-index: 1;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #6b6480;
+  text-align: center;
+}
+
+.su-public-brand .su-report-overall-text {
+  flex: 1 1 240px;
+  min-width: 200px;
 }
 
 .su-public-brand .su-report-band {
   display: inline-block;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: #f0e9fa;
+  color: #522583;
   border-radius: 999px;
-  padding: 6px 18px;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   white-space: nowrap;
-  flex-shrink: 0;
+  margin-bottom: 8px;
 }
 
 .su-public-brand .su-report-status {
-  font-size: 16px;
-  color: rgba(255, 255, 255, 0.82);
-  font-style: italic;
-  flex-shrink: 0;
+  display: inline-block;
+  background: #f0e9fa;
+  color: #522583;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
 }
 
 .su-public-brand .su-report-lede {
-  font-size: 15px;
+  font-size: 14px;
   color: #3a3346;
-  margin: 14px 0 0;
-  max-width: 68ch;
-  line-height: 1.65;
+  margin: 6px 0 0;
+  max-width: 60ch;
+  line-height: 1.6;
 }
 
 /* Stats row */
@@ -261,6 +321,69 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-top: 6px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   2b. PER-DECISION CARDS  (domain templates only — 4 Decisions / SU Full)
+   ══════════════════════════════════════════════════════════════════════════ */
+.su-public-brand .su-report-decisions {
+  padding: 8px 60px 8px;
+}
+
+.su-public-brand .su-report-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.su-public-brand .su-report-decision-card {
+  border: 1px solid #ece8f2;
+  border-left: 5px solid #522583;
+  border-radius: 13px;
+  padding: 14px 16px;
+  background: #ffffff;
+}
+
+.su-public-brand .su-report-decision-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.su-public-brand .su-report-decision-name {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: #1a1322;
+}
+
+.su-public-brand .su-report-decision-avg {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.su-public-brand .su-report-decision-bar {
+  height: 7px;
+  border-radius: 4px;
+  background: #eeeeee;
+  margin: 11px 0 7px;
+  overflow: hidden;
+}
+
+.su-public-brand .su-report-decision-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: #522583;
+}
+
+.su-public-brand .su-report-decision-sub {
+  font-size: 12px;
+  color: #6b6480;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -339,11 +462,11 @@
 .su-public-brand .su-report-q {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
+  gap: 12px;
   font-size: 13px;
   color: #3a3346;
-  padding: 5px 0;
-  border-bottom: 1px solid #f4f0fa;
+  padding: 8px 0;
+  border-bottom: 1px solid #faf8fd;
 }
 
 .su-public-brand .su-report-q:last-child {
@@ -385,14 +508,24 @@
   font-style: italic;
 }
 
+/* Right-aligned score CHIP — fixes the old "jammed digit" bug where the rating
+   number sat flush against the statement text. Now a self-contained pill,
+   visually separated from the label by the row gap. */
 .su-public-brand .su-report-q-rate {
   margin-left: auto;
-  flex-shrink: 0;
-  font-size: 11px;
-  color: #6b6480;
-  font-weight: 500;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  min-width: 30px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #522583;
+  background: #f0e9fa;
+  border-radius: 7px;
+  padding: 3px 9px;
   white-space: nowrap;
-  padding-left: 8px;
+  font-variant-numeric: tabular-nums;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 /* Orphan questions (not claimed by any section) */
@@ -576,6 +709,35 @@
   letter-spacing: 0.02em;
 }
 
+/* CTA link — styled as the purple button per mockup */
+.su-public-brand .su-report-cta {
+  display: inline-block;
+  margin-top: 16px;
+  background: #522583;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 700;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  padding: 12px 22px;
+  border-radius: 11px;
+  transition: background 0.15s;
+}
+
+.su-public-brand .su-report-cta:hover {
+  background: #3d1a63;
+  color: #ffffff;
+}
+
+@media print {
+  .su-public-brand .su-report-cta {
+    color: #522583;
+    background: none;
+    border: 1px solid #522583;
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    8. FOOTER
    ══════════════════════════════════════════════════════════════════════════ */
@@ -614,8 +776,10 @@
   .su-public-brand .su-report-cover-inner { padding: 36px 24px 0; }
   .su-public-brand .su-report-title { font-size: 34px; }
   .su-public-brand .su-report-overall { padding: 28px 24px; }
-  .su-public-brand .su-report-overall-main { padding: 20px 22px; }
+  .su-public-brand .su-report-overall-main { padding: 20px 22px; justify-content: center; text-align: center; }
   .su-public-brand .su-report-headline { font-size: 24px; }
+  .su-public-brand .su-report-decisions { padding: 8px 24px; }
+  .su-public-brand .su-report-card-grid { grid-template-columns: 1fr; }
   .su-public-brand .su-report-sections { padding: 6px 24px 32px; }
   .su-public-brand .su-report-grid { grid-template-columns: 1fr; }
   .su-public-brand .su-report-scores { padding: 32px 24px; }
@@ -673,11 +837,13 @@
   }
 
   /* Prevent awkward mid-card / mid-section splits */
-  .su-public-brand .su-report-card {
+  .su-public-brand .su-report-card,
+  .su-public-brand .su-report-decision-card {
     break-inside: avoid;
   }
 
   .su-public-brand .su-report-overall,
+  .su-public-brand .su-report-decisions,
   .su-public-brand .su-report-sections,
   .su-public-brand .su-report-scores,
   .su-public-brand .su-report-recs,

@@ -20,6 +20,8 @@ Object.defineProperty(globalThis, "crypto", {
 });
 
 const mockPush = jest.fn();
+// Mutable search-param store so individual tests can simulate `?coach=<ref>`.
+let mockSearchParams: Record<string, string> = {};
 jest.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
@@ -28,7 +30,9 @@ jest.mock("next/navigation", () => ({
     back: jest.fn(),
     forward: jest.fn(),
   }),
-  useSearchParams: () => ({ get: jest.fn() }),
+  useSearchParams: () => ({
+    get: (key: string) => mockSearchParams[key] ?? null,
+  }),
   usePathname: () => "/",
 }));
 
@@ -129,6 +133,7 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     jest.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
+    mockSearchParams = {};
   });
 
   // ── T7-1: Consent line visible during the form step ─────────────────────
@@ -235,5 +240,72 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
       screen.queryByText(/coach who sent this/i),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/facilitator will follow up/i)).not.toBeInTheDocument();
+  });
+
+  // ── §4: ?coach=<ref> is forwarded as referringCoachEmail in the POST body ──
+  it("sends the ?coach= param as referringCoachEmail in the submit body", async () => {
+    mockSearchParams = { coach: "coach@example.com" };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          scoreResult: scoreResultFixture,
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+
+    render(<PublicQuizClient {...baseProps} />);
+    reachFormStep();
+
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.referringCoachEmail).toBe("coach@example.com");
+  });
+
+  it("omits referringCoachEmail entirely when no ?coach= param is present", async () => {
+    // mockSearchParams reset to {} in beforeEach → no coach.
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          scoreResult: scoreResultFixture,
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+
+    render(<PublicQuizClient {...baseProps} />);
+    reachFormStep();
+
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body).not.toHaveProperty("referringCoachEmail");
+  });
+
+  // ── §5: consent + info copy disclose the emailed copy honestly ──────────
+  it("consent line discloses the emailed copy + full report to the referring coach", () => {
+    render(<PublicQuizClient {...baseProps} />);
+    reachFormStep();
+
+    const consent = screen.getByTestId("quiz-consent");
+    expect(consent).toHaveTextContent(/emailed to you/i);
+    expect(consent).toHaveTextContent(/full report/i);
   });
 });
