@@ -73,3 +73,92 @@ export function interpolateTokens(
     return key in values ? values[key] : "";
   });
 }
+
+// ── Subject ─────────────────────────────────────────────────────────────────
+// Allowlist EXCLUDES url/email/token-bearing keys so a credential can never
+// reach a subject line / SMTP header / telemetry record.
+const SUBJECT_ALLOW = new Set<string>([
+  "respondentfirstname", "firstname",
+  "respondentlastname", "lastname",
+  "respondentfullname", "respondentname", "fullname",
+  "organizationname", "campaignname", "templatename", "coachname", "closeat",
+]);
+
+function stripControlChars(value: string): string {
+  // Removes CR/LF and other control chars (header-injection safe). Mirrors report-email.ts
+  // (which strips C0 + C1 via the same hex-escape range — no eslint-disable needed for those).
+  return value.replace(/[\x00-\x1f\x7f-\x9f]/g, " ").trim();
+}
+
+export function renderSubject(template: string, vars: InvitationVars): string {
+  const values = buildTokenValues(vars);
+  let s = stripControlChars(interpolateTokens(template, values, SUBJECT_ALLOW));
+  // Defense-in-depth: assert no invitation credential leaked into the subject.
+  if (vars.invitationUrl && s.includes(vars.invitationUrl)) {
+    s = s.split(vars.invitationUrl).join("");
+  }
+  if (s.includes("#t=")) {
+    s = s.replace(/#t=\S+/g, "");
+  }
+  return s.trim();
+}
+
+// ── Link policy ───────────────────────────────────────────────────────────
+/** Returns a safe href or null. Allows http(s) and root-relative; rejects javascript:/data:/protocol-relative/malformed. */
+function safeHref(raw: string): string | null {
+  const url = raw.trim();
+  if (url.startsWith("//")) return null;              // protocol-relative
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) {             // has a scheme
+    if (/^https?:/i.test(url)) return url;
+    return null;                                       // javascript:, data:, mailto:, etc. rejected
+  }
+  if (url.startsWith("/")) return url;                 // root-relative
+  return null;                                         // anything else (encoded, malformed)
+}
+
+// ── Markdown-lite (links + bold), escape-first ──────────────────────────────
+function renderInline(escaped: string): string {
+  // `escaped` already HTML-escaped. Markdown delimiters (* [ ] ( )) are unaffected by escaping.
+  // Links: [text](url)
+  let out = escaped.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text: string, url: string) => {
+    const href = safeHref(url);
+    return href
+      ? `<a href="${escapeHtml(href)}" style="color:#522583;text-decoration:underline;">${text}</a>`
+      : text;
+  });
+  // Bold: **text**
+  out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  return out;
+}
+
+/** Remove a standalone line whose only content is a markdown link to the invitation URL (shell has its own CTA). */
+function dropRedundantCta(body: string, invitationUrl: string): string {
+  const lines = body.split("\n");
+  const kept = lines.filter((line) => {
+    const m = line.trim().match(/^\[[^\]]+\]\(([^)\s]+)\)$/);
+    return !(m && m[1] === invitationUrl);
+  });
+  return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+export function renderHtmlBody(template: string, vars: InvitationVars): string {
+  const values = buildTokenValues(vars);
+  const interpolated = dropRedundantCta(interpolateTokens(template, values), vars.invitationUrl);
+  const paragraphs = interpolated
+    .split(/\n\s*\n/)
+    .filter((p) => p.trim().length > 0)
+    .map((p) => {
+      const withBreaks = escapeHtml(p).replace(/\n/g, "<br/>");
+      return `<p style="margin:0 0 14px;color:#374151;font-size:15px;line-height:1.6;">${renderInline(withBreaks)}</p>`;
+    })
+    .join("");
+  return paragraphs;
+}
+
+export function renderTextBody(template: string, vars: InvitationVars): string {
+  const values = buildTokenValues(vars);
+  let txt = dropRedundantCta(interpolateTokens(template, values), vars.invitationUrl);
+  txt = txt.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, "$1 ($2)"); // link → "text (url)"
+  txt = txt.replace(/\*\*([^*]+)\*\*/g, "$1");                 // bold → text
+  return `${txt.trim()}\n\nStart the assessment: ${vars.invitationUrl}`;
+}
