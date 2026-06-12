@@ -25,18 +25,28 @@ function formatCloseAt(d: Date): string {
   return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 }
 
+/**
+ * Strip markdown structural characters so a substituted DATA token VALUE can never
+ * form a real link/bold/code span in the HTML body. Markdown is honored ONLY from the
+ * coach-authored template, never from respondent/org-supplied values. Applied to data
+ * fields only — NOT to the server-generated URL (it is used as an href in template links).
+ */
+function neutralizeMarkdown(s: string): string {
+  return s.replace(/[*[\]`]/g, ""); // strip bold/link/code delimiters so data can't form markdown
+}
+
 /** Canonical token → resolved string value, with neutral fallbacks for empty known tokens. */
 export function buildTokenValues(vars: InvitationVars): Record<string, string> {
-  const first = (vars.respondent.firstName ?? "").trim() || "there";
-  const last = (vars.respondent.lastName ?? "").trim();
-  const full = `${vars.respondent.firstName ?? ""} ${vars.respondent.lastName ?? ""}`.trim() || "there";
-  const org = (vars.organizationName ?? "").trim() || "your organization";
-  const campaign = (vars.campaignName ?? "").trim() || "your assessment";
-  const template = (vars.templateName ?? "").trim() || "your assessment";
-  const coach = (vars.coachName ?? "").trim() || "your coach";
-  const email = (vars.respondent.email ?? "").trim();
+  const first = neutralizeMarkdown((vars.respondent.firstName ?? "").trim() || "there");
+  const last = neutralizeMarkdown((vars.respondent.lastName ?? "").trim());
+  const full = neutralizeMarkdown(`${vars.respondent.firstName ?? ""} ${vars.respondent.lastName ?? ""}`.trim() || "there");
+  const org = neutralizeMarkdown((vars.organizationName ?? "").trim() || "your organization");
+  const campaign = neutralizeMarkdown((vars.campaignName ?? "").trim() || "your assessment");
+  const template = neutralizeMarkdown((vars.templateName ?? "").trim() || "your assessment");
+  const coach = neutralizeMarkdown((vars.coachName ?? "").trim() || "your coach");
+  const email = neutralizeMarkdown((vars.respondent.email ?? "").trim());
   const closeAt = vars.closeAt ? formatCloseAt(vars.closeAt) : "ongoing";
-  const url = vars.invitationUrl;
+  const url = vars.invitationUrl; // server-generated — left untouched (used as href in template links)
   // keys are normalized (lowercase, underscores stripped)
   return {
     respondentfirstname: first, firstname: first,
@@ -100,6 +110,7 @@ export function renderSubject(template: string, vars: InvitationVars): string {
   if (s.includes("#t=")) {
     s = s.replace(/#t=\S+/g, "");
   }
+  s = s.replace(/\s{2,}/g, " ");
   return s.trim();
 }
 
@@ -189,9 +200,9 @@ export function buildInvitationEmailHtml(input: { bodyMarkdown: string; vars: In
   <div style="padding:28px 32px 8px;">
     ${bodyHtml}
     <div style="text-align:center;margin:24px 0 8px;">
-      <a href="${vars.invitationUrl}" style="display:inline-block;background:${PURPLE};color:#ffffff;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Start the assessment</a>
+      <a href="${escapeHtml(vars.invitationUrl)}" style="display:inline-block;background:${PURPLE};color:#ffffff;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Start the assessment</a>
     </div>
-    <p style="color:#9ca3af;font-size:12px;margin-top:20px;">If the button doesn't work, paste this into your browser:<br/><span style="word-break:break-all;color:#6b7280;">${vars.invitationUrl}</span></p>
+    <p style="color:#9ca3af;font-size:12px;margin-top:20px;">If the button doesn't work, paste this into your browser:<br/><span style="word-break:break-all;color:#6b7280;">${escapeHtml(vars.invitationUrl)}</span></p>
   </div>
   <div style="padding:18px 32px;border-top:1px solid #e5e7eb;color:#9ca3af;font-size:12px;">&mdash; Scaling Up Platform</div>
 </div>`.trim();

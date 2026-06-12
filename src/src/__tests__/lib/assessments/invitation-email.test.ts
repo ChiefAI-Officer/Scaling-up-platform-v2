@@ -101,6 +101,21 @@ describe("renderHtmlBody — escaping + safe markdown + link policy + CTA normal
   it("never emits a literal token", () => {
     expect(renderHtmlBody("Hi {{firstName}} {{bogus}}", baseVars)).not.toContain("{{");
   });
+  it("neutralizes markdown-link syntax from a substituted data value (no injected <a>)", () => {
+    const html = renderHtmlBody("Hi {{firstName}}", {
+      ...baseVars,
+      respondent: { firstName: "[x](https://evil.test)", lastName: "Y", email: "e@e.com" },
+    });
+    expect(html).not.toContain("<a href");
+    expect(html).not.toContain('href="https://evil.test"');
+  });
+  it("neutralizes markdown-bold syntax from a substituted data value (no injected <strong>)", () => {
+    const html = renderHtmlBody("Hi {{firstName}}", {
+      ...baseVars,
+      respondent: { firstName: "**evil**", lastName: "Y", email: "e@e.com" },
+    });
+    expect(html).not.toContain("<strong>");
+  });
 });
 
 describe("renderTextBody — plain text twin", () => {
@@ -124,6 +139,14 @@ describe("buildInvitationEmailHtml — branded shell", () => {
     expect(html).toContain("Start the assessment");
     expect(html).not.toContain("{{");                       // no literal tokens
     expect(html).not.toContain("#1D4ED8");                  // not the old blue button
+  });
+  it("escapes the invitation URL in the shell (no attribute breakout / injected script)", () => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: { ...baseVars, invitationUrl: 'https://app.test/"><script>alert(1)</script>' },
+    });
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain('"><script');
   });
 });
 
