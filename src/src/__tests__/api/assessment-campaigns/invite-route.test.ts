@@ -63,10 +63,18 @@ const baseCampaign = {
   alias: "demo",
   name: "Demo",
   closeAt: null as Date | null,
+  invitationSubject: null as string | null,
+  invitationBodyMarkdown: null as string | null,
   template: {
+    name: "Five Dysfunctions",
     invitationSubject: "Take the assessment",
     invitationBodyMarkdown: "Hi {{respondentFirstName}}",
   },
+  organization: {
+    name: "Acme Corp",
+    owner: { firstName: "Owner", lastName: "Coach" },
+  },
+  creatorCoach: { firstName: "Pat", lastName: "Coach" },
 };
 
 const PARTICIPANTS = [
@@ -312,5 +320,21 @@ describe("POST /api/assessment-campaigns/[id]/invite", () => {
     );
     expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
     expect(db.assessmentInvitation.create).not.toHaveBeenCalled();
+  });
+
+  it("forwards organizationName, coachName, and templateName to the email", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    const res = await POST(
+      jsonReq({ respondentIds: ["r1"] }) as never,
+      detailParams("c1")
+    );
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationName: "Acme Corp",
+        coachName: "Pat Coach",
+        templateName: "Five Dysfunctions",
+      })
+    );
   });
 });
