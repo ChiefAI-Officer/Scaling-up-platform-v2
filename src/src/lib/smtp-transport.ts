@@ -12,12 +12,14 @@ export interface SmtpAttachment {
   content?: string | Buffer;
   path?: string;
   contentType: string;
+  cid?: string; // inline-image Content-ID (referenced as <img src="cid:...">)
 }
 
 export interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
+  text?: string; // plain-text alternative → multipart/alternative
   attachments?: SmtpAttachment[];
   telemetry?: Omit<DeliveryTelemetryEvent, "recipient" | "subject" | "status" | "provider">;
 }
@@ -88,10 +90,12 @@ export async function sendEmailViaSMTP(options: SendEmailOptions): Promise<void>
       to: options.to,
       subject: options.subject,
       html: options.html,
+      ...(options.text !== undefined ? { text: options.text } : {}),
       attachments: options.attachments?.map((a) => ({
         filename: a.filename,
         ...(a.content !== undefined ? { content: a.content } : {}),
         ...(a.path !== undefined ? { path: a.path } : {}),
+        ...(a.cid !== undefined ? { cid: a.cid } : {}),
         contentType: a.contentType,
       })),
     });
