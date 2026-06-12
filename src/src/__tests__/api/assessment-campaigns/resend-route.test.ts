@@ -59,6 +59,8 @@ const coachActor = {
 type CampaignOverrides = {
   status?: "DRAFT" | "ACTIVE" | "CLOSED";
   externalId?: string | null;
+  invitationSubject?: string | null;
+  invitationBodyMarkdown?: string | null;
 };
 
 function buildInvitation(overrides: CampaignOverrides = {}) {
@@ -83,10 +85,24 @@ function buildInvitation(overrides: CampaignOverrides = {}) {
       closeAt: null as Date | null,
       status: overrides.status ?? ("ACTIVE" as const),
       externalId: overrides.externalId ?? null,
+      invitationSubject:
+        overrides.invitationSubject === undefined
+          ? null
+          : overrides.invitationSubject,
+      invitationBodyMarkdown:
+        overrides.invitationBodyMarkdown === undefined
+          ? null
+          : overrides.invitationBodyMarkdown,
       template: {
+        name: "Five Dysfunctions",
         invitationSubject: "Take the assessment",
         invitationBodyMarkdown: "Hi {{respondentFirstName}}",
       },
+      organization: {
+        name: "Acme Corp",
+        owner: { firstName: "Owner", lastName: "Coach" },
+      },
+      creatorCoach: { firstName: "Pat", lastName: "Coach" },
     },
   };
 }
@@ -188,6 +204,54 @@ describe("POST /api/assessment-campaigns/[id]/invitations/[invitationId]/resend"
       "Cannot send invitations for a closed or imported campaign"
     );
     expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
+    expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
+  });
+
+  it("uses the per-campaign invitationSubject/Body override when present", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentInvitation.findUnique as jest.Mock).mockResolvedValue(
+      buildInvitation({
+        invitationSubject: "CUSTOM SUBJ",
+        invitationBodyMarkdown: "CUSTOM BODY {{respondentFirstName}}",
+      })
+    );
+    const res = await POST(emptyReq() as never, detailParams("c1", "inv-1"));
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        template: expect.objectContaining({
+          invitationSubject: "CUSTOM SUBJ",
+          invitationBodyMarkdown: "CUSTOM BODY {{respondentFirstName}}",
+        }),
+        organizationName: "Acme Corp",
+        coachName: "Pat Coach",
+        templateName: "Five Dysfunctions",
+      })
+    );
+  });
+
+  it("falls back to template defaults when no per-campaign override", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    const res = await POST(emptyReq() as never, detailParams("c1", "inv-1"));
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        template: expect.objectContaining({
+          invitationSubject: "Take the assessment",
+          invitationBodyMarkdown: "Hi {{respondentFirstName}}",
+        }),
+      })
+    );
+  });
+
+  it("does NOT rotate the token when the send fails", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (sendAssessmentInvitationEmail as jest.Mock).mockRejectedValueOnce(
+      new Error("smtp")
+    );
+    const res = await POST(emptyReq() as never, detailParams("c1", "inv-1"));
+    expect(res.status).toBe(502);
+    // Token-rotating update must NOT run when the send fails — prior link stays valid.
     expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
   });
 });

@@ -26,6 +26,7 @@ import {
   generateRawToken,
   hashToken,
 } from "@/lib/assessments/invitation-tokens";
+import { resolveCoachName } from "@/lib/assessments/invitation-email";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
 
 const RESENDABLE_STATUSES = new Set(["PENDING", "SENT", "VIEWED"]);
@@ -88,12 +89,22 @@ export async function POST(
             closeAt: true,
             status: true,
             externalId: true,
+            invitationSubject: true,
+            invitationBodyMarkdown: true,
             template: {
               select: {
+                name: true,
                 invitationSubject: true,
                 invitationBodyMarkdown: true,
               },
             },
+            organization: {
+              select: {
+                name: true,
+                owner: { select: { firstName: true, lastName: true } },
+              },
+            },
+            creatorCoach: { select: { firstName: true, lastName: true } },
           },
         },
       },
@@ -146,22 +157,18 @@ export async function POST(
     const rawToken = generateRawToken();
     const tokenHash = hashToken(rawToken);
     const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+    const c = invitation.campaign;
+    const coachName = resolveCoachName(
+      c.creatorCoach ?? null,
+      c.organization?.owner ?? null
+    );
 
-    // Rotate the cryptographic material on the same row. status / expiresAt
-    // are preserved per spec semantics (resend != re-invite).
-    const updated = await db.assessmentInvitation.update({
-      where: { id: invitationId },
-      data: {
-        tokenHash,
-        resentCount: { increment: 1 },
-        lastResentAt: new Date(),
-      },
-      select: { id: true, expiresAt: true, resentCount: true },
-    });
-
+    // Reorder: send FIRST with the freshly-minted token, then rotate the
+    // tokenHash on the row only after the send resolves. On send failure we
+    // return 502 WITHOUT rotating, so the recipient's prior link stays valid.
     try {
       await sendAssessmentInvitationEmail({
-        invitation: { id: updated.id, expiresAt: updated.expiresAt },
+        invitation: { id: invitation.id, expiresAt: invitation.expiresAt },
         respondent: {
           id: invitation.respondent.id,
           firstName: invitation.respondent.firstName,
@@ -169,12 +176,20 @@ export async function POST(
           email: invitation.respondent.email,
         },
         campaign: {
-          id: invitation.campaign.id,
-          name: invitation.campaign.name,
-          alias: invitation.campaign.alias,
-          closeAt: invitation.campaign.closeAt,
+          id: c.id,
+          name: c.name,
+          alias: c.alias,
+          closeAt: c.closeAt,
         },
-        template: invitation.campaign.template,
+        template: {
+          invitationSubject:
+            c.invitationSubject ?? c.template.invitationSubject,
+          invitationBodyMarkdown:
+            c.invitationBodyMarkdown ?? c.template.invitationBodyMarkdown,
+        },
+        organizationName: c.organization?.name ?? null,
+        coachName,
+        templateName: c.template?.name ?? null,
         rawToken,
         baseUrl: appUrl,
       });
@@ -189,6 +204,18 @@ export async function POST(
         { status: 502 }
       );
     }
+
+    // Send succeeded — rotate the cryptographic material on the same row now.
+    // status / expiresAt are preserved per spec semantics (resend != re-invite).
+    const updated = await db.assessmentInvitation.update({
+      where: { id: invitationId },
+      data: {
+        tokenHash,
+        resentCount: { increment: 1 },
+        lastResentAt: new Date(),
+      },
+      select: { id: true, expiresAt: true, resentCount: true },
+    });
 
     await logAudit({
       entityType: "AssessmentInvitation",
