@@ -86,6 +86,18 @@ describe("renderHtmlBody — escaping + safe markdown + link policy + CTA normal
     expect(html).toContain('<a href="https://scalingup.com/x"');
     expect(html).toContain(">docs</a>");
   });
+  it("single-escapes & in href query strings (no double-escaping)", () => {
+    // The paragraph body is HTML-escaped once before renderInline runs.
+    // A URL like ?a=1&b=2 becomes ?a=1&amp;b=2 after escapeHtml. renderInline must
+    // NOT call escapeHtml again on the captured href or & becomes &amp;amp;.
+    const html = renderHtmlBody(
+      "See [report](https://scalingup.com/r?a=1&b=2)",
+      baseVars,
+    );
+    expect(html).toContain("a=1&amp;b=2");         // escaped exactly once
+    expect(html).not.toContain("&amp;amp;");        // NOT double-escaped
+    expect(html).toContain('<a href="https://scalingup.com/r?a=1&amp;b=2"');
+  });
   it("rejects dangerous link schemes (renders text only)", () => {
     const html = renderHtmlBody("[click](javascript:alert(1)) and [x](data:text/html,1)", baseVars);
     expect(html).not.toContain("javascript:");

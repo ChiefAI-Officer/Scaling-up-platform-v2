@@ -134,7 +134,7 @@ function renderInline(escaped: string): string {
   let out = escaped.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, text: string, url: string) => {
     const href = safeHref(url);
     return href
-      ? `<a href="${escapeHtml(href)}" style="color:#522583;text-decoration:underline;">${text}</a>`
+      ? `<a href="${href}" style="color:#522583;text-decoration:underline;">${text}</a>`
       : text;
   });
   // Bold: **text**
