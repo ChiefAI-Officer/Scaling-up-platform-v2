@@ -280,62 +280,62 @@ const STRATEGY_QUESTIONS: QuestionDef[] = [
 ];
 
 // EXECUTION (Q17–Q24)
-// VERIFY wording before publish — sourced from screenshot; confirm verbatim against Esperto export.
+// Verified verbatim against the source (From Jeff/.../Website-scalingup-assessment.xlsx) on 2026-06-11.
 const EXECUTION_QUESTIONS: QuestionDef[] = [
   {
     stableKey: "qa_execution_1",
     sortOrder: 17,
     label:
-      "Our net profit is three to five times industry average, indicating effective execution of our strategy.", // VERIFY wording before publish
+      "Our net profit is three to five times industry average, indicating effective execution of our strategy.",
     sectionStableKey: "S_EXECUTION",
   },
   {
     stableKey: "qa_execution_2",
     sortOrder: 18,
     label:
-      "We are making progress toward the company's goals, and rarely spend time responding to crises.", // VERIFY wording before publish
+      "We are making progress toward the company's goals, and rarely spend time responding to crises.",
     sectionStableKey: "S_EXECUTION",
   },
   {
     stableKey: "qa_execution_3",
     sortOrder: 19,
     label:
-      "We have clearly-defined metrics assigned to each priority in our plan, which are regularly updated and visually displayed.", // VERIFY wording before publish
+      "We have clearly-defined metrics assigned to each priority in our plan, which are regularly updated and visually displayed.",
     sectionStableKey: "S_EXECUTION",
   },
   {
     stableKey: "qa_execution_4",
     sortOrder: 20,
     label:
-      "I'm confident that each employee can clearly articulate our top quarterly priorities and their role in attaining them.", // VERIFY wording before publish
+      "I'm confident that each employee can clearly articulate our top quarterly priorities and their role in attaining them.",
     sectionStableKey: "S_EXECUTION",
   },
   {
     stableKey: "qa_execution_5",
     sortOrder: 21,
     label:
-      "We consistently receive feedback from our customers on how we are doing and what they have heard about our competitors.", // VERIFY wording before publish
+      "We consistently receive feedback from our customers on how we are doing and what they have heard about our competitors.",
     sectionStableKey: "S_EXECUTION",
   },
   {
     stableKey: "qa_execution_6",
     sortOrder: 22,
     label:
-      "We have strong alignment between our strategic plan and our systems/priorities.", // VERIFY wording before publish
+      "We have strong alignment between our strategic plan and our systems/priorities.",
     sectionStableKey: "S_EXECUTION",
   },
   {
     stableKey: "qa_execution_7",
     sortOrder: 23,
     label:
-      "We have regular, established meetings to align activities with company priorities and to identify and resolve issues.", // VERIFY wording before publish
+      "We have regular, established meetings to align activities with company priorities and to identify and resolve issues.",
     sectionStableKey: "S_EXECUTION",
   },
   {
     stableKey: "qa_execution_8",
     sortOrder: 24,
     label:
-      "We have an effective process for employees to offer suggestions and feedback, in order to enhance our culture and strengthen our team.", // VERIFY wording before publish
+      "We have an effective process for employees to offer suggestions and feedback, in order to enhance our culture and strengthen our team.",
     sectionStableKey: "S_EXECUTION",
   },
 ];
