@@ -112,3 +112,29 @@ describe("renderTextBody — plain text twin", () => {
     expect(txt).toContain("Start the assessment: " + baseVars.invitationUrl);
   });
 });
+
+import { buildInvitationEmailHtml, resolveCoachName } from "@/lib/assessments/invitation-email";
+
+describe("buildInvitationEmailHtml — branded shell", () => {
+  it("wraps the body in the purple branded shell with CID logo + CTA", () => {
+    const html = buildInvitationEmailHtml({ bodyMarkdown: "Hi {{firstName}}", vars: baseVars });
+    expect(html).toContain("#522583");                      // brand purple
+    expect(html).toContain('src="cid:sulogo"');             // inline logo
+    expect(html).toContain(`href="${baseVars.invitationUrl}"`); // CTA href
+    expect(html).toContain("Start the assessment");
+    expect(html).not.toContain("{{");                       // no literal tokens
+    expect(html).not.toContain("#1D4ED8");                  // not the old blue button
+  });
+});
+
+describe("resolveCoachName — creatorCoach ?? owner", () => {
+  it("prefers the campaign creator coach", () => {
+    expect(resolveCoachName({ firstName: "Cre", lastName: "Ator" }, { firstName: "Own", lastName: "Er" })).toBe("Cre Ator");
+  });
+  it("falls back to the org owner", () => {
+    expect(resolveCoachName(null, { firstName: "Own", lastName: "Er" })).toBe("Own Er");
+  });
+  it("returns null when neither is present", () => {
+    expect(resolveCoachName(null, null)).toBeNull();
+  });
+});

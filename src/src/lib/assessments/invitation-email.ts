@@ -162,3 +162,46 @@ export function renderTextBody(template: string, vars: InvitationVars): string {
   txt = txt.replace(/\*\*([^*]+)\*\*/g, "$1");                 // bold → text
   return `${txt.trim()}\n\nStart the assessment: ${vars.invitationUrl}`;
 }
+
+// ── Branded shell ───────────────────────────────────────────────────────────
+const PURPLE = "#522583";
+const PURPLE_DEEP = "#3d1a63";
+const D_PEOPLE = "#E4002B", D_STRATEGY = "#00A6CE", D_EXECUTION = "#FFB81C", D_CASH = "#43B02A";
+
+export function buildInvitationEmailHtml(input: { bodyMarkdown: string; vars: InvitationVars }): string {
+  const { bodyMarkdown, vars } = input;
+  const bodyHtml = renderHtmlBody(bodyMarkdown, vars);
+  const orgLine = vars.organizationName ? escapeHtml(vars.organizationName) : "";
+  return `
+<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td width="25%" style="height:6px;background:${D_PEOPLE};font-size:0;line-height:0;">&nbsp;</td>
+      <td width="25%" style="height:6px;background:${D_STRATEGY};font-size:0;line-height:0;">&nbsp;</td>
+      <td width="25%" style="height:6px;background:${D_EXECUTION};font-size:0;line-height:0;">&nbsp;</td>
+      <td width="25%" style="height:6px;background:${D_CASH};font-size:0;line-height:0;">&nbsp;</td>
+    </tr>
+  </table>
+  <div style="background:${PURPLE};background-image:linear-gradient(135deg,${PURPLE},${PURPLE_DEEP});padding:28px 32px;">
+    <img src="cid:${SU_LOGO_CID}" alt="Scaling Up" width="180" style="display:block;border:0;outline:none;max-width:180px;height:auto;" />
+    ${orgLine ? `<div style="margin-top:14px;font-size:13px;color:#ffffff;opacity:0.85;">${orgLine}</div>` : ""}
+  </div>
+  <div style="padding:28px 32px 8px;">
+    ${bodyHtml}
+    <div style="text-align:center;margin:24px 0 8px;">
+      <a href="${vars.invitationUrl}" style="display:inline-block;background:${PURPLE};color:#ffffff;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Start the assessment</a>
+    </div>
+    <p style="color:#9ca3af;font-size:12px;margin-top:20px;">If the button doesn't work, paste this into your browser:<br/><span style="word-break:break-all;color:#6b7280;">${vars.invitationUrl}</span></p>
+  </div>
+  <div style="padding:18px 32px;border-top:1px solid #e5e7eb;color:#9ca3af;font-size:12px;">&mdash; Scaling Up Platform</div>
+</div>`.trim();
+}
+
+// ── Coach-name resolver (creator coach ?? org owner) ────────────────────────
+type CoachName = { firstName: string; lastName: string } | null;
+export function resolveCoachName(creatorCoach: CoachName, ownerCoach: CoachName): string | null {
+  const pick = creatorCoach ?? ownerCoach;
+  if (!pick) return null;
+  const name = `${pick.firstName ?? ""} ${pick.lastName ?? ""}`.trim();
+  return name.length > 0 ? name : null;
+}
