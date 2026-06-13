@@ -174,8 +174,17 @@ function routeParams(workshopId: string, template: string) {
 }
 
 /**
+ * A DISTINCT jest.fn for tx.auditLog.create — separate from the global
+ * db.auditLog.create mock. This lets tests assert that the audit write
+ * went through the transaction handle (tx), not the global db client.
+ */
+const txAuditLogCreate = jest.fn();
+
+/**
  * Wire db.$transaction to invoke its callback with a tx client that proxies
  * to the mocked db methods, so in-transaction calls are observable.
+ * tx.auditLog.create is a DISTINCT fn from db.auditLog.create so tests
+ * can prove the audit write is inside the transaction.
  */
 function wireTransaction() {
   (db.$transaction as jest.Mock).mockImplementation(async (cb: (tx: unknown) => unknown) =>
@@ -186,7 +195,7 @@ function wireTransaction() {
         create: db.landingPage.create,
       },
       auditLog: {
-        create: db.auditLog.create,
+        create: txAuditLogCreate,
       },
     })
   );
@@ -413,6 +422,46 @@ describe("Wave B Task 2 — per-workshop customHtml PUT", () => {
       // It must NOT have reached the write.
       expect((db.landingPage.updateMany as jest.Mock)).not.toHaveBeenCalled();
     });
+
+    it("sanitizerStripped: true in response when sanitizer strips <script>", async () => {
+      (db.landingPage.findUnique as jest.Mock)
+        .mockResolvedValueOnce(existingSolo())
+        .mockResolvedValueOnce({ ...existingSolo(), customHtml: "<p>hi</p>" });
+      (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      txAuditLogCreate.mockResolvedValue({ id: "audit-1" });
+
+      const response = await PUT(
+        buildPutRequest("workshop-1", "SOLO_LANDING", {
+          customHtml: '<p>hi</p><script>evil()</script>',
+          expectedCustomHtml: "<p>old</p>",
+        }),
+        routeParams("workshop-1", "SOLO_LANDING")
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.sanitizerStripped).toBe(true);
+    });
+
+    it("sanitizerStripped: false in response when sanitizer strips nothing", async () => {
+      (db.landingPage.findUnique as jest.Mock)
+        .mockResolvedValueOnce(existingSolo())
+        .mockResolvedValueOnce({ ...existingSolo(), customHtml: "<p>clean</p>" });
+      (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      txAuditLogCreate.mockResolvedValue({ id: "audit-1" });
+
+      const response = await PUT(
+        buildPutRequest("workshop-1", "SOLO_LANDING", {
+          customHtml: "<p>clean</p>",
+          expectedCustomHtml: "<p>old</p>",
+        }),
+        routeParams("workshop-1", "SOLO_LANDING")
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.sanitizerStripped).toBe(false);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -619,7 +668,7 @@ describe("Wave B Task 2 — per-workshop customHtml PUT", () => {
   // Group G — prior-body audit row in same transaction (Q1)
   // -------------------------------------------------------------------------
   describe("prior-body AuditLog", () => {
-    it("successful update writes UPDATE_CUSTOM_HTML audit row with previousCustomHtml", async () => {
+    it("successful update writes UPDATE_CUSTOM_HTML audit row with previousCustomHtml via tx (not global db)", async () => {
       const existing = {
         id: "lp-1",
         workshopId: "workshop-1",
@@ -634,7 +683,7 @@ describe("Wave B Task 2 — per-workshop customHtml PUT", () => {
         .mockResolvedValueOnce(existing)
         .mockResolvedValueOnce({ ...existing, customHtml: "<p>new</p>" });
       (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
-      (db.auditLog.create as jest.Mock).mockResolvedValue({ id: "audit-1" });
+      txAuditLogCreate.mockResolvedValue({ id: "audit-1" });
 
       const response = await PUT(
         buildPutRequest("workshop-1", "SOLO_LANDING", {
@@ -645,15 +694,55 @@ describe("Wave B Task 2 — per-workshop customHtml PUT", () => {
       );
 
       expect(response.status).toBe(200);
-      expect(db.auditLog.create as jest.Mock).toHaveBeenCalledTimes(1);
-      const auditArg = (db.auditLog.create as jest.Mock).mock.calls[0][0].data;
+
+      // The audit write MUST go through the tx handle (inside the transaction).
+      expect(txAuditLogCreate).toHaveBeenCalledTimes(1);
+      const auditArg = txAuditLogCreate.mock.calls[0][0].data;
       expect(auditArg.entityType).toBe("LandingPage");
       expect(auditArg.entityId).toBe("lp-1");
       expect(auditArg.action).toBe("UPDATE_CUSTOM_HTML");
       const changes = JSON.parse(auditArg.changes);
       expect(changes.previousCustomHtml).toBe("<p>the-old-value</p>");
-      // Written inside the transaction.
+
+      // The GLOBAL db.auditLog.create must NOT have been called — that would mean
+      // the audit bypassed the transaction and is not atomic with the row write.
+      expect(db.auditLog.create as jest.Mock).not.toHaveBeenCalled();
+
+      // The transaction itself must have been invoked.
       expect(db.$transaction as jest.Mock).toHaveBeenCalled();
+    });
+
+    it("audit failure inside tx → route returns 500 (no silent partial write)", async () => {
+      // If tx.auditLog.create throws, the $transaction mock propagates the error
+      // (the callback throws → the mock's async wrapper re-throws → route's outer
+      // catch returns 500). This proves audit failure rolls back atomically.
+      const existing = {
+        id: "lp-1",
+        workshopId: "workshop-1",
+        template: "SOLO_LANDING",
+        slug: "x",
+        content: "{}",
+        status: "DRAFT",
+        publishedAt: null,
+        customHtml: "<p>old</p>",
+      };
+      (db.landingPage.findUnique as jest.Mock).mockResolvedValueOnce(existing);
+      (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      // Simulate the audit write failing inside the transaction.
+      txAuditLogCreate.mockRejectedValueOnce(new Error("DB constraint error"));
+
+      const response = await PUT(
+        buildPutRequest("workshop-1", "SOLO_LANDING", {
+          customHtml: "<p>new</p>",
+          expectedCustomHtml: "<p>old</p>",
+        }),
+        routeParams("workshop-1", "SOLO_LANDING")
+      );
+
+      // The route must not return success:true — the write failed.
+      expect(response.status).toBe(500);
+      const body = await response.json();
+      expect(body.success).toBe(false);
     });
   });
 
@@ -669,7 +758,7 @@ describe("Wave B Task 2 — per-workshop customHtml PUT", () => {
       (db.landingPage.create as jest.Mock).mockImplementation((args: { data: unknown }) =>
         Promise.resolve({ id: "lp-new", ...(args.data as object) })
       );
-      (db.auditLog.create as jest.Mock).mockResolvedValue({ id: "audit-1" });
+      txAuditLogCreate.mockResolvedValue({ id: "audit-1" });
 
       const response = await PUT(
         buildPutRequest("workshop-1", "SOLO_LANDING", {
@@ -687,8 +776,9 @@ describe("Wave B Task 2 — per-workshop customHtml PUT", () => {
       // sanitized customHtml stored.
       expect(created.customHtml).not.toMatch(/<script/i);
       expect(created.customHtml).toContain("<p>fresh</p>");
-      // prior-body audit row: previousCustomHtml null, op save.
-      const auditArg = (db.auditLog.create as jest.Mock).mock.calls[0][0].data;
+      // prior-body audit row written through tx (not global db).
+      expect(txAuditLogCreate).toHaveBeenCalledTimes(1);
+      const auditArg = txAuditLogCreate.mock.calls[0][0].data;
       const changes = JSON.parse(auditArg.changes);
       expect(changes.previousCustomHtml).toBeNull();
       expect(changes.op).toBe("save");
@@ -727,7 +817,7 @@ describe("Wave B Task 2 — per-workshop customHtml PUT", () => {
         .mockResolvedValueOnce(existing)
         .mockResolvedValueOnce({ ...existing, customHtml: null });
       (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
-      (db.auditLog.create as jest.Mock).mockResolvedValue({ id: "audit-1" });
+      txAuditLogCreate.mockResolvedValue({ id: "audit-1" });
 
       const response = await PUT(
         buildPutRequest("workshop-1", "SOLO_LANDING", {

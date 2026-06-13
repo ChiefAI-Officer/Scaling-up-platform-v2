@@ -384,6 +384,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           success: true,
           data: saved,
           customHtml: saved.customHtml ?? null,
+          sanitizerStripped: didStrip,
         });
       }
 
@@ -453,6 +454,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           success: true,
           data: created,
           customHtml: created.customHtml ?? null,
+          sanitizerStripped: didStrip,
         });
       } catch (err) {
         if (
