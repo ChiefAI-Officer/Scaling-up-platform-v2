@@ -1098,6 +1098,56 @@ describe("Wave B Task 3 — capability marker (customHtmlEditor)", () => {
     const body = await response.json();
     expect(body.customHtmlEditor).toBe(true);
   });
+
+  // Addition 2 — data: null capability-marker branch:
+  // The GET handler has a specific branch for when no LandingPage row exists yet
+  // (data: null). Capability marker tests above all seed a non-null page. These
+  // tests cover the no-row path.
+
+  it("no landing-page row + privileged + flag ON → data: null response includes customHtmlEditor: true", async () => {
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING"),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toBeNull();
+    expect(body.customHtmlEditor).toBe(true);
+  });
+
+  it("no landing-page row + flag OFF → data: null response does NOT include customHtmlEditor: true", async () => {
+    delete process.env[FLAG];
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING"),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toBeNull();
+    expect(body.customHtmlEditor).not.toBe(true);
+    process.env[FLAG] = "1";
+  });
+
+  it("no landing-page row + coach + flag ON → data: null response does NOT include customHtmlEditor: true", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING"),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toBeNull();
+    expect(body.customHtmlEditor).not.toBe(true);
+  });
 });
 
 // ============================================================================
@@ -1293,6 +1343,49 @@ describe("Wave B Task 3 — restore action", () => {
     );
 
     expect(response.status).toBe(409);
+  });
+
+  // Addition 1 — entity-binding behavioral negative:
+  // The query layer returns a foreign row (entityId/previousCustomHtml reference a
+  // different page), but the restore write target must still be THIS page's id ("lp-3"),
+  // because the route derives the write target from existingPage.id (loaded via the
+  // workshopId+template composite key), NOT from the audit row contents.
+  it("entity-binding behavioral: foreign audit row returned → write is still keyed to THIS page (lp-3), not the foreign page", async () => {
+    const thisPage = resolvedLandingPage("<p>current</p>");
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce(thisPage)                                         // pre-restore page load
+      .mockResolvedValueOnce({ ...thisPage, customHtml: "<p>foreign body</p>" }); // post-tx re-read
+    // Simulates a misbehaving query layer: findFirst hands back a row that belongs to
+    // a different page (its entityId conceptually references "lp-FOREIGN").
+    (db.auditLog.findFirst as jest.Mock).mockResolvedValue({
+      id: "audit-foreign",
+      entityType: "LandingPage",
+      entityId: "lp-FOREIGN",
+      action: "UPDATE_CUSTOM_HTML",
+      changes: JSON.stringify({ op: "save", previousCustomHtml: "<p>foreign body</p>" }),
+    });
+    (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    txRestoreAuditLogCreate.mockResolvedValue({ id: "audit-restore-1" });
+
+    const response = await PUT(
+      buildRestorePutRequest("workshop-1", "SOLO_LANDING", {
+        expectedCustomHtml: "<p>current</p>",
+      }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    // Route completes (the foreign body is usable content — sanitizer passes it).
+    expect(response.status).toBe(200);
+
+    // The write WHERE clause must reference THIS page's id, not the foreign id.
+    const updateManyCall = (db.landingPage.updateMany as jest.Mock).mock.calls[0][0];
+    expect(updateManyCall.where.id).toBe("lp-3");
+    expect(updateManyCall.where.id).not.toBe("lp-FOREIGN");
+
+    // The audit row entityId written by the restore must also reference THIS page.
+    const auditData = txRestoreAuditLogCreate.mock.calls[0][0].data;
+    expect(auditData.entityId).toBe("lp-3");
+    expect(auditData.entityId).not.toBe("lp-FOREIGN");
   });
 
   it("save→restore→restore chain: each restore reverts to the previous prior body", async () => {
