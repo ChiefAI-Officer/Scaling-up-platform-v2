@@ -33,6 +33,27 @@ function sha(s: string): string {
   return createHash("sha256").update(s, "utf8").digest("hex");
 }
 
+// Wave B Task 3: shared helper — look up the active PageTemplate customHtml for a
+// given template type + workshop, applying the same category-precedence logic used
+// by the PUT create branch (category-scoped wins over null-categoryId). Returns the
+// raw (un-interpolated) customHtml string, or null when no match exists.
+async function findActivePageTemplateCustomHtml(
+  normalizedTemplate: TemplateType,
+  workshopCategoryId: string | null
+): Promise<string | null> {
+  const candidates = await db.pageTemplate.findMany({
+    where: {
+      templateType: normalizedTemplate,
+      isActive: true,
+      OR: [{ categoryId: workshopCategoryId }, { categoryId: null }],
+    },
+    select: { customHtml: true, categoryId: true },
+  });
+  const chosen =
+    candidates.find((t) => t.categoryId !== null) ?? candidates[0] ?? null;
+  return chosen?.customHtml ?? null;
+}
+
 interface RouteParams {
   params: Promise<{ id: string; template: string }>;
 }
@@ -102,9 +123,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // Wave B Task 3: capability marker — exposed when the flag is on AND the
+    // actor is privileged. Used by the editor UI to show/hide the HTML panel.
+    const editorEnabled = isCustomHtmlEditorEnabled() && isPrivilegedRole(actor.role);
+
     const workshopAccess = await db.workshop.findUnique({
       where: { id },
-      select: { coachId: true },
+      select: { coachId: true, categoryId: true },
     });
 
     if (!workshopAccess || !canManageCoachData(actor, workshopAccess.coachId)) {
@@ -112,6 +137,50 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         { success: false, error: "Workshop not found" },
         { status: 404 }
       );
+    }
+
+    // Wave B Task 3: ?resolved=1 — privileged + flag-gated. Returns the
+    // customHtml that would be produced by applying the active PageTemplate to
+    // this workshop's current variable values. Always regenerated from the
+    // template + CURRENT vars — never echoes the stored LandingPage.customHtml.
+    const resolvedMode = request.nextUrl?.searchParams?.get("resolved") === "1"
+      || new URL(request.url).searchParams.get("resolved") === "1";
+
+    if (resolvedMode) {
+      if (!isCustomHtmlEditorEnabled()) {
+        return NextResponse.json(
+          { success: false, error: "Not found" },
+          { status: 404 }
+        );
+      }
+      if (!isPrivilegedRole(actor.role)) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden — admin/staff only" },
+          { status: 403 }
+        );
+      }
+
+      // Only eligible templates can carry customHtml.
+      let customHtmlResolved = "";
+      if (ELIGIBLE_CUSTOM_HTML.includes(normalizedTemplate)) {
+        const rawTemplateHtml = await findActivePageTemplateCustomHtml(
+          normalizedTemplate,
+          workshopAccess.categoryId
+        );
+        if (rawTemplateHtml && rawTemplateHtml.trim().length > 0) {
+          const vars = await buildEnrichedLandingPageVariables(id);
+          const interpolated = vars
+            ? interpolateContentForHtml(rawTemplateHtml, vars)
+            : rawTemplateHtml;
+          customHtmlResolved = sanitizeCustomHtml(interpolated, { allowTokenUris: false }).sanitized;
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        customHtmlResolved,
+        customHtmlEditor: true,
+      });
     }
 
     const landingPage = await db.landingPage.findUnique({
@@ -124,10 +193,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
 
     if (!landingPage) {
-      return NextResponse.json({ success: true, data: null });
+      return NextResponse.json({
+        success: true,
+        data: null,
+        ...(editorEnabled ? { customHtmlEditor: true } : {}),
+      });
     }
 
-    return NextResponse.json({ success: true, data: landingPage });
+    return NextResponse.json({
+      success: true,
+      data: landingPage,
+      ...(editorEnabled ? { customHtmlEditor: true } : {}),
+    });
   } catch (error) {
     console.error("Error fetching landing page:", error);
     return NextResponse.json(
@@ -166,6 +243,164 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         { success: false, error: "Invalid template type" },
         { status: 400 }
       );
+    }
+
+    // -----------------------------------------------------------------------
+    // Wave B Task 3: ?action=restore-html — admin-only, flag-gated.
+    // Reads the latest UPDATE_CUSTOM_HTML audit row for this page (entity-bound),
+    // takes changes.previousCustomHtml, re-sanitizes it, and writes it back via
+    // the same transactional CAS+audit pattern used by the save path.
+    // -----------------------------------------------------------------------
+    const requestUrl = new URL(request.url);
+    const actionParam = requestUrl.searchParams.get("action");
+
+    if (actionParam === "restore-html") {
+      // Flag gate.
+      if (!isCustomHtmlEditorEnabled()) {
+        return NextResponse.json(
+          { success: false, error: "Not found" },
+          { status: 404 }
+        );
+      }
+      // Admin-only.
+      if (!isPrivilegedRole(actor.role)) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden — admin/staff only" },
+          { status: 403 }
+        );
+      }
+
+      // Rate-limit (same budget as save path).
+      const rl = await checkRateLimitAsync(
+        `customhtml:${actor.email}:${id}`,
+        RateLimits.standard
+      );
+      if (!rl.success) {
+        return NextResponse.json(
+          { success: false, error: "Too many requests" },
+          { status: 429 }
+        );
+      }
+
+      // Parse body for expectedCustomHtml (CAS sentinel).
+      let restoreBody: { expectedCustomHtml?: string | null } = {};
+      try {
+        const parsed = await request.json();
+        restoreBody = (parsed && typeof parsed === "object" ? parsed : {}) as typeof restoreBody;
+      } catch {
+        return NextResponse.json(
+          { success: false, error: "Invalid request body" },
+          { status: 400 }
+        );
+      }
+      const expectedCustomHtml: string | null = restoreBody.expectedCustomHtml ?? null;
+
+      // Workshop access check.
+      const workshop = await db.workshop.findUnique({
+        where: { id },
+        select: { id: true, coachId: true },
+      });
+      if (!workshop || !canManageCoachData(actor, workshop.coachId)) {
+        return NextResponse.json(
+          { success: false, error: "Workshop not found" },
+          { status: 404 }
+        );
+      }
+
+      // Load the existing LandingPage (we need its id for entity-bound audit lookup).
+      const existingPage = await db.landingPage.findUnique({
+        where: { workshopId_template: { workshopId: id, template: normalizedTemplate } },
+      });
+      if (!existingPage) {
+        return NextResponse.json(
+          { success: false, error: "Landing page not found" },
+          { status: 404 }
+        );
+      }
+
+      // Entity-bound audit lookup — MUST filter by THIS page's entityId.
+      const priorAudit = await db.auditLog.findFirst({
+        where: {
+          entityType: "LandingPage",
+          entityId: existingPage.id,
+          action: "UPDATE_CUSTOM_HTML",
+        },
+        orderBy: { timestamp: "desc" },
+      });
+      if (!priorAudit) {
+        return NextResponse.json(
+          { success: false, error: "No prior customHtml history found for this page" },
+          { status: 404 }
+        );
+      }
+
+      // Extract prior body — re-sanitize it (NO re-interpolation, per Q7).
+      let priorChanges: { previousCustomHtml?: string | null };
+      try {
+        priorChanges = JSON.parse(priorAudit.changes as string);
+      } catch {
+        return NextResponse.json(
+          { success: false, error: "Corrupted audit record" },
+          { status: 500 }
+        );
+      }
+      const priorRaw: string | null = priorChanges.previousCustomHtml ?? null;
+      const { sanitized: restoredSafe, didStripContent: restoreDidStrip } =
+        priorRaw === null
+          ? { sanitized: null as string | null, didStripContent: false }
+          : sanitizeCustomHtml(priorRaw, { allowTokenUris: false });
+      const restoredOrNull: string | null = priorRaw === null ? null : restoredSafe;
+
+      // Transactional value-compare CAS + audit (same pattern as save path).
+      const currentCustomHtml = existingPage.customHtml ?? null;
+      const saved = await db.$transaction(async (tx) => {
+        const res = await tx.landingPage.updateMany({
+          where: { id: existingPage.id, customHtml: expectedCustomHtml },
+          data: {
+            updatedAt: new Date(),
+            customHtml: restoredOrNull,
+          },
+        });
+        if (res.count === 0) {
+          return null;
+        }
+        await tx.auditLog.create({
+          data: {
+            entityType: "LandingPage",
+            entityId: existingPage.id,
+            action: "UPDATE_CUSTOM_HTML",
+            performedBy: actor.email,
+            changes: JSON.stringify({
+              op: "restore",
+              template: normalizedTemplate,
+              previousCustomHtml: currentCustomHtml,
+              prevSha: sha(currentCustomHtml ?? ""),
+              newSha: sha(restoredOrNull ?? ""),
+              newCustomHtmlLength: (restoredOrNull ?? "").length,
+              actorRole: actor.role,
+              sanitizerStripped: restoreDidStrip,
+            }),
+          },
+        });
+        return tx.landingPage.findUnique({ where: { id: existingPage.id } });
+      });
+
+      if (!saved) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "This page changed since you opened it — reload and re-apply.",
+          },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: saved,
+        customHtml: (saved as { customHtml?: string | null }).customHtml ?? null,
+        sanitizerStripped: restoreDidStrip,
+      });
     }
 
     // Parse raw JSON first so we can detect explicit key PRESENCE (Zod .optional()

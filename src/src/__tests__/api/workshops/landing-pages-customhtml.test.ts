@@ -43,6 +43,7 @@ jest.mock("@/lib/db", () => ({
     },
     auditLog: {
       create: jest.fn(),
+      findFirst: jest.fn(),
     },
     $transaction: jest.fn(),
   },
@@ -127,7 +128,7 @@ jest.mock("@/lib/rate-limit", () => ({
   }),
 }));
 
-import { PUT } from "@/app/api/workshops/[id]/landing-pages/[template]/route";
+import { PUT, GET } from "@/app/api/workshops/[id]/landing-pages/[template]/route";
 import { db } from "@/lib/db";
 import { getApiActor, canManageCoachData } from "@/lib/auth/authorization";
 
@@ -173,12 +174,47 @@ function routeParams(workshopId: string, template: string) {
   return { params: Promise.resolve({ id: workshopId, template }) };
 }
 
+function buildGetRequest(
+  workshopId: string,
+  template: string,
+  queryParams?: Record<string, string>
+): Parameters<typeof GET>[0] {
+  const url = new URL(
+    `http://localhost/api/workshops/${workshopId}/landing-pages/${template}`
+  );
+  if (queryParams) {
+    for (const [k, v] of Object.entries(queryParams)) {
+      url.searchParams.set(k, v);
+    }
+  }
+  return new Request(url.toString(), { method: "GET" }) as unknown as Parameters<typeof GET>[0];
+}
+
+function buildRestorePutRequest(
+  workshopId: string,
+  template: string,
+  body: Record<string, unknown>
+): Parameters<typeof PUT>[0] {
+  const url = `http://localhost/api/workshops/${workshopId}/landing-pages/${template}?action=restore-html`;
+  return new Request(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }) as unknown as Parameters<typeof PUT>[0];
+}
+
 /**
  * A DISTINCT jest.fn for tx.auditLog.create — separate from the global
  * db.auditLog.create mock. This lets tests assert that the audit write
  * went through the transaction handle (tx), not the global db client.
  */
 const txAuditLogCreate = jest.fn();
+
+/**
+ * A DISTINCT jest.fn for the restore-path tx.auditLog.create write, so
+ * restore tests can isolate their audit write from save-path tests.
+ */
+const txRestoreAuditLogCreate = jest.fn();
 
 /**
  * Wire db.$transaction to invoke its callback with a tx client that proxies
@@ -831,5 +867,501 @@ describe("Wave B Task 2 — per-workshop customHtml PUT", () => {
       const data = (db.landingPage.updateMany as jest.Mock).mock.calls[0][0].data;
       expect(data.customHtml).toBeNull();
     });
+  });
+});
+
+// ============================================================================
+// Wave B Task 3 — GET ?resolved=1, capability marker, restore action
+// ============================================================================
+
+// Helper: a landing page row with per-workshop customHtml override.
+function resolvedLandingPage(customHtml: string | null = "<p>stored-override</p>") {
+  return {
+    id: "lp-3",
+    workshopId: "workshop-1",
+    template: "SOLO_LANDING",
+    slug: "x",
+    content: "{}",
+    status: "DRAFT",
+    publishedAt: null,
+    customHtml,
+  };
+}
+
+// A PageTemplate row whose customHtml the resolved mode should use.
+const activePageTemplate = {
+  customCode: null,
+  customHtml: "<p>Hello {{workshop_title}}</p>",
+  categoryId: null,
+  content: '{"hero":"default"}',
+};
+
+describe("Wave B Task 3 — GET ?resolved=1 (resolved mode)", () => {
+  const FLAG = "WORKSHOP_CUSTOM_HTML_EDITOR_ENABLED";
+  const originalFlag = process.env[FLAG];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env[FLAG] = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (canManageCoachData as jest.Mock).mockReturnValue(true);
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
+    // Default: active template with customHtml.
+    (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([activePageTemplate]);
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(resolvedLandingPage());
+  });
+
+  afterAll(() => {
+    if (originalFlag === undefined) delete process.env[FLAG];
+    else process.env[FLAG] = originalFlag;
+  });
+
+  it("privileged GET ?resolved=1 returns customHtmlResolved from template (not stored override)", async () => {
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING", { resolved: "1" }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    // Must come from template interpolation (workshop_title resolved), NOT from stored LandingPage.customHtml.
+    expect(body.customHtmlResolved).toContain("Test Workshop");
+    // Must NOT echo the stored per-workshop override.
+    expect(body.customHtmlResolved).not.toContain("stored-override");
+  });
+
+  it("resolved mode with no active template customHtml → customHtmlResolved is empty string", async () => {
+    (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([
+      { ...activePageTemplate, customHtml: null },
+    ]);
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING", { resolved: "1" }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.customHtmlResolved).toBe("");
+  });
+
+  it("resolved mode with no active template at all → customHtmlResolved is empty string", async () => {
+    (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([]);
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING", { resolved: "1" }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.customHtmlResolved).toBe("");
+  });
+
+  it("coach GET ?resolved=1 → 403", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING", { resolved: "1" }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("flag OFF + GET ?resolved=1 → 404", async () => {
+    delete process.env[FLAG];
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING", { resolved: "1" }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect([404]).toContain(response.status);
+    process.env[FLAG] = "1";
+  });
+
+  it("resolved mode always regenerates from template, not from stored LandingPage.customHtml", async () => {
+    // Stored override is different from what the template would produce.
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(
+      resolvedLandingPage("<p>totally-different-stored-override</p>")
+    );
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING", { resolved: "1" }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    // Must use template content (not the stored override).
+    expect(body.customHtmlResolved).toContain("Test Workshop");
+    expect(body.customHtmlResolved).not.toContain("totally-different-stored-override");
+  });
+
+  it("category precedence: category-scoped template wins over null-categoryId template", async () => {
+    const globalTemplate = { ...activePageTemplate, customHtml: "<p>global</p>", categoryId: null };
+    const categoryTemplate = {
+      ...activePageTemplate,
+      customHtml: "<p>category {{workshop_title}}</p>",
+      categoryId: "cat-1",
+    };
+    // Category-scoped workshop.
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue({
+      ...fakeWorkshop,
+      categoryId: "cat-1",
+    });
+    (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([globalTemplate, categoryTemplate]);
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING", { resolved: "1" }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.customHtmlResolved).toContain("category");
+    expect(body.customHtmlResolved).not.toContain("global");
+  });
+});
+
+// ============================================================================
+// Wave B Task 3 — capability marker (customHtmlEditor field on GET)
+// ============================================================================
+
+describe("Wave B Task 3 — capability marker (customHtmlEditor)", () => {
+  const FLAG = "WORKSHOP_CUSTOM_HTML_EDITOR_ENABLED";
+  const originalFlag = process.env[FLAG];
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env[FLAG] = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (canManageCoachData as jest.Mock).mockReturnValue(true);
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(resolvedLandingPage());
+  });
+
+  afterAll(() => {
+    if (originalFlag === undefined) delete process.env[FLAG];
+    else process.env[FLAG] = originalFlag;
+  });
+
+  it("privileged + flag ON → normal GET includes customHtmlEditor: true", async () => {
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING"),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.customHtmlEditor).toBe(true);
+  });
+
+  it("coach + flag ON → normal GET does NOT include customHtmlEditor: true", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING"),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    // Coach must NOT see the editor capability.
+    expect(body.customHtmlEditor).not.toBe(true);
+  });
+
+  it("privileged + flag OFF → normal GET does NOT include customHtmlEditor: true", async () => {
+    delete process.env[FLAG];
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING"),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.customHtmlEditor).not.toBe(true);
+    process.env[FLAG] = "1";
+  });
+
+  it("resolved mode also includes customHtmlEditor: true for privileged + flag ON", async () => {
+    (db.pageTemplate.findMany as jest.Mock).mockResolvedValue([activePageTemplate]);
+
+    const response = await GET(
+      buildGetRequest("workshop-1", "SOLO_LANDING", { resolved: "1" }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.customHtmlEditor).toBe(true);
+  });
+});
+
+// ============================================================================
+// Wave B Task 3 — restore action (?action=restore-html on PUT)
+// ============================================================================
+
+describe("Wave B Task 3 — restore action", () => {
+  const FLAG = "WORKSHOP_CUSTOM_HTML_EDITOR_ENABLED";
+  const originalFlag = process.env[FLAG];
+
+  // Wire the transaction for restore tests — uses txRestoreAuditLogCreate so we
+  // can distinguish restore audit writes from save-path writes.
+  function wireRestoreTransaction() {
+    (db.$transaction as jest.Mock).mockImplementation(async (cb: (tx: unknown) => unknown) =>
+      cb({
+        landingPage: {
+          updateMany: db.landingPage.updateMany,
+          findUnique: db.landingPage.findUnique,
+          create: db.landingPage.create,
+        },
+        auditLog: {
+          create: txRestoreAuditLogCreate,
+        },
+      })
+    );
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env[FLAG] = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (canManageCoachData as jest.Mock).mockReturnValue(true);
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
+    wireRestoreTransaction();
+  });
+
+  afterAll(() => {
+    if (originalFlag === undefined) delete process.env[FLAG];
+    else process.env[FLAG] = originalFlag;
+  });
+
+  it("restore with prior audit row → reverts to previousCustomHtml, writes op:restore audit", async () => {
+    const currentPage = resolvedLandingPage("<p>current</p>");
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce(currentPage) // pre-restore existing
+      .mockResolvedValueOnce({ ...currentPage, customHtml: "<p>previous</p>" }); // post-tx re-read
+    (db.auditLog.findFirst as jest.Mock).mockResolvedValue({
+      id: "audit-1",
+      entityType: "LandingPage",
+      entityId: "lp-3",
+      action: "UPDATE_CUSTOM_HTML",
+      changes: JSON.stringify({ op: "save", previousCustomHtml: "<p>previous</p>" }),
+    });
+    (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    txRestoreAuditLogCreate.mockResolvedValue({ id: "audit-restore-1" });
+
+    const response = await PUT(
+      buildRestorePutRequest("workshop-1", "SOLO_LANDING", {
+        expectedCustomHtml: "<p>current</p>",
+      }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    // The write must target the prior sanitized value.
+    const writeData = (db.landingPage.updateMany as jest.Mock).mock.calls[0][0].data;
+    expect(writeData.customHtml).toBe("<p>previous</p>");
+    // Audit row must carry op:restore.
+    expect(txRestoreAuditLogCreate).toHaveBeenCalledTimes(1);
+    const auditArg = txRestoreAuditLogCreate.mock.calls[0][0].data;
+    const changes = JSON.parse(auditArg.changes);
+    expect(changes.op).toBe("restore");
+  });
+
+  it("restore with no prior audit row → 404", async () => {
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(resolvedLandingPage("<p>x</p>"));
+    (db.auditLog.findFirst as jest.Mock).mockResolvedValue(null);
+
+    const response = await PUT(
+      buildRestorePutRequest("workshop-1", "SOLO_LANDING", {
+        expectedCustomHtml: "<p>x</p>",
+      }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("entity-binding: auditLog.findFirst is always called with THIS page's entityId (not a foreign id)", async () => {
+    const currentPage = resolvedLandingPage("<p>current</p>");
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(currentPage);
+    // Simulate no matching audit row for this page (the DB returns null because the
+    // query is scoped to entityId="lp-3" and no row exists for it). In the real DB,
+    // a row with entityId="lp-FOREIGN" would never be returned by a query filtered
+    // to entityId="lp-3" — the mock proves the route sends the correct filter.
+    (db.auditLog.findFirst as jest.Mock).mockResolvedValue(null);
+
+    const response = await PUT(
+      buildRestorePutRequest("workshop-1", "SOLO_LANDING", {
+        expectedCustomHtml: "<p>current</p>",
+      }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    // Route must have queried with THIS page's entityId.
+    const findFirstArg = (db.auditLog.findFirst as jest.Mock).mock.calls[0][0];
+    expect(findFirstArg.where.entityId).toBe("lp-3");
+    expect(findFirstArg.where.action).toBe("UPDATE_CUSTOM_HTML");
+    // No prior row → 404 (no write happened).
+    expect(response.status).toBe(404);
+    expect((db.landingPage.updateMany as jest.Mock)).not.toHaveBeenCalled();
+  });
+
+  it("coach PUT ?action=restore-html → 403", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(resolvedLandingPage("<p>x</p>"));
+
+    const response = await PUT(
+      buildRestorePutRequest("workshop-1", "SOLO_LANDING", {
+        expectedCustomHtml: "<p>x</p>",
+      }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("flag OFF + restore → 404", async () => {
+    delete process.env[FLAG];
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(resolvedLandingPage("<p>x</p>"));
+
+    const response = await PUT(
+      buildRestorePutRequest("workshop-1", "SOLO_LANDING", {
+        expectedCustomHtml: "<p>x</p>",
+      }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect([404]).toContain(response.status);
+    process.env[FLAG] = "1";
+  });
+
+  it("restore re-sanitizes prior body (XSS in audit changes.previousCustomHtml is stripped)", async () => {
+    const currentPage = resolvedLandingPage("<p>current</p>");
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce(currentPage)
+      .mockResolvedValueOnce({ ...currentPage, customHtml: "<p>clean</p>" });
+    (db.auditLog.findFirst as jest.Mock).mockResolvedValue({
+      id: "audit-1",
+      entityType: "LandingPage",
+      entityId: "lp-3",
+      action: "UPDATE_CUSTOM_HTML",
+      // Tampered audit row: previousCustomHtml contains XSS.
+      changes: JSON.stringify({
+        op: "save",
+        previousCustomHtml: '<p>clean</p><script>evil()</script>',
+      }),
+    });
+    (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+    txRestoreAuditLogCreate.mockResolvedValue({ id: "audit-restore-1" });
+
+    const response = await PUT(
+      buildRestorePutRequest("workshop-1", "SOLO_LANDING", {
+        expectedCustomHtml: "<p>current</p>",
+      }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(200);
+    // The stored value must be sanitized — no <script> despite being in the audit log.
+    const writeData = (db.landingPage.updateMany as jest.Mock).mock.calls[0][0].data;
+    expect(writeData.customHtml).not.toMatch(/<script/i);
+  });
+
+  it("CAS mismatch on restore → 409", async () => {
+    const currentPage = resolvedLandingPage("<p>actual-current</p>");
+    (db.landingPage.findUnique as jest.Mock).mockResolvedValue(currentPage);
+    (db.auditLog.findFirst as jest.Mock).mockResolvedValue({
+      id: "audit-1",
+      entityType: "LandingPage",
+      entityId: "lp-3",
+      action: "UPDATE_CUSTOM_HTML",
+      changes: JSON.stringify({ op: "save", previousCustomHtml: "<p>previous</p>" }),
+    });
+    // Simulate that stored value already changed (CAS mismatch → count 0).
+    (db.landingPage.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+    const response = await PUT(
+      buildRestorePutRequest("workshop-1", "SOLO_LANDING", {
+        expectedCustomHtml: "<p>WRONG</p>",
+      }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(response.status).toBe(409);
+  });
+
+  it("save→restore→restore chain: each restore reverts to the previous prior body", async () => {
+    // Simulate audit log state at the time of each restore call.
+    // State: A (original) → saved B → saved C → restore1 reverts to B → restore2 reverts to C.
+
+    // --- Restore 1: C → B ---
+    const pageAtC = resolvedLandingPage("<p>C</p>");
+    // Page at B (what we revert to).
+    const pageAtB = resolvedLandingPage("<p>B</p>");
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce(pageAtC)    // restore1 pre-load
+      .mockResolvedValueOnce(pageAtB);   // restore1 post-tx re-read
+    // The LATEST audit row scoped to this page shows prev=B (save B→C snapshotted prevB).
+    (db.auditLog.findFirst as jest.Mock).mockResolvedValueOnce({
+      id: "audit-saveC",
+      entityType: "LandingPage",
+      entityId: "lp-3",
+      action: "UPDATE_CUSTOM_HTML",
+      changes: JSON.stringify({ op: "save", previousCustomHtml: "<p>B</p>" }),
+    });
+    (db.landingPage.updateMany as jest.Mock).mockResolvedValueOnce({ count: 1 });
+    txRestoreAuditLogCreate.mockResolvedValueOnce({ id: "audit-restore1" });
+
+    const restore1 = await PUT(
+      buildRestorePutRequest("workshop-1", "SOLO_LANDING", {
+        expectedCustomHtml: "<p>C</p>",
+      }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(restore1.status).toBe(200);
+    const r1WriteData = (db.landingPage.updateMany as jest.Mock).mock.calls[0][0].data;
+    expect(r1WriteData.customHtml).toBe("<p>B</p>");
+    const r1AuditChanges = JSON.parse(txRestoreAuditLogCreate.mock.calls[0][0].data.changes);
+    expect(r1AuditChanges.op).toBe("restore");
+    // previousCustomHtml in the restore1 audit row must be C (the value that was replaced).
+    expect(r1AuditChanges.previousCustomHtml).toBe("<p>C</p>");
+
+    // --- Restore 2: B → C (redo) ---
+    jest.clearAllMocks();
+    wireRestoreTransaction();
+
+    // After restore1, page is now B. The LATEST audit row is the restore1 audit row
+    // (action: UPDATE_CUSTOM_HTML, op: restore) which snapshotted prev=C.
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce(pageAtB)    // restore2 pre-load
+      .mockResolvedValueOnce(pageAtC);   // restore2 post-tx re-read
+    (db.auditLog.findFirst as jest.Mock).mockResolvedValueOnce({
+      id: "audit-restore1",
+      entityType: "LandingPage",
+      entityId: "lp-3",
+      action: "UPDATE_CUSTOM_HTML",
+      changes: JSON.stringify({ op: "restore", previousCustomHtml: "<p>C</p>" }),
+    });
+    (db.landingPage.updateMany as jest.Mock).mockResolvedValueOnce({ count: 1 });
+    txRestoreAuditLogCreate.mockResolvedValueOnce({ id: "audit-restore2" });
+
+    const restore2 = await PUT(
+      buildRestorePutRequest("workshop-1", "SOLO_LANDING", {
+        expectedCustomHtml: "<p>B</p>",
+      }),
+      routeParams("workshop-1", "SOLO_LANDING")
+    );
+
+    expect(restore2.status).toBe(200);
+    const r2WriteData = (db.landingPage.updateMany as jest.Mock).mock.calls[0][0].data;
+    expect(r2WriteData.customHtml).toBe("<p>C</p>");
+    const r2AuditChanges = JSON.parse(txRestoreAuditLogCreate.mock.calls[0][0].data.changes);
+    expect(r2AuditChanges.op).toBe("restore");
   });
 });
