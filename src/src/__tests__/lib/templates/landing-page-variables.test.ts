@@ -45,7 +45,6 @@ describe("buildEnrichedLandingPageVariables", () => {
 
   describe("when a REGISTRATION LandingPage exists", () => {
     beforeEach(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (mockDb.landingPage.findUnique as jest.Mock).mockResolvedValue({
         slug: "ws-2026-ab12-registration",
       });
@@ -62,7 +61,7 @@ describe("buildEnrichedLandingPageVariables", () => {
       process.env.APP_URL = "https://example.com";
       const result = await buildEnrichedLandingPageVariables(WORKSHOP_ID);
 
-      expect(result.registration_url).toBe(
+      expect(result!.registration_url).toBe(
         "https://example.com/workshop/ws-2026-ab12-registration"
       );
     });
@@ -71,7 +70,7 @@ describe("buildEnrichedLandingPageVariables", () => {
       process.env.APP_URL = "https://example.com";
       const result = await buildEnrichedLandingPageVariables(WORKSHOP_ID);
 
-      expect(result.registrationUrl).toBe(
+      expect(result!.registrationUrl).toBe(
         "https://example.com/workshop/ws-2026-ab12-registration"
       );
     });
@@ -93,13 +92,12 @@ describe("buildEnrichedLandingPageVariables", () => {
 
     it("uses a trailing-free APP_URL — no double-slash in URL", async () => {
       process.env.APP_URL = "https://example.com/";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (mockDb.landingPage.findUnique as jest.Mock).mockResolvedValue({
         slug: "some-slug",
       });
       const result = await buildEnrichedLandingPageVariables(WORKSHOP_ID);
       // Should match exactly what auto-build-service produces — template literal, no trim
-      expect(result.registration_url).toBe(
+      expect(result!.registration_url).toBe(
         "https://example.com//workshop/some-slug"
       );
     });
@@ -107,7 +105,6 @@ describe("buildEnrichedLandingPageVariables", () => {
 
   describe("when NO REGISTRATION LandingPage exists", () => {
     beforeEach(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (mockDb.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
     });
 
@@ -115,14 +112,14 @@ describe("buildEnrichedLandingPageVariables", () => {
       process.env.APP_URL = "https://example.com";
       const result = await buildEnrichedLandingPageVariables(WORKSHOP_ID);
 
-      expect(result.registration_url).toBe("");
+      expect(result!.registration_url).toBe("");
     });
 
     it("returns registrationUrl camelCase alias as empty string", async () => {
       process.env.APP_URL = "https://example.com";
       const result = await buildEnrichedLandingPageVariables(WORKSHOP_ID);
 
-      expect(result.registrationUrl).toBe("");
+      expect(result!.registrationUrl).toBe("");
     });
 
     it("still returns all base variables from buildWorkshopVariables", async () => {
@@ -136,7 +133,6 @@ describe("buildEnrichedLandingPageVariables", () => {
   describe("when buildWorkshopVariables returns null (workshop not found)", () => {
     beforeEach(() => {
       mockBuildWorkshopVariables.mockResolvedValue(null);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (mockDb.landingPage.findUnique as jest.Mock).mockResolvedValue(null);
     });
 
