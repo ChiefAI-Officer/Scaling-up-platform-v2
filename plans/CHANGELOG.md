@@ -6,6 +6,28 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-06-12 — Assessment invitation emails: merge-field fix + branded HTML (Spec 17 Wave A) <!-- ENTRY_ISO:2026-06-12 ENTRY_SLUG:assessment-invite-email-branding-merge-fix -->
+
+**PR #57** (squash `5ba0800`, prod). **Spec 17 — Wave A** (the first wave of the 33-item Jeff June 9 feedback punch-list; spec `docs/specs/v7.6/17-jeff-june9-feedback-punchlist.md`, plan `17a`). Closes feedback **#4** (merge fields rendering literally) + **#5** (high-end HTML invitation emails). Additive only — **no migration**.
+
+**The bug (#4) was bigger than reported.** The invitation `substitute()` only resolved 6 tokens; the 7 seeded templates actually use `{{organizationName}}`, `{{templateName}}`, `{{respondentFirstName}}`/`{{firstName}}`, `{{invitationUrl}}`/`{{assessmentUrl}}` — so **4 tokens rendered literally**, and `{{assessmentUrl}}` is the **CTA link** on Five Dysfunctions & Quick (their "start" links were broken text).
+
+**New `src/src/lib/assessments/invitation-email.ts`** (pure, unit-tested; mirrors `report-email.ts`):
+- `buildTokenValues` + `interpolateTokens` — full alias set in both `{{camelCase}}` and `{{snake_case}}`, neutral fallbacks for empty known tokens ("your organization"/"your coach"/"there"/"ongoing"), unknown tokens stripped.
+- Typed render paths: `renderSubject` (allowlist EXCLUDING url/email/token-bearing values + `stripControlChars` + assert no `#t=`/URL leak), `renderTextBody` (plain-text twin), `renderHtmlBody` (escape-first; safe inline markdown — links + bold — with a link URL policy rejecting `javascript:`/`data:`/protocol-relative; `dropRedundantCta`).
+- `buildInvitationEmailHtml` — branded inline-styled, table-based, Outlook/Gmail-safe shell: Four-Decisions stripe → `#522583` purple hero with the **white SU logo** (inline **CID** PNG, base64-embedded → serverless-safe) → body → purple "Start the assessment" CTA (replaces the bare blue `#1D4ED8` button) → footer. `resolveCoachName` = `createdByCoachId` coach ?? `organization.owner`.
+- `src/src/lib/assets/invitation-logo.ts` — base64-embedded white PNG (generated from `su-logo-white.svg`) + preflight test.
+
+**`smtp-transport`**: added optional `text` (multipart/alternative — plain-text twin) + `cid` on `SmtpAttachment`; both passed to nodemailer. Additive — existing callers unaffected.
+
+**`sendAssessmentInvitationEmail`** delegates to the new module; attaches the logo CID; passes `html`+`text`. **Env kill-switch `ASSESSMENT_INVITE_BRANDED=0`** reverts to a preserved legacy renderer.
+
+**The 3 routes** (invite/reminders/resend): load `organization.name` + owner/creator coach + `template.name` and forward them; **resend now honors per-campaign `invitationSubject`/`invitationBodyMarkdown` overrides** (it ignored them); reminders + resend **rotate the invitation token only AFTER a successful send** (previously rotated before → a failed send killed the recipient's existing link with no replacement) + a reminder **batch cap**.
+
+**Process**: built subagent-driven (TDD per task group, spec + code-quality reviewers between groups). Hardened via **grill-with-docs + grill-me**, then a **claudex Codex adversarial loop** (senior-eng + ops/SRE) plus a **dedicated synchronous security pass** (the loop's security round was lost to a runner desync). Review caught + fixed: a **coach clone-route authz bypass** (`POST /api/landing-pages/library` copied `customHtml` — HIGH), a **subject-line token-credential leak** (HIGH), **markdown-injection-via-PII** (neutralize markdown delimiters in data values), the shell `href` escape, and a double-escape in body link hrefs. 67+ targeted tests green; ESLint clean; `CI=true npx next build --turbopack` passes.
+
+**Wave B** (per-workshop landing-page HTML editor — the "on workshops" email ask) is designed + grilled + Codex-reviewed and **gated** with its plan `17b` (zero-migration after grill); **not yet built**. Waves C–F catalogued + gated in Spec 17. The clone-route bypass's full fix lands in Wave B.
+
 ### 2026-06-11 — Quick Assessment: polished results report + report emails + per-coach links <!-- ENTRY_ISO:2026-06-11 ENTRY_SLUG:quick-assessment-report-emails-coach-links -->
 
 **PRs #53 + #54** (Spec [`16`](docs/specs/v7.6/16-quick-assessment-report-emails-and-coach-links.md)). Triggered by the user live-testing the now-launched public Quick Assessment and finding three gaps: the results page was the bare un-styled `BrandedReport`, a bare public link had no coach attribution, and nobody received a copy. Decided via brainstorm + an approved `/frontend-design` mockup; built with a **Workflow** (report-rendering phase → distribution/attribution phase → 3-lens adversarial review) then a fix pass. Additive only — **no migration**.
