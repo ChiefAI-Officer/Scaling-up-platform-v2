@@ -9,6 +9,13 @@ import { db } from "@/lib/db";
 import { generateIcsContent, buildLocationString } from "@/lib/ics-generator";
 import { formatEventDateUTC, formatTimeWithZone } from "@/lib/utils";
 import { composeRegistrationConfirmationEmail } from "@/lib/notifications/transactional-email-template";
+import {
+    buildInvitationEmailHtml,
+    renderSubject,
+    renderTextBody,
+    type InvitationVars,
+} from "@/lib/assessments/invitation-email";
+import { SU_LOGO_PNG, SU_LOGO_CID } from "@/lib/assets/invitation-logo";
 
 // ============================================
 // Types
@@ -1085,57 +1092,40 @@ export async function sendAssessmentInvitationEmail(data: {
     respondent: { id: string; firstName: string; lastName: string; email: string };
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
     template: { invitationSubject: string; invitationBodyMarkdown: string };
+    organizationName?: string | null;
+    coachName?: string | null;
+    templateName?: string | null;
     rawToken: string;
     baseUrl: string;
 }): Promise<void> {
     const trimmedBase = data.baseUrl.replace(/\/+$/, "");
     const invitationUrl = `${trimmedBase}/org-survey/${data.campaign.alias}#t=${data.rawToken}`;
-    const closeAtFormatted = data.campaign.closeAt
-        ? data.campaign.closeAt.toLocaleDateString("en-US", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-              timeZone: "UTC",
-          })
-        : "ongoing";
-    const fullName = `${data.respondent.firstName} ${data.respondent.lastName}`.trim();
 
-    const substitute = (input: string): string =>
-        input
-            .replace(/\{\{respondentFirstName\}\}/g, data.respondent.firstName)
-            .replace(/\{\{respondentLastName\}\}/g, data.respondent.lastName)
-            .replace(/\{\{respondentFullName\}\}/g, fullName)
-            .replace(/\{\{campaignName\}\}/g, data.campaign.name)
-            .replace(/\{\{invitationUrl\}\}/g, invitationUrl)
-            .replace(/\{\{closeAt\}\}/g, closeAtFormatted);
+    // Kill-switch: ASSESSMENT_INVITE_BRANDED=0 reverts to the legacy plain renderer.
+    const branded = process.env.ASSESSMENT_INVITE_BRANDED !== "0";
 
-    const subject = substitute(data.template.invitationSubject);
-    const bodyText = substitute(data.template.invitationBodyMarkdown);
-    // Minimal Markdown → HTML: paragraph breaks on blank lines, escape HTML
-    // first. Heavy Markdown rendering is intentionally out of scope.
-    const escaped = escapeHtml(bodyText);
-    const paragraphs = escaped
-        .split(/\n\s*\n/)
-        .map((p) => `<p style="margin:0 0 12px;color:#374151;">${p.replace(/\n/g, "<br/>")}</p>`)
-        .join("");
-    const html = `
-    <div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">
-      ${paragraphs}
-      <br/>
-      <div style="text-align:center;">
-        <a href="${invitationUrl}"
-           style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">
-          Start the assessment
-        </a>
-      </div>
-      <p style="color:#9ca3af;font-size:13px;margin-top:24px;">
-        If the button doesn't work, paste this link into your browser:<br/>
-        <span style="word-break:break-all;color:#6b7280;">${invitationUrl}</span>
-      </p>
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
-      <p style="color:#9ca3af;font-size:12px;">&mdash; Scaling Up Platform</p>
-    </div>
-    `;
+    if (!branded) {
+        await sendLegacyInvitationEmail({ ...data, invitationUrl });
+        return;
+    }
+
+    const vars: InvitationVars = {
+        respondent: {
+            firstName: data.respondent.firstName,
+            lastName: data.respondent.lastName,
+            email: data.respondent.email,
+        },
+        organizationName: data.organizationName ?? null,
+        campaignName: data.campaign.name,
+        templateName: data.templateName ?? null,
+        coachName: data.coachName ?? null,
+        invitationUrl,
+        closeAt: data.campaign.closeAt,
+    };
+
+    const subject = renderSubject(data.template.invitationSubject, vars);
+    const html = buildInvitationEmailHtml({ bodyMarkdown: data.template.invitationBodyMarkdown, vars });
+    const text = renderTextBody(data.template.invitationBodyMarkdown, vars);
 
     // STRICT: failures propagate. The invite route catches and marks the
     // invitation row as send-failed instead of optimistically flipping SENT.
@@ -1143,10 +1133,58 @@ export async function sendAssessmentInvitationEmail(data: {
         to: data.respondent.email,
         subject,
         html,
+        text,
+        attachments: [
+            { filename: "su-logo.png", content: SU_LOGO_PNG, contentType: "image/png", cid: SU_LOGO_CID },
+        ],
         telemetry: {
             recipientRole: "CUSTOM",
             metadata: {
                 type: "assessment_invitation",
+                campaignId: data.campaign.id,
+                invitationId: data.invitation.id,
+                respondentId: data.respondent.id,
+            },
+        },
+    });
+}
+
+/** Legacy plain invitation renderer — retained as the ASSESSMENT_INVITE_BRANDED=0 off-switch. */
+async function sendLegacyInvitationEmail(data: {
+    invitation: { id: string; expiresAt: Date };
+    respondent: { id: string; firstName: string; lastName: string; email: string };
+    campaign: { id: string; name: string; alias: string; closeAt: Date | null };
+    template: { invitationSubject: string; invitationBodyMarkdown: string };
+    invitationUrl: string;
+}): Promise<void> {
+    const closeAtFormatted = data.campaign.closeAt
+        ? data.campaign.closeAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })
+        : "ongoing";
+    const fullName = `${data.respondent.firstName} ${data.respondent.lastName}`.trim();
+    const substitute = (input: string): string =>
+        input
+            .replace(/\{\{respondentFirstName\}\}/g, data.respondent.firstName)
+            .replace(/\{\{respondentLastName\}\}/g, data.respondent.lastName)
+            .replace(/\{\{respondentFullName\}\}/g, fullName)
+            .replace(/\{\{campaignName\}\}/g, data.campaign.name)
+            .replace(/\{\{invitationUrl\}\}/g, data.invitationUrl)
+            .replace(/\{\{closeAt\}\}/g, closeAtFormatted);
+    const subject = substitute(data.template.invitationSubject);
+    const bodyText = substitute(data.template.invitationBodyMarkdown);
+    const escaped = escapeHtml(bodyText);
+    const paragraphs = escaped
+        .split(/\n\s*\n/)
+        .map((p) => `<p style="margin:0 0 12px;color:#374151;">${p.replace(/\n/g, "<br/>")}</p>`)
+        .join("");
+    const html = `<div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">${paragraphs}<br/><div style="text-align:center;"><a href="${data.invitationUrl}" style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">Start the assessment</a></div></div>`;
+    await sendEmailViaSMTP({
+        to: data.respondent.email,
+        subject,
+        html,
+        telemetry: {
+            recipientRole: "CUSTOM",
+            metadata: {
+                type: "assessment_invitation_legacy",
                 campaignId: data.campaign.id,
                 invitationId: data.invitation.id,
                 respondentId: data.respondent.id,

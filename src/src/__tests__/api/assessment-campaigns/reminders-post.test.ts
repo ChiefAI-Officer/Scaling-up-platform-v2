@@ -67,10 +67,18 @@ const baseCampaign = {
   alias: "demo",
   name: "Demo",
   closeAt: null as Date | null,
+  invitationSubject: null as string | null,
+  invitationBodyMarkdown: null as string | null,
   template: {
+    name: "Five Dysfunctions",
     invitationSubject: "Take the assessment",
     invitationBodyMarkdown: "Hi {{respondentFirstName}}",
   },
+  organization: {
+    name: "Acme Corp",
+    owner: { firstName: "Owner", lastName: "Coach" },
+  },
+  creatorCoach: { firstName: "Pat", lastName: "Coach" },
 };
 
 const ACTIVE_PARTICIPANTS = [
@@ -441,5 +449,79 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     expect(calls[0][0].template.invitationBodyMarkdown).toBe(
       "Hi {{respondentFirstName}}",
     );
+  });
+
+  it("forwards organizationName, coachName, and templateName to the email", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(200);
+    const calls = (sendAssessmentInvitationEmail as jest.Mock).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[0][0]).toEqual(
+      expect.objectContaining({
+        organizationName: "Acme Corp",
+        coachName: "Pat Coach",
+        templateName: "Five Dysfunctions",
+      })
+    );
+  });
+
+  it("does NOT rotate the token when the send fails (old link stays valid)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    // Target a single participant and fail its send.
+    (sendAssessmentInvitationEmail as jest.Mock).mockRejectedValue(
+      new Error("smtp down")
+    );
+    const res = await POST(
+      jsonReq({ participantIds: ["r1"] }) as never,
+      detailParams("c1")
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { sent: number; failed: unknown[] };
+    };
+    expect(body.data.sent).toBe(0);
+    expect(body.data.failed).toHaveLength(1);
+    // The token-rotating update must NOT have run for the failed send — the
+    // prior token (and the recipient's existing link) stays valid.
+    expect(db.assessmentInvitation.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tokenHash: expect.anything() }),
+      })
+    );
+  });
+
+  it("caps the batch at MAX_REMINDER_BATCH and reports remaining", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    const COUNT = 205;
+    const many = Array.from({ length: COUNT }, (_, i) => ({
+      respondentId: `r${i}`,
+      respondent: {
+        id: `r${i}`,
+        firstName: "F",
+        lastName: "L",
+        email: `r${i}@example.com`,
+        deletedAt: null,
+      },
+    }));
+    (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation(
+      (args) => {
+        if (args?.include) {
+          return Promise.resolve({ ...baseCampaign, participants: many });
+        }
+        return Promise.resolve(baseCampaign);
+      }
+    );
+    (db.assessmentInvitation.findMany as jest.Mock).mockResolvedValue(
+      many.map((p) => pendingInvitation(p.respondentId))
+    );
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { sent: number; remaining: number };
+    };
+    expect(body.data.sent).toBeLessThanOrEqual(200);
+    expect(body.data.remaining).toBe(COUNT - 200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(200);
   });
 });

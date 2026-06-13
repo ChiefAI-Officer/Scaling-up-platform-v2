@@ -41,9 +41,11 @@ import {
   generateRawToken,
   hashToken,
 } from "@/lib/assessments/invitation-tokens";
+import { resolveCoachName } from "@/lib/assessments/invitation-email";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+const MAX_REMINDER_BATCH = 200; // serverless/SMTP budget guard
 
 const ReminderBodySchema = z.object({
   participantIds: z.array(z.string().min(1)).optional(),
@@ -112,10 +114,18 @@ export async function POST(
       include: {
         template: {
           select: {
+            name: true,
             invitationSubject: true,
             invitationBodyMarkdown: true,
           },
         },
+        organization: {
+          select: {
+            name: true,
+            owner: { select: { firstName: true, lastName: true } },
+          },
+        },
+        creatorCoach: { select: { firstName: true, lastName: true } },
         participants: {
           include: {
             respondent: {
@@ -186,12 +196,13 @@ export async function POST(
           sent: 0,
           skipped: 0,
           failed: 0,
+          remaining: 0,
           note: "no-targets",
         },
       });
       return NextResponse.json({
         success: true,
-        data: { sent: 0, skipped: 0, failed: [] as FailedEntry[] },
+        data: { sent: 0, skipped: 0, failed: [] as FailedEntry[], remaining: 0 },
       });
     }
 
@@ -228,11 +239,23 @@ export async function POST(
 
     const appUrl = process.env.APP_URL ?? "http://localhost:3000";
 
+    const coachName = resolveCoachName(
+      campaign.creatorCoach ?? null,
+      campaign.organization?.owner ?? null
+    );
+    const organizationName = campaign.organization?.name ?? null;
+    const templateName = campaign.template?.name ?? null;
+
+    // Batch cap — keep SMTP latency inside the serverless budget. Targets
+    // beyond the cap are reported via `remaining` so the caller can chunk.
+    const capped = targets.slice(0, MAX_REMINDER_BATCH);
+    const remaining = Math.max(0, targets.length - capped.length);
+
     let sent = 0;
     let skipped = 0;
     const failed: FailedEntry[] = [];
 
-    for (const participant of targets) {
+    for (const participant of capped) {
       const respondent = participant.respondent!;
       const prior = existingByRespondentId.get(participant.respondentId);
 
@@ -260,37 +283,12 @@ export async function POST(
       const rawToken = generateRawToken();
       const tokenHash = hashToken(rawToken);
 
-      let invitationRow: { id: string; expiresAt: Date };
-      try {
-        // Reuse the same row — bump resentCount + lastResentAt, refresh
-        // expiresAt (in case the prior was minted before the campaign
-        // closeAt was set), and rotate the token. Status preserved.
-        invitationRow = await db.assessmentInvitation.update({
-          where: { id: prior.id },
-          data: {
-            tokenHash,
-            expiresAt,
-            resentCount: { increment: 1 },
-            lastResentAt: new Date(),
-          },
-          select: { id: true, expiresAt: true },
-        });
-      } catch (writeErr) {
-        console.error(
-          "[assessment-reminders] failed to update invitation row",
-          { respondentId: participant.respondentId },
-          writeErr
-        );
-        failed.push({
-          participantId: participant.respondentId,
-          reason: "write-failed",
-        });
-        continue;
-      }
-
+      // Reorder: send FIRST with the freshly-minted token, and only persist
+      // the rotated tokenHash AFTER the send resolves. On send failure we
+      // `continue` WITHOUT rotating, so the recipient's prior link stays valid.
       try {
         await sendAssessmentInvitationEmail({
-          invitation: invitationRow,
+          invitation: { id: prior.id, expiresAt },
           respondent: {
             id: respondent.id,
             firstName: respondent.firstName,
@@ -310,24 +308,49 @@ export async function POST(
               campaign.invitationBodyMarkdown ??
               campaign.template.invitationBodyMarkdown,
           },
+          organizationName,
+          coachName,
+          templateName,
           rawToken,
           baseUrl: appUrl,
         });
-        sent += 1;
       } catch (sendErr) {
         console.error(
           "[assessment-reminders] SMTP send failed",
-          {
-            respondentId: participant.respondentId,
-            invitationId: invitationRow.id,
-          },
+          { respondentId: participant.respondentId, invitationId: prior.id },
           sendErr
         );
         failed.push({
           participantId: participant.respondentId,
           reason: "smtp-failed",
         });
+        continue; // prior token NOT rotated — recipient's existing link stays valid
       }
+
+      // Send succeeded — now rotate the token, refresh expiresAt (in case the
+      // prior was minted before closeAt was set), and bump resend counters.
+      try {
+        await db.assessmentInvitation.update({
+          where: { id: prior.id },
+          data: {
+            tokenHash,
+            expiresAt,
+            resentCount: { increment: 1 },
+            lastResentAt: new Date(),
+          },
+          select: { id: true },
+        });
+      } catch (writeErr) {
+        console.error(
+          "[assessment-reminders] post-send token persist failed",
+          { respondentId: participant.respondentId },
+          writeErr
+        );
+        // Email already delivered with the new token; the prior token also
+        // still validates → recipient is not locked out (residual gap documented
+        // in 17a; closing it fully needs a deferred token-version column).
+      }
+      sent += 1;
     }
 
     await logAudit({
@@ -342,13 +365,14 @@ export async function POST(
         skipped,
         failed: failed.length,
         targets: targets.length,
+        remaining,
         requestedIds: requestedIds ?? null,
       },
     });
 
     return NextResponse.json({
       success: true,
-      data: { sent, skipped, failed },
+      data: { sent, skipped, failed, remaining },
     });
   } catch (error) {
     console.error("Error sending reminders:", error);

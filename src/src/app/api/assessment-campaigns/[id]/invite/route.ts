@@ -30,6 +30,7 @@ import {
   generateRawToken,
   hashToken,
 } from "@/lib/assessments/invitation-tokens";
+import { resolveCoachName } from "@/lib/assessments/invitation-email";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -79,10 +80,18 @@ export async function POST(
       include: {
         template: {
           select: {
+            name: true,
             invitationSubject: true,
             invitationBodyMarkdown: true,
           },
         },
+        organization: {
+          select: {
+            name: true,
+            owner: { select: { firstName: true, lastName: true } },
+          },
+        },
+        creatorCoach: { select: { firstName: true, lastName: true } },
         participants: {
           include: {
             respondent: {
@@ -185,6 +194,13 @@ export async function POST(
 
     const appUrl = process.env.APP_URL ?? "http://localhost:3000";
 
+    const coachName = resolveCoachName(
+      campaign.creatorCoach ?? null,
+      campaign.organization?.owner ?? null
+    );
+    const organizationName = campaign.organization?.name ?? null;
+    const templateName = campaign.template?.name ?? null;
+
     for (const participant of targets) {
       const respondent = participant.respondent!;
       const prior = existingByRespondentId.get(participant.respondentId);
@@ -269,6 +285,9 @@ export async function POST(
               campaign.invitationBodyMarkdown ??
               campaign.template.invitationBodyMarkdown,
           },
+          organizationName,
+          coachName,
+          templateName,
           rawToken,
           baseUrl: appUrl,
         });
