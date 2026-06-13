@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { db } from "@/lib/db";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { validateCustomCode } from "@/lib/templates/interpolate-custom-code";
 import { buildWorkshopVariables } from "@/lib/templates/template-interpolation";
 import { interpolateContentForHtml } from "@/lib/templates/interpolate-content-html";
 import { sanitizeCustomHtml } from "@/lib/templates/sanitize-custom-html";
+import { buildEnrichedLandingPageVariables } from "@/lib/templates/landing-page-variables";
+import { RateLimits, checkRateLimitAsync } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const VALID_TEMPLATES = ["BIO_PAGE", "SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] as const;
@@ -12,6 +15,23 @@ type TemplateType = typeof VALID_TEMPLATES[number];
 
 // TEMPLATE-02: eligibility filter — only SOLO_LANDING / DUO_LANDING may carry customHtml.
 const ELIGIBLE_CUSTOM_HTML: readonly TemplateType[] = ["SOLO_LANDING", "DUO_LANDING"] as const;
+
+// Wave B Task 2: matches CUSTOM_HTML_MAX_LENGTH in /api/page-templates/[id].
+// Applied to the inbound string AND the post-interpolation rendered string.
+const CUSTOM_HTML_MAX_LENGTH = 500_000;
+
+// Wave B Task 2: default-off feature flag. When unset/falsy, the per-workshop
+// customHtml write path is fully blocked and the route behaves exactly as before
+// (content / status / customCode unaffected).
+function isCustomHtmlEditorEnabled(): boolean {
+  const v = process.env.WORKSHOP_CUSTOM_HTML_EDITOR_ENABLED;
+  return v === "1" || v === "true" || v === "TRUE" || v === "yes";
+}
+
+// Wave B Task 2: sha256 hex for audit metadata (never logs the HTML itself).
+function sha(s: string): string {
+  return createHash("sha256").update(s, "utf8").digest("hex");
+}
 
 interface RouteParams {
   params: Promise<{ id: string; template: string }>;
@@ -29,9 +49,13 @@ const updateLandingPageBodySchema = z.object({
   // Coach role attempts get 403. parse5 validation runs server-side via
   // validateCustomCode (CHG-03). Pass null to clear.
   customCode: z.string().nullable().optional(),
-  // Fix-1: customHtml is intentionally NOT accepted from this route's body.
-  // The route is coach-accessible (canManageCoachData), so admin-blessed HTML
-  // would be reachable by every coach. Edits live on /api/page-templates/[id].
+  // Wave B Task 2: admin-only per-workshop raw HTML override. Default-off flag,
+  // mode-exclusive (cannot coexist with content/status/customCode), value-compare
+  // CAS via expectedCustomHtml, sanitized + interpolated on write. null clears.
+  customHtml: z.string().max(CUSTOM_HTML_MAX_LENGTH).nullable().optional(),
+  // Value-compare CAS sentinel (R2-MED-2). Required (even if null) on updates to
+  // an existing row; absent on first-save create.
+  expectedCustomHtml: z.string().nullable().optional(),
 });
 
 function normalizeTemplate(template: string): TemplateType | null {
@@ -144,7 +168,21 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const bodyValidation = updateLandingPageBodySchema.safeParse(await request.json());
+    // Parse raw JSON first so we can detect explicit key PRESENCE (Zod .optional()
+    // collapses "absent" and "present: undefined"). The CAS gate below distinguishes
+    // a missing expectedCustomHtml field from an explicit null.
+    let rawBody: Record<string, unknown>;
+    try {
+      const parsed = await request.json();
+      rawBody = (parsed && typeof parsed === "object" ? parsed : {}) as Record<string, unknown>;
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+
+    const bodyValidation = updateLandingPageBodySchema.safeParse(rawBody);
     if (!bodyValidation.success) {
       console.error("[landing-page PUT] body validation failed:", bodyValidation.error.issues);
       return NextResponse.json(
@@ -153,7 +191,61 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    const { content, status, customCode } = bodyValidation.data;
+    const { content, status, customCode, customHtml, expectedCustomHtml } = bodyValidation.data;
+    const hasExpectedCustomHtmlField = "expectedCustomHtml" in rawBody;
+
+    // -----------------------------------------------------------------------
+    // Wave B Task 2: per-workshop customHtml write path.
+    // All gating below is skipped entirely when no customHtml key was sent —
+    // existing content / status / customCode flows are unchanged.
+    // -----------------------------------------------------------------------
+    if (customHtml !== undefined) {
+      // Flag gate (R3-HIGH-1): default-off. Block the entire customHtml path.
+      if (!isCustomHtmlEditorEnabled()) {
+        return NextResponse.json(
+          { success: false, error: "Not found" },
+          { status: 404 }
+        );
+      }
+
+      // Admin/staff only (mirror customCode). Coach attempts — including crafted
+      // bodies — are rejected before any DB work.
+      if (!isPrivilegedRole(actor.role)) {
+        return NextResponse.json(
+          { success: false, error: "Forbidden — admin/staff only" },
+          { status: 403 }
+        );
+      }
+
+      // Mode-exclusive (R2-MED-1): a customHtml save must not also carry
+      // content / status / customCode.
+      if (content !== undefined || status !== undefined || customCode !== undefined) {
+        return NextResponse.json(
+          { success: false, error: "customHtml save must be exclusive" },
+          { status: 400 }
+        );
+      }
+
+      // Eligibility: only SOLO_LANDING / DUO_LANDING may carry non-null customHtml.
+      if (customHtml !== null && !ELIGIBLE_CUSTOM_HTML.includes(normalizedTemplate)) {
+        return NextResponse.json(
+          { success: false, error: "customHtml is only allowed on SOLO_LANDING / DUO_LANDING" },
+          { status: 400 }
+        );
+      }
+
+      // Per-actor (and per-workshop) rate limit to bound audit-row growth.
+      const rl = await checkRateLimitAsync(
+        `customhtml:${actor.email}:${id}`,
+        RateLimits.standard
+      );
+      if (!rl.success) {
+        return NextResponse.json(
+          { success: false, error: "Too many requests" },
+          { status: 429 }
+        );
+      }
+    }
 
     // ENH-MAY6-5: customCode editing is admin/staff only. Coach attempts
     // (including via crafted PUT bodies) are rejected. validateCustomCode is
@@ -201,6 +293,185 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
         },
       },
     });
+
+    // -----------------------------------------------------------------------
+    // Wave B Task 2: dedicated customHtml write path (mode-exclusive — runs only
+    // when no content/status/customCode were sent). Returns early; the legacy
+    // block below is untouched for non-customHtml requests.
+    // -----------------------------------------------------------------------
+    if (customHtml !== undefined) {
+      // CAS-required gate (R2-MED-2): an update to an existing row MUST carry an
+      // explicit expectedCustomHtml field (null permitted) so two editors cannot
+      // silently clobber each other. Not required on first-save create.
+      if (existing && !hasExpectedCustomHtmlField) {
+        return NextResponse.json(
+          { success: false, error: "expectedCustomHtml is required to update an existing override" },
+          { status: 400 }
+        );
+      }
+
+      // Sanitize-on-write, two-stage (mirror auto-build): interpolate tokens with
+      // the enriched variable map, then strict-sanitize (no token URIs allowed).
+      const vars = await buildEnrichedLandingPageVariables(id);
+      const interpolated =
+        customHtml === null
+          ? null
+          : vars
+            ? interpolateContentForHtml(customHtml, vars)
+            : customHtml;
+      const { sanitized: safe, didStripContent: didStrip } =
+        interpolated === null
+          ? { sanitized: null as string | null, didStripContent: false }
+          : sanitizeCustomHtml(interpolated, { allowTokenUris: false });
+      const safeOrNull: string | null = customHtml === null ? null : safe;
+
+      // Post-interpolation length cap (R2-MED-3): the rendered string may exceed
+      // the inbound cap once tokens expand.
+      if (safeOrNull && safeOrNull.length > CUSTOM_HTML_MAX_LENGTH) {
+        return NextResponse.json(
+          { success: false, error: "rendered HTML exceeds size limit" },
+          { status: 400 }
+        );
+      }
+
+      if (existing) {
+        // Column-scoped value-compare CAS update + prior-body audit in ONE tx.
+        const expected = expectedCustomHtml ?? null;
+        const saved = await db.$transaction(async (tx) => {
+          const res = await tx.landingPage.updateMany({
+            where: { id: existing.id, customHtml: expected },
+            data: {
+              updatedAt: new Date(),
+              customHtml: safeOrNull,
+            },
+          });
+          if (res.count === 0) {
+            // Stored value moved since the editor loaded it (or wrong expected).
+            return null;
+          }
+          await tx.auditLog.create({
+            data: {
+              entityType: "LandingPage",
+              entityId: existing.id,
+              action: "UPDATE_CUSTOM_HTML",
+              performedBy: actor.email,
+              changes: JSON.stringify({
+                op: "save",
+                template: normalizedTemplate,
+                previousCustomHtml: existing.customHtml ?? null,
+                prevSha: sha(existing.customHtml ?? ""),
+                newSha: sha(safeOrNull ?? ""),
+                newCustomHtmlLength: (safeOrNull ?? "").length,
+                actorRole: actor.role,
+                sanitizerStripped: didStrip,
+              }),
+            },
+          });
+          return tx.landingPage.findUnique({ where: { id: existing.id } });
+        });
+
+        if (!saved) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "This page changed since you opened it — reload and re-apply.",
+            },
+            { status: 409 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: saved,
+          customHtml: saved.customHtml ?? null,
+        });
+      }
+
+      // No existing row → first save. Synthesize valid content from the active
+      // PageTemplate (NEVER JSON.stringify(undefined)). No CAS on create; a
+      // concurrent insert surfaces as Prisma P2002 → 409.
+      const slug = generateSlug(id, normalizedTemplate, workshop.title);
+      const candidateTemplates = await db.pageTemplate.findMany({
+        where: {
+          templateType: normalizedTemplate,
+          isActive: true,
+          OR: [{ categoryId: workshop.categoryId }, { categoryId: null }],
+        },
+        select: { content: true, customCode: true, categoryId: true },
+      });
+      const chosen =
+        candidateTemplates.find((t) => t.categoryId !== null) ?? candidateTemplates[0] ?? null;
+
+      // Synthesize content: prefer the template's JSON content, else an empty
+      // object string. Guard against a malformed template content value.
+      let synthesizedContent = "{}";
+      if (chosen?.content && typeof chosen.content === "string") {
+        try {
+          JSON.parse(chosen.content);
+          synthesizedContent = chosen.content;
+        } catch {
+          synthesizedContent = "{}";
+        }
+      }
+
+      try {
+        const created = await db.$transaction(async (tx) => {
+          const row = await tx.landingPage.create({
+            data: {
+              workshopId: id,
+              template: normalizedTemplate,
+              slug,
+              content: synthesizedContent,
+              status: "DRAFT",
+              publishedAt: null,
+              customCode: chosen?.customCode ?? null,
+              customHtml: safeOrNull,
+            },
+          });
+          await tx.auditLog.create({
+            data: {
+              entityType: "LandingPage",
+              entityId: row.id,
+              action: "UPDATE_CUSTOM_HTML",
+              performedBy: actor.email,
+              changes: JSON.stringify({
+                op: "save",
+                template: normalizedTemplate,
+                previousCustomHtml: null,
+                prevSha: sha(""),
+                newSha: sha(safeOrNull ?? ""),
+                newCustomHtmlLength: (safeOrNull ?? "").length,
+                actorRole: actor.role,
+                sanitizerStripped: didStrip,
+              }),
+            },
+          });
+          return row;
+        });
+
+        return NextResponse.json({
+          success: true,
+          data: created,
+          customHtml: created.customHtml ?? null,
+        });
+      } catch (err) {
+        if (
+          err &&
+          typeof err === "object" &&
+          "code" in err &&
+          (err as { code?: string }).code === "P2002"
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "This page changed since you opened it — reload and re-apply.",
+            },
+            { status: 409 }
+          );
+        }
+        throw err;
+      }
+    }
 
     let landingPage;
 
