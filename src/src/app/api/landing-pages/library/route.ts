@@ -8,8 +8,8 @@ import { z } from "zod";
 const TEMPLATE_OPTIONS = ["SOLO_LANDING", "DUO_LANDING", "REGISTRATION", "THANK_YOU"] as const;
 type TemplateType = (typeof TEMPLATE_OPTIONS)[number];
 
-// TEMPLATE-02: eligibility filter — only SOLO_LANDING / DUO_LANDING may carry customHtml.
-const ELIGIBLE_CUSTOM_HTML: readonly TemplateType[] = ["SOLO_LANDING", "DUO_LANDING"] as const;
+// R1-HIGH-2 + R2-HIGH-1: ELIGIBLE_CUSTOM_HTML removed — the clone route is not a
+// customHtml writer. customHtml is never copied from source to target in any branch.
 
 const landingPageLibraryQuerySchema = z.object({
   template: z.string().trim().optional(),
@@ -268,11 +268,11 @@ export async function POST(request: NextRequest) {
             // pages keep their iDev pixel. Coach-accessible routes never
             // accept customCode from request bodies.
             customCode: sourcePage.customCode ?? null,
-            // TEMPLATE-02: eligibility filter — clone customHtml only into
-            // SOLO_LANDING / DUO_LANDING destinations.
-            customHtml: ELIGIBLE_CUSTOM_HTML.includes(targetTemplateRaw)
-              ? sourcePage.customHtml ?? null
-              : null,
+            // R1-HIGH-2 + R2-HIGH-1: the clone route is NOT a customHtml writer.
+            // Wave B stores customHtml as a RESOLVED snapshot (workshop values baked
+            // in), so copying the source body would leak the source workshop's coach
+            // name / registration URL onto the target (R1-HIGH-2).
+            // Prisma defaults the column to null — no explicit assignment needed.
           },
         });
 
