@@ -9,7 +9,7 @@
  * surrounding editor's "Save Draft" / "Save & Publish" buttons.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
@@ -26,6 +26,12 @@ export interface CustomHtmlPanelProps {
    * Empty string means no active template / nothing to resolve.
    */
   resolvedHtml: string;
+  /**
+   * Optional callback fired whenever the live textarea value changes (including
+   * on mount and after programmatic Restore/Refresh). The parent editor uses
+   * this to mirror the live HTML into the Live Preview pane.
+   */
+  onValueChange?: (value: string) => void;
 }
 
 export function CustomHtmlPanel({
@@ -34,6 +40,7 @@ export function CustomHtmlPanel({
   pageStatus,
   initialCustomHtml,
   resolvedHtml,
+  onValueChange,
 }: CustomHtmlPanelProps) {
   // Q5b: non-empty stored value → else resolvedHtml → else ""
   const initialValue =
@@ -42,6 +49,12 @@ export function CustomHtmlPanel({
       : resolvedHtml;
 
   const [htmlValue, setHtmlValue] = useState<string>(initialValue);
+
+  // Report live value to parent (for Live Preview) — fires on mount + every change.
+  useEffect(() => {
+    onValueChange?.(htmlValue);
+  }, [htmlValue, onValueChange]);
+
   // CAS anchor: what was last loaded from the server
   const [loadedHtml, setLoadedHtml] = useState<string | null>(
     initialCustomHtml ?? null

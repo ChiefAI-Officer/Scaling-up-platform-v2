@@ -142,6 +142,8 @@ export default function DuoLandingEditor() {
   const [pageCustomHtml, setPageCustomHtml] = useState<string | null>(null);
   const [pageStatus, setPageStatus] = useState<string | null>(null);
   const [resolvedHtml, setResolvedHtml] = useState<string>("");
+  // Mirrors the live CustomHtmlPanel textarea value for the Live Preview pane.
+  const [livePreviewHtml, setLivePreviewHtml] = useState<string>("");
 
   useEffect(() => {
     async function loadData() {
@@ -223,7 +225,10 @@ export default function DuoLandingEditor() {
         // CustomHtmlPanel wiring — fail-closed: only activate when marker is true
         if (pageData.customHtmlEditor === true) {
           setCustomHtmlEditor(true);
-          setPageCustomHtml(pageData.data?.customHtml ?? null);
+          const storedHtml = pageData.data?.customHtml ?? null;
+          setPageCustomHtml(storedHtml);
+          // Seed Live Preview with the saved override so it reflects on first load.
+          setLivePreviewHtml(storedHtml ?? "");
           setPageStatus(pageData.data?.status ?? null);
           // Pre-fetch resolved HTML for the "Refresh" fallback (Q5b)
           try {
@@ -568,6 +573,7 @@ export default function DuoLandingEditor() {
               pageStatus={pageStatus}
               initialCustomHtml={pageCustomHtml}
               resolvedHtml={resolvedHtml}
+              onValueChange={setLivePreviewHtml}
             />
           )}
         </div>
@@ -579,13 +585,27 @@ export default function DuoLandingEditor() {
               <CardTitle className="text-sm font-medium">Live Preview</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
-                <DuoLandingPageTemplate
-                  content={formData}
-                  workshop={SAMPLE_WORKSHOP_DUO}
-                  isPreview={true}
-                />
-              </div>
+              {customHtmlEditor && livePreviewHtml.trim() !== "" ? (
+                <div>
+                  <p className="px-3 py-1.5 text-xs text-muted-foreground border-b bg-muted/50">
+                    Preview shows your raw HTML. On the live page, tokens (e.g. {"{{"}<span>{"registration_url"}</span>{"}}"}) resolve and disallowed tags/scripts are stripped.
+                  </p>
+                  <iframe
+                    title="Custom HTML preview"
+                    srcDoc={livePreviewHtml}
+                    sandbox=""
+                    className="w-full h-[calc(100vh-240px)] border-0 bg-white"
+                  />
+                </div>
+              ) : (
+                <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
+                  <DuoLandingPageTemplate
+                    content={formData}
+                    workshop={SAMPLE_WORKSHOP_DUO}
+                    isPreview={true}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -315,6 +315,44 @@ it("shows published notice when pageStatus is PUBLISHED", () => {
   expect(screen.queryByText(/won't be public/i)).toBeNull();
 });
 
+// ── 17b. onValueChange fires with initial value on mount ──
+it("onValueChange is called on mount with the initial textarea value", () => {
+  const onValueChange = jest.fn();
+  render(
+    <CustomHtmlPanel
+      {...BASE_PROPS}
+      initialCustomHtml="<p>initial</p>"
+      resolvedHtml=""
+      onValueChange={onValueChange}
+    />
+  );
+  // useEffect fires after mount — called at least once with the initial value
+  expect(onValueChange).toHaveBeenCalledWith("<p>initial</p>");
+});
+
+// ── 17c. onValueChange fires on every textarea keystroke ──
+it("onValueChange is called with updated value after typing in textarea", () => {
+  const onValueChange = jest.fn();
+  render(
+    <CustomHtmlPanel
+      {...BASE_PROPS}
+      initialCustomHtml=""
+      resolvedHtml=""
+      onValueChange={onValueChange}
+    />
+  );
+  onValueChange.mockClear();
+  fireEvent.change(getTextarea()!, { target: { value: "<p>typed</p>" } });
+  expect(onValueChange).toHaveBeenCalledWith("<p>typed</p>");
+});
+
+// ── 17d. onValueChange not required — panel works without it (no crash) ──
+it("panel renders without crash when onValueChange is not provided", () => {
+  expect(() =>
+    render(<CustomHtmlPanel {...BASE_PROPS} initialCustomHtml="<p>x</p>" resolvedHtml="" />)
+  ).not.toThrow();
+});
+
 // ── 17. Two consecutive saves send the correctly-updated expectedCustomHtml (CAS-baseline) ──
 it("two consecutive saves re-anchor expectedCustomHtml to the server-returned value after save 1", async () => {
   // Save 1: server echoes SERVER-A
