@@ -70,18 +70,31 @@ it("leaves textarea empty when both initialCustomHtml and resolvedHtml are absen
   expect(getTextarea()!.value).toBe("");
 });
 
-// ── 5. Fail-closed: panel hidden when customHtmlEditor is false (don't render the component) ──
-it("does NOT render the panel when the caller chooses not to render it (customHtmlEditor:false)", () => {
-  // The parent page does: {customHtmlEditor && <CustomHtmlPanel ... />}
-  // We simulate that by not rendering the component at all.
-  const { container } = render(<></>);
+// ── 5 & 6. Fail-closed: panel not rendered when customHtmlEditor is false or undefined ──
+//
+// Full-page mount of the solo/duo editor pages is impractical in RTL because each page
+// requires mocking useParams, three parallel fetch() calls with different shapes, and the
+// Next.js router — the test setup cost outweighs the signal.  Instead we replicate the
+// exact guard expression used in both editor pages:
+//
+//   {customHtmlEditor && <CustomHtmlPanel workshopId={...} templateKey={...} ... />}
+//
+// This directly exercises the branch that keeps the panel hidden.  If the guard
+// expression in the real pages ever changes (e.g. to ternary), this test would need
+// to be updated accordingly.
+it("fail-closed guard: replicates {customHtmlEditor && <CustomHtmlPanel />} — no textarea when false", () => {
+  const customHtmlEditor = false;
+  const { container } = render(
+    <>{customHtmlEditor && <CustomHtmlPanel {...BASE_PROPS} />}</>
+  );
   expect(container.querySelector("textarea")).toBeNull();
 });
 
-// ── 6. Fail-closed: absent customHtmlEditor → no panel ──
-it("does NOT render the panel when customHtmlEditor is undefined (absent marker)", () => {
-  // Same as above: when customHtmlEditor is undefined/falsy the parent won't mount it.
-  const { container } = render(<></>);
+it("fail-closed guard: replicates {customHtmlEditor && <CustomHtmlPanel />} — no textarea when undefined", () => {
+  const customHtmlEditor = undefined as boolean | undefined;
+  const { container } = render(
+    <>{customHtmlEditor && <CustomHtmlPanel {...BASE_PROPS} />}</>
+  );
   expect(container.querySelector("textarea")).toBeNull();
 });
 

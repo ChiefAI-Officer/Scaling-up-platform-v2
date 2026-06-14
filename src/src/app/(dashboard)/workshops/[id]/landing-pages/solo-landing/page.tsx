@@ -34,20 +34,6 @@ interface SoloLandingData {
   registrationUrl: string;
 }
 
-interface Workshop {
-  id: string;
-  title: string;
-  eventDate: string;
-  eventTime: string | null;
-  timezone: string;
-  coach: {
-    firstName: string;
-    lastName: string;
-    bio: string | null;
-    profileImage: string | null;
-  };
-}
-
 interface PartnerProfile {
   id: string;
   name: string;
@@ -81,7 +67,6 @@ export default function SoloLandingEditor() {
   const params = useParams();
   const workshopId = params.id as string;
 
-  const [workshop, setWorkshop] = useState<Workshop | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +112,6 @@ export default function SoloLandingEditor() {
 
         const workshopData = await workshopRes.json();
         if (workshopData.success) {
-          setWorkshop(workshopData.data);
           const w = workshopData.data;
           const eventDate = new Date(w.eventDate);
           
