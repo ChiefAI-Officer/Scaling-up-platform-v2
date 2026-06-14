@@ -314,3 +314,50 @@ it("shows published notice when pageStatus is PUBLISHED", () => {
   expect(screen.getByText(/this page is published/i)).toBeInTheDocument();
   expect(screen.queryByText(/won't be public/i)).toBeNull();
 });
+
+// ── 17. Two consecutive saves send the correctly-updated expectedCustomHtml (CAS-baseline) ──
+it("two consecutive saves re-anchor expectedCustomHtml to the server-returned value after save 1", async () => {
+  // Save 1: server echoes SERVER-A
+  // Save 2: server echoes SERVER-B
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, customHtml: "<p>SERVER-A</p>", sanitizerStripped: false }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, customHtml: "<p>SERVER-B</p>", sanitizerStripped: false }),
+    });
+
+  render(
+    <CustomHtmlPanel
+      {...BASE_PROPS}
+      initialCustomHtml={null}
+      resolvedHtml=""
+    />
+  );
+
+  const ta = getTextarea()!;
+
+  // ── Save 1 ──
+  fireEvent.change(ta, { target: { value: "<p>edit-1</p>" } });
+  fireEvent.click(screen.getByRole("button", { name: /save html/i }));
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+
+  const body1 = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body as string);
+  // Before any save the loaded baseline is the prop value — null (becomes null in payload)
+  expect(body1.expectedCustomHtml).toBeNull();
+
+  // ── Save 2 ──
+  fireEvent.change(ta, { target: { value: "<p>edit-2</p>" } });
+  fireEvent.click(screen.getByRole("button", { name: /save html/i }));
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+
+  const body2 = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body as string);
+  // After save 1 the component re-anchors to the server's stored value
+  expect(body2.expectedCustomHtml).toBe("<p>SERVER-A</p>");
+});

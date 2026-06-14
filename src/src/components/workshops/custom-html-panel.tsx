@@ -147,6 +147,7 @@ export function CustomHtmlPanel({
     setShowRefreshConfirm(false);
     setRefreshing(true);
     setError(null);
+    setWarning(null);
 
     try {
       const response = await fetch(`${baseUrl}?resolved=1`);
@@ -157,6 +158,8 @@ export function CustomHtmlPanel({
       if (data.success) {
         setHtmlValue(data.customHtmlResolved ?? "");
         // NO save — textarea state only
+      } else {
+        setError("Failed to fetch resolved HTML.");
       }
     } catch {
       setError("Failed to fetch resolved HTML.");
@@ -207,12 +210,12 @@ export function CustomHtmlPanel({
 
           {/* Error / warning banners */}
           {error && (
-            <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md text-sm">
+            <div role="alert" className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md text-sm">
               {error}
             </div>
           )}
           {warning && (
-            <div className="bg-warning/10 border border-warning/20 text-warning-foreground px-3 py-2 rounded-md text-sm">
+            <div role="status" className="bg-warning/10 border border-warning/20 text-warning-foreground px-3 py-2 rounded-md text-sm">
               {warning}
             </div>
           )}
