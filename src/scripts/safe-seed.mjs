@@ -225,4 +225,13 @@ function main() {
   process.exit(0);
 }
 
-main();
+// Only run the CLI when invoked directly (node scripts/safe-seed.mjs ...). When
+// IMPORTED for its exported guard helpers (e.g. rollback-workshop-customhtml.mjs),
+// do NOT execute main() — otherwise the importer's argv would be parsed as a seed
+// alias. run-assessment-seeds.mjs invokes this as a CHILD PROCESS (not an import),
+// so its behavior is unaffected.
+const isDirectInvocation =
+  process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isDirectInvocation) {
+  main();
+}
