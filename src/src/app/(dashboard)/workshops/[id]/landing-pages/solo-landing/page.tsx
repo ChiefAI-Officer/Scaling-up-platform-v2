@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SoloLandingPageTemplate, SAMPLE_WORKSHOP_SOLO } from "@/components/templates/solo-landing-page-template";
 import { formatZoneAbbrev, formatTimeWithZone } from "@/lib/utils";
+import { CustomHtmlPanel } from "@/components/workshops/custom-html-panel";
 
 interface SoloLandingData {
   coachPhoto: string;
@@ -86,6 +87,11 @@ export default function SoloLandingEditor() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [availablePartners, setAvailablePartners] = useState<PartnerProfile[]>([]);
+  // CustomHtmlPanel state — fail-closed: only render when API says customHtmlEditor:true
+  const [customHtmlEditor, setCustomHtmlEditor] = useState(false);
+  const [pageCustomHtml, setPageCustomHtml] = useState<string | null>(null);
+  const [pageStatus, setPageStatus] = useState<string | null>(null);
+  const [resolvedHtml, setResolvedHtml] = useState<string>("");
 
   const [formData, setFormData] = useState<SoloLandingData>({
     coachPhoto: "",
@@ -141,6 +147,27 @@ export default function SoloLandingEditor() {
         if (pageData.success && pageData.data) {
           const content = JSON.parse(pageData.data.content);
           setFormData((prev) => ({ ...prev, ...content }));
+        }
+        // CustomHtmlPanel wiring — fail-closed: only activate when marker is true
+        if (pageData.customHtmlEditor === true) {
+          setCustomHtmlEditor(true);
+          setPageCustomHtml(pageData.data?.customHtml ?? null);
+          setPageStatus(pageData.data?.status ?? null);
+          // Pre-fetch resolved HTML for the "Refresh" fallback (Q5b)
+          try {
+            const resolvedRes = await fetch(
+              `/api/workshops/${workshopId}/landing-pages/SOLO_LANDING?resolved=1`
+            );
+            const resolvedData = await resolvedRes.json() as {
+              success?: boolean;
+              customHtmlResolved?: string;
+            };
+            if (resolvedData.success) {
+              setResolvedHtml(resolvedData.customHtmlResolved ?? "");
+            }
+          } catch {
+            // resolvedHtml stays "" — Refresh button will be disabled
+          }
         }
 
         const partnersData = (await partnersRes.json()) as PartnersResponse;
@@ -472,6 +499,17 @@ export default function SoloLandingEditor() {
               ← Back to Workshop
             </Link>
           </div>
+
+          {/* CustomHtmlPanel — fail-closed: rendered only when API marker is true */}
+          {customHtmlEditor && (
+            <CustomHtmlPanel
+              workshopId={workshopId}
+              templateKey="SOLO_LANDING"
+              pageStatus={pageStatus}
+              initialCustomHtml={pageCustomHtml}
+              resolvedHtml={resolvedHtml}
+            />
+          )}
         </div>
 
 
