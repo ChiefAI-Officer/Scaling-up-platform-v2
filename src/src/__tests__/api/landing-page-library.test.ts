@@ -303,7 +303,7 @@ describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-0
         workshop: { coachId: "coach-target" },
       })
       .mockResolvedValueOnce(null); // no existing target page
-    (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+    (db.landingPage.create as jest.Mock).mockImplementation((args: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: "lp-new", ...args.data })
     );
 
@@ -335,7 +335,7 @@ describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-0
         workshop: { coachId: "coach-target" },
       })
       .mockResolvedValueOnce(null);
-    (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+    (db.landingPage.create as jest.Mock).mockImplementation((args: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: "lp-new", ...args.data })
     );
 
@@ -365,7 +365,7 @@ describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-0
         workshop: { coachId: "coach-target" },
       })
       .mockResolvedValueOnce(null);
-    (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+    (db.landingPage.create as jest.Mock).mockImplementation((args: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: "lp-new", ...args.data })
     );
 
