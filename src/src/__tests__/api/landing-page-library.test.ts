@@ -288,7 +288,10 @@ describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-0
     (db.landingPage.update as jest.Mock).mockResolvedValue({});
   });
 
-  it("copies customHtml from source SOLO_LANDING to a SOLO_LANDING clone", async () => {
+  // UPDATED (R1-HIGH-2): clone must NOT copy source customHtml — it is a resolved
+  // snapshot containing source-specific values (coach name, registration URL).
+  // Old behavior (copying customHtml) was removed; this test now asserts the fix.
+  it("does NOT copy customHtml from source SOLO_LANDING to a SOLO_LANDING clone (R1-HIGH-2)", async () => {
     (db.landingPage.findUnique as jest.Mock)
       .mockResolvedValueOnce({
         // source page
@@ -300,7 +303,7 @@ describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-0
         workshop: { coachId: "coach-target" },
       })
       .mockResolvedValueOnce(null); // no existing target page
-    (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+    (db.landingPage.create as jest.Mock).mockImplementation((args: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: "lp-new", ...args.data })
     );
 
@@ -314,10 +317,14 @@ describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-0
 
     expect(response.status).toBe(200);
     const createArgs = (db.landingPage.create as jest.Mock).mock.calls[0][0];
-    expect(createArgs.data.customHtml).toBe("<p>Cloned customHtml</p>");
+    // customHtml must NOT be copied — Prisma defaults it to null
+    expect(createArgs.data.customHtml).toBeUndefined();
   });
 
-  it("nulls customHtml on the destination when target template is ineligible (THANK_YOU)", async () => {
+  // UPDATED (R1-HIGH-2): clone never writes customHtml for any template type.
+  // Previously asserted `toBeNull()` for ineligible templates; now the field is
+  // absent from create data entirely (Prisma defaults to null).
+  it("customHtml is absent from create data for ineligible THANK_YOU destination (R1-HIGH-2)", async () => {
     (db.landingPage.findUnique as jest.Mock)
       .mockResolvedValueOnce({
         id: "lp-src",
@@ -328,7 +335,7 @@ describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-0
         workshop: { coachId: "coach-target" },
       })
       .mockResolvedValueOnce(null);
-    (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+    (db.landingPage.create as jest.Mock).mockImplementation((args: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: "lp-new", ...args.data })
     );
 
@@ -342,10 +349,12 @@ describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-0
 
     expect(response.status).toBe(200);
     const createArgs = (db.landingPage.create as jest.Mock).mock.calls[0][0];
-    expect(createArgs.data.customHtml).toBeNull();
+    // customHtml is not in the data object — Prisma defaults to null
+    expect(createArgs.data).not.toHaveProperty("customHtml");
   });
 
-  it("keeps customHtml=null on destination when source page has customHtml=null", async () => {
+  // UPDATED (R1-HIGH-2): clone never writes customHtml — field is absent from create data.
+  it("customHtml is absent from create data when source has customHtml=null (R1-HIGH-2)", async () => {
     (db.landingPage.findUnique as jest.Mock)
       .mockResolvedValueOnce({
         id: "lp-src",
@@ -356,7 +365,7 @@ describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-0
         workshop: { coachId: "coach-target" },
       })
       .mockResolvedValueOnce(null);
-    (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+    (db.landingPage.create as jest.Mock).mockImplementation((args: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: "lp-new", ...args.data })
     );
 
@@ -370,6 +379,222 @@ describe("Landing Page Library API - POST /api/landing-pages/library (TEMPLATE-0
 
     expect(response.status).toBe(200);
     const createArgs = (db.landingPage.create as jest.Mock).mock.calls[0][0];
-    expect(createArgs.data.customHtml).toBeNull();
+    // customHtml is not present in the data object at all — Prisma will default to null
+    expect(createArgs.data).not.toHaveProperty("customHtml");
+  });
+});
+
+// ===========================================================================
+// R1-HIGH-2 / R2-HIGH-1: clone route must NOT be a customHtml writer
+// ===========================================================================
+describe("Landing Page Library API - POST clone: customHtml isolation (R1-HIGH-2 / R2-HIGH-1)", () => {
+  function buildPostRequest(body: Record<string, unknown>): Parameters<typeof POST>[0] {
+    return new NextRequest("http://localhost/api/landing-pages/library", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }) as unknown as Parameters<typeof POST>[0];
+  }
+
+  const coachActor = {
+    userId: "coach-user-1",
+    email: "coach@example.com",
+    role: "COACH",
+    coachId: "coach-target",
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (canManageCoachData as jest.Mock).mockReturnValue(true);
+    (db.workshop.findUnique as jest.Mock).mockResolvedValue({
+      id: "ws-target",
+      title: "Target Workshop",
+      coachId: "coach-target",
+    });
+    (db.landingPage.update as jest.Mock).mockResolvedValue({
+      id: "lp-existing",
+      workshopId: "ws-target",
+      template: "SOLO_LANDING",
+      status: "DRAFT",
+      slug: "target-solo-landing-abc",
+    });
+    (db.landingPage.create as jest.Mock).mockImplementation((args: { data: Record<string, unknown> }) =>
+      Promise.resolve({
+        id: "lp-new",
+        workshopId: "ws-target",
+        template: "SOLO_LANDING",
+        status: "DRAFT",
+        slug: "target-solo-landing-xyz",
+        ...args.data,
+      })
+    );
+  });
+
+  // R1-HIGH-2: source customHtml is a resolved snapshot containing source-specific values.
+  // Copying it leaks the SOURCE workshop's coach name / registration URL onto the target.
+  it("R1-HIGH-2: create branch — does NOT copy source customHtml even for eligible SOLO_LANDING destination", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        // source page with source-specific resolved HTML
+        id: "lp-src",
+        template: "SOLO_LANDING",
+        content: '{"heading":"x"}',
+        customCode: null,
+        customHtml:
+          "<p>Join Coach Alice for this workshop. Register at https://example.com/workshop/source-slug</p>",
+        workshop: { coachId: "coach-source" },
+      })
+      .mockResolvedValueOnce(null); // no existing target page → create branch
+
+    const response = await POST(
+      buildPostRequest({
+        targetWorkshopId: "ws-target",
+        targetTemplate: "SOLO_LANDING",
+        sourceLandingPageId: "lp-src",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const createArgs = (db.landingPage.create as jest.Mock).mock.calls[0][0];
+    // customHtml must NOT be present — not the source's resolved snapshot
+    expect(createArgs.data).not.toHaveProperty("customHtml");
+    // Confirm none of the source-specific content leaked through
+    expect(JSON.stringify(createArgs.data)).not.toContain("Coach Alice");
+    expect(JSON.stringify(createArgs.data)).not.toContain("source-slug");
+  });
+
+  it("R1-HIGH-2: create branch — customHtml absent from create data regardless of source value (coach actor)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        id: "lp-src",
+        template: "SOLO_LANDING",
+        content: '{"heading":"y"}',
+        customCode: null,
+        customHtml: "<section>Source-specific override</section>",
+        workshop: { coachId: "coach-target" }, // same coach, still must not copy
+      })
+      .mockResolvedValueOnce(null);
+
+    const response = await POST(
+      buildPostRequest({
+        targetWorkshopId: "ws-target",
+        targetTemplate: "SOLO_LANDING",
+        sourceLandingPageId: "lp-src",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const createArgs = (db.landingPage.create as jest.Mock).mock.calls[0][0];
+    // customHtml must NOT be present in create data at all (Prisma defaults to null)
+    expect(createArgs.data).not.toHaveProperty("customHtml");
+  });
+
+  // R2-HIGH-1: if the target already has a customHtml (admin-authored override), the clone
+  // update branch must not touch it — neither overwrite nor clear it.
+  it("R2-HIGH-1: update branch — does NOT overwrite existing target customHtml (coach actor)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+
+    const existingTargetPage = {
+      id: "lp-existing",
+      workshopId: "ws-target",
+      template: "SOLO_LANDING",
+      status: "PUBLISHED",
+      slug: "target-solo-landing-abc",
+      customHtml: "<div>Admin-authored override — must survive clone</div>",
+    };
+
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        // source page
+        id: "lp-src",
+        template: "SOLO_LANDING",
+        content: '{"heading":"z"}',
+        customCode: null,
+        customHtml: "<p>Source override to NOT copy</p>",
+        workshop: { coachId: "coach-source" },
+      })
+      .mockResolvedValueOnce(existingTargetPage); // existing target → update branch
+
+    const response = await POST(
+      buildPostRequest({
+        targetWorkshopId: "ws-target",
+        targetTemplate: "SOLO_LANDING",
+        sourceLandingPageId: "lp-src",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const updateArgs = (db.landingPage.update as jest.Mock).mock.calls[0][0];
+    // customHtml must NOT appear in the update data at all (neither set nor cleared)
+    expect(updateArgs.data).not.toHaveProperty("customHtml");
+  });
+
+  it("R2-HIGH-1: update branch — does NOT clear target customHtml (admin actor)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+
+    const existingTargetPage = {
+      id: "lp-existing",
+      workshopId: "ws-target",
+      template: "SOLO_LANDING",
+      status: "PUBLISHED",
+      slug: "target-solo-landing-abc",
+      customHtml: "<div>Admin override</div>",
+    };
+
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        id: "lp-src",
+        template: "SOLO_LANDING",
+        content: '{"heading":"a"}',
+        customCode: null,
+        customHtml: "<p>Should not overwrite admin override</p>",
+        workshop: { coachId: "coach-source" },
+      })
+      .mockResolvedValueOnce(existingTargetPage);
+
+    const response = await POST(
+      buildPostRequest({
+        targetWorkshopId: "ws-target",
+        targetTemplate: "SOLO_LANDING",
+        sourceLandingPageId: "lp-src",
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const updateArgs = (db.landingPage.update as jest.Mock).mock.calls[0][0];
+    expect(updateArgs.data).not.toHaveProperty("customHtml");
+  });
+
+  // Confirm no UPDATE_CUSTOM_HTML audit row is written by the clone route.
+  // (The route uses db.landingPage.create/update, not any audit logger — assert
+  // that the db mock has no audit-related calls.)
+  it("clone route does not call any audit logger for customHtml changes", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.landingPage.findUnique as jest.Mock)
+      .mockResolvedValueOnce({
+        id: "lp-src",
+        template: "SOLO_LANDING",
+        content: '{"heading":"x"}',
+        customCode: null,
+        customHtml: "<p>Source</p>",
+        workshop: { coachId: "coach-source" },
+      })
+      .mockResolvedValueOnce(null);
+
+    await POST(
+      buildPostRequest({
+        targetWorkshopId: "ws-target",
+        targetTemplate: "SOLO_LANDING",
+        sourceLandingPageId: "lp-src",
+      })
+    );
+
+    // The db mock has no auditLog model — if the route tried to call it, Jest
+    // would throw. Confirm the create was called once and customHtml is absent.
+    expect(db.landingPage.create).toHaveBeenCalledTimes(1);
+    const createArgs = (db.landingPage.create as jest.Mock).mock.calls[0][0];
+    expect(createArgs.data).not.toHaveProperty("customHtml");
   });
 });

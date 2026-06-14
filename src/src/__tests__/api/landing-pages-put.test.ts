@@ -452,7 +452,7 @@ describe("PUT /api/workshops/[id]/landing-pages/[template]", () => {
           categoryId: null,
         },
       ]);
-      (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+      (db.landingPage.create as jest.Mock).mockImplementation((args: { data: object }) =>
         Promise.resolve({ id: "lp-1", ...args.data })
       );
 
@@ -481,7 +481,7 @@ describe("PUT /api/workshops/[id]/landing-pages/[template]", () => {
           categoryId: null,
         },
       ]);
-      (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+      (db.landingPage.create as jest.Mock).mockImplementation((args: { data: object }) =>
         Promise.resolve({ id: "lp-reg", ...args.data })
       );
 
@@ -498,11 +498,14 @@ describe("PUT /api/workshops/[id]/landing-pages/[template]", () => {
       expect(created.data.customHtml).toBeNull();
     });
 
-    // Fix-1: customHtml from coach-accessible PUT request body is REMOVED.
-    // The PUT route is gated by canManageCoachData, not isPrivilegedRole — so
-    // any coach could otherwise stuff sanitized HTML into their LandingPage row.
-    // Custom HTML is admin-controlled via the page-templates PATCH route only.
-    it("ignores customHtml in request body — only template-copy survives on SOLO_LANDING CREATE", async () => {
+    // Wave B Task 2: the deliberate Fix-1 silent-drop is superseded by a
+    // default-OFF flag gate. With WORKSHOP_CUSTOM_HTML_EDITOR_ENABLED unset (the
+    // state of this suite), ANY body carrying customHtml is blocked outright
+    // (404) — it is no longer silently dropped while the content save proceeds.
+    // The legacy content/status/customCode save path is unchanged when no
+    // customHtml key is present (covered by the tests above + the no-regression
+    // tests in landing-pages-customhtml.test.ts).
+    it("blocks customHtml in request body when the editor flag is OFF — SOLO_LANDING CREATE", async () => {
       (getApiActor as jest.Mock).mockResolvedValue(adminActor);
       (canManageCoachData as jest.Mock).mockReturnValue(true);
       (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
@@ -514,7 +517,7 @@ describe("PUT /api/workshops/[id]/landing-pages/[template]", () => {
           categoryId: null,
         },
       ]);
-      (db.landingPage.create as jest.Mock).mockImplementation((args: any) =>
+      (db.landingPage.create as jest.Mock).mockImplementation((args: { data: object }) =>
         Promise.resolve({ id: "lp-1", ...args.data })
       );
 
@@ -527,13 +530,12 @@ describe("PUT /api/workshops/[id]/landing-pages/[template]", () => {
         routeParams("workshop-1", "SOLO_LANDING")
       );
 
-      expect(response.status).toBe(200);
-      const created = (db.landingPage.create as jest.Mock).mock.calls[0][0];
-      // Body customHtml is silently dropped; only the admin-blessed template copy is stored.
-      expect(created.data.customHtml).toBe("<p>FROM TEMPLATE</p>");
+      // Flag OFF → blocked before any write.
+      expect(response.status).toBe(404);
+      expect((db.landingPage.create as jest.Mock)).not.toHaveBeenCalled();
     });
 
-    it("ignores customHtml in request body on UPDATE — customHtml column not written", async () => {
+    it("blocks customHtml in request body when the editor flag is OFF — SOLO_LANDING UPDATE", async () => {
       (getApiActor as jest.Mock).mockResolvedValue(adminActor);
       (canManageCoachData as jest.Mock).mockReturnValue(true);
       (db.workshop.findUnique as jest.Mock).mockResolvedValue(fakeWorkshop);
@@ -545,8 +547,9 @@ describe("PUT /api/workshops/[id]/landing-pages/[template]", () => {
         content: "{}",
         status: "DRAFT",
         publishedAt: null,
+        customHtml: null,
       });
-      (db.landingPage.update as jest.Mock).mockImplementation((args: any) =>
+      (db.landingPage.update as jest.Mock).mockImplementation((args: { data: object }) =>
         Promise.resolve({ id: "lp-1", ...args.data })
       );
 
@@ -559,9 +562,8 @@ describe("PUT /api/workshops/[id]/landing-pages/[template]", () => {
         routeParams("workshop-1", "SOLO_LANDING")
       );
 
-      expect(response.status).toBe(200);
-      const updated = (db.landingPage.update as jest.Mock).mock.calls[0][0];
-      expect(updated.data).not.toHaveProperty("customHtml");
+      expect(response.status).toBe(404);
+      expect((db.landingPage.update as jest.Mock)).not.toHaveBeenCalled();
     });
   });
 });

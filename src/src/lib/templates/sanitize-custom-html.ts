@@ -129,6 +129,7 @@ export function sanitizeCustomHtml(input: string, options: SanitizeOptions = {})
     // DOMPurify behavior; loses sanitize-html's per-property style allowlist).
     // Safe because save-time is admin-only and we don't allow url() or
     // expression() via the JS-injection vectors that DOMPurify guarded.
+    // Q3 (Wave B): admin-trusted surface — inline-style/<style> CSS url()/@import are NOT scheme-validated. customHtml is admin/staff-only; revisit if it ever becomes coach-writable.
     parseStyleAttributes: false,
     // Suppress the <style>/<noscript>/<svg> XSS warning — we render only on
     // trusted admin templates after explicit save-time sanitization.

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DuoLandingPageTemplate, SAMPLE_WORKSHOP_DUO } from "@/components/templates/duo-landing-page-template";
+import { CustomHtmlPanel } from "@/components/workshops/custom-html-panel";
 
 interface Coach {
   name: string;
@@ -136,6 +137,11 @@ export default function DuoLandingEditor() {
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState<DuoLandingData>(DEFAULT_DATA);
   const [bioProfiles, setBioProfiles] = useState<CoachBioProfile[]>([]);
+  // CustomHtmlPanel state — fail-closed: only render when API says customHtmlEditor:true
+  const [customHtmlEditor, setCustomHtmlEditor] = useState(false);
+  const [pageCustomHtml, setPageCustomHtml] = useState<string | null>(null);
+  const [pageStatus, setPageStatus] = useState<string | null>(null);
+  const [resolvedHtml, setResolvedHtml] = useState<string>("");
 
   useEffect(() => {
     async function loadData() {
@@ -213,6 +219,27 @@ export default function DuoLandingEditor() {
         if (pageData.success && pageData.data) {
           const content = JSON.parse(pageData.data.content);
           Object.assign(nextData, content);
+        }
+        // CustomHtmlPanel wiring — fail-closed: only activate when marker is true
+        if (pageData.customHtmlEditor === true) {
+          setCustomHtmlEditor(true);
+          setPageCustomHtml(pageData.data?.customHtml ?? null);
+          setPageStatus(pageData.data?.status ?? null);
+          // Pre-fetch resolved HTML for the "Refresh" fallback (Q5b)
+          try {
+            const resolvedRes = await fetch(
+              `/api/workshops/${workshopId}/landing-pages/DUO_LANDING?resolved=1`
+            );
+            const resolvedData = await resolvedRes.json() as {
+              success?: boolean;
+              customHtmlResolved?: string;
+            };
+            if (resolvedData.success) {
+              setResolvedHtml(resolvedData.customHtmlResolved ?? "");
+            }
+          } catch {
+            // resolvedHtml stays "" — Refresh button will be disabled
+          }
         }
 
         const bioProfilesData = await bioProfilesRes.json();
@@ -532,6 +559,17 @@ export default function DuoLandingEditor() {
               </Link>
             </div>
           </div>
+
+          {/* CustomHtmlPanel — fail-closed: rendered only when API marker is true */}
+          {customHtmlEditor && (
+            <CustomHtmlPanel
+              workshopId={workshopId}
+              templateKey="DUO_LANDING"
+              pageStatus={pageStatus}
+              initialCustomHtml={pageCustomHtml}
+              resolvedHtml={resolvedHtml}
+            />
+          )}
         </div>
 
         {/* Preview Panel */}
