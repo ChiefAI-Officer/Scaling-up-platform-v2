@@ -283,7 +283,14 @@ async function main() {
     const decision = checkGuard({ url, expectedHost, hasOverride: args.hasOverride });
     if (!decision.allowed) {
       console.error(`\n❌ BLOCKED — prod guard refused (--apply).\n`);
-      console.error(`  ${decision.reason}\n`);
+      // The shared guard's reason is written for safe-seed.mjs; print THIS
+      // script's actionable re-run hint, then the guard's reason as detail.
+      console.error(
+        `  Refusing to modify production without explicit confirmation.\n` +
+          `  Re-run with: node scripts/rollback-workshop-customhtml.mjs ` +
+          `<your filters> --apply ${OVERRIDE_FLAG}\n`
+      );
+      console.error(`  Detail: ${decision.reason}\n`);
       process.exit(1);
     }
   }

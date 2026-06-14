@@ -44,10 +44,17 @@ There is **no schema migration** — `AuditLog.changes` is a Postgres `text`
 column, so the full prior body is stored in the JSON (Q1). This is the durable
 store the rollback script and the restore action both read.
 
+> **Note on identifier casing in SQL.** Prisma maps the models to **snake_case
+> table names** (`AuditLog` → `audit_logs`, `LandingPage` → `landing_pages`) but
+> keeps **camelCase column names**. Unquoted identifiers fold to lowercase in
+> Postgres, so every column MUST be double-quoted (`"entityType"`, `"changes"`,
+> `"customHtml"`, …) or the query errors with "column does not exist". The table
+> names are already lowercase, so they need no quoting.
+>
 > **Note on JSON access in SQL.** `changes` is a plain `text` column (it is NOT a
-> `jsonb` column). The queries below cast it (`changes::jsonb`) so Postgres can
+> `jsonb` column). The queries below cast it (`("changes"::jsonb)`) so Postgres can
 > use the `->>` operators. If a legacy row contains non-JSON text the cast will
-> error; scope by `action = 'UPDATE_CUSTOM_HTML'` (only Wave B writes this action)
+> error; scope by `"action" = 'UPDATE_CUSTOM_HTML'` (only Wave B writes this action)
 > to stay safe. Run these read-only against a replica/branch when possible.
 
 ---
@@ -131,16 +138,16 @@ These are read-only SQL queries an operator runs against prod (ideally a replica
 / Neon branch) for a 24h or deploy-window rollup. They replace a wired dashboard
 for v1; wiring spec-06's `/admin/observability` for these is a deferred follow-up.
 
-Set the window once per session, e.g. `WHERE timestamp >= now() - interval '24 hours'`.
+Set the window once per session, e.g. `WHERE "timestamp" >= now() - interval '24 hours'`.
 
 ### 1. Save vs restore volume (by `op`)
 
 ```sql
-SELECT (changes::jsonb ->> 'op') AS op, count(*) AS n
+SELECT (("changes"::jsonb) ->> 'op') AS op, count(*) AS n
 FROM audit_logs
-WHERE entity_type = 'LandingPage'
-  AND action = 'UPDATE_CUSTOM_HTML'
-  AND timestamp >= now() - interval '24 hours'
+WHERE "entityType" = 'LandingPage'
+  AND "action" = 'UPDATE_CUSTOM_HTML'
+  AND "timestamp" >= now() - interval '24 hours'
 GROUP BY 1
 ORDER BY 1;
 ```
@@ -153,24 +160,24 @@ the source template or a malformed paste.
 ```sql
 SELECT count(*) AS sanitizer_stripped_writes
 FROM audit_logs
-WHERE entity_type = 'LandingPage'
-  AND action = 'UPDATE_CUSTOM_HTML'
-  AND (changes::jsonb ->> 'sanitizerStripped') = 'true'
-  AND timestamp >= now() - interval '24 hours';
+WHERE "entityType" = 'LandingPage'
+  AND "action" = 'UPDATE_CUSTOM_HTML'
+  AND (("changes"::jsonb) ->> 'sanitizerStripped') = 'true'
+  AND "timestamp" >= now() - interval '24 hours';
 ```
 
 ### 3. Rollback batches run (operator activity)
 
 ```sql
-SELECT id, performed_by, timestamp,
-       (changes::jsonb ->> 'restored')        AS restored,
-       (changes::jsonb ->> 'skippedDiverged') AS skipped,
-       (changes::jsonb ->> 'totalPages')      AS total
+SELECT "id", "performedBy", "timestamp",
+       (("changes"::jsonb) ->> 'restored')        AS restored,
+       (("changes"::jsonb) ->> 'skippedDiverged') AS skipped,
+       (("changes"::jsonb) ->> 'totalPages')      AS total
 FROM audit_logs
-WHERE entity_type = 'LandingPage'
-  AND action = 'ROLLBACK_CUSTOM_HTML_BATCH'
-  AND timestamp >= now() - interval '7 days'
-ORDER BY timestamp DESC;
+WHERE "entityType" = 'LandingPage'
+  AND "action" = 'ROLLBACK_CUSTOM_HTML_BATCH'
+  AND "timestamp" >= now() - interval '7 days'
+ORDER BY "timestamp" DESC;
 ```
 
 ### 4. # public pages currently rendering a non-empty customHtml (BLAST RADIUS)
@@ -179,10 +186,10 @@ The single most important gauge: how many LIVE pages would a bad render affect.
 
 ```sql
 SELECT count(*) AS live_pages_with_customhtml
-FROM "LandingPage"
+FROM landing_pages
 WHERE "customHtml" IS NOT NULL
   AND "customHtml" <> ''
-  AND status = 'PUBLISHED';
+  AND "status" = 'PUBLISHED';
 ```
 
 ### Counts that are NOT DB-derivable (app metrics / logs)
@@ -256,17 +263,17 @@ Illustrative prune statement (DO NOT run unreviewed; for the future job's design
 -- every UPDATE_CUSTOM_HTML row that is NOT the latest for its page AND is older
 -- than 90 days AND still carries a non-null previousCustomHtml.
 WITH ranked AS (
-  SELECT id, entity_id, timestamp,
-         row_number() OVER (PARTITION BY entity_id ORDER BY timestamp DESC) AS rn,
-         (changes::jsonb ->> 'previousCustomHtml') AS prev
+  SELECT "id", "entityId", "timestamp",
+         row_number() OVER (PARTITION BY "entityId" ORDER BY "timestamp" DESC) AS rn,
+         (("changes"::jsonb) ->> 'previousCustomHtml') AS prev
   FROM audit_logs
-  WHERE entity_type = 'LandingPage'
-    AND action = 'UPDATE_CUSTOM_HTML'
+  WHERE "entityType" = 'LandingPage'
+    AND "action" = 'UPDATE_CUSTOM_HTML'
 )
-SELECT id, entity_id, timestamp
+SELECT "id", "entityId", "timestamp"
 FROM ranked
 WHERE rn > 1
-  AND timestamp < now() - interval '90 days'
+  AND "timestamp" < now() - interval '90 days'
   AND prev IS NOT NULL;
 ```
 
@@ -277,13 +284,13 @@ be tuned before it becomes a backup/PITR problem.
 
 ```sql
 SELECT
-  count(*)                                            AS customhtml_audit_rows,
-  pg_size_pretty(sum(octet_length(changes)))          AS total_changes_bytes,
-  pg_size_pretty(avg(octet_length(changes))::bigint)  AS avg_row_bytes,
-  pg_size_pretty(max(octet_length(changes))::bigint)  AS max_row_bytes
+  count(*)                                              AS customhtml_audit_rows,
+  pg_size_pretty(sum(octet_length("changes")))          AS total_changes_bytes,
+  pg_size_pretty(avg(octet_length("changes"))::bigint)  AS avg_row_bytes,
+  pg_size_pretty(max(octet_length("changes"))::bigint)  AS max_row_bytes
 FROM audit_logs
-WHERE entity_type = 'LandingPage'
-  AND action = 'UPDATE_CUSTOM_HTML';
+WHERE "entityType" = 'LandingPage'
+  AND "action" = 'UPDATE_CUSTOM_HTML';
 ```
 
 **Monitor threshold:** alert (warn) when `total_changes_bytes` for these rows
