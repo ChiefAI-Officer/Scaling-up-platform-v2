@@ -119,10 +119,12 @@ export async function POST(
         closeAt: true,
         templateId: true,
         versionId: true,
+        deletedAt: true,
         template: { select: { name: true } },
       },
     });
-    if (!campaign) {
+    // SEC-M6: a soft-deleted campaign is invisible — treat as not-found.
+    if (!campaign || campaign.deletedAt !== null) {
       return NextResponse.json(
         { success: false, error: "CAMPAIGN_NOT_FOUND" },
         { status: 404 },

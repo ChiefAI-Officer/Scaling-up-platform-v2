@@ -22,6 +22,7 @@ import {
   canAccessOrganization,
   canCreateCampaign,
 } from "@/lib/assessments/access-control";
+import { liveCampaignWhere } from "@/lib/assessments/campaign-live";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import type { Prisma } from "@prisma/client";
@@ -76,13 +77,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const where: Prisma.AssessmentCampaignWhereInput = {};
+    // SEC-M6: soft-deleted campaigns (deletedAt set) are hidden from the
+    // list for everyone — the live guard is baked in via liveCampaignWhere.
+    const extra: Prisma.AssessmentCampaignWhereInput = {};
     if (!isPrivilegedRole(actor.role)) {
       if (!actor.coachId) {
         return NextResponse.json({ success: true, data: [] });
       }
-      where.createdByCoachId = actor.coachId;
+      extra.createdByCoachId = actor.coachId;
     }
+    const where = liveCampaignWhere(extra);
 
     const campaigns = await db.assessmentCampaign.findMany({
       where,

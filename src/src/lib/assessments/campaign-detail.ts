@@ -219,6 +219,11 @@ export async function getCampaignOverview(
   db: CampaignDetailDb,
   campaignId: string,
 ): Promise<CampaignOverview> {
+  // SEC-M6: soft-delete is enforced UPSTREAM — every caller of this loader
+  // (the detail page + the respondents API route) first gates on
+  // canManageCampaign, which rejects (deletedAt set) campaigns as not-found.
+  // This read therefore only ever runs against a campaign already proven
+  // live, so keying by id alone is safe here.
   const campaign = await db.assessmentCampaign.findUnique({
     where: { id: campaignId },
     include: {

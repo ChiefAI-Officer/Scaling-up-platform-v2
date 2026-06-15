@@ -66,6 +66,8 @@ export async function GET(
     }
 
     const now = new Date();
+    // SEC-M6: a soft-deleted campaign is no longer available.
+    if (invitation.campaign.deletedAt !== null) return gateFailed();
     if (invitation.revokedAt !== null) return gateFailed();
     if (now >= invitation.expiresAt) return gateFailed();
     if (invitation.status === "SUBMITTED") return gateFailed();

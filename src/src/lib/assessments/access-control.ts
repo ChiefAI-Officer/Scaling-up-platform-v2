@@ -71,14 +71,18 @@ export interface AccessControlDb {
     }) => Promise<{ id: string; certificationStatus: string } | null>;
   };
   assessmentCampaign: {
-    findUnique: (args: {
-      where: { id: string };
+    // SEC-M6: load LIVE campaigns via findFirst so the deletedAt soft-delete
+    // tombstone can be pinned in the where (deletedAt is not a unique field,
+    // so findUnique cannot filter on it).
+    findFirst: (args: {
+      where: { id: string; deletedAt?: Date | null };
     }) => Promise<{
       id: string;
       organizationId: string;
       templateId: string;
       createdByCoachId: string | null;
       status: "DRAFT" | "ACTIVE" | "CLOSED";
+      deletedAt: Date | null;
     } | null>;
   };
 }
@@ -235,9 +239,15 @@ export async function canManageCampaign(
   actor: ApiActor,
   campaignId: string,
   mode: CampaignAccessMode,
+  options: { includeDeleted?: boolean } = {},
 ): Promise<boolean> {
-  const campaign = await db.assessmentCampaign.findUnique({
-    where: { id: campaignId },
+  // SEC-M6: LIVE-only by default — a soft-deleted campaign is treated as
+  // not-found / no access for everyone (admin included). `includeDeleted`
+  // is the explicit opt-in for a future admin-recovery code path ONLY.
+  const campaign = await db.assessmentCampaign.findFirst({
+    where: options.includeDeleted
+      ? { id: campaignId }
+      : { id: campaignId, deletedAt: null },
   });
   if (!campaign) return false;
 

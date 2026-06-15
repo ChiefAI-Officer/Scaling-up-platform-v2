@@ -120,6 +120,10 @@ export async function POST(
         }
 
         const now = new Date();
+        // SEC-M6: a soft-deleted campaign is no longer available.
+        if (invitation.campaign.deletedAt !== null) {
+          return { kind: "gate" as const };
+        }
         if (invitation.revokedAt !== null) return { kind: "gate" as const };
         if (now >= invitation.expiresAt) return { kind: "gate" as const };
         if (invitation.campaign.status !== "ACTIVE") {

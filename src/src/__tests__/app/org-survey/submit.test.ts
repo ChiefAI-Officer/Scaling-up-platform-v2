@@ -86,6 +86,7 @@ function mockHappyInvitation(overrides?: Partial<{ status: string }>) {
     campaign: {
       id: "c1",
       alias: "demo",
+      deletedAt: null,
       status: "ACTIVE",
       openAt: new Date(Date.now() - 1000),
       closeAt: null,

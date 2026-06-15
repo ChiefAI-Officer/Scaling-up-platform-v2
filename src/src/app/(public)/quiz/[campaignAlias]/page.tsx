@@ -40,10 +40,12 @@ export default async function PublicQuizPage({
       openAt: true,
       closeAt: true,
       versionId: true,
+      deletedAt: true,
       template: { select: { id: true, name: true, alias: true } },
     },
   });
-  if (!campaign || campaign.accessMode !== "PUBLIC") {
+  // SEC-M6: a soft-deleted campaign is invisible — 404 like a missing one.
+  if (!campaign || campaign.deletedAt !== null || campaign.accessMode !== "PUBLIC") {
     notFound();
   }
 

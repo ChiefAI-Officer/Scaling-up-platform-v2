@@ -17,9 +17,13 @@ jest.mock("@/lib/db", () => ({
     organization: { findUnique: jest.fn() },
     accessGroupCoach: { findMany: jest.fn().mockResolvedValue([]) },
     accessGroupTemplate: { findMany: jest.fn().mockResolvedValue([]) },
-    assessmentCampaign: {
-      findUnique: jest.fn(),
-    },
+    assessmentCampaign: (() => {
+      // SEC-M6: canManageCampaign now loads via findFirst → delegate to
+      // findUnique so existing sequencing is preserved.
+      const findUnique = jest.fn();
+      const findFirst = jest.fn((args) => findUnique(args));
+      return { findUnique, findFirst };
+    })(),
     assessmentCampaignParticipant: {
       findMany: jest.fn().mockResolvedValue([]),
     },

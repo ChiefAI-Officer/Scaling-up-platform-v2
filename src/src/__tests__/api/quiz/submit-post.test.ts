@@ -88,6 +88,7 @@ const activeOpenCampaign = {
   closeAt: null,
   templateId: "tpl-1",
   versionId: "ver-1",
+  deletedAt: null,
 };
 
 function jsonReq(body: unknown): Request {
