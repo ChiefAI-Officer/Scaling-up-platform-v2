@@ -6,6 +6,20 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-06-15 — Assessment survey participant UX, all assessments (Spec 17 Wave C) <!-- ENTRY_ISO:2026-06-15 ENTRY_SLUG:wave-c-survey-ux -->
+
+**Wave C — participant survey UX polish across ALL assessments** (PR #63, squash `3518d87`, prod). Closes Jeff's Spec 17 #6–#14. Every change lives in the shared participant components (`SectionPager` / `QuestionInput` / `AssessmentShellHeader`) + scoped `.su-assessment-brand` CSS, so it applies uniformly to every assessment (invited `/org-survey` + public `/quiz`): Rockefeller, QSP v1/v2, LVA, Scaling Up Full, Five Dysfunctions, public Quick Assessment. **Additive — no migration, no feature flag** (reversible by `git revert` + Vercel promote-previous).
+
+- **#6/#10 Unified purple card:** white logo → campaign-name caption → "Section N of M" → one linear progress bar, all in one purple shell. Removed the white `ty-header` bar, the repeating white survey-title `ty-card`, and the decorative segmented strip; the progressbar moved into `AssessmentShellHeader` (exactly one `role=progressbar`).
+- **#7** Removed the orange "01" section-number badge.
+- **#8 Slider visually unset:** unanswered → thumb hidden + flat empty rail (was parked at the minimum looking pre-selected); a track-level `:focus-visible` ring keeps keyboard focus visible with no thumb. Fixes the long-standing stuck-at-minimum trap for **every** assessment; the minimum is selectable.
+- **#9** Slider handle 22px → 30px.
+- **#11/#12** Text/number inputs get a visible border + focus ring + placeholders; the existing 10k `MAX_TEXT_ANSWER_LENGTH` is surfaced as a near-cap counter (extracted to a client-safe `lib/assessments/answer-limits.ts` so the participant bundle doesn't pull in scoring/Zod).
+- **#13 Per-question red validation:** blocked advance → each unanswered required question gets a focus-independent red card border + `aria-invalid`, focus jumps to the first miss (`getElementById`, selector-safe), clears per-question on answer (prune-only-when-`isAnswered`); per-type incl. MULTI_CHOICE. Plus a `requireAtLeastOneAnswer` mode (both flows) for all-optional zero-answer submits, a synchronous submit latch (double-click), a client-safe stale-answer prune (hydrate + pre-submit), and inline org-survey submit-error recovery (stay on the pager, not a terminal screen).
+- **#14** Verify-only — section intros render their `description`.
+
+**Process:** brainstorm → `/grill-with-docs` (G1–G5) → `/grill-me` (G6–G7) → `/claudex:plan` 3-round (16 findings, all addressed) → `/frontend-design` mockup (user-approved) → subagent-driven build (8 TDD tasks, implementer + spec + code-quality review each) → whole-branch review MERGE-READY + 2 fixes. Build clean; ESLint 0/0 on changed files; full suite 3360+ passed (~10 pre-existing/environmental failures only). Preview-smoked live on the public Quick Assessment (blank-until-tapped slider, descriptions, immaculate results) + a real-Chromium Playwright slider-state check. Specs `docs/specs/v7.6/17c-*`. **Gotcha:** invite emails link to `APP_URL` (prod), so invited links open on prod even from preview campaigns — host-swap to test invited on a preview. **Deferred → "v2" wave:** fewer-clicks pager (section intro + questions on one page), invited results page (Wave D `sendResultsToRespondent` #15), per-template content (empty Welcome/Completion + missing descriptions), invite-email body copy.
+
 ### 2026-06-14 — Per-workshop landing-page custom-HTML editor (Spec 17 Wave B) <!-- ENTRY_ISO:2026-06-14 ENTRY_SLUG:wave-b-workshop-html-editor -->
 
 **Spec 17 Wave B — per-workshop landing-page custom-HTML editor (PR #59, squash `62143fb`, prod behind a default-OFF flag).** Closes Jeff's "on workshops" PDF ask: an admin/staff-only editor to set an individual workshop's landing-page `customHtml`, shipped dark behind `WORKSHOP_CUSTOM_HTML_EDITOR_ENABLED` (absent in committed config — **merging changed nothing live; launch is a separate flag-flip**).
