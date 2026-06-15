@@ -277,3 +277,40 @@ describe("QuestionInput", () => {
     expect(onChange).toHaveBeenCalledWith("S1_Q1", 1);
   });
 });
+
+const multiChoiceQuestion: QuestionForInput = {
+  stableKey: "S1_MC",
+  type: "MULTI_CHOICE",
+  label: "Pick some",
+  isRequired: true,
+  options: [ { key: "a", label: "Alpha" }, { key: "b", label: "Beta" } ],
+};
+
+describe("QuestionInput invalid + a11y contract (Wave C)", () => {
+  it("slider: invalid sets aria-invalid on the range input", () => {
+    render(<QuestionInput question={sliderQuestion} value={undefined} onChange={jest.fn()} invalid />);
+    expect(screen.getByRole("slider")).toHaveAttribute("aria-invalid", "true");
+  });
+  it("text: invalid sets aria-invalid + shows a placeholder", () => {
+    render(<QuestionInput question={{ ...sliderQuestion, type: "TEXT", stableKey: "T1" }} value={undefined} onChange={jest.fn()} invalid />);
+    const ta = screen.getByRole("textbox");
+    expect(ta).toHaveAttribute("aria-invalid", "true");
+    expect(ta).toHaveAttribute("placeholder");
+  });
+  it("multi-choice: invalid marks the group invalid AND the first checkbox carries the focus id", () => {
+    render(<QuestionInput question={multiChoiceQuestion} value={[]} onChange={jest.fn()} invalid />);
+    expect(screen.getByRole("group")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getAllByRole("checkbox")[0]).toHaveAttribute("id", "q-S1_MC");
+  });
+  it("text: enforces the 10k maxLength", () => {
+    render(<QuestionInput question={{ ...sliderQuestion, type: "TEXT", stableKey: "T2" }} value={""} onChange={jest.fn()} />);
+    expect(screen.getByRole("textbox")).toHaveAttribute("maxLength", "10000");
+  });
+  it("text: shows the char counter only near the cap", () => {
+    const near = "x".repeat(9_500);
+    const { rerender } = render(<QuestionInput question={{ ...sliderQuestion, type: "TEXT", stableKey: "T3" }} value={"hi"} onChange={jest.fn()} />);
+    expect(screen.queryByTestId("char-counter")).toBeNull();
+    rerender(<QuestionInput question={{ ...sliderQuestion, type: "TEXT", stableKey: "T3" }} value={near} onChange={jest.fn()} />);
+    expect(screen.getByTestId("char-counter")).toHaveTextContent("9500 / 10000");
+  });
+});
