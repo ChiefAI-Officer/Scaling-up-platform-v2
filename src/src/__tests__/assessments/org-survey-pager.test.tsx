@@ -299,6 +299,62 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  it("keeps the participant ON the pager (inline alert, not terminal) when the pre-submit required/empty gate fires (R2-M1 parity)", async () => {
+    // The two pre-submit gates in handleSubmit (global required-unanswered scan
+    // + zero-answer EMPTY_ANSWERS guard) used to call setPhase({ kind: "error" })
+    // — a terminal dead-end screen. They now surface inline via setSubmitError so
+    // the participant stays on the pager and can fix the answer in place, matching
+    // the genuine POST-failure recovery (and the public quiz client).
+    //
+    // Reachable path: a survey with sections but NO questions renders the pager's
+    // ungated "Nothing to answer yet" Submit (the per-page required gate never
+    // runs), so clicking Submit reaches handleSubmit with zero answers → the
+    // empty-answer gate fires. The participant must NOT be dead-ended.
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            // Zero sections + zero questions ⇒ buildSectionPages returns [] ⇒ the
+            // pager shows the ungated Submit, so handleSubmit's pre-submit gate is
+            // the only enforcement and IS reached.
+            data: { ...surveyData, sections: [], questions: [] },
+          }),
+        } as Response);
+      }
+      // /submit must NEVER be hit — the gate returns before any POST.
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, data: { submissionId: "sub_x" } }),
+      } as Response);
+    }) as unknown as typeof fetch;
+
+    await reachPager();
+
+    // The ungated Submit appears (no required gating, no answers).
+    const submitBtn = await screen.findByRole("button", { name: /submit/i });
+    fireEvent.click(submitBtn);
+
+    // Inline alert appears, the pager stays mounted (Submit still present), the
+    // terminal error screen is NOT shown, no /submit POST fires, and navigation
+    // never happens.
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/please answer at least one question/i);
+    expect(screen.getByRole("button", { name: /submit/i })).toBeInTheDocument();
+    // Terminal error phase copy must NOT appear.
+    expect(screen.queryByText(/can't open this survey/i)).not.toBeInTheDocument();
+    // No POST to /submit and no thank-you navigation.
+    const submitCalls = (global.fetch as jest.Mock).mock.calls.filter(([u]) =>
+      String(u).includes("/submit"),
+    );
+    expect(submitCalls).toHaveLength(0);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   it("Screen 1 (welcome) renders the value-prop list with INVITED team framing + stat chips from real data", async () => {
     render(<OrgSurveyClient campaignAlias={ALIAS} />);
     // Wait for the intro (welcome) phase to render after /me resolves.

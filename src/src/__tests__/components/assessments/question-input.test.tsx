@@ -297,9 +297,12 @@ describe("QuestionInput invalid + a11y contract (Wave C)", () => {
     expect(ta).toHaveAttribute("aria-invalid", "true");
     expect(ta).toHaveAttribute("placeholder");
   });
-  it("multi-choice: invalid marks the group invalid AND the first checkbox carries the focus id", () => {
+  it("multi-choice: invalid sets aria-invalid on the first checkbox (not the role=group wrapper) AND it carries the focus id", () => {
     render(<QuestionInput question={multiChoiceQuestion} value={[]} onChange={jest.fn()} invalid />);
-    expect(screen.getByRole("group")).toHaveAttribute("aria-invalid", "true");
+    // aria-invalid lives on the focusable first checkbox, not the role="group"
+    // div (jsx-a11y/role-supports-aria-props — the group does not support it).
+    expect(screen.getAllByRole("checkbox")[0]).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("group")).not.toHaveAttribute("aria-invalid");
     expect(screen.getAllByRole("checkbox")[0]).toHaveAttribute("id", "q-S1_MC");
   });
   it("text: enforces the 10k maxLength", () => {

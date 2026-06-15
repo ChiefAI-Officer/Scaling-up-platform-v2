@@ -167,7 +167,6 @@ export function QuestionInput({
         className={`survey-checkbox-group${invalid ? " is-invalid" : ""}`}
         role="group"
         aria-label={q.label}
-        aria-invalid={invalid || undefined}
       >
         {q.options.map((opt, idx) => {
           const checked = selected.includes(opt.key);
@@ -176,6 +175,11 @@ export function QuestionInput({
               <input
                 type="checkbox"
                 id={idx === 0 ? `q-${q.stableKey}` : undefined}
+                // aria-invalid belongs on a focusable widget, not on the
+                // role="group" wrapper (jsx-a11y/role-supports-aria-props). The
+                // first checkbox carries it; the group keeps the `is-invalid`
+                // class that drives the visible red border via CSS.
+                aria-invalid={idx === 0 ? invalid || undefined : undefined}
                 checked={checked}
                 disabled={disabled || (!checked && atMax)}
                 onChange={() => {

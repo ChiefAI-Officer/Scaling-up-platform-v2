@@ -243,24 +243,25 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
       .filter((q) => !isAnswered(answers[q.stableKey]))
       .map((q) => q.label);
     if (missing.length > 0) {
-      setPhase({
-        kind: "error",
-        message: `Please answer all required questions before submitting (${missing.length} missing).`,
-      });
+      // Inline recovery (R2-M1 parity): a still-unanswered required question must
+      // NOT dead-end the participant on the terminal error phase. Keep them on the
+      // pager (ready phase) with the inline alert so they can fix the answer in
+      // place — mirrors the public quiz client, which handles this non-terminally.
+      setSubmitError(
+        `Please answer all required questions before submitting (${missing.length} missing).`
+      );
       return;
     }
 
     // The submit route rejects an empty `answers` array (EMPTY_ANSWERS 400),
     // so even an all-optional survey must have ≥1 answered question before we
-    // POST. Mirrors the public quiz client guard.
+    // POST. Mirrors the public quiz client guard. Surface this inline (non-terminal)
+    // so the participant stays on the pager and can answer a question.
     const answeredCount = Object.values(answers).filter((v) =>
       isAnswered(v)
     ).length;
     if (answeredCount === 0) {
-      setPhase({
-        kind: "error",
-        message: "Please answer at least one question before submitting.",
-      });
+      setSubmitError("Please answer at least one question before submitting.");
       return;
     }
 
