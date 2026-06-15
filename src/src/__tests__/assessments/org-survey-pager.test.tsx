@@ -230,6 +230,75 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     expect(saved.q1).toBe(2);
   });
 
+  it("prunes a stale draft answer key (no longer a rendered question) from the submit POST body (R3-M2)", async () => {
+    // Seed a draft containing a STALE key ("removedQ") that maps to no current
+    // question, alongside the two valid answers, under the per-respondent key.
+    localStorage.setItem(
+      invitedDraftKey(RESPONDENT_KEY),
+      JSON.stringify({ q1: 2, orphanReq: "free text", removedQ: 9 }),
+    );
+
+    await reachPager();
+    await screen.findByText(/section 1 of 2/i);
+
+    // Advance to the Other page (the slider already holds the restored value 2)
+    // and submit.
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await screen.findByText(/section 2 of 2/i);
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => {
+      const calls = (global.fetch as jest.Mock).mock.calls;
+      expect(calls.some(([u]) => String(u).includes("/submit"))).toBe(true);
+    });
+
+    const submitCall = (global.fetch as jest.Mock).mock.calls.find(([u]) =>
+      String(u).includes("/submit"),
+    );
+    const body = JSON.parse((submitCall[1] as RequestInit).body as string);
+    const keys = body.answers.map((a: { stableKey: string }) => a.stableKey);
+    // The stale key is gone; only the two real questions are POSTed.
+    expect(keys).not.toContain("removedQ");
+    expect(keys.sort()).toEqual(["orphanReq", "q1"]);
+  });
+
+  it("keeps the participant ON the pager (inline error, not a terminal screen) when submit fails (R2-M1)", async () => {
+    // /me succeeds; /submit returns a 500 — the participant must stay on the
+    // pager with an inline error, NOT land on the terminal error phase.
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: surveyData }),
+        } as Response);
+      }
+      // /submit fails.
+      return Promise.resolve({
+        ok: false,
+        status: 500,
+        json: async () => ({ success: false, error: "Failed to submit answers" }),
+      } as Response);
+    }) as unknown as typeof fetch;
+
+    await reachPager();
+    await screen.findByText(/section 1 of 2/i);
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await screen.findByText(/section 2 of 2/i);
+    fireEvent.change(screen.getByLabelText(/Orphan Q/i), {
+      target: { value: "free text" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    // Inline error appears AND the pager is still mounted (the question is
+    // still present); router.push to thank-you was never called.
+    await screen.findByRole("alert");
+    expect(screen.getByText("Orphan Q")).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   it("Screen 1 (welcome) renders the value-prop list with INVITED team framing + stat chips from real data", async () => {
     render(<OrgSurveyClient campaignAlias={ALIAS} />);
     // Wait for the intro (welcome) phase to render after /me resolves.
