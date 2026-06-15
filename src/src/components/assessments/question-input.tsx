@@ -1,6 +1,7 @@
 "use client";
 
 import type { SyntheticEvent } from "react";
+import { MAX_TEXT_ANSWER_LENGTH } from "@/lib/assessments/answer-limits";
 
 /**
  * Phase C — QuestionInput shared component.
@@ -41,6 +42,7 @@ interface QuestionInputProps {
   value: number | string | string[] | undefined;
   onChange: (stableKey: string, value: number | string | string[]) => void;
   disabled?: boolean;
+  invalid?: boolean;
 }
 
 export function QuestionInput({
@@ -48,6 +50,7 @@ export function QuestionInput({
   value,
   onChange,
   disabled,
+  invalid,
 }: QuestionInputProps) {
   if (q.type === "SLIDER_LIKERT" && q.scale) {
     const { min, max, step, anchorMin, anchorMax } = q.scale;
@@ -59,11 +62,11 @@ export function QuestionInput({
       onChange(q.stableKey, Number(e.currentTarget.value));
     const MOVE_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"];
     return (
-      <div className={`survey-slider-wrap${answered ? "" : " is-unanswered"}`}>
+      <div className={`survey-slider-wrap${answered ? "" : " is-unanswered"}${invalid ? " is-invalid" : ""}`}>
         <input
           id={`q-${q.stableKey}`}
           type="range"
-          className="survey-slider"
+          className={`survey-slider${invalid ? " is-invalid" : ""}`}
           min={min}
           max={max}
           step={step}
@@ -72,6 +75,8 @@ export function QuestionInput({
           aria-valuemax={max}
           aria-valuenow={answered ? value : undefined}
           aria-valuetext={answered ? String(value) : "Not yet answered"}
+          aria-invalid={invalid || undefined}
+          style={answered ? ({ ["--pct" as string]: `${((numVal - min) / (max - min)) * 100}%` }) : undefined}
           onChange={commit}
           onClick={commit}
           // Commit on pointer release too: a tap that registers as a tiny drag
@@ -104,15 +109,26 @@ export function QuestionInput({
   }
 
   if (q.type === "TEXT") {
+    const textValue = typeof value === "string" ? value : "";
     return (
-      <textarea
-        id={`q-${q.stableKey}`}
-        className="survey-textarea"
-        rows={3}
-        value={typeof value === "string" ? value : ""}
-        onChange={(e) => onChange(q.stableKey, e.target.value)}
-        disabled={disabled}
-      />
+      <>
+        <textarea
+          id={`q-${q.stableKey}`}
+          className={`survey-textarea${invalid ? " is-invalid" : ""}`}
+          rows={3}
+          value={textValue}
+          placeholder="Type your answer here…"
+          maxLength={MAX_TEXT_ANSWER_LENGTH}
+          aria-invalid={invalid || undefined}
+          onChange={(e) => onChange(q.stableKey, e.target.value)}
+          disabled={disabled}
+        />
+        {textValue.length >= MAX_TEXT_ANSWER_LENGTH - 1000 ? (
+          <span className="survey-char-counter" data-testid="char-counter">
+            {textValue.length} / {MAX_TEXT_ANSWER_LENGTH}
+          </span>
+        ) : null}
+      </>
     );
   }
 
@@ -121,7 +137,9 @@ export function QuestionInput({
       <input
         id={`q-${q.stableKey}`}
         type="number"
-        className="survey-input-number"
+        className={`survey-input-number${invalid ? " is-invalid" : ""}`}
+        placeholder="Enter a number"
+        aria-invalid={invalid || undefined}
         value={
           typeof value === "number"
             ? value
@@ -146,16 +164,22 @@ export function QuestionInput({
       q.maxChoices !== undefined && selected.length >= q.maxChoices;
     return (
       <div
-        className="survey-checkbox-group"
+        className={`survey-checkbox-group${invalid ? " is-invalid" : ""}`}
         role="group"
         aria-label={q.label}
       >
-        {q.options.map((opt) => {
+        {q.options.map((opt, idx) => {
           const checked = selected.includes(opt.key);
           return (
             <label key={opt.key} className="survey-checkbox-item">
               <input
                 type="checkbox"
+                id={idx === 0 ? `q-${q.stableKey}` : undefined}
+                // aria-invalid belongs on a focusable widget, not on the
+                // role="group" wrapper (jsx-a11y/role-supports-aria-props). The
+                // first checkbox carries it; the group keeps the `is-invalid`
+                // class that drives the visible red border via CSS.
+                aria-invalid={idx === 0 ? invalid || undefined : undefined}
                 checked={checked}
                 disabled={disabled || (!checked && atMax)}
                 onChange={() => {

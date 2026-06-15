@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SectionPager } from "@/components/assessments/section-pager";
 import { buildSectionPages, type PagerSection, type PagerQuestion } from "@/lib/assessments/section-pages";
 
@@ -36,8 +36,8 @@ describe("SectionPager", () => {
     expect(screen.getByText(/section 1 of 2/i)).toBeInTheDocument();
     // Intro slide hero container renders.
     expect(container.querySelector(".su-intro-slide")).toBeInTheDocument();
-    // Section number badge (01) renders inside the kicker.
-    expect(container.querySelector(".su-intro-num")).toBeInTheDocument();
+    // #7 — the "01" section-number badge was removed from the intro kicker.
+    expect(container.querySelector(".su-intro-num")).not.toBeInTheDocument();
   });
 
   it("Screen 2 is DISTINCT: renders the domain accent rail + a 'What this section covers' callout from section.description", () => {
@@ -155,26 +155,21 @@ describe("SectionPager", () => {
     expect(screen.getByText(/northwind logistics/i)).toBeInTheDocument();
   });
 
-  it("the shell header's Section N of M + active-segment count track the pager's OWN state through next/back (single source)", () => {
+  it("the shell header's Section N of M tracks the pager's OWN state through next/back (single source)", () => {
     const { container } = setup(); // S0 (empty intro) + S1 (questions)
     // The shell header label lives in the appbar; it shows the pager's section.
     const headerLabel = () => container.querySelector(".su-shell-where")?.textContent ?? "";
-    const activeSegs = () => container.querySelectorAll(".su-shell-seg-item.is-active").length;
 
-    // On the first section's intro: Section 1 of 2, 1 active segment.
+    // On the first section's intro: Section 1 of 2.
     expect(headerLabel()).toMatch(/section 1 of 2/i);
-    expect(activeSegs()).toBe(1);
-    expect(container.querySelectorAll(".su-shell-seg-item")).toHaveLength(2);
 
-    // Begin section → advances to S1 (S0 empty) → Section 2 of 2, 2 active segments.
+    // Begin section → advances to S1 (S0 empty) → Section 2 of 2.
     fireEvent.click(screen.getByRole("button", { name: /begin section/i }));
     expect(headerLabel()).toMatch(/section 2 of 2/i);
-    expect(activeSegs()).toBe(2);
 
     // Back across the empty welcome → back to its intro → Section 1 of 2 again.
     fireEvent.click(screen.getByRole("button", { name: /back/i }));
     expect(headerLabel()).toMatch(/section 1 of 2/i);
-    expect(activeSegs()).toBe(1);
   });
 
   it("a section with BOTH a description and questions: intro → Begin section → questions → Back → intro", () => {
@@ -188,5 +183,93 @@ describe("SectionPager", () => {
     expect(screen.getByText("Q1")).toBeInTheDocument(); // questions
     fireEvent.click(screen.getByRole("button", { name: /back/i }));
     expect(screen.getByText("Strategy intro")).toBeInTheDocument(); // back to intro (ADR-0004 description persists)
+  });
+
+  // ── Wave C Task 3 — per-question validation + min-answer gate + submit latch ──
+
+  it("blocked advance flags the unanswered required question (aria-invalid) AND moves focus to it", async () => {
+    setup(); // S0 (empty intro) + S1 (one required slider, unanswered)
+    fireEvent.click(screen.getByRole("button", { name: /begin section/i }));
+    // Submit with the required slider unanswered → blocked + flagged.
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    const slider = screen.getByRole("slider", { name: "Q1" });
+    expect(slider).toHaveAttribute("aria-invalid", "true");
+    // Focus moves to the offending control (deferred via requestAnimationFrame).
+    await waitFor(() => expect(slider).toHaveFocus());
+  });
+
+  it("answering a flagged question clears ONLY its invalid state", () => {
+    const onAnswerChange = jest.fn();
+    const onSubmit = jest.fn();
+    const pages = buildSectionPages(sections, questions);
+    const { rerender } = render(
+      <SectionPager pages={pages} answers={{}} onAnswerChange={onAnswerChange} onSubmit={onSubmit} submitting={false} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /begin section/i }));
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    expect(screen.getByRole("slider", { name: "Q1" })).toHaveAttribute("aria-invalid", "true");
+
+    // Answer the slider (controlled → feed the value back through rerender).
+    fireEvent.click(screen.getByRole("slider", { name: "Q1" }));
+    expect(onAnswerChange).toHaveBeenCalledWith("q1", 0);
+    const pages2 = buildSectionPages(sections, questions);
+    rerender(<SectionPager pages={pages2} answers={{ q1: 0 }} onAnswerChange={onAnswerChange} onSubmit={onSubmit} submitting={false} />);
+    expect(screen.getByRole("slider", { name: "Q1" })).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("a required TEXT question flagged, then changed to whitespace, STAYS invalid", () => {
+    const secs: PagerSection[] = [{ stableKey: "T1", sortOrder: 1, name: "Notes" }];
+    const qs: PagerQuestion[] = [
+      { stableKey: "t1", sortOrder: 1, sectionStableKey: "T1", type: "TEXT", label: "Tell us why", isRequired: true },
+    ];
+    const onAnswerChange = jest.fn();
+    const pages = buildSectionPages(secs, qs);
+    const { rerender } = render(
+      <SectionPager pages={pages} answers={{}} onAnswerChange={onAnswerChange} onSubmit={jest.fn()} submitting={false} />,
+    );
+    // No intro (no description, has questions) → questions are shown immediately.
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    const textarea = screen.getByRole("textbox", { name: "Tell us why" });
+    expect(textarea).toHaveAttribute("aria-invalid", "true");
+
+    // Type whitespace only — isAnswered("   ") is false, so the flag must STAY.
+    fireEvent.change(textarea, { target: { value: "   " } });
+    expect(onAnswerChange).toHaveBeenCalledWith("t1", "   ");
+    const pages2 = buildSectionPages(secs, qs);
+    rerender(<SectionPager pages={pages2} answers={{ t1: "   " }} onAnswerChange={onAnswerChange} onSubmit={jest.fn()} submitting={false} />);
+    expect(screen.getByRole("textbox", { name: "Tell us why" })).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("requireAtLeastOneAnswer: an all-optional set with zero answers blocks Submit with a non-field alert", () => {
+    const secs: PagerSection[] = [{ stableKey: "O1", sortOrder: 1, name: "Optional" }];
+    const qs: PagerQuestion[] = [
+      { stableKey: "o1", sortOrder: 1, sectionStableKey: "O1", type: "TEXT", label: "Optional A", isRequired: false },
+      { stableKey: "o2", sortOrder: 2, sectionStableKey: "O1", type: "TEXT", label: "Optional B", isRequired: false },
+    ];
+    const onSubmit = jest.fn();
+    const pages = buildSectionPages(secs, qs);
+    const { container } = render(
+      <SectionPager pages={pages} answers={{}} onAnswerChange={jest.fn()} onSubmit={onSubmit} submitting={false} requireAtLeastOneAnswer />,
+    );
+    // No intro, no required questions → Submit is the only gate.
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    // Alert shown with the min-answer copy.
+    expect(screen.getByRole("alert")).toHaveTextContent(/at least one question/i);
+    // NON-field gate — no control is marked invalid.
+    expect(container.querySelector("[aria-invalid='true']")).toBeNull();
+    // Submit is NOT called.
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("double-clicking Submit (after answering the required question) calls onSubmit at most once", () => {
+    const onSubmit = jest.fn();
+    const pages = buildSectionPages(sections, questions);
+    render(<SectionPager pages={pages} answers={{ q1: 2 }} onAnswerChange={jest.fn()} onSubmit={onSubmit} submitting={false} />);
+    fireEvent.click(screen.getByRole("button", { name: /begin section/i }));
+    const submit = screen.getByRole("button", { name: /submit/i });
+    // Two synchronous clicks — the ref latch must swallow the second.
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });

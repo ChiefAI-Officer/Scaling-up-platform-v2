@@ -23,6 +23,7 @@
  */
 
 import { z } from "zod";
+import { MAX_TEXT_ANSWER_LENGTH } from "./answer-limits";
 
 // ─── Zod schemas (input validation) ──────────────────────────────────────
 
@@ -487,7 +488,7 @@ export class ScoringValidationError extends Error {
 // ─── Answer value validation ──────────────────────────────────────────────
 
 /** Maximum character length accepted for a TEXT answer. */
-export const MAX_TEXT_ANSWER_LENGTH = 10_000;
+export { MAX_TEXT_ANSWER_LENGTH } from "./answer-limits";
 
 /**
  * Validates the runtime value of a single answer against its question's type

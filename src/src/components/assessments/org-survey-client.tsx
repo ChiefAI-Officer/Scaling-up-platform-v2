@@ -27,6 +27,7 @@ import {
   useAnswerDraft,
   invitedDraftKey,
 } from "@/lib/assessments/use-answer-draft";
+import { pruneAnswersToQuestions } from "@/lib/assessments/prune-answers";
 import {
   WelcomeShellHeader,
   WelcomeExpectations,
@@ -87,6 +88,9 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "exchanging" });
   const [answers, setAnswers] = useState<Record<string, number | string | string[]>>({});
+  // Inline submit error shown ON the pager (R2-M1) — a failed submit no longer
+  // dead-ends the participant on the terminal error phase.
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // localStorage autosave for the invited respondent. The hook must run
   // unconditionally at the top level (Rules of Hooks), before any phase-based
@@ -209,36 +213,67 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     [sortedQuestions.length],
   );
 
+  // The set of stableKeys that map to a currently-rendered question. Used both
+  // to prune a stale localStorage draft on hydrate AND to prune the POST body
+  // pre-submit (Wave C R3-M2) so an answer whose question no longer exists can
+  // never reach the server and trap the user.
+  const knownKeys = useMemo(
+    () => new Set(sortedQuestions.map((q) => q.stableKey)),
+    [sortedQuestions],
+  );
+
+  // Hydrate prune (secondary): once questions are known, prune the answer state
+  // once to the known set. The same-ref guard in pruneAnswersToQuestions means
+  // this no-ops (no setState) when nothing is stale, so it can't loop.
+  useEffect(() => {
+    if (knownKeys.size === 0) return;
+    // Safe one-shot reconciliation: the same-ref guard in pruneAnswersToQuestions
+    // makes this a no-op (no state change) once nothing is stale, so it cannot
+    // cascade or loop. Mirrors the ref-routed setState the autosave hook performs.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAnswers((prev) => pruneAnswersToQuestions(prev, knownKeys));
+  }, [knownKeys]);
+
   async function handleSubmit() {
     if (phase.kind !== "ready") return;
+    setSubmitError(null);
 
     const required = phase.data.questions.filter((q) => q.isRequired);
     const missing = required
       .filter((q) => !isAnswered(answers[q.stableKey]))
       .map((q) => q.label);
     if (missing.length > 0) {
-      setPhase({
-        kind: "error",
-        message: `Please answer all required questions before submitting (${missing.length} missing).`,
-      });
+      // Inline recovery (R2-M1 parity): a still-unanswered required question must
+      // NOT dead-end the participant on the terminal error phase. Keep them on the
+      // pager (ready phase) with the inline alert so they can fix the answer in
+      // place — mirrors the public quiz client, which handles this non-terminally.
+      setSubmitError(
+        `Please answer all required questions before submitting (${missing.length} missing).`
+      );
       return;
     }
 
     // The submit route rejects an empty `answers` array (EMPTY_ANSWERS 400),
     // so even an all-optional survey must have ≥1 answered question before we
-    // POST. Mirrors the public quiz client guard.
+    // POST. Mirrors the public quiz client guard. Surface this inline (non-terminal)
+    // so the participant stays on the pager and can answer a question.
     const answeredCount = Object.values(answers).filter((v) =>
       isAnswered(v)
     ).length;
     if (answeredCount === 0) {
-      setPhase({
-        kind: "error",
-        message: "Please answer at least one question before submitting.",
-      });
+      setSubmitError("Please answer at least one question before submitting.");
       return;
     }
 
-    setPhase({ kind: "submitting", data: phase.data });
+    // Pre-submit prune (R3-M2): drop any answer whose stableKey isn't a
+    // currently-rendered question (a stale localStorage draft) so it can't
+    // reach the server. Persist the pruned map back if it changed so the local
+    // state + autosaved draft stay in sync.
+    const pruned = pruneAnswersToQuestions(answers, knownKeys);
+    if (pruned !== answers) setAnswers(pruned);
+
+    const submittingData = phase.data;
+    setPhase({ kind: "submitting", data: submittingData });
 
     try {
       const submitRes = await fetch(`/org-survey/${campaignAlias}/submit`, {
@@ -247,25 +282,27 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         credentials: "include",
         cache: "no-store",
         body: JSON.stringify({
-          answers: Object.entries(answers).map(([stableKey, value]) => ({
+          answers: Object.entries(pruned).map(([stableKey, value]) => ({
             stableKey,
             value,
           })),
         }),
       });
       if (!submitRes.ok) {
+        // Submit-error recovery (R2-M1): a failed submit must NOT dead-end the
+        // participant on a terminal error screen. Drop back to the pager
+        // (ready phase) and surface the message inline so they can retry.
         const message = await readError(submitRes, "Failed to submit.");
-        setPhase({ kind: "error", message });
+        setSubmitError(message);
+        setPhase({ kind: "ready", data: submittingData });
         return;
       }
       clearDraft();
       router.push(`/org-survey/${campaignAlias}/thank-you`);
     } catch (err) {
       console.error("[org-survey] submit failed", err);
-      setPhase({
-        kind: "error",
-        message: "Something went wrong. Please try again.",
-      });
+      setSubmitError("Something went wrong. Please try again.");
+      setPhase({ kind: "ready", data: submittingData });
     }
   }
 
@@ -373,21 +410,21 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
 
   return (
     <div className="ty-page">
-      <header className="ty-header">
-        <span className="ty-brand">Scaling Up</span>
-        <span>{data.campaign.name}</span>
-      </header>
       <main className="survey-body">
         <div className="survey-form">
-          <section className="ty-card" aria-labelledby="survey-title">
-            <span className="hero-eyebrow">Survey</span>
-            <h1 className="ty-title" id="survey-title">
-              {data.campaign.name}
-            </h1>
-            <p className="ty-lede">
-              Please rate each item below and submit when you&apos;re done.
-            </p>
-          </section>
+          {submitError && (
+            <div
+              className="wf-intersection-banner"
+              role="alert"
+              style={{
+                background: "hsl(var(--destructive) / 0.1)",
+                borderColor: "hsl(var(--destructive) / 0.3)",
+                color: "hsl(var(--destructive))",
+              }}
+            >
+              {submitError}
+            </div>
+          )}
 
           <SectionPager
             pages={pages}
@@ -400,6 +437,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             onExit={() => setPhase({ kind: "intro", data: phase.data })}
             assessmentName={data.campaign.name}
             companyName={data.campaign.organizationName ?? undefined}
+            requireAtLeastOneAnswer
           />
         </div>
       </main>

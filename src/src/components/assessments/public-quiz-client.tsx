@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { SectionPager } from "./section-pager";
 import {
@@ -10,6 +10,7 @@ import {
   type PagerQuestion,
 } from "@/lib/assessments/section-pages";
 import { useAnswerDraft, publicDraftKey } from "@/lib/assessments/use-answer-draft";
+import { pruneAnswersToQuestions } from "@/lib/assessments/prune-answers";
 import {
   WelcomeShellHeader,
   WelcomeExpectations,
@@ -148,6 +149,23 @@ export function PublicQuizClient({
   // Hook must run unconditionally at the top level, before any early return.
   const draftKey = useMemo(() => publicDraftKey(campaignAlias), [campaignAlias]);
   const { clearDraft } = useAnswerDraft(draftKey, answers, setAnswers);
+
+  // The set of stableKeys that map to a currently-rendered question. Used both
+  // to prune a stale localStorage draft on hydrate AND to prune the POST body
+  // pre-submit (Wave C R3-M2) so an answer whose question no longer exists can
+  // never reach the server.
+  const knownKeys = useMemo(
+    () => new Set(sortedQuestions.map((q) => q.stableKey)),
+    [sortedQuestions],
+  );
+
+  // Hydrate prune (secondary): once questions are known, prune the answer state
+  // once to the known set. The same-ref guard in pruneAnswersToQuestions means
+  // this no-ops when nothing is stale, so it can't loop.
+  useEffect(() => {
+    if (knownKeys.size === 0) return;
+    setAnswers((prev) => pruneAnswersToQuestions(prev, knownKeys));
+  }, [knownKeys]);
 
   if (!isOpen || step === "error") {
     return (
@@ -409,6 +427,12 @@ export function PublicQuizClient({
     setSubmitting(true);
     // Lazily assign a stable idempotency key for this submission attempt.
     if (!idemRef.current) idemRef.current = crypto.randomUUID();
+    // Pre-submit prune (R3-M2): drop any answer whose stableKey isn't a
+    // currently-rendered question (a stale localStorage draft) before POSTing.
+    // Persist the pruned map back if it changed so local state + the autosaved
+    // draft stay in sync.
+    const pruned = pruneAnswersToQuestions(answers, knownKeys);
+    if (pruned !== answers) setAnswers(pruned);
     try {
       const res = await fetch(`/api/quiz/${campaignAlias}/submit`, {
         method: "POST",
@@ -419,7 +443,7 @@ export function PublicQuizClient({
             lastName: lastName.trim(),
             email: email.trim(),
           },
-          answers: Object.entries(answers).map(([stableKey, value]) => ({
+          answers: Object.entries(pruned).map(([stableKey, value]) => ({
             stableKey,
             value,
           })),
@@ -455,15 +479,12 @@ export function PublicQuizClient({
 
   return (
     <div className="ty-page">
-      <header className="ty-header">
-        <span className="ty-brand">Scaling Up</span>
-        <span>{campaignName}</span>
-      </header>
       <main className="survey-body">
         <div className="survey-form">
           {submitError && (
             <div
               className="wf-intersection-banner"
+              role="alert"
               style={{
                 background: "hsl(var(--destructive) / 0.1)",
                 borderColor: "hsl(var(--destructive) / 0.3)",
@@ -481,7 +502,8 @@ export function PublicQuizClient({
             onSubmit={handleSubmit}
             submitting={submitting}
             onExit={() => setStep("info")}
-            assessmentName={templateName}
+            assessmentName={campaignName}
+            requireAtLeastOneAnswer
           />
 
           <p

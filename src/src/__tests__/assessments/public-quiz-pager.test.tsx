@@ -169,6 +169,56 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(localStorage.getItem(key)).toBeNull();
   });
 
+  it("prunes a stale draft answer key (no longer a rendered question) from the submit POST body (R3-M2)", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_prune_1",
+          scoreResult: {
+            perQuestion: [],
+            perSection: [],
+            overallTotal: 0,
+            overallAverage: 0,
+            countAchieved: 0,
+            tier: null,
+            tierMetricValue: 0,
+            unansweredKeys: [],
+          },
+        },
+      }),
+    });
+
+    // Seed a draft with a STALE key ("removedQ") that maps to no current
+    // question, alongside a valid answer, BEFORE mount so the hook hydrates it.
+    localStorage.setItem(
+      publicDraftKey(ALIAS),
+      JSON.stringify({ q1: 2, removedQ: 9 }),
+    );
+
+    render(<PublicQuizClient {...baseProps} />);
+    reachFormStep();
+
+    // Answer q1 explicitly (don't depend on debounced draft restore), advance,
+    // answer q2, and submit. The stale "removedQ" must not reach the server.
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(screen.getByText(/section 2 of 2/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    const keys = body.answers.map((a: { stableKey: string }) => a.stableKey);
+    // The stale key is gone; only the two real questions are POSTed.
+    expect(keys).not.toContain("removedQ");
+    expect(keys.sort()).toEqual(["q1", "q2"]);
+  });
+
   it("still renders the intro and info phases with the public-taker fields intact", () => {
     render(<PublicQuizClient {...baseProps} />);
     // intro

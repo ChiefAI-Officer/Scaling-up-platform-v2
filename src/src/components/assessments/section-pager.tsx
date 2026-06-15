@@ -18,6 +18,8 @@ interface SectionPagerProps {
   assessmentName?: string;
   /** Company / organization name shown in the shell header (invited flow only). */
   companyName?: string;
+  /** Public/optional surveys: require at least one answered question before submit. */
+  requireAtLeastOneAnswer?: boolean;
 }
 
 function pageHasIntro(p: SectionPage): boolean {
@@ -25,12 +27,18 @@ function pageHasIntro(p: SectionPage): boolean {
   return (p.description?.trim()?.length ?? 0) > 0 || !hasQuestions;
 }
 
-export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName }: SectionPagerProps) {
+export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName, requireAtLeastOneAnswer }: SectionPagerProps) {
   const [sectionIndex, setSectionIndex] = React.useState(0);
   const page = pages[sectionIndex];
   const [view, setView] = React.useState<"intro" | "questions">(page && pageHasIntro(page) ? "intro" : "questions");
   const [showGateError, setShowGateError] = React.useState(false);
+  const [invalidKeys, setInvalidKeys] = React.useState<Set<string>>(new Set());
+  const [gateMessage, setGateMessage] = React.useState<string>("");
+  const submitLatch = React.useRef(false);
   const headingRef = React.useRef<HTMLHeadingElement>(null);
+
+  // Release the synchronous double-click latch once a submit settles.
+  React.useEffect(() => { if (!submitting) submitLatch.current = false; }, [submitting]);
 
   if (!page) {
     return (
@@ -48,10 +56,23 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
   const total = pages.flatMap((p) => p.questions).length;
 
   function focusHeading() { requestAnimationFrame(() => headingRef.current?.focus()); }
+  function focusFirstInvalid(stableKey: string) {
+    requestAnimationFrame(() => document.getElementById(`q-${stableKey}`)?.focus());
+  }
+  function focusFirstAnswerable() {
+    const first = page.questions[0];
+    if (first) requestAnimationFrame(() => document.getElementById(`q-${first.stableKey}`)?.focus());
+  }
 
   function handleAnswerChange(stableKey: string, value: number | string | string[]) {
-    setShowGateError(false);
     onAnswerChange(stableKey, value);
+    setInvalidKeys((prev) => {
+      if (!prev.has(stableKey) || !isAnswered(value)) return prev; // whitespace/empty STAYS invalid
+      const next = new Set(prev);
+      next.delete(stableKey);
+      if (next.size === 0) setShowGateError(false);
+      return next;
+    });
   }
 
   function goToSection(idx: number) {
@@ -59,16 +80,36 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     setSectionIndex(idx);
     setView(pageHasIntro(next) ? "intro" : "questions");
     setShowGateError(false);
+    setInvalidKeys(new Set());
     focusHeading();
   }
-  function advance() { if (isLast) { onSubmit(); return; } goToSection(sectionIndex + 1); }
+  function advance() { if (isLast) { attemptSubmit(); return; } goToSection(sectionIndex + 1); }
   function handleForwardFromIntro() {
     if (hasQuestions) { setView("questions"); setShowGateError(false); focusHeading(); }
     else { advance(); }
   }
+  function attemptSubmit() {
+    const totalAnswered = pages.flatMap((p) => p.questions).filter((q) => isAnswered(answers[q.stableKey])).length;
+    if (requireAtLeastOneAnswer && totalAnswered === 0) {
+      setGateMessage("Please answer at least one question before submitting.");
+      setShowGateError(true);
+      focusFirstAnswerable(); // NON-field alert; do NOT mark optional questions invalid
+      return;
+    }
+    if (submitLatch.current || submitting) return; // synchronous double-click guard
+    submitLatch.current = true;
+    onSubmit();
+  }
   function handleNext() {
     const unanswered = page.questions.filter((q) => q.isRequired && !isAnswered(answers[q.stableKey]));
-    if (unanswered.length > 0) { setShowGateError(true); return; }
+    if (unanswered.length > 0) {
+      setInvalidKeys(new Set(unanswered.map((q) => q.stableKey)));
+      setGateMessage("Please answer all required questions before continuing.");
+      setShowGateError(true);
+      focusFirstInvalid(unanswered[0].stableKey);
+      return;
+    }
+    if (isLast) { attemptSubmit(); return; }
     advance();
   }
   function handleBack() {
@@ -99,10 +140,9 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
         totalSections={pages.length}
         assessmentName={assessmentName}
         companyName={companyName}
+        answeredCount={answeredCount}
+        totalQuestions={total}
       />
-      <div role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={answeredCount} className="survey-progress">
-        <div className="survey-progress-fill" style={{ width: total ? `${(answeredCount / total) * 100}%` : "0%" }} />
-      </div>
 
       {view === "intro" ? (
         <section
@@ -113,7 +153,6 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
           {/* Domain accent rail — colored top bar (neutral when no domain). */}
           <div className="su-intro-rail" aria-hidden="true" />
           <div className="su-intro-kicker">
-            <span className="su-intro-num" aria-hidden="true">{String(sectionIndex + 1).padStart(2, "0")}</span>
             <span className="su-intro-stepblock">
               {stepLabel ? <span className="su-intro-label">{stepLabel}</span> : null}
               <h2
@@ -163,11 +202,11 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
                   {q.label}{q.isRequired ? <span className="survey-required" aria-hidden="true"> *</span> : null}
                 </label>
                 {q.helpText ? <p className="survey-question-help">{q.helpText}</p> : null}
-                <QuestionInput question={q} value={answers[q.stableKey]} onChange={handleAnswerChange} disabled={submitting} />
+                <QuestionInput question={q} value={answers[q.stableKey]} onChange={handleAnswerChange} disabled={submitting} invalid={invalidKeys.has(q.stableKey)} />
               </li>
             ))}
           </ul>
-          {showGateError ? <p role="alert" className="survey-error">Please answer all required questions before continuing.</p> : null}
+          {showGateError ? <p role="alert" className="survey-error">{gateMessage}</p> : null}
           <div className="survey-nav">
             <button type="button" className="wf-btn wf-btn-secondary" onClick={handleBack}>Back</button>
             <button type="button" className="wf-btn wf-btn-primary" onClick={handleNext} disabled={submitting}>{isLast ? "Submit" : "Next"}</button>
