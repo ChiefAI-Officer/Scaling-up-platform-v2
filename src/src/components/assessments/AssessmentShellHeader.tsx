@@ -7,13 +7,12 @@ import React from "react";
  *
  * Presentational only — it renders whatever section position it is given. It is
  * mounted INSIDE {@link SectionPager}, which feeds it the pager's OWN current
- * section index + total, so the progress strip can never drift from the
+ * section index + total, so the progress bar can never drift from the
  * questions on screen (single source of section state — claudex r1 #8).
  *
  * Look: purple appbar (matches the approved /tmp/su-assessment-mockups/quiz.html)
- * with the white Scaling Up logo, a "Assessment · Company" caption, and a
- * Four-Decisions segmented progress strip (one segment per section, the first
- * `currentSection` lit using the four-decisions colours cycling).
+ * with the white Scaling Up logo, a "Assessment · Company" caption, "Section N
+ * of M" text, and the authoritative linear progressbar (answered/total questions).
  *
  * Scope: every class lives under `.su-assessment-brand` (the pager root already
  * provides that scope) so there is zero leak to the blue admin/coach UI.
@@ -21,22 +20,25 @@ import React from "react";
 export interface AssessmentShellHeaderProps {
   /** 1-based index of the section currently on screen. */
   currentSection: number;
-  /** Total number of sections (one progress segment each). */
+  /** Total number of sections. */
   totalSections: number;
   /** Assessment / campaign / template name (left caption). Optional. */
   assessmentName?: string;
   /** Company / organization name (right caption). Rendered only when provided. */
   companyName?: string;
+  /** Number of questions answered so far (drives the progressbar). */
+  answeredCount: number;
+  /** Total number of questions across all sections (progressbar max). */
+  totalQuestions: number;
 }
-
-// Four Decisions accent colours, cycled across the active progress segments.
-const FOUR_DECISIONS = ["#f7a600", "#008bd2", "#946b36", "#95c11f"] as const;
 
 export function AssessmentShellHeader({
   currentSection,
   totalSections,
   assessmentName,
   companyName,
+  answeredCount,
+  totalQuestions,
 }: AssessmentShellHeaderProps) {
   const total = Math.max(0, Math.floor(totalSections));
   const active = Math.min(Math.max(0, Math.floor(currentSection)), total);
@@ -62,21 +64,15 @@ export function AssessmentShellHeader({
         </span>
       )}
 
-      {/* Presentational segmented strip. The pager already renders the
-          authoritative role="progressbar" (answered/total questions); a second
-          one here would create an ambiguous accessibility tree, so this strip is
-          aria-hidden and the "Section N of M" text carries the meaning. */}
-      <div className="su-shell-seg" aria-hidden="true">
-        {Array.from({ length: total }, (_, i) => {
-          const on = i < active;
-          return (
-            <i
-              key={i}
-              className={`su-shell-seg-item${on ? " is-active" : ""}`}
-              style={on ? { background: FOUR_DECISIONS[i % FOUR_DECISIONS.length] } : undefined}
-            />
-          );
-        })}
+      <div
+        role="progressbar"
+        aria-label="Progress"
+        aria-valuemin={0}
+        aria-valuemax={totalQuestions}
+        aria-valuenow={answeredCount}
+        className="survey-progress su-shell-progress"
+      >
+        <div className="survey-progress-fill" style={{ width: totalQuestions ? `${(answeredCount / totalQuestions) * 100}%` : "0%" }} />
       </div>
     </header>
   );

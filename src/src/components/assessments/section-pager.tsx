@@ -140,10 +140,9 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
         totalSections={pages.length}
         assessmentName={assessmentName}
         companyName={companyName}
+        answeredCount={answeredCount}
+        totalQuestions={total}
       />
-      <div role="progressbar" aria-label="Progress" aria-valuemin={0} aria-valuemax={total} aria-valuenow={answeredCount} className="survey-progress">
-        <div className="survey-progress-fill" style={{ width: total ? `${(answeredCount / total) * 100}%` : "0%" }} />
-      </div>
 
       {view === "intro" ? (
         <section

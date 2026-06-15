@@ -155,26 +155,21 @@ describe("SectionPager", () => {
     expect(screen.getByText(/northwind logistics/i)).toBeInTheDocument();
   });
 
-  it("the shell header's Section N of M + active-segment count track the pager's OWN state through next/back (single source)", () => {
+  it("the shell header's Section N of M tracks the pager's OWN state through next/back (single source)", () => {
     const { container } = setup(); // S0 (empty intro) + S1 (questions)
     // The shell header label lives in the appbar; it shows the pager's section.
     const headerLabel = () => container.querySelector(".su-shell-where")?.textContent ?? "";
-    const activeSegs = () => container.querySelectorAll(".su-shell-seg-item.is-active").length;
 
-    // On the first section's intro: Section 1 of 2, 1 active segment.
+    // On the first section's intro: Section 1 of 2.
     expect(headerLabel()).toMatch(/section 1 of 2/i);
-    expect(activeSegs()).toBe(1);
-    expect(container.querySelectorAll(".su-shell-seg-item")).toHaveLength(2);
 
-    // Begin section → advances to S1 (S0 empty) → Section 2 of 2, 2 active segments.
+    // Begin section → advances to S1 (S0 empty) → Section 2 of 2.
     fireEvent.click(screen.getByRole("button", { name: /begin section/i }));
     expect(headerLabel()).toMatch(/section 2 of 2/i);
-    expect(activeSegs()).toBe(2);
 
     // Back across the empty welcome → back to its intro → Section 1 of 2 again.
     fireEvent.click(screen.getByRole("button", { name: /back/i }));
     expect(headerLabel()).toMatch(/section 1 of 2/i);
-    expect(activeSegs()).toBe(1);
   });
 
   it("a section with BOTH a description and questions: intro → Begin section → questions → Back → intro", () => {
