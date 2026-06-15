@@ -1168,6 +1168,13 @@ model AssessmentTemplate {
   resultsEmailSubject           String?
   resultsEmailBodyMarkdown      String?
   resultsEmailContentApproved   Boolean                             @default(false)
+  // Wave D (Spec 17) — approval binding for the results email. The approval
+  // is bound to a content HASH so editing the subject/body after approval
+  // invalidates the prior sign-off (the app compares the live content hash
+  // against `resultsEmailContentApprovedHash`).
+  resultsEmailContentApprovedHash String?
+  resultsEmailContentApprovedAt   DateTime?
+  resultsEmailContentApprovedBy   String?
   aggregationMode               AssessmentTemplateAggregationMode   @default(FULL_VISIBILITY)
   createdBy                     String
   createdAt                     DateTime                            @default(now())
@@ -1224,6 +1231,15 @@ model AssessmentCampaign {
   // Task O — per-campaign invitation email overrides (null = fall back to template defaults)
   invitationSubject       String?
   invitationBodyMarkdown  String?
+  // Wave D (Spec 17) — additive campaign-setup columns.
+  deletedAt               DateTime?                // soft-delete tombstone
+  inviteTiming            AssessmentInviteTiming   @default(IMMEDIATELY)
+  inviteSendStartedAt     DateTime?                // CAS claim — when a send run grabbed this campaign (distinct from completion)
+  inviteSendHeartbeatAt   DateTime?                // lease heartbeat — last liveness tick of the active send run
+  invitesSentAt           DateTime?                // completion marker — set once invites finished sending
+  sendResultsToRespondent Boolean                  @default(false)
+  notifyCoachOnCompletion Boolean                  @default(false)
+  invitationBodyHtml      String?                  // optional rich-HTML invitation body
   createdBy           String
   createdByCoachId    String?                      // v7.6: role-specific coach ownership pointer (nullable so admin PUBLIC campaigns can omit)
   createdAt           DateTime                     @default(now())
@@ -1438,6 +1454,17 @@ enum AssessmentCampaignStatus {
   DRAFT
   ACTIVE
   CLOSED
+}
+
+// Wave D (Spec 17) — when a campaign's invitations are dispatched.
+// IMMEDIATELY: send on activation. ON_OPEN: defer until openAt (sent by the
+// scheduled-send cron). NOTE: there is intentionally NO `SCHEDULED` value on
+// AssessmentCampaignStatus — "Scheduled" is a DERIVED app-state
+// (status=DRAFT AND inviteTiming=ON_OPEN AND invitesSentAt IS NULL AND openAt>now),
+// never a stored enum value.
+enum AssessmentInviteTiming {
+  IMMEDIATELY
+  ON_OPEN
 }
 
 enum AssessmentCampaignEndMode {
