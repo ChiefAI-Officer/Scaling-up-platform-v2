@@ -127,6 +127,9 @@ interface WizardState {
    *  NOT persisted to the draft (ephemeral UI label only). */
   orgName: string;
   templateId: string;
+  /** Display name of the selected template — shown on the Schedule step (#17).
+   *  NOT persisted to the draft (ephemeral UI label only). */
+  templateName: string;
   respondentIds: string[];
   ceoRespondentId: string | null;
   name: string;
@@ -195,6 +198,7 @@ export function CampaignWizard() {
       organizationId: "",
       orgName: "",
       templateId: "",
+      templateName: "",
       respondentIds: [],
       ceoRespondentId: null,
       name: "",
@@ -253,6 +257,7 @@ export function CampaignWizard() {
           organizationId: parsed.organizationId ?? "",
           orgName: "", // ephemeral — not persisted; will re-populate when org is re-selected
           templateId: parsed.templateId ?? "",
+          templateName: "", // ephemeral — not persisted; will re-populate when template is re-selected
           respondentIds: Array.isArray(parsed.respondentIds)
             ? parsed.respondentIds
             : [],
@@ -362,13 +367,6 @@ export function CampaignWizard() {
       // best-effort
     }
   }, []);
-
-  const update = useCallback(
-    <K extends keyof WizardState>(key: K, value: WizardState[K]) => {
-      setState((s) => ({ ...s, [key]: value }));
-    },
-    [],
-  );
 
   const next = () =>
     setState((s) => {
@@ -614,7 +612,9 @@ export function CampaignWizard() {
         {state.step === 1 && (
           <TemplateStep
             value={state.templateId}
-            onChange={(v) => update("templateId", v)}
+            onChange={(id, name) =>
+              setState((s) => ({ ...s, templateId: id, templateName: name }))
+            }
             onBack={back}
             onNext={next}
           />
@@ -642,6 +642,7 @@ export function CampaignWizard() {
             openAt={state.openAt}
             endMode={state.endMode}
             closeAt={state.closeAt}
+            templateName={state.templateName}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             onBack={back}
             onNext={next}
@@ -774,7 +775,7 @@ function TemplateStep({
   onNext,
 }: {
   value: string;
-  onChange: (v: string) => void;
+  onChange: (id: string, name: string) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -831,7 +832,7 @@ function TemplateStep({
                 name="template"
                 value={t.id}
                 checked={value === t.id}
-                onChange={() => onChange(t.id)}
+                onChange={() => onChange(t.id, t.name)}
                 className="accent-primary mt-1"
               />
               <div className="flex-1">
@@ -899,6 +900,7 @@ function ParticipantsStep({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   // Tracks whether the current ceoRespondentId was auto-derived (vs. user-clicked).
   const [ceoPickSource, setCeoPickSource] = useState<CeoPickSource>(null);
 
@@ -1082,6 +1084,40 @@ function ParticipantsStep({
     return result;
   }, [teams, respondents]);
 
+  // Apply search filter: only keep members whose name or email contains the
+  // search query (case-insensitive). Groups with no visible members are hidden.
+  const filteredGroups = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return groups;
+    return groups
+      .map((g) => ({
+        ...g,
+        members: g.members.filter(
+          (r) =>
+            `${r.firstName} ${r.lastName}`.toLowerCase().includes(q) ||
+            r.email.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((g) => g.members.length > 0);
+  }, [groups, searchQuery]);
+
+  /** Toggle all currently-visible members of a group on or off. */
+  function toggleSelectAll(groupKey: string, visibleIds: string[], selectAll: boolean) {
+    let next = respondentIds.slice();
+    if (selectAll) {
+      for (const id of visibleIds) {
+        if (!next.includes(id)) next.push(id);
+      }
+    } else {
+      const visibleSet = new Set(visibleIds);
+      next = next.filter((id) => !visibleSet.has(id));
+    }
+    // CEO is unchanged by Select-All; keep existing CEO if they're still in selection.
+    const ceo = next.includes(ceoRespondentId ?? "") ? ceoRespondentId : null;
+    if (ceo !== ceoRespondentId) setCeoPickSource(null);
+    onChange(next, ceo);
+  }
+
   function renderRow(r: Respondent) {
     const checked = respondentIds.includes(r.id);
     const isCEO = ceoRespondentId === r.id;
@@ -1190,29 +1226,54 @@ function ParticipantsStep({
         </div>
       ) : (
         <div className="space-y-4">
-          {groups.map((g) => (
-            <div
-              key={g.key}
-              className="border border-border rounded-lg overflow-hidden"
-              data-testid={`participant-group-${g.key}`}
-            >
+          <Input
+            type="search"
+            placeholder="Search members…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search members"
+          />
+          {filteredGroups.map((g) => {
+            const visibleIds = g.members.map((m) => m.id);
+            const selectedInGroup = visibleIds.filter((id) =>
+              respondentIds.includes(id),
+            );
+            const allSelected =
+              visibleIds.length > 0 &&
+              selectedInGroup.length === visibleIds.length;
+            return (
               <div
-                className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border"
-                style={{ paddingLeft: `${g.depth * 16 + 12}px` }}
+                key={g.key}
+                className="border border-border rounded-lg overflow-hidden"
+                data-testid={`participant-group-${g.key}`}
               >
-                <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {g.label}
-                </span>
-                <span className="text-[10px] text-muted-foreground">
-                  ({g.members.length})
-                </span>
+                <div
+                  className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border"
+                  style={{ paddingLeft: `${g.depth * 16 + 12}px` }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e) =>
+                      toggleSelectAll(g.key, visibleIds, e.target.checked)
+                    }
+                    aria-label={`Select all ${g.label}`}
+                    className="accent-primary"
+                  />
+                  <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {g.label}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    ({g.members.length})
+                  </span>
+                </div>
+                <div className="divide-y divide-border">
+                  {g.members.map(renderRow)}
+                </div>
               </div>
-              <div className="divide-y divide-border">
-                {g.members.map(renderRow)}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -1250,6 +1311,7 @@ function ScheduleStep({
   openAt,
   endMode,
   closeAt,
+  templateName,
   onChange,
   onBack,
   onNext,
@@ -1258,6 +1320,7 @@ function ScheduleStep({
   openAt: string;
   endMode: EndMode;
   closeAt: string;
+  templateName: string;
   onChange: (patch: Partial<WizardState>) => void;
   onBack: () => void;
   onNext: () => void;
@@ -1281,6 +1344,15 @@ function ScheduleStep({
         <p className="text-sm text-muted-foreground">
           When should this campaign open and close?
         </p>
+        {templateName && (
+          <p
+            className="mt-2 text-sm text-muted-foreground"
+            data-testid="schedule-template-name"
+          >
+            Assessment:{" "}
+            <span className="font-medium text-foreground">{templateName}</span>
+          </p>
+        )}
       </div>
 
       <div className="space-y-4">
