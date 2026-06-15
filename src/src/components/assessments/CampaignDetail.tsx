@@ -171,6 +171,10 @@ export function CampaignDetail({
   const [closeReason, setCloseReason] = useState("");
   const [closing, setClosing] = useState(false);
 
+  // Delete campaign dialog state (Wave D, #1 — soft-delete with blast-radius confirm).
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Add Respondent modal state — pick-existing only (Slice 1).
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [orgRespondents, setOrgRespondents] = useState<OrgRespondentRow[]>([]);
@@ -291,6 +295,36 @@ export function CampaignDetail({
       });
     } finally {
       setClosing(false);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof body.error === "string" ? body.error : "Failed to delete campaign",
+        );
+      }
+      toast({
+        title: "Campaign deleted",
+        description: "The campaign has been removed.",
+      });
+      setDeleteDialogOpen(false);
+      router.push("/portal/assessments");
+    } catch (err) {
+      toast({
+        title: "Could not delete campaign",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -863,6 +897,15 @@ export function CampaignDetail({
                 {closeActionLabel}
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setDeleteDialogOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border bg-card text-destructive hover:bg-destructive/10 transition-colors"
+              data-testid="campaign-delete-btn"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete campaign
+            </button>
           </div>
         </div>
 
@@ -1639,6 +1682,47 @@ export function CampaignDetail({
             >
               {closing && <Loader2 className="w-4 h-4 animate-spin" />}
               {closeActionLabel}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Delete campaign dialog (Wave D #1) */}
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          if (deleting) return;
+          setDeleteDialogOpen(open);
+        }}
+      >
+        <DialogContent data-testid="campaign-delete-dialog">
+          <DialogHeader>
+            <DialogTitle>Delete this campaign?</DialogTitle>
+            <DialogDescription>
+              {headerMetrics.invited > 0 || headerMetrics.completed > 0
+                ? `${headerMetrics.invited} invited and ${headerMetrics.completed} completed participants will lose access. Responses are retained.`
+                : "Invited participants will lose access. Responses are retained."}
+              {" "}This is not reversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleting}
+              className="inline-flex items-center justify-center text-sm font-medium px-4 py-2 rounded-lg border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              data-testid="campaign-delete-cancel"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={deleting}
+              className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              data-testid="campaign-delete-confirm"
+            >
+              {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+              Delete campaign
             </button>
           </DialogFooter>
         </DialogContent>

@@ -80,11 +80,12 @@ export async function GET(request: NextRequest) {
         where: { publishedAt: { not: null } },
       }),
       db.assessmentTemplateVersion.count({ where: { publishedAt: null } }),
-      db.assessmentCampaign.count({ where: { status: "DRAFT" } }),
-      db.assessmentCampaign.count({ where: { status: "ACTIVE" } }),
-      db.assessmentCampaign.count({ where: { status: "CLOSED" } }),
-      db.assessmentCampaign.count({ where: { accessMode: "INVITED" } }),
-      db.assessmentCampaign.count({ where: { accessMode: "PUBLIC" } }),
+      // SEC-M6: exclude soft-deleted campaigns from operator counters.
+      db.assessmentCampaign.count({ where: { status: "DRAFT", deletedAt: null } }),
+      db.assessmentCampaign.count({ where: { status: "ACTIVE", deletedAt: null } }),
+      db.assessmentCampaign.count({ where: { status: "CLOSED", deletedAt: null } }),
+      db.assessmentCampaign.count({ where: { accessMode: "INVITED", deletedAt: null } }),
+      db.assessmentCampaign.count({ where: { accessMode: "PUBLIC", deletedAt: null } }),
       db.assessmentSubmission.count(),
       db.assessmentSubmission.count({
         where: { submittedAt: { gte: oneDayAgo } },

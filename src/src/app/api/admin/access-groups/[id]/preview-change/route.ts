@@ -271,6 +271,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       where: {
         createdByCoachId: { in: affectedCoachIds },
         status: { in: ["DRAFT", "ACTIVE"] },
+        deletedAt: null,
       },
       _count: { _all: true },
     });

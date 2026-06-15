@@ -126,6 +126,7 @@ export interface AccessChangeTx {
       where?: {
         createdByCoachId?: string;
         status?: { in?: string[] };
+        deletedAt?: Date | null;
       };
     }) => Promise<
       Array<{
@@ -358,6 +359,7 @@ export async function evaluateAccessChange(
         where: {
           createdByCoachId: cid,
           status: { in: ["DRAFT", "ACTIVE"] },
+          deletedAt: null,
         },
       });
       if (campaigns.length > 0) {
