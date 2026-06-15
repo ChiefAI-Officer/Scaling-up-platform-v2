@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { resultsEmailContentHash } from "@/lib/assessments/results-email-approval";
 
 export async function GET(
   _request: NextRequest,
@@ -130,7 +131,11 @@ export async function PATCH(
 
     const existing = await db.assessmentTemplate.findFirst({
       where: { id, deletedAt: null },
-      select: { id: true },
+      select: {
+        id: true,
+        resultsEmailSubject: true,
+        resultsEmailBodyMarkdown: true,
+      },
     });
     if (!existing) {
       return NextResponse.json(
@@ -149,6 +154,9 @@ export async function PATCH(
       resultsEmailSubject?: string | null;
       resultsEmailBodyMarkdown?: string | null;
       resultsEmailContentApproved?: boolean;
+      resultsEmailContentApprovedHash?: string | null;
+      resultsEmailContentApprovedAt?: Date | null;
+      resultsEmailContentApprovedBy?: string | null;
     } = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
@@ -162,8 +170,43 @@ export async function PATCH(
       updateData.resultsEmailSubject = data.resultsEmailSubject;
     if (data.resultsEmailBodyMarkdown !== undefined)
       updateData.resultsEmailBodyMarkdown = data.resultsEmailBodyMarkdown;
-    if (data.resultsEmailContentApproved !== undefined)
-      updateData.resultsEmailContentApproved = data.resultsEmailContentApproved;
+
+    // SEC-H2 — bind the Results Email approval to a hash of the exact approved
+    // content. Resolve the post-update subject/body (what the row WILL hold) so
+    // both the clear-on-edit detection and the approve binding act on the same
+    // committed content.
+    const nextSubject =
+      data.resultsEmailSubject !== undefined
+        ? data.resultsEmailSubject
+        : existing.resultsEmailSubject;
+    const nextBody =
+      data.resultsEmailBodyMarkdown !== undefined
+        ? data.resultsEmailBodyMarkdown
+        : existing.resultsEmailBodyMarkdown;
+
+    const editsContent =
+      (data.resultsEmailSubject !== undefined &&
+        data.resultsEmailSubject !== existing.resultsEmailSubject) ||
+      (data.resultsEmailBodyMarkdown !== undefined &&
+        data.resultsEmailBodyMarkdown !== existing.resultsEmailBodyMarkdown);
+
+    if (data.resultsEmailContentApproved === true) {
+      // Approve always binds to the content as it will be AFTER this request.
+      updateData.resultsEmailContentApproved = true;
+      updateData.resultsEmailContentApprovedHash = resultsEmailContentHash(
+        nextSubject,
+        nextBody,
+      );
+      updateData.resultsEmailContentApprovedAt = new Date();
+      updateData.resultsEmailContentApprovedBy = actor.email ?? actor.userId;
+    } else if (data.resultsEmailContentApproved === false || editsContent) {
+      // Explicit unapprove, OR a content edit without re-approving in the same
+      // request → clear approval (a stale approval must never linger).
+      updateData.resultsEmailContentApproved = false;
+      updateData.resultsEmailContentApprovedHash = null;
+      updateData.resultsEmailContentApprovedAt = null;
+      updateData.resultsEmailContentApprovedBy = null;
+    }
 
     await db.assessmentTemplate.update({ where: { id }, data: updateData });
 
