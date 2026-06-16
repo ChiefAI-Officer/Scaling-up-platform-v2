@@ -60,14 +60,20 @@ import {
   waveDAutoSendEnabled,
   assessmentSendsPaused,
 } from "@/lib/assessments/wave-d-feature-flags";
+import { ASSESSMENT_SEND_INVITES_EVENT } from "./assessment-invite-fanout-event";
 
 // ---------------------------------------------------------------------------
 // Event
 // ---------------------------------------------------------------------------
 
-/** Trigger event. Payload is `{ campaignId }` ONLY (SEC-M5). */
-export const ASSESSMENT_SEND_INVITES_EVENT =
-  "assessment/campaign.send-invites" as const;
+/**
+ * Trigger event. Payload is `{ campaignId }` ONLY (SEC-M5).
+ *
+ * Re-exported (imported above) from a side-effect-free constants module so
+ * non-Inngest callers — e.g. the campaign-create route's post-commit emit —
+ * can import the name WITHOUT evaluating this function definition.
+ */
+export { ASSESSMENT_SEND_INVITES_EVENT };
 
 export interface FanoutInput {
   campaignId: string;

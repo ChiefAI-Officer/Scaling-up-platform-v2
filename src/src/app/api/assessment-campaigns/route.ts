@@ -32,6 +32,12 @@ import {
 } from "@/lib/assessments/campaign-create-service";
 import { splitName } from "@/lib/assessments/respondent-csv";
 import { normalizeEmail } from "@/app/api/organizations/[id]/respondents/route";
+import { buildTeamPath } from "@/app/api/assessment-campaigns/[id]/participants/route";
+import { waveDAutoSendEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import { inngest } from "@/inngest/client";
+// Import the event name from the side-effect-free constants module (NOT the
+// fan-out function module) so the route never evaluates inngest.createFunction.
+import { ASSESSMENT_SEND_INVITES_EVENT } from "@/inngest/functions/assessment-invite-fanout-event";
 
 const CAMPAIGN_LANGUAGE_DEFAULT = "enUS";
 
@@ -236,12 +242,56 @@ export async function POST(request: NextRequest) {
     const ts = buildAliasTimestamp(new Date());
     const aliasBase = `${orgSlug}_${tmplSlug}_${ts}`;
 
-    const openAtDate = new Date(data.openAt);
+    // ─────────────────────────────────────────────────────────────────────
+    // Task 9 (Wave D) — distinguish a Wave-D create from a legacy create.
+    //
+    // A Wave-D create is marked by ANY of: `inviteTiming` present, `waveD:
+    // true`, or a non-empty `participantIds` array. It does: atomic create +
+    // in-tx participant re-auth (SEC-M3) + lifecycle + post-commit auto-send.
+    // Absence of all three = legacy create: DRAFT, no participants attached
+    // here (coaches attach later via the participants route), no auto-send.
+    // ─────────────────────────────────────────────────────────────────────
+    const isWaveDCreate =
+      data.inviteTiming !== undefined ||
+      data.waveD === true ||
+      (Array.isArray(data.participantIds) && data.participantIds.length > 0);
+    const inviteTiming = data.inviteTiming ?? "IMMEDIATELY";
+    const autoSendOn = waveDAutoSendEnabled();
+    // IMMEDIATELY + flag ON: open now and send right away. Everything else
+    // (ON_OPEN, OR the flag off) is DRAFT and never auto-sends from the route.
+    const goesActiveAndSends =
+      isWaveDCreate && inviteTiming === "IMMEDIATELY" && autoSendOn;
+
+    const now = new Date();
+    // For a Wave-D IMMEDIATELY create, openAt = NOW (R1-H1) — the campaign
+    // opens immediately, so a client-sent openAt is ignored (and may be
+    // omitted). This holds whether or not the flag is on: flag-off still
+    // opens-now, it just stays DRAFT and doesn't auto-send (dark). All other
+    // paths (ON_OPEN, legacy) use the client openAt and require it.
+    const immediateOpen = isWaveDCreate && inviteTiming === "IMMEDIATELY";
+    // openAt is optional in the schema ONLY for the immediate-open path (it's
+    // ignored there). On every other path the schema's superRefine guarantees
+    // it's present; the `?? ""` keeps the type honest and yields an Invalid
+    // Date that the NaN guard below rejects with a 400 (defense in depth).
+    const openAtDate = immediateOpen ? now : new Date(data.openAt ?? "");
     if (Number.isNaN(openAtDate.getTime())) {
       return NextResponse.json(
         { success: false, error: "openAt must be a valid ISO date" },
         { status: 400 }
       );
+    }
+    // ON_OPEN requires a FUTURE openAt (the cron sends at openAt — a past
+    // openAt would never trigger a send and silently strand the campaign).
+    if (isWaveDCreate && inviteTiming === "ON_OPEN" && autoSendOn) {
+      if (openAtDate.getTime() <= now.getTime()) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "openAt must be in the future when inviteTiming is ON_OPEN",
+          },
+          { status: 400 }
+        );
+      }
     }
     const closeAtDate =
       data.endMode === "ENDS_AFTER" && data.closeAt
@@ -253,63 +303,171 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    // Lifecycle: ACTIVE only when we open + send now; everything else DRAFT.
+    const initialStatus: "ACTIVE" | "DRAFT" = goesActiveAndSends
+      ? "ACTIVE"
+      : "DRAFT";
 
-    // Try the natural alias first; on P2002 (collision), fall back to
-    // aliasBase + short random suffix.
-    let campaign;
-    try {
-      campaign = await db.assessmentCampaign.create({
-        data: {
-          name: data.name,
-          description: data.description ?? null,
-          templateId: data.templateId,
-          versionId: version.id,
-          organizationId: data.organizationId,
-          language: version.language,
-          alias: aliasBase,
-          status: "DRAFT",
-          openAt: openAtDate,
-          endMode: data.endMode,
-          closeAt: closeAtDate,
-          invitationSubject: data.invitationSubject ?? null,
-          invitationBodyMarkdown: data.invitationBodyMarkdown ?? null,
-          sendResultsToRespondent: data.sendResultsToRespondent,
-          notifyCoachOnCompletion: data.notifyCoachOnCompletion,
-          createdBy: actor.userId,
-          createdByCoachId: actor.coachId,
-        },
-      });
-    } catch (error) {
-      if (
+    // Narrow `actor` for the closure below: the 401 + coach guards above
+    // already proved non-null + non-null coachId, but TS control-flow
+    // narrowing does not flow into a nested function declaration, so bind
+    // the fields to locals here.
+    const createdByUserId = actor.userId;
+    const createdByCoachId = actor.coachId;
+    // Shared create payload. `alias` is overridden on the P2002 fallback path.
+    function campaignCreateData(alias: string) {
+      return {
+        name: data.name,
+        description: data.description ?? null,
+        templateId: data.templateId,
+        versionId: version.id,
+        organizationId: data.organizationId,
+        language: version.language,
+        alias,
+        status: initialStatus,
+        inviteTiming,
+        openAt: openAtDate,
+        endMode: data.endMode,
+        closeAt: closeAtDate,
+        invitationSubject: data.invitationSubject ?? null,
+        invitationBodyMarkdown: data.invitationBodyMarkdown ?? null,
+        sendResultsToRespondent: data.sendResultsToRespondent,
+        notifyCoachOnCompletion: data.notifyCoachOnCompletion,
+        createdBy: createdByUserId,
+        createdByCoachId,
+      };
+    }
+    function isP2002(error: unknown): boolean {
+      return (
         typeof error === "object" &&
         error !== null &&
         "code" in error &&
         (error as { code: string }).code === "P2002"
-      ) {
-        const aliasFallback = `${aliasBase}_${Math.random()
-          .toString(36)
-          .slice(2, 8)}`;
-        campaign = await db.assessmentCampaign.create({
-          data: {
-            name: data.name,
-            description: data.description ?? null,
-            templateId: data.templateId,
-            versionId: version.id,
+      );
+    }
+
+    let campaign;
+    if (isWaveDCreate) {
+      // ───────────────────────────────────────────────────────────────────
+      // Task 9 (Wave D) — ATOMIC create + in-tx participant re-auth (SEC-M3).
+      //
+      // The campaign create AND the participant attach happen in ONE
+      // db.$transaction so a failure can't leave orphan participants or a
+      // campaign missing its participants. Participant IDs are re-verified
+      // INSIDE the tx against the campaign's org (anti-IDOR) — the client's
+      // IDs are never trusted blindly.
+      // ───────────────────────────────────────────────────────────────────
+      const participantIds = data.participantIds ?? [];
+      const ceoRespondentId = data.ceoRespondentId ?? null;
+
+      // Load + re-authorize the respondents BEFORE the tx so a foreign/deleted
+      // ID is a clean 400 (no campaign created). The same org-scoped + count
+      // checks are the security core. Skipped when no participants submitted.
+      let verified: Array<{
+        id: string;
+        teamId: string | null;
+        firstName: string;
+        lastName: string;
+      }> = [];
+      if (participantIds.length > 0) {
+        verified = await db.orgRespondent.findMany({
+          where: {
+            id: { in: participantIds },
             organizationId: data.organizationId,
-            language: version.language,
-            alias: aliasFallback,
-            status: "DRAFT",
-            openAt: openAtDate,
-            endMode: data.endMode,
-            closeAt: closeAtDate,
-            sendResultsToRespondent: data.sendResultsToRespondent,
-            notifyCoachOnCompletion: data.notifyCoachOnCompletion,
-            createdBy: actor.userId,
-            createdByCoachId: actor.coachId,
+            deletedAt: null,
           },
+          select: { id: true, teamId: true, firstName: true, lastName: true },
         });
-      } else {
-        throw error;
+        // SEC-M3: a missing / foreign-org / deleted ID → loaded count differs
+        // from the submitted count → reject. No campaign, no participants.
+        if (verified.length !== participantIds.length) {
+          return NextResponse.json(
+            {
+              success: false,
+              error:
+                "One or more participantIds do not belong to this campaign's organization",
+            },
+            { status: 400 }
+          );
+        }
+        // CEO (if any) must be among the verified IDs (schema already checks
+        // membership in the submitted list; this confirms it survived re-auth).
+        if (ceoRespondentId && !verified.some((r) => r.id === ceoRespondentId)) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: "ceoRespondentId must be a verified participant",
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Org teams for the teamPathAtAdd snapshot (immutable add-time copy).
+      const teams = (await db.orgTeam.findMany({
+        where: { organizationId: data.organizationId },
+        select: { id: true, name: true, parentTeamId: true, deletedAt: true },
+      })) as Array<{
+        id: string;
+        name: string;
+        parentTeamId: string | null;
+        deletedAt: Date | null;
+      }>;
+      const teamsById = new Map(teams.map((t) => [t.id, t]));
+
+      async function createWaveD(alias: string) {
+        return db.$transaction(async (tx) => {
+          const created = await tx.assessmentCampaign.create({
+            data: campaignCreateData(alias),
+          });
+          for (const r of verified) {
+            const path = buildTeamPath(r.teamId, teamsById);
+            await tx.assessmentCampaignParticipant.create({
+              data: {
+                campaignId: created.id,
+                respondentId: r.id,
+                isCEO: ceoRespondentId === r.id,
+                teamPathAtAdd: path.ids,
+                teamLabelsAtAdd: path.labels,
+              },
+            });
+          }
+          return created;
+        });
+      }
+
+      try {
+        campaign = await createWaveD(aliasBase);
+      } catch (error) {
+        if (isP2002(error)) {
+          const aliasFallback = `${aliasBase}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`;
+          campaign = await createWaveD(aliasFallback);
+        } else {
+          throw error;
+        }
+      }
+    } else {
+      // ───────────────────────────────────────────────────────────────────
+      // Legacy create — unchanged behavior: DRAFT, no participant attach here,
+      // no auto-send. (initialStatus is DRAFT on this path by construction.)
+      // ───────────────────────────────────────────────────────────────────
+      try {
+        campaign = await db.assessmentCampaign.create({
+          data: campaignCreateData(aliasBase),
+        });
+      } catch (error) {
+        if (isP2002(error)) {
+          const aliasFallback = `${aliasBase}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`;
+          campaign = await db.assessmentCampaign.create({
+            data: campaignCreateData(aliasFallback),
+          });
+        } else {
+          throw error;
+        }
       }
     }
 
@@ -340,11 +498,42 @@ export async function POST(request: NextRequest) {
         organizationId: campaign.organizationId,
         versionId: campaign.versionId,
         alias: campaign.alias,
+        status: campaign.status,
+        inviteTiming,
+        waveD: isWaveDCreate,
+        participantsAttached: isWaveDCreate
+          ? (data.participantIds?.length ?? 0)
+          : 0,
+        autoSendEmitted: goesActiveAndSends,
         bulkRespondentsCreated: bulkResult?.created.length ?? 0,
         bulkRespondentsSkipped: bulkResult?.skipped.length ?? 0,
         bulkRespondentsErrors: bulkResult?.errors.length ?? 0,
       },
     });
+
+    // ───────────────────────────────────────────────────────────────────────
+    // Task 9 (Wave D) — POST-COMMIT, guarded auto-send emit (IMMEDIATELY only).
+    //
+    // The emit is AFTER the tx commits (never inside) and best-effort: if
+    // inngest.send throws (outage/misconfig) the campaign is already durable
+    // and the stale-claim cron is the backstop, so we MUST NOT fail the
+    // request. ON_OPEN / flag-off / legacy never emit here (the cron sends
+    // ON_OPEN at openAt; flag-off/legacy stay DRAFT). SEC-M5: payload is
+    // `{ campaignId }` ONLY — never tokens, emails, or URLs.
+    // ───────────────────────────────────────────────────────────────────────
+    if (goesActiveAndSends) {
+      try {
+        await inngest.send({
+          name: ASSESSMENT_SEND_INVITES_EVENT,
+          data: { campaignId: campaign.id },
+        });
+      } catch (sendErr) {
+        console.error(
+          "assessment invite fan-out emit failed (cron backstop will retry):",
+          sendErr,
+        );
+      }
+    }
 
     return NextResponse.json(
       {

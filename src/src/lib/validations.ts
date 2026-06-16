@@ -507,7 +507,11 @@ export const createAssessmentCampaignSchema = z
         name: z.string().min(1, "Campaign name is required").max(200).transform(_trim),
         templateId: z.string().min(1, "templateId is required"),
         organizationId: z.string().min(1, "organizationId is required"),
-        openAt: z.string().min(1, "openAt is required"),
+        // Required on every path EXCEPT a Wave-D IMMEDIATELY create (which
+        // opens NOW and ignores any client openAt — see the superRefine below
+        // and the route's `immediateOpen` branch). Legacy + ON_OPEN creates
+        // still require it.
+        openAt: z.string().min(1, "openAt is required").optional(),
         endMode: z.enum(["OPEN_END", "ENDS_AFTER"]),
         closeAt: z.string().min(1).optional().nullable(),
         description: z.string().max(2000).transform(_trim).optional().nullable(),
@@ -517,6 +521,23 @@ export const createAssessmentCampaignSchema = z
         // Task 6b — #15/#16 toggles
         sendResultsToRespondent: z.boolean().default(false),
         notifyCoachOnCompletion: z.boolean().default(false),
+        // Task 9 (Wave D) — invite timing. Its PRESENCE (or `waveD: true`, or a
+        // non-empty participantIds array) marks a Wave-D create (atomic create +
+        // participant attach + lifecycle + auto-send). Absence = legacy create
+        // (DRAFT, no participants attached here, no auto-send).
+        inviteTiming: z.enum(["IMMEDIATELY", "ON_OPEN"]).optional(),
+        // Task 9 (Wave D) — explicit Wave-D marker (lets a caller opt in even
+        // with the default IMMEDIATELY timing and no participants).
+        waveD: z.boolean().optional(),
+        // Task 9 (Wave D) — participant respondent IDs to attach atomically.
+        // Re-authorized server-side (SEC-M3): every ID must belong to the
+        // campaign's organization and be non-deleted, count must match, the
+        // CEO (if any) must be among them.
+        participantIds: z
+            .array(z.string().min(1))
+            .max(500)
+            .optional(),
+        ceoRespondentId: z.string().min(1).optional().nullable(),
         // deprecated: Task M optional bulk-respondent payload from the wizard
         // CSV import. The setup-first flip (Slice 1) stopped the wizard from
         // sending this — coaches now pick EXISTING members. Kept optional and
@@ -535,6 +556,26 @@ export const createAssessmentCampaignSchema = z
             .optional(),
     })
     .superRefine((data, ctx) => {
+        // Task 9 (Wave D) — openAt is OPTIONAL only for a Wave-D IMMEDIATELY
+        // create (opens NOW; route ignores any client openAt). Mirrors the
+        // route's `isWaveDCreate` + default-IMMEDIATELY logic. Every other
+        // path (ON_OPEN, legacy) still requires openAt.
+        const isWaveDCreate =
+            data.inviteTiming !== undefined ||
+            data.waveD === true ||
+            (Array.isArray(data.participantIds) &&
+                data.participantIds.length > 0);
+        const effectiveTiming = data.inviteTiming ?? "IMMEDIATELY";
+        const openAtOptional =
+            isWaveDCreate && effectiveTiming === "IMMEDIATELY";
+        if (!openAtOptional && !data.openAt) {
+            ctx.addIssue({
+                code: "custom",
+                message: "openAt is required",
+                path: ["openAt"],
+            });
+        }
+
         if (data.endMode === "ENDS_AFTER") {
             if (!data.closeAt) {
                 ctx.addIssue({
@@ -544,9 +585,8 @@ export const createAssessmentCampaignSchema = z
                 });
                 return;
             }
-            const openMs = Date.parse(data.openAt);
             const closeMs = Date.parse(data.closeAt);
-            if (Number.isNaN(openMs) || Number.isNaN(closeMs)) {
+            if (Number.isNaN(closeMs)) {
                 ctx.addIssue({
                     code: "custom",
                     message: "openAt and closeAt must be valid ISO dates",
@@ -554,13 +594,61 @@ export const createAssessmentCampaignSchema = z
                 });
                 return;
             }
-            if (closeMs <= openMs) {
+            // openAt may be omitted on a Wave-D IMMEDIATELY create (opens NOW);
+            // the route enforces closeAt > now at runtime. Only compare here
+            // when an explicit openAt was supplied (legacy / ON_OPEN paths).
+            if (data.openAt) {
+                const openMs = Date.parse(data.openAt);
+                if (Number.isNaN(openMs)) {
+                    ctx.addIssue({
+                        code: "custom",
+                        message: "openAt and closeAt must be valid ISO dates",
+                        path: ["closeAt"],
+                    });
+                    return;
+                }
+                if (closeMs <= openMs) {
+                    ctx.addIssue({
+                        code: "custom",
+                        message: "closeAt must be after openAt",
+                        path: ["closeAt"],
+                    });
+                }
+            }
+        }
+
+        // Task 9 (Wave D) — participantIds integrity (shape-level only; the
+        // ownership re-auth happens server-side, in the create transaction).
+        if (data.participantIds && data.participantIds.length > 0) {
+            const ids = new Set<string>();
+            for (const id of data.participantIds) {
+                if (ids.has(id)) {
+                    ctx.addIssue({
+                        code: "custom",
+                        message: "participantIds must be unique",
+                        path: ["participantIds"],
+                    });
+                    break;
+                }
+                ids.add(id);
+            }
+            if (
+                data.ceoRespondentId &&
+                !data.participantIds.includes(data.ceoRespondentId)
+            ) {
                 ctx.addIssue({
                     code: "custom",
-                    message: "closeAt must be after openAt",
-                    path: ["closeAt"],
+                    message: "ceoRespondentId must be present in participantIds",
+                    path: ["ceoRespondentId"],
                 });
             }
+        } else if (data.ceoRespondentId) {
+            // A CEO with no participant list to anchor it to is invalid.
+            ctx.addIssue({
+                code: "custom",
+                message: "ceoRespondentId requires a non-empty participantIds",
+                path: ["ceoRespondentId"],
+            });
         }
     });
 
