@@ -110,7 +110,14 @@ function makeDeps(
   const sendEmail = jest.fn().mockResolvedValue(undefined);
   const isPaused = jest.fn().mockReturnValue(false);
   const isAutoSendEnabled = jest.fn().mockReturnValue(true);
-  const runStep = jest.fn((_name: string, fn: () => unknown) => fn());
+  // Mirror REAL Inngest: every step.run return is JSON-serialized + parsed back,
+  // so a Date returned from a step comes back as an ISO string (exactly as in
+  // prod). The fan-out MUST rehydrate any Date it reads back across this
+  // boundary, or it will hand a string where a Date is expected.
+  const runStep = jest.fn(
+    async (_name: string, fn: () => unknown) =>
+      JSON.parse(JSON.stringify(await fn())),
+  );
 
   const deps = {
     db: {
@@ -468,5 +475,178 @@ describe("runInviteFanout", () => {
     expect(result.aborted).toBe(true);
     expect(result.reason).toBe("not-found");
     expect(deps.sendInvitesBatch).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // FIX 1 — step-boundary Date rehydration (closeAt survives JSON round-trip)
+  // -------------------------------------------------------------------------
+  it("rehydrates campaign.closeAt to a real Date after the preflight-load step (does NOT pass a string into the send path)", async () => {
+    const deps = makeDeps();
+    const closeAt = new Date("2026-09-30T00:00:00Z");
+    deps.findUnique.mockResolvedValue(
+      makeCampaign({ closeAt, participants: makeParticipants(1) } as any),
+    );
+    deps.sendInvitesBatch.mockResolvedValue({
+      sent: ["resp-0"],
+      skipped: [],
+      failed: [],
+      results: [],
+    });
+
+    // With the JSON-round-trip runner, closeAt comes back from preflight-load as
+    // a STRING. The fan-out must rehydrate it to a Date before handing it to
+    // sendInvitesBatch (which uses it as expiresAt + the mailer calls
+    // closeAt.toLocaleDateString — a TypeError on a string).
+    const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    expect(result.aborted).toBe(false);
+    const input = deps.sendInvitesBatch.mock.calls[0][1];
+    expect(input.campaign.closeAt).toBeInstanceOf(Date);
+    expect(input.campaign.closeAt.toISOString()).toBe(closeAt.toISOString());
+    // proves a real Date method works (the prod crash was .toLocaleDateString)
+    expect(() => input.campaign.closeAt.toLocaleDateString("en-US")).not.toThrow();
+  });
+
+  // -------------------------------------------------------------------------
+  // FIX 2 — no false completion on a total send failure (SMTP outage)
+  // -------------------------------------------------------------------------
+  it("on a TOTAL send failure (zero sent, zero already-SENT, ≥1 failed): does NOT mark sent, RELEASES the claim, and throws", async () => {
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue(
+      makeCampaign({ participants: makeParticipants(2) } as any),
+    );
+    deps.sendInvitesBatch.mockResolvedValue({
+      sent: [],
+      skipped: [],
+      failed: ["resp-0", "resp-1"],
+      results: [],
+    });
+
+    await expect(
+      runInviteFanout(deps, { campaignId: CAMPAIGN_ID }),
+    ).rejects.toThrow();
+
+    // NOT marked sent (nothing got through)
+    expect(findMarkSent(deps.updateMany)).toBeUndefined();
+
+    // claim RELEASED so a later run / the cron can re-claim
+    const releaseCall = deps.updateMany.mock.calls.find(
+      (c: any) =>
+        c[0]?.data && c[0].data.inviteSendStartedAt === null,
+    );
+    expect(releaseCall).toBeDefined();
+    expect(releaseCall[0].data.invitesSentAt).toBeUndefined();
+  });
+
+  it("on a PARTIAL failure (some sent, some failed) still marks complete; bad addresses stay PENDING", async () => {
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue(
+      makeCampaign({ participants: makeParticipants(2) } as any),
+    );
+    deps.sendInvitesBatch.mockResolvedValue({
+      sent: ["resp-0"],
+      skipped: [],
+      failed: ["resp-1"],
+      results: [],
+    });
+
+    const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    expect(result.aborted).toBe(false);
+    expect(result.sent).toBe(1);
+    const markCall = findMarkSent(deps.updateMany);
+    expect(markCall).toBeDefined();
+    expect(markCall.data.invitesSentAt).toEqual(FIXED_NOW);
+  });
+
+  it("completes (does NOT release / throw) when progress is only already-SENT recipients (zero new sends, zero failures)", async () => {
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue(
+      makeCampaign({ participants: makeParticipants(2) } as any),
+    );
+    deps.sendInvitesBatch.mockResolvedValue({
+      sent: [],
+      skipped: ["resp-0", "resp-1"],
+      failed: [],
+      results: [],
+    });
+
+    const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    expect(result.aborted).toBe(false);
+    const markCall = findMarkSent(deps.updateMany);
+    expect(markCall).toBeDefined();
+    expect(markCall.data.invitesSentAt).toEqual(FIXED_NOW);
+  });
+
+  // -------------------------------------------------------------------------
+  // FIX 3 — heartbeat carries a LIVE timestamp (fresh per batch)
+  // -------------------------------------------------------------------------
+  it("writes a FRESH now() into each heartbeat (advances across batches — liveness signal)", async () => {
+    const t1 = new Date("2026-06-16T12:00:00Z");
+    const t2 = new Date("2026-06-16T12:01:00Z");
+    const t3 = new Date("2026-06-16T12:02:00Z");
+    const t4 = new Date("2026-06-16T12:03:00Z");
+    const t5 = new Date("2026-06-16T12:04:00Z");
+    const clock = [t1, t2, t3, t4, t5];
+    let i = 0;
+    // increasing clock so a heartbeat written from the run-start value would be
+    // detectable (all equal) vs. a fresh value (advances).
+    const now = jest.fn(() => clock[Math.min(i++, clock.length - 1)]);
+
+    const deps = makeDeps({ now } as any);
+    deps.findUnique.mockResolvedValue(
+      makeCampaign({ participants: makeParticipants(30) } as any),
+    );
+
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    const heartbeatCalls = deps.updateMany.mock.calls.filter(
+      (c: any) => c[0].data && c[0].data.inviteSendHeartbeatAt !== undefined,
+    );
+    // 2 batches → 2 heartbeats
+    expect(heartbeatCalls.length).toBe(2);
+    const h1 = heartbeatCalls[0][0].data.inviteSendHeartbeatAt;
+    const h2 = heartbeatCalls[1][0].data.inviteSendHeartbeatAt;
+    // the two heartbeats must NOT be the same captured value
+    expect(h2).not.toEqual(h1);
+  });
+
+  // -------------------------------------------------------------------------
+  // FIX 4 — status-guard the DRAFT→ACTIVE flip
+  // -------------------------------------------------------------------------
+  it("status-guards the DRAFT→ACTIVE flip (where.status === DRAFT) so it cannot flip a campaign moved out of DRAFT mid-run", async () => {
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue(
+      makeCampaign({ inviteTiming: "ON_OPEN", status: "DRAFT" }),
+    );
+    deps.sendInvitesBatch.mockResolvedValue({
+      sent: ["resp-0", "resp-1"],
+      skipped: [],
+      failed: [],
+      results: [],
+    });
+
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    const markCall = findMarkSent(deps.updateMany);
+    expect(markCall.data.status).toBe("ACTIVE");
+    expect(markCall.where.status).toBe("DRAFT");
+    // invitesSentAt set regardless of the flip
+    expect(markCall.data.invitesSentAt).toEqual(FIXED_NOW);
+  });
+
+  it("does NOT add a status guard when there is no flip (IMMEDIATELY campaign)", async () => {
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue(
+      makeCampaign({ inviteTiming: "IMMEDIATELY", status: "ACTIVE" }),
+    );
+
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    const markCall = findMarkSent(deps.updateMany);
+    expect(markCall.data.status).toBeUndefined();
+    expect(markCall.where.status).toBeUndefined();
+    expect(markCall.data.invitesSentAt).toEqual(FIXED_NOW);
   });
 });

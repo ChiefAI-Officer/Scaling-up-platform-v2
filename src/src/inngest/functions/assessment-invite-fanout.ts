@@ -197,7 +197,7 @@ export async function runInviteFanout(
   // -------------------------------------------------------------------------
   // 2. Pre-flight guards (after claim).
   // -------------------------------------------------------------------------
-  const campaign = await deps.runStep("preflight-load", () =>
+  const loaded = await deps.runStep("preflight-load", () =>
     deps.db.assessmentCampaign.findUnique({
       where: { id: campaignId },
       include: {
@@ -234,9 +234,32 @@ export async function runInviteFanout(
 
   // Campaign vanished after claim (race / hard delete). Nothing to release that
   // matters — leave whatever row state exists; abort.
-  if (!campaign) {
+  if (!loaded) {
     return { claimed: true, aborted: true, reason: "not-found" };
   }
+
+  // FIX 1 (CRITICAL): real Inngest JSON-serializes every step.run return, so
+  // every Date read back from `preflight-load` is actually an ISO STRING. Most
+  // notably `closeAt` flows into sendInvitesBatch as `expiresAt` AND into the
+  // mailer, which calls `closeAt.toLocaleDateString(...)` — a TypeError on a
+  // string for any campaign with closeAt set. Rehydrate every Date field at the
+  // step boundary (repo convention — see process-payment-completed.ts).
+  const rehydrateDate = (v: Date | string | null): Date | null =>
+    v === null ? null : new Date(v as unknown as string);
+  const campaign = {
+    ...loaded,
+    closeAt: rehydrateDate(loaded.closeAt),
+    deletedAt: rehydrateDate(loaded.deletedAt),
+    participants: loaded.participants.map((p) => ({
+      ...p,
+      respondent: p.respondent
+        ? {
+            ...p.respondent,
+            deletedAt: rehydrateDate(p.respondent.deletedAt),
+          }
+        : null,
+    })),
+  };
 
   // Deleted → abort, DO NOT release (leave the claim so nothing re-picks it up).
   if (campaign.deletedAt) {
@@ -280,7 +303,11 @@ export async function runInviteFanout(
   // -------------------------------------------------------------------------
   // 4. Send each chunk in its own durable step.
   // -------------------------------------------------------------------------
+  // Aggregate per-recipient outcomes across ALL batches so completion can
+  // distinguish "made progress" from "nothing got through" (FIX 2).
   let totalSent = 0;
+  let totalAlready = 0;
+  let totalFailed = 0;
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
 
@@ -303,10 +330,13 @@ export async function runInviteFanout(
 
     // Heartbeat: prove this run is alive so the stale-claim cron can tell a
     // dead run apart from a slow one. id-scoped updateMany (no count read).
+    // FIX 3: write a FRESH deps.now() per batch — a single captured value makes
+    // a slow-but-alive multi-batch run indistinguishable from a dead one and
+    // defeats the stale-claim cron.
     await deps.runStep(`heartbeat-${i + 1}`, () =>
       deps.db.assessmentCampaign.updateMany({
         where: { id: campaignId },
-        data: { inviteSendHeartbeatAt: now },
+        data: { inviteSendHeartbeatAt: deps.now() },
       }),
     );
 
@@ -335,23 +365,67 @@ export async function runInviteFanout(
       ),
     );
     totalSent += result.sent.length;
+    totalAlready += result.skipped.length;
+    totalFailed += result.failed.length;
   }
 
   // -------------------------------------------------------------------------
-  // 5. Completion — mark sent (+ flip ON_OPEN DRAFT → ACTIVE).
+  // 5. Completion (FIX 2) — distinguish "made progress" from "total outage".
   // -------------------------------------------------------------------------
+  // `sendInvitesBatch` swallows per-recipient SMTP failures (returns failed[],
+  // never throws). If EVERY recipient failed (zero sent, zero already-SENT, ≥1
+  // failed) nothing reached anyone — marking sent here would falsely complete
+  // the campaign AND, because invitesSentAt would be set, the CAS claim could
+  // never fire again → permanently un-reclaimable with zero emails delivered.
+  // So: release the claim and throw, letting Inngest retry / the cron re-claim.
+  // A PARTIAL failure (some sent, some failed) still completes — the bad
+  // addresses stay PENDING and are resendable via /resend (avoids forever-stuck
+  // on one bad address).
+  const madeProgress = totalSent > 0 || totalAlready > 0;
+  if (!madeProgress && totalFailed > 0) {
+    await releaseClaim(deps, campaignId);
+    throw new Error(
+      `Assessment invite fan-out for campaign ${campaignId} delivered zero ` +
+        `invitations (${totalFailed} failed, 0 sent) — releasing claim for retry.`,
+    );
+  }
+
+  // Mark sent — set invitesSentAt REGARDLESS (completion is real progress).
   const flipToActive =
     campaign.inviteTiming === "ON_OPEN" && campaign.status === "DRAFT";
 
   await deps.runStep("mark-sent", () =>
     deps.db.assessmentCampaign.updateMany({
-      where: { id: campaignId },
+      where: {
+        id: campaignId,
+        // FIX 4: status-guard the DRAFT→ACTIVE flip so an admin who moved the
+        // campaign out of DRAFT mid-run isn't flipped back to ACTIVE. Only
+        // applied when we intend to flip — invitesSentAt is set unconditionally
+        // by the separate release-status-less write below when no flip applies,
+        // OR carried on this guarded write when it does (the DRAFT guard can
+        // only fail if the admin already moved it out of DRAFT, in which case
+        // the follow-up unguarded write still records invitesSentAt).
+        ...(flipToActive ? { status: "DRAFT" } : {}),
+      },
       data: {
         invitesSentAt: now,
         ...(flipToActive ? { status: "ACTIVE" } : {}),
       },
     }),
   );
+
+  // FIX 4 (cont.): if we attempted a status-guarded flip, the guarded write
+  // above is a no-op when the campaign is no longer DRAFT — which would also
+  // drop invitesSentAt. Record invitesSentAt unconditionally so completion is
+  // never lost just because the flip was guarded out.
+  if (flipToActive) {
+    await deps.runStep("mark-sent-fallback", () =>
+      deps.db.assessmentCampaign.updateMany({
+        where: { id: campaignId, invitesSentAt: null },
+        data: { invitesSentAt: now },
+      }),
+    );
+  }
 
   return { claimed: true, aborted: false, sent: totalSent, batches: batches.length };
 }
