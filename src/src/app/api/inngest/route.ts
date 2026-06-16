@@ -14,6 +14,7 @@ import {
   quickAssessmentLeadEmailCron,
 } from "@/inngest/functions/quick-assessment-lead-email";
 import { assessmentInviteFanout } from "@/inngest/functions/assessment-invite-fanout";
+import { assessmentScheduledSendCron } from "@/inngest/functions/assessment-scheduled-send-cron";
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -30,5 +31,6 @@ export const { GET, POST, PUT } = serve({
         quickAssessmentLeadEmail,
         quickAssessmentLeadEmailCron,
         assessmentInviteFanout,
+        assessmentScheduledSendCron,
     ],
 });
