@@ -443,6 +443,25 @@ describe("outbox enqueue", () => {
     // txMock.assessmentEmailOutbox.create was called → confirms it's inside $transaction
     expect(txMock.assessmentEmailOutbox.create).toHaveBeenCalled();
   });
+
+  // Wave D regression: the PUBLIC quiz path must NOT read the INVITED-only
+  // sendResultsToRespondent toggle, and must NOT enqueue the invited
+  // RESPONDENT / OWNING_COACH rows. The public taker email is unchanged.
+  it("Wave D regression: PUBLIC path never selects sendResultsToRespondent", async () => {
+    await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
+    const select = (db.assessmentCampaign.findUnique as jest.Mock).mock
+      .calls[0][0].select;
+    expect(select).not.toHaveProperty("sendResultsToRespondent");
+    expect(select).not.toHaveProperty("notifyCoachOnCompletion");
+  });
+
+  it("Wave D regression: PUBLIC path never enqueues RESPONDENT or OWNING_COACH rows", async () => {
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    await POST(makeRequest(VALID_BODY) as never, makeParams() as never);
+    const roles = enqueuedRoles();
+    expect(roles).not.toContain("RESPONDENT");
+    expect(roles).not.toContain("OWNING_COACH");
+  });
 });
 
 /* -------------------------------------------------------------------------- */
