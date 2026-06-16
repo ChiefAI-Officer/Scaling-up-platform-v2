@@ -149,6 +149,10 @@ interface WizardState {
   sendResultsToRespondent: boolean;
   /** #16: Send coach a notification when a respondent completes. */
   notifyCoachOnCompletion: boolean;
+  // Task 10 — #2/#3 timing radio.
+  /** IMMEDIATELY: invitations send at creation (openAt forced to now by server).
+   *  ON_OPEN: invitations send when campaign opens (openAt must be future). */
+  inviteTiming: "IMMEDIATELY" | "ON_OPEN";
 }
 
 const STEPS = [
@@ -220,6 +224,7 @@ export function CampaignWizard() {
       templateResultsEmailApproved: false,
       sendResultsToRespondent: false,
       notifyCoachOnCompletion: false,
+      inviteTiming: "IMMEDIATELY" as const,
     };
   });
 
@@ -292,6 +297,9 @@ export function CampaignWizard() {
           templateResultsEmailApproved: false,
           sendResultsToRespondent: parsed.sendResultsToRespondent === true,
           notifyCoachOnCompletion: parsed.notifyCoachOnCompletion === true,
+          // Task 10 — inviteTiming defaults to IMMEDIATELY if not persisted.
+          inviteTiming:
+            parsed.inviteTiming === "ON_OPEN" ? "ON_OPEN" : "IMMEDIATELY",
         };
         if (!cancelled) {
           setPendingDraft({
@@ -443,6 +451,8 @@ export function CampaignWizard() {
           // the server re-validates at send time; we pass the user's intent through.
           sendResultsToRespondent: state.sendResultsToRespondent,
           notifyCoachOnCompletion: state.notifyCoachOnCompletion,
+          // Task 10 — #2/#3 timing radio: tell server when to send invitations.
+          inviteTiming: state.inviteTiming,
         }),
       });
       const createBody = await createRes.json();
@@ -676,6 +686,7 @@ export function CampaignWizard() {
             resultsEmailApproved={state.templateResultsEmailApproved}
             sendResultsToRespondent={state.sendResultsToRespondent}
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
+            inviteTiming={state.inviteTiming}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             onBack={back}
             onNext={next}
@@ -1348,6 +1359,7 @@ function ScheduleStep({
   resultsEmailApproved,
   sendResultsToRespondent,
   notifyCoachOnCompletion,
+  inviteTiming,
   onChange,
   onBack,
   onNext,
@@ -1360,12 +1372,33 @@ function ScheduleStep({
   resultsEmailApproved: boolean;
   sendResultsToRespondent: boolean;
   notifyCoachOnCompletion: boolean;
+  inviteTiming: "IMMEDIATELY" | "ON_OPEN";
   onChange: (patch: Partial<WizardState>) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
+  // Capture the current time once at mount. Because "is openAt in the past?"
+  // only needs to be checked at the moment the user edits the field (not
+  // continuously refreshed), a mount-time snapshot is correct and avoids the
+  // react-hooks/purity lint error that firing Date.now() inside useMemo would
+  // trigger.
+  const [mountedAt] = useState(() => Date.now());
+
+  const openAtParsed = openAt ? Date.parse(openAt) : NaN;
+  const openAtInPast = useMemo(
+    () =>
+      inviteTiming === "ON_OPEN" &&
+      !Number.isNaN(openAtParsed) &&
+      openAtParsed <= mountedAt,
+    [inviteTiming, openAtParsed, mountedAt],
+  );
+
   const valid = useMemo(() => {
-    if (!name.trim() || !openAt) return false;
+    if (!name.trim()) return false;
+    if (inviteTiming === "ON_OPEN") {
+      if (!openAt) return false;
+      if (openAtInPast) return false;
+    }
     if (endMode === "ENDS_AFTER") {
       if (!closeAt) return false;
       const o = Date.parse(openAt);
@@ -1374,7 +1407,7 @@ function ScheduleStep({
       if (c <= o) return false;
     }
     return true;
-  }, [name, openAt, endMode, closeAt]);
+  }, [name, openAt, openAtInPast, inviteTiming, endMode, closeAt]);
 
   return (
     <div className="space-y-6">
@@ -1407,16 +1440,67 @@ function ScheduleStep({
           />
         </div>
 
+        {/* Task 10 — #2/#3: timing radio */}
         <div className="space-y-2">
-          <Label htmlFor="openAt">Opens at</Label>
+          <Label>When to send invitations</Label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="inviteTiming"
+                checked={inviteTiming === "IMMEDIATELY"}
+                onChange={() => onChange({ inviteTiming: "IMMEDIATELY" })}
+                className="accent-primary"
+                aria-label="Immediately"
+              />
+              Immediately
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="inviteTiming"
+                checked={inviteTiming === "ON_OPEN"}
+                onChange={() => onChange({ inviteTiming: "ON_OPEN" })}
+                className="accent-primary"
+                aria-label="When the campaign opens"
+              />
+              When the campaign opens
+            </label>
+          </div>
+          {inviteTiming === "IMMEDIATELY" && (
+            <p className="text-xs text-muted-foreground" data-testid="immediately-note">
+              Invitations send as soon as you create this campaign.
+            </p>
+          )}
+        </div>
+
+        {inviteTiming === "ON_OPEN" ? (
+          <div className="space-y-2">
+            <Label htmlFor="openAt">Opens at</Label>
+            <Input
+              id="openAt"
+              type="datetime-local"
+              value={openAt}
+              onChange={(e) => onChange({ openAt: e.target.value })}
+              required
+            />
+            {openAtInPast && (
+              <p className="text-xs text-destructive" data-testid="openat-past-error">
+                Open time must be in the future when scheduling invitations.
+              </p>
+            )}
+          </div>
+        ) : (
           <Input
             id="openAt"
             type="datetime-local"
             value={openAt}
             onChange={(e) => onChange({ openAt: e.target.value })}
-            required
+            disabled
+            aria-hidden="true"
+            className="hidden"
           />
-        </div>
+        )}
 
         <div className="space-y-2">
           <Label>End</Label>
@@ -1733,7 +1817,14 @@ function ReviewStep({
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : null}
-            Create + Activate
+            {state.inviteTiming === "IMMEDIATELY"
+              ? `Create & send ${state.respondentIds.length} invitation(s) now`
+              : state.openAt
+                ? `Schedule for ${new Intl.DateTimeFormat("en-US", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(state.openAt))}`
+                : "Schedule campaign"}
           </Button>
         </div>
       </div>
