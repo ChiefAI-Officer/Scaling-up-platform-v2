@@ -125,14 +125,13 @@ describe("runScheduledSendSweep — due ON_OPEN sweep", () => {
     expect(result.dueEmitted).toBe(2);
   });
 
-  it("the due query filters status DRAFT/ACTIVE + ON_OPEN + openAt<=now + unsent + unclaimed + not-deleted", async () => {
+  it("the due query filters status DRAFT/ACTIVE + openAt<=now + unsent + unclaimed + not-deleted (no inviteTiming filter)", async () => {
     const deps = makeDeps();
     await runScheduledSendSweep(deps);
 
     const dueQuery = deps.findMany.mock.calls[0][0];
     expect(dueQuery.where).toEqual({
       status: { in: ["DRAFT", "ACTIVE"] },
-      inviteTiming: "ON_OPEN",
       openAt: { lte: FIXED_NOW },
       invitesSentAt: null,
       inviteSendStartedAt: null,
@@ -186,7 +185,7 @@ describe("runScheduledSendSweep — stale-claim recovery", () => {
     expect(resetCall.where.deletedAt).toBeNull();
     // must guard that the claim is still set (so we don't reset a fresh re-claim)
     expect(resetCall.where.inviteSendStartedAt).not.toBeUndefined();
-    expect(resetCall.data).toEqual({ inviteSendStartedAt: null });
+    expect(resetCall.data).toEqual({ inviteSendStartedAt: null, inviteSendHeartbeatAt: null });
 
     // re-emit the fan-out
     expect(deps.sendEvent).toHaveBeenCalledTimes(1);
@@ -286,5 +285,146 @@ describe("runScheduledSendSweep — stale-claim recovery", () => {
     expect(staleQuery.where.inviteSendStartedAt).toEqual({ not: null });
     expect(staleQuery.take).toBeDefined();
     expect(typeof staleQuery.take).toBe("number");
+  });
+
+  // FIX 2 — reset must clear BOTH inviteSendStartedAt AND inviteSendHeartbeatAt
+  it("reset updateMany data clears BOTH inviteSendStartedAt AND inviteSendHeartbeatAt (FIX-2)", async () => {
+    const deps = makeDeps();
+    deps.findMany
+      .mockResolvedValueOnce([]) // no due
+      .mockResolvedValueOnce([
+        {
+          id: "camp-stale-hb",
+          inviteSendStartedAt: new Date("2026-06-16T11:00:00Z"),
+          inviteSendHeartbeatAt: new Date("2026-06-16T11:40:00Z"), // stale
+        },
+      ]);
+
+    await runScheduledSendSweep(deps);
+
+    expect(deps.updateMany).toHaveBeenCalledTimes(1);
+    const resetData = deps.updateMany.mock.calls[0][0].data;
+    // Must clear the stale heartbeat so the re-claimed fresh run isn't
+    // spuriously judged stale on the next cron tick.
+    expect(resetData).toEqual({
+      inviteSendStartedAt: null,
+      inviteSendHeartbeatAt: null,
+    });
+  });
+
+  // FIX 3 — reset WHERE must pin inviteSendStartedAt to the exact value read
+  it("reset WHERE pins inviteSendStartedAt to the exact Date read (FIX-3)", async () => {
+    const claimDate = new Date("2026-06-16T11:00:00Z");
+    const deps = makeDeps();
+    deps.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "camp-pin",
+          inviteSendStartedAt: claimDate,
+          inviteSendHeartbeatAt: new Date("2026-06-16T11:40:00Z"), // stale
+        },
+      ]);
+
+    await runScheduledSendSweep(deps);
+
+    const resetWhere = deps.updateMany.mock.calls[0][0].where;
+    // The WHERE must use the exact Date object (or matching value) that was
+    // read, not just `{ not: null }`, so a row re-claimed between read and
+    // reset is not clobbered.
+    expect(resetWhere.inviteSendStartedAt).toEqual(claimDate);
+  });
+
+  // FIX 3 — a row re-claimed between read and reset → updateMany matches 0 → no re-emit
+  it("no re-emit when reset matches 0 rows because claim changed after read (FIX-3 race guard)", async () => {
+    const claimDate = new Date("2026-06-16T11:00:00Z");
+    const deps = makeDeps();
+    deps.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "camp-race-pinned",
+          inviteSendStartedAt: claimDate,
+          inviteSendHeartbeatAt: new Date("2026-06-16T11:40:00Z"), // stale
+        },
+      ]);
+    // The pinned WHERE matches 0 because the row was re-claimed between read and reset
+    deps.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = await runScheduledSendSweep(deps);
+
+    expect(deps.sendEvent).not.toHaveBeenCalled();
+    expect(result.staleRecovered).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FIX 1 — cron must backstop lost IMMEDIATELY events
+// ---------------------------------------------------------------------------
+
+describe("runScheduledSendSweep — IMMEDIATELY backstop (FIX-1)", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("due query does NOT filter by inviteTiming — IMMEDIATELY campaigns are included", async () => {
+    const deps = makeDeps();
+    await runScheduledSendSweep(deps);
+
+    const dueQuery = deps.findMany.mock.calls[0][0];
+    // The inviteTiming filter must be absent — the cron is the backstop for
+    // ALL timing modes (an IMMEDIATELY campaign whose initial Inngest event
+    // was lost sits with invitesSentAt=null, inviteSendStartedAt=null forever
+    // unless the cron covers it).
+    expect(dueQuery.where).not.toHaveProperty("inviteTiming");
+  });
+
+  it("emits for an IMMEDIATELY campaign with openAt<=now and no claim/sent (lost-event recovery)", async () => {
+    const deps = makeDeps();
+    deps.findMany
+      .mockResolvedValueOnce([{ id: "camp-immediately-lost" }]) // returned by due sweep
+      .mockResolvedValueOnce([]); // no stale claims
+
+    const result = await runScheduledSendSweep(deps);
+
+    expect(deps.sendEvent).toHaveBeenCalledTimes(1);
+    expect(deps.sendEvent.mock.calls[0][0]).toEqual({
+      name: ASSESSMENT_SEND_INVITES_EVENT,
+      data: { campaignId: "camp-immediately-lost" },
+    });
+    expect(result.dueEmitted).toBe(1);
+  });
+
+  it("does NOT emit for an IMMEDIATELY campaign with a future openAt", async () => {
+    const deps = makeDeps();
+    // The WHERE clause has openAt: { lte: now }, so a future-openAt row would
+    // NOT be returned by the query. Both sweeps return [].
+    deps.findMany.mockResolvedValue([]);
+
+    const result = await runScheduledSendSweep(deps);
+
+    expect(deps.sendEvent).not.toHaveBeenCalled();
+    expect(result.dueEmitted).toBe(0);
+  });
+
+  it("does NOT emit for an IMMEDIATELY campaign that is already claimed (inviteSendStartedAt set)", async () => {
+    const deps = makeDeps();
+    // Due sweep returns [] because inviteSendStartedAt is not null → WHERE excludes it.
+    // The already-claimed row would show up in the stale sweep only if it's stale.
+    deps.findMany.mockResolvedValue([]);
+
+    const result = await runScheduledSendSweep(deps);
+
+    expect(deps.sendEvent).not.toHaveBeenCalled();
+    expect(result.dueEmitted).toBe(0);
+  });
+
+  it("does NOT emit for an IMMEDIATELY campaign that already has invitesSentAt set", async () => {
+    const deps = makeDeps();
+    // invitesSentAt != null → WHERE excludes it; due sweep returns [].
+    deps.findMany.mockResolvedValue([]);
+
+    const result = await runScheduledSendSweep(deps);
+
+    expect(deps.sendEvent).not.toHaveBeenCalled();
+    expect(result.dueEmitted).toBe(0);
   });
 });

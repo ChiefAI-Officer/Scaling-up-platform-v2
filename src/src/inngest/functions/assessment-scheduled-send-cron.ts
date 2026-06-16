@@ -119,14 +119,17 @@ export async function runScheduledSendSweep(
 
   const now = deps.now();
 
-  // 2. DUE SWEEP — future-dated ON_OPEN campaigns whose openAt has passed and
-  //    that are not yet claimed or sent. NO SCHEDULED status exists — the gate
-  //    is inviteTiming=ON_OPEN + openAt<=now (the campaign can be DRAFT or
-  //    ACTIVE). The partial index idx_campaign_due_unsent backs this.
+  // 2. DUE SWEEP — campaigns whose openAt has passed and that are not yet
+  //    claimed or sent. The gate is status IN (DRAFT, ACTIVE) + openAt<=now +
+  //    unclaimed + unsent + not-deleted. inviteTiming is NOT filtered here —
+  //    the cron is the backstop for ALL timing modes: an IMMEDIATELY campaign
+  //    whose initial Inngest event was lost sits with invitesSentAt=null and
+  //    inviteSendStartedAt=null forever unless the cron covers it. Redundant
+  //    emits for ON_OPEN campaigns are harmless — the fan-out's CAS claim
+  //    no-ops them. The partial index idx_campaign_due_unsent backs this.
   const due = (await deps.db.assessmentCampaign.findMany({
     where: {
       status: { in: ["DRAFT", "ACTIVE"] },
-      inviteTiming: "ON_OPEN",
       openAt: { lte: now },
       invitesSentAt: null,
       inviteSendStartedAt: null,
@@ -181,17 +184,24 @@ export async function runScheduledSendSweep(
       continue;
     }
 
-    // Reset the claim, GUARDED on the same stale predicate (incl. invitesSentAt
-    // null) so we never reset a run that just completed or was re-claimed
-    // between our read and this write. count === 0 ⇒ raced ⇒ do NOT re-emit.
+    // Reset the claim, GUARDED on the EXACT claim value we read+judged-stale
+    // (FIX-3: pinning to row.inviteSendStartedAt rather than `{ not: null }`
+    // prevents clobbering a row re-claimed between our read and this write).
+    // Also guarded on invitesSentAt null + deletedAt null.
+    // count === 0 ⇒ raced / just-completed ⇒ do NOT re-emit.
+    //
+    // FIX-2: clear inviteSendHeartbeatAt alongside inviteSendStartedAt so the
+    // re-claimed fresh run doesn't inherit the dead run's stale heartbeat.
+    // Without this, the next cron tick would compute liveness = stale heartbeat
+    // (not the fresh claim time) and spuriously reset the live run.
     const reset = await deps.db.assessmentCampaign.updateMany({
       where: {
         id: row.id,
-        inviteSendStartedAt: { not: null },
+        inviteSendStartedAt: toDate(row.inviteSendStartedAt),
         invitesSentAt: null,
         deletedAt: null,
       },
-      data: { inviteSendStartedAt: null },
+      data: { inviteSendStartedAt: null, inviteSendHeartbeatAt: null },
     });
 
     if (reset.count === 0) {
