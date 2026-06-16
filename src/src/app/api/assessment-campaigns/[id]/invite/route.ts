@@ -1,10 +1,19 @@
 /**
- * Assessment v7.6 — Send invitations to campaign participants (Task D).
+ * Assessment v7.6 — Manual invitation send: LATE-ADD / RESEND path (Task D + Wave D R1-M6).
  *
  * POST body:
  *   { respondentIds?: string[] }  // omit to invite all active participants
  *
- * Per-respondent semantics:
+ * Wave D (R1-M6): the campaign's INITIAL bulk send is now performed automatically
+ * by the Wave-D Inngest fan-out (a later task). This route is therefore the
+ * *late-add / resend* path only — it serves sending to specific late-added
+ * recipients (or re-sending) AFTER the initial auto-send has completed
+ * (`invitesSentAt` set). A bulk early-send of a campaign that has NOT yet done
+ * its automatic initial send (`invitesSentAt IS NULL`) is REJECTED with 409, so
+ * a coach cannot double-send / bypass the fan-out.
+ *
+ * The per-recipient create+send logic is shared with the fan-out via
+ * `sendInvitesBatch` (lib/assessments/invite-send.ts). Per-respondent semantics:
  *   - "sent"            — new invitation row created OR existing PENDING row
  *                         re-keyed with a fresh raw token and emailed
  *   - "already-invited" — row already exists in SENT/VIEWED/SUBMITTED status
@@ -12,7 +21,7 @@
  *   - "send-failed"     — row written (status PENDING) but SMTP throw —
  *                         caller can call /resend later
  *
- * Hard cap: 25 respondents per request. Above that returns 400.
+ * Hard cap: 25 respondents per request (INVITE_BATCH_CAP). Above that returns 400.
  * The cap exists to keep SMTP latency inside Vercel's 30s budget; the
  * UI is expected to chunk larger lists.
  */
@@ -26,15 +35,12 @@ import {
 } from "@/lib/assessments/access-control";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
-import {
-  generateRawToken,
-  hashToken,
-} from "@/lib/assessments/invitation-tokens";
 import { resolveCoachName } from "@/lib/assessments/invitation-email";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
-
-const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
-const BATCH_CAP = 25;
+import {
+  sendInvitesBatch,
+  INVITE_BATCH_CAP,
+} from "@/lib/assessments/invite-send";
 
 const InviteBodySchema = z.object({
   respondentIds: z.array(z.string().min(1)).optional(),
@@ -128,6 +134,22 @@ export async function POST(
       );
     }
 
+    // Wave D (R1-M6): the initial bulk send is automatic (the fan-out). Until it
+    // has completed (`invitesSentAt` set), this manual route must not perform a
+    // bulk early-send — that would double-send / bypass the fan-out. It only
+    // serves late-add / resend AFTER the automatic initial send. Gate keys
+    // purely on `invitesSentAt` (a future task wires the actual auto-send).
+    if (campaign.invitesSentAt == null) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "This campaign will send its invitations automatically; manual bulk send is disabled until the initial send completes.",
+        },
+        { status: 409 }
+      );
+    }
+
     let body: unknown = {};
     try {
       body = await request.json();
@@ -162,35 +184,15 @@ export async function POST(
       );
     }
 
-    if (targets.length > BATCH_CAP) {
+    if (targets.length > INVITE_BATCH_CAP) {
       return NextResponse.json(
         {
           success: false,
-          error: `Too many recipients in one call. Split into multiple calls (max ${BATCH_CAP}).`,
+          error: `Too many recipients in one call. Split into multiple calls (max ${INVITE_BATCH_CAP}).`,
         },
         { status: 400 }
       );
     }
-
-    // Load existing invitation rows for this campaign + target subset.
-    const existing = await db.assessmentInvitation.findMany({
-      where: {
-        campaignId,
-        respondentId: { in: targets.map((t) => t.respondentId) },
-      },
-    });
-    const existingByRespondentId = new Map(
-      existing.map((row) => [row.respondentId, row])
-    );
-
-    const closeAt = campaign.closeAt;
-    const fallbackExpiresAt = new Date(Date.now() + NINETY_DAYS_MS);
-    const expiresAt = closeAt ?? fallbackExpiresAt;
-
-    const results: Array<{
-      respondentId: string;
-      status: "sent" | "already-invited" | "send-failed";
-    }> = [];
 
     const appUrl = process.env.APP_URL ?? "http://localhost:3000";
 
@@ -201,118 +203,37 @@ export async function POST(
     const organizationName = campaign.organization?.name ?? null;
     const templateName = campaign.template?.name ?? null;
 
-    for (const participant of targets) {
-      const respondent = participant.respondent!;
-      const prior = existingByRespondentId.get(participant.respondentId);
-
-      // Existing row: only PENDING is re-sendable here (SENT/VIEWED already
-      // have a valid token in flight — use /resend to bump those without
-      // rotating the token).
-      if (prior && prior.status !== "PENDING") {
-        results.push({
-          respondentId: participant.respondentId,
-          status: "already-invited",
-        });
-        continue;
-      }
-      if (prior && prior.revokedAt) {
-        results.push({
-          respondentId: participant.respondentId,
-          status: "already-invited",
-        });
-        continue;
-      }
-
-      const rawToken = generateRawToken();
-      const tokenHash = hashToken(rawToken);
-
-      let invitationRow: { id: string; expiresAt: Date };
-      try {
-        if (prior) {
-          // Re-key PENDING row with a fresh token + refreshed expiresAt.
-          invitationRow = await db.assessmentInvitation.update({
-            where: { id: prior.id },
-            data: {
-              tokenHash,
-              expiresAt,
-              status: "PENDING",
-            },
-            select: { id: true, expiresAt: true },
-          });
-        } else {
-          invitationRow = await db.assessmentInvitation.create({
-            data: {
-              campaignId,
-              respondentId: participant.respondentId,
-              tokenHash,
-              status: "PENDING",
-              expiresAt,
-            },
-            select: { id: true, expiresAt: true },
-          });
-        }
-      } catch (writeErr) {
-        console.error(
-          "[assessment-invite] failed to write invitation row",
-          writeErr
-        );
-        results.push({
-          respondentId: participant.respondentId,
-          status: "send-failed",
-        });
-        continue;
-      }
-
-      try {
-        await sendAssessmentInvitationEmail({
-          invitation: invitationRow,
-          respondent: {
-            id: respondent.id,
-            firstName: respondent.firstName,
-            lastName: respondent.lastName,
-            email: respondent.email,
-          },
-          campaign: {
-            id: campaign.id,
-            name: campaign.name,
-            alias: campaign.alias,
-            closeAt: campaign.closeAt,
-          },
+    // Shared per-recipient create+send (also used by the Wave-D fan-out).
+    const { results } = await sendInvitesBatch(
+      { db, sendEmail: sendAssessmentInvitationEmail },
+      {
+        campaign: {
+          id: campaign.id,
+          name: campaign.name,
+          alias: campaign.alias,
+          closeAt: campaign.closeAt,
+          invitationSubject: campaign.invitationSubject,
+          invitationBodyMarkdown: campaign.invitationBodyMarkdown,
           template: {
-            invitationSubject:
-              campaign.invitationSubject ?? campaign.template.invitationSubject,
-            invitationBodyMarkdown:
-              campaign.invitationBodyMarkdown ??
-              campaign.template.invitationBodyMarkdown,
+            invitationSubject: campaign.template.invitationSubject,
+            invitationBodyMarkdown: campaign.template.invitationBodyMarkdown,
           },
-          organizationName,
-          coachName,
-          templateName,
-          rawToken,
-          baseUrl: appUrl,
-        });
-
-        await db.assessmentInvitation.update({
-          where: { id: invitationRow.id },
-          data: { status: "SENT", sentAt: new Date() },
-        });
-        results.push({
-          respondentId: participant.respondentId,
-          status: "sent",
-        });
-      } catch (sendErr) {
-        console.error(
-          "[assessment-invite] SMTP send failed",
-          { respondentId: participant.respondentId, invitationId: invitationRow.id },
-          sendErr
-        );
-        // Leave row as PENDING — caller can retry via /resend or re-invite.
-        results.push({
-          respondentId: participant.respondentId,
-          status: "send-failed",
-        });
+        },
+        recipients: targets.map((p) => ({
+          respondentId: p.respondentId,
+          respondent: {
+            id: p.respondent!.id,
+            firstName: p.respondent!.firstName,
+            lastName: p.respondent!.lastName,
+            email: p.respondent!.email,
+          },
+        })),
+        baseUrl: appUrl,
+        organizationName,
+        coachName,
+        templateName,
       }
-    }
+    );
 
     await logAudit({
       entityType: "AssessmentInvitation",
