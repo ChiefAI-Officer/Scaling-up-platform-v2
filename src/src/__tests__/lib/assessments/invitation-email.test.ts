@@ -162,6 +162,73 @@ describe("buildInvitationEmailHtml — branded shell", () => {
   });
 });
 
+describe("renderFullHtmlBody — full-HTML override (#20)", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { renderFullHtmlBody, renderFullTextBody } = require("@/lib/assessments/invitation-email");
+
+  it("interpolates {{invitationUrl}} into an href via Wave A TOKEN_RE (pin #1)", () => {
+    const out = renderFullHtmlBody(
+      '<p>Hi {{respondentFirstName}}</p><a href="{{invitationUrl}}">Start</a>',
+      baseVars,
+    );
+    expect(out).toContain("Jane");
+    expect(out).toContain(`href="${baseVars.invitationUrl}"`);
+    expect(out).not.toContain("{{invitationUrl}}");
+  });
+
+  it("resolves snake_case {{invitation_url}} (same regex/aliases as Wave A)", () => {
+    const out = renderFullHtmlBody('<a href="{{invitation_url}}">go</a>', baseVars);
+    expect(out).toContain(`href="${baseVars.invitationUrl}"`);
+  });
+
+  it("does NOT entity-decode before token substitution (pin #2)", () => {
+    // A stored &#123;&#123;invitationUrl&#125;&#125; must stay inert HTML
+    // entities — never resurrected into a live token the validator never vetted.
+    const stored = '<p>&#123;&#123;invitationUrl&#125;&#125; {{invitationUrl}}</p>';
+    const out = renderFullHtmlBody(stored, baseVars);
+    // The real token is interpolated exactly once; the entity-encoded one is not.
+    const occurrences = out.split(baseVars.invitationUrl).length - 1;
+    expect(occurrences).toBe(1);
+    // The credential bytes "#t=SECRET" appear only once (from the live token).
+    expect(out.split("#t=SECRET").length - 1).toBe(1);
+  });
+
+  it("neutralizes a PII token value containing <script> (escape-before-sanitize)", () => {
+    const out = renderFullHtmlBody(
+      "<p>Hello {{respondentFirstName}}</p>",
+      {
+        ...baseVars,
+        respondent: { firstName: '<script>alert(1)</script>', lastName: "Doe", email: "x@y.z" },
+      },
+    );
+    expect(out).not.toContain("<script>");
+    expect(out).not.toContain("alert(1)</script>");
+  });
+
+  it("strips disallowed tags via the strict sanitizer (no shell wrap)", () => {
+    const out = renderFullHtmlBody(
+      '<p>Body {{invitationUrl}}</p><iframe src="https://evil"></iframe><script>x()</script>',
+      baseVars,
+    );
+    expect(out).not.toContain("<iframe");
+    expect(out).not.toContain("<script");
+    // No branded shell markers (CTA button text / logo cid).
+    expect(out).not.toContain("Start the assessment");
+    expect(out).not.toContain("cid:");
+  });
+
+  it("derives a plain-text twin from the HTML (renderFullTextBody)", () => {
+    const txt = renderFullTextBody(
+      '<p>Hi {{respondentFirstName}}</p><a href="{{invitationUrl}}">Start</a>',
+      baseVars,
+    );
+    expect(txt).toContain("Jane");
+    expect(txt).toContain(baseVars.invitationUrl);
+    expect(txt).not.toContain("<p>");
+    expect(txt).not.toContain("<a ");
+  });
+});
+
 describe("resolveCoachName — creatorCoach ?? owner", () => {
   it("prefers the campaign creator coach", () => {
     expect(resolveCoachName({ firstName: "Cre", lastName: "Ator" }, { firstName: "Own", lastName: "Er" })).toBe("Cre Ator");

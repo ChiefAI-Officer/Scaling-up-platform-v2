@@ -21,6 +21,7 @@ import {
   getCampaignRespondents,
 } from "@/lib/assessments/campaign-detail";
 import { CampaignDetail } from "@/components/assessments/CampaignDetail";
+import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -57,6 +58,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     <CampaignDetail
       initialOverview={overview}
       initialRespondents={respondents}
+      customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
     />
   );
 }

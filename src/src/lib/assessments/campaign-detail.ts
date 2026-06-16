@@ -76,6 +76,7 @@ export interface CampaignOverview {
     organizationName: string;
     invitationSubject: string | null;
     invitationBodyMarkdown: string | null;
+    invitationBodyHtml: string | null;
   };
   stats: {
     totalParticipants: number;
@@ -128,6 +129,7 @@ interface CampaignWithRels {
   createdAt: Date;
   invitationSubject: string | null;
   invitationBodyMarkdown: string | null;
+  invitationBodyHtml: string | null;
   template: { id: string; name: string };
   organization: { id: string; name: string };
 }
@@ -270,6 +272,7 @@ export async function getCampaignOverview(
       organizationName: campaign.organization.name,
       invitationSubject: campaign.invitationSubject,
       invitationBodyMarkdown: campaign.invitationBodyMarkdown,
+      invitationBodyHtml: campaign.invitationBodyHtml,
     },
     stats,
   };

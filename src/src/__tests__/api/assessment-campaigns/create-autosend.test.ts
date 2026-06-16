@@ -88,6 +88,9 @@ jest.mock("@/inngest/client", () => ({
 const flags = { autoSend: true };
 jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
   waveDAutoSendEnabled: () => flags.autoSend,
+  // Task 12 (#20): the route now reads this flag for the full-HTML invitation
+  // body. Default OFF here so the field is ignored (these tests never set it).
+  waveDCustomHtmlEmailEnabled: () => false,
 }));
 
 import { POST } from "@/app/api/assessment-campaigns/route";

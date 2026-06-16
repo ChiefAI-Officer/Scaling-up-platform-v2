@@ -23,6 +23,14 @@ import { Parser } from "htmlparser2";
 // URL `/org-survey/{alias}#t=<token>`. The validator must recognize every
 // spelling a coach might paste.
 // ──────────────────────────────────────────────────────────────────────────
+/**
+ * Max RAW invitation-HTML length accepted on save (#20). Reuses the Wave-B
+ * "cap the stored bytes" concept (post-interpolation the body grows when the
+ * URL token expands to a full https URL, but 50KB leaves ample headroom for a
+ * rich email while bounding sanitize/DB cost). Save rejects over this.
+ */
+export const MAX_INVITATION_HTML_LENGTH = 50_000;
+
 export const INVITATION_URL_TOKENS = [
   "invitationUrl",
   "invitation_url",

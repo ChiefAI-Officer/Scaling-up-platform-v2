@@ -33,7 +33,14 @@ import {
 import { splitName } from "@/lib/assessments/respondent-csv";
 import { normalizeEmail } from "@/app/api/organizations/[id]/respondents/route";
 import { buildTeamPath } from "@/app/api/assessment-campaigns/[id]/participants/route";
-import { waveDAutoSendEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import {
+  waveDAutoSendEnabled,
+  waveDCustomHtmlEmailEnabled,
+} from "@/lib/assessments/wave-d-feature-flags";
+import {
+  validateInvitationHtml,
+  MAX_INVITATION_HTML_LENGTH,
+} from "@/lib/assessments/email-html-sanitizer";
 import { inngest } from "@/inngest/client";
 // Import the event name from the side-effect-free constants module (NOT the
 // fan-out function module) so the route never evaluates inngest.createFunction.
@@ -158,6 +165,40 @@ export async function POST(request: NextRequest) {
       );
     }
     const data = validation.data;
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Task 12 (#20) — per-campaign FULL-HTML invitation body: validate-on-save.
+    //
+    //   - Flag OFF → the field is IGNORED (legacy behavior, stored null).
+    //   - Flag ON  → enforce a 50KB length cap, then run the token-PLACEMENT
+    //                validator on the RAW bytes (PRE-interpolation). Reject
+    //                400 with the validator `reason`. Store the RAW validated
+    //                HTML — sanitization happens at RENDER (post-interpolation)
+    //                so the stored bytes match what the validator saw.
+    // ─────────────────────────────────────────────────────────────────────
+    let invitationBodyHtmlToStore: string | null = null;
+    if (waveDCustomHtmlEmailEnabled()) {
+      const rawHtml = data.invitationBodyHtml;
+      if (typeof rawHtml === "string" && rawHtml.trim().length > 0) {
+        if (rawHtml.length > MAX_INVITATION_HTML_LENGTH) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Invitation HTML exceeds the ${MAX_INVITATION_HTML_LENGTH}-character limit.`,
+            },
+            { status: 400 }
+          );
+        }
+        const placement = validateInvitationHtml(rawHtml);
+        if (!placement.ok) {
+          return NextResponse.json(
+            { success: false, error: placement.reason },
+            { status: 400 }
+          );
+        }
+        invitationBodyHtmlToStore = rawHtml; // RAW (sanitize at render, not at rest)
+      }
+    }
 
     // Organization ownership check.
     const orgAllowed = await canAccessOrganization(
@@ -331,6 +372,7 @@ export async function POST(request: NextRequest) {
         closeAt: closeAtDate,
         invitationSubject: data.invitationSubject ?? null,
         invitationBodyMarkdown: data.invitationBodyMarkdown ?? null,
+        invitationBodyHtml: invitationBodyHtmlToStore,
         sendResultsToRespondent: data.sendResultsToRespondent,
         notifyCoachOnCompletion: data.notifyCoachOnCompletion,
         createdBy: createdByUserId,

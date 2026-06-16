@@ -94,6 +94,7 @@ interface FanoutCampaignRow {
   deletedAt: Date | null;
   invitationSubject: string | null;
   invitationBodyMarkdown: string | null;
+  invitationBodyHtml: string | null;
   template: {
     name: string;
     invitationSubject: string;
@@ -357,6 +358,7 @@ export async function runInviteFanout(
             closeAt: campaign.closeAt,
             invitationSubject: campaign.invitationSubject,
             invitationBodyMarkdown: campaign.invitationBodyMarkdown,
+            invitationBodyHtml: campaign.invitationBodyHtml,
             template: {
               invitationSubject: campaign.template.invitationSubject,
               invitationBodyMarkdown: campaign.template.invitationBodyMarkdown,

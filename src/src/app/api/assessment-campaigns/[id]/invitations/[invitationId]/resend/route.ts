@@ -91,6 +91,7 @@ export async function POST(
             externalId: true,
             invitationSubject: true,
             invitationBodyMarkdown: true,
+            invitationBodyHtml: true,
             template: {
               select: {
                 name: true,
@@ -187,6 +188,7 @@ export async function POST(
           invitationBodyMarkdown:
             c.invitationBodyMarkdown ?? c.template.invitationBodyMarkdown,
         },
+        invitationBodyHtml: c.invitationBodyHtml,
         organizationName: c.organization?.name ?? null,
         coachName,
         templateName: c.template?.name ?? null,

@@ -308,6 +308,7 @@ export async function POST(
               campaign.invitationBodyMarkdown ??
               campaign.template.invitationBodyMarkdown,
           },
+          invitationBodyHtml: campaign.invitationBodyHtml,
           organizationName,
           coachName,
           templateName,

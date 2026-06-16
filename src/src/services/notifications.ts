@@ -13,8 +13,11 @@ import {
     buildInvitationEmailHtml,
     renderSubject,
     renderTextBody,
+    renderFullHtmlBody,
+    renderFullTextBody,
     type InvitationVars,
 } from "@/lib/assessments/invitation-email";
+import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
 import { SU_LOGO_PNG, SU_LOGO_CID } from "@/lib/assets/invitation-logo";
 
 // ============================================
@@ -1092,6 +1095,12 @@ export async function sendAssessmentInvitationEmail(data: {
     respondent: { id: string; firstName: string; lastName: string; email: string };
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
     template: { invitationSubject: string; invitationBodyMarkdown: string };
+    /**
+     * Per-campaign full-HTML invitation override (#20). When non-empty AND
+     * waveDCustomHtmlEmailEnabled(), this REPLACES the entire branded shell
+     * (the subject still comes from invitationSubject — never the HTML).
+     */
+    invitationBodyHtml?: string | null;
     organizationName?: string | null;
     coachName?: string | null;
     templateName?: string | null;
@@ -1123,9 +1132,39 @@ export async function sendAssessmentInvitationEmail(data: {
         closeAt: data.campaign.closeAt,
     };
 
+    // Subject ALWAYS comes from invitationSubject (token-allowlisted path) —
+    // NEVER derived from the full-HTML body. This holds on every render path.
     const subject = renderSubject(data.template.invitationSubject, vars);
-    const html = buildInvitationEmailHtml({ bodyMarkdown: data.template.invitationBodyMarkdown, vars });
-    const text = renderTextBody(data.template.invitationBodyMarkdown, vars);
+
+    // Render precedence (#20):
+    //   invitationBodyHtml (full HTML, flag on) > invitationBodyMarkdown (shell) > template default.
+    // The full-HTML body REPLACES the branded shell entirely (no wrap, no CID
+    // logo attachment). buildTokenValues already neutralizes markdown in PII;
+    // renderFullHtmlBody additionally HTML-escapes every token value BEFORE
+    // substitution and strict-sanitizes the result (the second gate).
+    const fullHtml =
+        waveDCustomHtmlEmailEnabled() &&
+        typeof data.invitationBodyHtml === "string" &&
+        data.invitationBodyHtml.trim().length > 0
+            ? data.invitationBodyHtml
+            : null;
+
+    let html: string;
+    let text: string;
+    let attachments: SmtpAttachment[] = [
+        { filename: "su-logo.png", content: SU_LOGO_PNG, contentType: "image/png", cid: SU_LOGO_CID },
+    ];
+
+    if (fullHtml) {
+        // Full-HTML override: the rendered body IS the whole email — no shell,
+        // and no CID logo attachment (the coach controls all imagery).
+        html = renderFullHtmlBody(fullHtml, vars);
+        text = renderFullTextBody(fullHtml, vars);
+        attachments = [];
+    } else {
+        html = buildInvitationEmailHtml({ bodyMarkdown: data.template.invitationBodyMarkdown, vars });
+        text = renderTextBody(data.template.invitationBodyMarkdown, vars);
+    }
 
     // STRICT: failures propagate. The invite route catches and marks the
     // invitation row as send-failed instead of optimistically flipping SENT.
@@ -1134,9 +1173,7 @@ export async function sendAssessmentInvitationEmail(data: {
         subject,
         html,
         text,
-        attachments: [
-            { filename: "su-logo.png", content: SU_LOGO_PNG, contentType: "image/png", cid: SU_LOGO_CID },
-        ],
+        attachments,
         telemetry: {
             recipientRole: "CUSTOM",
             metadata: {

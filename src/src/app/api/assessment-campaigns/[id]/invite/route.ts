@@ -214,6 +214,7 @@ export async function POST(
           closeAt: campaign.closeAt,
           invitationSubject: campaign.invitationSubject,
           invitationBodyMarkdown: campaign.invitationBodyMarkdown,
+          invitationBodyHtml: campaign.invitationBodyHtml,
           template: {
             invitationSubject: campaign.template.invitationSubject,
             invitationBodyMarkdown: campaign.template.invitationBodyMarkdown,

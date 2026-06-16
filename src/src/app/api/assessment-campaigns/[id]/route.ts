@@ -21,6 +21,11 @@ import {
 import { loadLiveCampaign } from "@/lib/assessments/campaign-live";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import {
+  validateInvitationHtml,
+  MAX_INVITATION_HTML_LENGTH,
+} from "@/lib/assessments/email-html-sanitizer";
 
 export async function GET(
   _request: NextRequest,
@@ -167,6 +172,7 @@ export async function PATCH(
       closeAt?: Date | null;
       invitationSubject?: string | null;
       invitationBodyMarkdown?: string | null;
+      invitationBodyHtml?: string | null;
     } = {};
 
     if (data.name !== undefined) updateData.name = data.name;
@@ -175,6 +181,36 @@ export async function PATCH(
       updateData.invitationSubject = data.invitationSubject;
     if (data.invitationBodyMarkdown !== undefined)
       updateData.invitationBodyMarkdown = data.invitationBodyMarkdown;
+    // Task 12 (#20) — full-HTML invitation body: validate-on-save (flag-gated).
+    //   - Flag OFF → field IGNORED (not written).
+    //   - Flag ON  → empty/whitespace clears the override (→ null); otherwise
+    //                enforce the 50KB cap + token-PLACEMENT validation on the
+    //                RAW bytes, then store the RAW validated HTML (sanitize at
+    //                render, not at rest, so stored bytes match the validator's).
+    if (data.invitationBodyHtml !== undefined && waveDCustomHtmlEmailEnabled()) {
+      const rawHtml = data.invitationBodyHtml;
+      if (rawHtml === null || rawHtml.trim().length === 0) {
+        updateData.invitationBodyHtml = null;
+      } else {
+        if (rawHtml.length > MAX_INVITATION_HTML_LENGTH) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Invitation HTML exceeds the ${MAX_INVITATION_HTML_LENGTH}-character limit.`,
+            },
+            { status: 400 }
+          );
+        }
+        const placement = validateInvitationHtml(rawHtml);
+        if (!placement.ok) {
+          return NextResponse.json(
+            { success: false, error: placement.reason },
+            { status: 400 }
+          );
+        }
+        updateData.invitationBodyHtml = rawHtml;
+      }
+    }
     if (data.openAt !== undefined) {
       const d = new Date(data.openAt);
       if (Number.isNaN(d.getTime())) {

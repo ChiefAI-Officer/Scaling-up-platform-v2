@@ -61,6 +61,8 @@ export type InviteMailer = (data: {
   respondent: { id: string; firstName: string; lastName: string; email: string };
   campaign: { id: string; name: string; alias: string; closeAt: Date | null };
   template: { invitationSubject: string; invitationBodyMarkdown: string };
+  /** Per-campaign full-HTML invitation override (#20) — REPLACES the shell when non-empty (+ flag on). */
+  invitationBodyHtml?: string | null;
   organizationName: string | null;
   coachName: string | null;
   templateName: string | null;
@@ -95,6 +97,8 @@ export interface SendInvitesInput {
     /** Per-campaign overrides (null → fall back to template defaults). */
     invitationSubject: string | null;
     invitationBodyMarkdown: string | null;
+    /** Per-campaign full-HTML invitation override (#20) — REPLACES the shell when non-empty (+ flag on). */
+    invitationBodyHtml?: string | null;
     template: {
       invitationSubject: string;
       invitationBodyMarkdown: string;
@@ -234,6 +238,7 @@ export async function sendInvitesBatch(
           invitationBodyMarkdown:
             campaign.invitationBodyMarkdown ?? campaign.template.invitationBodyMarkdown,
         },
+        invitationBodyHtml: campaign.invitationBodyHtml ?? null,
         organizationName,
         coachName,
         templateName,

@@ -141,6 +141,9 @@ interface WizardState {
   // Task O UI — per-campaign invitation email overrides. Null/empty = fall back to template default.
   invitationSubject: string;
   invitationBodyMarkdown: string;
+  // Task 12 (#20) — per-campaign FULL-HTML invitation body. Empty = fall back to the
+  // markdown/template default. When set + flag on, REPLACES the entire branded email.
+  invitationBodyHtml: string;
   // Task 6b — #15/#16 result/notify toggles.
   /** Whether the selected template has an approved results email (server-computed).
    *  Ephemeral — not persisted to the draft; re-evaluated when template is picked. */
@@ -201,7 +204,12 @@ function formatDateTimeLocal(d: Date): string {
   );
 }
 
-export function CampaignWizard() {
+export function CampaignWizard({
+  customHtmlEmailEnabled = false,
+}: {
+  /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
+  customHtmlEmailEnabled?: boolean;
+} = {}) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -221,6 +229,7 @@ export function CampaignWizard() {
       closeAt: "",
       invitationSubject: "",
       invitationBodyMarkdown: "",
+      invitationBodyHtml: "",
       templateResultsEmailApproved: false,
       sendResultsToRespondent: false,
       notifyCoachOnCompletion: false,
@@ -291,6 +300,10 @@ export function CampaignWizard() {
           invitationBodyMarkdown:
             typeof parsed.invitationBodyMarkdown === "string"
               ? parsed.invitationBodyMarkdown
+              : "",
+          invitationBodyHtml:
+            typeof parsed.invitationBodyHtml === "string"
+              ? parsed.invitationBodyHtml
               : "",
           // Task 6b — not persisted to draft (approved state is re-derived from template);
           // toggles are persisted so a resumed draft keeps the user's choices.
@@ -446,6 +459,13 @@ export function CampaignWizard() {
           invitationBodyMarkdown:
             state.invitationBodyMarkdown.trim() !== ""
               ? state.invitationBodyMarkdown.trim()
+              : undefined,
+          // Task 12 (#20) — full-HTML body. Sent RAW (the server validates +
+          // stores raw, then sanitizes at render). Only sent when the flag is
+          // on AND non-empty; the server ignores it when its flag is off.
+          invitationBodyHtml:
+            customHtmlEmailEnabled && state.invitationBodyHtml.trim() !== ""
+              ? state.invitationBodyHtml
               : undefined,
           // Task 6b — #15/#16 toggles. #15 is only meaningful when approved, but
           // the server re-validates at send time; we pass the user's intent through.
@@ -700,6 +720,7 @@ export function CampaignWizard() {
             onSaveDraft={() => saveCampaign({ activate: false })}
             onActivate={() => saveCampaign({ activate: true })}
             canActivate={Boolean(canActivate)}
+            customHtmlEmailEnabled={customHtmlEmailEnabled}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
         )}
@@ -1615,6 +1636,7 @@ function ReviewStep({
   onBack,
   onSaveDraft,
   onActivate,
+  customHtmlEmailEnabled = false,
   onChange,
 }: {
   state: WizardState;
@@ -1623,6 +1645,7 @@ function ReviewStep({
   onBack: () => void;
   onSaveDraft: () => void;
   onActivate: () => void;
+  customHtmlEmailEnabled?: boolean;
   onChange: (patch: Partial<WizardState>) => void;
 }) {
   const [orgName, setOrgName] = useState<string>("");
@@ -1794,6 +1817,68 @@ function ReviewStep({
                 {state.invitationBodyMarkdown.length} / 5000 characters
               </p>
             </div>
+            {customHtmlEmailEnabled && (
+              <div className="space-y-1 border-t border-border pt-3">
+                <label className="text-xs font-medium text-foreground">
+                  Full custom HTML (advanced)
+                </label>
+                <p className="text-[11px] text-muted-foreground">
+                  When set, this HTML <strong>replaces the entire branded
+                  email</strong> (no template wrap). It must include the survey
+                  link token{" "}
+                  <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                    {"{{invitationUrl}}"}
+                  </code>{" "}
+                  — either as a link <code className="text-[10px]">href</code> or
+                  as plain text. The same merge tokens above are available.
+                </p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept=".html,.htm,text/html"
+                    className="text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-muted file:px-2 file:py-1 file:text-xs"
+                    data-testid="invitation-html-file"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const text =
+                          typeof reader.result === "string" ? reader.result : "";
+                        onChange({ invitationBodyHtml: text });
+                      };
+                      reader.readAsText(file);
+                      // Reset so re-selecting the same file re-fires onChange.
+                      e.target.value = "";
+                    }}
+                  />
+                  {state.invitationBodyHtml.trim() !== "" && (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-destructive hover:underline"
+                      data-testid="invitation-html-clear"
+                      onClick={() => onChange({ invitationBodyHtml: "" })}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  value={state.invitationBodyHtml}
+                  onChange={(e) =>
+                    onChange({ invitationBodyHtml: e.target.value })
+                  }
+                  maxLength={50000}
+                  rows={10}
+                  placeholder="Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  data-testid="invitation-html-input"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  {state.invitationBodyHtml.length} / 50000 characters
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

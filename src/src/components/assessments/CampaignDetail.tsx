@@ -64,6 +64,8 @@ interface ResultPayload {
 export interface CampaignDetailProps {
   initialOverview: CampaignOverview;
   initialRespondents: CampaignRespondentRow[];
+  /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
+  customHtmlEmailEnabled?: boolean;
 }
 
 interface OrgRespondentRow {
@@ -150,6 +152,7 @@ function StatusPill({
 export function CampaignDetail({
   initialOverview,
   initialRespondents,
+  customHtmlEmailEnabled = false,
 }: CampaignDetailProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -208,10 +211,17 @@ export function CampaignDetail({
   const [emailBody, setEmailBody] = useState<string>(
     overview.campaign.invitationBodyMarkdown ?? "",
   );
+  // Task 12 (#20) — full-HTML override editor state.
+  const [emailHtml, setEmailHtml] = useState<string>(
+    overview.campaign.invitationBodyHtml ?? "",
+  );
+  const [emailHtmlError, setEmailHtmlError] = useState<string | null>(null);
   const [emailSaving, setEmailSaving] = useState(false);
   const emailDirty =
     emailSubject !== (overview.campaign.invitationSubject ?? "") ||
-    emailBody !== (overview.campaign.invitationBodyMarkdown ?? "");
+    emailBody !== (overview.campaign.invitationBodyMarkdown ?? "") ||
+    (customHtmlEmailEnabled &&
+      emailHtml !== (overview.campaign.invitationBodyHtml ?? ""));
 
   // Follow-on (May 21) — coach edit start-date affordance.
   // openAt is set in the wizard and locked post-creation in earlier UI;
@@ -626,18 +636,31 @@ export function CampaignDetail({
     if (emailSaving) return;
     setEmailSaving(true);
     try {
+      setEmailHtmlError(null);
+      const payload: Record<string, unknown> = {
+        invitationSubject: emailSubject.trim() === "" ? null : emailSubject.trim(),
+        invitationBodyMarkdown:
+          emailBody.trim() === "" ? null : emailBody.trim(),
+      };
+      // Task 12 (#20) — only send the full-HTML field when the flag is on.
+      // The server validates token placement + length and rejects with a reason.
+      if (customHtmlEmailEnabled) {
+        payload.invitationBodyHtml = emailHtml.trim() === "" ? null : emailHtml;
+      }
       const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          invitationSubject: emailSubject.trim() === "" ? null : emailSubject.trim(),
-          invitationBodyMarkdown:
-            emailBody.trim() === "" ? null : emailBody.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok || body.success === false) {
-        throw new Error(body.error || `HTTP ${res.status}`);
+        const reason =
+          typeof body.error === "string" ? body.error : `HTTP ${res.status}`;
+        // A 400 here is almost always the HTML token-placement validator — show it inline.
+        if (res.status === 400 && customHtmlEmailEnabled) {
+          setEmailHtmlError(reason);
+        }
+        throw new Error(reason);
       }
       toast({
         title: "Invitation email saved",
@@ -1103,6 +1126,81 @@ export function CampaignDetail({
                   {emailBody.length} / 5000 characters
                 </p>
               </div>
+              {customHtmlEmailEnabled && (
+                <div className="space-y-1 border-t border-border pt-3">
+                  <label className="text-xs font-medium text-foreground">
+                    Full custom HTML (advanced)
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">
+                    When set, this HTML <strong>replaces the entire branded
+                    email</strong> (no template wrap). It must include{" "}
+                    <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                      {"{{invitationUrl}}"}
+                    </code>{" "}
+                    as a link <code className="text-[10px]">href</code> or as
+                    plain text.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept=".html,.htm,text/html"
+                      className="text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-muted file:px-2 file:py-1 file:text-xs"
+                      data-testid="email-overrides-html-file"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const text =
+                            typeof reader.result === "string"
+                              ? reader.result
+                              : "";
+                          setEmailHtml(text);
+                          setEmailHtmlError(null);
+                        };
+                        reader.readAsText(file);
+                        e.target.value = "";
+                      }}
+                    />
+                    {emailHtml.trim() !== "" && (
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-destructive hover:underline"
+                        data-testid="email-overrides-html-clear"
+                        onClick={() => {
+                          setEmailHtml("");
+                          setEmailHtmlError(null);
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    value={emailHtml}
+                    onChange={(e) => {
+                      setEmailHtml(e.target.value);
+                      setEmailHtmlError(null);
+                    }}
+                    maxLength={50000}
+                    rows={10}
+                    placeholder="Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                    className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    data-testid="email-overrides-html"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    {emailHtml.length} / 50000 characters
+                  </p>
+                  {emailHtmlError && (
+                    <p
+                      className="text-[11px] text-destructive"
+                      data-testid="email-overrides-html-error"
+                    >
+                      {emailHtmlError}
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
@@ -1111,6 +1209,8 @@ export function CampaignDetail({
                     setEmailBody(
                       overview.campaign.invitationBodyMarkdown ?? "",
                     );
+                    setEmailHtml(overview.campaign.invitationBodyHtml ?? "");
+                    setEmailHtmlError(null);
                     setEmailOpen(false);
                   }}
                   disabled={emailSaving}
