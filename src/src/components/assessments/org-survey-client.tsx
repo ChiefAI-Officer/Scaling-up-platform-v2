@@ -35,6 +35,7 @@ import {
   deriveScaleLabel,
   deriveTimeEstimate,
 } from "@/components/assessments/assessment-welcome";
+import { formatTimestampDateTime } from "@/lib/utils";
 
 interface ScaleConfig {
   min: number;
@@ -464,7 +465,7 @@ async function readError(res: Response, fallback: string): Promise<string> {
       const body = (await res.json()) as { error?: string; openAt?: string };
       if (typeof body?.error === "string") return body.error;
       if (body?.openAt) {
-        return `This survey hasn't opened yet. It opens ${new Date(body.openAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.`;
+        return `This survey hasn't opened yet. It opens ${formatTimestampDateTime(body.openAt)}.`;
       }
     } catch {
       /* fall through */
