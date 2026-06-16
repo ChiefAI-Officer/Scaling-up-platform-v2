@@ -96,6 +96,8 @@ interface TemplateSummary {
   alias: string;
   description: string | null;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
+  /** Computed server-side via isResultsEmailApproved. Controls #15 toggle gate. */
+  resultsEmailApproved: boolean;
 }
 
 interface Respondent {
@@ -139,6 +141,14 @@ interface WizardState {
   // Task O UI — per-campaign invitation email overrides. Null/empty = fall back to template default.
   invitationSubject: string;
   invitationBodyMarkdown: string;
+  // Task 6b — #15/#16 result/notify toggles.
+  /** Whether the selected template has an approved results email (server-computed).
+   *  Ephemeral — not persisted to the draft; re-evaluated when template is picked. */
+  templateResultsEmailApproved: boolean;
+  /** #15: Send each respondent their results email on submit. Gated on templateResultsEmailApproved. */
+  sendResultsToRespondent: boolean;
+  /** #16: Send coach a notification when a respondent completes. */
+  notifyCoachOnCompletion: boolean;
 }
 
 const STEPS = [
@@ -207,6 +217,9 @@ export function CampaignWizard() {
       closeAt: "",
       invitationSubject: "",
       invitationBodyMarkdown: "",
+      templateResultsEmailApproved: false,
+      sendResultsToRespondent: false,
+      notifyCoachOnCompletion: false,
     };
   });
 
@@ -274,6 +287,11 @@ export function CampaignWizard() {
             typeof parsed.invitationBodyMarkdown === "string"
               ? parsed.invitationBodyMarkdown
               : "",
+          // Task 6b — not persisted to draft (approved state is re-derived from template);
+          // toggles are persisted so a resumed draft keeps the user's choices.
+          templateResultsEmailApproved: false,
+          sendResultsToRespondent: parsed.sendResultsToRespondent === true,
+          notifyCoachOnCompletion: parsed.notifyCoachOnCompletion === true,
         };
         if (!cancelled) {
           setPendingDraft({
@@ -421,6 +439,10 @@ export function CampaignWizard() {
             state.invitationBodyMarkdown.trim() !== ""
               ? state.invitationBodyMarkdown.trim()
               : undefined,
+          // Task 6b — #15/#16 toggles. #15 is only meaningful when approved, but
+          // the server re-validates at send time; we pass the user's intent through.
+          sendResultsToRespondent: state.sendResultsToRespondent,
+          notifyCoachOnCompletion: state.notifyCoachOnCompletion,
         }),
       });
       const createBody = await createRes.json();
@@ -612,8 +634,16 @@ export function CampaignWizard() {
         {state.step === 1 && (
           <TemplateStep
             value={state.templateId}
-            onChange={(id, name) =>
-              setState((s) => ({ ...s, templateId: id, templateName: name }))
+            onChange={(id, name, resultsEmailApproved) =>
+              setState((s) => ({
+                ...s,
+                templateId: id,
+                templateName: name,
+                templateResultsEmailApproved: resultsEmailApproved,
+                // If the template changes and is no longer approved, clear #15.
+                sendResultsToRespondent:
+                  resultsEmailApproved ? s.sendResultsToRespondent : false,
+              }))
             }
             onBack={back}
             onNext={next}
@@ -643,6 +673,9 @@ export function CampaignWizard() {
             endMode={state.endMode}
             closeAt={state.closeAt}
             templateName={state.templateName}
+            resultsEmailApproved={state.templateResultsEmailApproved}
+            sendResultsToRespondent={state.sendResultsToRespondent}
+            notifyCoachOnCompletion={state.notifyCoachOnCompletion}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             onBack={back}
             onNext={next}
@@ -775,7 +808,7 @@ function TemplateStep({
   onNext,
 }: {
   value: string;
-  onChange: (id: string, name: string) => void;
+  onChange: (id: string, name: string, resultsEmailApproved: boolean) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -832,7 +865,7 @@ function TemplateStep({
                 name="template"
                 value={t.id}
                 checked={value === t.id}
-                onChange={() => onChange(t.id, t.name)}
+                onChange={() => onChange(t.id, t.name, t.resultsEmailApproved)}
                 className="accent-primary mt-1"
               />
               <div className="flex-1">
@@ -1312,6 +1345,9 @@ function ScheduleStep({
   endMode,
   closeAt,
   templateName,
+  resultsEmailApproved,
+  sendResultsToRespondent,
+  notifyCoachOnCompletion,
   onChange,
   onBack,
   onNext,
@@ -1321,6 +1357,9 @@ function ScheduleStep({
   endMode: EndMode;
   closeAt: string;
   templateName: string;
+  resultsEmailApproved: boolean;
+  sendResultsToRespondent: boolean;
+  notifyCoachOnCompletion: boolean;
   onChange: (patch: Partial<WizardState>) => void;
   onBack: () => void;
   onNext: () => void;
@@ -1422,6 +1461,53 @@ function ScheduleStep({
             )}
           </div>
         )}
+      </div>
+
+      {/* Task 6b — #15/#16 email toggles */}
+      <div className="space-y-3 border border-border rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-foreground">Email notifications</h3>
+
+        {/* #15 — Respondent results email */}
+        <div className="space-y-1">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              id="sendResultsToRespondent"
+              type="checkbox"
+              checked={sendResultsToRespondent}
+              disabled={!resultsEmailApproved}
+              onChange={(e) =>
+                onChange({ sendResultsToRespondent: e.target.checked })
+              }
+              className="accent-primary w-4 h-4"
+              aria-label="Email each respondent their results"
+            />
+            <span className={`text-sm ${!resultsEmailApproved ? "text-muted-foreground" : "text-foreground"}`}>
+              Email each respondent their results
+            </span>
+          </label>
+          {!resultsEmailApproved && (
+            <p className="text-xs text-muted-foreground pl-7">
+              Results email not yet approved for this template — ask an admin.
+            </p>
+          )}
+        </div>
+
+        {/* #16 — Coach completion notify */}
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            id="notifyCoachOnCompletion"
+            type="checkbox"
+            checked={notifyCoachOnCompletion}
+            onChange={(e) =>
+              onChange({ notifyCoachOnCompletion: e.target.checked })
+            }
+            className="accent-primary w-4 h-4"
+            aria-label="Email me when someone completes"
+          />
+          <span className="text-sm text-foreground">
+            Email me when someone completes
+          </span>
+        </label>
       </div>
 
       <div className="flex justify-between pt-4">

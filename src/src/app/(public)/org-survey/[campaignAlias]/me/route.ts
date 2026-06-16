@@ -100,6 +100,8 @@ export async function GET(
             name: invitation.campaign.name,
             alias: invitation.campaign.alias,
             organizationName: invitation.campaign.organization?.name ?? null,
+            // Task 6b: expose toggle so the client can branch thank-you copy.
+            sendResultsToRespondent: invitation.campaign.sendResultsToRespondent,
           },
           version: { language: invitation.campaign.version.language },
           sections: invitation.campaign.version.sections,

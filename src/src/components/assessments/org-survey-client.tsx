@@ -70,7 +70,13 @@ interface SurveyData {
   // to key the localStorage autosave draft per-respondent so two invitees of
   // the same campaign on a shared device never cross-hydrate each other.
   respondentKey?: string;
-  campaign: { name: string; alias: string; organizationName?: string | null };
+  campaign: {
+    name: string;
+    alias: string;
+    organizationName?: string | null;
+    /** Task 6b: when true, append ?results=1 to the thank-you redirect. */
+    sendResultsToRespondent?: boolean;
+  };
   version: { language: string };
   sections: Section[];
   questions: Question[];
@@ -298,7 +304,13 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         return;
       }
       clearDraft();
-      router.push(`/org-survey/${campaignAlias}/thank-you`);
+      // Task 6b: append ?results=1 so the thank-you page shows confirming copy
+      // when the campaign is configured to email results to respondents.
+      // `submittingData` is captured at the top of this function — use it
+      // directly to avoid TypeScript narrowing issues with `phase.kind`.
+      const resultsParam =
+        submittingData.campaign?.sendResultsToRespondent ? "?results=1" : "";
+      router.push(`/org-survey/${campaignAlias}/thank-you${resultsParam}`);
     } catch (err) {
       console.error("[org-survey] submit failed", err);
       setSubmitError("Something went wrong. Please try again.");
