@@ -13,6 +13,7 @@ import {
   quickAssessmentLeadEmail,
   quickAssessmentLeadEmailCron,
 } from "@/inngest/functions/quick-assessment-lead-email";
+import { assessmentInviteFanout } from "@/inngest/functions/assessment-invite-fanout";
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -28,5 +29,6 @@ export const { GET, POST, PUT } = serve({
         handleRegistrationCreatedFree,
         quickAssessmentLeadEmail,
         quickAssessmentLeadEmailCron,
+        assessmentInviteFanout,
     ],
 });
