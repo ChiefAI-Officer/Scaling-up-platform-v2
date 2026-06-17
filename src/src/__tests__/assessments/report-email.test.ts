@@ -15,7 +15,10 @@
  *  - subject differs by recipientRole
  */
 
-import { buildReportEmailHtml } from "@/lib/assessments/report-email";
+import {
+  buildReportEmailHtml,
+  buildRespondentReportFromSubmission,
+} from "@/lib/assessments/report-email";
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import type { ScoreResult } from "@/lib/assessments/scoring";
 
@@ -360,5 +363,30 @@ describe("buildReportEmailHtml — subject by role", () => {
     const taker = buildReportEmailHtml({ report, recipientRole: "TAKER_COPY" });
     const coach = buildReportEmailHtml({ report, recipientRole: "REFERRING_COACH" });
     expect(taker.bodyHtml).not.toBe(coach.bodyHtml);
+  });
+});
+
+describe("buildRespondentReportFromSubmission — templateAlias", () => {
+  function submissionArgs(
+    overrides: Partial<Parameters<typeof buildRespondentReportFromSubmission>[0]> = {},
+  ): Parameters<typeof buildRespondentReportFromSubmission>[0] {
+    return {
+      result: {} as ScoreResult,
+      publicTaker: { firstName: "Jane", lastName: "Doe", email: "jane@example.com" },
+      assessmentName: "Rockefeller Habits Checklist",
+      campaignLabel: null,
+      sections: [],
+      questions: [],
+      scoringConfig: {},
+      submittedAt: new Date("2026-06-17T10:00:00Z"),
+      submissionId: "sub-1",
+      templateAlias: "RockHabits",
+      ...overrides,
+    };
+  }
+
+  it("threads templateAlias onto the returned RespondentReport (so reportConfigFor can read it)", () => {
+    const report = buildRespondentReportFromSubmission(submissionArgs());
+    expect(report.templateAlias).toBe("RockHabits");
   });
 });

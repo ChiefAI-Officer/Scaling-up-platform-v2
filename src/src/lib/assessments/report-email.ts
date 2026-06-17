@@ -72,6 +72,8 @@ export interface BuildRespondentReportArgs {
   result: ScoreResult;
   publicTaker: { firstName: string; lastName: string; email: string };
   assessmentName: string;
+  /** The template's stable alias — drives reportConfigFor (scored vs qualitative). */
+  templateAlias: string;
   campaignLabel: string | null;
   sections: unknown;
   questions: unknown;
@@ -132,6 +134,7 @@ export function buildRespondentReportFromSubmission(
     jobTitle: null,
     companyName: "",
     assessmentName: args.assessmentName,
+    templateAlias: args.templateAlias,
     campaignLabel: args.campaignLabel,
     submittedAt: args.submittedAt,
     result: args.result,

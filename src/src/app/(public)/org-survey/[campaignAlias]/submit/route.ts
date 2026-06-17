@@ -85,6 +85,7 @@ interface EnqueueArgs {
     version: { sections: unknown; questions: unknown; scoringConfig: unknown };
     template: {
       name: string;
+      alias: string;
       resultsEmailSubject: string | null;
       resultsEmailBodyMarkdown: string | null;
       resultsEmailContentApproved: boolean;
@@ -134,6 +135,7 @@ async function enqueueWaveDEmails(
           email: respondentEmail,
         },
         assessmentName: template.name,
+        templateAlias: template.alias,
         campaignLabel: null,
         sections: campaign.version.sections,
         questions: campaign.version.questions,
@@ -268,6 +270,7 @@ export async function POST(
                 template: {
                   select: {
                     name: true,
+                    alias: true,
                     resultsEmailSubject: true,
                     resultsEmailBodyMarkdown: true,
                     resultsEmailContentApproved: true,
