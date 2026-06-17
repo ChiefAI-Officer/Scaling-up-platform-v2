@@ -164,6 +164,45 @@ describe("AssessmentResultView", () => {
     ).toContain("q1");
   });
 
+  it("shows question text (not bare code) when questionByKey is provided (#21)", () => {
+    const result = buildResult({
+      perQuestion: [{ stableKey: "q1_1", value: 5, achieved: true }],
+    });
+    render(
+      <AssessmentResultView
+        result={result}
+        version={buildVersion()}
+        questionByKey={{ q1_1: "How ready are you?" }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("per-question-toggle"));
+    const detail = screen.getByTestId("per-question-detail");
+    // The human-readable label is the primary display.
+    expect(detail.textContent).toContain("How ready are you?");
+    // The bare code is no longer the primary label — it must not appear in a
+    // primary (non-muted) span. The label heading carries it instead.
+    const primaryLabel = detail.querySelector(
+      '[data-testid="per-question-label-q1_1"]',
+    );
+    expect(primaryLabel?.textContent).toBe("How ready are you?");
+  });
+
+  it("falls back to the stableKey code when no label is mapped (#21)", () => {
+    const result = buildResult({
+      perQuestion: [{ stableKey: "q9_9", value: 3, achieved: false }],
+    });
+    render(
+      <AssessmentResultView
+        result={result}
+        version={buildVersion()}
+        questionByKey={{ q1_1: "How ready are you?" }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("per-question-toggle"));
+    const detail = screen.getByTestId("per-question-detail");
+    expect(detail.textContent).toContain("q9_9");
+  });
+
   it("renders empty section message when no sections present", () => {
     const result = buildResult({ perSection: [] });
     render(
