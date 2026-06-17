@@ -218,6 +218,11 @@ describe("buildQspV1Content()", () => {
     expect(actualLabels).toEqual(expectedLabels);
   });
 
+  it("no QSPv1 question label contains '(with 1 decimal)' (#26/#28 parity with QSPv2)", () => {
+    const offenders = content.questions.filter((q) => /with 1 decimal/i.test(q.label));
+    expect(offenders).toEqual([]);
+  });
+
   // ── Scoring schema parse (engine contract) ───────────────────────────────
   //
   // TemplateVersionForScoringSchema validates the discriminated-union question
