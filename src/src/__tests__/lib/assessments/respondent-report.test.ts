@@ -93,6 +93,7 @@ const GOOD_SUBMISSION = {
     template: {
       id: "tpl-1",
       name: "Rockefeller",
+      alias: "leadership-vision-alignment",
     },
     organization: {
       name: "Acme Corp",
@@ -153,6 +154,8 @@ test("1. owning coach + submission → status:ok, all fields populated, provenan
 
   // assessmentName is ALWAYS the instrument/template name
   expect(report.assessmentName).toBe("Rockefeller");
+  // templateAlias is the stable instrument slug (template.alias)
+  expect(report.templateAlias).toBe("leadership-vision-alignment");
   // campaignLabel is the coach's label when present
   expect(report.campaignLabel).toBe("Acme Q1 Campaign");
 
@@ -342,6 +345,22 @@ test("7. db.$transaction is invoked and the fetch happens within its callback", 
       }),
     }),
   );
+});
+
+test("templateAlias surfaces template.alias on the report payload", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  const { $transaction } = makeMockDb(GOOD_SUBMISSION);
+
+  const result = await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  expect(result.status).toBe("ok");
+  if (result.status !== "ok") return;
+  expect(result.report.templateAlias).toBe("leadership-vision-alignment");
 });
 
 test("assessmentName is always template.name; campaignLabel is null when campaign.name is empty", async () => {

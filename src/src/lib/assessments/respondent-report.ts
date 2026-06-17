@@ -61,6 +61,7 @@ interface RawSubmission {
     template: {
       id: string;
       name: string;
+      alias: string;
     };
     organization: {
       name: string;
@@ -94,6 +95,13 @@ export interface RespondentReport {
   companyName: string;
   /** template.name — the instrument title (e.g. "Rockefeller Habits Checklist") */
   assessmentName: string;
+  /**
+   * template.alias — the stable instrument slug (e.g. "leadership-vision-alignment").
+   * Optional on the shared type because the public-quiz submit path
+   * (buildRespondentReportFromSubmission) constructs this shape without a
+   * template-alias in hand; the authorized loader always populates it.
+   */
+  templateAlias?: string;
   /** campaign.name — the coach's label; null when absent or empty */
   campaignLabel: string | null;
   submittedAt: Date;
@@ -211,6 +219,7 @@ export async function getRespondentReport(
               select: {
                 id: true,
                 name: true,
+                alias: true,
               },
             },
             organization: {
@@ -285,6 +294,7 @@ export async function getRespondentReport(
       jobTitle: submission.respondent.jobTitle ?? null,
       companyName: submission.campaign.organization.name,
       assessmentName,
+      templateAlias: submission.campaign.template.alias,
       campaignLabel,
       submittedAt: submission.submittedAt,
       result,
