@@ -139,6 +139,19 @@ describe("buildQspV2Content()", () => {
     }
   });
 
+  // ── #26: no '(with 1 decimal)' suffix; scale is integer (step:1) ──────────
+
+  it("no question label mentions decimals (#26 — scale is integer, step:1)", () => {
+    for (const q of content.questions) {
+      expect(q.label).not.toMatch(/with 1 decimal/i);
+    }
+  });
+
+  it("P1 overall-rating label is exactly 'How would you rate the past Quarter? (1-10)' (#26)", () => {
+    const labels = content.questions.map((q) => q.label);
+    expect(labels).toContain("How would you rate the past Quarter? (1-10)");
+  });
+
   // ── Slider scale ─────────────────────────────────────────────────────────
 
   it("every SLIDER_LIKERT scale deep-equals { min:1, max:10, step:1, anchorMin:'', anchorMax:'' }", () => {

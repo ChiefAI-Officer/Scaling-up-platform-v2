@@ -193,7 +193,7 @@ export function buildQspV2Content(): QspV2Content {
       stableKey: "P1_overall_rating",
       sortOrder: 1,
       type: "NUMBER",
-      label: "How would you rate the past Quarter? (1-10) (with 1 decimal)",
+      label: "How would you rate the past Quarter? (1-10)",
       sectionStableKey: "P1_retrospective",
       isRequired: true,
     },
