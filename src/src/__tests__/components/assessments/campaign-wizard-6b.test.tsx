@@ -141,7 +141,7 @@ afterEach(() => {
 
 async function advanceToSchedule(templates = [TEMPLATE_APPROVED]) {
   installFetch(templates);
-  render(<CampaignWizard />);
+  render(<CampaignWizard resultsEmailEnabled coachNotifyEnabled />);
 
   // Step 0 — org
   const orgRadio = await screen.findByRole("radio", { name: /acme corp/i });
@@ -242,7 +242,7 @@ describe("CampaignWizard — #15/#16 toggles", () => {
 describe("CampaignWizard — toggles flow into create payload", () => {
   it("sends sendResultsToRespondent=false and notifyCoachOnCompletion=false by default", async () => {
     installFetch([TEMPLATE_APPROVED]);
-    render(<CampaignWizard />);
+    render(<CampaignWizard resultsEmailEnabled coachNotifyEnabled />);
 
     // Step 0
     const orgRadio = await screen.findByRole("radio", { name: /acme corp/i });
@@ -288,7 +288,7 @@ describe("CampaignWizard — toggles flow into create payload", () => {
 
   it("sends sendResultsToRespondent=true when #15 is toggled on (approved template)", async () => {
     installFetch([TEMPLATE_APPROVED]);
-    render(<CampaignWizard />);
+    render(<CampaignWizard resultsEmailEnabled coachNotifyEnabled />);
 
     // Step 0
     const orgRadio = await screen.findByRole("radio", { name: /acme corp/i });
@@ -335,7 +335,7 @@ describe("CampaignWizard — toggles flow into create payload", () => {
 
   it("sends notifyCoachOnCompletion=true when #16 is toggled on", async () => {
     installFetch([TEMPLATE_APPROVED]);
-    render(<CampaignWizard />);
+    render(<CampaignWizard resultsEmailEnabled coachNotifyEnabled />);
 
     // Step 0
     const orgRadio = await screen.findByRole("radio", { name: /acme corp/i });

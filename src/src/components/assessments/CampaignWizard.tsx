@@ -207,6 +207,8 @@ function formatDateTimeLocal(d: Date): string {
 export function CampaignWizard({
   customHtmlEmailEnabled = false,
   autoSend = false,
+  resultsEmailEnabled = false,
+  coachNotifyEnabled = false,
 }: {
   /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -218,6 +220,20 @@ export function CampaignWizard({
    * the campaign is created DRAFT (the manual "Send Invitations" path works).
    */
   autoSend?: boolean;
+  /**
+   * Wave D FIX 2 — gate the #15 "Email each respondent their results" checkbox
+   * behind WAVE_D_RESULTS_EMAIL_ENABLED (mirrors the server flag). When false
+   * (the default merge state) the checkbox is hidden AND sendResultsToRespondent
+   * is never sent true — otherwise the thank-you page would promise a results
+   * email that the (flag-gated) send path never delivers.
+   */
+  resultsEmailEnabled?: boolean;
+  /**
+   * Wave D FIX 2 — gate the #16 "Email me when someone completes" checkbox
+   * behind WAVE_D_COACH_NOTIFY_ENABLED (mirrors the server flag). When false,
+   * the checkbox is hidden AND notifyCoachOnCompletion is never sent true.
+   */
+  coachNotifyEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -478,8 +494,16 @@ export function CampaignWizard({
               : undefined,
           // Task 6b — #15/#16 toggles. #15 is only meaningful when approved, but
           // the server re-validates at send time; we pass the user's intent through.
-          sendResultsToRespondent: state.sendResultsToRespondent,
-          notifyCoachOnCompletion: state.notifyCoachOnCompletion,
+          // FIX 2 (dark-merge): when the corresponding flag is OFF the checkbox
+          // is hidden, so its state stays false; we additionally force false here
+          // so a stale persisted draft value can never sneak through as true and
+          // make the thank-you page promise an email the send path won't deliver.
+          sendResultsToRespondent: resultsEmailEnabled
+            ? state.sendResultsToRespondent
+            : false,
+          notifyCoachOnCompletion: coachNotifyEnabled
+            ? state.notifyCoachOnCompletion
+            : false,
           // Task 10 — #2/#3 timing radio: tell server when to send invitations.
           // Gated on the auto-send flag (dark-merge fix): when auto-send is OFF
           // we MUST NOT send inviteTiming — sending it marks the create as a
@@ -722,6 +746,8 @@ export function CampaignWizard({
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
             inviteTiming={state.inviteTiming}
             autoSend={autoSend}
+            resultsEmailEnabled={resultsEmailEnabled}
+            coachNotifyEnabled={coachNotifyEnabled}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             onBack={back}
             onNext={next}
@@ -1398,6 +1424,8 @@ function ScheduleStep({
   notifyCoachOnCompletion,
   inviteTiming,
   autoSend,
+  resultsEmailEnabled,
+  coachNotifyEnabled,
   onChange,
   onBack,
   onNext,
@@ -1414,6 +1442,10 @@ function ScheduleStep({
   /** Wave D auto-send flag — when false, hide the timing radio + show the
    *  legacy openAt picker (the inviteTiming state is ignored on the create). */
   autoSend: boolean;
+  /** Wave D FIX 2 — gate the #15 results-email checkbox (mirrors server flag). */
+  resultsEmailEnabled: boolean;
+  /** Wave D FIX 2 — gate the #16 coach-notify checkbox (mirrors server flag). */
+  coachNotifyEnabled: boolean;
   onChange: (patch: Partial<WizardState>) => void;
   onBack: () => void;
   onNext: () => void;
@@ -1599,52 +1631,63 @@ function ScheduleStep({
         )}
       </div>
 
-      {/* Task 6b — #15/#16 email toggles */}
-      <div className="space-y-3 border border-border rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-foreground">Email notifications</h3>
+      {/* Task 6b — #15/#16 email toggles.
+          FIX 2 (dark-merge): each checkbox is gated behind its own Wave-D flag.
+          With a flag OFF the checkbox is hidden AND its field is forced false on
+          the create (in saveCampaign) — so the thank-you page can never promise
+          a results email the (flag-gated) send path won't actually deliver.
+          The whole panel is hidden when BOTH flags are off. */}
+      {(resultsEmailEnabled || coachNotifyEnabled) && (
+        <div className="space-y-3 border border-border rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-foreground">Email notifications</h3>
 
-        {/* #15 — Respondent results email */}
-        <div className="space-y-1">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              id="sendResultsToRespondent"
-              type="checkbox"
-              checked={sendResultsToRespondent}
-              disabled={!resultsEmailApproved}
-              onChange={(e) =>
-                onChange({ sendResultsToRespondent: e.target.checked })
-              }
-              className="accent-primary w-4 h-4"
-              aria-label="Email each respondent their results"
-            />
-            <span className={`text-sm ${!resultsEmailApproved ? "text-muted-foreground" : "text-foreground"}`}>
-              Email each respondent their results
-            </span>
-          </label>
-          {!resultsEmailApproved && (
-            <p className="text-xs text-muted-foreground pl-7">
-              Results email not yet approved for this template — ask an admin.
-            </p>
+          {/* #15 — Respondent results email */}
+          {resultsEmailEnabled && (
+            <div className="space-y-1">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  id="sendResultsToRespondent"
+                  type="checkbox"
+                  checked={sendResultsToRespondent}
+                  disabled={!resultsEmailApproved}
+                  onChange={(e) =>
+                    onChange({ sendResultsToRespondent: e.target.checked })
+                  }
+                  className="accent-primary w-4 h-4"
+                  aria-label="Email each respondent their results"
+                />
+                <span className={`text-sm ${!resultsEmailApproved ? "text-muted-foreground" : "text-foreground"}`}>
+                  Email each respondent their results
+                </span>
+              </label>
+              {!resultsEmailApproved && (
+                <p className="text-xs text-muted-foreground pl-7">
+                  Results email not yet approved for this template — ask an admin.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* #16 — Coach completion notify */}
+          {coachNotifyEnabled && (
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                id="notifyCoachOnCompletion"
+                type="checkbox"
+                checked={notifyCoachOnCompletion}
+                onChange={(e) =>
+                  onChange({ notifyCoachOnCompletion: e.target.checked })
+                }
+                className="accent-primary w-4 h-4"
+                aria-label="Email me when someone completes"
+              />
+              <span className="text-sm text-foreground">
+                Email me when someone completes
+              </span>
+            </label>
           )}
         </div>
-
-        {/* #16 — Coach completion notify */}
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            id="notifyCoachOnCompletion"
-            type="checkbox"
-            checked={notifyCoachOnCompletion}
-            onChange={(e) =>
-              onChange({ notifyCoachOnCompletion: e.target.checked })
-            }
-            className="accent-primary w-4 h-4"
-            aria-label="Email me when someone completes"
-          />
-          <span className="text-sm text-foreground">
-            Email me when someone completes
-          </span>
-        </label>
-      </div>
+      )}
 
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack}>

@@ -406,6 +406,11 @@ export async function runInviteFanout(
     deps.db.assessmentCampaign.updateMany({
       where: {
         id: campaignId,
+        // FIX 1: deletedAt-guard the mark-sent write. A campaign soft-deleted
+        // in the window between the last batch's recheck and this write must
+        // NOT get invitesSentAt stamped on a dead row (the recheck only guards
+        // the per-batch sends, not the terminal mark-sent).
+        deletedAt: null,
         // FIX 4: status-guard the DRAFT→ACTIVE flip so an admin who moved the
         // campaign out of DRAFT mid-run isn't flipped back to ACTIVE. Only
         // applied when we intend to flip — invitesSentAt is set unconditionally
@@ -429,7 +434,8 @@ export async function runInviteFanout(
   if (flipToActive) {
     await deps.runStep("mark-sent-fallback", () =>
       deps.db.assessmentCampaign.updateMany({
-        where: { id: campaignId, invitesSentAt: null },
+        // FIX 1: deletedAt-guard the fallback stamp too — same window risk.
+        where: { id: campaignId, invitesSentAt: null, deletedAt: null },
         data: { invitesSentAt: now },
       }),
     );

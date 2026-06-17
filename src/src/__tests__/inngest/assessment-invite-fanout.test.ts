@@ -214,6 +214,86 @@ describe("runInviteFanout", () => {
     expect(result.sent).toBe(2);
   });
 
+  // -------------------------------------------------------------------------
+  // FIX 1 — mark-sent must be deletedAt-guarded
+  // -------------------------------------------------------------------------
+  it("the mark-sent updateMany where-clause includes deletedAt: null (IMMEDIATELY — no flip)", async () => {
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue(
+      makeCampaign({ inviteTiming: "IMMEDIATELY", status: "ACTIVE" } as any),
+    );
+    deps.sendInvitesBatch.mockResolvedValue({
+      sent: ["resp-0", "resp-1"],
+      skipped: [],
+      failed: [],
+      results: [],
+    });
+
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    const markCall = findMarkSent(deps.updateMany);
+    expect(markCall).toBeDefined();
+    // The guard: a campaign soft-deleted between recheck and mark-sent must
+    // NOT get invitesSentAt stamped on a deleted row.
+    expect(markCall.where.deletedAt).toBeNull();
+  });
+
+  it("BOTH mark-sent and mark-sent-fallback where-clauses include deletedAt: null (ON_OPEN flip)", async () => {
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue(
+      makeCampaign({ inviteTiming: "ON_OPEN", status: "DRAFT" } as any),
+    );
+    deps.sendInvitesBatch.mockResolvedValue({
+      sent: ["resp-0", "resp-1"],
+      skipped: [],
+      failed: [],
+      results: [],
+    });
+
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    // Both writes that can set invitesSentAt must carry deletedAt: null.
+    const stampCalls = deps.updateMany.mock.calls.filter(
+      (c: any) => c[0]?.data && c[0].data.invitesSentAt !== undefined,
+    );
+    expect(stampCalls.length).toBe(2); // mark-sent (guarded flip) + fallback
+    for (const c of stampCalls) {
+      expect(c[0].where.deletedAt).toBeNull();
+    }
+  });
+
+  it("does NOT stamp invitesSentAt when the campaign is soft-deleted before mark-sent (updateMany count 0, no-op)", async () => {
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue(
+      makeCampaign({ inviteTiming: "IMMEDIATELY", status: "ACTIVE" } as any),
+    );
+    deps.sendInvitesBatch.mockResolvedValue({
+      sent: ["resp-0", "resp-1"],
+      skipped: [],
+      failed: [],
+      results: [],
+    });
+
+    // Simulate the DB: the deletedAt-guarded mark-sent matches no live row
+    // because the campaign was soft-deleted in the window → count 0 (no-op).
+    deps.updateMany.mockImplementation(async (args: any) => {
+      if (args?.data && args.data.invitesSentAt !== undefined) {
+        // mark-sent / fallback against a deleted row → no row updated
+        return { count: 0 };
+      }
+      return { count: 1 };
+    });
+
+    const result = await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+
+    const markCall = findMarkSent(deps.updateMany);
+    expect(markCall.where.deletedAt).toBeNull();
+    // The write executed but matched 0 rows — no invitesSentAt stamped on the
+    // deleted campaign. Completion still returns (the deletion is the desired
+    // terminal state); the guard merely prevents a stamp on a dead row.
+    expect(result.claimed).toBe(true);
+  });
+
   it("passes db + sendAssessmentInvitationEmail mailer + now into sendInvitesBatch deps", async () => {
     const deps = makeDeps();
     await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
