@@ -304,12 +304,14 @@ export async function POST(request: NextRequest) {
       isWaveDCreate && inviteTiming === "IMMEDIATELY" && autoSendOn;
 
     const now = new Date();
-    // For a Wave-D IMMEDIATELY create, openAt = NOW (R1-H1) — the campaign
-    // opens immediately, so a client-sent openAt is ignored (and may be
-    // omitted). This holds whether or not the flag is on: flag-off still
-    // opens-now, it just stays DRAFT and doesn't auto-send (dark). All other
+    // For a Wave-D IMMEDIATELY create with auto-send ON, openAt = NOW (R1-H1) —
+    // the campaign opens immediately, so a client-sent openAt is ignored (and
+    // may be omitted). When auto-send is OFF (dark merge) the lifecycle is
+    // legacy: stay DRAFT AND honor the coach's chosen openAt verbatim — forcing
+    // now there would be an unflagged behavior delta vs origin/main. All other
     // paths (ON_OPEN, legacy) use the client openAt and require it.
-    const immediateOpen = isWaveDCreate && inviteTiming === "IMMEDIATELY";
+    const immediateOpen =
+      isWaveDCreate && inviteTiming === "IMMEDIATELY" && autoSendOn;
     // openAt is optional in the schema ONLY for the immediate-open path (it's
     // ignored there). On every other path the schema's superRefine guarantees
     // it's present; the `?? ""` keeps the type honest and yields an Invalid

@@ -146,7 +146,7 @@ afterEach(() => {
 /** Renders the wizard (sets up fetch mock first) then advances to Schedule step. */
 async function advanceToSchedule(participantCount = 1) {
   installFetch();
-  render(<CampaignWizard />);
+  render(<CampaignWizard autoSend={true} />);
 
   // Step 0 — org
   const orgRadio = await screen.findByRole("radio", { name: /acme corp/i });
@@ -381,7 +381,7 @@ describe("CampaignWizard — consequence-labeled Create button", () => {
   it("disables Next when 0 participants are selected (can't reach Review with 0)", async () => {
     // Verify the guard: Next is disabled on the Participants step when 0 selected.
     installFetch([]);
-    render(<CampaignWizard />);
+    render(<CampaignWizard autoSend={true} />);
 
     // Step 0 — org
     const orgRadio = await screen.findByRole("radio", { name: /acme corp/i });

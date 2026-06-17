@@ -249,12 +249,32 @@ describe("Task 9 — flag OFF (dark)", () => {
   it("IMMEDIATELY with flag OFF → DRAFT, no emit", async () => {
     flags.autoSend = false;
     const res = await POST(
-      jsonReq({ ...baseBody, inviteTiming: "IMMEDIATELY", participantIds: ["r1"] }) as never,
+      jsonReq({ ...baseBody, inviteTiming: "IMMEDIATELY", participantIds: ["r1"], openAt: future }) as never,
     );
     expect(res.status).toBe(201);
     const createArgs = (db.assessmentCampaign.create as jest.Mock).mock.calls[0][0];
     expect(createArgs.data.status).toBe("DRAFT");
     expect(inngest.send).not.toHaveBeenCalled();
+  });
+
+  it("IMMEDIATELY with flag OFF honors the client openAt (does NOT force now)", async () => {
+    // Dark-merge regression: with auto-send OFF, the route must behave like
+    // origin/main — the coach's chosen openAt is persisted verbatim, NOT
+    // overwritten with `now`. Forcing now is a flag-off behavior delta.
+    flags.autoSend = false;
+    const res = await POST(
+      jsonReq({
+        ...baseBody,
+        inviteTiming: "IMMEDIATELY",
+        participantIds: ["r1"],
+        openAt: future,
+      }) as never,
+    );
+    expect(res.status).toBe(201);
+    const createArgs = (db.assessmentCampaign.create as jest.Mock).mock.calls[0][0];
+    expect(new Date(createArgs.data.openAt).toISOString()).toBe(
+      new Date(future).toISOString(),
+    );
   });
 });
 

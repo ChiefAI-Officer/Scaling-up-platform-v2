@@ -48,6 +48,14 @@ jest.mock("@/services/notifications", () => ({
   sendAssessmentInvitationEmail: jest.fn(),
 }));
 
+// Wave-D auto-send flag. The early-send 409 gate must ONLY apply when auto-send
+// is ON; default ON in this suite so the existing gate tests pass unchanged.
+// The flag-off composition test flips it to false.
+const flags = { autoSend: true };
+jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
+  waveDAutoSendEnabled: () => flags.autoSend,
+}));
+
 import { POST } from "@/app/api/assessment-campaigns/[id]/invite/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
@@ -132,6 +140,7 @@ function emptyReq(): Request {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  flags.autoSend = true;
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
       accessGroupId: "g1",
@@ -372,6 +381,35 @@ describe("POST /api/assessment-campaigns/[id]/invite", () => {
     expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
     expect(db.assessmentInvitation.create).not.toHaveBeenCalled();
     expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
+  });
+
+  // ── Dark-merge fix: the early-send gate is auto-send-flag-gated ───────────
+  it("flag OFF + invitesSentAt NULL → manual bulk send WORKS (no 409 strand)", async () => {
+    // With auto-send OFF (the default merge state) there is NO automatic
+    // initial send to defer to, so the manual /invite must work for an unsent
+    // campaign exactly as on origin/main. A permanent 409 here would strand the
+    // coach: they could never send the initial invitations.
+    flags.autoSend = false;
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation((args) => {
+      if (args?.include) {
+        return Promise.resolve({
+          ...baseCampaign,
+          invitesSentAt: null,
+          participants: PARTICIPANTS,
+        });
+      }
+      return Promise.resolve({ ...baseCampaign, invitesSentAt: null });
+    });
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      success: boolean;
+      data: Array<{ respondentId: string; status: string }>;
+    };
+    expect(body.success).toBe(true);
+    expect(body.data).toHaveLength(2);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(2);
   });
 
   it("late-add: invitesSentAt set → send works for the targeted recipient", async () => {

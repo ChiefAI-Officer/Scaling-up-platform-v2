@@ -41,6 +41,7 @@ import {
   sendInvitesBatch,
   INVITE_BATCH_CAP,
 } from "@/lib/assessments/invite-send";
+import { waveDAutoSendEnabled } from "@/lib/assessments/wave-d-feature-flags";
 
 const InviteBodySchema = z.object({
   respondentIds: z.array(z.string().min(1)).optional(),
@@ -134,12 +135,15 @@ export async function POST(
       );
     }
 
-    // Wave D (R1-M6): the initial bulk send is automatic (the fan-out). Until it
-    // has completed (`invitesSentAt` set), this manual route must not perform a
-    // bulk early-send — that would double-send / bypass the fan-out. It only
-    // serves late-add / resend AFTER the automatic initial send. Gate keys
-    // purely on `invitesSentAt` (a future task wires the actual auto-send).
-    if (campaign.invitesSentAt == null) {
+    // Wave D (R1-M6): when auto-send is ON, the initial bulk send is automatic
+    // (the fan-out). Until it has completed (`invitesSentAt` set), this manual
+    // route must not perform a bulk early-send — that would double-send / bypass
+    // the fan-out. It only serves late-add / resend AFTER the automatic initial
+    // send. The gate is auto-send-flag-gated: with the flag OFF (the default,
+    // dark merge) there is NO automatic send to defer to, so the manual /invite
+    // must work for an unsent campaign exactly as on origin/main — gating it
+    // would strand the coach with a permanent 409 (the core new-campaign flow).
+    if (waveDAutoSendEnabled() && campaign.invitesSentAt == null) {
       return NextResponse.json(
         {
           success: false,

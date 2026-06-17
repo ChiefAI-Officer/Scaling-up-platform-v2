@@ -206,9 +206,18 @@ function formatDateTimeLocal(d: Date): string {
 
 export function CampaignWizard({
   customHtmlEmailEnabled = false,
+  autoSend = false,
 }: {
   /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
+  /**
+   * Wave D — gate the auto-send timing radio + the `inviteTiming` create-payload
+   * field behind WAVE_D_AUTO_SEND_ENABLED (mirrors the server flag). When false
+   * (the default merge state) the wizard takes the LEGACY path: no timing radio,
+   * no `inviteTiming` sent, the coach's chosen `openAt` is shown + honored, and
+   * the campaign is created DRAFT (the manual "Send Invitations" path works).
+   */
+  autoSend?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -472,7 +481,12 @@ export function CampaignWizard({
           sendResultsToRespondent: state.sendResultsToRespondent,
           notifyCoachOnCompletion: state.notifyCoachOnCompletion,
           // Task 10 — #2/#3 timing radio: tell server when to send invitations.
-          inviteTiming: state.inviteTiming,
+          // Gated on the auto-send flag (dark-merge fix): when auto-send is OFF
+          // we MUST NOT send inviteTiming — sending it marks the create as a
+          // "Wave-D create" (auto-send lifecycle), which with the flag off
+          // strands the campaign at the manual /invite 409 gate. Omitting it
+          // takes the legacy DRAFT create path (coach's openAt honored).
+          inviteTiming: autoSend ? state.inviteTiming : undefined,
         }),
       });
       const createBody = await createRes.json();
@@ -707,6 +721,7 @@ export function CampaignWizard({
             sendResultsToRespondent={state.sendResultsToRespondent}
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
             inviteTiming={state.inviteTiming}
+            autoSend={autoSend}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             onBack={back}
             onNext={next}
@@ -721,6 +736,7 @@ export function CampaignWizard({
             onActivate={() => saveCampaign({ activate: true })}
             canActivate={Boolean(canActivate)}
             customHtmlEmailEnabled={customHtmlEmailEnabled}
+            autoSend={autoSend}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
         )}
@@ -1381,6 +1397,7 @@ function ScheduleStep({
   sendResultsToRespondent,
   notifyCoachOnCompletion,
   inviteTiming,
+  autoSend,
   onChange,
   onBack,
   onNext,
@@ -1394,6 +1411,9 @@ function ScheduleStep({
   sendResultsToRespondent: boolean;
   notifyCoachOnCompletion: boolean;
   inviteTiming: "IMMEDIATELY" | "ON_OPEN";
+  /** Wave D auto-send flag — when false, hide the timing radio + show the
+   *  legacy openAt picker (the inviteTiming state is ignored on the create). */
+  autoSend: boolean;
   onChange: (patch: Partial<WizardState>) => void;
   onBack: () => void;
   onNext: () => void;
@@ -1416,7 +1436,11 @@ function ScheduleStep({
 
   const valid = useMemo(() => {
     if (!name.trim()) return false;
-    if (inviteTiming === "ON_OPEN") {
+    if (!autoSend) {
+      // Legacy path (auto-send OFF): the openAt picker is always shown and the
+      // open date is required (matching origin/main). No future-only constraint.
+      if (!openAt) return false;
+    } else if (inviteTiming === "ON_OPEN") {
       if (!openAt) return false;
       if (openAtInPast) return false;
     }
@@ -1428,7 +1452,7 @@ function ScheduleStep({
       if (c <= o) return false;
     }
     return true;
-  }, [name, openAt, openAtInPast, inviteTiming, endMode, closeAt]);
+  }, [name, openAt, openAtInPast, inviteTiming, endMode, closeAt, autoSend]);
 
   return (
     <div className="space-y-6">
@@ -1461,41 +1485,48 @@ function ScheduleStep({
           />
         </div>
 
-        {/* Task 10 — #2/#3: timing radio */}
-        <div className="space-y-2">
-          <Label>When to send invitations</Label>
-          <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="radio"
-                name="inviteTiming"
-                checked={inviteTiming === "IMMEDIATELY"}
-                onChange={() => onChange({ inviteTiming: "IMMEDIATELY" })}
-                className="accent-primary"
-                aria-label="Immediately"
-              />
-              Immediately
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="radio"
-                name="inviteTiming"
-                checked={inviteTiming === "ON_OPEN"}
-                onChange={() => onChange({ inviteTiming: "ON_OPEN" })}
-                className="accent-primary"
-                aria-label="When the campaign opens"
-              />
-              When the campaign opens
-            </label>
+        {/* Task 10 — #2/#3: timing radio. Gated on the auto-send flag — hidden
+            entirely when auto-send is OFF (dark merge), where the create takes
+            the legacy DRAFT path and the openAt picker is always shown. */}
+        {autoSend && (
+          <div className="space-y-2">
+            <Label>When to send invitations</Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="inviteTiming"
+                  checked={inviteTiming === "IMMEDIATELY"}
+                  onChange={() => onChange({ inviteTiming: "IMMEDIATELY" })}
+                  className="accent-primary"
+                  aria-label="Immediately"
+                />
+                Immediately
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="inviteTiming"
+                  checked={inviteTiming === "ON_OPEN"}
+                  onChange={() => onChange({ inviteTiming: "ON_OPEN" })}
+                  className="accent-primary"
+                  aria-label="When the campaign opens"
+                />
+                When the campaign opens
+              </label>
+            </div>
+            {inviteTiming === "IMMEDIATELY" && (
+              <p className="text-xs text-muted-foreground" data-testid="immediately-note">
+                Invitations send as soon as you create this campaign.
+              </p>
+            )}
           </div>
-          {inviteTiming === "IMMEDIATELY" && (
-            <p className="text-xs text-muted-foreground" data-testid="immediately-note">
-              Invitations send as soon as you create this campaign.
-            </p>
-          )}
-        </div>
+        )}
 
-        {inviteTiming === "ON_OPEN" ? (
+        {/* Auto-send OFF (legacy) OR auto-send ON + ON_OPEN → show the picker.
+            Auto-send ON + IMMEDIATELY → openAt is forced to now server-side, so
+            the picker is hidden (kept in DOM disabled for state continuity). */}
+        {!autoSend || inviteTiming === "ON_OPEN" ? (
           <div className="space-y-2">
             <Label htmlFor="openAt">Opens at</Label>
             <Input
@@ -1637,6 +1668,7 @@ function ReviewStep({
   onSaveDraft,
   onActivate,
   customHtmlEmailEnabled = false,
+  autoSend = false,
   onChange,
 }: {
   state: WizardState;
@@ -1646,6 +1678,8 @@ function ReviewStep({
   onSaveDraft: () => void;
   onActivate: () => void;
   customHtmlEmailEnabled?: boolean;
+  /** Wave D auto-send flag — drives the consequence-labeled activate button. */
+  autoSend?: boolean;
   onChange: (patch: Partial<WizardState>) => void;
 }) {
   const [orgName, setOrgName] = useState<string>("");
@@ -1902,14 +1936,18 @@ function ReviewStep({
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : null}
-            {state.inviteTiming === "IMMEDIATELY"
-              ? `Create & send ${state.respondentIds.length} invitation(s) now`
-              : state.openAt
-                ? `Schedule for ${new Intl.DateTimeFormat("en-US", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  }).format(new Date(state.openAt))}`
-                : "Schedule campaign"}
+            {!autoSend
+              ? // Legacy path (auto-send OFF): create + activate the campaign;
+                // invitations are sent later via the manual "Send Invitations".
+                "Create campaign"
+              : state.inviteTiming === "IMMEDIATELY"
+                ? `Create & send ${state.respondentIds.length} invitation(s) now`
+                : state.openAt
+                  ? `Schedule for ${new Intl.DateTimeFormat("en-US", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(state.openAt))}`
+                  : "Schedule campaign"}
           </Button>
         </div>
       </div>
