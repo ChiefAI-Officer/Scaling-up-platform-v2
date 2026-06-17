@@ -17,7 +17,14 @@ jest.mock("@/lib/db", () => ({
     organization: { findUnique: jest.fn() },
     accessGroupCoach: { findMany: jest.fn().mockResolvedValue([]) },
     accessGroupTemplate: { findMany: jest.fn().mockResolvedValue([]) },
-    assessmentCampaign: { findUnique: jest.fn() },
+    assessmentCampaign: (() => {
+      // SEC-M6: canManageCampaign now loads via findFirst. Delegate to
+      // findUnique so existing mockResolvedValueOnce sequencing (authz row
+      // first, then any route meta reads) is preserved unchanged.
+      const findUnique = jest.fn();
+      const findFirst = jest.fn((args) => findUnique(args));
+      return { findUnique, findFirst };
+    })(),
     assessmentInvitation: {
       findMany: jest.fn(),
       create: jest.fn(),
@@ -41,6 +48,14 @@ jest.mock("@/services/notifications", () => ({
   sendAssessmentInvitationEmail: jest.fn(),
 }));
 
+// Wave-D auto-send flag. The early-send 409 gate must ONLY apply when auto-send
+// is ON; default ON in this suite so the existing gate tests pass unchanged.
+// The flag-off composition test flips it to false.
+const flags = { autoSend: true };
+jest.mock("@/lib/assessments/wave-d-feature-flags", () => ({
+  waveDAutoSendEnabled: () => flags.autoSend,
+}));
+
 import { POST } from "@/app/api/assessment-campaigns/[id]/invite/route";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
@@ -58,8 +73,13 @@ const baseCampaign = {
   organizationId: "org-1",
   templateId: "tpl-1",
   createdByCoachId: "coach-1",
-  status: "DRAFT" as const,
+  status: "ACTIVE" as const,
   externalId: null as string | null,
+  // Wave D (R1-M6): the manual route is the LATE-ADD / resend path. A legitimate
+  // call targets a campaign whose initial auto-send already completed, so the
+  // fixture has invitesSentAt set. The early-send gate (invitesSentAt IS NULL)
+  // is exercised by its own test below.
+  invitesSentAt: new Date("2026-06-15T00:00:00.000Z") as Date | null,
   alias: "demo",
   name: "Demo",
   closeAt: null as Date | null,
@@ -120,6 +140,7 @@ function emptyReq(): Request {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  flags.autoSend = true;
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
       accessGroupId: "g1",
@@ -336,5 +357,74 @@ describe("POST /api/assessment-campaigns/[id]/invite", () => {
         templateName: "Five Dysfunctions",
       })
     );
+  });
+
+  // ── Wave D (R1-M6): early-send gate ──────────────────────────────────────
+  it("409 when invitesSentAt IS NULL — bulk early-send is disabled (use auto-send)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation((args) => {
+      if (args?.include) {
+        return Promise.resolve({
+          ...baseCampaign,
+          invitesSentAt: null,
+          participants: PARTICIPANTS,
+        });
+      }
+      return Promise.resolve({ ...baseCampaign, invitesSentAt: null });
+    });
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { success: boolean; error: string };
+    expect(body.success).toBe(false);
+    expect(body.error).toMatch(/automatically|disabled/i);
+    // No row written, no email sent — the gate runs before any send logic.
+    expect(sendAssessmentInvitationEmail).not.toHaveBeenCalled();
+    expect(db.assessmentInvitation.create).not.toHaveBeenCalled();
+    expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
+  });
+
+  // ── Dark-merge fix: the early-send gate is auto-send-flag-gated ───────────
+  it("flag OFF + invitesSentAt NULL → manual bulk send WORKS (no 409 strand)", async () => {
+    // With auto-send OFF (the default merge state) there is NO automatic
+    // initial send to defer to, so the manual /invite must work for an unsent
+    // campaign exactly as on origin/main. A permanent 409 here would strand the
+    // coach: they could never send the initial invitations.
+    flags.autoSend = false;
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation((args) => {
+      if (args?.include) {
+        return Promise.resolve({
+          ...baseCampaign,
+          invitesSentAt: null,
+          participants: PARTICIPANTS,
+        });
+      }
+      return Promise.resolve({ ...baseCampaign, invitesSentAt: null });
+    });
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      success: boolean;
+      data: Array<{ respondentId: string; status: string }>;
+    };
+    expect(body.success).toBe(true);
+    expect(body.data).toHaveLength(2);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it("late-add: invitesSentAt set → send works for the targeted recipient", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    const res = await POST(
+      jsonReq({ respondentIds: ["r2"] }) as never,
+      detailParams("c1")
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      success: boolean;
+      data: Array<{ respondentId: string; status: string }>;
+    };
+    expect(body.success).toBe(true);
+    expect(body.data).toEqual([{ respondentId: "r2", status: "sent" }]);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(1);
   });
 });

@@ -115,7 +115,8 @@ describe("GET /api/assessment-campaigns", () => {
     );
     expect(db.assessmentCampaign.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { createdByCoachId: "coach-1" },
+        // SEC-M6: live guard is always present.
+        where: { createdByCoachId: "coach-1", deletedAt: null },
       }),
     );
   });
@@ -127,7 +128,8 @@ describe("GET /api/assessment-campaigns", () => {
       new Request("http://localhost/api/assessment-campaigns") as never,
     );
     expect(db.assessmentCampaign.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: {} }),
+      // SEC-M6: even admins only see live campaigns in the list.
+      expect.objectContaining({ where: { deletedAt: null } }),
     );
   });
 });

@@ -89,6 +89,14 @@ type AssessmentQuickLeadEnqueued = {
     };
 };
 
+// Wave D (Spec 17): triggers the durable, batched invite fan-out for a campaign.
+// SEC-M5: payload is campaignId ONLY — never tokens, emails, or URLs.
+type AssessmentCampaignSendInvites = {
+    data: {
+        campaignId: string;
+    };
+};
+
 type Events = {
     "workshop/created": WorkshopCreated;
     "workshop/approved": WorkshopApproved;
@@ -101,6 +109,7 @@ type Events = {
     "workflow/step.execute": WorkflowStepExecute;
     "workflow/step.trigger": WorkflowStepTrigger;
     "assessment/quick-lead.enqueued": AssessmentQuickLeadEnqueued;
+    "assessment/campaign.send-invites": AssessmentCampaignSendInvites;
 };
 
 export const schemas = new EventSchemas().fromRecord<Events>();

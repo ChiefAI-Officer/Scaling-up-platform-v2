@@ -51,9 +51,11 @@ export async function POST(
 
     const { id } = await params;
 
-    // 3. Load campaign
-    const campaign = await db.assessmentCampaign.findUnique({
-      where: { id },
+    // 3. Load campaign — LIVE-only (deletedAt: null). A soft-deleted
+    //    campaign must NOT be resurrectable via publish. findFirst because
+    //    deletedAt is not a unique field (cannot appear in findUnique where).
+    const campaign = await db.assessmentCampaign.findFirst({
+      where: { id, deletedAt: null },
       select: { id: true, status: true, accessMode: true },
     });
     if (!campaign) {

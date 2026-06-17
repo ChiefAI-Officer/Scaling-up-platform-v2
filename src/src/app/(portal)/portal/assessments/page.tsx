@@ -35,6 +35,8 @@ const APP_URL =
 async function resolvePublicQuickAlias(): Promise<string | null> {
   const campaign = await db.assessmentCampaign.findFirst({
     where: {
+      // SEC-M6: never surface a soft-deleted campaign as the share target.
+      deletedAt: null,
       accessMode: "PUBLIC",
       status: "ACTIVE",
       template: { alias: "scaling-up-quick" },
@@ -58,7 +60,8 @@ export default async function CoachAssessmentsPage() {
   // Single round-trip: include participants (for respondentId → invitation join)
   // and invitations (for staged-progress metrics).
   const campaigns = await db.assessmentCampaign.findMany({
-    where: { createdByCoachId: coach.id },
+    // SEC-M6: soft-deleted campaigns are hidden from the coach's list.
+    where: { createdByCoachId: coach.id, deletedAt: null },
     include: {
       organization: { select: { id: true, name: true } },
       template: { select: { id: true, name: true } },

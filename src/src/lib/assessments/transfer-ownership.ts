@@ -106,6 +106,7 @@ export interface TransferOwnershipTx extends AccessControlDb {
       where?: {
         organizationId?: string;
         status?: { in?: string[] };
+        deletedAt?: Date | null;
       };
     }) => Promise<
       Array<{
@@ -231,7 +232,7 @@ export async function transferOrganizationOwnership(
   await tx.$executeRaw`SELECT id FROM assessment_campaigns WHERE "organizationId" = ${request.organizationId} FOR UPDATE`;
 
   const allCampaigns = await tx.assessmentCampaign.findMany({
-    where: { organizationId: request.organizationId },
+    where: { organizationId: request.organizationId, deletedAt: null },
   });
 
   const activeOrDraftCampaigns = allCampaigns.filter(

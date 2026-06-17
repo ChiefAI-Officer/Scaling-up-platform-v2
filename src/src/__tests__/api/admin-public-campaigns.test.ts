@@ -24,6 +24,7 @@ jest.mock("@/lib/db", () => ({
     assessmentCampaign: {
       create: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
     },
     assessmentTemplate: {
@@ -384,7 +385,7 @@ describe("POST /api/admin/public-campaigns/[id]/publish — PUBLISH", () => {
     });
 
     it("returns 404 when campaign does not exist", async () => {
-      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(null);
+      (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue(null);
       const res = await publishPost(
         makePublishRequest() as never,
         publishParams("camp-404")
@@ -393,7 +394,7 @@ describe("POST /api/admin/public-campaigns/[id]/publish — PUBLISH", () => {
     });
 
     it("returns 400 with NOT_PUBLIC when campaign accessMode is INVITED", async () => {
-      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
         id: "camp-1",
         status: "DRAFT",
         accessMode: "INVITED",
@@ -408,7 +409,7 @@ describe("POST /api/admin/public-campaigns/[id]/publish — PUBLISH", () => {
     });
 
     it("returns 409 with ALREADY_ACTIVE when campaign is already ACTIVE", async () => {
-      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
         id: "camp-1",
         status: "ACTIVE",
         accessMode: "PUBLIC",
@@ -423,7 +424,7 @@ describe("POST /api/admin/public-campaigns/[id]/publish — PUBLISH", () => {
     });
 
     it("returns 409 when campaign is CLOSED", async () => {
-      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
         id: "camp-1",
         status: "CLOSED",
         accessMode: "PUBLIC",
@@ -439,7 +440,7 @@ describe("POST /api/admin/public-campaigns/[id]/publish — PUBLISH", () => {
   describe("happy path", () => {
     beforeEach(() => {
       (getApiActor as jest.Mock).mockResolvedValue(adminActor);
-      (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({
         id: "camp-1",
         status: "DRAFT",
         accessMode: "PUBLIC",

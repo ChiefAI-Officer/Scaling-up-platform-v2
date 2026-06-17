@@ -30,6 +30,20 @@ import {
   type Answer,
 } from "@/lib/assessments/scoring";
 import { logAudit } from "@/lib/audit";
+import {
+  waveDResultsEmailEnabled,
+  waveDCoachNotifyEnabled,
+  assessmentSendsPaused,
+} from "@/lib/assessments/wave-d-feature-flags";
+import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
+import {
+  buildRespondentReportFromSubmission,
+  buildReportEmailHtml,
+} from "@/lib/assessments/report-email";
+import {
+  buildResultsEmailHtml,
+  buildCoachNotifyEmail,
+} from "@/lib/assessments/results-email";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -47,6 +61,140 @@ function gateFailed(): NextResponse {
     { success: false, error: "This survey is no longer available." },
     { status: 410, headers: NO_STORE_HEADERS }
   );
+}
+
+/** Narrow shape of the tx client used for the in-tx outbox enqueue. The real
+ *  Prisma transaction client is structurally assignable to this (its create has
+ *  a wider, generic signature); we only call the one method. */
+type OutboxTx = {
+  assessmentEmailOutbox: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    create: (args: { data: any }) => Promise<unknown>;
+  };
+};
+
+interface EnqueueArgs {
+  submissionId: string;
+  campaign: {
+    id: string;
+    accessMode: string;
+    sendResultsToRespondent: boolean;
+    notifyCoachOnCompletion: boolean;
+    createdByCoachId: string | null;
+    creatorCoach: { email: string } | null;
+    version: { sections: unknown; questions: unknown; scoringConfig: unknown };
+    template: {
+      name: string;
+      resultsEmailSubject: string | null;
+      resultsEmailBodyMarkdown: string | null;
+      resultsEmailContentApproved: boolean;
+      resultsEmailContentApprovedHash: string | null;
+    } | null;
+  };
+  respondent: { email: string; firstName: string; lastName: string } | null;
+  respondentId: string;
+  scoreResult: unknown;
+}
+
+/**
+ * Enqueues the Wave D results (#15) + coach-notify (#16) outbox rows for an
+ * INVITED submission, inside the submit transaction.
+ *
+ * Each email is independently gated and independently guarded: a render failure
+ * for one is swallowed (the email is skipped) so the submission itself — and the
+ * other email — still commit. Idempotency comes from the
+ * @@unique([submissionId, recipientRole]) constraint.
+ */
+async function enqueueWaveDEmails(
+  tx: OutboxTx,
+  { submissionId, campaign, respondent, respondentId, scoreResult }: EnqueueArgs
+): Promise<void> {
+  // Global kill switch — nothing is enqueued while sends are paused.
+  if (assessmentSendsPaused()) return;
+
+  const isInvited = campaign.accessMode === "INVITED";
+
+  // ── #15 RESPONDENT results ────────────────────────────────────────────────
+  const template = campaign.template;
+  const respondentEmail = respondent?.email?.trim();
+  if (
+    isInvited &&
+    campaign.sendResultsToRespondent &&
+    waveDResultsEmailEnabled() &&
+    template !== null &&
+    isResultsEmailApproved(template) &&
+    respondentEmail
+  ) {
+    try {
+      const report = buildRespondentReportFromSubmission({
+        result: scoreResult as never,
+        publicTaker: {
+          firstName: respondent?.firstName ?? "",
+          lastName: respondent?.lastName ?? "",
+          email: respondentEmail,
+        },
+        assessmentName: template.name,
+        campaignLabel: null,
+        sections: campaign.version.sections,
+        questions: campaign.version.questions,
+        scoringConfig: campaign.version.scoringConfig,
+        submittedAt: new Date(),
+        submissionId: "",
+        referringCoachEmail: null,
+      });
+      const { bodyHtml: reportHtml } = buildReportEmailHtml({
+        report,
+        recipientRole: "TAKER_COPY",
+      });
+      const bodyHtml = buildResultsEmailHtml({
+        bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
+        reportHtml,
+      });
+      await tx.assessmentEmailOutbox.create({
+        data: {
+          submissionId,
+          recipientEmail: respondentEmail,
+          recipientRole: "RESPONDENT",
+          emailType: "ASSESSMENT_RESULTS",
+          subject: template.resultsEmailSubject ?? "Your assessment results",
+          bodyHtml,
+        },
+      });
+    } catch (err) {
+      // Do NOT roll back the submission — skip this email only.
+      console.error("[assessment-submit] #15 results enqueue skipped:", err);
+    }
+  }
+
+  // ── #16 OWNING_COACH notify ───────────────────────────────────────────────
+  const coachEmail = campaign.creatorCoach?.email?.trim();
+  if (
+    campaign.notifyCoachOnCompletion &&
+    waveDCoachNotifyEnabled() &&
+    campaign.createdByCoachId &&
+    coachEmail
+  ) {
+    try {
+      const { subject, bodyHtml } = buildCoachNotifyEmail({
+        appUrl: process.env.APP_URL ?? "",
+        campaignId: campaign.id,
+        respondentId,
+        assessmentName: campaign.template?.name ?? "an assessment",
+      });
+      await tx.assessmentEmailOutbox.create({
+        data: {
+          submissionId,
+          recipientEmail: coachEmail,
+          recipientRole: "OWNING_COACH",
+          emailType: "COACH_COMPLETION",
+          subject,
+          bodyHtml,
+        },
+      });
+    } catch (err) {
+      console.error("[assessment-submit] #16 coach-notify enqueue skipped:", err);
+    }
+  }
 }
 
 export async function POST(
@@ -100,14 +248,30 @@ export async function POST(
         const invitation = await tx.assessmentInvitation.findUnique({
           where: { id: invitationId },
           include: {
+            // Wave D #15: the respondent's email is the #15 recipient.
+            respondent: {
+              select: { email: true, firstName: true, lastName: true },
+            },
             campaign: {
               include: {
+                // Wave D: per-campaign send toggles + the owning coach (#16).
+                creatorCoach: { select: { email: true } },
                 version: {
                   select: {
                     id: true,
                     questions: true,
                     sections: true,
                     scoringConfig: true,
+                  },
+                },
+                // Wave D #15: admin-authored results email + approval gate.
+                template: {
+                  select: {
+                    name: true,
+                    resultsEmailSubject: true,
+                    resultsEmailBodyMarkdown: true,
+                    resultsEmailContentApproved: true,
+                    resultsEmailContentApprovedHash: true,
                   },
                 },
               },
@@ -120,6 +284,10 @@ export async function POST(
         }
 
         const now = new Date();
+        // SEC-M6: a soft-deleted campaign is no longer available.
+        if (invitation.campaign.deletedAt !== null) {
+          return { kind: "gate" as const };
+        }
         if (invitation.revokedAt !== null) return { kind: "gate" as const };
         if (now >= invitation.expiresAt) return { kind: "gate" as const };
         if (invitation.campaign.status !== "ACTIVE") {
@@ -166,6 +334,19 @@ export async function POST(
             result: scoreResult as unknown as object,
           },
           select: { id: true },
+        });
+
+        // ── Wave D: enqueue 0–2 outbox rows IN-TX (transactional outbox).
+        // The submission + its outbox rows commit atomically; the double-submit
+        // 409 above guarantees exactly-once. Each enqueue is guarded so a render
+        // failure for one email NEVER rolls back the submission — it is simply
+        // skipped (the unique [submissionId, recipientRole] keeps it idempotent).
+        await enqueueWaveDEmails(tx, {
+          submissionId: submission.id,
+          campaign: invitation.campaign,
+          respondent: invitation.respondent,
+          respondentId: invitation.respondentId,
+          scoreResult,
         });
 
         await tx.assessmentInvitation.update({

@@ -9,11 +9,17 @@
  * the coach belongs to grants. Implemented in JS off two cheap queries to
  * avoid raw SQL. Heavy `questions/sections/scoring` JSON intentionally
  * excluded; consumers must fetch a specific template detail route for that.
+ *
+ * Wave D (Task 6b): `resultsEmailApproved` is computed server-side via
+ * `isResultsEmailApproved` and returned to the wizard so the #15 toggle can
+ * self-disable when the template's approval hash does not match. The raw
+ * hash is NEVER exposed to the client.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
 
 interface TemplateSummary {
   id: string;
@@ -21,6 +27,8 @@ interface TemplateSummary {
   alias: string;
   description: string | null;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
+  /** True only when the results-email content is approved AND the hash matches. */
+  resultsEmailApproved: boolean;
 }
 
 export async function GET(request: NextRequest) {
@@ -45,12 +53,23 @@ export async function GET(request: NextRequest) {
           alias: true,
           description: true,
           aggregationMode: true,
+          resultsEmailContentApproved: true,
+          resultsEmailContentApprovedHash: true,
+          resultsEmailSubject: true,
+          resultsEmailBodyMarkdown: true,
         },
         orderBy: { name: "asc" },
       });
       return NextResponse.json({
         success: true,
-        data: templates satisfies TemplateSummary[],
+        data: templates.map((t) => ({
+          id: t.id,
+          name: t.name,
+          alias: t.alias,
+          description: t.description,
+          aggregationMode: t.aggregationMode,
+          resultsEmailApproved: isResultsEmailApproved(t),
+        })) satisfies TemplateSummary[],
       });
     }
 
@@ -107,13 +126,24 @@ export async function GET(request: NextRequest) {
         alias: true,
         description: true,
         aggregationMode: true,
+        resultsEmailContentApproved: true,
+        resultsEmailContentApprovedHash: true,
+        resultsEmailSubject: true,
+        resultsEmailBodyMarkdown: true,
       },
       orderBy: { name: "asc" },
     });
 
     return NextResponse.json({
       success: true,
-      data: templates satisfies TemplateSummary[],
+      data: templates.map((t) => ({
+        id: t.id,
+        name: t.name,
+        alias: t.alias,
+        description: t.description,
+        aggregationMode: t.aggregationMode,
+        resultsEmailApproved: isResultsEmailApproved(t),
+      })) satisfies TemplateSummary[],
     });
   } catch (error) {
     console.error("Error listing assessment templates:", error);

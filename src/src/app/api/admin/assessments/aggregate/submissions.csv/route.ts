@@ -138,7 +138,8 @@ export async function GET(request: NextRequest): Promise<Response> {
     }),
     db.assessmentSubmission.findMany({
       where: {
-        campaign: { templateId, versionId },
+        // SEC-M6: exclude submissions whose campaign was soft-deleted.
+        campaign: { templateId, versionId, deletedAt: null },
       },
       select: {
         id: true,

@@ -21,6 +21,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { hashToken } from "@/lib/assessments/invitation-tokens";
 import { getInvitationSession } from "@/lib/assessments/invitation-cookie";
+import { formatTimestampDateTime } from "@/lib/utils";
 
 const ExchangeBodySchema = z.object({
   token: z.string().min(1),
@@ -41,7 +42,7 @@ function gateNotYetOpen(openAt: Date): NextResponse {
       success: false,
       code: "NOT_YET_OPEN",
       openAt: openAt.toISOString(),
-      error: `This survey hasn't opened yet. It opens ${openAt.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.`,
+      error: `This survey hasn't opened yet. It opens ${formatTimestampDateTime(openAt)}.`,
     },
     { status: 425, headers: NO_STORE_HEADERS }
   );
@@ -82,6 +83,7 @@ export async function POST(
             status: true,
             openAt: true,
             closeAt: true,
+            deletedAt: true,
           },
         },
       },
@@ -97,6 +99,8 @@ export async function POST(
 
     const now = new Date();
 
+    // SEC-M6: a soft-deleted campaign is no longer available.
+    if (invitation.campaign.deletedAt !== null) return gateFailed();
     if (invitation.revokedAt !== null) return gateFailed();
     if (now >= invitation.expiresAt) return gateFailed();
     if (invitation.status === "SUBMITTED") return gateFailed();

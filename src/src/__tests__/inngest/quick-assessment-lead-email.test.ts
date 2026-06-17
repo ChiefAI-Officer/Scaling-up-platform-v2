@@ -294,6 +294,47 @@ describe("drainLeadOutbox", () => {
     expect(failCall[0].data.status).toBe("PENDING");
     expect(failCall[0].data.attempts).toBe(1);
   });
+
+  // -------------------------------------------------------------------------
+  // SEC-M4: PII purge — bodyHtml cleared on SENT + on terminal FAILED, kept on PENDING
+  // -------------------------------------------------------------------------
+  it("SEC-M4: clears bodyHtml to \"\" when a row is marked SENT", async () => {
+    const row = makeRow({ id: "row-sent", bodyHtml: "<table>PII REPORT</table>" });
+    const deps = makeDeps();
+    deps.dbFindMany.mockResolvedValue([row]);
+
+    await drainLeadOutbox(deps, SUBMISSION_ID);
+
+    const call = deps.dbUpdate.mock.calls[0][0];
+    expect(call.data.status).toBe("SENT");
+    expect(call.data.bodyHtml).toBe("");
+  });
+
+  it("SEC-M4: clears bodyHtml to \"\" on a TERMINAL FAILED row", async () => {
+    const row = makeRow({ id: "row-dead", attempts: 4, bodyHtml: "<table>PII</table>" });
+    const deps = makeDeps();
+    deps.dbFindMany.mockResolvedValue([row]);
+    deps.sendEmail.mockRejectedValue(new Error("Permanent failure"));
+
+    await drainLeadOutbox(deps, SUBMISSION_ID);
+
+    const call = deps.dbUpdate.mock.calls[0][0];
+    expect(call.data.status).toBe("FAILED");
+    expect(call.data.bodyHtml).toBe("");
+  });
+
+  it("SEC-M4: does NOT clear bodyHtml while a row stays PENDING (still needed for retry)", async () => {
+    const row = makeRow({ id: "row-retry", attempts: 0, bodyHtml: "<table>PII</table>" });
+    const deps = makeDeps();
+    deps.dbFindMany.mockResolvedValue([row]);
+    deps.sendEmail.mockRejectedValue(new Error("Transient"));
+
+    await drainLeadOutbox(deps, SUBMISSION_ID);
+
+    const call = deps.dbUpdate.mock.calls[0][0];
+    expect(call.data.status).toBe("PENDING");
+    expect(call.data.bodyHtml).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

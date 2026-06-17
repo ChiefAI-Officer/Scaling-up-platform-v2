@@ -96,6 +96,8 @@ interface TemplateSummary {
   alias: string;
   description: string | null;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
+  /** Computed server-side via isResultsEmailApproved. Controls #15 toggle gate. */
+  resultsEmailApproved: boolean;
 }
 
 interface Respondent {
@@ -127,6 +129,9 @@ interface WizardState {
    *  NOT persisted to the draft (ephemeral UI label only). */
   orgName: string;
   templateId: string;
+  /** Display name of the selected template — shown on the Schedule step (#17).
+   *  NOT persisted to the draft (ephemeral UI label only). */
+  templateName: string;
   respondentIds: string[];
   ceoRespondentId: string | null;
   name: string;
@@ -136,6 +141,21 @@ interface WizardState {
   // Task O UI — per-campaign invitation email overrides. Null/empty = fall back to template default.
   invitationSubject: string;
   invitationBodyMarkdown: string;
+  // Task 12 (#20) — per-campaign FULL-HTML invitation body. Empty = fall back to the
+  // markdown/template default. When set + flag on, REPLACES the entire branded email.
+  invitationBodyHtml: string;
+  // Task 6b — #15/#16 result/notify toggles.
+  /** Whether the selected template has an approved results email (server-computed).
+   *  Ephemeral — not persisted to the draft; re-evaluated when template is picked. */
+  templateResultsEmailApproved: boolean;
+  /** #15: Send each respondent their results email on submit. Gated on templateResultsEmailApproved. */
+  sendResultsToRespondent: boolean;
+  /** #16: Send coach a notification when a respondent completes. */
+  notifyCoachOnCompletion: boolean;
+  // Task 10 — #2/#3 timing radio.
+  /** IMMEDIATELY: invitations send at creation (openAt forced to now by server).
+   *  ON_OPEN: invitations send when campaign opens (openAt must be future). */
+  inviteTiming: "IMMEDIATELY" | "ON_OPEN";
 }
 
 const STEPS = [
@@ -184,7 +204,37 @@ function formatDateTimeLocal(d: Date): string {
   );
 }
 
-export function CampaignWizard() {
+export function CampaignWizard({
+  customHtmlEmailEnabled = false,
+  autoSend = false,
+  resultsEmailEnabled = false,
+  coachNotifyEnabled = false,
+}: {
+  /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
+  customHtmlEmailEnabled?: boolean;
+  /**
+   * Wave D — gate the auto-send timing radio + the `inviteTiming` create-payload
+   * field behind WAVE_D_AUTO_SEND_ENABLED (mirrors the server flag). When false
+   * (the default merge state) the wizard takes the LEGACY path: no timing radio,
+   * no `inviteTiming` sent, the coach's chosen `openAt` is shown + honored, and
+   * the campaign is created DRAFT (the manual "Send Invitations" path works).
+   */
+  autoSend?: boolean;
+  /**
+   * Wave D FIX 2 — gate the #15 "Email each respondent their results" checkbox
+   * behind WAVE_D_RESULTS_EMAIL_ENABLED (mirrors the server flag). When false
+   * (the default merge state) the checkbox is hidden AND sendResultsToRespondent
+   * is never sent true — otherwise the thank-you page would promise a results
+   * email that the (flag-gated) send path never delivers.
+   */
+  resultsEmailEnabled?: boolean;
+  /**
+   * Wave D FIX 2 — gate the #16 "Email me when someone completes" checkbox
+   * behind WAVE_D_COACH_NOTIFY_ENABLED (mirrors the server flag). When false,
+   * the checkbox is hidden AND notifyCoachOnCompletion is never sent true.
+   */
+  coachNotifyEnabled?: boolean;
+} = {}) {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -195,6 +245,7 @@ export function CampaignWizard() {
       organizationId: "",
       orgName: "",
       templateId: "",
+      templateName: "",
       respondentIds: [],
       ceoRespondentId: null,
       name: "",
@@ -203,6 +254,11 @@ export function CampaignWizard() {
       closeAt: "",
       invitationSubject: "",
       invitationBodyMarkdown: "",
+      invitationBodyHtml: "",
+      templateResultsEmailApproved: false,
+      sendResultsToRespondent: false,
+      notifyCoachOnCompletion: false,
+      inviteTiming: "IMMEDIATELY" as const,
     };
   });
 
@@ -253,6 +309,7 @@ export function CampaignWizard() {
           organizationId: parsed.organizationId ?? "",
           orgName: "", // ephemeral — not persisted; will re-populate when org is re-selected
           templateId: parsed.templateId ?? "",
+          templateName: "", // ephemeral — not persisted; will re-populate when template is re-selected
           respondentIds: Array.isArray(parsed.respondentIds)
             ? parsed.respondentIds
             : [],
@@ -269,6 +326,18 @@ export function CampaignWizard() {
             typeof parsed.invitationBodyMarkdown === "string"
               ? parsed.invitationBodyMarkdown
               : "",
+          invitationBodyHtml:
+            typeof parsed.invitationBodyHtml === "string"
+              ? parsed.invitationBodyHtml
+              : "",
+          // Task 6b — not persisted to draft (approved state is re-derived from template);
+          // toggles are persisted so a resumed draft keeps the user's choices.
+          templateResultsEmailApproved: false,
+          sendResultsToRespondent: parsed.sendResultsToRespondent === true,
+          notifyCoachOnCompletion: parsed.notifyCoachOnCompletion === true,
+          // Task 10 — inviteTiming defaults to IMMEDIATELY if not persisted.
+          inviteTiming:
+            parsed.inviteTiming === "ON_OPEN" ? "ON_OPEN" : "IMMEDIATELY",
         };
         if (!cancelled) {
           setPendingDraft({
@@ -363,13 +432,6 @@ export function CampaignWizard() {
     }
   }, []);
 
-  const update = useCallback(
-    <K extends keyof WizardState>(key: K, value: WizardState[K]) => {
-      setState((s) => ({ ...s, [key]: value }));
-    },
-    [],
-  );
-
   const next = () =>
     setState((s) => {
       const updated = { ...s, step: Math.min(s.step + 1, 4) };
@@ -423,6 +485,32 @@ export function CampaignWizard() {
             state.invitationBodyMarkdown.trim() !== ""
               ? state.invitationBodyMarkdown.trim()
               : undefined,
+          // Task 12 (#20) — full-HTML body. Sent RAW (the server validates +
+          // stores raw, then sanitizes at render). Only sent when the flag is
+          // on AND non-empty; the server ignores it when its flag is off.
+          invitationBodyHtml:
+            customHtmlEmailEnabled && state.invitationBodyHtml.trim() !== ""
+              ? state.invitationBodyHtml
+              : undefined,
+          // Task 6b — #15/#16 toggles. #15 is only meaningful when approved, but
+          // the server re-validates at send time; we pass the user's intent through.
+          // FIX 2 (dark-merge): when the corresponding flag is OFF the checkbox
+          // is hidden, so its state stays false; we additionally force false here
+          // so a stale persisted draft value can never sneak through as true and
+          // make the thank-you page promise an email the send path won't deliver.
+          sendResultsToRespondent: resultsEmailEnabled
+            ? state.sendResultsToRespondent
+            : false,
+          notifyCoachOnCompletion: coachNotifyEnabled
+            ? state.notifyCoachOnCompletion
+            : false,
+          // Task 10 — #2/#3 timing radio: tell server when to send invitations.
+          // Gated on the auto-send flag (dark-merge fix): when auto-send is OFF
+          // we MUST NOT send inviteTiming — sending it marks the create as a
+          // "Wave-D create" (auto-send lifecycle), which with the flag off
+          // strands the campaign at the manual /invite 409 gate. Omitting it
+          // takes the legacy DRAFT create path (coach's openAt honored).
+          inviteTiming: autoSend ? state.inviteTiming : undefined,
         }),
       });
       const createBody = await createRes.json();
@@ -614,7 +702,17 @@ export function CampaignWizard() {
         {state.step === 1 && (
           <TemplateStep
             value={state.templateId}
-            onChange={(v) => update("templateId", v)}
+            onChange={(id, name, resultsEmailApproved) =>
+              setState((s) => ({
+                ...s,
+                templateId: id,
+                templateName: name,
+                templateResultsEmailApproved: resultsEmailApproved,
+                // If the template changes and is no longer approved, clear #15.
+                sendResultsToRespondent:
+                  resultsEmailApproved ? s.sendResultsToRespondent : false,
+              }))
+            }
             onBack={back}
             onNext={next}
           />
@@ -642,6 +740,14 @@ export function CampaignWizard() {
             openAt={state.openAt}
             endMode={state.endMode}
             closeAt={state.closeAt}
+            templateName={state.templateName}
+            resultsEmailApproved={state.templateResultsEmailApproved}
+            sendResultsToRespondent={state.sendResultsToRespondent}
+            notifyCoachOnCompletion={state.notifyCoachOnCompletion}
+            inviteTiming={state.inviteTiming}
+            autoSend={autoSend}
+            resultsEmailEnabled={resultsEmailEnabled}
+            coachNotifyEnabled={coachNotifyEnabled}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             onBack={back}
             onNext={next}
@@ -655,6 +761,8 @@ export function CampaignWizard() {
             onSaveDraft={() => saveCampaign({ activate: false })}
             onActivate={() => saveCampaign({ activate: true })}
             canActivate={Boolean(canActivate)}
+            customHtmlEmailEnabled={customHtmlEmailEnabled}
+            autoSend={autoSend}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
           />
         )}
@@ -774,7 +882,7 @@ function TemplateStep({
   onNext,
 }: {
   value: string;
-  onChange: (v: string) => void;
+  onChange: (id: string, name: string, resultsEmailApproved: boolean) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -831,7 +939,7 @@ function TemplateStep({
                 name="template"
                 value={t.id}
                 checked={value === t.id}
-                onChange={() => onChange(t.id)}
+                onChange={() => onChange(t.id, t.name, t.resultsEmailApproved)}
                 className="accent-primary mt-1"
               />
               <div className="flex-1">
@@ -899,6 +1007,7 @@ function ParticipantsStep({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   // Tracks whether the current ceoRespondentId was auto-derived (vs. user-clicked).
   const [ceoPickSource, setCeoPickSource] = useState<CeoPickSource>(null);
 
@@ -1082,6 +1191,40 @@ function ParticipantsStep({
     return result;
   }, [teams, respondents]);
 
+  // Apply search filter: only keep members whose name or email contains the
+  // search query (case-insensitive). Groups with no visible members are hidden.
+  const filteredGroups = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return groups;
+    return groups
+      .map((g) => ({
+        ...g,
+        members: g.members.filter(
+          (r) =>
+            `${r.firstName} ${r.lastName}`.toLowerCase().includes(q) ||
+            r.email.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((g) => g.members.length > 0);
+  }, [groups, searchQuery]);
+
+  /** Toggle all currently-visible members of a group on or off. */
+  function toggleSelectAll(groupKey: string, visibleIds: string[], selectAll: boolean) {
+    let next = respondentIds.slice();
+    if (selectAll) {
+      for (const id of visibleIds) {
+        if (!next.includes(id)) next.push(id);
+      }
+    } else {
+      const visibleSet = new Set(visibleIds);
+      next = next.filter((id) => !visibleSet.has(id));
+    }
+    // CEO is unchanged by Select-All; keep existing CEO if they're still in selection.
+    const ceo = next.includes(ceoRespondentId ?? "") ? ceoRespondentId : null;
+    if (ceo !== ceoRespondentId) setCeoPickSource(null);
+    onChange(next, ceo);
+  }
+
   function renderRow(r: Respondent) {
     const checked = respondentIds.includes(r.id);
     const isCEO = ceoRespondentId === r.id;
@@ -1190,29 +1333,54 @@ function ParticipantsStep({
         </div>
       ) : (
         <div className="space-y-4">
-          {groups.map((g) => (
-            <div
-              key={g.key}
-              className="border border-border rounded-lg overflow-hidden"
-              data-testid={`participant-group-${g.key}`}
-            >
+          <Input
+            type="search"
+            placeholder="Search members…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search members"
+          />
+          {filteredGroups.map((g) => {
+            const visibleIds = g.members.map((m) => m.id);
+            const selectedInGroup = visibleIds.filter((id) =>
+              respondentIds.includes(id),
+            );
+            const allSelected =
+              visibleIds.length > 0 &&
+              selectedInGroup.length === visibleIds.length;
+            return (
               <div
-                className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border"
-                style={{ paddingLeft: `${g.depth * 16 + 12}px` }}
+                key={g.key}
+                className="border border-border rounded-lg overflow-hidden"
+                data-testid={`participant-group-${g.key}`}
               >
-                <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {g.label}
-                </span>
-                <span className="text-[10px] text-muted-foreground">
-                  ({g.members.length})
-                </span>
+                <div
+                  className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border"
+                  style={{ paddingLeft: `${g.depth * 16 + 12}px` }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e) =>
+                      toggleSelectAll(g.key, visibleIds, e.target.checked)
+                    }
+                    aria-label={`Select all ${g.label}`}
+                    className="accent-primary"
+                  />
+                  <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {g.label}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    ({g.members.length})
+                  </span>
+                </div>
+                <div className="divide-y divide-border">
+                  {g.members.map(renderRow)}
+                </div>
               </div>
-              <div className="divide-y divide-border">
-                {g.members.map(renderRow)}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -1250,6 +1418,14 @@ function ScheduleStep({
   openAt,
   endMode,
   closeAt,
+  templateName,
+  resultsEmailApproved,
+  sendResultsToRespondent,
+  notifyCoachOnCompletion,
+  inviteTiming,
+  autoSend,
+  resultsEmailEnabled,
+  coachNotifyEnabled,
   onChange,
   onBack,
   onNext,
@@ -1258,12 +1434,48 @@ function ScheduleStep({
   openAt: string;
   endMode: EndMode;
   closeAt: string;
+  templateName: string;
+  resultsEmailApproved: boolean;
+  sendResultsToRespondent: boolean;
+  notifyCoachOnCompletion: boolean;
+  inviteTiming: "IMMEDIATELY" | "ON_OPEN";
+  /** Wave D auto-send flag — when false, hide the timing radio + show the
+   *  legacy openAt picker (the inviteTiming state is ignored on the create). */
+  autoSend: boolean;
+  /** Wave D FIX 2 — gate the #15 results-email checkbox (mirrors server flag). */
+  resultsEmailEnabled: boolean;
+  /** Wave D FIX 2 — gate the #16 coach-notify checkbox (mirrors server flag). */
+  coachNotifyEnabled: boolean;
   onChange: (patch: Partial<WizardState>) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
+  // Capture the current time once at mount. Because "is openAt in the past?"
+  // only needs to be checked at the moment the user edits the field (not
+  // continuously refreshed), a mount-time snapshot is correct and avoids the
+  // react-hooks/purity lint error that firing Date.now() inside useMemo would
+  // trigger.
+  const [mountedAt] = useState(() => Date.now());
+
+  const openAtParsed = openAt ? Date.parse(openAt) : NaN;
+  const openAtInPast = useMemo(
+    () =>
+      inviteTiming === "ON_OPEN" &&
+      !Number.isNaN(openAtParsed) &&
+      openAtParsed <= mountedAt,
+    [inviteTiming, openAtParsed, mountedAt],
+  );
+
   const valid = useMemo(() => {
-    if (!name.trim() || !openAt) return false;
+    if (!name.trim()) return false;
+    if (!autoSend) {
+      // Legacy path (auto-send OFF): the openAt picker is always shown and the
+      // open date is required (matching origin/main). No future-only constraint.
+      if (!openAt) return false;
+    } else if (inviteTiming === "ON_OPEN") {
+      if (!openAt) return false;
+      if (openAtInPast) return false;
+    }
     if (endMode === "ENDS_AFTER") {
       if (!closeAt) return false;
       const o = Date.parse(openAt);
@@ -1272,7 +1484,7 @@ function ScheduleStep({
       if (c <= o) return false;
     }
     return true;
-  }, [name, openAt, endMode, closeAt]);
+  }, [name, openAt, openAtInPast, inviteTiming, endMode, closeAt, autoSend]);
 
   return (
     <div className="space-y-6">
@@ -1281,6 +1493,15 @@ function ScheduleStep({
         <p className="text-sm text-muted-foreground">
           When should this campaign open and close?
         </p>
+        {templateName && (
+          <p
+            className="mt-2 text-sm text-muted-foreground"
+            data-testid="schedule-template-name"
+          >
+            Assessment:{" "}
+            <span className="font-medium text-foreground">{templateName}</span>
+          </p>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -1296,16 +1517,74 @@ function ScheduleStep({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="openAt">Opens at</Label>
+        {/* Task 10 — #2/#3: timing radio. Gated on the auto-send flag — hidden
+            entirely when auto-send is OFF (dark merge), where the create takes
+            the legacy DRAFT path and the openAt picker is always shown. */}
+        {autoSend && (
+          <div className="space-y-2">
+            <Label>When to send invitations</Label>
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="inviteTiming"
+                  checked={inviteTiming === "IMMEDIATELY"}
+                  onChange={() => onChange({ inviteTiming: "IMMEDIATELY" })}
+                  className="accent-primary"
+                  aria-label="Immediately"
+                />
+                Immediately
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="inviteTiming"
+                  checked={inviteTiming === "ON_OPEN"}
+                  onChange={() => onChange({ inviteTiming: "ON_OPEN" })}
+                  className="accent-primary"
+                  aria-label="When the campaign opens"
+                />
+                When the campaign opens
+              </label>
+            </div>
+            {inviteTiming === "IMMEDIATELY" && (
+              <p className="text-xs text-muted-foreground" data-testid="immediately-note">
+                Invitations send as soon as you create this campaign.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Auto-send OFF (legacy) OR auto-send ON + ON_OPEN → show the picker.
+            Auto-send ON + IMMEDIATELY → openAt is forced to now server-side, so
+            the picker is hidden (kept in DOM disabled for state continuity). */}
+        {!autoSend || inviteTiming === "ON_OPEN" ? (
+          <div className="space-y-2">
+            <Label htmlFor="openAt">Opens at</Label>
+            <Input
+              id="openAt"
+              type="datetime-local"
+              value={openAt}
+              onChange={(e) => onChange({ openAt: e.target.value })}
+              required
+            />
+            {openAtInPast && (
+              <p className="text-xs text-destructive" data-testid="openat-past-error">
+                Open time must be in the future when scheduling invitations.
+              </p>
+            )}
+          </div>
+        ) : (
           <Input
             id="openAt"
             type="datetime-local"
             value={openAt}
             onChange={(e) => onChange({ openAt: e.target.value })}
-            required
+            disabled
+            aria-hidden="true"
+            className="hidden"
           />
-        </div>
+        )}
 
         <div className="space-y-2">
           <Label>End</Label>
@@ -1352,6 +1631,64 @@ function ScheduleStep({
         )}
       </div>
 
+      {/* Task 6b — #15/#16 email toggles.
+          FIX 2 (dark-merge): each checkbox is gated behind its own Wave-D flag.
+          With a flag OFF the checkbox is hidden AND its field is forced false on
+          the create (in saveCampaign) — so the thank-you page can never promise
+          a results email the (flag-gated) send path won't actually deliver.
+          The whole panel is hidden when BOTH flags are off. */}
+      {(resultsEmailEnabled || coachNotifyEnabled) && (
+        <div className="space-y-3 border border-border rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-foreground">Email notifications</h3>
+
+          {/* #15 — Respondent results email */}
+          {resultsEmailEnabled && (
+            <div className="space-y-1">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  id="sendResultsToRespondent"
+                  type="checkbox"
+                  checked={sendResultsToRespondent}
+                  disabled={!resultsEmailApproved}
+                  onChange={(e) =>
+                    onChange({ sendResultsToRespondent: e.target.checked })
+                  }
+                  className="accent-primary w-4 h-4"
+                  aria-label="Email each respondent their results"
+                />
+                <span className={`text-sm ${!resultsEmailApproved ? "text-muted-foreground" : "text-foreground"}`}>
+                  Email each respondent their results
+                </span>
+              </label>
+              {!resultsEmailApproved && (
+                <p className="text-xs text-muted-foreground pl-7">
+                  Results email not yet approved for this template — ask an admin.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* #16 — Coach completion notify */}
+          {coachNotifyEnabled && (
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                id="notifyCoachOnCompletion"
+                type="checkbox"
+                checked={notifyCoachOnCompletion}
+                onChange={(e) =>
+                  onChange({ notifyCoachOnCompletion: e.target.checked })
+                }
+                className="accent-primary w-4 h-4"
+                aria-label="Email me when someone completes"
+              />
+              <span className="text-sm text-foreground">
+                Email me when someone completes
+              </span>
+            </label>
+          )}
+        </div>
+      )}
+
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
@@ -1373,6 +1710,8 @@ function ReviewStep({
   onBack,
   onSaveDraft,
   onActivate,
+  customHtmlEmailEnabled = false,
+  autoSend = false,
   onChange,
 }: {
   state: WizardState;
@@ -1381,6 +1720,9 @@ function ReviewStep({
   onBack: () => void;
   onSaveDraft: () => void;
   onActivate: () => void;
+  customHtmlEmailEnabled?: boolean;
+  /** Wave D auto-send flag — drives the consequence-labeled activate button. */
+  autoSend?: boolean;
   onChange: (patch: Partial<WizardState>) => void;
 }) {
   const [orgName, setOrgName] = useState<string>("");
@@ -1552,6 +1894,68 @@ function ReviewStep({
                 {state.invitationBodyMarkdown.length} / 5000 characters
               </p>
             </div>
+            {customHtmlEmailEnabled && (
+              <div className="space-y-1 border-t border-border pt-3">
+                <label className="text-xs font-medium text-foreground">
+                  Full custom HTML (advanced)
+                </label>
+                <p className="text-[11px] text-muted-foreground">
+                  When set, this HTML <strong>replaces the entire branded
+                  email</strong> (no template wrap). It must include the survey
+                  link token{" "}
+                  <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                    {"{{invitationUrl}}"}
+                  </code>{" "}
+                  — either as a link <code className="text-[10px]">href</code> or
+                  as plain text. The same merge tokens above are available.
+                </p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept=".html,.htm,text/html"
+                    className="text-xs text-muted-foreground file:mr-2 file:rounded-md file:border file:border-border file:bg-muted file:px-2 file:py-1 file:text-xs"
+                    data-testid="invitation-html-file"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const text =
+                          typeof reader.result === "string" ? reader.result : "";
+                        onChange({ invitationBodyHtml: text });
+                      };
+                      reader.readAsText(file);
+                      // Reset so re-selecting the same file re-fires onChange.
+                      e.target.value = "";
+                    }}
+                  />
+                  {state.invitationBodyHtml.trim() !== "" && (
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-destructive hover:underline"
+                      data-testid="invitation-html-clear"
+                      onClick={() => onChange({ invitationBodyHtml: "" })}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  value={state.invitationBodyHtml}
+                  onChange={(e) =>
+                    onChange({ invitationBodyHtml: e.target.value })
+                  }
+                  maxLength={50000}
+                  rows={10}
+                  placeholder="Paste your full HTML email here, or upload an .html file above. Leave blank to use the body above."
+                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  data-testid="invitation-html-input"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  {state.invitationBodyHtml.length} / 50000 characters
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1575,7 +1979,18 @@ function ReviewStep({
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : null}
-            Create + Activate
+            {!autoSend
+              ? // Legacy path (auto-send OFF): create + activate the campaign;
+                // invitations are sent later via the manual "Send Invitations".
+                "Create campaign"
+              : state.inviteTiming === "IMMEDIATELY"
+                ? `Create & send ${state.respondentIds.length} invitation(s) now`
+                : state.openAt
+                  ? `Schedule for ${new Intl.DateTimeFormat("en-US", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(state.openAt))}`
+                  : "Schedule campaign"}
           </Button>
         </div>
       </div>

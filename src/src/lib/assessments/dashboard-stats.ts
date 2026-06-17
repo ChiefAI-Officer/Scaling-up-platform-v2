@@ -36,7 +36,8 @@ export async function getAssessmentsDashboardStats(
 
   const [activeCampaigns, templatesPublished, submissionsMTD] =
     await Promise.all([
-      db.assessmentCampaign.count({ where: { status: "ACTIVE" } }),
+      // SEC-M6: exclude soft-deleted campaigns from the active count.
+      db.assessmentCampaign.count({ where: { status: "ACTIVE", deletedAt: null } }),
       // Templates with at least one published version. Counting distinct
       // templates (not versions) — "Templates Published" on the card means
       // "how many templates are launchable today".

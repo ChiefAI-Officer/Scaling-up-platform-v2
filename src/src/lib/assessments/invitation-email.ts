@@ -10,6 +10,7 @@
  */
 import { escapeHtml } from "@/lib/templates/interpolate-content-html";
 import { SU_LOGO_CID } from "@/lib/assets/invitation-logo";
+import { sanitizeEmailHtml } from "@/lib/assessments/email-html-sanitizer";
 
 export interface InvitationVars {
   respondent: { firstName: string; lastName: string; email: string };
@@ -172,6 +173,65 @@ export function renderTextBody(template: string, vars: InvitationVars): string {
   txt = txt.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, "$1 ($2)"); // link → "text (url)"
   txt = txt.replace(/\*\*([^*]+)\*\*/g, "$1");                 // bold → text
   return `${txt.trim()}\n\nStart the assessment: ${vars.invitationUrl}`;
+}
+
+// ── Full-HTML override (#20) ────────────────────────────────────────────────
+//
+// When a campaign sets `invitationBodyHtml`, that HTML REPLACES the entire
+// branded shell (no wrap). Render = interpolate → sanitize:
+//   1. Interpolate the RAW stored bytes with Wave A's `interpolateTokens`
+//      (SAME `TOKEN_RE` the placement validator counts with — PIN #1) so the
+//      bytes that reach the sanitizer match the bytes the validator vetted.
+//      No HTML-entity decode happens first (PIN #2): a stored
+//      `&#123;&#123;invitationUrl&#125;&#125;` stays inert and is never
+//      resurrected into a live token.
+//   2. Token VALUES are HTML-escaped before substitution (a malicious
+//      respondent name "<script>" becomes inert text), and the
+//      post-interpolation strict sanitizer is the SECOND gate.
+// The server-generated invitationUrl is escaped too (it lands in an href /
+// text node — attribute/text encoding is correct; the URL has no `&`).
+
+/** Token values for the full-HTML path: every value HTML-escaped (PIN: PII can't inject markup). */
+function buildEscapedTokenValues(vars: InvitationVars): Record<string, string> {
+  const raw = buildTokenValues(vars);
+  const escaped: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    escaped[k] = escapeHtml(v);
+  }
+  return escaped;
+}
+
+/**
+ * Render a per-campaign full-HTML invitation body. interpolate (Wave A
+ * TOKEN_RE, escaped values, raw bytes) → strict sanitize. The RESULT is the
+ * ENTIRE email body — NO branded shell wrap.
+ */
+export function renderFullHtmlBody(rawHtml: string, vars: InvitationVars): string {
+  const values = buildEscapedTokenValues(vars);
+  const interpolated = interpolateTokens(rawHtml, values); // PIN #1 + #2
+  return sanitizeEmailHtml(interpolated);                  // second gate
+}
+
+/** Plain-text twin derived from the rendered full-HTML body (tags stripped). */
+export function renderFullTextBody(rawHtml: string, vars: InvitationVars): string {
+  const html = renderFullHtmlBody(rawHtml, vars);
+  const text = html
+    .replace(/<\s*br\s*\/?\s*>/gi, "\n")        // <br> → newline
+    .replace(/<\/(p|div|tr|h[1-4]|li)\s*>/gi, "\n") // block close → newline
+    .replace(/<[^>]+>/g, "")                          // strip remaining tags
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  // Guarantee the survey link is reachable in the plain-text twin even if the
+  // coach only used it as an href (tags — and their hrefs — are stripped above).
+  if (vars.invitationUrl && !text.includes(vars.invitationUrl)) {
+    return `${text}\n\nStart the assessment: ${vars.invitationUrl}`.trim();
+  }
+  return text;
 }
 
 // ── Branded shell ───────────────────────────────────────────────────────────

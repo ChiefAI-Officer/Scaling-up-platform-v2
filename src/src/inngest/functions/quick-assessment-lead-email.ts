@@ -94,6 +94,10 @@ export async function drainLeadOutbox(
         data: {
           status: "SENT",
           sentAt: now,
+          // SEC-M4: bodyHtml holds rendered PII (the respondent's full report).
+          // Purge it once the row is terminal — the column is NOT NULL, so we
+          // clear to "" rather than null.
+          bodyHtml: "",
         },
       });
 
@@ -116,6 +120,9 @@ export async function drainLeadOutbox(
           lastError,
           status: newStatus,
           nextAttemptAt,
+          // SEC-M4: on a TERMINAL failure the row is never re-sent, so purge the
+          // rendered-PII body. A still-PENDING row keeps its body for retry.
+          ...(newStatus === "FAILED" ? { bodyHtml: "" } : {}),
         },
       });
 

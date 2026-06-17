@@ -6,12 +6,27 @@
 import "@/styles/wireframes-scoped.css";
 import { requireCoach } from "@/lib/auth/authorization";
 import { CampaignWizard } from "@/components/assessments/CampaignWizard";
+import {
+  waveDCustomHtmlEmailEnabled,
+  waveDAutoSendEnabled,
+  waveDResultsEmailEnabled,
+  waveDCoachNotifyEnabled,
+} from "@/lib/assessments/wave-d-feature-flags";
 
 export default async function NewCampaignPage() {
   await requireCoach();
+  const customHtmlEmailEnabled = waveDCustomHtmlEmailEnabled();
+  const autoSend = waveDAutoSendEnabled();
+  const resultsEmailEnabled = waveDResultsEmailEnabled();
+  const coachNotifyEnabled = waveDCoachNotifyEnabled();
   return (
     <div className="wf-scope max-w-3xl mx-auto">
-      <CampaignWizard />
+      <CampaignWizard
+        customHtmlEmailEnabled={customHtmlEmailEnabled}
+        autoSend={autoSend}
+        resultsEmailEnabled={resultsEmailEnabled}
+        coachNotifyEnabled={coachNotifyEnabled}
+      />
     </div>
   );
 }

@@ -54,6 +54,7 @@ jest.mock("@/lib/rate-limit", () => ({
   withRateLimit: jest.fn().mockResolvedValue({ allowed: true, headers: {} }),
 }));
 
+import { createHash } from "crypto";
 import { POST as listPOST } from "@/app/api/admin/assessment-templates/route";
 import {
   PATCH as detailPATCH,
@@ -193,6 +194,143 @@ describe("PATCH /api/admin/assessment-templates/[id]", () => {
     expect(updateArgs.data.name).toBe("Renamed");
     expect(updateArgs.data.aggregationMode).toBe("CEO_ONLY");
     expect(db.auditLog.create).toHaveBeenCalled();
+  });
+
+  // SEC-H2 — results-email approval is bound to a content hash. The PATCH
+  // handler must clear approval when content is edited without re-approving,
+  // and must bind the stored hash to the post-update content when approving.
+  describe("SEC-H2 results-email approval binding", () => {
+    function existingTemplate(over: Record<string, unknown> = {}) {
+      return {
+        id: "tpl-1",
+        resultsEmailSubject: "Your results",
+        resultsEmailBodyMarkdown: "Here is your report.",
+        resultsEmailContentApproved: true,
+        resultsEmailContentApprovedHash: hashOf("Your results", "Here is your report."),
+        resultsEmailContentApprovedAt: new Date("2026-06-01T00:00:00Z"),
+        resultsEmailContentApprovedBy: "prev@example.com",
+        ...over,
+      };
+    }
+
+    function hashOf(subject: string | null, body: string | null): string {
+      // Local mirror of the helper's canonicalization (kept independent so the
+      // test pins the exact contract, not the implementation).
+      return createHash("sha256")
+        .update(JSON.stringify([subject ?? "", body ?? ""]))
+        .digest("hex");
+    }
+
+    it("editing the body after approval clears approval + hash + at + by", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(existingTemplate());
+      (db.assessmentTemplate.update as jest.Mock).mockResolvedValue({});
+      const res = await detailPATCH(
+        patchReq({ resultsEmailBodyMarkdown: "Edited body" }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data.resultsEmailBodyMarkdown).toBe("Edited body");
+      expect(updateArgs.data.resultsEmailContentApproved).toBe(false);
+      expect(updateArgs.data.resultsEmailContentApprovedHash).toBeNull();
+      expect(updateArgs.data.resultsEmailContentApprovedAt).toBeNull();
+      expect(updateArgs.data.resultsEmailContentApprovedBy).toBeNull();
+    });
+
+    it("editing the subject after approval clears approval", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(existingTemplate());
+      (db.assessmentTemplate.update as jest.Mock).mockResolvedValue({});
+      const res = await detailPATCH(
+        patchReq({ resultsEmailSubject: "New subject" }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data.resultsEmailContentApproved).toBe(false);
+      expect(updateArgs.data.resultsEmailContentApprovedHash).toBeNull();
+    });
+
+    it("does NOT clear approval when content is sent unchanged (no-op edit)", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(existingTemplate());
+      (db.assessmentTemplate.update as jest.Mock).mockResolvedValue({});
+      const res = await detailPATCH(
+        patchReq({
+          resultsEmailSubject: "Your results",
+          resultsEmailBodyMarkdown: "Here is your report.",
+        }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      // Approval state untouched (not forced to false).
+      expect(updateArgs.data.resultsEmailContentApproved).toBeUndefined();
+      expect(updateArgs.data.resultsEmailContentApprovedHash).toBeUndefined();
+    });
+
+    it("approving stores hash (of current content) + at + by", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(
+        existingTemplate({
+          resultsEmailContentApproved: false,
+          resultsEmailContentApprovedHash: null,
+          resultsEmailContentApprovedAt: null,
+          resultsEmailContentApprovedBy: null,
+        }),
+      );
+      (db.assessmentTemplate.update as jest.Mock).mockResolvedValue({});
+      const res = await detailPATCH(
+        patchReq({ resultsEmailContentApproved: true }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data.resultsEmailContentApproved).toBe(true);
+      expect(updateArgs.data.resultsEmailContentApprovedHash).toBe(
+        hashOf("Your results", "Here is your report."),
+      );
+      expect(updateArgs.data.resultsEmailContentApprovedAt).toBeInstanceOf(Date);
+      expect(updateArgs.data.resultsEmailContentApprovedBy).toBe(adminActor.email);
+    });
+
+    it("editing AND approving in one request binds the hash to the NEW content", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(existingTemplate());
+      (db.assessmentTemplate.update as jest.Mock).mockResolvedValue({});
+      const res = await detailPATCH(
+        patchReq({
+          resultsEmailSubject: "Fresh subject",
+          resultsEmailBodyMarkdown: "Fresh body",
+          resultsEmailContentApproved: true,
+        }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data.resultsEmailContentApproved).toBe(true);
+      expect(updateArgs.data.resultsEmailContentApprovedHash).toBe(
+        hashOf("Fresh subject", "Fresh body"),
+      );
+      expect(updateArgs.data.resultsEmailContentApprovedBy).toBe(adminActor.email);
+    });
+
+    it("explicit unapprove (false) clears hash + at + by", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(existingTemplate());
+      (db.assessmentTemplate.update as jest.Mock).mockResolvedValue({});
+      const res = await detailPATCH(
+        patchReq({ resultsEmailContentApproved: false }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data.resultsEmailContentApproved).toBe(false);
+      expect(updateArgs.data.resultsEmailContentApprovedHash).toBeNull();
+      expect(updateArgs.data.resultsEmailContentApprovedAt).toBeNull();
+      expect(updateArgs.data.resultsEmailContentApprovedBy).toBeNull();
+    });
   });
 });
 

@@ -36,13 +36,12 @@
  *    `versionNumber` DESC. v1 has a single published version per
  *    template (Rockefeller alias `RockHabits`, v1 enUS) — this code is
  *    written to be correct on day one with the v1.5 multi-version case.
- *  - Soft-delete: campaigns with `status === "CANCELED"` are excluded.
- *    There's no `deletedAt` column on AssessmentCampaign in v7.6
- *    schema — the type union only includes DRAFT/ACTIVE/CLOSED so a
- *    future CANCELED value remains forward-compatible without a
- *    schema change here. Filtering happens at the service layer
- *    rather than the DB so callers stubbing the DB don't have to
- *    replicate the filter.
+ *  - Soft-delete (SEC-M6): the Wave-D migration added
+ *    `AssessmentCampaign.deletedAt`. Deleted campaigns are excluded at the
+ *    DB level (`deletedAt: null` in the campaign findMany where). A
+ *    defense-in-depth `status !== "CANCELED"` filter is also kept for any
+ *    future CANCELED status value (the type union is DRAFT/ACTIVE/CLOSED
+ *    today).
  */
 
 import type { ScoreResult, PerSectionResult } from "./scoring";
@@ -184,7 +183,11 @@ export interface TrendsDb {
   };
   assessmentCampaign: {
     findMany: (args: {
-      where: { templateId: string; organizationId: string };
+      where: {
+        templateId: string;
+        organizationId: string;
+        deletedAt?: Date | null;
+      };
       include?: Record<string, unknown>;
       orderBy?: Record<string, unknown>;
     }) => Promise<CampaignRow[]>;
@@ -357,7 +360,9 @@ export async function getLongitudinalTrend(
   }
 
   const allCampaigns = await db.assessmentCampaign.findMany({
-    where: { templateId, organizationId },
+    // SEC-M6: soft-deleted campaigns (deletedAt set) are excluded at the DB
+    // level via the shared live-guard so they never reach the trend chart.
+    where: { templateId, organizationId, deletedAt: null },
     include: {
       version: {
         select: { id: true, versionNumber: true, language: true },
@@ -366,8 +371,9 @@ export async function getLongitudinalTrend(
     orderBy: { openAt: "asc" },
   });
 
-  // Drop soft-deleted: today the only AssessmentCampaign status values are
-  // DRAFT/ACTIVE/CLOSED. Future CANCELED rows are filtered defensively.
+  // Defense-in-depth status filter: today the only AssessmentCampaign status
+  // values are DRAFT/ACTIVE/CLOSED. A future CANCELED status is filtered here
+  // too (the deletedAt tombstone is the primary soft-delete signal).
   const liveCampaigns = allCampaigns.filter((c) => c.status !== "CANCELED");
 
   const includedCampaigns = liveCampaigns.filter(

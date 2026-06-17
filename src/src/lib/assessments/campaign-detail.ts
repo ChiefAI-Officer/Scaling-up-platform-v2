@@ -76,6 +76,7 @@ export interface CampaignOverview {
     organizationName: string;
     invitationSubject: string | null;
     invitationBodyMarkdown: string | null;
+    invitationBodyHtml: string | null;
   };
   stats: {
     totalParticipants: number;
@@ -128,6 +129,7 @@ interface CampaignWithRels {
   createdAt: Date;
   invitationSubject: string | null;
   invitationBodyMarkdown: string | null;
+  invitationBodyHtml: string | null;
   template: { id: string; name: string };
   organization: { id: string; name: string };
 }
@@ -219,6 +221,11 @@ export async function getCampaignOverview(
   db: CampaignDetailDb,
   campaignId: string,
 ): Promise<CampaignOverview> {
+  // SEC-M6: soft-delete is enforced UPSTREAM — every caller of this loader
+  // (the detail page + the respondents API route) first gates on
+  // canManageCampaign, which rejects (deletedAt set) campaigns as not-found.
+  // This read therefore only ever runs against a campaign already proven
+  // live, so keying by id alone is safe here.
   const campaign = await db.assessmentCampaign.findUnique({
     where: { id: campaignId },
     include: {
@@ -265,6 +272,7 @@ export async function getCampaignOverview(
       organizationName: campaign.organization.name,
       invitationSubject: campaign.invitationSubject,
       invitationBodyMarkdown: campaign.invitationBodyMarkdown,
+      invitationBodyHtml: campaign.invitationBodyHtml,
     },
     stats,
   };

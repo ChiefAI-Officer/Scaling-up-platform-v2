@@ -93,6 +93,7 @@ describe("POST exchange", () => {
       campaign: {
         id: "c1",
         alias: "DIFFERENT",
+        deletedAt: null,
         status: "ACTIVE",
         openAt: new Date(Date.now() - 1000),
         closeAt: null,
@@ -111,6 +112,7 @@ describe("POST exchange", () => {
       campaign: {
         id: "c1",
         alias: "demo",
+        deletedAt: null,
         status: "ACTIVE",
         openAt: new Date(Date.now() - 1000),
         closeAt: null,
@@ -129,6 +131,7 @@ describe("POST exchange", () => {
       campaign: {
         id: "c1",
         alias: "demo",
+        deletedAt: null,
         status: "ACTIVE",
         openAt: new Date(Date.now() - 1000),
         closeAt: null,
@@ -147,6 +150,7 @@ describe("POST exchange", () => {
       campaign: {
         id: "c1",
         alias: "demo",
+        deletedAt: null,
         status: "ACTIVE",
         openAt: new Date(Date.now() - 1000),
         closeAt: null,
@@ -165,6 +169,7 @@ describe("POST exchange", () => {
       campaign: {
         id: "c1",
         alias: "demo",
+        deletedAt: null,
         status: "CLOSED",
         openAt: new Date(Date.now() - 1000),
         closeAt: null,
@@ -183,6 +188,7 @@ describe("POST exchange", () => {
       campaign: {
         id: "c1",
         alias: "demo",
+        deletedAt: null,
         status: "ACTIVE",
         openAt: new Date(Date.now() + 86_400_000),
         closeAt: null,
@@ -201,6 +207,7 @@ describe("POST exchange", () => {
       campaign: {
         id: "c1",
         alias: "demo",
+        deletedAt: null,
         status: "ACTIVE",
         openAt: new Date(Date.now() - 1000),
         closeAt: null,

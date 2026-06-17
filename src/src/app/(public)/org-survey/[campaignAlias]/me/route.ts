@@ -66,6 +66,8 @@ export async function GET(
     }
 
     const now = new Date();
+    // SEC-M6: a soft-deleted campaign is no longer available.
+    if (invitation.campaign.deletedAt !== null) return gateFailed();
     if (invitation.revokedAt !== null) return gateFailed();
     if (now >= invitation.expiresAt) return gateFailed();
     if (invitation.status === "SUBMITTED") return gateFailed();
@@ -98,6 +100,8 @@ export async function GET(
             name: invitation.campaign.name,
             alias: invitation.campaign.alias,
             organizationName: invitation.campaign.organization?.name ?? null,
+            // Task 6b: expose toggle so the client can branch thank-you copy.
+            sendResultsToRespondent: invitation.campaign.sendResultsToRespondent,
           },
           version: { language: invitation.campaign.version.language },
           sections: invitation.campaign.version.sections,

@@ -64,6 +64,8 @@ interface CampaignRow {
   templateId: string;
   createdByCoachId: string | null;
   status: "DRAFT" | "ACTIVE" | "CLOSED";
+  // SEC-M6: optional in fixtures (defaults to live/not-deleted).
+  deletedAt?: Date | null;
 }
 
 function buildDb(state: {
@@ -118,9 +120,19 @@ function buildDb(state: {
       }),
     },
     assessmentCampaign: {
-      findUnique: jest.fn(async (args: { where: { id: string } }) => {
-        return campaigns.find((c) => c.id === args.where.id) ?? null;
-      }),
+      // SEC-M6: canManageCampaign now loads via findFirst with a
+      // `deletedAt: null` guard by default. Honor it in the stub so
+      // soft-deleted fixtures are filtered out.
+      findFirst: jest.fn(
+        async (args: { where: { id?: string; deletedAt?: Date | null } }) => {
+          const row = campaigns.find((c) => c.id === args.where.id) ?? null;
+          if (!row) return null;
+          if (args.where.deletedAt === null && (row.deletedAt ?? null) !== null) {
+            return null;
+          }
+          return row;
+        },
+      ),
     },
   };
 }

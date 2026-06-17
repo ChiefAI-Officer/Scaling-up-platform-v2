@@ -3,18 +3,29 @@
  * GET: canManageCampaign mode="read" (creator coach OR admin).
  * PATCH: canManageCampaign mode="write" (creator coach with current
  * template+org access OR admin) AND status === DRAFT.
+ * DELETE (Wave D, #1): soft-delete (sets deletedAt). Authorization is a
+ * DISTINCT ownership predicate — admin/privileged OR the campaign creator
+ * coach (createdByCoachId === actor.coachId) — NOT canManageCampaign,
+ * because delete is ownership cleanup that must survive a later loss of
+ * template/org access. Deletable in ANY state (DRAFT/ACTIVE/CLOSED).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { updateAssessmentCampaignSchema } from "@/lib/validations";
-import { getApiActor } from "@/lib/auth/authorization";
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import {
   asAccessDb,
   canManageCampaign,
 } from "@/lib/assessments/access-control";
+import { loadLiveCampaign } from "@/lib/assessments/campaign-live";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
+import {
+  validateInvitationHtml,
+  MAX_INVITATION_HTML_LENGTH,
+} from "@/lib/assessments/email-html-sanitizer";
 
 export async function GET(
   _request: NextRequest,
@@ -161,6 +172,7 @@ export async function PATCH(
       closeAt?: Date | null;
       invitationSubject?: string | null;
       invitationBodyMarkdown?: string | null;
+      invitationBodyHtml?: string | null;
     } = {};
 
     if (data.name !== undefined) updateData.name = data.name;
@@ -169,6 +181,36 @@ export async function PATCH(
       updateData.invitationSubject = data.invitationSubject;
     if (data.invitationBodyMarkdown !== undefined)
       updateData.invitationBodyMarkdown = data.invitationBodyMarkdown;
+    // Task 12 (#20) — full-HTML invitation body: validate-on-save (flag-gated).
+    //   - Flag OFF → field IGNORED (not written).
+    //   - Flag ON  → empty/whitespace clears the override (→ null); otherwise
+    //                enforce the 50KB cap + token-PLACEMENT validation on the
+    //                RAW bytes, then store the RAW validated HTML (sanitize at
+    //                render, not at rest, so stored bytes match the validator's).
+    if (data.invitationBodyHtml !== undefined && waveDCustomHtmlEmailEnabled()) {
+      const rawHtml = data.invitationBodyHtml;
+      if (rawHtml === null || rawHtml.trim().length === 0) {
+        updateData.invitationBodyHtml = null;
+      } else {
+        if (rawHtml.length > MAX_INVITATION_HTML_LENGTH) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Invitation HTML exceeds the ${MAX_INVITATION_HTML_LENGTH}-character limit.`,
+            },
+            { status: 400 }
+          );
+        }
+        const placement = validateInvitationHtml(rawHtml);
+        if (!placement.ok) {
+          return NextResponse.json(
+            { success: false, error: placement.reason },
+            { status: 400 }
+          );
+        }
+        updateData.invitationBodyHtml = rawHtml;
+      }
+    }
     if (data.openAt !== undefined) {
       const d = new Date(data.openAt);
       if (Number.isNaN(d.getTime())) {
@@ -213,6 +255,85 @@ export async function PATCH(
     console.error("Error updating campaign:", error);
     return NextResponse.json(
       { success: false, error: "Failed to update campaign" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const rateLimit = await withRateLimit(request, RateLimits.standard);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: "Too many requests" },
+        { status: 429, headers: rateLimit.headers }
+      );
+    }
+
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    const { id } = await params;
+
+    // Load the LIVE campaign (soft-deleted → null → 404). A deleted or
+    // non-existent campaign is treated identically.
+    const campaign = await loadLiveCampaign<{
+      id: string;
+      createdByCoachId: string | null;
+      status: "DRAFT" | "ACTIVE" | "CLOSED";
+    }>(db.assessmentCampaign, id, {
+      select: { id: true, createdByCoachId: true, status: true },
+    });
+    if (!campaign) {
+      return NextResponse.json(
+        { success: false, error: "Campaign not found" },
+        { status: 404 }
+      );
+    }
+
+    // Distinct OWNERSHIP predicate (not canManageCampaign): admin/privileged
+    // OR the creator coach. This deliberately ignores current template/org
+    // access — delete is ownership cleanup, so a creator coach who later lost
+    // template access (H-8 path) can still delete their own campaign.
+    const isOwner =
+      campaign.createdByCoachId !== null &&
+      actor.coachId !== null &&
+      campaign.createdByCoachId === actor.coachId;
+    if (!isPrivilegedRole(actor.role) && !isOwner) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+
+    // Soft-delete only — responses/invitations are preserved. Deletable in
+    // ANY state (DRAFT/ACTIVE/CLOSED).
+    await db.assessmentCampaign.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    await logAudit({
+      entityType: "AssessmentCampaign",
+      entityId: id,
+      action: "DELETE",
+      performedBy: actor.email,
+      changes: { softDelete: true, status: campaign.status },
+    });
+
+    return NextResponse.json({ success: true, message: "Campaign deleted" });
+  } catch (error) {
+    console.error("Error deleting campaign:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to delete campaign" },
       { status: 500 }
     );
   }
