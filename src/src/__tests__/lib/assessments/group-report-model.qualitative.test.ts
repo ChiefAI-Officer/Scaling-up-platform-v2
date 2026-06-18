@@ -272,6 +272,15 @@ describe("qualitative qa sections", () => {
     }
   });
 
+  it("S5_explained (choices-mapped but TEXT-only) falls back to a qa section", () => {
+    // SECTION_PRESENTATION maps LVA S5_explained → "choices", but the section
+    // carries only TEXT questions (no MULTI_CHOICE). The aggregation falls back
+    // to a qa block — so the rendered section's presentation is "qa".
+    const s5 = findSection(sectionsOf(), "S5_explained") as GroupQaSection;
+    expect(s5).toBeDefined();
+    expect(s5.presentation).toBe("qa");
+  });
+
   it("the standalone rehire NUMBER renders perRespondent + mean (answerers only)", () => {
     const s6 = findSection(sectionsOf(), "S6_focus") as GroupQaSection;
     expect(s6.presentation).toBe("qa");

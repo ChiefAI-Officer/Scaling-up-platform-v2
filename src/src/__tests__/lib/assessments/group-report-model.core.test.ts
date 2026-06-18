@@ -47,12 +47,15 @@ describe("buildGroupReportModel — dispatch", () => {
     expect(model.scored).toBeUndefined();
   });
 
-  it("scored campaigns still emit an EMPTY scored container (T5 fills it)", () => {
-    // An unknown alias resolves to "scored"; T5 owns scored aggregation, so the
-    // container stays empty here.
+  it("dispatches the scored container for an unknown alias (T5 fills it)", () => {
+    // An unknown alias resolves to "scored"; T5 owns scored aggregation. The
+    // container is defined with array sections/questions; the per-type
+    // aggregation contract is covered in group-report-model.scored.test.ts.
     const model = buildGroupReportModel({ ...fixtureLva(), alias: "some-unknown-alias" });
     expect(model.scored).toBeDefined();
-    expect(model.scored?.sections).toEqual([]);
+    expect(Array.isArray(model.scored?.sections)).toBe(true);
+    expect(Array.isArray(model.scored?.questions)).toBe(true);
+    expect(model.scored?.tier).toBeDefined();
     expect(model.qualitative).toBeUndefined();
   });
 });

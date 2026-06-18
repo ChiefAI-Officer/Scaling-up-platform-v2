@@ -255,19 +255,90 @@ export type GroupQualitativeSection =
   | GroupQaSection;
 
 /**
- * Scored aggregation output (T5 fills `sections`). Declared here for the
- * contract; T3 emits it with EMPTY sections.
+ * Scored aggregation output (T5). MIRRORS the per-respondent scored report
+ * headline (BrandedReport: per-section table → per-domain cards → ScaleUp
+ * Score → tier) rather than inventing a new shape (R1-HIGH-2). Every figure is
+ * read VERBATIM from each submission's FROZEN `result` (a `ScoreResult`) —
+ * NEVER recomputed (R1-HIGH-1, rule 5). The team aggregate ALWAYS excludes the
+ * CEO (rule 1); a key with zero non-CEO contributors → `teamAvg`/`dev` null
+ * (the N<2 fallback, rule 2).
+ *
+ * Blocks are PRESENCE-driven (rule 3): `domains` is present iff any submission
+ * carries `result.perDomain`; `scaleUpScore` iff any carries `result.scaleUpScore`;
+ * `tier` is always present (it summarizes `result.tier.label`). For a plain
+ * section-only template (Rockefeller / Five-Dysfunctions) `domains` and
+ * `scaleUpScore` are `undefined`.
  */
 export interface GroupScoredReport {
-  // T5 — per-section means / per-question Mean+respondent columns go here.
+  /** Per-section CEO-vs-team rows (the base/fallback for non-domain templates). */
   sections: GroupScoredSection[];
+  /** Per-question CEO-vs-team means (CEO-excluded teamMean). */
+  questions: GroupScoredQuestion[];
+  /** Present iff any submission's `result` carries `perDomain` (rule 3). */
+  domains?: GroupScoredDomain[];
+  /** Present iff any submission's `result` carries `scaleUpScore` (rule 3). */
+  scaleUpScore?: GroupScoredScaleUp;
+  /** CEO tier label + the team's tier-label distribution (CEO-excluded). */
+  tier: GroupScoredTier;
 }
 
-/** Placeholder scored-section shape (T5 refines/extends as needed). */
+/**
+ * A scored section row mirroring a per-respondent `perSection` entry's
+ * `averagePoints`. `ceo` = the CEO submission's averagePoints for this section
+ * (null when the CEO didn't submit or didn't answer it); `teamAvg` = arithmetic
+ * mean of the NON-CEO submissions' averagePoints (null when N<2 — i.e. zero
+ * non-CEO contributors); `dev = ceo - teamAvg` (null when either is null).
+ * `n` = count of non-CEO submissions that contributed a value.
+ */
 export interface GroupScoredSection {
   stableKey: string;
   name: string;
-  // T5 — aggregated Mean + per-respondent score columns.
+  ceo: number | null;
+  teamAvg: number | null;
+  dev: number | null;
+  n: number;
+}
+
+/**
+ * A scored per-domain row mirroring a per-respondent `perDomain` card's
+ * `averagePoints`. CEO-excluded team mean (same null/dev rules as a section).
+ */
+export interface GroupScoredDomain {
+  key: string;
+  label: string;
+  ceo: number | null;
+  teamAvg: number | null;
+  dev: number | null;
+  n: number;
+}
+
+/** The 0-100 ScaleUp Score headline: CEO value + CEO-excluded team mean. */
+export interface GroupScoredScaleUp {
+  ceo: number | null;
+  teamAvg: number | null;
+}
+
+/**
+ * The tier headline: the CEO submission's tier label (null when no CEO
+ * submission / no tier) + the distribution of NON-CEO submissions' tier labels.
+ */
+export interface GroupScoredTier {
+  ceo: string | null;
+  teamDistribution: Array<{ label: string; count: number }>;
+}
+
+/**
+ * A scored per-question CEO-vs-team row: `ceo` = the CEO submission's
+ * `perQuestion.value` (null when absent); `teamMean` = mean of the NON-CEO
+ * submissions' values for this question (null when no non-CEO answered it);
+ * `n` = non-CEO answerer count. `label` from `questionsByKey`.
+ */
+export interface GroupScoredQuestion {
+  stableKey: string;
+  label: string;
+  ceo: number | null;
+  teamMean: number | null;
+  n: number;
 }
 
 export interface CampaignGroupReport {
@@ -400,6 +471,9 @@ interface CohortMember {
   isCEO: boolean;
   isOrphan: boolean;
   answers: Map<string, NormalizedAnswer>;
+  /** The submission's raw frozen `result` (a ScoreResult) — read by the scored
+   *  path only; never recomputed. Kept raw so qualitative campaigns ignore it. */
+  result: unknown;
 }
 
 // ─── Qualitative section grouping + aggregation (T4) ─────────────────────────
@@ -784,6 +858,322 @@ function buildQualitativeSections(
   return out;
 }
 
+// ─── Scored section + headline aggregation (T5) ──────────────────────────────
+//
+// Reads each submission's FROZEN `result` (a ScoreResult) VERBATIM — never
+// recomputes a score (R1-HIGH-1, rule 5). The team aggregate ALWAYS excludes
+// the CEO (rule 1); a key with zero non-CEO contributors → null teamAvg/dev
+// (the N<2 fallback, rule 2). A malformed/missing result row is skipped (its
+// contribution is dropped) and flips `degraded`.
+
+/** A defensively-parsed view of a submission's frozen ScoreResult. */
+interface ParsedScoreResult {
+  /** stableKey → averagePoints (finite numbers only). */
+  sectionAvg: Map<string, number>;
+  /** stableKey → section display name (first-seen wins; for section ordering). */
+  sectionName: Map<string, string>;
+  /** domain key → averagePoints (finite numbers only; null entries dropped). */
+  domainAvg: Map<string, number>;
+  /** domain key → label (first-seen wins). */
+  domainLabel: Map<string, string>;
+  /** stableKey → perQuestion.value (finite numbers only). */
+  questionValue: Map<string, number>;
+  /** finite scaleUpScore, or null. */
+  scaleUpScore: number | null;
+  /** tier.label, or null. */
+  tierLabel: string | null;
+  /** true when the result row carried perDomain (drives the domains block). */
+  hasDomains: boolean;
+  /** true when the result row carried a finite scaleUpScore. */
+  hasScaleUpScore: boolean;
+}
+
+function num(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Parse a frozen `result` into a ParsedScoreResult. Returns null when the result
+ * is not a usable object (caller treats that submission as a non-contributor +
+ * flips degraded). NEVER throws.
+ */
+function parseScoreResult(result: unknown): ParsedScoreResult | null {
+  if (!result || typeof result !== "object") return null;
+  const r = result as Record<string, unknown>;
+
+  const parsed: ParsedScoreResult = {
+    sectionAvg: new Map(),
+    sectionName: new Map(),
+    domainAvg: new Map(),
+    domainLabel: new Map(),
+    questionValue: new Map(),
+    scaleUpScore: null,
+    tierLabel: null,
+    hasDomains: false,
+    hasScaleUpScore: false,
+  };
+
+  if (Array.isArray(r.perSection)) {
+    for (const row of r.perSection as unknown[]) {
+      if (!row || typeof row !== "object") continue;
+      const s = row as Record<string, unknown>;
+      if (typeof s.stableKey !== "string") continue;
+      const avg = num(s.averagePoints);
+      if (avg !== null) parsed.sectionAvg.set(s.stableKey, avg);
+      if (typeof s.name === "string" && !parsed.sectionName.has(s.stableKey)) {
+        parsed.sectionName.set(s.stableKey, s.name);
+      }
+    }
+  }
+
+  if (Array.isArray(r.perDomain)) {
+    parsed.hasDomains = true;
+    for (const row of r.perDomain as unknown[]) {
+      if (!row || typeof row !== "object") continue;
+      const d = row as Record<string, unknown>;
+      if (typeof d.key !== "string") continue;
+      const avg = num(d.averagePoints); // null when "no data" (kept absent)
+      if (avg !== null) parsed.domainAvg.set(d.key, avg);
+      if (typeof d.label === "string" && !parsed.domainLabel.has(d.key)) {
+        parsed.domainLabel.set(d.key, d.label);
+      }
+    }
+  }
+
+  if (Array.isArray(r.perQuestion)) {
+    for (const row of r.perQuestion as unknown[]) {
+      if (!row || typeof row !== "object") continue;
+      const q = row as Record<string, unknown>;
+      if (typeof q.stableKey !== "string") continue;
+      const value = num(q.value);
+      if (value !== null) parsed.questionValue.set(q.stableKey, value);
+    }
+  }
+
+  const sus = num(r.scaleUpScore);
+  if (sus !== null) {
+    parsed.scaleUpScore = sus;
+    parsed.hasScaleUpScore = true;
+  }
+
+  if (r.tier && typeof r.tier === "object") {
+    const t = r.tier as Record<string, unknown>;
+    if (typeof t.label === "string") parsed.tierLabel = t.label;
+  }
+
+  return parsed;
+}
+
+/** A cohort member's parsed result, tagged CEO/non-CEO, for scored aggregation. */
+interface ScoredMember {
+  isCEO: boolean;
+  parsed: ParsedScoreResult;
+}
+
+/** CEO-excluded team mean of the values a getter pulls (null when none). */
+function teamMeanBy(
+  members: ScoredMember[],
+  get: (p: ParsedScoreResult) => number | null,
+): { teamAvg: number | null; n: number } {
+  const values: number[] = [];
+  for (const m of members) {
+    if (m.isCEO) continue;
+    const v = get(m.parsed);
+    if (v !== null) values.push(v);
+  }
+  return values.length > 0 ? { teamAvg: meanOf(values), n: values.length } : { teamAvg: null, n: 0 };
+}
+
+/** The CEO submission's value via a getter (first CEO member; null when none). */
+function ceoValueBy(
+  members: ScoredMember[],
+  get: (p: ParsedScoreResult) => number | null,
+): number | null {
+  for (const m of members) {
+    if (!m.isCEO) continue;
+    const v = get(m.parsed);
+    if (v !== null) return v;
+  }
+  return null;
+}
+
+const devOf = (ceo: number | null, teamAvg: number | null): number | null =>
+  ceo === null || teamAvg === null ? null : ceo - teamAvg;
+
+/**
+ * Builds the scored aggregation: per-section + per-question CEO-vs-team rows,
+ * plus the presence-driven headline blocks (domains / scaleUpScore / tier).
+ * PURE — reads each member's parsed FROZEN result; never recomputes.
+ *
+ * Section ORDER + display NAMES come from `version.sections` (mirrors the
+ * per-respondent report); a section the version doesn't list falls back to the
+ * result's own name. Only sections at least one submission scored are emitted.
+ */
+function buildScoredReport(
+  sectionsRaw: unknown,
+  questionsByKey: Record<string, QuestionMeta>,
+  scoredMembers: ScoredMember[],
+): GroupScoredReport {
+  const sectionList = parseGroupSections(sectionsRaw);
+
+  // Resolve a display name for a section key: version first, else result-carried.
+  const versionName = new Map(sectionList.map((s) => [s.stableKey, s.name]));
+  const resultName = (key: string): string => {
+    for (const m of scoredMembers) {
+      const n = m.parsed.sectionName.get(key);
+      if (n) return n;
+    }
+    return key;
+  };
+
+  // Collect every section key any submission scored, in version order first,
+  // then any extra keys (result-only) in first-seen order.
+  const orderedKeys: string[] = [];
+  const seen = new Set<string>();
+  for (const s of sectionList) {
+    orderedKeys.push(s.stableKey);
+    seen.add(s.stableKey);
+  }
+  for (const m of scoredMembers) {
+    for (const key of m.parsed.sectionAvg.keys()) {
+      if (!seen.has(key)) {
+        orderedKeys.push(key);
+        seen.add(key);
+      }
+    }
+  }
+
+  const sections: GroupScoredSection[] = [];
+  for (const key of orderedKeys) {
+    // Skip a section nobody scored (Esperto conditional output parity).
+    if (!scoredMembers.some((m) => m.parsed.sectionAvg.has(key))) continue;
+    const ceo = ceoValueBy(scoredMembers, (p) => p.sectionAvg.get(key) ?? null);
+    const { teamAvg, n } = teamMeanBy(
+      scoredMembers,
+      (p) => p.sectionAvg.get(key) ?? null,
+    );
+    sections.push({
+      stableKey: key,
+      name: versionName.get(key) ?? resultName(key),
+      ceo,
+      teamAvg,
+      dev: devOf(ceo, teamAvg),
+      n,
+    });
+  }
+
+  // Per-question rows — one per scored question any submission carries, in
+  // questionsByKey (version question) order, then any result-only keys.
+  const questionKeys: string[] = [];
+  const qSeen = new Set<string>();
+  for (const key of Object.keys(questionsByKey)) {
+    questionKeys.push(key);
+    qSeen.add(key);
+  }
+  for (const m of scoredMembers) {
+    for (const key of m.parsed.questionValue.keys()) {
+      if (!qSeen.has(key)) {
+        questionKeys.push(key);
+        qSeen.add(key);
+      }
+    }
+  }
+  const questions: GroupScoredQuestion[] = [];
+  for (const key of questionKeys) {
+    if (!scoredMembers.some((m) => m.parsed.questionValue.has(key))) continue;
+    const ceo = ceoValueBy(scoredMembers, (p) => p.questionValue.get(key) ?? null);
+    const { teamAvg, n } = teamMeanBy(
+      scoredMembers,
+      (p) => p.questionValue.get(key) ?? null,
+    );
+    questions.push({
+      stableKey: key,
+      label: stripLegacyDecimalSuffix(questionsByKey[key]?.label ?? key),
+      ceo,
+      teamMean: teamAvg,
+      n,
+    });
+  }
+
+  const report: GroupScoredReport = {
+    sections,
+    questions,
+    tier: buildScoredTier(scoredMembers),
+  };
+
+  // Domains block — present iff any submission carried perDomain.
+  if (scoredMembers.some((m) => m.parsed.hasDomains)) {
+    report.domains = buildScoredDomains(scoredMembers);
+  }
+
+  // ScaleUp Score block — present iff any submission carried a finite score.
+  if (scoredMembers.some((m) => m.parsed.hasScaleUpScore)) {
+    const ceo = ceoValueBy(scoredMembers, (p) => p.scaleUpScore);
+    const { teamAvg } = teamMeanBy(scoredMembers, (p) => p.scaleUpScore);
+    report.scaleUpScore = { ceo, teamAvg };
+  }
+
+  return report;
+}
+
+/** Per-domain CEO-vs-team rows, in first-seen domain order across submissions. */
+function buildScoredDomains(scoredMembers: ScoredMember[]): GroupScoredDomain[] {
+  const orderedKeys: string[] = [];
+  const seen = new Set<string>();
+  const labelByKey = new Map<string, string>();
+  for (const m of scoredMembers) {
+    for (const [key, label] of m.parsed.domainLabel) {
+      if (!labelByKey.has(key)) labelByKey.set(key, label);
+    }
+    // Order keys by their appearance in perDomain (label map preserves order).
+    for (const key of m.parsed.domainLabel.keys()) {
+      if (!seen.has(key)) {
+        orderedKeys.push(key);
+        seen.add(key);
+      }
+    }
+  }
+
+  const domains: GroupScoredDomain[] = [];
+  for (const key of orderedKeys) {
+    const ceo = ceoValueBy(scoredMembers, (p) => p.domainAvg.get(key) ?? null);
+    const { teamAvg, n } = teamMeanBy(
+      scoredMembers,
+      (p) => p.domainAvg.get(key) ?? null,
+    );
+    domains.push({
+      key,
+      label: labelByKey.get(key) ?? key,
+      ceo,
+      teamAvg,
+      dev: devOf(ceo, teamAvg),
+      n,
+    });
+  }
+  return domains;
+}
+
+/** CEO tier label + the non-CEO team's tier-label distribution. */
+function buildScoredTier(scoredMembers: ScoredMember[]): GroupScoredTier {
+  let ceo: string | null = null;
+  for (const m of scoredMembers) {
+    if (m.isCEO && m.parsed.tierLabel) {
+      ceo = m.parsed.tierLabel;
+      break;
+    }
+  }
+  // Distribution over non-CEO submissions, in first-seen label order.
+  const counts = new Map<string, number>();
+  for (const m of scoredMembers) {
+    if (m.isCEO) continue;
+    const label = m.parsed.tierLabel;
+    if (!label) continue;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  const teamDistribution = Array.from(counts, ([label, count]) => ({ label, count }));
+  return { ceo, teamDistribution };
+}
+
 // ─── Main builder ──────────────────────────────────────────────────────────
 
 /**
@@ -871,6 +1261,7 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
       isCEO: ceoRespondentIds.has(respondentId),
       isOrphan,
       answers,
+      result: sub.result,
     });
   }
 
@@ -906,18 +1297,12 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
     answersByRespondent.set(m.respondentId, m.answers);
   }
 
-  const report: CampaignGroupReport = {
-    reportType,
-    respondents,
-    respondentCount: respondents.length,
-    degraded,
-    questionsByKey,
-    answersByRespondent,
-  };
-
   // Dispatch — aggregate the matching section container.
+  let qualitative: GroupQualitativeReport | undefined;
+  let scored: GroupScoredReport | undefined;
+
   if (reportType === "qualitative") {
-    report.qualitative = {
+    qualitative = {
       sections: buildQualitativeSections(
         input?.alias,
         input?.version?.sections,
@@ -927,8 +1312,29 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
       ),
     };
   } else {
-    report.scored = { sections: [] }; // T5 fills sections
+    // Parse each submission's FROZEN result; a malformed/missing result is a
+    // non-contributor that flips degraded (rule 5) — the submission still
+    // stays in the cohort (it remains in `respondents`).
+    const scoredMembers: ScoredMember[] = [];
+    for (const m of members) {
+      const parsed = parseScoreResult(m.result);
+      if (parsed === null) {
+        degraded = true;
+        continue;
+      }
+      scoredMembers.push({ isCEO: m.isCEO, parsed });
+    }
+    scored = buildScoredReport(input?.version?.sections, questionsByKey, scoredMembers);
   }
 
-  return report;
+  return {
+    reportType,
+    respondents,
+    respondentCount: respondents.length,
+    degraded,
+    questionsByKey,
+    answersByRespondent,
+    ...(qualitative ? { qualitative } : {}),
+    ...(scored ? { scored } : {}),
+  };
 }
