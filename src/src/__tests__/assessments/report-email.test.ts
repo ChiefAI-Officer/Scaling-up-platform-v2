@@ -378,6 +378,7 @@ describe("buildRespondentReportFromSubmission — templateAlias", () => {
       sections: [],
       questions: [],
       scoringConfig: {},
+      rawAnswers: [],
       submittedAt: new Date("2026-06-17T10:00:00Z"),
       submissionId: "sub-1",
       templateAlias: "RockHabits",
@@ -388,6 +389,28 @@ describe("buildRespondentReportFromSubmission — templateAlias", () => {
   it("threads templateAlias onto the returned RespondentReport (so reportConfigFor can read it)", () => {
     const report = buildRespondentReportFromSubmission(submissionArgs());
     expect(report.templateAlias).toBe("RockHabits");
+  });
+
+  // ── Wave E Task 9 — thread real answers + submittedAt + submissionId ───────
+  it("threads the submitted rawAnswers onto the returned RespondentReport (qualitative path renders answers)", () => {
+    const report = buildRespondentReportFromSubmission(
+      submissionArgs({
+        rawAnswers: [{ stableKey: "q1", value: "hello" }],
+      }),
+    );
+    expect(report.rawAnswers).toEqual([{ stableKey: "q1", value: "hello" }]);
+  });
+
+  it("threads the real submittedAt + submissionId from args (no placeholder defaults)", () => {
+    const report = buildRespondentReportFromSubmission(
+      submissionArgs({
+        rawAnswers: [{ stableKey: "q1", value: "hello" }],
+        submittedAt: new Date("2026-05-01T00:00:00Z"),
+        submissionId: "sub_1",
+      }),
+    );
+    expect(report.submittedAt).toEqual(new Date("2026-05-01T00:00:00Z"));
+    expect(report.provenance.submissionId).toBe("sub_1");
   });
 });
 

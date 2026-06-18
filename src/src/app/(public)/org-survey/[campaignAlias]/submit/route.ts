@@ -95,6 +95,12 @@ interface EnqueueArgs {
   respondent: { email: string; firstName: string; lastName: string } | null;
   respondentId: string;
   scoreResult: unknown;
+  /** The submitted answers ({ stableKey, value }[]) — persisted to
+   *  submission.answers; the qualitative report renders them back. */
+  rawAnswers: unknown;
+  /** The submission's real timestamp (same instant the invitation flips to
+   *  SUBMITTED). NOT a placeholder new Date(). */
+  submittedAt: Date;
 }
 
 /**
@@ -108,7 +114,15 @@ interface EnqueueArgs {
  */
 async function enqueueWaveDEmails(
   tx: OutboxTx,
-  { submissionId, campaign, respondent, respondentId, scoreResult }: EnqueueArgs
+  {
+    submissionId,
+    campaign,
+    respondent,
+    respondentId,
+    scoreResult,
+    rawAnswers,
+    submittedAt,
+  }: EnqueueArgs
 ): Promise<void> {
   // Global kill switch — nothing is enqueued while sends are paused.
   if (assessmentSendsPaused()) return;
@@ -140,8 +154,9 @@ async function enqueueWaveDEmails(
         sections: campaign.version.sections,
         questions: campaign.version.questions,
         scoringConfig: campaign.version.scoringConfig,
-        submittedAt: new Date(),
-        submissionId: "",
+        rawAnswers,
+        submittedAt,
+        submissionId,
         referringCoachEmail: null,
       });
       const { bodyHtml: reportHtml } = buildReportEmailHtml({
@@ -344,17 +359,22 @@ export async function POST(
         // 409 above guarantees exactly-once. Each enqueue is guarded so a render
         // failure for one email NEVER rolls back the submission — it is simply
         // skipped (the unique [submissionId, recipientRole] keeps it idempotent).
+        // Single instant shared by the report's submittedAt + the invitation's
+        // SUBMITTED stamp, so the emailed report date matches the DB row.
+        const submittedAt = new Date();
         await enqueueWaveDEmails(tx, {
           submissionId: submission.id,
           campaign: invitation.campaign,
           respondent: invitation.respondent,
           respondentId: invitation.respondentId,
           scoreResult,
+          rawAnswers,
+          submittedAt,
         });
 
         await tx.assessmentInvitation.update({
           where: { id: invitation.id },
-          data: { status: "SUBMITTED", submittedAt: new Date() },
+          data: { status: "SUBMITTED", submittedAt },
         });
 
         return {

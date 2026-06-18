@@ -79,6 +79,9 @@ export interface BuildRespondentReportArgs {
   sections: unknown;
   questions: unknown;
   scoringConfig: unknown;
+  /** The submitted answers (shape `{ stableKey, value }[]`) — the qualitative
+   *  (LVA/QSP) report renders these back to the respondent. */
+  rawAnswers: unknown;
   submittedAt: Date;
   submissionId: string;
   /** Optional: the coach who referred this taker. Wired into the CTA mailto link. */
@@ -142,7 +145,7 @@ export function buildRespondentReportFromSubmission(
     sections: args.sections,
     questionByKey,
     questionsByKey,
-    rawAnswers: [],
+    rawAnswers: args.rawAnswers,
     scoringConfig: args.scoringConfig,
     provenance: {
       submissionId: args.submissionId,

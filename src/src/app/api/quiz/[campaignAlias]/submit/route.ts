@@ -250,8 +250,13 @@ export async function POST(
       sections: version.sections,
       questions: allQuestions,
       scoringConfig: version.scoringConfig,
+      rawAnswers: data.answers, // the same answers persisted to submission.answers
       submittedAt: now,
-      submissionId: "", // provenance not rendered in the email body
+      // submissionId is only known after the submission is persisted (below).
+      // The email body does not render provenance for the scored public quiz,
+      // so the placeholder is benign here; the qualitative path only triggers
+      // on the INVITED route, where the real id IS threaded.
+      submissionId: "",
       referringCoachEmail: data.referringCoachEmail ?? null,
     });
 
