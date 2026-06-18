@@ -894,3 +894,344 @@
     break-inside: avoid;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   QUALITATIVE REPORT  (Wave E — LVA / QSP, per-respondent, NO team Mean)
+   Mirrors src/public/wireframes-phase2/wave-e-qualitative-report-mockup.html.
+   All rules scoped under `.su-public-brand .su-report` (ADR-0005).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Footer submitted-date span (shared footer twin) */
+.su-public-brand .su-report-submitted-date {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+/* ── Section shell ───────────────────────────────────────────────────────── */
+.su-public-brand .su-section {
+  padding: 36px 60px 30px;
+}
+.su-public-brand .su-section + .su-section {
+  border-top: 1px solid #f0eef5;
+}
+.su-public-brand .su-section-eyebrow {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #008bd2;
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+.su-public-brand .su-section-title {
+  font-weight: 800;
+  font-size: 26px;
+  color: #522583;
+  margin: 0 0 6px;
+  line-height: 1.12;
+}
+.su-public-brand .su-section-intro {
+  font-size: 14px;
+  color: #3a3346;
+  max-width: 72ch;
+  margin: 6px 0 22px;
+  line-height: 1.6;
+}
+
+/* ── Preface (text-only) ─────────────────────────────────────────────────── */
+.su-public-brand .su-preface .su-preface-body {
+  font-size: 15px;
+  color: #3a3346;
+  max-width: 64ch;
+  line-height: 1.7;
+}
+.su-public-brand .su-preface .su-preface-body p {
+  margin: 0 0 14px;
+}
+
+/* ── Metric table (numbers — ONE respondent column, NO Mean) ─────────────── */
+.su-public-brand .su-metric-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  max-width: 620px;
+}
+.su-public-brand .su-metric-table thead th {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  color: #6b6480;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0 14px 8px;
+  border-bottom: 2px solid #522583;
+  text-align: right;
+}
+.su-public-brand .su-metric-table thead th.lbl {
+  text-align: left;
+}
+.su-public-brand .su-metric-table tbody td {
+  padding: 11px 14px;
+  vertical-align: middle;
+}
+.su-public-brand .su-metric-table tbody tr {
+  background: #eef7fb;
+}
+.su-public-brand .su-metric-table tbody tr:nth-child(even) {
+  background: #e4f1f8;
+}
+.su-public-brand .su-metric-table .su-metric-label {
+  font-size: 14px;
+  color: #1a1322;
+  font-weight: 500;
+}
+.su-public-brand .su-metric-table .su-metric-val {
+  text-align: right;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: #522583;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  width: 130px;
+}
+
+/* ── Q&A rows (blue question heading + answer beneath) ───────────────────── */
+.su-public-brand .su-qa {
+  margin: 0 0 18px;
+}
+.su-public-brand .su-qa-q {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 18px;
+  color: #008bd2;
+  line-height: 1.25;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #cfe9f6;
+  margin: 0 0 9px;
+}
+/* Amber heading variant — flagged obstacle factors (Esperto orange) */
+.su-public-brand .su-qa.amber .su-qa-q {
+  color: #b87400;
+  border-bottom-color: #fbe6b8;
+}
+.su-public-brand .su-qa-a {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 18px;
+  align-items: baseline;
+  padding: 2px 0 4px;
+}
+.su-public-brand .su-qa-who {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1a1322;
+}
+.su-public-brand .su-qa-text {
+  font-size: 14px;
+  color: #2b2536;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Strengths matrix — 16-factor Weak/Average/Strong (respondent's pick) ── */
+.su-public-brand .su-matrix {
+  border: 1px solid #e4e4e4;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.su-public-brand .su-matrix-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  align-items: stretch;
+  border-bottom: 1px solid #f0eef5;
+}
+.su-public-brand .su-matrix-row:last-child {
+  border-bottom: 0;
+}
+.su-public-brand .su-matrix-head {
+  background: #522583;
+}
+.su-public-brand .su-matrix-head .su-matrix-cell {
+  color: #ffffff;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.su-public-brand .su-matrix-cell {
+  padding: 11px 16px;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+}
+.su-public-brand .su-matrix-cell.factor {
+  font-weight: 600;
+  color: #1a1322;
+}
+.su-public-brand .su-matrix-cell.rating {
+  justify-content: center;
+  color: #b8b2c4;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  border-left: 1px solid #f4f2f8;
+}
+.su-public-brand .su-matrix-row:nth-child(even of :not(.su-matrix-head)) {
+  background: #fbfafd;
+}
+.su-public-brand .su-matrix-cell.rating.picked {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.su-public-brand .su-matrix-cell.rating.picked.weak {
+  background: rgba(216, 35, 42, 0.1);
+  color: #b01b20;
+}
+.su-public-brand .su-matrix-cell.rating.picked.avg {
+  background: rgba(247, 166, 0, 0.16);
+  color: #8a5e00;
+}
+.su-public-brand .su-matrix-cell.rating.picked.strong {
+  background: rgba(149, 193, 31, 0.2);
+  color: #4a7a00;
+}
+
+/* ── Percent fill bar (rehire % — respondent's value, NO Mean bar) ───────── */
+.su-public-brand .su-barwrap {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 18px;
+  align-items: center;
+  margin-top: 6px;
+}
+.su-public-brand .su-bar-who {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1a1322;
+}
+.su-public-brand .su-bar-row {
+  position: relative;
+  padding-right: 56px;
+}
+.su-public-brand .su-bar-track {
+  position: relative;
+  height: 26px;
+  background: #eef0ea;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.su-public-brand .su-bar-fill {
+  height: 100%;
+  background: #95c11f;
+  border-radius: 6px;
+}
+.su-public-brand .su-bar-val {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 0;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: #4a7a00;
+}
+
+/* ── Statement ratings table (1–N — ONE column, NO Mean) ─────────────────── */
+.su-public-brand .su-stmt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  max-width: 660px;
+  margin-top: 18px;
+}
+.su-public-brand .su-stmt-table thead th {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  color: #6b6480;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0 14px 8px;
+  border-bottom: 2px solid #522583;
+  text-align: right;
+}
+.su-public-brand .su-stmt-table thead th.lbl {
+  text-align: left;
+}
+.su-public-brand .su-stmt-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e4e4e4;
+  vertical-align: middle;
+}
+.su-public-brand .su-stmt-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.su-public-brand .su-stmt-label {
+  color: #1a1322;
+  font-weight: 500;
+}
+.su-public-brand .su-stmt-rate {
+  text-align: right;
+  width: 96px;
+}
+.su-public-brand .su-stmt-rate span {
+  display: inline-block;
+  min-width: 44px;
+  text-align: center;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: #522583;
+  background: #f4f0fa;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Responsive (screen) ─────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .su-public-brand .su-section {
+    padding: 28px 24px;
+  }
+  .su-public-brand .su-qa-a,
+  .su-public-brand .su-barwrap {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .su-public-brand .su-matrix-row {
+    grid-template-columns: 1.2fr repeat(3, 1fr);
+  }
+  .su-public-brand .su-matrix-cell {
+    padding: 9px 8px;
+    font-size: 11.5px;
+  }
+}
+
+/* ── Print — paginate the qualitative blocks cleanly ─────────────────────── */
+@media print {
+  .su-public-brand .su-section,
+  .su-public-brand .su-qa,
+  .su-public-brand .su-barwrap,
+  .su-public-brand .su-matrix,
+  .su-public-brand .su-preface {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .su-public-brand .su-metric-table tr,
+  .su-public-brand .su-stmt-table tr,
+  .su-public-brand .su-matrix-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .su-public-brand .su-metric-table thead,
+  .su-public-brand .su-stmt-table thead {
+    display: table-header-group;
+  }
+}

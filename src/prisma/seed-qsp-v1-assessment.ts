@@ -203,7 +203,7 @@ export function buildQspV1Content(): QspV1Content {
       sortOrder: 1,
       type: "NUMBER",
       label:
-        "How would you rate the overall performance of the company in the quarter we are about to close (this quarter)? (1-10) (with 1 decimal)",
+        "How would you rate the overall performance of the company in the quarter we are about to close (this quarter)? (1-10)",
       sectionStableKey: "S2_rating",
       isRequired: true,
     },

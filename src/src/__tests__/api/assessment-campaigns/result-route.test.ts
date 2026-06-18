@@ -153,6 +153,12 @@ describe("GET /api/assessment-campaigns/[id]/respondents/[respondentId]/result",
           { minMetric: 33, maxMetric: 40, label: "Great", message: "Great" },
         ],
       },
+      questions: [
+        { stableKey: "q1_1", label: "How ready are you?", type: "ROCKEFELLER_CHECK" },
+        { stableKey: "q1_2", label: "Do you have a plan?", type: "ROCKEFELLER_CHECK" },
+        // duplicate stableKey — first-wins
+        { stableKey: "q1_1", label: "DUPLICATE — should be ignored", type: "ROCKEFELLER_CHECK" },
+      ],
     };
     (db.assessmentSubmission.findFirst as jest.Mock).mockResolvedValue({
       id: "sub-1",
@@ -171,6 +177,7 @@ describe("GET /api/assessment-campaigns/[id]/respondents/[respondentId]/result",
           id: "ver-1",
           sections: fakeVersion.sections,
           scoringConfig: fakeVersion.scoringConfig,
+          questions: fakeVersion.questions,
         },
       },
     });
@@ -187,5 +194,10 @@ describe("GET /api/assessment-campaigns/[id]/respondents/[respondentId]/result",
     expect(body.data.result).toEqual(fakeResult);
     expect(body.data.version.sections).toEqual(fakeVersion.sections);
     expect(body.data.version.scoringConfig).toEqual(fakeVersion.scoringConfig);
+    // #21 — the raw-data view needs question text, not just codes.
+    expect(body.data.questionByKey).toEqual({
+      q1_1: "How ready are you?",
+      q1_2: "Do you have a plan?",
+    });
   });
 });

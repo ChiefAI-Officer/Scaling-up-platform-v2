@@ -58,6 +58,8 @@ interface ResultPayload {
   submissionId: string;
   submittedAt: string;
   result: ScoreResult;
+  // #21 — stableKey → question text, so the inline view shows labels not codes.
+  questionByKey?: Record<string, string>;
   version: { sections: unknown; scoringConfig: unknown };
 }
 
@@ -1560,6 +1562,7 @@ export function CampaignDetail({
                           <AssessmentResultView
                             result={cached.result}
                             version={cached.version}
+                            questionByKey={cached.questionByKey}
                           />
                         </td>
                       </tr>

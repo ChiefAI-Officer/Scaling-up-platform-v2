@@ -120,7 +120,7 @@ export async function POST(
         templateId: true,
         versionId: true,
         deletedAt: true,
-        template: { select: { name: true } },
+        template: { select: { name: true, alias: true } },
       },
     });
     // SEC-M6: a soft-deleted campaign is invisible — treat as not-found.
@@ -219,6 +219,10 @@ export async function POST(
     // -----------------------------------------------------------------------
     const assessmentName =
       campaign.template?.name ?? "Scaling Up Quick Assessment";
+    // Template alias drives reportConfigFor (scored vs qualitative) in the email
+    // path. alias is a non-null column on AssessmentTemplate; empty-string
+    // fallback yields the scored default if the relation is somehow absent.
+    const templateAlias = campaign.template?.alias ?? "";
 
     // SU team address: prefer QUICK_ASSESSMENT_TEAM_EMAIL, fall back to
     // ESCALATION_EMAIL, then ADMIN_EMAIL. Empty string → no SU_TEAM row enqueued.
@@ -241,12 +245,18 @@ export async function POST(
       result,
       publicTaker: data.publicTaker,
       assessmentName,
+      templateAlias,
       campaignLabel: null, // campaignLabel is not rendered in the email body
       sections: version.sections,
       questions: allQuestions,
       scoringConfig: version.scoringConfig,
+      rawAnswers: data.answers, // the same answers persisted to submission.answers
       submittedAt: now,
-      submissionId: "", // provenance not rendered in the email body
+      // submissionId is only known after the submission is persisted (below).
+      // The email body does not render provenance for the scored public quiz,
+      // so the placeholder is benign here; the qualitative path only triggers
+      // on the INVITED route, where the real id IS threaded.
+      submissionId: "",
       referringCoachEmail: data.referringCoachEmail ?? null,
     });
 

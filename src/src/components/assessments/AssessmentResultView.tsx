@@ -48,6 +48,13 @@ export interface AssessmentResultViewProps {
     sections: VersionSection[] | unknown;
     scoringConfig: VersionScoringConfig | unknown;
   };
+  /**
+   * #21 — stableKey → question text map. When present, the per-question detail
+   * renders the human-readable label as the primary text and keeps the bare
+   * code as a small muted secondary. Falls back to the code when a key is
+   * missing.
+   */
+  questionByKey?: Record<string, string>;
 }
 
 // Defensive coercion. The version payload arrives as Prisma JSON (`unknown`).
@@ -111,6 +118,7 @@ function formatNumber(n: number): string {
 export function AssessmentResultView({
   result,
   version,
+  questionByKey,
 }: AssessmentResultViewProps) {
   const [expanded, setExpanded] = useState(false);
   const sections = asSections(version.sections);
@@ -259,15 +267,27 @@ export function AssessmentResultView({
             data-testid="per-question-detail"
           >
             <ul className="divide-y divide-border">
-              {result.perQuestion.map((q) => (
+              {result.perQuestion.map((q) => {
+                const label = questionByKey?.[q.stableKey];
+                return (
                 <li
                   key={q.stableKey}
-                  className="px-4 py-2 flex items-center justify-between text-sm"
+                  className="px-4 py-2 flex items-center justify-between gap-3 text-sm"
                 >
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {q.stableKey}
+                  <span className="min-w-0 flex flex-col">
+                    <span
+                      className="text-foreground"
+                      data-testid={`per-question-label-${q.stableKey}`}
+                    >
+                      {label ?? q.stableKey}
+                    </span>
+                    {label ? (
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {q.stableKey}
+                      </span>
+                    ) : null}
                   </span>
-                  <span className="flex items-center gap-3">
+                  <span className="flex items-center gap-3 shrink-0">
                     <span className="tabular-nums font-medium text-foreground">
                       {q.value}
                     </span>
@@ -284,7 +304,8 @@ export function AssessmentResultView({
                     )}
                   </span>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </div>
         )}

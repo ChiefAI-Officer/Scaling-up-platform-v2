@@ -91,6 +91,7 @@ export async function GET(
                 id: true,
                 sections: true,
                 scoringConfig: true,
+                questions: true,
               },
             },
           },
@@ -105,6 +106,28 @@ export async function GET(
       );
     }
 
+    // #21 — the inline "Raw Data" view showed question CODES (e.g. q1_1)
+    // instead of question text. Build a stableKey → label map so the view can
+    // render the human-readable question. Mirrors the first-wins dup-guard in
+    // lib/assessments/respondent-report.ts. version.questions is Prisma JSON
+    // (an array of { stableKey, label, type, … }) — guard for shape.
+    const rawQuestions: unknown[] = Array.isArray(
+      submission.campaign.version.questions
+    )
+      ? (submission.campaign.version.questions as unknown[])
+      : [];
+    const questionByKey: Record<string, string> = {};
+    for (const q of rawQuestions) {
+      if (!q || typeof q !== "object") continue;
+      const { stableKey, label } = q as Record<string, unknown>;
+      if (typeof stableKey !== "string" || typeof label !== "string") continue;
+      // First-wins on duplicate stableKey.
+      if (Object.prototype.hasOwnProperty.call(questionByKey, stableKey)) {
+        continue;
+      }
+      questionByKey[stableKey] = label;
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -112,6 +135,7 @@ export async function GET(
         submittedAt: submission.submittedAt,
         respondent: submission.respondent,
         result: submission.result,
+        questionByKey,
         version: {
           sections: submission.campaign.version.sections,
           scoringConfig: submission.campaign.version.scoringConfig,

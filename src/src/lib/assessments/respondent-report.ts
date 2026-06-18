@@ -19,6 +19,14 @@ import {
   asAccessDb,
 } from "@/lib/assessments/access-control";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import {
+  buildQuestionMetaByKey,
+  type QuestionMeta,
+} from "@/lib/assessments/question-meta";
+
+// Re-export so existing `import { QuestionMeta } from "respondent-report"`
+// consumers keep working after the shared builder extraction.
+export type { QuestionMeta } from "@/lib/assessments/question-meta";
 
 // ─── DB interface (narrow — accepts full PrismaClient or a tx) ────────────
 
@@ -61,6 +69,7 @@ interface RawSubmission {
     template: {
       id: string;
       name: string;
+      alias: string;
     };
     organization: {
       name: string;
@@ -70,14 +79,6 @@ interface RawSubmission {
 }
 
 // ─── Public output types ──────────────────────────────────────────────────
-
-export interface QuestionMeta {
-  type: string;
-  label: string;
-  sectionStableKey?: string;
-  min?: number;
-  max?: number;
-}
 
 export interface ReportProvenance {
   submissionId: string;
@@ -94,6 +95,13 @@ export interface RespondentReport {
   companyName: string;
   /** template.name — the instrument title (e.g. "Rockefeller Habits Checklist") */
   assessmentName: string;
+  /**
+   * template.alias — the stable instrument slug (e.g. "leadership-vision-alignment").
+   * Optional on the shared type because the public-quiz submit path
+   * (buildRespondentReportFromSubmission) constructs this shape without a
+   * template-alias in hand; the authorized loader always populates it.
+   */
+  templateAlias?: string;
   /** campaign.name — the coach's label; null when absent or empty */
   campaignLabel: string | null;
   submittedAt: Date;
@@ -131,25 +139,6 @@ export type RespondentReportOutcome =
   | { status: "not-found" };
 
 // ─── Guard helpers ────────────────────────────────────────────────────────
-
-interface RawScale {
-  min?: number;
-  max?: number;
-}
-
-interface RawQuestion {
-  stableKey: string;
-  label: string;
-  type?: string;
-  sectionStableKey?: string;
-  scale?: RawScale;
-}
-
-function isRawQuestion(v: unknown): v is RawQuestion {
-  if (!v || typeof v !== "object") return false;
-  const r = v as Record<string, unknown>;
-  return typeof r.stableKey === "string" && typeof r.label === "string";
-}
 
 function isScoreResult(value: unknown): value is ScoreResult {
   if (!value || typeof value !== "object") return false;
@@ -211,6 +200,7 @@ export async function getRespondentReport(
               select: {
                 id: true,
                 name: true,
+                alias: true,
               },
             },
             organization: {
@@ -234,39 +224,15 @@ export async function getRespondentReport(
       return { status: "not-found" } as const;
     }
 
-    // Build questionByKey / questionsByKey — first-wins on duplicate (H10)
-    const rawQuestions: unknown[] = Array.isArray(
+    // Build questionsByKey via the SHARED builder (type+label+section+scale+
+    // options, first-wins on duplicate — H10/C-M1/C-H1). questionByKey is the
+    // label-only projection kept for existing consumers.
+    const questionsByKey: Record<string, QuestionMeta> = buildQuestionMetaByKey(
       submission.campaign.version.questions,
-    )
-      ? (submission.campaign.version.questions as unknown[])
-      : [];
-
+    );
     const questionByKey: Record<string, string> = {};
-    const questionsByKey: Record<string, QuestionMeta> = {};
-    const seenKeys = new Set<string>();
-
-    for (const q of rawQuestions) {
-      if (!isRawQuestion(q)) continue;
-      if (seenKeys.has(q.stableKey)) {
-        console.warn(
-          `[respondent-report] duplicate stableKey "${q.stableKey}" in version.questions — keeping first occurrence`,
-        );
-        continue;
-      }
-      seenKeys.add(q.stableKey);
-      questionByKey[q.stableKey] = q.label;
-      const meta: QuestionMeta = {
-        type: typeof q.type === "string" ? q.type : "UNKNOWN",
-        label: q.label,
-      };
-      if (typeof q.sectionStableKey === "string") {
-        meta.sectionStableKey = q.sectionStableKey;
-      }
-      if (q.scale && typeof q.scale === "object") {
-        if (typeof q.scale.min === "number") meta.min = q.scale.min;
-        if (typeof q.scale.max === "number") meta.max = q.scale.max;
-      }
-      questionsByKey[q.stableKey] = meta;
+    for (const [key, meta] of Object.entries(questionsByKey)) {
+      questionByKey[key] = meta.label;
     }
 
     // Guard the frozen result — degraded if it doesn't look like ScoreResult (H10)
@@ -285,6 +251,7 @@ export async function getRespondentReport(
       jobTitle: submission.respondent.jobTitle ?? null,
       companyName: submission.campaign.organization.name,
       assessmentName,
+      templateAlias: submission.campaign.template.alias,
       campaignLabel,
       submittedAt: submission.submittedAt,
       result,
