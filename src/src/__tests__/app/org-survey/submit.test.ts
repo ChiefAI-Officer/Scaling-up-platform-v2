@@ -324,6 +324,76 @@ describe("POST submit — strict v6.6 validation", () => {
     expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
   });
 
+  // I1: the GENUINE under-lock race — Phase 1 (lock-free read) sees VIEWED and
+  // PASSES the fast-fail gate, so the request proceeds past the early 409 and
+  // into the tx; only the Phase-2 SELECT … FOR UPDATE re-read sees SUBMITTED
+  // (a concurrent submit landed between the two reads). The 409 here therefore
+  // comes from the under-lock conflict branch, NOT the Phase-1 early return.
+  it("409 from the UNDER-LOCK re-read (Phase 1 VIEWED, Phase 2 SUBMITTED) — no submission, no outbox", async () => {
+    // Phase 1 (lock-free, full include) sees VIEWED → passes gating, opens tx.
+    const phase1Invitation = {
+      id: "inv-1",
+      status: "VIEWED",
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      respondentId: "r1",
+      campaignId: "c1",
+      respondent: {
+        email: "respondent@example.com",
+        firstName: "Resp",
+        lastName: "Ondent",
+      },
+      campaign: {
+        id: "c1",
+        alias: "demo",
+        deletedAt: null,
+        status: "ACTIVE",
+        accessMode: "INVITED",
+        openAt: new Date(Date.now() - 1000),
+        closeAt: null,
+        sendResultsToRespondent: true,
+        notifyCoachOnCompletion: true,
+        createdByCoachId: "coach-1",
+        creatorCoach: { email: "coach@example.com" },
+        version: {
+          id: "v1",
+          questions: goodVersion.questions,
+          sections: goodVersion.sections,
+          scoringConfig: goodVersion.scoringConfig,
+        },
+        template: {
+          name: "Rockefeller Habits Checklist",
+          resultsEmailSubject: "Your results",
+          resultsEmailBodyMarkdown: "Here are your results.",
+          resultsEmailContentApproved: true,
+          resultsEmailContentApprovedHash: "hash",
+        },
+      },
+    };
+    dbMock.assessmentInvitation.findUnique.mockResolvedValue(phase1Invitation);
+
+    // Phase 2 (the SELECT … FOR UPDATE re-read) sees the SAME invitation, but a
+    // concurrent submit already flipped it to SUBMITTED under the lock.
+    txMock.assessmentInvitation.findUnique.mockResolvedValue({
+      ...phase1Invitation,
+      status: "SUBMITTED",
+    });
+
+    const res = await POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo")
+    );
+
+    expect(res.status).toBe(409);
+    // The conflict was caught under the lock — no submission row was created…
+    expect(txMock.assessmentSubmission.create).not.toHaveBeenCalled();
+    // …and no outbox rows were inserted (the INSERT loop runs only after create).
+    expect(txMock.assessmentEmailOutbox.create).not.toHaveBeenCalled();
+    // Prove this exercised the locked path, NOT the Phase-1 early return: the tx
+    // opened and the under-lock re-read actually ran.
+    expect(txMock.assessmentInvitation.findUnique).toHaveBeenCalledTimes(1);
+  });
+
   it("401 when no session", async () => {
     sessionState.invitationId = undefined as unknown as string;
     sessionState.campaignAlias = undefined as unknown as string;

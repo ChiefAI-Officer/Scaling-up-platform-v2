@@ -494,7 +494,14 @@ function buildQualitativeReportEmail({
   escFirst: string;
   escDate: string;
 }): ReportEmail {
-  const escTitle = escapeHtml(report.assessmentName);
+  // M2: guard a non-string assessmentName so escaping the title can never throw
+  // out of buildReportEmailHtml (the "never throws" contract). escTitle is used
+  // by the shell, which is built on BOTH the success and catch paths below.
+  const escTitle = escapeHtml(
+    typeof report.assessmentName === "string"
+      ? report.assessmentName
+      : "Assessment",
+  );
 
   const shell = (inner: string): string => `<!DOCTYPE html>
 <html lang="en">

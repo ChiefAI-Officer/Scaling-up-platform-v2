@@ -160,10 +160,20 @@ function buildWaveDOutboxRows({
         submissionId: "", // not interpolated into the body; FK set at INSERT
         referringCoachEmail: null,
       });
-      const { bodyHtml: reportHtml } = buildReportEmailHtml({
+      const { bodyHtml: reportHtml, renderError } = buildReportEmailHtml({
         report,
         recipientRole: "TAKER_COPY",
       });
+      // M4: buildReportEmailHtml never throws — on a qualitative body-render
+      // failure it degrades to a safe body + a renderError signal. Surface it
+      // (the submission still succeeds) so the fallback is diagnosable.
+      // TODO(wave-e T13): emit assessment.report.render.failure metric
+      if (renderError) {
+        console.error(
+          `[assessment-submit] #15 report render fell back (campaignId=${campaign.id} template=${template.alias} recipientRole=RESPONDENT):`,
+          renderError
+        );
+      }
       const bodyHtml = buildResultsEmailHtml({
         bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
         reportHtml,
