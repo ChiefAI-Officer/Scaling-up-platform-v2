@@ -191,4 +191,34 @@ describe("QualitativeReport — content", () => {
     const { container } = render(<QualitativeReport report={lvaReport()} />);
     expect(container.textContent).not.toMatch(/Mean/i);
   });
+
+  // ── C-H1 — MULTI_CHOICE stored KEYS render as option LABELS ───────────────
+  it("renders MULTI_CHOICE answers as option labels, not the stored keys", () => {
+    const report = baseReport({
+      sections: [{ stableKey: "S4_obstacles", name: "Biggest Obstacles" }],
+      questionsByKey: {
+        S4_biggest_obstacles: {
+          type: "MULTI_CHOICE",
+          label: "Pick the three biggest obstacles",
+          sectionStableKey: "S4_obstacles",
+          options: [
+            { key: "the_leadership", label: "The Leadership" },
+            { key: "culture", label: "Culture" },
+            { key: "strategy", label: "Strategy" },
+          ],
+        },
+      },
+      // The stored value is the option KEYS (as persisted by scoring.ts).
+      rawAnswers: [
+        { stableKey: "S4_biggest_obstacles", value: ["the_leadership", "culture", "strategy"] },
+      ],
+    });
+    render(<QualitativeReport report={report} />);
+    const section = screen.getByTestId("qual-section-S4_obstacles");
+    expect(section.textContent).toContain("The Leadership");
+    expect(section.textContent).toContain("Culture");
+    expect(section.textContent).toContain("Strategy");
+    // The raw keys must not leak into the rendered output.
+    expect(section.textContent).not.toContain("the_leadership");
+  });
 });

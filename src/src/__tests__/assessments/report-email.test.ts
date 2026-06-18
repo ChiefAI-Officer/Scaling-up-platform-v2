@@ -412,6 +412,48 @@ describe("buildRespondentReportFromSubmission — templateAlias", () => {
     expect(report.submittedAt).toEqual(new Date("2026-05-01T00:00:00Z"));
     expect(report.provenance.submissionId).toBe("sub_1");
   });
+
+  // ── C-M1 — questionsByKey now carries scale (min/max) AND options ──────────
+  it("carries scale min/max from a rating question onto questionsByKey (so email ratings render)", () => {
+    const report = buildRespondentReportFromSubmission(
+      submissionArgs({
+        questions: [
+          {
+            stableKey: "S3_sales",
+            label: "Sales",
+            type: "SLIDER_LIKERT",
+            sectionStableKey: "S3_strengths",
+            scale: { min: 1, max: 3 },
+          },
+        ],
+      }),
+    );
+    expect(report.questionsByKey["S3_sales"].min).toBe(1);
+    expect(report.questionsByKey["S3_sales"].max).toBe(3);
+  });
+
+  it("carries MULTI_CHOICE {key,label} options onto questionsByKey (so email resolves labels)", () => {
+    const report = buildRespondentReportFromSubmission(
+      submissionArgs({
+        questions: [
+          {
+            stableKey: "S4_biggest_obstacles",
+            label: "Pick the biggest obstacles",
+            type: "MULTI_CHOICE",
+            sectionStableKey: "S4_obstacles",
+            options: [
+              { key: "the_leadership", label: "The Leadership" },
+              { key: "culture", label: "Culture" },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(report.questionsByKey["S4_biggest_obstacles"].options).toEqual([
+      { key: "the_leadership", label: "The Leadership" },
+      { key: "culture", label: "Culture" },
+    ]);
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════════

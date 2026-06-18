@@ -130,6 +130,38 @@ describe("buildReportEmailHtml — qualitative dispatch", () => {
     expect(bodyHtml).toContain("Sales pipeline");
     expect(bodyHtml).toContain("Cash flow");
   });
+
+  // ── C-H1 — MULTI_CHOICE stored KEYS render as option LABELS ───────────────
+  it("renders MULTI_CHOICE answers as option LABELS, not the stored keys", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: qualReport({
+        templateAlias: "leadership-vision-alignment",
+        sections: [{ stableKey: "S4_obstacles", name: "Biggest Obstacles" }],
+        questionsByKey: {
+          S4_biggest_obstacles: {
+            type: "MULTI_CHOICE",
+            label: "Pick the three biggest obstacles",
+            sectionStableKey: "S4_obstacles",
+            options: [
+              { key: "the_leadership", label: "The Leadership" },
+              { key: "culture", label: "Culture" },
+              { key: "strategy", label: "Strategy" },
+            ],
+          },
+        },
+        // The stored value is the option KEYS (as persisted by scoring.ts).
+        rawAnswers: [
+          { stableKey: "S4_biggest_obstacles", value: ["the_leadership", "culture", "strategy"] },
+        ],
+      }),
+      recipientRole: "TAKER_COPY",
+    });
+    expect(bodyHtml).toContain("The Leadership");
+    expect(bodyHtml).toContain("Culture");
+    expect(bodyHtml).toContain("Strategy");
+    // The raw keys must NOT leak into the rendered body.
+    expect(bodyHtml).not.toContain("the_leadership");
+  });
 });
 
 // ── R2-H3 — escape everything respondent-controlled ──────────────────────────

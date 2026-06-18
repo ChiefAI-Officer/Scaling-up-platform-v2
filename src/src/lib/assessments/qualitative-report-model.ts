@@ -57,6 +57,14 @@ export interface QualItem {
   /** Scale bounds — populated for SLIDER_LIKERT ratings only. */
   min?: number;
   max?: number;
+  /**
+   * Display-ready values for MULTI_CHOICE items: each stored option KEY
+   * resolved to its human LABEL via the question's `options` (fallback to the
+   * raw key when no match). Renderers display these instead of `value` so
+   * stored keys (`the_leadership`) never leak (co-validate C-H1). Present only
+   * for MULTI_CHOICE.
+   */
+  displayValues?: string[];
 }
 
 export interface QualSection {
@@ -77,6 +85,9 @@ export interface QMeta {
   sectionStableKey?: string;
   min?: number;
   max?: number;
+  /** MULTI_CHOICE option list ({key,label}) — used to resolve stored keys to
+   *  labels for display (C-H1). */
+  options?: Array<{ key: string; label: string }>;
 }
 
 export interface BuildQualitativeModelInput {
@@ -282,6 +293,20 @@ export function buildQualitativeModel(
       };
       if (typeof meta.min === "number") item.min = meta.min;
       if (typeof meta.max === "number") item.max = meta.max;
+
+      // C-H1: resolve MULTI_CHOICE stored option KEYS → human LABELS so the
+      // renderers never display raw keys. Fallback to the raw key when an
+      // option has no matching label (or the question carries no options).
+      if (meta.type === "MULTI_CHOICE" && Array.isArray(value)) {
+        const labelByOptionKey = new Map<string, string>(
+          (meta.options ?? []).map((o) => [o.key, o.label]),
+        );
+        item.displayValues = (value as unknown[]).map((v) => {
+          const k = String(v);
+          return labelByOptionKey.get(k) ?? k;
+        });
+      }
+
       items.push(item);
     }
 

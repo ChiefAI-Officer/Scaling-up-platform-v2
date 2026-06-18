@@ -62,6 +62,17 @@ function answerText(value: unknown): string {
   return String(value);
 }
 
+/**
+ * Display text for an item. Prefers the model's resolved `displayValues`
+ * (MULTI_CHOICE option labels) so stored keys never reach the screen (C-H1);
+ * falls back to the raw value for every other type. Renderers stay dumb — the
+ * key→label resolution happens in buildQualitativeModel, not here.
+ */
+function itemText(item: QualItem): string {
+  if (item.displayValues) return item.displayValues.join(", ");
+  return answerText(item.value);
+}
+
 /** Who answered — "{name} ({role})" when a role is known, else just the name. */
 function attribution(name: string, role: string | null): string {
   return role && role.trim() !== "" ? `${name} (${role})` : name;
@@ -96,7 +107,7 @@ function MetricTable({ who, items }: { who: string; items: QualItem[] }) {
         {items.map((item) => (
           <tr key={item.stableKey} data-testid={`qual-item-${item.stableKey}`}>
             <td className="su-metric-label">{item.label}</td>
-            <td className="su-metric-val">{answerText(item.value)}</td>
+            <td className="su-metric-val">{itemText(item)}</td>
           </tr>
         ))}
       </tbody>
@@ -146,7 +157,7 @@ function QaRow({
       <p className="su-qa-q">{item.label}</p>
       <div className="su-qa-a">
         <span className="su-qa-who">{who}</span>
-        <div className="su-qa-text">{answerText(item.value)}</div>
+        <div className="su-qa-text">{itemText(item)}</div>
       </div>
     </div>
   );
@@ -220,7 +231,7 @@ function RatingBlock({ who, items }: { who: string; items: QualItem[] }) {
               >
                 <td className="su-stmt-label">{item.label}</td>
                 <td className="su-stmt-rate">
-                  <span>{answerText(item.value)}</span>
+                  <span>{itemText(item)}</span>
                 </td>
               </tr>
             ))}

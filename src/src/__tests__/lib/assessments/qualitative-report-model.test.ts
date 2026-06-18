@@ -338,4 +338,87 @@ describe("buildQualitativeModel", () => {
       rawAnswers: "garbage",
     }).sections).toEqual([]);
   });
+
+  // ── C-H1: MULTI_CHOICE keys resolve to option labels ─────────────────────
+  describe("MULTI_CHOICE label resolution (C-H1)", () => {
+    it("resolves stored option KEYS to their human labels via question.options", () => {
+      const model = buildQualitativeModel({
+        templateAlias: "leadership-vision-alignment",
+        sections: [{ stableKey: "S4_obstacles", name: "Biggest Obstacles" }],
+        questionsByKey: {
+          S4_biggest_obstacles: {
+            type: "MULTI_CHOICE",
+            label: "Pick the biggest obstacles",
+            sectionStableKey: "S4_obstacles",
+            options: [
+              { key: "the_leadership", label: "The Leadership" },
+              { key: "culture", label: "Culture" },
+              { key: "strategy", label: "Strategy" },
+            ],
+          },
+        },
+        // The stored value is the option KEYS (NOT labels).
+        rawAnswers: [
+          { stableKey: "S4_biggest_obstacles", value: ["the_leadership", "culture", "strategy"] },
+        ],
+      });
+
+      const item = model.sections[0].items[0];
+      // The display-ready values are the LABELS, not the raw keys.
+      expect(item.displayValues).toEqual(["The Leadership", "Culture", "Strategy"]);
+      // The raw keys must not be exposed as the display value.
+      expect(item.displayValues).not.toContain("the_leadership");
+      expect(item.displayValues).not.toContain("culture");
+    });
+
+    it("falls back to the raw key string when an option key has no matching label", () => {
+      const model = buildQualitativeModel({
+        templateAlias: "leadership-vision-alignment",
+        sections: [{ stableKey: "S4_obstacles", name: "Obstacles" }],
+        questionsByKey: {
+          obs: {
+            type: "MULTI_CHOICE",
+            label: "Pick obstacles",
+            sectionStableKey: "S4_obstacles",
+            options: [{ key: "culture", label: "Culture" }],
+          },
+        },
+        rawAnswers: [{ stableKey: "obs", value: ["culture", "mystery_key"] }],
+      });
+
+      const item = model.sections[0].items[0];
+      expect(item.displayValues).toEqual(["Culture", "mystery_key"]);
+    });
+
+    it("falls back to the raw keys when the question carries no options", () => {
+      const model = buildQualitativeModel({
+        templateAlias: "leadership-vision-alignment",
+        sections: [{ stableKey: "S4_obstacles", name: "Obstacles" }],
+        questionsByKey: {
+          obs: {
+            type: "MULTI_CHOICE",
+            label: "Pick obstacles",
+            sectionStableKey: "S4_obstacles",
+          },
+        },
+        rawAnswers: [{ stableKey: "obs", value: ["sales", "cash"] }],
+      });
+
+      const item = model.sections[0].items[0];
+      expect(item.displayValues).toEqual(["sales", "cash"]);
+    });
+
+    it("does not set displayValues on non-MULTI_CHOICE items", () => {
+      const model = buildQualitativeModel({
+        templateAlias: "leadership-vision-alignment",
+        sections: [{ stableKey: "S2_vision", name: "Vision" }],
+        questionsByKey: {
+          v1: { type: "TEXT", label: "Products", sectionStableKey: "S2_vision" },
+        },
+        rawAnswers: [{ stableKey: "v1", value: "SaaS" }],
+      });
+
+      expect(model.sections[0].items[0].displayValues).toBeUndefined();
+    });
+  });
 });

@@ -50,6 +50,7 @@ import {
   type QualItem,
   type QualSection,
 } from "@/lib/assessments/qualitative-report-model";
+import { buildQuestionMetaByKey } from "@/lib/assessments/question-meta";
 
 export type ReportEmailRecipientRole = "TAKER_COPY" | "REFERRING_COACH";
 
@@ -121,47 +122,23 @@ export interface BuildRespondentReportArgs {
   referringCoachEmail?: string | null;
 }
 
-interface RawReportQuestion {
-  stableKey: string;
-  label: string;
-  type?: string;
-  sectionStableKey?: string;
-}
-
-function isRawReportQuestion(v: unknown): v is RawReportQuestion {
-  if (!v || typeof v !== "object") return false;
-  const r = v as Record<string, unknown>;
-  return typeof r.stableKey === "string" && typeof r.label === "string";
-}
-
 /**
  * Builds a RespondentReport from the data the public-quiz submit route already
  * has in hand — no DB round-trip. Pure. The result is shared by both report
  * emails (TAKER_COPY + REFERRING_COACH) so they are byte-identical.
+ *
+ * questionsByKey is built via the SHARED `buildQuestionMetaByKey` so the email
+ * twin carries the SAME type+label+section+scale+options metadata as the
+ * on-screen loader (C-M1) — including MULTI_CHOICE {key,label} options so keys
+ * resolve to labels (C-H1).
  */
 export function buildRespondentReportFromSubmission(
   args: BuildRespondentReportArgs,
 ): RespondentReport {
-  const rawQuestions: unknown[] = Array.isArray(args.questions)
-    ? args.questions
-    : [];
-
+  const questionsByKey = buildQuestionMetaByKey(args.questions);
   const questionByKey: Record<string, string> = {};
-  const questionsByKey: Record<string, { type: string; label: string; sectionStableKey?: string }> = {};
-  const seen = new Set<string>();
-  for (const q of rawQuestions) {
-    if (!isRawReportQuestion(q)) continue;
-    if (seen.has(q.stableKey)) continue; // first-wins on duplicate
-    seen.add(q.stableKey);
-    questionByKey[q.stableKey] = q.label;
-    const meta: { type: string; label: string; sectionStableKey?: string } = {
-      type: typeof q.type === "string" ? q.type : "UNKNOWN",
-      label: q.label,
-    };
-    if (typeof q.sectionStableKey === "string") {
-      meta.sectionStableKey = q.sectionStableKey;
-    }
-    questionsByKey[q.stableKey] = meta;
+  for (const [key, meta] of Object.entries(questionsByKey)) {
+    questionByKey[key] = meta.label;
   }
 
   const name = `${args.publicTaker.firstName.trim()} ${args.publicTaker.lastName.trim()}`.trim();
@@ -314,6 +291,15 @@ function qualAnswerText(value: unknown): string {
   return "";
 }
 
+/** Display text for an item. Prefers the model's resolved `displayValues`
+ *  (MULTI_CHOICE option labels) so stored keys never reach the email (C-H1);
+ *  falls back to the raw value otherwise. The model does the key→label
+ *  resolution; this renderer stays dumb (joins + escapes only). */
+function qualItemText(item: QualItem): string {
+  if (item.displayValues) return item.displayValues.join(", ");
+  return qualAnswerText(item.value);
+}
+
 /** Clamp a numeric percent into an integer in [0,100] for a style width. NEVER
  *  interpolate a raw answer into a style/attribute. */
 function clampPercent(value: unknown): number {
@@ -376,9 +362,10 @@ function renderQualItem(item: QualItem): string {
   }
 
   // TEXT / MULTI_CHOICE / everything else → blue question heading + answer text.
-  // MULTI_CHOICE values are an array of option labels (each escaped by
-  // qualAnswerText → escapeHtml). Free-text is RAW-capped before escaping.
-  const rawText = qualAnswerText(item.value);
+  // MULTI_CHOICE renders resolved option LABELS (via item.displayValues, set by
+  // the model — C-H1), each escaped by escapeHtml. Free-text is RAW-capped
+  // before escaping.
+  const rawText = qualItemText(item);
   const escAnswer = escapeHtml(capRawAnswer(rawText));
   return `
   <tr>
