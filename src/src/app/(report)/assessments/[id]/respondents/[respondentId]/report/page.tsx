@@ -32,6 +32,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import { getRespondentReport } from "@/lib/assessments/respondent-report";
+import { reportConfigFor } from "@/lib/assessments/report-config";
 import { logAudit, type AuditAction } from "@/lib/audit";
 import { checkRateLimitAsync, RateLimits } from "@/lib/rate-limit";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
@@ -108,12 +109,24 @@ export default async function RespondentReportPage({ params }: PageProps) {
   // (entityType / action / entityId / performedBy). "VIEW_REPORT" is a
   // free-form action string (AuditLog.action is String — no migration); the
   // cast keeps the helper's typed union honest without touching lib/audit.ts.
+  //
+  // R2-L8 — #25 removed the visible footer provenance stamp, so the
+  // traceability moves into the audit entry: record templateAlias, versionId,
+  // contentHash, and the resolved reportType (scored | qualitative) so we can
+  // always reconstruct which renderer produced what was shown. JSON-only —
+  // no schema change (changes is the existing AuditLog JSON/text column).
   await logAudit({
     entityType: "AssessmentSubmission",
     action: "VIEW_REPORT" as AuditAction,
     entityId: report.provenance.submissionId,
     performedBy: actor.email,
-    changes: { kind: "respondent-report" },
+    changes: {
+      kind: "respondent-report",
+      templateAlias: report.templateAlias ?? null,
+      reportType: reportConfigFor(report.templateAlias).reportType,
+      versionId: report.provenance.versionId,
+      contentHash: report.provenance.contentHash,
+    },
   });
 
   // H16 — structured ops marker for observability.

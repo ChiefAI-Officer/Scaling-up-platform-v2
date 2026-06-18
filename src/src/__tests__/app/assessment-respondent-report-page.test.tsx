@@ -108,6 +108,7 @@ function okReport() {
       jobTitle: "CEO",
       companyName: "Acme Corp",
       assessmentName: "Rockefeller Habits Checklist",
+      templateAlias: "RockHabits",
       campaignLabel: "Q1 Pulse",
       submittedAt: new Date("2026-01-15T00:00:00Z"),
       result: { perSection: [], perQuestion: [] },
@@ -164,6 +165,30 @@ describe("(report) respondent report page", () => {
         entityType: "AssessmentSubmission",
         action: "VIEW_REPORT",
         entityId: "sub-99",
+      }),
+    );
+  });
+
+  it("records report provenance (templateAlias + reportType + versionId + contentHash) in the VIEW_REPORT audit changes (R2-L8)", async () => {
+    // #25 removed the visible footer provenance stamp; the traceability moves
+    // into the VIEW_REPORT audit entry so we can always reconstruct which
+    // renderer (scored vs qualitative) produced what was shown.
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetRespondentReport.mockResolvedValue(okReport());
+
+    await Page(makeProps());
+
+    expect(mockLogAudit).toHaveBeenCalledTimes(1);
+    const auditArg = mockLogAudit.mock.calls[0][0] as {
+      changes?: Record<string, unknown>;
+    };
+    expect(auditArg.changes).toEqual(
+      expect.objectContaining({
+        templateAlias: "RockHabits",
+        // RockHabits is a scored template (reportConfigFor resolves it)
+        reportType: "scored",
+        versionId: "ver-1",
+        contentHash: "abc12345",
       }),
     );
   });

@@ -36,6 +36,7 @@ import {
   assessmentSendsPaused,
 } from "@/lib/assessments/wave-d-feature-flags";
 import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
+import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
   buildRespondentReportFromSubmission,
   buildReportEmailHtml,
@@ -167,12 +168,23 @@ function buildWaveDOutboxRows({
       // M4: buildReportEmailHtml never throws — on a qualitative body-render
       // failure it degrades to a safe body + a renderError signal. Surface it
       // (the submission still succeeds) so the fallback is diagnosable.
-      // TODO(wave-e T13): emit assessment.report.render.failure metric
+      //
+      // R3-M1 / T11-M4: the assessment /admin/observability dashboard (spec-06)
+      // is v1 DB-derived with NO metric counter backend, so there is no
+      // lightweight counter to increment. Emit a STRUCTURED, greppable
+      // render-failure log instead — labeled by templateAlias / reportType /
+      // recipientRole / emailType — which is the v1 alert source (a dashboard
+      // panel is a tracked follow-up; see 17e-ops-runbook §Observability).
       if (renderError) {
-        console.error(
-          `[assessment-submit] #15 report render fell back (campaignId=${campaign.id} template=${template.alias} recipientRole=RESPONDENT):`,
-          renderError
-        );
+        console.error("[assessment-report] render-failure", {
+          templateAlias: template.alias,
+          reportType: reportConfigFor(template.alias).reportType,
+          renderPath: "email",
+          recipientRole: "RESPONDENT",
+          emailType: "ASSESSMENT_RESULTS",
+          campaignId: campaign.id,
+          error: renderError,
+        });
       }
       const bodyHtml = buildResultsEmailHtml({
         bodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
@@ -534,6 +546,18 @@ export async function POST(
                 subject: row.subject,
                 bodyHtml: row.bodyHtml,
               },
+            });
+            // R2-L8: the outbox row has no metadata column (no migration), so
+            // record which renderer produced the (frozen) bodyHtml as a
+            // structured log line — keeps send-side provenance after #25
+            // removed the visible footer stamp. No PII (no answer text).
+            const alias = locked.campaign.template?.alias ?? null;
+            console.info("[assessment-report] enqueued", {
+              templateAlias: alias,
+              reportType: reportConfigFor(alias).reportType,
+              emailType: row.emailType,
+              recipientRole: row.recipientRole,
+              versionId: locked.campaign.version?.id ?? null,
             });
           } catch (err) {
             console.error(
