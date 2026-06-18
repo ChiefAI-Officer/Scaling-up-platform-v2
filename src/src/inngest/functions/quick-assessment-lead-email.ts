@@ -69,6 +69,7 @@ export async function drainLeadOutbox(
   const now = deps.now ? deps.now() : new Date();
   const maxAttempts = deps.maxAttempts ?? 5;
 
+  // TODO(wave-e follow-up): the drain does not re-check results-email approval at SEND time; an approval revoked AFTER enqueue but before drain still sends. Broader Wave-D outbox concern (see co-validate C-M2 / R2-H2).
   const rows = await deps.db.assessmentEmailOutbox.findMany({
     where: {
       submissionId,

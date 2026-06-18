@@ -221,6 +221,51 @@ function buildWaveDOutboxRows({
   return rows;
 }
 
+/**
+ * C-M2: the render-input fingerprint for the prepared Wave-D email rows. The
+ * #15 results row depends on the respondent toggle + the template's results-
+ * email approval hash + alias + the pinned version id; the #16 coach-notify row
+ * depends on the coach toggle + the owning-coach identity. Captured in Phase 1
+ * (lock-free) and re-derived UNDER the lock in Phase 2 — a field change between
+ * the two means the corresponding prepared row is stale and must be dropped.
+ *
+ * Compared by string-equality (#15 / #16 keys), so the exact field list is the
+ * load-bearing contract: extend BOTH this builder and the Phase-2 locked select
+ * together, or the compare silently stops covering the new input.
+ */
+interface EmailRenderFingerprint {
+  /** Drives the #15 ASSESSMENT_RESULTS row render/gate. */
+  results: string;
+  /** Drives the #16 COACH_COMPLETION row render/gate. */
+  coach: string;
+}
+
+function emailRenderFingerprint(campaign: {
+  sendResultsToRespondent: boolean;
+  notifyCoachOnCompletion: boolean;
+  createdByCoachId: string | null;
+  creatorCoach: { email: string } | null;
+  version: { id: string };
+  template: {
+    alias: string;
+    resultsEmailContentApprovedHash: string | null;
+  } | null;
+}): EmailRenderFingerprint {
+  return {
+    results: JSON.stringify([
+      campaign.sendResultsToRespondent,
+      campaign.template?.resultsEmailContentApprovedHash ?? null,
+      campaign.template?.alias ?? null,
+      campaign.version.id,
+    ]),
+    coach: JSON.stringify([
+      campaign.notifyCoachOnCompletion,
+      campaign.createdByCoachId,
+      campaign.creatorCoach?.email ?? null,
+    ]),
+  };
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ campaignAlias: string }> }
@@ -367,6 +412,14 @@ export async function POST(
         submittedAt,
       });
 
+      // C-M2: capture the render-input fingerprints these rows were prepared
+      // from (Phase-1, lock-free). Phase 2 re-reads the same fields UNDER the
+      // lock and drops any prepared row whose inputs changed during the
+      // Phase-1 → Phase-2 window (approval revoked/edited, toggle flipped, the
+      // pinned version swapped). The submission still commits — only the stale
+      // email row is skipped.
+      const phase1Fingerprint = emailRenderFingerprint(invitation.campaign);
+
       // ── Phase 2 (locked tx): re-validate → create submission → INSERT rows ─
       const result = await db.$transaction(async (tx) => {
         // SELECT FOR UPDATE on the invitation row — Postgres-level lock to
@@ -390,6 +443,19 @@ export async function POST(
                 status: true,
                 openAt: true,
                 closeAt: true,
+                // C-M2: the email render-input fields, re-read under the lock so
+                // the prepared #15/#16 rows can be re-validated before INSERT.
+                sendResultsToRespondent: true,
+                notifyCoachOnCompletion: true,
+                createdByCoachId: true,
+                creatorCoach: { select: { email: true } },
+                version: { select: { id: true } },
+                template: {
+                  select: {
+                    alias: true,
+                    resultsEmailContentApprovedHash: true,
+                  },
+                },
               },
             },
           },
@@ -424,13 +490,40 @@ export async function POST(
           select: { id: true },
         });
 
+        // ── C-M2: re-validate the email render inputs UNDER the lock. The
+        // prepared rows were rendered/decided from the Phase-1 (unlocked) read;
+        // if the results-email approval/content/toggle or the coach-notify
+        // toggle/identity changed in the Phase-1 → Phase-2 window, the matching
+        // prepared row is stale and must be DROPPED (never inserted). Mirrors
+        // the per-email skip-on-failure handling used in the INSERT loop below —
+        // the submission itself is unaffected.
+        const phase2Fingerprint = emailRenderFingerprint(locked.campaign);
+        const rowsToEnqueue = preparedRows.filter((row) => {
+          if (row.emailType === "ASSESSMENT_RESULTS") {
+            if (phase2Fingerprint.results !== phase1Fingerprint.results) {
+              console.warn(
+                `[assessment-submit] #15 results row dropped — render inputs changed under lock (campaignId=${locked.campaignId})`
+              );
+              return false;
+            }
+          } else if (row.emailType === "COACH_COMPLETION") {
+            if (phase2Fingerprint.coach !== phase1Fingerprint.coach) {
+              console.warn(
+                `[assessment-submit] #16 coach-notify row dropped — render inputs changed under lock (campaignId=${locked.campaignId})`
+              );
+              return false;
+            }
+          }
+          return true;
+        });
+
         // ── Wave D: INSERT the pre-rendered outbox rows IN-TX (transactional
         // outbox). The submission + its outbox rows commit atomically; the
         // double-submit 409 above guarantees exactly-once. Each INSERT is
         // guarded so a write failure for one email NEVER rolls back the
         // submission — it is simply skipped (the unique [submissionId,
         // recipientRole] keeps it idempotent on replay).
-        for (const row of preparedRows) {
+        for (const row of rowsToEnqueue) {
           try {
             await tx.assessmentEmailOutbox.create({
               data: {

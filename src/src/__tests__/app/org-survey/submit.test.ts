@@ -180,6 +180,7 @@ function mockHappyInvitation(
       },
       template: {
         name: "Rockefeller Habits Checklist",
+        alias: "rockefeller",
         resultsEmailSubject: "Your results",
         resultsEmailBodyMarkdown: "Here are your results.",
         resultsEmailContentApproved: true,
@@ -527,5 +528,211 @@ describe("Wave D — outbox enqueue", () => {
     // #15 skipped (render threw); #16 still enqueued.
     expect(enqueuedRoles()).not.toContain("RESPONDENT");
     expect(enqueuedRoles()).toContain("OWNING_COACH");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  co-validate C-M2 — re-validate email render inputs UNDER the submit lock  */
+/*                                                                            */
+/*  Phase 1 (lock-free) renders + decides the #15/#16 outbox rows from the    */
+/*  campaign/template state read there. If that state changes during the      */
+/*  Phase-1 → Phase-2 window (approval revoked, content edited, toggle        */
+/*  flipped), the locked tx must DROP the now-stale prepared row rather than  */
+/*  insert it. The submission itself still commits.                          */
+/* -------------------------------------------------------------------------- */
+describe("Wave D C-M2 — stale email render-input re-check under the lock", () => {
+  function submit() {
+    return POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo")
+    );
+  }
+  function enqueuedRoles(): string[] {
+    return txMock.assessmentEmailOutbox.create.mock.calls.map(
+      (c: Array<{ data: { recipientRole: string } }>) => c[0].data.recipientRole
+    );
+  }
+
+  it("SKIPS the #15 ASSESSMENT_RESULTS row when the approval hash changed between Phase 1 and Phase 2 (submission still 200)", async () => {
+    // Phase 1 sees the template approved with hash "hash-A" → #15 prepared.
+    mockHappyInvitation();
+    // Phase 2 (under lock) sees a DIFFERENT approval hash — content was edited /
+    // re-approved (or the approval was cleared) during the window.
+    const locked = {
+      id: "inv-1",
+      status: "VIEWED",
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      respondentId: "r1",
+      campaignId: "c1",
+      campaign: {
+        id: "c1",
+        alias: "demo",
+        deletedAt: null,
+        status: "ACTIVE",
+        accessMode: "INVITED",
+        openAt: new Date(Date.now() - 1000),
+        closeAt: null,
+        sendResultsToRespondent: true,
+        notifyCoachOnCompletion: true,
+        createdByCoachId: "coach-1",
+        creatorCoach: { email: "coach@example.com" },
+        version: { id: "v1" },
+        template: {
+          name: "Rockefeller Habits Checklist",
+          alias: "rockefeller",
+          resultsEmailSubject: "Your results",
+          resultsEmailBodyMarkdown: "Here are your results.",
+          resultsEmailContentApproved: true,
+          resultsEmailContentApprovedHash: "hash-B-changed",
+        },
+      },
+    };
+    txMock.assessmentInvitation.findUnique.mockResolvedValue(locked);
+
+    const res = await submit();
+    expect(res.status).toBe(200);
+    // Submission committed.
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledTimes(1);
+    // #15 dropped — its render inputs went stale under the lock…
+    expect(enqueuedRoles()).not.toContain("RESPONDENT");
+    // …but #16 is unaffected (its inputs did not change).
+    expect(enqueuedRoles()).toContain("OWNING_COACH");
+  });
+
+  it("SKIPS the #15 row when sendResultsToRespondent was turned OFF between Phase 1 and Phase 2", async () => {
+    mockHappyInvitation();
+    const locked = {
+      id: "inv-1",
+      status: "VIEWED",
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      respondentId: "r1",
+      campaignId: "c1",
+      campaign: {
+        id: "c1",
+        alias: "demo",
+        deletedAt: null,
+        status: "ACTIVE",
+        accessMode: "INVITED",
+        openAt: new Date(Date.now() - 1000),
+        closeAt: null,
+        sendResultsToRespondent: false, // toggled OFF during the window
+        notifyCoachOnCompletion: true,
+        createdByCoachId: "coach-1",
+        creatorCoach: { email: "coach@example.com" },
+        version: { id: "v1" },
+        template: {
+          name: "Rockefeller Habits Checklist",
+          alias: "rockefeller",
+          resultsEmailSubject: "Your results",
+          resultsEmailBodyMarkdown: "Here are your results.",
+          resultsEmailContentApproved: true,
+          resultsEmailContentApprovedHash: "hash",
+        },
+      },
+    };
+    txMock.assessmentInvitation.findUnique.mockResolvedValue(locked);
+
+    const res = await submit();
+    expect(res.status).toBe(200);
+    expect(enqueuedRoles()).not.toContain("RESPONDENT");
+    expect(enqueuedRoles()).toContain("OWNING_COACH");
+  });
+
+  it("SKIPS the #16 COACH_COMPLETION row when notifyCoachOnCompletion was turned OFF between Phase 1 and Phase 2", async () => {
+    mockHappyInvitation();
+    const locked = {
+      id: "inv-1",
+      status: "VIEWED",
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      respondentId: "r1",
+      campaignId: "c1",
+      campaign: {
+        id: "c1",
+        alias: "demo",
+        deletedAt: null,
+        status: "ACTIVE",
+        accessMode: "INVITED",
+        openAt: new Date(Date.now() - 1000),
+        closeAt: null,
+        sendResultsToRespondent: true,
+        notifyCoachOnCompletion: false, // toggled OFF during the window
+        createdByCoachId: "coach-1",
+        creatorCoach: { email: "coach@example.com" },
+        version: { id: "v1" },
+        template: {
+          name: "Rockefeller Habits Checklist",
+          alias: "rockefeller",
+          resultsEmailSubject: "Your results",
+          resultsEmailBodyMarkdown: "Here are your results.",
+          resultsEmailContentApproved: true,
+          resultsEmailContentApprovedHash: "hash",
+        },
+      },
+    };
+    txMock.assessmentInvitation.findUnique.mockResolvedValue(locked);
+
+    const res = await submit();
+    expect(res.status).toBe(200);
+    expect(enqueuedRoles()).not.toContain("OWNING_COACH");
+    // #15 unaffected.
+    expect(enqueuedRoles()).toContain("RESPONDENT");
+  });
+
+  it("INSERTS both rows when the Phase-1 and Phase-2 render-input fingerprints MATCH (unchanged)", async () => {
+    // mockHappyInvitation sets BOTH the Phase-1 (db) and Phase-2 (tx) reads to
+    // the SAME invitation object → fingerprints match → both rows inserted.
+    // (The Phase-2 object must therefore carry the same render-input fields the
+    // fingerprint compares: alias + approval hash + toggles + version id.)
+    const invitation = {
+      id: "inv-1",
+      status: "VIEWED",
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      respondentId: "r1",
+      campaignId: "c1",
+      respondent: {
+        email: "respondent@example.com",
+        firstName: "Resp",
+        lastName: "Ondent",
+      },
+      campaign: {
+        id: "c1",
+        alias: "demo",
+        deletedAt: null,
+        status: "ACTIVE",
+        accessMode: "INVITED",
+        openAt: new Date(Date.now() - 1000),
+        closeAt: null,
+        sendResultsToRespondent: true,
+        notifyCoachOnCompletion: true,
+        createdByCoachId: "coach-1",
+        creatorCoach: { email: "coach@example.com" },
+        version: {
+          id: "v1",
+          questions: goodVersion.questions,
+          sections: goodVersion.sections,
+          scoringConfig: goodVersion.scoringConfig,
+        },
+        template: {
+          name: "Rockefeller Habits Checklist",
+          alias: "rockefeller",
+          resultsEmailSubject: "Your results",
+          resultsEmailBodyMarkdown: "Here are your results.",
+          resultsEmailContentApproved: true,
+          resultsEmailContentApprovedHash: "hash",
+        },
+      },
+    };
+    dbMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
+    txMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
+
+    const res = await submit();
+    expect(res.status).toBe(200);
+    expect(enqueuedRoles()).toContain("RESPONDENT");
+    expect(enqueuedRoles()).toContain("OWNING_COACH");
+    expect(enqueuedRoles()).toHaveLength(2);
   });
 });
