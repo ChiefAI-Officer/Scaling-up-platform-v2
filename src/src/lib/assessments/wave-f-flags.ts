@@ -61,3 +61,24 @@ export function isGroupReportEnabled(
 
   return candidates.some((value) => allowlist.includes(value));
 }
+
+/**
+ * Template aliases the group report is surfaced for.
+ *
+ * Per Jeff (2026-06-18): the aggregate/CEO group report is wanted on the
+ * Leadership Vision Alignment assessment ONLY — NOT on the scored reports
+ * (Rockefeller / Five Dysfunctions), which over-showed in the mockup and
+ * confused him. The generic scored group engine remains in the codebase but
+ * is intentionally NOT surfaced (unreachable) — add an alias here to surface it.
+ *
+ * Single source of truth: gates BOTH the loader (group-report.ts) and the
+ * CampaignDetail entry point.
+ */
+export const GROUP_REPORT_ALIASES: readonly string[] = [
+  "leadership-vision-alignment",
+];
+
+/** Whether a campaign's template alias is surfaced for the group report. */
+export function isGroupReportAlias(alias: string | null | undefined): boolean {
+  return typeof alias === "string" && GROUP_REPORT_ALIASES.includes(alias);
+}

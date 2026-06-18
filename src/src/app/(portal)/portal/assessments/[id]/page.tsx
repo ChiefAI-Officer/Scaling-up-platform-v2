@@ -23,7 +23,10 @@ import {
 } from "@/lib/assessments/campaign-detail";
 import { CampaignDetail } from "@/components/assessments/CampaignDetail";
 import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
-import { isGroupReportEnabled } from "@/lib/assessments/wave-f-flags";
+import {
+  isGroupReportEnabled,
+  isGroupReportAlias,
+} from "@/lib/assessments/wave-f-flags";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -71,11 +74,14 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       accessMode: true,
       createdByCoachId: true,
       organizationId: true,
+      template: { select: { alias: true } },
     },
   });
   const canShowGroupReport =
     campaignForFlag !== null &&
     campaignForFlag.accessMode === "INVITED" &&
+    // LVA-only surface (Jeff 2026-06-18) — scored reports are not aggregated.
+    isGroupReportAlias(campaignForFlag.template?.alias) &&
     isGroupReportEnabled(actor, campaignForFlag) &&
     (await canViewGroupReport(asAccessDb(db), actor, id));
 

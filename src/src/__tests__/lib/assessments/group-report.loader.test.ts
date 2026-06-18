@@ -191,6 +191,23 @@ test("PUBLIC campaign → notApplicable (no model built)", async () => {
   expect(mock._findManySubmissions).not.toHaveBeenCalled();
 });
 
+test("non-LVA INVITED campaign → notApplicable (unsupported-template; scored engine not surfaced)", async () => {
+  // Jeff 2026-06-18: the group report is surfaced for LVA only. A scored
+  // template (Rockefeller) must NOT build/audit a group report even when INVITED.
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      template: { alias: "RockHabits", name: "Rockefeller Habits" },
+    }),
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("notApplicable");
+  if (res.kind !== "notApplicable") return;
+  expect(res.reason).toBe("unsupported-template");
+  expect(mock._findManySubmissions).not.toHaveBeenCalled();
+});
+
 test("campaign not found (null) → forbidden", async () => {
   const mock = makeMockDb({ campaign: null });
 

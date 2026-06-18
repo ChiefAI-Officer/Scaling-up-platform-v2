@@ -33,6 +33,7 @@ import {
   canViewGroupReport,
   asAccessDb,
 } from "@/lib/assessments/access-control";
+import { isGroupReportAlias } from "@/lib/assessments/wave-f-flags";
 import {
   buildGroupReportModel,
   type CampaignGroupReport,
@@ -154,7 +155,7 @@ export interface GroupReportProvenance {
 }
 
 export type GroupReportResult =
-  | { kind: "notApplicable"; reason: "public" }
+  | { kind: "notApplicable"; reason: "public" | "unsupported-template" }
   | { kind: "forbidden" }
   | { kind: "empty"; provenance: GroupReportProvenance }
   | { kind: "ok"; report: CampaignGroupReport; provenance: GroupReportProvenance };
@@ -251,6 +252,17 @@ export async function getCampaignGroupReport(
       // INVITED-only: a PUBLIC campaign has no team group report.
       if (campaign.accessMode !== "INVITED") {
         return { kind: "notApplicable", reason: "public" } as const;
+      }
+
+      // LVA-only surface (Jeff 2026-06-18): the group report is wanted on the
+      // Leadership Vision Alignment assessment only — not the scored reports.
+      // The generic scored engine stays built but unreachable; gate here so a
+      // non-allowlisted INVITED campaign never builds/audits a group report.
+      if (!isGroupReportAlias(campaign.template.alias)) {
+        return {
+          kind: "notApplicable",
+          reason: "unsupported-template",
+        } as const;
       }
 
       // Participants — the source of isCEO + the canonical name snapshot.

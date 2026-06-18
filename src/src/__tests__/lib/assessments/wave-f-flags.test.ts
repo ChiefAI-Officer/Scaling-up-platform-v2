@@ -12,7 +12,11 @@
  * campaigns can be canaried while the global flag stays off.
  */
 
-import { isGroupReportEnabled } from "@/lib/assessments/wave-f-flags";
+import {
+  isGroupReportEnabled,
+  isGroupReportAlias,
+  GROUP_REPORT_ALIASES,
+} from "@/lib/assessments/wave-f-flags";
 
 const GLOBAL = "WAVE_F_GROUP_REPORT_ENABLED";
 const CANARY = "WAVE_F_GROUP_REPORT_CANARY";
@@ -181,5 +185,32 @@ describe("null / undefined safety", () => {
   it("matches campaign id even when actor is null", () => {
     process.env[CANARY] = "camp-allowed";
     expect(isGroupReportEnabled(null, { id: "camp-allowed" })).toBe(true);
+  });
+});
+
+describe("isGroupReportAlias (LVA-only surface — Jeff 2026-06-18)", () => {
+  it("allowlist is exactly the LVA alias", () => {
+    expect(GROUP_REPORT_ALIASES).toEqual(["leadership-vision-alignment"]);
+  });
+
+  it("returns true for the LVA alias", () => {
+    expect(isGroupReportAlias("leadership-vision-alignment")).toBe(true);
+  });
+
+  it("returns false for scored templates (not surfaced)", () => {
+    expect(isGroupReportAlias("RockHabits")).toBe(false);
+    expect(isGroupReportAlias("five-dysfunctions")).toBe(false);
+    expect(isGroupReportAlias("scaling-up-full")).toBe(false);
+  });
+
+  it("returns false for other qualitative templates (LVA only for now)", () => {
+    expect(isGroupReportAlias("qsp-v1")).toBe(false);
+    expect(isGroupReportAlias("qsp-v2")).toBe(false);
+  });
+
+  it("returns false for null/undefined/empty", () => {
+    expect(isGroupReportAlias(null)).toBe(false);
+    expect(isGroupReportAlias(undefined)).toBe(false);
+    expect(isGroupReportAlias("")).toBe(false);
   });
 });
