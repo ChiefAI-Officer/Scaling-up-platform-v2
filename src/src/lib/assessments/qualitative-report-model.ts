@@ -219,12 +219,49 @@ interface RawSection {
   stableKey: string;
   name: string;
   description?: string;
+  /**
+   * Section-embedded question membership (C-M3). Older / historical pinned LVA
+   * & QSP versions carry their question keys on the SECTION here instead of (or
+   * in addition to) a `sectionStableKey` on each question. Each entry is either
+   * an object with a `stableKey` or a bare string key (mirrors the scored
+   * renderer's `parseSections` in BrandedReport.tsx).
+   */
+  questionKeys: string[];
+}
+
+/**
+ * Extracts the section-embedded question-key list from a raw `questions` field,
+ * accepting both `[{ stableKey }]` and bare-string `["key"]` shapes (C-M3 — the
+ * same membership shape BrandedReport.tsx's parseSections reads).
+ */
+function extractSectionQuestionKeys(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const keys: string[] = [];
+  for (const q of raw) {
+    if (typeof q === "string") {
+      keys.push(q);
+    } else if (q && typeof q === "object") {
+      const qk = (q as Record<string, unknown>).stableKey;
+      if (typeof qk === "string") keys.push(qk);
+    }
+  }
+  return keys;
 }
 
 function isRawSection(v: unknown): v is RawSection {
   if (!v || typeof v !== "object") return false;
   const r = v as Record<string, unknown>;
   return typeof r.stableKey === "string" && typeof r.name === "string";
+}
+
+/** Normalizes a guarded raw section, lifting its embedded question keys (C-M3). */
+function toRawSection(v: RawSection & Record<string, unknown>): RawSection {
+  return {
+    stableKey: v.stableKey,
+    name: v.name,
+    description: typeof v.description === "string" ? v.description : undefined,
+    questionKeys: extractSectionQuestionKeys(v.questions),
+  };
 }
 
 interface RawAnswerRow {
@@ -251,7 +288,9 @@ export function buildQualitativeModel(
   const { templateAlias, sections, questionsByKey, rawAnswers } = input;
 
   const sectionList: RawSection[] = Array.isArray(sections)
-    ? (sections as unknown[]).filter(isRawSection)
+    ? (sections as unknown[])
+        .filter(isRawSection)
+        .map((s) => toRawSection(s as RawSection & Record<string, unknown>))
     : [];
 
   // Build stableKey → submitted value map from the raw answer rows.
@@ -262,18 +301,74 @@ export function buildQualitativeModel(
     }
   }
 
+  const questionEntries = Object.entries(questionsByKey ?? {});
+
   // Index questions by their section, preserving questionsByKey insertion order
   // (which mirrors the version's question order).
+  //
+  // C-M3 — defensive grouping for OLD pinned versions: a question is assigned to
+  // a section via `meta.sectionStableKey` FIRST; when that's absent (older
+  // content shape), it's resolved via the SECTION's own embedded question-key
+  // list (`sections[].questions`, lifted into `section.questionKeys`). A
+  // question already placed by `sectionStableKey` is never duplicated by the
+  // section-list pass. Without this, retroactively flipping a historical LVA/QSP
+  // version to the qualitative renderer would produce an EMPTY report.
   const questionsBySection = new Map<string, Array<{ key: string; meta: QMeta }>>();
-  for (const [key, meta] of Object.entries(questionsByKey ?? {})) {
+  const assignedKeys = new Set<string>();
+
+  // Pass 1 — questions that carry their own sectionStableKey.
+  const metaByKey = new Map<string, QMeta>();
+  for (const [key, meta] of questionEntries) {
+    metaByKey.set(key, meta);
     const sectionKey = meta.sectionStableKey;
     if (!sectionKey) continue;
     const bucket = questionsBySection.get(sectionKey) ?? [];
     bucket.push({ key, meta });
     questionsBySection.set(sectionKey, bucket);
+    assignedKeys.add(key);
+  }
+
+  // Pass 2 — section-embedded membership for questions not yet assigned.
+  for (const section of sectionList) {
+    for (const key of section.questionKeys) {
+      if (assignedKeys.has(key)) continue;
+      const meta = metaByKey.get(key);
+      if (!meta) continue;
+      const bucket = questionsBySection.get(section.stableKey) ?? [];
+      bucket.push({ key, meta });
+      questionsBySection.set(section.stableKey, bucket);
+      assignedKeys.add(key);
+    }
   }
 
   const aliasMap = templateAlias ? SECTION_PRESENTATION[templateAlias] : undefined;
+
+  /** Shapes a present answer row into a QualItem (shared with the orphan bucket). */
+  const toItem = (key: string, meta: QMeta, value: unknown): QualItem => {
+    const item: QualItem = {
+      stableKey: key,
+      label: stripLegacyDecimalSuffix(meta.label),
+      type: meta.type,
+      value,
+    };
+    if (typeof meta.min === "number") item.min = meta.min;
+    if (typeof meta.max === "number") item.max = meta.max;
+
+    // C-H1: resolve MULTI_CHOICE stored option KEYS → human LABELS so the
+    // renderers never display raw keys. Fallback to the raw key when an
+    // option has no matching label (or the question carries no options).
+    if (meta.type === "MULTI_CHOICE" && Array.isArray(value)) {
+      const labelByOptionKey = new Map<string, string>(
+        (meta.options ?? []).map((o) => [o.key, o.label]),
+      );
+      item.displayValues = (value as unknown[]).map((v) => {
+        const k = String(v);
+        return labelByOptionKey.get(k) ?? k;
+      });
+    }
+
+    return item;
+  };
 
   const out: QualSection[] = [];
 
@@ -284,30 +379,7 @@ export function buildQualitativeModel(
     for (const { key, meta } of questions) {
       const value = answerByKey.get(key);
       if (!isReportAnswerPresent(meta.type, value)) continue;
-
-      const item: QualItem = {
-        stableKey: key,
-        label: stripLegacyDecimalSuffix(meta.label),
-        type: meta.type,
-        value,
-      };
-      if (typeof meta.min === "number") item.min = meta.min;
-      if (typeof meta.max === "number") item.max = meta.max;
-
-      // C-H1: resolve MULTI_CHOICE stored option KEYS → human LABELS so the
-      // renderers never display raw keys. Fallback to the raw key when an
-      // option has no matching label (or the question carries no options).
-      if (meta.type === "MULTI_CHOICE" && Array.isArray(value)) {
-        const labelByOptionKey = new Map<string, string>(
-          (meta.options ?? []).map((o) => [o.key, o.label]),
-        );
-        item.displayValues = (value as unknown[]).map((v) => {
-          const k = String(v);
-          return labelByOptionKey.get(k) ?? k;
-        });
-      }
-
-      items.push(item);
+      items.push(toItem(key, meta, value));
     }
 
     // Omit a section with zero present items (Esperto conditional output).
@@ -326,6 +398,27 @@ export function buildQualitativeModel(
       qualSection.description = section.description;
     }
     out.push(qualSection);
+  }
+
+  // C-M3 — "Additional responses" bucket: any ANSWERED question that resolved to
+  // no section (no sectionStableKey AND not referenced by any section's list)
+  // must still surface so content is never silently dropped (mirrors the scored
+  // renderer's orphanRows handling). The bucket only appears when it has ≥1
+  // present item; a section with zero present items is still omitted.
+  const orphanItems: QualItem[] = [];
+  for (const [key, meta] of questionEntries) {
+    if (assignedKeys.has(key)) continue;
+    const value = answerByKey.get(key);
+    if (!isReportAnswerPresent(meta.type, value)) continue;
+    orphanItems.push(toItem(key, meta, value));
+  }
+  if (orphanItems.length > 0) {
+    out.push({
+      stableKey: "__additional_responses__",
+      name: "Additional responses",
+      kind: "qa",
+      items: orphanItems,
+    });
   }
 
   return { sections: out };

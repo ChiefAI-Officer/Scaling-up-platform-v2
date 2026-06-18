@@ -421,4 +421,234 @@ describe("buildQualitativeModel", () => {
       expect(model.sections[0].items[0].displayValues).toBeUndefined();
     });
   });
+
+  // ── C-M3: defensive grouping for OLD pinned versions ─────────────────────
+  // The qualitative report type is deployment-global and applies retroactively
+  // to already-pinned/historical LVA & QSP versions. Older content shapes may
+  // carry section membership on the SECTION (sections[].questions) rather than
+  // on each question (questionsByKey[*].sectionStableKey). Grouping by
+  // sectionStableKey alone would render an EMPTY report for those rows.
+  describe("old pinned versions (sections[].questions fallback) — C-M3", () => {
+    it("groups questions via sections[].questions when questions lack sectionStableKey (object-form)", () => {
+      // Plausible historical LVA version: questions have NO sectionStableKey,
+      // but each section embeds its question keys under `questions: [{stableKey}]`.
+      const model = buildQualitativeModel({
+        templateAlias: "leadership-vision-alignment",
+        sections: [
+          {
+            stableKey: "S2_vision",
+            name: "Vision on the Future",
+            questions: [
+              { stableKey: "S2_main_products" },
+              { stableKey: "S2_main_markets" },
+            ],
+          },
+          {
+            stableKey: "S1_financials",
+            name: "Financials",
+            questions: [{ stableKey: "S1_revenue" }, { stableKey: "S1_customers" }],
+          },
+        ],
+        questionsByKey: {
+          // No sectionStableKey on any question (the OLD shape).
+          S2_main_products: { type: "TEXT", label: "Our main Products in three years" },
+          S2_main_markets: { type: "TEXT", label: "Our main Markets in three years" },
+          S1_revenue: { type: "NUMBER", label: "Revenue (in million)" },
+          S1_customers: { type: "NUMBER", label: "Number of customers" },
+        },
+        rawAnswers: [
+          { stableKey: "S2_main_products", value: "SOFTWARE AND SERVICES" },
+          { stableKey: "S2_main_markets", value: "EMEA" },
+          { stableKey: "S1_revenue", value: 12 },
+          { stableKey: "S1_customers", value: 300 },
+        ],
+      });
+
+      // The new global flip must NOT render an empty report.
+      expect(model.sections).not.toHaveLength(0);
+      expect(model.sections.map((s) => s.stableKey)).toEqual([
+        "S2_vision",
+        "S1_financials",
+      ]);
+      const vision = model.sections.find((s) => s.stableKey === "S2_vision")!;
+      expect(vision.items.map((i) => i.stableKey)).toEqual([
+        "S2_main_products",
+        "S2_main_markets",
+      ]);
+      expect(vision.kind).toBe("qa");
+      const financials = model.sections.find((s) => s.stableKey === "S1_financials")!;
+      expect(financials.items.map((i) => i.stableKey)).toEqual([
+        "S1_revenue",
+        "S1_customers",
+      ]);
+      // Type-driven kind still works off the grouped items (all NUMBER).
+      expect(financials.kind).toBe("metric-table");
+    });
+
+    it("groups questions via sections[].questions in bare-string form", () => {
+      const model = buildQualitativeModel({
+        templateAlias: "qsp-v1",
+        sections: [
+          {
+            stableKey: "S5_start_stop_continue",
+            name: "Start / Stop / Continue",
+            // Bare-string membership form (as parseSections also accepts).
+            questions: ["S5_start", "S5_stop"],
+          },
+        ],
+        questionsByKey: {
+          S5_start: { type: "TEXT", label: "What to start" },
+          S5_stop: { type: "TEXT", label: "What to stop" },
+        },
+        rawAnswers: [
+          { stableKey: "S5_start", value: "Daily huddles" },
+          { stableKey: "S5_stop", value: "Long meetings" },
+        ],
+      });
+
+      expect(model.sections).toHaveLength(1);
+      expect(model.sections[0].items.map((i) => i.stableKey)).toEqual([
+        "S5_start",
+        "S5_stop",
+      ]);
+    });
+
+    it("prefers sectionStableKey but still picks up section-listed members lacking it", () => {
+      // Mixed shape: one question carries sectionStableKey (new), one is only
+      // referenced via sections[].questions (old). Both must land in the section.
+      const model = buildQualitativeModel({
+        templateAlias: "leadership-vision-alignment",
+        sections: [
+          {
+            stableKey: "S2_vision",
+            name: "Vision",
+            questions: [{ stableKey: "via_key" }, { stableKey: "via_list" }],
+          },
+        ],
+        questionsByKey: {
+          via_key: { type: "TEXT", label: "Resolved by sectionStableKey", sectionStableKey: "S2_vision" },
+          via_list: { type: "TEXT", label: "Resolved by section list only" },
+        },
+        rawAnswers: [
+          { stableKey: "via_key", value: "A" },
+          { stableKey: "via_list", value: "B" },
+        ],
+      });
+
+      expect(model.sections).toHaveLength(1);
+      expect(model.sections[0].items.map((i) => i.stableKey).sort()).toEqual([
+        "via_key",
+        "via_list",
+      ]);
+      // No duplication — each question appears exactly once.
+      expect(model.sections[0].items).toHaveLength(2);
+    });
+
+    it("does not duplicate a question that is BOTH section-listed and sectionStableKey-tagged", () => {
+      const model = buildQualitativeModel({
+        templateAlias: "leadership-vision-alignment",
+        sections: [
+          { stableKey: "S2_vision", name: "Vision", questions: [{ stableKey: "q1" }] },
+        ],
+        questionsByKey: {
+          q1: { type: "TEXT", label: "Products", sectionStableKey: "S2_vision" },
+        },
+        rawAnswers: [{ stableKey: "q1", value: "SaaS" }],
+      });
+
+      expect(model.sections[0].items).toHaveLength(1);
+      expect(model.sections[0].items[0].stableKey).toBe("q1");
+    });
+
+    it("still omits a section whose section-listed members are all unanswered", () => {
+      const model = buildQualitativeModel({
+        templateAlias: "leadership-vision-alignment",
+        sections: [
+          {
+            stableKey: "S2_vision",
+            name: "Vision",
+            questions: [{ stableKey: "v1" }],
+          },
+          {
+            stableKey: "S5_explained",
+            name: "Obstacles Explained",
+            questions: [{ stableKey: "e1" }, { stableKey: "e2" }],
+          },
+        ],
+        questionsByKey: {
+          v1: { type: "TEXT", label: "Products" },
+          e1: { type: "TEXT", label: "Why Sales" },
+          e2: { type: "TEXT", label: "Why Cash" },
+        },
+        rawAnswers: [
+          { stableKey: "v1", value: "SaaS" },
+          { stableKey: "e1", value: "" },
+          { stableKey: "e2", value: "   " },
+        ],
+      });
+
+      expect(model.sections.map((s) => s.stableKey)).toEqual(["S2_vision"]);
+    });
+  });
+
+  // ── C-M3: orphan answered questions → "Additional responses" bucket ──────
+  describe("orphan answered questions bucket — C-M3", () => {
+    it("collects an answered question assigned to NO section into 'Additional responses'", () => {
+      const model = buildQualitativeModel({
+        templateAlias: "leadership-vision-alignment",
+        sections: [{ stableKey: "S2_vision", name: "Vision" }],
+        questionsByKey: {
+          v1: { type: "TEXT", label: "Products", sectionStableKey: "S2_vision" },
+          // orphan: no sectionStableKey AND not referenced by any section.
+          orphan_q: { type: "TEXT", label: "An un-sectioned answered question" },
+        },
+        rawAnswers: [
+          { stableKey: "v1", value: "SaaS" },
+          { stableKey: "orphan_q", value: "Must not be dropped" },
+        ],
+      });
+
+      // Real section + a trailing synthetic "Additional responses" section.
+      expect(model.sections).toHaveLength(2);
+      const bucket = model.sections[model.sections.length - 1];
+      expect(bucket.name).toBe("Additional responses");
+      expect(bucket.kind).toBe("qa");
+      expect(bucket.items.map((i) => i.stableKey)).toEqual(["orphan_q"]);
+      expect(bucket.items[0].value).toBe("Must not be dropped");
+    });
+
+    it("does NOT add the 'Additional responses' bucket when an orphan is unanswered", () => {
+      const model = buildQualitativeModel({
+        templateAlias: "leadership-vision-alignment",
+        sections: [{ stableKey: "S2_vision", name: "Vision" }],
+        questionsByKey: {
+          v1: { type: "TEXT", label: "Products", sectionStableKey: "S2_vision" },
+          orphan_q: { type: "TEXT", label: "Un-sectioned, unanswered" },
+        },
+        rawAnswers: [
+          { stableKey: "v1", value: "SaaS" },
+          { stableKey: "orphan_q", value: "   " },
+        ],
+      });
+
+      // Only the real section — no empty trailing bucket.
+      expect(model.sections.map((s) => s.stableKey)).toEqual(["S2_vision"]);
+      expect(model.sections.some((s) => s.name === "Additional responses")).toBe(false);
+    });
+
+    it("collects an orphan even when there are NO real sections at all", () => {
+      const model = buildQualitativeModel({
+        templateAlias: "some-future-template",
+        sections: [],
+        questionsByKey: {
+          orphan_q: { type: "TEXT", label: "Lonely answered question" },
+        },
+        rawAnswers: [{ stableKey: "orphan_q", value: "kept" }],
+      });
+
+      expect(model.sections).toHaveLength(1);
+      expect(model.sections[0].name).toBe("Additional responses");
+      expect(model.sections[0].items.map((i) => i.stableKey)).toEqual(["orphan_q"]);
+    });
+  });
 });
