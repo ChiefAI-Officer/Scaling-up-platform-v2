@@ -3,6 +3,11 @@
 - **Status:** Accepted (2026-06-18). Hardened through `/claudex:plan` (3 rounds: senior-eng →
   security → ops/SRE); this file reflects the post-review model (supersedes the pre-review
   "CEO-included for both / all-completed / canManageCampaign-read" wording).
+- **Scope (build-time refinement, 2026-06-18):** Jeff confirmed the group report is surfaced for
+  the **Leadership Vision Alignment template ONLY** (not the scored reports). The qualitative +
+  scored aggregation models in this ADR are both built, but only LVA is reachable: a
+  `GROUP_REPORT_ALIASES` allowlist (LVA) gates both the loader and the entry point. The scored
+  model is dormant infrastructure, surfaced later by adding an alias.
 - **Context:** Spec 17 Wave F #22 (CEO / Group report). Supersedes the deferrals in
   [ADR-0003](0003-*) (LVA group factor-bar) and [ADR-0007](0007-*) ("individual ≠ cohort report").
   Reuses the report-type dispatch from [ADR-0010](0010-assessment-reports-have-two-types-scored-and-qualitative.md).

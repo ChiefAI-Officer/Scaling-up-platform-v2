@@ -7,6 +7,14 @@
 > See the three claudex Changelogs + Loop outcome at the bottom.
 > Source punch-list item: **#22** (the team-Mean / aggregate "CEO" view), deferred from Wave E
 > (G1; ADR-0003 deferred the LVA group factor-bar; ADR-0007 "individual ≠ cohort report").
+>
+> **⚠ SCOPE UPDATE (2026-06-18, during build):** Jeff confirmed via Slack the group report is
+> wanted on the **Leadership Vision Alignment assessment ONLY** (*"we don't need aggregate on all
+> reports… just the one"* → *"Just LVA"*). The generic SCORED group archetype (Rockefeller/Five-D)
+> below is **built but NOT surfaced** — both the loader and the CampaignDetail entry point gate on
+> `GROUP_REPORT_ALIASES` (LVA only) in `wave-f-flags.ts`; a non-LVA campaign returns `notApplicable`
+> (no model build, no audit) and shows no link. The scored sections of this doc describe the dormant
+> engine, kept for a future ask (add an alias to surface). See [17f ops runbook](17f-ops-runbook.md).
 
 ## Goal
 
