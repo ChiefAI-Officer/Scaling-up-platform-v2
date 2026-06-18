@@ -45,14 +45,29 @@ const txMock = {
   },
 };
 
-jest.mock("@/lib/db", () => ({
-  db: {
-    $transaction: jest.fn(
-      (fn: (tx: typeof txMock) => unknown) => fn(txMock)
-    ),
+// R3-M3: the route now does a Phase-1 read (full include) on the top-level `db`
+// client BEFORE opening the tx (rendering runs lock-free), then a Phase-2
+// re-read on the tx client UNDER the FOR UPDATE lock. Both findUnique mocks are
+// driven by mockHappyInvitation so the two phases agree.
+//
+// The `db` mock is built INSIDE the jest.mock factory (so it is self-contained
+// at hoist time) and the handles are surfaced through `dbMock` for assertions.
+// `var` hoists so the factory's assignment is visible to the rest of the file.
+// eslint-disable-next-line no-var
+var dbMock: {
+  $transaction: jest.Mock;
+  assessmentInvitation: { findUnique: jest.Mock };
+  auditLog: { create: jest.Mock };
+};
+
+jest.mock("@/lib/db", () => {
+  dbMock = {
+    $transaction: jest.fn((fn: (tx: typeof txMock) => unknown) => fn(txMock)),
+    assessmentInvitation: { findUnique: jest.fn() },
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
-  },
-}));
+  };
+  return { db: dbMock };
+});
 
 // Wave D feature flags — default ON in tests; individual tests flip them off.
 // eslint-disable-next-line no-var
@@ -127,7 +142,7 @@ function mockHappyInvitation(
     creatorCoachEmail: string | null;
   }>
 ) {
-  txMock.assessmentInvitation.findUnique.mockResolvedValue({
+  const invitation = {
     id: "inv-1",
     status: overrides?.status ?? "VIEWED",
     revokedAt: null,
@@ -171,7 +186,10 @@ function mockHappyInvitation(
         resultsEmailContentApprovedHash: "hash",
       },
     },
-  });
+  };
+  // Phase 1 (lock-free read, full include) + Phase 2 (locked re-read) agree.
+  dbMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
+  txMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
 }
 
 function jsonReq(body: unknown): Request {

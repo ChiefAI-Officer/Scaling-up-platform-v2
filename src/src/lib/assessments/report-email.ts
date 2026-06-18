@@ -45,6 +45,11 @@ import {
   headlineForTierMetric,
 } from "@/lib/assessments/report-presentation";
 import { reportConfigFor } from "@/lib/assessments/report-config";
+import {
+  buildQualitativeModel,
+  type QualItem,
+  type QualSection,
+} from "@/lib/assessments/qualitative-report-model";
 
 export type ReportEmailRecipientRole = "TAKER_COPY" | "REFERRING_COACH";
 
@@ -56,7 +61,35 @@ export interface BuildReportEmailArgs {
 export interface ReportEmail {
   subject: string;
   bodyHtml: string;
+  /**
+   * Wave E (R2-M6) — set ONLY when the qualitative body failed to render and a
+   * safe minimal fallback was returned instead. The caller can record this as a
+   * render failure. Absent on the happy path (scored + qualitative) and on the
+   * scored path entirely.
+   */
+  renderError?: string;
 }
+
+// ── Wave E (R1-M5) — qualitative email size budget ─────────────────────────
+//
+// Email clients choke on multi-hundred-KB bodies (Gmail clips at ~102 KB). The
+// on-screen QualitativeReport is NOT truncated; this budget applies ONLY to the
+// email twin. There is NO respondent report URL to link to (ADR-0007/0008), so
+// truncation must stand alone.
+
+/** Max characters of a single free-text answer rendered into the email. The RAW
+ *  string is truncated to this BEFORE escaping (so the cap counts source chars,
+ *  not entity-expanded chars). */
+export const QUAL_EMAIL_ANSWER_CAP = 600;
+
+/** Soft ceiling for the assembled qualitative BODY (the per-section HTML, not
+ *  the surrounding shell). Once exceeded we stop appending further sections and
+ *  add a short truncation note. */
+export const QUAL_EMAIL_BYTE_BUDGET = 90_000;
+
+const TRUNCATED_ANSWER_SUFFIX = "… (truncated)";
+const QUAL_TRUNCATION_NOTE =
+  "(report truncated for email; full report available to your coach)";
 
 // ── Server-side RespondentReport assembly (Spec 16 §3) ──────────────────────
 //
@@ -249,6 +282,277 @@ function firstName(full: string): string {
   return trimmed.split(/\s+/)[0];
 }
 
+// ── Qualitative email body (Wave E, Task 11) ───────────────────────────────
+//
+// The EMAIL twin of the on-screen QualitativeReport. Inline-HTML string
+// assembly does NOT auto-escape, so EVERY respondent-controlled value (answer
+// text, option labels, question labels) is escaped here (R2-H3). Free-text is
+// size-capped (R1-M5) and each item/section render is wrapped in try/catch so a
+// malformed shape degrades instead of throwing the whole email (R2-M6).
+
+/** Truncate a RAW answer string to the cap (BEFORE escaping) with a suffix. */
+function capRawAnswer(raw: string): string {
+  if (raw.length <= QUAL_EMAIL_ANSWER_CAP) return raw;
+  return raw.slice(0, QUAL_EMAIL_ANSWER_CAP) + TRUNCATED_ANSWER_SUFFIX;
+}
+
+/** Render an answer value to a display string. Arrays join with commas; numbers
+ *  stringify; objects/other shapes become "" (caught defensively upstream). */
+function qualAnswerText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+  if (typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .map((v) =>
+        typeof v === "string" || typeof v === "number" ? String(v) : "",
+      )
+      .filter((s) => s !== "")
+      .join(", ");
+  }
+  // An object / null / undefined is not a presentable scalar — render nothing.
+  return "";
+}
+
+/** Clamp a numeric percent into an integer in [0,100] for a style width. NEVER
+ *  interpolate a raw answer into a style/attribute. */
+function clampPercent(value: unknown): number {
+  const n = typeof value === "number" && Number.isFinite(value) ? value : 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+/** Is this item a percentage NUMBER (0–100 scale)? → rendered as a fill bar. */
+function isPercentQualItem(item: QualItem): boolean {
+  return (
+    item.type === "NUMBER" &&
+    typeof item.value === "number" &&
+    item.min === 0 &&
+    item.max === 100
+  );
+}
+
+/** Render ONE qualitative item to an email-safe HTML row. Throws on a truly
+ *  pathological shape; the section assembler catches per-item. */
+function renderQualItem(item: QualItem): string {
+  const escLabel = escapeHtml(item.label);
+
+  // Percent NUMBER → label + fill bar (width clamped, never raw-interpolated).
+  if (isPercentQualItem(item)) {
+    const pct = clampPercent(item.value);
+    const escVal = escapeHtml(qualAnswerText(item.value));
+    return `
+    <tr>
+      <td style="padding:8px 0 2px;font-weight:700;font-size:13px;color:${INK};line-height:1.45;">${escLabel}</td>
+    </tr>
+    <tr>
+      <td style="padding:0 0 10px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="padding-right:10px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eeeeee;border-radius:4px;">
+                <tr>
+                  <td width="${pct}%" style="height:8px;background:${PURPLE};border-radius:4px;font-size:0;line-height:0;">&nbsp;</td>
+                  <td style="font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+            <td align="right" style="white-space:nowrap;font-weight:800;font-size:13px;color:${PURPLE};">${escVal}%</td>
+          </tr>
+        </table>
+      </td>
+    </tr>`;
+  }
+
+  // SLIDER_LIKERT / NUMBER (non-percent) → label + value chip (statement row).
+  if (item.type === "SLIDER_LIKERT" || item.type === "NUMBER") {
+    const escVal = escapeHtml(qualAnswerText(item.value));
+    return `
+    <tr>
+      <td style="padding:8px 0;border-bottom:1px solid ${LINE};font-size:13px;color:#3a3450;line-height:1.45;">${escLabel}</td>
+      <td align="right" style="padding:8px 0 8px 12px;border-bottom:1px solid ${LINE};white-space:nowrap;vertical-align:top;">
+        <span style="display:inline-block;min-width:30px;text-align:center;font-weight:800;font-size:13px;color:${PURPLE};background:${PURPLE_TINT};border-radius:7px;padding:3px 8px;">${escVal}</span>
+      </td>
+    </tr>`;
+  }
+
+  // TEXT / MULTI_CHOICE / everything else → blue question heading + answer text.
+  // MULTI_CHOICE values are an array of option labels (each escaped by
+  // qualAnswerText → escapeHtml). Free-text is RAW-capped before escaping.
+  const rawText = qualAnswerText(item.value);
+  const escAnswer = escapeHtml(capRawAnswer(rawText));
+  return `
+  <tr>
+    <td colspan="2" style="padding:12px 0 2px;font-weight:800;font-size:14px;color:${PURPLE};line-height:1.4;">${escLabel}</td>
+  </tr>
+  <tr>
+    <td colspan="2" style="padding:0 0 12px;font-size:13px;color:${INK};line-height:1.55;">${escAnswer}</td>
+  </tr>`;
+}
+
+/** Render ONE qualitative section (heading + description + item rows). Per-item
+ *  try/catch so a malformed answer skips that item only. Returns "" if every
+ *  item failed AND there is no heading worth showing. */
+function renderQualSection(section: QualSection): string {
+  const escName = escapeHtml(section.name);
+  const escDesc =
+    typeof section.description === "string" && section.description.trim() !== ""
+      ? escapeHtml(section.description)
+      : "";
+
+  const itemRows: string[] = [];
+  for (const item of section.items) {
+    try {
+      itemRows.push(renderQualItem(item));
+    } catch {
+      // R2-M6: skip a malformed item; the rest of the section still renders.
+      continue;
+    }
+  }
+  if (itemRows.length === 0) return "";
+
+  const descHtml = escDesc
+    ? `<tr><td colspan="2" style="padding:2px 0 6px;font-size:13px;color:${MUTED};line-height:1.5;">${escDesc}</td></tr>`
+    : "";
+
+  return `
+  <tr>
+    <td style="padding:22px 32px 0;">
+      <div style="font-size:16px;font-weight:800;color:${INK};margin-bottom:4px;">${escName}</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        ${descHtml}
+        ${itemRows.join("")}
+      </table>
+    </td>
+  </tr>`;
+}
+
+/**
+ * Assembles the qualitative BODY sections (the part that replaces the scored
+ * anatomy). Returns the section HTML + whether truncation occurred. Pure; the
+ * surrounding shell (cover/preface/footer) is added by the caller.
+ *
+ * Size budget (R1-M5): sections are appended until the running byte total would
+ * exceed QUAL_EMAIL_BYTE_BUDGET; once exceeded we stop and append a standalone
+ * truncation note (no report URL exists to link to).
+ */
+function buildQualitativeBodySections(report: RespondentReport): {
+  html: string;
+  truncated: boolean;
+} {
+  const model = buildQualitativeModel({
+    templateAlias: report.templateAlias,
+    sections: report.sections,
+    questionsByKey: report.questionsByKey,
+    rawAnswers: report.rawAnswers,
+  });
+
+  const parts: string[] = [];
+  let bytes = 0;
+  let truncated = false;
+
+  for (const section of model.sections) {
+    let sectionHtml = "";
+    try {
+      sectionHtml = renderQualSection(section);
+    } catch {
+      // R2-M6: a section that throws as a whole is skipped, not fatal.
+      continue;
+    }
+    if (sectionHtml === "") continue;
+
+    const addBytes = Buffer.byteLength(sectionHtml, "utf8");
+    if (bytes + addBytes > QUAL_EMAIL_BYTE_BUDGET && parts.length > 0) {
+      truncated = true;
+      break;
+    }
+    parts.push(sectionHtml);
+    bytes += addBytes;
+  }
+
+  return { html: parts.join(""), truncated };
+}
+
+/**
+ * Assembles the full qualitative report email (shell + body). Reuses the scored
+ * email's branded cover/footer; only the BODY differs. Never throws — on a body
+ * render failure it returns a minimal safe body + a renderError signal (R2-M6).
+ */
+function buildQualitativeReportEmail({
+  report,
+  recipientRole,
+  subject,
+  cover,
+  escName,
+  escFirst,
+  escDate,
+}: {
+  report: RespondentReport;
+  recipientRole: ReportEmailRecipientRole;
+  subject: string;
+  cover: string;
+  escName: string;
+  escFirst: string;
+  escDate: string;
+}): ReportEmail {
+  const escTitle = escapeHtml(report.assessmentName);
+
+  const shell = (inner: string): string => `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escTitle}</title>
+</head>
+<body style="margin:0;padding:24px 12px;background:#eef0f4;font-family:${FONT};color:${INK};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eef0f4;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;">
+          ${cover}
+          ${inner}
+          <tr>
+            <td align="center" style="padding:18px 32px 26px;font-size:11px;color:${MUTED};">${escDate} &middot; Generated by Scaling Up Platform</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  // Preface / lead-in (text-only). Coach copy carries a "your client" lead-in.
+  const preface =
+    recipientRole === "REFERRING_COACH"
+      ? `<tr><td style="padding:18px 32px 0;font-size:14px;color:${INK};line-height:1.5;">Your client <strong>${escName}</strong> just completed the assessment. Their answers, organized by theme, are below.</td></tr>`
+      : `<tr><td style="padding:18px 32px 0;font-size:14px;color:${INK};line-height:1.5;">Dear ${escFirst}, here is your report — your own answers, organized by theme.</td></tr>`;
+
+  try {
+    const { html: sectionsHtml, truncated } = buildQualitativeBodySections(report);
+
+    const truncationNote = truncated
+      ? `<tr><td style="padding:14px 32px 0;font-size:12px;color:${MUTED};font-style:italic;line-height:1.5;">${escapeHtml(
+          QUAL_TRUNCATION_NOTE,
+        )}</td></tr>`
+      : "";
+
+    // No present sections at all → a graceful "received" body (not an error).
+    const body =
+      sectionsHtml === ""
+        ? `<tr><td style="padding:22px 32px;font-size:14px;color:${INK};line-height:1.55;">Your assessment has been received.</td></tr>`
+        : `${preface}${sectionsHtml}${truncationNote}`;
+
+    return { subject, bodyHtml: shell(body) };
+  } catch (err) {
+    // R2-M6: the WHOLE body failed — minimal safe fallback + render signal.
+    const fallback = `<tr><td style="padding:22px 32px;font-size:14px;color:${INK};line-height:1.55;">Your assessment has been received.</td></tr>`;
+    return {
+      subject,
+      bodyHtml: shell(fallback),
+      renderError: err instanceof Error ? err.message : "qualitative render failed",
+    };
+  }
+}
+
 // ── Builder ──────────────────────────────────────────────────────────────
 
 export function buildReportEmailHtml({
@@ -319,6 +623,23 @@ export function buildReportEmailHtml({
       <div style="font-size:13px;color:#ffffff;opacity:0.85;">Report for ${escName} &middot; ${escDate}</div>
     </td>
   </tr>`;
+
+  // ── Qualitative dispatch (Wave E, Task 11) ───────────────────────────────
+  // For qualitative templates (LVA / QSP) the BODY renders the respondent's own
+  // answers (escaped, size-capped, defensively) instead of the scored anatomy.
+  // The cover/footer shell is shared. A render failure NEVER throws out of here:
+  // it degrades to a minimal safe body + a renderError signal for the caller.
+  if (reportConfigFor(report.templateAlias).reportType === "qualitative") {
+    return buildQualitativeReportEmail({
+      report,
+      recipientRole,
+      subject,
+      cover,
+      escName,
+      escFirst,
+      escDate,
+    });
+  }
 
   // ── Overall ──────────────────────────────────────────────────────────────
   const bandPill = neutral
