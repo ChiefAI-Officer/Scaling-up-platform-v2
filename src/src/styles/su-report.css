@@ -1235,3 +1235,508 @@
     display: table-header-group;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   GROUP REPORT (Wave F #22) — team-level siblings of the per-respondent report.
+   The CEO Full Report: aggregates all completed submissions of a campaign.
+   Mirrors wave-f-group-report-mockup.html (repo root). ALL rules scoped under
+   `.su-public-brand .su-report` (ADR-0005) — zero global-token leak.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* "Group Report" cover badge */
+.su-public-brand .su-group-kind {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 14px;
+}
+
+/* Body wrapper + "as of" provenance line */
+.su-public-brand .su-group-body {
+  padding: 34px 60px 14px;
+}
+.su-public-brand .su-group-asof {
+  background: #f4f0fa;
+  border: 1px solid #e4dcf0;
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 12.5px;
+  color: #6b6480;
+  margin-bottom: 26px;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.su-public-brand .su-group-asof b {
+  color: #522583;
+}
+
+/* Section shell */
+.su-public-brand .su-group-sec {
+  margin: 0 0 34px;
+}
+.su-public-brand .su-group-sec-title {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #522583;
+  font-size: 21px;
+  margin: 0 0 4px;
+  font-weight: 800;
+  border-left: 5px solid #522583;
+  padding-left: 12px;
+  line-height: 1.2;
+}
+.su-public-brand .su-group-intro {
+  color: #6b6480;
+  font-size: 13.5px;
+  margin: 6px 0 16px;
+  padding-left: 17px;
+  max-width: 72ch;
+}
+
+/* Shared CEO emphasis */
+.su-public-brand .su-group-ceo {
+  color: #522583;
+  font-weight: 700;
+}
+
+/* ── Metric-table matrix ─────────────────────────────────────────────────── */
+.su-public-brand .su-group-mtx {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.su-public-brand .su-group-mtx th,
+.su-public-brand .su-group-mtx td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #e4dcf0;
+  text-align: right;
+}
+.su-public-brand .su-group-mtx thead th:first-child,
+.su-public-brand .su-group-mtx tbody th:first-child,
+.su-public-brand .su-group-mtx td:first-child {
+  text-align: left;
+}
+.su-public-brand .su-group-mtx tbody th[scope="row"] {
+  font-weight: 500;
+  color: #1a1322;
+}
+.su-public-brand .su-group-mtx thead th {
+  background: #f0e9fa;
+  color: #522583;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  border-bottom: 2px solid #522583;
+}
+.su-public-brand .su-group-mtx td.su-group-mean,
+.su-public-brand .su-group-mtx .su-group-mean-col {
+  font-weight: 700;
+}
+.su-public-brand .su-group-mtx td.su-group-mean {
+  background: #f4f0fa;
+}
+.su-public-brand .su-group-mtx .su-group-n {
+  color: #6b6480;
+  font-size: 11px;
+  font-weight: 400;
+}
+.su-public-brand .su-group-mtx tr:last-child td,
+.su-public-brand .su-group-mtx tr:last-child th {
+  border-bottom: none;
+}
+.su-public-brand .su-group-blank {
+  color: #c3bcd2;
+}
+
+/* ── Rating (stacked Weak/Average/Strong) ────────────────────────────────── */
+.su-public-brand .su-group-rat-row {
+  display: grid;
+  grid-template-columns: 210px 1fr 52px;
+  gap: 12px;
+  align-items: center;
+  margin: 7px 0;
+  font-size: 13px;
+}
+.su-public-brand .su-group-rat-lab {
+  text-align: right;
+  color: #1a1322;
+}
+.su-public-brand .su-group-rat-bar {
+  height: 18px;
+  border-radius: 3px;
+  display: flex;
+  overflow: hidden;
+  background: #eee;
+}
+.su-public-brand .su-group-rat-bar .s {
+  background: #95c11f;
+}
+.su-public-brand .su-group-rat-bar .a {
+  background: #f7a600;
+}
+.su-public-brand .su-group-rat-bar .w {
+  background: #c8202f;
+}
+.su-public-brand .su-group-rat-val {
+  font-weight: 700;
+  color: #522583;
+  text-align: right;
+}
+.su-public-brand .su-group-legend {
+  display: flex;
+  gap: 20px;
+  font-size: 12px;
+  color: #6b6480;
+  margin: 14px 0 4px;
+  padding-left: 222px;
+  flex-wrap: wrap;
+}
+.su-public-brand .su-group-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+.su-public-brand .su-group-legend i.s {
+  background: #95c11f;
+}
+.su-public-brand .su-group-legend i.a {
+  background: #f7a600;
+}
+.su-public-brand .su-group-legend i.w {
+  background: #c8202f;
+}
+.su-public-brand .su-group-legend-note {
+  color: #522583;
+}
+
+/* ── Choices / obstacle bars ─────────────────────────────────────────────── */
+.su-public-brand .su-group-obs {
+  display: grid;
+  grid-template-columns: 210px 1fr 46px;
+  gap: 12px;
+  align-items: center;
+  margin: 5px 0;
+  font-size: 13px;
+}
+.su-public-brand .su-group-obs-lab {
+  text-align: right;
+}
+.su-public-brand .su-group-obs.zero .su-group-obs-lab {
+  color: #6b6480;
+}
+.su-public-brand .su-group-obs-track {
+  display: block;
+  height: 16px;
+  background: #f1edf8;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.su-public-brand .su-group-obs-fill {
+  display: block;
+  height: 100%;
+  background: #c8202f;
+  border-radius: 3px;
+}
+.su-public-brand .su-group-obs-pct {
+  font-weight: 700;
+  text-align: right;
+  font-size: 12.5px;
+}
+.su-public-brand .su-group-denom {
+  padding-left: 222px;
+  color: #6b6480;
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+
+/* ── Q&A (free text + standalone number) ─────────────────────────────────── */
+.su-public-brand .su-group-qa {
+  margin-bottom: 18px;
+}
+.su-public-brand .su-group-qa-q {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #008bd2;
+  font-size: 15px;
+  margin: 0 0 7px;
+  font-weight: 700;
+  border-bottom: 1px solid #e4dcf0;
+  padding-bottom: 5px;
+}
+.su-public-brand .su-group-qa-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 14px;
+  padding: 5px 0;
+  font-size: 13.5px;
+  align-items: baseline;
+}
+.su-public-brand .su-group-qa-who {
+  color: #6b6480;
+  font-weight: 600;
+}
+.su-public-brand .su-group-qa-who.su-group-ceo {
+  color: #522583;
+}
+.su-public-brand .su-group-qa-num {
+  font-weight: 700;
+  color: #522583;
+  font-variant-numeric: tabular-nums;
+}
+.su-public-brand .su-group-meanline {
+  padding-left: 214px;
+  color: #522583;
+  font-weight: 700;
+  font-size: 12.5px;
+  margin-top: 6px;
+}
+
+/* ── Scored alignment profile ────────────────────────────────────────────── */
+.su-public-brand .su-group-prof {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.su-public-brand .su-group-prof th,
+.su-public-brand .su-group-prof td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #e4dcf0;
+  text-align: right;
+}
+.su-public-brand .su-group-prof thead th:first-child,
+.su-public-brand .su-group-prof tbody th:first-child {
+  text-align: left;
+}
+.su-public-brand .su-group-prof thead th {
+  background: #f0e9fa;
+  color: #522583;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  border-bottom: 2px solid #522583;
+}
+.su-public-brand .su-group-prof tbody th[scope="row"] {
+  font-weight: 500;
+  color: #1a1322;
+}
+.su-public-brand .su-group-prof-sub {
+  display: block;
+  font-weight: 400;
+  font-size: 10px;
+}
+.su-public-brand .su-group-dev .su-group-dev-arrow {
+  font-size: 10px;
+  margin-right: 3px;
+}
+.su-public-brand .su-group-dev.up .su-group-dev-arrow {
+  color: #008bd2;
+}
+.su-public-brand .su-group-dev.dn .su-group-dev-arrow {
+  color: #946b36;
+}
+.su-public-brand .su-group-dev.na,
+.su-public-brand .su-group-na {
+  color: #bdb6cc;
+}
+.su-public-brand .su-group-dev-note {
+  font-size: 11px;
+}
+
+/* Tier band + CEO tier chip */
+.su-public-brand .su-group-tier {
+  display: inline-block;
+  background: #522583;
+  color: #fff;
+  padding: 3px 11px;
+  border-radius: 14px;
+  font-size: 11.5px;
+  font-weight: 700;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.su-public-brand .su-group-tierband {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 0;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.su-public-brand .su-group-tierband-lab {
+  font-size: 12px;
+  color: #6b6480;
+}
+.su-public-brand .su-group-tierband-t {
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: #f4f0fa;
+  color: #522583;
+  font-weight: 600;
+}
+
+/* ScaleUp Score figures */
+.su-public-brand .su-group-scaleup {
+  display: flex;
+  gap: 40px;
+  padding-left: 17px;
+}
+.su-public-brand .su-group-scaleup-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.su-public-brand .su-group-scaleup-lab {
+  font-size: 12px;
+  color: #6b6480;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.su-public-brand .su-group-scaleup-val {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  color: #1a1322;
+}
+.su-public-brand .su-group-scaleup-val.su-group-ceo {
+  color: #522583;
+}
+
+/* Per-question CEO-vs-team bars */
+.su-public-brand .su-group-qbar {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 14px;
+  margin: 9px 0;
+  font-size: 13px;
+  align-items: center;
+}
+.su-public-brand .su-group-qbar-lab {
+  text-align: right;
+  color: #1a1322;
+}
+.su-public-brand .su-group-qbar-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.su-public-brand .su-group-qbar-b {
+  height: 14px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  color: #fff;
+  font-size: 10px;
+  padding-left: 6px;
+  font-weight: 700;
+  min-width: max-content;
+}
+.su-public-brand .su-group-qbar-b.c {
+  background: #522583;
+}
+.su-public-brand .su-group-qbar-b.t {
+  background: #b9a9d6;
+  color: #3f1c66;
+}
+.su-public-brand .su-group-qbar-k {
+  white-space: nowrap;
+}
+
+/* ── Callout notes (no-CEO degrade) ──────────────────────────────────────── */
+.su-public-brand .su-group-note {
+  background: #fff8e1;
+  border-left: 5px solid #f7a600;
+  color: #3a2400;
+  padding: 11px 15px;
+  border-radius: 0 6px 6px 0;
+  font-size: 13px;
+  margin: 6px 0 24px;
+}
+.su-public-brand .su-group-note b {
+  color: #7a4b00;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.su-public-brand .su-group-empty {
+  background: #f4f0fa;
+  border: 1px solid #e4dcf0;
+  border-radius: 8px;
+  padding: 40px 32px;
+  text-align: center;
+  margin: 6px 0 24px;
+}
+.su-public-brand .su-group-empty-title {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 800;
+  font-size: 19px;
+  color: #522583;
+  margin: 0 0 8px;
+}
+.su-public-brand .su-group-empty-sub {
+  font-size: 14px;
+  color: #6b6480;
+  max-width: 48ch;
+  margin: 0 auto;
+}
+
+/* ── Group report — responsive (screen) ──────────────────────────────────── */
+@media (max-width: 720px) {
+  .su-public-brand .su-group-body {
+    padding: 24px 20px 10px;
+  }
+  .su-public-brand .su-group-rat-row {
+    grid-template-columns: 1fr 1.6fr 40px;
+  }
+  .su-public-brand .su-group-obs {
+    grid-template-columns: 1fr 1.6fr 40px;
+  }
+  .su-public-brand .su-group-legend,
+  .su-public-brand .su-group-denom,
+  .su-public-brand .su-group-meanline {
+    padding-left: 0;
+  }
+  .su-public-brand .su-group-qa-row,
+  .su-public-brand .su-group-qbar {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .su-public-brand .su-group-qbar-lab,
+  .su-public-brand .su-group-rat-lab,
+  .su-public-brand .su-group-qa-row .su-group-qa-text {
+    text-align: left;
+  }
+  .su-public-brand .su-group-scaleup {
+    gap: 24px;
+    padding-left: 0;
+  }
+}
+
+/* ── Group report — print ────────────────────────────────────────────────── */
+@media print {
+  .su-public-brand .su-group-sec,
+  .su-public-brand .su-group-qa,
+  .su-public-brand .su-group-empty,
+  .su-public-brand .su-group-note {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .su-public-brand .su-group-mtx tr,
+  .su-public-brand .su-group-prof tr,
+  .su-public-brand .su-group-rat-row,
+  .su-public-brand .su-group-obs,
+  .su-public-brand .su-group-qbar {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .su-public-brand .su-group-mtx thead,
+  .su-public-brand .su-group-prof thead {
+    display: table-header-group;
+  }
+}
