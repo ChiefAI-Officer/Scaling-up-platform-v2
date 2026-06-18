@@ -160,7 +160,10 @@ export function isReportAnswerPresent(type: string, value: unknown): boolean {
  * A section/alias NOT in this map falls through to a type-driven default
  * (see classifyByTypes) so future templates work without edits here.
  */
-const SECTION_PRESENTATION: Record<string, Record<string, PresentationKind>> = {
+export const SECTION_PRESENTATION: Record<
+  string,
+  Record<string, PresentationKind>
+> = {
   "leadership-vision-alignment": {
     S1_financials: "metric-table",
     S2_vision: "qa",
@@ -194,23 +197,45 @@ const SECTION_PRESENTATION: Record<string, Record<string, PresentationKind>> = {
 };
 
 /**
- * Type-driven fallback for sections/aliases not in SECTION_PRESENTATION:
+ * Type-driven fallback for sections/aliases not in SECTION_PRESENTATION,
+ * classifying from a bare list of question TYPES:
  *   - all NUMBER                 → metric-table
- *   - all / majority SLIDER_LIKERT → rating
+ *   - majority SLIDER_LIKERT     → rating
  *   - contains any MULTI_CHOICE  → choices
  *   - otherwise                  → qa
+ *
+ * Exported so the GROUP report model (group-report-model.ts) classifies each
+ * section identically to the per-respondent report and the two cannot drift.
  */
-function classifyByTypes(items: QualItem[]): PresentationKind {
-  if (items.length === 0) return "qa";
-  if (items.some((i) => i.type === "MULTI_CHOICE")) return "choices";
+export function classifyPresentationByTypes(types: string[]): PresentationKind {
+  if (types.length === 0) return "qa";
+  if (types.some((t) => t === "MULTI_CHOICE")) return "choices";
 
-  const numberCount = items.filter((i) => i.type === "NUMBER").length;
-  if (numberCount === items.length) return "metric-table";
+  const numberCount = types.filter((t) => t === "NUMBER").length;
+  if (numberCount === types.length) return "metric-table";
 
-  const sliderCount = items.filter((i) => i.type === "SLIDER_LIKERT").length;
-  if (sliderCount > items.length / 2) return "rating";
+  const sliderCount = types.filter((t) => t === "SLIDER_LIKERT").length;
+  if (sliderCount > types.length / 2) return "rating";
 
   return "qa";
+}
+
+/**
+ * Resolves the presentation kind for a section: the alias-keyed
+ * SECTION_PRESENTATION map FIRST, else the type-driven fallback over the
+ * section's question types. Shared by the per-respondent and group models.
+ */
+export function presentationKindForSection(
+  alias: string | undefined,
+  sectionStableKey: string,
+  types: string[],
+): PresentationKind {
+  const aliasMap = alias ? SECTION_PRESENTATION[alias] : undefined;
+  return aliasMap?.[sectionStableKey] ?? classifyPresentationByTypes(types);
+}
+
+function classifyByTypes(items: QualItem[]): PresentationKind {
+  return classifyPresentationByTypes(items.map((i) => i.type));
 }
 
 // ─── Guards (mirror respondent-report.ts JSON-guarding posture) ──────────────
@@ -234,7 +259,7 @@ interface RawSection {
  * accepting both `[{ stableKey }]` and bare-string `["key"]` shapes (C-M3 — the
  * same membership shape BrandedReport.tsx's parseSections reads).
  */
-function extractSectionQuestionKeys(raw: unknown): string[] {
+export function extractSectionQuestionKeys(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const keys: string[] = [];
   for (const q of raw) {

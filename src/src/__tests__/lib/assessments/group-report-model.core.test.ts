@@ -37,13 +37,23 @@ describe("buildGroupReportModel — dispatch", () => {
     expect(model.questionsByKey.S4_biggest_obstacles?.options?.length).toBe(16);
   });
 
-  it("declares qualitative/scored sections but leaves them stubbed (T4/T5)", () => {
+  it("dispatches the qualitative container for an LVA campaign (T4 fills sections; scored absent)", () => {
     const model = buildGroupReportModel(fixtureLva());
-    // The dispatched section exists for the resolved type; its aggregated
-    // content is empty until the later task fills it.
+    // The dispatched section exists for the resolved type; T4 fills it with the
+    // aggregated qualitative sections. The per-type aggregation contract is
+    // covered in group-report-model.qualitative.test.ts.
     expect(model.qualitative).toBeDefined();
-    expect(model.qualitative?.sections).toEqual([]);
+    expect(Array.isArray(model.qualitative?.sections)).toBe(true);
     expect(model.scored).toBeUndefined();
+  });
+
+  it("scored campaigns still emit an EMPTY scored container (T5 fills it)", () => {
+    // An unknown alias resolves to "scored"; T5 owns scored aggregation, so the
+    // container stays empty here.
+    const model = buildGroupReportModel({ ...fixtureLva(), alias: "some-unknown-alias" });
+    expect(model.scored).toBeDefined();
+    expect(model.scored?.sections).toEqual([]);
+    expect(model.qualitative).toBeUndefined();
   });
 });
 
