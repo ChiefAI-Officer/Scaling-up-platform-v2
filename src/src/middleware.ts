@@ -5,6 +5,15 @@ import {
   getRequestIdentifierFromHeaders,
 } from "@/lib/global-rate-limit";
 
+// R2-LOW-1: the branded results report pages render named PII (scores, answers).
+// Both the per-respondent report (`/assessments/<id>/respondents/<rid>/report`)
+// and the campaign-level GROUP report (`/assessments/<id>/report`) must be served
+// `no-store, private` so they are never cached by the browser or proxies. The
+// optional `(respondents/<rid>/)?` group matches both shapes without matching the
+// bare campaign page, the respondents listing, or API routes.
+export const REPORT_NO_STORE_REGEX =
+  /^\/assessments\/[^/]+\/(respondents\/[^/]+\/)?report\/?$/;
+
 function withRateLimitHeaders(
   response: NextResponse,
   headers?: Record<string, string>
@@ -102,10 +111,11 @@ export default withAuth(
       }
     }
 
-    // H15: the branded results report page renders a respondent's PII (scores,
-    // answers). Force no-store so it isn't cached by the browser/proxies.
+    // H15 / R2-LOW-1: the branded results report pages render named PII (scores,
+    // answers). Force no-store on both the per-respondent and campaign-level group
+    // report so they aren't cached by the browser/proxies. See REPORT_NO_STORE_REGEX.
     const passthrough = NextResponse.next();
-    if (/^\/assessments\/[^/]+\/respondents\/[^/]+\/report\/?$/.test(pathname)) {
+    if (REPORT_NO_STORE_REGEX.test(pathname)) {
       passthrough.headers.set("Cache-Control", "no-store, private");
     }
     return withRateLimitHeaders(passthrough, rateLimitHeaders);
