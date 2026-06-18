@@ -39,6 +39,7 @@ import {
   headlineForTierMetric,
 } from "@/lib/assessments/report-presentation";
 import { reportConfigFor } from "@/lib/assessments/report-config";
+import { QualitativeReport } from "@/components/assessments/QualitativeReport";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -150,6 +151,13 @@ export interface BrandedReportProps {
 }
 
 export function BrandedReport({ report, assessmentName, campaignLabel }: BrandedReportProps) {
+  // Qualitative templates (LVA / QSP) get a wholly different per-respondent
+  // renderer — their answers are mostly free-text/metrics, not scored items.
+  // The scored anatomy below is unchanged for default/scored templates.
+  if (reportConfigFor(report.templateAlias).reportType === "qualitative") {
+    return <QualitativeReport report={report} />;
+  }
+
   const result: ScoreResult = report.result ?? ({} as ScoreResult);
   const perQuestion: PerQuestionResult[] = Array.isArray(result.perQuestion)
     ? result.perQuestion
