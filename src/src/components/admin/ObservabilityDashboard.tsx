@@ -25,6 +25,12 @@ interface DashboardData {
     last24h: number;
     byAction: Record<string, number>;
   };
+  // Wave F #22 (R3-M1) — group report (bulk-PII surface) DB-derived counters.
+  // Optional for back-compat with an older route response.
+  groupReports?: {
+    views24h: number;
+    views7d: number;
+  };
   timestamp: string;
 }
 
@@ -121,6 +127,13 @@ export function ObservabilityDashboard() {
         <Stat label="Invited (org)" value={data.submissions.invited} />
         <Stat label="Public" value={data.submissions.public} />
       </Section>
+
+      {data.groupReports && (
+        <Section title="Group reports">
+          <Stat label="Views 24h" value={data.groupReports.views24h} />
+          <Stat label="Views 7d" value={data.groupReports.views7d} />
+        </Section>
+      )}
 
       <Section title="Audit log (last 24h)">
         <Stat label="Total" value={data.auditLog.last24h} />

@@ -328,3 +328,161 @@ describe("(report) campaign group report page", () => {
     expect(action).toBe("GROUP_REPORT_VIEW");
   });
 });
+
+describe("(report) group report page — R3-M1 ops metrics (assessment.group_report.*)", () => {
+  let infoSpy: jest.SpyInstance;
+
+  // The route emits via emitGroupReportMetric → console.info(JSON.stringify).
+  // Collect every parsed marker for assertion (route behavior is unchanged —
+  // these are additive logging assertions on the existing paths).
+  function markers(): Array<Record<string, unknown>> {
+    return infoSpy.mock.calls
+      .map((c) => {
+        try {
+          return JSON.parse(c[0] as string) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      })
+      .filter(
+        (m): m is Record<string, unknown> =>
+          !!m && typeof m.marker === "string" &&
+          (m.marker as string).startsWith("assessment.group_report."),
+      );
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRateLimit.mockResolvedValue({
+      success: true,
+      remaining: 99,
+      resetAt: Date.now() + 60000,
+    });
+    mockAuditCreate.mockResolvedValue({ id: "audit-1" });
+    infoSpy = jest.spyOn(console, "info").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    infoSpy.mockRestore();
+  });
+
+  it("emits assessment.group_report.view with latencyMs (and no PII) on ok", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockIsEnabled.mockReturnValue(true);
+    mockGetGroupReport.mockResolvedValue(okResult());
+
+    const node = await Page(makeProps());
+    renderToStaticMarkup(node as React.ReactElement);
+
+    const view = markers().find((m) => m.marker === "assessment.group_report.view");
+    expect(view).toBeDefined();
+    expect(view).toEqual(
+      expect.objectContaining({
+        role: "ADMIN",
+        template: "lva",
+        reportType: "qualitative",
+        completedCount: 3,
+        invitedCount: 5,
+        orphanCount: 0,
+        degraded: false,
+      }),
+    );
+    expect(typeof view!.latencyMs).toBe("number");
+
+    // PII guard: no name/email/answer/submissionId across ALL emitted markers.
+    const serialized = JSON.stringify(markers());
+    expect(serialized).not.toContain("Jane CEO");
+    expect(serialized).not.toMatch(/@/);
+    expect(serialized).not.toContain("submissionId");
+  });
+
+  it("emits assessment.group_report.authz_deny on the forbidden path (no view)", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockIsEnabled.mockReturnValue(true);
+    mockGetGroupReport.mockResolvedValue({ kind: "forbidden" });
+
+    await expect(Page(makeProps())).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK");
+
+    const ms = markers();
+    expect(ms.some((m) => m.marker === "assessment.group_report.authz_deny")).toBe(true);
+    expect(ms.some((m) => m.marker === "assessment.group_report.view")).toBe(false);
+  });
+
+  it("emits assessment.group_report.rate_limited (and not view) when shed", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockIsEnabled.mockReturnValue(true);
+    mockRateLimit.mockResolvedValue({ success: false, remaining: 0, resetAt: 0, retryAfter: 60 });
+
+    await expect(Page(makeProps())).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK");
+
+    const ms = markers();
+    expect(ms.some((m) => m.marker === "assessment.group_report.rate_limited")).toBe(true);
+    expect(ms.some((m) => m.marker === "assessment.group_report.view")).toBe(false);
+  });
+
+  it("emits assessment.group_report.not_applicable for a PUBLIC campaign", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockIsEnabled.mockReturnValue(true);
+    mockGetGroupReport.mockResolvedValue({ kind: "notApplicable", reason: "public" });
+
+    const node = await Page(makeProps());
+    renderToStaticMarkup(node as React.ReactElement);
+
+    expect(
+      markers().some((m) => m.marker === "assessment.group_report.not_applicable"),
+    ).toBe(true);
+  });
+
+  it("emits assessment.group_report.empty (with invitedCount) for zero completions", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockIsEnabled.mockReturnValue(true);
+    mockGetGroupReport.mockResolvedValue({
+      kind: "empty",
+      provenance: { ...provenance(), completedCount: 0 },
+    });
+
+    const node = await Page(makeProps());
+    renderToStaticMarkup(node as React.ReactElement);
+
+    const empty = markers().find((m) => m.marker === "assessment.group_report.empty");
+    expect(empty).toEqual(
+      expect.objectContaining({ role: "ADMIN", invitedCount: 5, completedCount: 0 }),
+    );
+  });
+
+  it("emits audit_failure + render_failure (and re-raises) when the audit write throws", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockIsEnabled.mockReturnValue(true);
+    mockGetGroupReport.mockResolvedValue(okResult());
+    mockAuditCreate.mockRejectedValue(new Error("db down"));
+
+    await expect(Page(makeProps())).rejects.toThrow("db down");
+
+    const ms = markers();
+    expect(ms.some((m) => m.marker === "assessment.group_report.audit_failure")).toBe(true);
+    expect(ms.some((m) => m.marker === "assessment.group_report.render_failure")).toBe(true);
+    // No success marker on a failed render.
+    expect(ms.some((m) => m.marker === "assessment.group_report.view")).toBe(false);
+  });
+
+  it("emits degraded + orphan_submission when the model reports them", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockIsEnabled.mockReturnValue(true);
+    const res = okResult();
+    res.report.degraded = true;
+    res.report.respondents = [
+      { respondentId: "r-ceo", name: "Jane CEO", jobTitle: "CEO", isCEO: true, isOrphan: false },
+      { respondentId: "r-x", name: "Unknown respondent", jobTitle: null, isCEO: false, isOrphan: true },
+    ];
+    mockGetGroupReport.mockResolvedValue(res);
+
+    const node = await Page(makeProps());
+    renderToStaticMarkup(node as React.ReactElement);
+
+    const ms = markers();
+    const degraded = ms.find((m) => m.marker === "assessment.group_report.degraded");
+    expect(degraded).toEqual(expect.objectContaining({ degraded: true, template: "lva" }));
+    const orphan = ms.find((m) => m.marker === "assessment.group_report.orphan_submission");
+    expect(orphan).toEqual(expect.objectContaining({ orphanCount: 1, template: "lva" }));
+  });
+});

@@ -45,6 +45,7 @@ import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import { isGroupReportEnabled } from "@/lib/assessments/wave-f-flags";
 import { getCampaignGroupReport } from "@/lib/assessments/group-report";
+import { emitGroupReportMetric } from "@/lib/assessments/group-report-metrics";
 import { checkRateLimitAsync, RateLimits } from "@/lib/rate-limit";
 import type { AuditAction } from "@/lib/audit";
 import {
@@ -94,13 +95,7 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
       RateLimits.standard,
     );
     if (!rl.success) {
-      console.info(
-        JSON.stringify({
-          marker: "assessment.group-report.view",
-          outcome: "rate-limited",
-          role: actor?.role ?? null,
-        }),
-      );
+      emitGroupReportMetric("rate_limited", { role: actor?.role ?? null });
       notFound();
     }
   } catch (err) {
@@ -119,20 +114,36 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
   //    Prisma client at runtime; bridge via the helper's own parameter type.
   const reportDb = db as unknown as Parameters<typeof getCampaignGroupReport>[0];
   const generatedAt = new Date();
-  const result = await getCampaignGroupReport(
-    reportDb,
-    actor,
-    campaignId,
-    generatedAt,
-  );
+
+  // R3-M1 render latency: wall-clock around the load + audit + render. Date.now()
+  // is allowed at the route boundary (the loader/model stay clock-free). Wrapped
+  // in try/catch so a load/render/audit throw emits a `render_failure` marker
+  // (greppable for the 5xx/render-failure alert gate) and re-raises — including
+  // the fail-closed audit-write throw, which ALSO emits an `audit_failure`.
+  const startedAt = Date.now();
+  let result: Awaited<ReturnType<typeof getCampaignGroupReport>>;
+  try {
+    result = await getCampaignGroupReport(reportDb, actor, campaignId, generatedAt);
+  } catch (err) {
+    // notFound()/redirect from inside the load is control flow, not a failure.
+    unstable_rethrow(err);
+    emitGroupReportMetric("render_failure", {
+      role: actor?.role ?? null,
+      latencyMs: Date.now() - startedAt,
+      errorClass: err instanceof Error ? err.constructor.name : "unknown",
+    });
+    throw err;
+  }
 
   // forbidden → 404 (enumeration-safe; do NOT reveal existence). No audit.
   if (result.kind === "forbidden") {
+    emitGroupReportMetric("authz_deny", { role: actor?.role ?? null });
     notFound();
   }
 
   // notApplicable (PUBLIC campaign) → a clean informative panel. No audit.
   if (result.kind === "notApplicable") {
+    emitGroupReportMetric("not_applicable", { role: actor?.role ?? null });
     return (
       <div className="su-report-page">
         <div className="su-group-empty" data-testid="group-report-not-applicable">
@@ -151,6 +162,11 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
   // empty (zero completions) → branded empty-state panel. No audit (nothing
   // sensitive is rendered; the cohort is empty).
   if (result.kind === "empty") {
+    emitGroupReportMetric("empty", {
+      role: actor?.role ?? null,
+      invitedCount: result.provenance.invitedCount,
+      completedCount: 0,
+    });
     return (
       <div className="su-report-page">
         <GroupReportEmpty />
@@ -165,37 +181,78 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
   // logAudit wrapper): a write failure THROWS so we never silently render bulk
   // PII without an audit trail. action is a free-form String column (no
   // migration). changes carries the full provenance for as-of reproducibility.
-  await db.auditLog.create({
-    data: {
-      entityType: "AssessmentCampaign",
-      entityId: campaignId,
-      action: "GROUP_REPORT_VIEW" satisfies AuditAction,
-      performedBy: actor?.email ?? "anon",
-      changes: JSON.stringify({
-        kind: "group-report",
-        generatedAt: provenance.generatedAt.toISOString(),
-        versionId: provenance.versionId,
-        templateAlias: provenance.templateAlias,
-        contentHash: provenance.contentHash,
-        ceoParticipantId: provenance.ceoParticipantId,
-        completedCount: provenance.completedCount,
-        invitedCount: provenance.invitedCount,
-        submissionIds: provenance.submissionIds,
-      }),
-      ipAddress: ip,
-      userAgent,
-    },
-  });
-
-  console.info(
-    JSON.stringify({
-      marker: "assessment.group-report.view",
-      outcome: "ok",
+  // R3-M1: an audit-write throw emits BOTH `audit_failure` (the fail-closed
+  // gate fired) and `render_failure` (the request 5xx'd) — greppable for the
+  // audit-failure + 5xx alert gates — then re-raises (behavior unchanged).
+  try {
+    await db.auditLog.create({
+      data: {
+        entityType: "AssessmentCampaign",
+        entityId: campaignId,
+        action: "GROUP_REPORT_VIEW" satisfies AuditAction,
+        performedBy: actor?.email ?? "anon",
+        changes: JSON.stringify({
+          kind: "group-report",
+          generatedAt: provenance.generatedAt.toISOString(),
+          versionId: provenance.versionId,
+          templateAlias: provenance.templateAlias,
+          contentHash: provenance.contentHash,
+          ceoParticipantId: provenance.ceoParticipantId,
+          completedCount: provenance.completedCount,
+          invitedCount: provenance.invitedCount,
+          submissionIds: provenance.submissionIds,
+        }),
+        ipAddress: ip,
+        userAgent,
+      },
+    });
+  } catch (err) {
+    emitGroupReportMetric("audit_failure", {
       role: actor?.role ?? null,
       template: provenance.templateAlias,
-      completed: provenance.completedCount,
-    }),
-  );
+      errorClass: err instanceof Error ? err.constructor.name : "unknown",
+    });
+    emitGroupReportMetric("render_failure", {
+      role: actor?.role ?? null,
+      latencyMs: Date.now() - startedAt,
+      errorClass: err instanceof Error ? err.constructor.name : "unknown",
+    });
+    throw err;
+  }
+
+  // R3-M1 — degraded / orphan signals derived from the assembled model (no PII;
+  // counts only). degraded = ≥1 dropped answer; orphanCount = cohort members
+  // whose submission has no matching participant row.
+  const orphanCount = report.respondents.filter((r) => r.isOrphan).length;
+  if (report.degraded) {
+    emitGroupReportMetric("degraded", {
+      role: actor?.role ?? null,
+      template: provenance.templateAlias,
+      reportType: report.reportType,
+      degraded: true,
+      completedCount: provenance.completedCount,
+    });
+  }
+  if (orphanCount > 0) {
+    emitGroupReportMetric("orphan_submission", {
+      role: actor?.role ?? null,
+      template: provenance.templateAlias,
+      orphanCount,
+      completedCount: provenance.completedCount,
+    });
+  }
+
+  // R3-M1 — the OK render marker, with wall-clock render latency.
+  emitGroupReportMetric("view", {
+    role: actor?.role ?? null,
+    template: provenance.templateAlias,
+    reportType: report.reportType,
+    completedCount: provenance.completedCount,
+    invitedCount: provenance.invitedCount,
+    orphanCount,
+    degraded: report.degraded,
+    latencyMs: Date.now() - startedAt,
+  });
 
   // CEO display name from the model's CEO respondent (the loader/model own the
   // name snapshot — no extra DB hit).

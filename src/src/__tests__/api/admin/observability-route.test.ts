@@ -137,4 +137,34 @@ describe("GET /api/admin/observability", () => {
     expect(body.data.auditLog.byAction).toEqual({ CREATE: 20, UPDATE: 10 });
     expect(typeof body.data.timestamp).toBe("string");
   });
+
+  it("includes DB-derived group-report view counters (Wave F #22, R3-M1)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    // auditLog.count is called 3x in order: total-last24h, then the two
+    // GROUP_REPORT_VIEW windows (24h, 7d).
+    (db.auditLog.count as jest.Mock)
+      .mockResolvedValueOnce(30) // auditLast24h (total)
+      .mockResolvedValueOnce(7) // GROUP_REPORT_VIEW last 24h
+      .mockResolvedValueOnce(19); // GROUP_REPORT_VIEW last 7d
+    (db.auditLog.groupBy as jest.Mock).mockResolvedValue([
+      { action: "GROUP_REPORT_VIEW", _count: { _all: 7 } },
+    ]);
+
+    const res = await GET(emptyReq() as never);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.data.groupReports).toEqual({ views24h: 7, views7d: 19 });
+
+    // The dedicated GROUP_REPORT_VIEW count query is scoped to the action +
+    // a time window (not a blanket count).
+    const countCalls = (db.auditLog.count as jest.Mock).mock.calls;
+    const grCalls = countCalls.filter(
+      (c) => c[0]?.where?.action === "GROUP_REPORT_VIEW",
+    );
+    expect(grCalls).toHaveLength(2);
+    for (const c of grCalls) {
+      expect(c[0].where.timestamp.gte).toBeInstanceOf(Date);
+    }
+  });
 });
