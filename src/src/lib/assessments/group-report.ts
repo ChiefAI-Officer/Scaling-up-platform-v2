@@ -96,9 +96,13 @@ interface RawCampaign {
   organizationId: string;
   templateId: string;
   versionId: string;
-  template: { alias: string };
+  // Display names threaded through provenance for the T8 renderer — read in
+  // the SAME snapshot (no second un-snapshotted round-trip).
+  organization: { name: string };
+  template: { alias: string; name: string };
   version: {
     id: string;
+    versionNumber: number;
     questions: unknown;
     sections: unknown;
     scoringConfig: unknown;
@@ -141,6 +145,12 @@ export interface GroupReportProvenance {
   contentHash: string;
   /** The rendered submission ids (for the audit trail, T8). */
   submissionIds: string[];
+  /** Owning organization's display name (campaign.organization.name). */
+  companyName: string;
+  /** Instrument title (campaign.template.name) — for the report header. */
+  assessmentName: string;
+  /** Pinned version label "<alias>-v<versionNumber>" for the "as of" line. */
+  versionLabel: string;
 }
 
 export type GroupReportResult =
@@ -209,10 +219,12 @@ export async function getCampaignGroupReport(
           organizationId: true,
           templateId: true,
           versionId: true,
-          template: { select: { alias: true } },
+          organization: { select: { name: true } },
+          template: { select: { alias: true, name: true } },
           version: {
             select: {
               id: true,
+              versionNumber: true,
               questions: true,
               sections: true,
               scoringConfig: true,
@@ -298,6 +310,9 @@ export async function getCampaignGroupReport(
         ceoParticipantId,
         contentHash,
         submissionIds,
+        companyName: campaign.organization.name,
+        assessmentName: campaign.template.name,
+        versionLabel: `${templateAlias}-v${campaign.version.versionNumber}`,
       };
 
       // 0 completed → empty (provenance still carries the invitation counts).

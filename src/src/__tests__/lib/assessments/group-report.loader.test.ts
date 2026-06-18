@@ -41,6 +41,7 @@ const GENERATED_AT = new Date("2026-06-18T12:00:00Z");
 
 const VERSION = {
   id: "ver-1",
+  versionNumber: 2,
   contentHash: "vhash-1",
   sections: [{ stableKey: "s1", name: "Section One" }],
   questions: [
@@ -64,7 +65,8 @@ function makeCampaign(overrides: Record<string, unknown> = {}) {
     templateId: "tpl-1",
     versionId: "ver-1",
     deletedAt: null,
-    template: { alias: "leadership-vision-alignment" },
+    organization: { name: "Acme Corp" },
+    template: { alias: "leadership-vision-alignment", name: "Leadership Vision Alignment" },
     version: VERSION,
     ...overrides,
   };
