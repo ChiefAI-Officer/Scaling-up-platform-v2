@@ -39,7 +39,7 @@
  * ceoName is derived from the model's CEO respondent row.
  */
 
-import { notFound } from "next/navigation";
+import { notFound, unstable_rethrow } from "next/navigation";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
@@ -104,7 +104,12 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
       notFound();
     }
   } catch (err) {
-    if (err instanceof Error && err.message === "NEXT_NOT_FOUND") throw err;
+    // notFound() above throws Next's control-flow error (digest
+    // "NEXT_HTTP_ERROR_FALLBACK;404"). unstable_rethrow re-throws any Next
+    // navigation control-flow (notFound/redirect) and returns for everything
+    // else — so a genuine rate-limiter OUTAGE is logged + tolerated, but a
+    // rate-limit MISS (fail-closed notFound) is NOT swallowed.
+    unstable_rethrow(err);
     console.error("[group-report-page] rate-limit check skipped:", err);
   }
 

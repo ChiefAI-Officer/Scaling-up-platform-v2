@@ -26,10 +26,28 @@ jest.mock("next/navigation", () => ({
       digest: `NEXT_REDIRECT;${url}`,
     });
   }),
+  // Real Next 16 notFound() throws a control-flow error with this digest —
+  // NOT "NEXT_NOT_FOUND". Mock the true shape so the rate-limit fail-closed
+  // path is faithfully exercised.
   notFound: jest.fn().mockImplementation(() => {
-    throw Object.assign(new Error("NEXT_NOT_FOUND"), {
-      digest: "NEXT_NOT_FOUND",
+    throw Object.assign(new Error("NEXT_HTTP_ERROR_FALLBACK;404"), {
+      digest: "NEXT_HTTP_ERROR_FALLBACK;404",
     });
+  }),
+  // Mirrors Next's unstable_rethrow: re-throw navigation control-flow
+  // (notFound/redirect), return for anything else.
+  unstable_rethrow: jest.fn().mockImplementation((err: unknown) => {
+    const digest =
+      typeof err === "object" && err !== null
+        ? (err as { digest?: string }).digest
+        : undefined;
+    if (
+      typeof digest === "string" &&
+      (digest.startsWith("NEXT_HTTP_ERROR_FALLBACK") ||
+        digest.startsWith("NEXT_REDIRECT"))
+    ) {
+      throw err;
+    }
   }),
 }));
 
@@ -185,7 +203,7 @@ describe("(report) campaign group report page", () => {
     mockGetApiActor.mockResolvedValue(adminActor());
     mockIsEnabled.mockReturnValue(false);
 
-    await expect(Page(makeProps())).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(Page(makeProps())).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK");
     expect(mockNotFound).toHaveBeenCalledTimes(1);
     expect(mockGetGroupReport).not.toHaveBeenCalled();
     expect(mockAuditCreate).not.toHaveBeenCalled();
@@ -201,7 +219,7 @@ describe("(report) campaign group report page", () => {
     mockIsEnabled.mockReturnValue(true);
     mockRateLimit.mockResolvedValue({ success: false, remaining: 0, resetAt: 0, retryAfter: 60 });
 
-    await expect(Page(makeProps())).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(Page(makeProps())).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK");
     expect(mockNotFound).toHaveBeenCalledTimes(1);
     expect(mockGetGroupReport).not.toHaveBeenCalled();
     expect(mockAuditCreate).not.toHaveBeenCalled();
@@ -212,7 +230,7 @@ describe("(report) campaign group report page", () => {
     mockIsEnabled.mockReturnValue(true);
     mockGetGroupReport.mockResolvedValue({ kind: "forbidden" });
 
-    await expect(Page(makeProps())).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(Page(makeProps())).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK");
     expect(mockNotFound).toHaveBeenCalledTimes(1);
     expect(mockAuditCreate).not.toHaveBeenCalled();
   });
