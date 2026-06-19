@@ -461,8 +461,14 @@ export function CampaignWizard({
     if (!canActivate) return;
     setSubmitting(true);
     try {
+      // When Wave D auto-send is active and the coach chooses the primary
+      // create button, create+participant attach must be atomic. The create
+      // route advances IMMEDIATELY campaigns out of DRAFT before returning, so
+      // the follow-up DRAFT-only /participants endpoint would reject them.
+      const attachParticipantsInCreate = autoSend && activate;
+
       // 1) Create campaign. Setup-first flip: participants are EXISTING
-      // members picked in Step 2, so the create body no longer carries a
+      // members picked in Step 2, so the create body never carries a
       // `bulkRespondents` array — the company + members already exist.
       const createRes = await fetch("/api/assessment-campaigns", {
         method: "POST",
@@ -510,7 +516,18 @@ export function CampaignWizard({
           // "Wave-D create" (auto-send lifecycle), which with the flag off
           // strands the campaign at the manual /invite 409 gate. Omitting it
           // takes the legacy DRAFT create path (coach's openAt honored).
-          inviteTiming: autoSend ? state.inviteTiming : undefined,
+          // Also omit it for "Save as Draft": that button must stay on the
+          // legacy DRAFT path even when the feature flag is on.
+          inviteTiming: attachParticipantsInCreate
+            ? state.inviteTiming
+            : undefined,
+          participantIds: attachParticipantsInCreate
+            ? state.respondentIds
+            : undefined,
+          ceoRespondentId:
+            attachParticipantsInCreate && state.ceoRespondentId
+              ? state.ceoRespondentId
+              : undefined,
         }),
       });
       const createBody = await createRes.json();
@@ -523,54 +540,50 @@ export function CampaignWizard({
       }
       const campaignId = createBody.data.id as string;
 
-      // 2) Add participants.
-      // TODO: atomic create+participants — the create route does NOT accept
-      // respondentIds/ceoRespondentId (only the deprecated bulkRespondents
-      // create-new path), so picking EXISTING members requires this second
-      // call. Until the create route grows a "pick-existing participants"
-      // input, the campaign row exists before participants are attached, so a
-      // failure here leaves a created-but-empty campaign. We surface that
-      // partial state explicitly (below) rather than a generic error, and do
-      // NOT delete-rollback.
-      const partRes = await fetch(
-        `/api/assessment-campaigns/${campaignId}/participants`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            respondentIds: state.respondentIds,
-            ceoRespondentId: state.ceoRespondentId ?? undefined,
-          }),
-        },
-      );
-      const partBody = await partRes.json();
-      if (!partRes.ok || !partBody.success) {
-        // The campaign WAS created — make the partial state understandable
-        // instead of a generic "Could not save campaign" toast.
-        const reason = extractErrorMessage(
-          partBody.error,
-          "the participants could not be added",
+      // 2) Add participants. Wave-D primary creates already attached them in
+      // the create transaction, before auto-send emit. Legacy creates and
+      // "Save as Draft" still use the DRAFT-only participant endpoint.
+      if (!attachParticipantsInCreate) {
+        const partRes = await fetch(
+          `/api/assessment-campaigns/${campaignId}/participants`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              respondentIds: state.respondentIds,
+              ceoRespondentId: state.ceoRespondentId ?? undefined,
+            }),
+          },
         );
-        // Clear the auto-save draft: the campaign exists, so resuming the
-        // wizard draft would create a duplicate. The coach finishes in the
-        // campaign detail page.
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        try {
-          await fetch(DRAFT_ENDPOINT, { method: "DELETE" });
-        } catch {
-          // best-effort; the campaign was already created
+        const partBody = await partRes.json();
+        if (!partRes.ok || !partBody.success) {
+          // The campaign WAS created — make the partial state understandable
+          // instead of a generic "Could not save campaign" toast.
+          const reason = extractErrorMessage(
+            partBody.error,
+            "the participants could not be added",
+          );
+          // Clear the auto-save draft: the campaign exists, so resuming the
+          // wizard draft would create a duplicate. The coach finishes in the
+          // campaign detail page.
+          if (debounceRef.current) clearTimeout(debounceRef.current);
+          try {
+            await fetch(DRAFT_ENDPOINT, { method: "DELETE" });
+          } catch {
+            // best-effort; the campaign was already created
+          }
+          toast({
+            title: "Campaign created, but adding participants failed",
+            description: `${reason}. Open the campaign to add them.`,
+            variant: "destructive",
+          });
+          router.push(`/portal/assessments/${campaignId}`);
+          return;
         }
-        toast({
-          title: "Campaign created, but adding participants failed",
-          description: `${reason}. Open the campaign to add them.`,
-          variant: "destructive",
-        });
-        router.push(`/portal/assessments/${campaignId}`);
-        return;
       }
 
       // 3) Optionally activate.
-      if (activate) {
+      if (activate && !attachParticipantsInCreate) {
         const actRes = await fetch(
           `/api/assessment-campaigns/${campaignId}/activate`,
           { method: "POST" },

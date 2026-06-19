@@ -229,4 +229,33 @@ describe("CampaignWizard — auto-send flag gates the inviteTiming payload", () 
       );
     });
   });
+
+  it("autoSend=true: sends selected participants in the create body and skips the DRAFT-only participants endpoint", async () => {
+    await advanceToSchedule(true);
+
+    const nameInput = screen.getByLabelText(/campaign name/i);
+    fireEvent.change(nameInput, { target: { value: "Test Campaign" } });
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    const createBtn = await screen.findByRole("button", { name: /create & send/i });
+    await act(async () => {
+      fireEvent.click(createBtn);
+    });
+
+    await waitFor(() => {
+      const createCall = fetchCalls.find(
+        (c) => c.url.endsWith("/api/assessment-campaigns") && c.method === "POST",
+      );
+      expect(createCall).toBeDefined();
+      expect((createCall?.body as Record<string, unknown>)?.participantIds).toEqual([
+        "resp-1",
+      ]);
+    });
+
+    expect(
+      fetchCalls.find((c) =>
+        c.url.includes("/api/assessment-campaigns/camp-1/participants"),
+      ),
+    ).toBeUndefined();
+  });
 });
