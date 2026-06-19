@@ -17,6 +17,7 @@
  *     campaigns: { draft, active, closed, invited, public },
  *     submissions: { total, last24h, last7d, public, invited },
  *     auditLog: { last24h, byAction: Record<string, number> },
+ *     groupReports: { views24h, views7d },  // Wave F #22 (R3-M1), DB-derived
  *     timestamp: ISO string
  *   }
  */
@@ -67,6 +68,8 @@ export async function GET(request: NextRequest) {
       submissionsInvited,
       auditLast24h,
       auditByActionRaw,
+      groupReportViewsLast24h,
+      groupReportViewsLast7d,
     ] = await Promise.all([
       db.coach.count({ where: { certificationStatus: "ACTIVE" } }),
       db.coach.count({ where: { certificationStatus: "PENDING" } }),
@@ -100,6 +103,26 @@ export async function GET(request: NextRequest) {
         by: ["action"],
         where: { timestamp: { gte: oneDayAgo } },
         _count: { _all: true },
+      }),
+      // Wave F #22 (R3-M1): the group report (bulk-PII surface) writes exactly
+      // one GROUP_REPORT_VIEW AuditLog row per successful view (fail-closed).
+      // Derive a dedicated panel from those rows — same DB-derived mechanism as
+      // every other counter here. Successful VIEWS are the auditable signal;
+      // the rest of the assessment.group_report.* signal set (rate_limited /
+      // authz_deny / degraded / orphan / audit_failure / render_failure) is
+      // log-derived (see docs runbook) since those paths intentionally write
+      // no audit row.
+      db.auditLog.count({
+        where: {
+          action: "GROUP_REPORT_VIEW",
+          timestamp: { gte: oneDayAgo },
+        },
+      }),
+      db.auditLog.count({
+        where: {
+          action: "GROUP_REPORT_VIEW",
+          timestamp: { gte: sevenDaysAgo },
+        },
       }),
     ]);
 
@@ -145,6 +168,13 @@ export async function GET(request: NextRequest) {
         auditLog: {
           last24h: auditLast24h,
           byAction,
+        },
+        groupReports: {
+          // DB-derived (GROUP_REPORT_VIEW audit rows). The other
+          // assessment.group_report.* signals are log-derived — see the
+          // Wave F ops runbook for the log queries + alert gates.
+          views24h: groupReportViewsLast24h,
+          views7d: groupReportViewsLast7d,
         },
         timestamp: now.toISOString(),
       },

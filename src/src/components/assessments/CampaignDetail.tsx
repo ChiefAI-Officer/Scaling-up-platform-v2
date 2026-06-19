@@ -68,6 +68,15 @@ export interface CampaignDetailProps {
   initialRespondents: CampaignRespondentRow[];
   /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
+  /**
+   * Wave F #22 (T10) — gates the campaign-level "View group report" entry
+   * point. Computed SERVER-side (accessMode==="INVITED" && flag/canary &&
+   * canViewGroupReport); the client receives ONLY this boolean and never
+   * recomputes auth. Fail-closed: absent/false → no link rendered.
+   */
+  canViewGroupReport?: boolean;
+  /** Wave F #22 (T10) — `/assessments/<id>/report`; only used when the capability is true. */
+  groupReportHref?: string;
 }
 
 interface OrgRespondentRow {
@@ -155,6 +164,8 @@ export function CampaignDetail({
   initialOverview,
   initialRespondents,
   customHtmlEmailEnabled = false,
+  canViewGroupReport = false,
+  groupReportHref,
 }: CampaignDetailProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -879,13 +890,31 @@ export function CampaignDetail({
         >
           <ArrowLeft className="w-4 h-4" /> Back to Assessments
         </Link>
-        <Link
-          href={`/portal/assessments/trends?templateId=${encodeURIComponent(campaign.templateId)}&organizationId=${encodeURIComponent(campaign.organizationId)}`}
-          className="inline-flex items-center gap-2 bg-card border border-border hover:bg-muted/40 text-sm font-medium text-foreground px-3 py-1.5 rounded-lg transition-colors"
-          data-testid="campaign-detail-view-trends"
-        >
-          <LineChart className="w-4 h-4" /> View Trends
-        </Link>
+        <div className="flex items-center gap-2">
+          {canViewGroupReport && groupReportHref && (
+            // Wave F #22 (T10) — gated campaign-level group report entry.
+            // R3-M2: a PLAIN <a> (NOT a Next <Link>): a Link would prefetch
+            // the bulk-PII group report on render — triggering the loader +
+            // a GROUP_REPORT_VIEW audit before any explicit click. target=
+            // "_blank" opens the report in its own tab; rel guards the opener.
+            <a
+              href={groupReportHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-sm font-medium text-primary-foreground px-3 py-1.5 rounded-lg transition-colors"
+              data-testid="campaign-detail-view-group-report"
+            >
+              <FileText className="w-4 h-4" /> View group report
+            </a>
+          )}
+          <Link
+            href={`/portal/assessments/trends?templateId=${encodeURIComponent(campaign.templateId)}&organizationId=${encodeURIComponent(campaign.organizationId)}`}
+            className="inline-flex items-center gap-2 bg-card border border-border hover:bg-muted/40 text-sm font-medium text-foreground px-3 py-1.5 rounded-lg transition-colors"
+            data-testid="campaign-detail-view-trends"
+          >
+            <LineChart className="w-4 h-4" /> View Trends
+          </Link>
+        </div>
       </div>
 
       {/* Overview card */}

@@ -22,7 +22,11 @@
 
 import type { ApiActor } from "@/lib/auth/access-control";
 import { isPrivilegedRole } from "@/lib/auth/access-control";
-import { CERTIFIED_STATUS, DEACTIVATED_STATUS } from "@/lib/auth/coach-status";
+import {
+  CERTIFIED_STATUS,
+  DEACTIVATED_STATUS,
+  isCertified,
+} from "@/lib/auth/coach-status";
 import {
   getAccessPolicyVersion,
   type AccessPolicyVersion,
@@ -272,6 +276,55 @@ export async function canManageCampaign(
   if (!org || org.deletedAt !== null) return false;
   if (org.ownerCoachId !== actor.coachId) return false;
 
+  return canAccessTemplate(db, actor, campaign.templateId);
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// canViewGroupReport — STRICTER gate for the bulk group report (Wave F #22,
+// R2-HIGH-3). The group report is a BULK named-PII disclosure (every
+// respondent's named answers side by side), so it MUST NOT reuse the
+// lenient `canManageCampaign(..., "read")` gate, which intentionally permits
+// RETAINED access (a coach who has LOST template access can still read
+// reports they created). For non-privileged users this applies the SAME
+// write-level CURRENCY checks `canManageCampaign("write")` performs —
+// current org ownership + current template access — PLUS a current
+// active-coach check (mirrors canCreateCampaign). A coach who created the
+// campaign but has since lost template access / org ownership / active
+// status → false. Admin/STAFF bypass (audited elsewhere).
+// ────────────────────────────────────────────────────────────────────────
+
+export async function canViewGroupReport(
+  db: AccessControlDb,
+  actor: ApiActor,
+  campaignId: string,
+): Promise<boolean> {
+  // SEC-M6: LIVE-only — a soft-deleted campaign is not-found / no access for
+  // everyone (admin included). Mirrors canManageCampaign's load.
+  const campaign = await db.assessmentCampaign.findFirst({
+    where: { id: campaignId, deletedAt: null },
+  });
+  if (!campaign) return false;
+
+  if (isPrivilegedRole(actor.role)) return true;
+  if (!actor.coachId) return false;
+
+  // Coach must be the campaign creator; admin-created PUBLIC campaigns
+  // (createdByCoachId=null) are admin-only.
+  if (campaign.createdByCoachId === null) return false;
+  if (campaign.createdByCoachId !== actor.coachId) return false;
+
+  // Currency check 1: the coach must CURRENTLY be active (certified).
+  const coach = await db.coach.findUnique({ where: { id: actor.coachId } });
+  if (!coach || !isCertified(coach)) return false;
+
+  // Currency check 2: the coach must STILL own the campaign's org.
+  const org = await db.organization.findUnique({
+    where: { id: campaign.organizationId },
+  });
+  if (!org || org.deletedAt !== null) return false;
+  if (org.ownerCoachId !== actor.coachId) return false;
+
+  // Currency check 3: the coach must STILL have template access.
   return canAccessTemplate(db, actor, campaign.templateId);
 }
 
