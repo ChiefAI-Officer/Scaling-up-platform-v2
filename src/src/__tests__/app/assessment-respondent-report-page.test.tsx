@@ -20,10 +20,29 @@ jest.mock("next/navigation", () => ({
       digest: `NEXT_REDIRECT;${url}`,
     });
   }),
+  // Real Next 16 notFound() throws a control-flow error with this digest —
+  // NOT "NEXT_NOT_FOUND". Mock the true shape so the rate-limit fail-closed
+  // path is faithfully exercised (the prior mock's stale digest let the
+  // rate-limit guard's bad `err.message === "NEXT_NOT_FOUND"` check pass).
   notFound: jest.fn().mockImplementation(() => {
-    throw Object.assign(new Error("NEXT_NOT_FOUND"), {
-      digest: "NEXT_NOT_FOUND",
+    throw Object.assign(new Error("NEXT_HTTP_ERROR_FALLBACK;404"), {
+      digest: "NEXT_HTTP_ERROR_FALLBACK;404",
     });
+  }),
+  // Mirrors Next's unstable_rethrow: re-throw navigation control-flow
+  // (notFound/redirect), return for anything else.
+  unstable_rethrow: jest.fn().mockImplementation((err: unknown) => {
+    const digest =
+      typeof err === "object" && err !== null
+        ? (err as { digest?: string }).digest
+        : undefined;
+    if (
+      typeof digest === "string" &&
+      (digest.startsWith("NEXT_HTTP_ERROR_FALLBACK") ||
+        digest.startsWith("NEXT_REDIRECT"))
+    ) {
+      throw err;
+    }
   }),
 }));
 
@@ -37,6 +56,24 @@ jest.mock("@/lib/assessments/respondent-report", () => ({
 
 jest.mock("@/lib/audit", () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("@/lib/rate-limit", () => ({
+  checkRateLimitAsync: jest.fn().mockResolvedValue({
+    success: true,
+    remaining: 99,
+    resetAt: Date.now() + 60000,
+  }),
+  RateLimits: { standard: { interval: 60000, maxRequests: 100 } },
+}));
+
+// next/headers has no request scope under jest; provide a stand-in so the
+// rate-limit guard is genuinely exercised (without this, headers() throws,
+// the catch swallows it, and the rate-limit branch is never reached).
+jest.mock("next/headers", () => ({
+  headers: jest.fn().mockResolvedValue({
+    get: () => null,
+  }),
 }));
 
 // Real BrandedReport renders deep markup; render a thin stand-in so the page
@@ -69,6 +106,7 @@ import { redirect, notFound } from "next/navigation";
 import { getApiActor } from "@/lib/auth/authorization";
 import { getRespondentReport } from "@/lib/assessments/respondent-report";
 import { logAudit } from "@/lib/audit";
+import { checkRateLimitAsync } from "@/lib/rate-limit";
 import Page from "@/app/(report)/assessments/[id]/respondents/[respondentId]/report/page";
 import type { ApiActor } from "@/lib/auth/access-control";
 
@@ -77,6 +115,7 @@ const mockGetRespondentReport = getRespondentReport as jest.Mock;
 const mockLogAudit = logAudit as jest.Mock;
 const mockRedirect = redirect as unknown as jest.Mock;
 const mockNotFound = notFound as unknown as jest.Mock;
+const mockRateLimit = checkRateLimitAsync as unknown as jest.Mock;
 
 function makeProps(id = "camp-1", respondentId = "resp-1") {
   return { params: Promise.resolve({ id, respondentId }) };
@@ -130,6 +169,12 @@ function okReport() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Default to an allowed request; the rate-limit-exceeded test overrides this.
+  mockRateLimit.mockResolvedValue({
+    success: true,
+    remaining: 99,
+    resetAt: Date.now() + 60000,
+  });
 });
 
 describe("(report) respondent report page", () => {
@@ -218,7 +263,7 @@ describe("(report) respondent report page", () => {
     mockGetApiActor.mockResolvedValue(coachActor());
     mockGetRespondentReport.mockResolvedValue({ status: "forbidden" });
 
-    await expect(Page(makeProps())).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(Page(makeProps())).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK");
     expect(mockNotFound).toHaveBeenCalledTimes(1);
     expect(mockLogAudit).not.toHaveBeenCalled();
   });
@@ -227,8 +272,28 @@ describe("(report) respondent report page", () => {
     mockGetApiActor.mockResolvedValue(coachActor());
     mockGetRespondentReport.mockResolvedValue({ status: "not-found" });
 
-    await expect(Page(makeProps())).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(Page(makeProps())).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK");
     expect(mockNotFound).toHaveBeenCalledTimes(1);
+    expect(mockLogAudit).not.toHaveBeenCalled();
+  });
+
+  it("fails closed (notFound) when rate-limit is exceeded — load + audit NOT reached (Wave I hardening)", async () => {
+    // Regression: the catch around the rate-limit guard used to test
+    // `err.message === "NEXT_NOT_FOUND"`, but Next 16's notFound() throws the
+    // digest "NEXT_HTTP_ERROR_FALLBACK;404" — so the guard never matched and
+    // the fail-closed notFound() was SWALLOWED, letting the report render
+    // (and audit) past an exceeded rate limit. unstable_rethrow fixes it.
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockRateLimit.mockResolvedValue({
+      success: false,
+      remaining: 0,
+      resetAt: 0,
+      retryAfter: 60,
+    });
+
+    await expect(Page(makeProps())).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK");
+    expect(mockNotFound).toHaveBeenCalledTimes(1);
+    expect(mockGetRespondentReport).not.toHaveBeenCalled();
     expect(mockLogAudit).not.toHaveBeenCalled();
   });
 
