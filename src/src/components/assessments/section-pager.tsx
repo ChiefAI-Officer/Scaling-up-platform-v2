@@ -22,15 +22,9 @@ interface SectionPagerProps {
   requireAtLeastOneAnswer?: boolean;
 }
 
-function pageHasIntro(p: SectionPage): boolean {
-  const hasQuestions = p.questions.length > 0;
-  return (p.description?.trim()?.length ?? 0) > 0 || !hasQuestions;
-}
-
 export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName, requireAtLeastOneAnswer }: SectionPagerProps) {
   const [sectionIndex, setSectionIndex] = React.useState(0);
   const page = pages[sectionIndex];
-  const [view, setView] = React.useState<"intro" | "questions">(page && pageHasIntro(page) ? "intro" : "questions");
   const [showGateError, setShowGateError] = React.useState(false);
   const [invalidKeys, setInvalidKeys] = React.useState<Set<string>>(new Set());
   const [gateMessage, setGateMessage] = React.useState<string>("");
@@ -49,8 +43,6 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     );
   }
 
-  const hasQuestions = page.questions.length > 0;
-  const hasIntro = pageHasIntro(page);
   const isLast = sectionIndex === pages.length - 1;
   const answeredCount = pages.flatMap((p) => p.questions).filter((q) => isAnswered(answers[q.stableKey])).length;
   const total = pages.flatMap((p) => p.questions).length;
@@ -75,18 +67,12 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     });
   }
 
-  function goToSection(idx: number) {
-    const next = pages[idx];
-    setSectionIndex(idx);
-    setView(pageHasIntro(next) ? "intro" : "questions");
+  function advance() {
+    if (isLast) { attemptSubmit(); return; }
+    setSectionIndex(sectionIndex + 1);
     setShowGateError(false);
     setInvalidKeys(new Set());
     focusHeading();
-  }
-  function advance() { if (isLast) { attemptSubmit(); return; } goToSection(sectionIndex + 1); }
-  function handleForwardFromIntro() {
-    if (hasQuestions) { setView("questions"); setShowGateError(false); focusHeading(); }
-    else { advance(); }
   }
   function attemptSubmit() {
     const totalAnswered = pages.flatMap((p) => p.questions).filter((q) => isAnswered(answers[q.stableKey])).length;
@@ -113,20 +99,14 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     advance();
   }
   function handleBack() {
-    if (view === "questions" && hasIntro) { setView("intro"); setShowGateError(false); focusHeading(); return; }
     if (sectionIndex === 0) { onExit?.(); return; }
-    const prev = sectionIndex - 1;
-    setSectionIndex(prev);
-    setView(pages[prev].questions.length > 0 ? "questions" : "intro");
+    setSectionIndex(sectionIndex - 1);
     setShowGateError(false);
     focusHeading();
   }
 
-  const introForwardLabel = isLast && !hasQuestions ? "Submit" : "Begin section →";
-  const questionCount = page.questions.length;
-
-  // Domain accent for the section-intro rail + number badge. Neutral grey when
-  // the section carries no domain (report-presentation handles the fallback).
+  // Domain accent for the section-intro rail. Neutral grey when the section
+  // carries no domain (report-presentation handles the fallback).
   const accent = domainColor(page.domain ?? "");
   // Step label = the section's own partLabel ("Fundamental 1" in the mockup)
   // when present. The shell header already carries the canonical "Section N of
@@ -144,75 +124,44 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
         totalQuestions={total}
       />
 
-      {view === "intro" ? (
-        <section
-          className="su-intro-slide"
-          aria-labelledby="su-intro-heading"
-          style={{ ["--su-section-accent" as string]: accent }}
-        >
-          {/* Domain accent rail — colored top bar (neutral when no domain). */}
-          <div className="su-intro-rail" aria-hidden="true" />
-          <div className="su-intro-kicker">
-            <span className="su-intro-stepblock">
-              {stepLabel ? <span className="su-intro-label">{stepLabel}</span> : null}
-              <h2
-                id="su-intro-heading"
-                ref={headingRef}
-                tabIndex={-1}
-                className="su-intro-title"
-              >
-                {page.name}
-              </h2>
-            </span>
+      <section
+        className="su-section-intro"
+        style={{ ["--su-section-accent" as string]: accent }}
+      >
+        {/* Domain accent rail — colored top bar (neutral when no domain). */}
+        <div className="su-intro-rail" aria-hidden="true" />
+        {stepLabel ? <span className="su-intro-label">{stepLabel}</span> : null}
+        <h2 ref={headingRef} tabIndex={-1} className="survey-section-title">
+          {page.name}
+        </h2>
+        {page.description?.trim() ? (
+          <div className="su-intro-covers">
+            <span className="su-intro-covers-k">What this section covers</span>
+            <p className="su-intro-desc">{page.description}</p>
           </div>
-          {page.description?.trim() ? (
-            <div className="su-intro-covers">
-              <span className="su-intro-covers-k">What this section covers</span>
-              <p className="su-intro-desc">{page.description}</p>
-            </div>
-          ) : null}
-          <div className="su-intro-meta">
-            {questionCount > 0 ? (
-              <span className="su-intro-estimate">
-                {questionCount} question{questionCount !== 1 ? "s" : ""}
-              </span>
-            ) : <span />}
-            <button
-              type="button"
-              className="su-intro-begin"
-              onClick={handleForwardFromIntro}
-              disabled={submitting}
-            >
-              {introForwardLabel}
-            </button>
-          </div>
-          <div className="survey-nav su-intro-back-row">
-            <button type="button" className="wf-btn wf-btn-ghost su-intro-back" onClick={handleBack}>← Back</button>
-          </div>
-        </section>
-      ) : (
-        <>
-          <h2 ref={headingRef} tabIndex={-1} className="survey-section-title">
-            {page.partLabel ? `${page.partLabel}: ` : ""}{page.name}
-          </h2>
-          <ul className="survey-question-list">
-            {page.questions.map((q) => (
-              <li key={q.stableKey} className="survey-question">
-                <label htmlFor={`q-${q.stableKey}`} className="survey-question-label">
-                  {q.label}{q.isRequired ? <span className="survey-required" aria-hidden="true"> *</span> : null}
-                </label>
-                {q.helpText ? <p className="survey-question-help">{q.helpText}</p> : null}
-                <QuestionInput question={q} value={answers[q.stableKey]} onChange={handleAnswerChange} disabled={submitting} invalid={invalidKeys.has(q.stableKey)} />
-              </li>
-            ))}
-          </ul>
-          {showGateError ? <p role="alert" className="survey-error">{gateMessage}</p> : null}
-          <div className="survey-nav">
-            <button type="button" className="wf-btn wf-btn-secondary" onClick={handleBack}>Back</button>
-            <button type="button" className="wf-btn wf-btn-primary" onClick={handleNext} disabled={submitting}>{isLast ? "Submit" : "Next"}</button>
-          </div>
-        </>
-      )}
+        ) : null}
+      </section>
+
+      {page.questions.length > 0 ? (
+        <ul className="survey-question-list">
+          {page.questions.map((q) => (
+            <li key={q.stableKey} className="survey-question">
+              <label htmlFor={`q-${q.stableKey}`} className="survey-question-label">
+                {q.label}{q.isRequired ? <span className="survey-required" aria-hidden="true"> *</span> : null}
+              </label>
+              {q.helpText ? <p className="survey-question-help">{q.helpText}</p> : null}
+              <QuestionInput question={q} value={answers[q.stableKey]} onChange={handleAnswerChange} disabled={submitting} invalid={invalidKeys.has(q.stableKey)} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {showGateError ? <p role="alert" className="survey-error">{gateMessage}</p> : null}
+
+      <div className="survey-nav">
+        <button type="button" className="wf-btn wf-btn-secondary" onClick={handleBack}>Back</button>
+        <button type="button" className="wf-btn wf-btn-primary" onClick={handleNext} disabled={submitting}>{isLast ? "Submit" : "Next"}</button>
+      </div>
     </div>
   );
 }
