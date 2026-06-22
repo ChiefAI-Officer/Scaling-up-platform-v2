@@ -21,12 +21,20 @@ jest.mock("@/lib/rate-limit", () => ({
   checkRateLimitAsync: jest.fn(),
   RateLimits: { standard: { interval: 60000, maxRequests: 100 } },
 }));
+jest.mock("@/lib/assessments/respondent-report", () => ({ getRespondentReport: jest.fn() }));
+jest.mock("@/lib/assessments/report-config", () => ({
+  reportConfigFor: jest.fn(() => ({ reportType: "qualitative" })),
+}));
 
 import { viewReport } from "@/lib/assessments/report-gate-core";
 import { getApiActor } from "@/lib/auth/authorization";
 import { headers } from "next/headers";
 import { isGroupReportEnabled } from "@/lib/assessments/wave-f-flags";
-import { viewGroupReport, ipFromHeaders } from "@/lib/assessments/report-access-gate";
+import {
+  viewGroupReport,
+  viewRespondentReport,
+  ipFromHeaders,
+} from "@/lib/assessments/report-access-gate";
 
 const mockViewReport = viewReport as jest.Mock;
 const mockGetApiActor = getApiActor as jest.Mock;
@@ -136,5 +144,81 @@ describe("viewGroupReport adapter", () => {
     expect(ipFromHeaders(fakeHeaders({ "x-forwarded-for": "9.9.9.9, 1.1.1.1" }) as never)).toBe("9.9.9.9");
     expect(ipFromHeaders(fakeHeaders({ "x-real-ip": "8.8.8.8" }) as never)).toBe("8.8.8.8");
     expect(ipFromHeaders(fakeHeaders({}) as never)).toBe("localhost");
+  });
+});
+
+describe("viewRespondentReport adapter", () => {
+  it("wires surface/policy + the strengthened key (actorKey = coachId first)", async () => {
+    mockGetApiActor.mockResolvedValue({ userId: "u1", email: "c@x.com", role: "COACH", coachId: "coach-9" });
+    await viewRespondentReport({} as never, { campaignId: "camp-1", respondentId: "resp-7" });
+    const opts = lastOpts();
+    expect(opts.surface).toBe("respondent");
+    expect(opts.noActorPolicy).toBe("redirect-login");
+    expect(opts.flagGate).toBeUndefined();
+    // fix #2: strengthened from IP-only to actor+campaign+respondent+IP.
+    expect(opts.rateLimitKey).toBe("report:coach-9:camp-1:resp-7:9.9.9.9");
+    expect(opts.metricRole).toBe("COACH");
+    expect(opts.userAgent).toBe("UA/1");
+  });
+
+  it("actorKey falls back userId → anon", async () => {
+    mockGetApiActor.mockResolvedValue({ userId: "u2", email: "a@x.com", role: "ADMIN", coachId: null });
+    await viewRespondentReport({} as never, { campaignId: "c", respondentId: "r" });
+    expect(lastOpts().rateLimitKey).toBe("report:u2:c:r:9.9.9.9");
+
+    mockViewReport.mockClear();
+    mockGetApiActor.mockResolvedValue(null);
+    await viewRespondentReport({} as never, { campaignId: "c", respondentId: "r" });
+    expect(lastOpts().rateLimitKey).toBe("report:anon:c:r:9.9.9.9");
+    expect(lastOpts().metricRole).toBeNull();
+  });
+
+  it("classify maps statuses → dispositions", async () => {
+    mockGetApiActor.mockResolvedValue({ userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null });
+    await viewRespondentReport({} as never, { campaignId: "c", respondentId: "r" });
+    const { classify } = lastOpts();
+    expect(classify({ status: "ok" })).toBe("ok");
+    expect(classify({ status: "forbidden" })).toBe("forbidden");
+    expect(classify({ status: "not-found" })).toBe("not-found");
+  });
+
+  it("auditOf builds the VIEW_REPORT spec (templateAlias + reportType + provenance)", async () => {
+    mockGetApiActor.mockResolvedValue({ userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null });
+    await viewRespondentReport({} as never, { campaignId: "c", respondentId: "r" });
+    const spec = lastOpts().auditOf({
+      status: "ok",
+      report: {
+        templateAlias: "lva",
+        provenance: { submissionId: "sub-1", versionId: "v-1", contentHash: "h" },
+      },
+    });
+    expect(spec).toMatchObject({
+      entityType: "AssessmentSubmission",
+      action: "VIEW_REPORT",
+      entityId: "sub-1",
+    });
+    expect(spec.changes).toMatchObject({
+      kind: "respondent-report",
+      templateAlias: "lva",
+      reportType: "qualitative",
+      versionId: "v-1",
+      contentHash: "h",
+    });
+  });
+
+  it("auditOf preserves templateAlias ?? null when the alias is undefined", async () => {
+    mockGetApiActor.mockResolvedValue({ userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null });
+    await viewRespondentReport({} as never, { campaignId: "c", respondentId: "r" });
+    const spec = lastOpts().auditOf({
+      status: "ok",
+      report: { provenance: { submissionId: "s", versionId: "v", contentHash: "h" } },
+    });
+    expect(spec.changes.templateAlias).toBeNull();
+  });
+
+  it("has no auditFailureFields (respondent had no audit_failure metric before)", async () => {
+    mockGetApiActor.mockResolvedValue({ userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null });
+    await viewRespondentReport({} as never, { campaignId: "c", respondentId: "r" });
+    expect(lastOpts().auditFailureFields).toBeUndefined();
   });
 });
