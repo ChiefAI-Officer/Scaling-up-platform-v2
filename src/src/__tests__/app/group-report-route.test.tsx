@@ -4,20 +4,22 @@
  * URL: /assessments/[id]/report (sibling to the per-respondent report; same
  * (report) brand-scoped route group, no portal chrome).
  *
- * The page is a server component that:
- *  - resolves the actor server-side (getApiActor)
+ * Since the Report access gate refactor (ADR-0012, PR1), the cross-cutting
+ * protocol lives in `viewGroupReport` → the pure `viewReport` core. This file
+ * mocks ONLY the leaves (getApiActor, headers, the flag, the loader, rate-limit,
+ * db.auditLog.create, the GroupReport components) and drives the REAL page →
+ * adapter → gate chain — i.e. it is the leaf-mocked INTEGRATION suite proving
+ * the wiring is connected end-to-end (the gate's protocol itself is unit-tested
+ * against fakes in report-gate-core.test.ts). The asserted, observable behavior
+ * is unchanged from the pre-gate inline implementation:
  *  - FLAG-GATES first: isGroupReportEnabled(actor, {id}) === false → notFound()
  *    (404, loader NOT called)
- *  - rate-limits BEFORE the expensive load; exceeded → notFound() (fail-closed,
- *    loader NOT called)
- *  - gates on getCampaignGroupReport:
- *      forbidden     → notFound() (enumeration-safe; no existence leak)
- *      notApplicable → the invited-only informative panel (no audit)
- *      empty         → the empty-state panel (no audit)
- *      ok            → writes EXACTLY ONE GROUP_REPORT_VIEW audit row DIRECTLY
- *                      via db.auditLog.create (fail-CLOSED — a write failure
- *                      throws, never a silent render) then renders <GroupReport>
- *  - marks the segment force-dynamic / revalidate 0 (H15 cache/PII)
+ *  - rate-limits BEFORE the load; exceeded → notFound() (fail-closed, no load)
+ *  - forbidden → notFound() (enumeration-safe; no audit)
+ *  - notApplicable / empty → the panels (no audit)
+ *  - ok → EXACTLY ONE fail-closed GROUP_REPORT_VIEW audit row, then <GroupReport>
+ *  - structured assessment.group_report.* metrics (now via emitReportMetric, with
+ *    an additive `surface: "group"` field); marks force-dynamic / revalidate 0.
  */
 
 jest.mock("next/navigation", () => ({

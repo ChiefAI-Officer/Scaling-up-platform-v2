@@ -84,7 +84,13 @@ An instrument with no real scoring — Quarterly Session Prep v1 and v2. Respons
 
 **Results report** (a.k.a. "the report", "the PDF"):
 The branded, printable **per-respondent** document a coach/admin views for *one* completed submission — cover, overall result, per-section breakdown, scores table, recommendations (when present), conclusion. It is the human-readable view that **replaces the raw answer (`stableKey`) view**. It is per individual.
-_Avoid_: conflating the per-respondent **Results report** with a cohort **Aggregate report** (Esperto's "group" / "self-comparison" report — the facilitator's all-responses dashboard, a separate out-of-scope artifact).
+_Avoid_: conflating the per-respondent **Results report** with a cohort **Aggregate report** (Esperto's "group" / "self-comparison" report — the facilitator's all-responses dashboard; shipped for LVA in Wave F).
+
+### Viewing reports
+
+**Report access gate**:
+The single server-side envelope every report-viewing route passes through before a report renders. It owns the *cross-cutting* protocol — actor resolution, the rate-limit guard (fail-closed to an enumeration-safe 404 when exceeded, but tolerant of a rate-limiter *outage*), the fail-closed audit write (with IP/UA + report provenance), no-store, and structured view metrics — and it wraps a report *loader*. The **loader** owns the domain authorization (`canManageCampaign` / `canViewGroupReport`) and returns the discriminated outcome (forbidden / notApplicable / empty / ok); the gate writes the audit + emits metrics on `ok` and hands the outcome back to the page, which renders each case. Two adapters today: the per-respondent **Results report** and the cohort **Aggregate report**.
+_Avoid_: "middleware" (the real `no-store` response header is set in Next middleware — a separate layer), "auth guard" (authorization lives in the loader, not the gate — the gate never decides who may see what).
 
 ## Relationships
 
@@ -92,6 +98,7 @@ _Avoid_: conflating the per-respondent **Results report** with a cohort **Aggreg
 - A **Campaign** pins exactly one **Template Version** and targets many **Respondents** (each via a **Participant** record).
 - A scored **Template Version** defines **Scoring Tiers**; a Scaling Up Full version additionally defines **Domains** and per-question **Recommendations**.
 - A **Respondent**'s progress in a campaign is an **Invitation status band**; their answers, once submitted, may produce a **Scoring tier** result.
+- A **Results report** (per-respondent) and an **Aggregate report** (cohort) are both viewed through the **Report access gate**, which wraps each one's **loader**.
 
 ## Example dialogue
 
