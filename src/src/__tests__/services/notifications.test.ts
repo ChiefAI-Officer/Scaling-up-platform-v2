@@ -350,3 +350,140 @@ describe("sendAssessmentInvitationEmail — full-HTML override (#20)", () => {
     expect(args.html.split("#t=SECRET").length - 1).toBe(1);
   });
 });
+
+// ===========================================================================
+// sendAssessmentInvitationEmail — default body/subject at the send chokepoint
+// (Wave G) + legacy subject hardening + send telemetry
+// ===========================================================================
+
+// A distinctive phrase from DEFAULT_INVITATION_BODY (lib/assessments/invitation-defaults.ts).
+// Apostrophe-free substring so it matches in both the HTML-escaped body
+// ("You&#039;ve been invited to complete") and the unescaped plain-text body.
+const DEFAULT_BODY_PHRASE = "been invited to complete";
+const DEFAULT_SUBJECT = "Your Scaling Up assessment invitation";
+const DEFAULT_VERSION = "wave-g-1";
+
+describe("sendAssessmentInvitationEmail — default body/subject + telemetry (Wave G)", () => {
+  const ORIGINAL_FLAG = process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+  const ORIGINAL_BRANDED = process.env.ASSESSMENT_INVITE_BRANDED;
+
+  // baseData with BLANK subject + body so defaults kick in.
+  const blankData = () => ({
+    invitation: { id: "inv1", expiresAt: new Date("2026-07-01T00:00:00Z") },
+    respondent: { id: "r1", firstName: "Jane", lastName: "Doe", email: "jane@example.com" },
+    campaign: { id: "c1", name: "Q1 Alignment", alias: "abc", closeAt: null as Date | null },
+    template: {
+      invitationSubject: "",
+      invitationBodyMarkdown: "   ", // whitespace-only — must be treated as blank
+    },
+    organizationName: "Acme Corp",
+    coachName: "Pat Coach",
+    templateName: "Five Dysfunctions",
+    rawToken: "SECRET",
+    baseUrl: "https://app.test",
+  });
+
+  beforeEach(() => {
+    mockSendEmailViaSMTP.mockClear();
+    delete process.env.ASSESSMENT_INVITE_BRANDED; // branded path on by default
+    delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+  });
+
+  afterEach(() => {
+    if (ORIGINAL_FLAG === undefined) delete process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED;
+    else process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = ORIGINAL_FLAG;
+    if (ORIGINAL_BRANDED === undefined) delete process.env.ASSESSMENT_INVITE_BRANDED;
+    else process.env.ASSESSMENT_INVITE_BRANDED = ORIGINAL_BRANDED;
+  });
+
+  it("1. branded + blank subject & body → defaults fill in + telemetry says default", async () => {
+    await sendAssessmentInvitationEmail(blankData());
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.subject).toBe(DEFAULT_SUBJECT);
+    // The default body's distinctive phrase appears in the rendered HTML and text.
+    expect(args.html).toContain(DEFAULT_BODY_PHRASE);
+    expect(args.text).toContain(DEFAULT_BODY_PHRASE);
+    expect(args.telemetry.metadata).toMatchObject({
+      renderer: "branded",
+      subjectSource: "default",
+      bodySource: "default",
+      defaultVersion: DEFAULT_VERSION,
+    });
+  });
+
+  it("2. branded + authored subject & body → defaults NOT used", async () => {
+    await sendAssessmentInvitationEmail({
+      ...blankData(),
+      template: {
+        invitationSubject: "Take {{campaignName}}",
+        invitationBodyMarkdown: "Hello {{respondentFirstName}}, please begin.",
+      },
+    });
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.subject).toBe("Take Q1 Alignment");
+    expect(args.subject).not.toBe(DEFAULT_SUBJECT);
+    expect(args.html).toContain("Hello Jane, please begin.");
+    expect(args.html).not.toContain(DEFAULT_BODY_PHRASE);
+    expect(args.telemetry.metadata).toMatchObject({
+      renderer: "branded",
+      subjectSource: "authored",
+      bodySource: "authored",
+      defaultVersion: null,
+    });
+  });
+
+  it("3. legacy (ASSESSMENT_INVITE_BRANDED=0) + blank → default subject + body with resolved org/template tokens", async () => {
+    process.env.ASSESSMENT_INVITE_BRANDED = "0";
+    await sendAssessmentInvitationEmail(blankData());
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.subject).toBe(DEFAULT_SUBJECT);
+    expect(args.html).toContain(DEFAULT_BODY_PHRASE);
+    // The default body interpolates {{templateName}} + {{organizationName}} —
+    // the OLD legacy substitute() didn't know those tokens.
+    expect(args.html).toContain("Five Dysfunctions");
+    expect(args.html).toContain("Acme Corp");
+    expect(args.telemetry.metadata).toMatchObject({
+      type: "assessment_invitation_legacy",
+      renderer: "legacy",
+      subjectSource: "default",
+      bodySource: "default",
+      defaultVersion: DEFAULT_VERSION,
+    });
+  });
+
+  it("4. legacy + authored subject with raw CR/LF + url token → renderSubject strips the credential and control chars", async () => {
+    process.env.ASSESSMENT_INVITE_BRANDED = "0";
+    await sendAssessmentInvitationEmail({
+      ...blankData(),
+      template: {
+        invitationSubject: "Hi {{invitationUrl}}\r\ninjected",
+        invitationBodyMarkdown: "body",
+      },
+    });
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    // The header-injection / credential leak is closed by renderSubject.
+    expect(args.subject).not.toContain("#t=");
+    expect(args.subject).not.toContain("\r");
+    expect(args.subject).not.toContain("\n");
+    expect(args.subject).not.toContain("https://app.test");
+  });
+
+  it("5. custom-HTML + blank subject → subject defaulted, body is the full HTML (not the default body)", async () => {
+    process.env.WAVE_D_CUSTOM_HTML_EMAIL_ENABLED = "1";
+    await sendAssessmentInvitationEmail({
+      ...blankData(),
+      invitationBodyHtml: '<h1>Custom</h1><p>Hi {{respondentFirstName}}</p><a href="{{invitationUrl}}">Start</a>',
+    });
+    const args = mockSendEmailViaSMTP.mock.calls[0][0];
+    expect(args.subject).toBe(DEFAULT_SUBJECT);
+    // The full HTML is the body — the default body phrase is ABSENT.
+    expect(args.html).toContain("<h1>Custom</h1>");
+    expect(args.html).not.toContain(DEFAULT_BODY_PHRASE);
+    expect(args.telemetry.metadata).toMatchObject({
+      renderer: "custom_html",
+      bodySource: "custom_html",
+      subjectSource: "default",
+      defaultVersion: DEFAULT_VERSION,
+    });
+  });
+});
