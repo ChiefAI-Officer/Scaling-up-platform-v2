@@ -41,6 +41,7 @@ jest.mock("@/lib/db", () => {
   const orgTeam = { findMany: jest.fn().mockResolvedValue([]) };
   const assessmentCampaignParticipant = {
     create: jest.fn(),
+    createMany: jest.fn(),
     updateMany: jest.fn(),
     update: jest.fn(),
   };
@@ -178,6 +179,9 @@ beforeEach(() => {
       isCEO: args.data.isCEO,
     }),
   );
+  (db.assessmentCampaignParticipant.createMany as jest.Mock).mockImplementation((args) =>
+    Promise.resolve({ count: args.data.length }),
+  );
   (db.assessmentCampaignParticipant.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
   // Default: every queried org respondent exists & belongs to org-1 (the
   // re-auth query returns exactly the requested IDs). Tests that need a
@@ -213,8 +217,11 @@ describe("Task 9 — IMMEDIATELY + flag ON", () => {
     expect(openMs).toBeGreaterThanOrEqual(before - 1000);
     expect(openMs).toBeLessThanOrEqual(Date.now() + 1000);
 
-    // participants attached
-    expect(db.assessmentCampaignParticipant.create).toHaveBeenCalledTimes(2);
+    // participants attached in one batched createMany (no per-row N+1)
+    expect(db.assessmentCampaignParticipant.createMany).toHaveBeenCalledTimes(1);
+    expect(
+      (db.assessmentCampaignParticipant.createMany as jest.Mock).mock.calls[0][0].data,
+    ).toHaveLength(2);
 
     // fan-out emitted post-commit with { campaignId } only
     expect(inngest.send).toHaveBeenCalledWith({
@@ -286,7 +293,7 @@ describe("Task 9 — legacy payload (no Wave-D contract)", () => {
     expect(res.status).toBe(201);
     const createArgs = (db.assessmentCampaign.create as jest.Mock).mock.calls[0][0];
     expect(createArgs.data.status).toBe("DRAFT");
-    expect(db.assessmentCampaignParticipant.create).not.toHaveBeenCalled();
+    expect(db.assessmentCampaignParticipant.createMany).not.toHaveBeenCalled();
     expect(inngest.send).not.toHaveBeenCalled();
   });
 });
@@ -356,7 +363,7 @@ describe("Task 9 — atomicity", () => {
   });
 
   it("a mid-create failure aborts the tx → no campaign returned, no emit", async () => {
-    (db.assessmentCampaignParticipant.create as jest.Mock).mockRejectedValueOnce(
+    (db.assessmentCampaignParticipant.createMany as jest.Mock).mockRejectedValueOnce(
       new Error("boom"),
     );
     const res = await POST(

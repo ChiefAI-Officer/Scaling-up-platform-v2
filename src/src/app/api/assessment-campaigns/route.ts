@@ -464,16 +464,19 @@ export async function POST(request: NextRequest) {
           const created = await tx.assessmentCampaign.create({
             data: campaignCreateData(alias),
           });
-          for (const r of verified) {
-            const path = buildTeamPath(r.teamId, teamsById);
-            await tx.assessmentCampaignParticipant.create({
-              data: {
-                campaignId: created.id,
-                respondentId: r.id,
-                isCEO: ceoRespondentId === r.id,
-                teamPathAtAdd: path.ids,
-                teamLabelsAtAdd: path.labels,
-              },
+          if (verified.length > 0) {
+            // Single batched insert (no per-row N+1); still atomic inside the tx.
+            await tx.assessmentCampaignParticipant.createMany({
+              data: verified.map((r) => {
+                const path = buildTeamPath(r.teamId, teamsById);
+                return {
+                  campaignId: created.id,
+                  respondentId: r.id,
+                  isCEO: ceoRespondentId === r.id,
+                  teamPathAtAdd: path.ids,
+                  teamLabelsAtAdd: path.labels,
+                };
+              }),
             });
           }
           return created;
