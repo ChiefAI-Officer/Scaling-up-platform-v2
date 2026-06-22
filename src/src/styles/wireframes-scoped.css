@@ -1006,6 +1006,14 @@
   margin: 0;
   color: hsl(var(--foreground));
 }
+/* Wave G a11y #2 — visible focus ring for the programmatically-focused section
+   heading (tabIndex={-1} + .focus() on each section advance/back in
+   section-pager.tsx). Uses :focus, NOT :focus-visible: :focus-visible is
+   unreliable for programmatic focus of a non-interactive element, especially in
+   Safari. Tradeoff: the ring may also show if a user clicks the heading text
+   directly — accepted (the heading isn't a control and isn't in the tab order);
+   reversible to :focus-visible if rejected. */
+.wf-scope .survey-section-title:focus { outline: 2px solid #522583; outline-offset: 4px; }
 .wf-scope .survey-section-desc {
   font-size: 0.875rem;
   color: hsl(var(--muted-foreground));
@@ -1447,6 +1455,28 @@
   box-shadow: 0 18px 50px -28px rgba(82, 37, 131, 0.35);
 }
 
+/* Merged-page section intro (Wave G SectionPager). The intro + its questions
+   now render on ONE page inside .survey-section, so this block is a HEADER
+   REGION at the top of that page — NOT a nested white card. Decision: do not
+   recreate the .su-intro-slide border/radius/box-shadow. .survey-section is a
+   bare flex column (no card surface) and the .survey-question-list below has
+   no chrome either, so a floating white card here would read as a detached
+   card above bare questions. A clean transparent header keeps one coherent
+   page; the inner .su-intro-covers callout still carries its own subtle chrome.
+   position:relative re-anchors the position:absolute .su-intro-rail (its only
+   positioned ancestor was .su-intro-slide). Top/left padding mirror the rail's
+   needs (clears the 6px top rail; left offset matches .su-intro-slide so the
+   full-bleed rail still sits cleanly at the top edge). */
+.su-assessment-brand .su-section-intro {
+  --su-section-accent: #6b6480;            /* fallback; overridden inline */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  color: var(--su-ink, #2b2440);
+  padding: 1.75rem 1.75rem 0;
+  margin-bottom: 0.5rem;
+}
+
 /* Domain accent rail — colored top bar (the distinct visual hook). */
 .su-assessment-brand .su-intro-rail {
   position: absolute;
@@ -1557,6 +1587,7 @@
 
 @media (max-width: 640px) {
   .su-assessment-brand .su-intro-slide { padding: 1.5rem 1.25rem 1.25rem; }
+  .su-assessment-brand .su-section-intro { padding: 1.5rem 1.25rem 0; }
   .su-assessment-brand .su-intro-title { font-size: 1.3125rem; }
   .su-assessment-brand .su-intro-meta { flex-wrap: wrap; }
 }
