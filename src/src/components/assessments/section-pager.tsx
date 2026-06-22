@@ -68,7 +68,6 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
   }
 
   function advance() {
-    if (isLast) { attemptSubmit(); return; }
     setSectionIndex(sectionIndex + 1);
     setShowGateError(false);
     setInvalidKeys(new Set());
