@@ -11,12 +11,19 @@ import { formatEventDateUTC, formatTimeWithZone } from "@/lib/utils";
 import { composeRegistrationConfirmationEmail } from "@/lib/notifications/transactional-email-template";
 import {
     buildInvitationEmailHtml,
+    buildTokenValues,
+    interpolateTokens,
     renderSubject,
     renderTextBody,
     renderFullHtmlBody,
     renderFullTextBody,
     type InvitationVars,
 } from "@/lib/assessments/invitation-email";
+import {
+    DEFAULT_INVITATION_BODY,
+    DEFAULT_INVITATION_SUBJECT,
+    DEFAULT_INVITATION_VERSION,
+} from "@/lib/assessments/invitation-defaults";
 import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-flags";
 import { SU_LOGO_PNG, SU_LOGO_CID } from "@/lib/assets/invitation-logo";
 
@@ -1110,11 +1117,35 @@ export async function sendAssessmentInvitationEmail(data: {
     const trimmedBase = data.baseUrl.replace(/\/+$/, "");
     const invitationUrl = `${trimmedBase}/org-survey/${data.campaign.alias}#t=${data.rawToken}`;
 
+    // Wave G — default body/subject at the single send chokepoint (covers ALL
+    // send paths: initial / reminder / resend / auto-send all call this fn).
+    // "Blank" = null/undefined/whitespace-only. We MUST use .trim() not `??`,
+    // because `??` does not catch "" — an empty string is a present-but-blank
+    // value that would otherwise send an empty body/subject.
+    const subjectBlank = (data.template.invitationSubject ?? "").trim().length === 0;
+    const effectiveSubject = subjectBlank ? DEFAULT_INVITATION_SUBJECT : data.template.invitationSubject;
+    const subjectSource: "authored" | "default" = subjectBlank ? "default" : "authored";
+
+    const bodyBlank = (data.template.invitationBodyMarkdown ?? "").trim().length === 0;
+    const effectiveBodyMarkdown = bodyBlank ? DEFAULT_INVITATION_BODY : data.template.invitationBodyMarkdown;
+    const bodySource: "authored" | "default" = bodyBlank ? "default" : "authored";
+
     // Kill-switch: ASSESSMENT_INVITE_BRANDED=0 reverts to the legacy plain renderer.
     const branded = process.env.ASSESSMENT_INVITE_BRANDED !== "0";
 
     if (!branded) {
-        await sendLegacyInvitationEmail({ ...data, invitationUrl });
+        await sendLegacyInvitationEmail({
+            invitation: data.invitation,
+            respondent: data.respondent,
+            campaign: data.campaign,
+            organizationName: data.organizationName ?? null,
+            templateName: data.templateName ?? null,
+            invitationUrl,
+            effectiveSubject,
+            effectiveBodyMarkdown,
+            subjectSource,
+            bodySource,
+        });
         return;
     }
 
@@ -1134,7 +1165,7 @@ export async function sendAssessmentInvitationEmail(data: {
 
     // Subject ALWAYS comes from invitationSubject (token-allowlisted path) —
     // NEVER derived from the full-HTML body. This holds on every render path.
-    const subject = renderSubject(data.template.invitationSubject, vars);
+    const subject = renderSubject(effectiveSubject, vars);
 
     // Render precedence (#20):
     //   invitationBodyHtml (full HTML, flag on) > invitationBodyMarkdown (shell) > template default.
@@ -1157,14 +1188,20 @@ export async function sendAssessmentInvitationEmail(data: {
 
     if (fullHtml) {
         // Full-HTML override: the rendered body IS the whole email — no shell,
-        // and no CID logo attachment (the coach controls all imagery).
+        // and no CID logo attachment (the coach controls all imagery). The
+        // default body never applies here (the full HTML replaces the body).
         html = renderFullHtmlBody(fullHtml, vars);
         text = renderFullTextBody(fullHtml, vars);
         attachments = [];
     } else {
-        html = buildInvitationEmailHtml({ bodyMarkdown: data.template.invitationBodyMarkdown, vars });
-        text = renderTextBody(data.template.invitationBodyMarkdown, vars);
+        html = buildInvitationEmailHtml({ bodyMarkdown: effectiveBodyMarkdown, vars });
+        text = renderTextBody(effectiveBodyMarkdown, vars);
     }
+
+    // Telemetry (PII-FREE): which renderer + whether defaults filled a blank.
+    const renderer: "branded" | "custom_html" = fullHtml ? "custom_html" : "branded";
+    const effectiveBodySource: "authored" | "default" | "custom_html" = fullHtml ? "custom_html" : bodySource;
+    const usedDefault = subjectSource === "default" || effectiveBodySource === "default";
 
     // STRICT: failures propagate. The invite route catches and marks the
     // invitation row as send-failed instead of optimistically flipping SENT.
@@ -1181,6 +1218,10 @@ export async function sendAssessmentInvitationEmail(data: {
                 campaignId: data.campaign.id,
                 invitationId: data.invitation.id,
                 respondentId: data.respondent.id,
+                renderer,
+                subjectSource,
+                bodySource: effectiveBodySource,
+                defaultVersion: usedDefault ? DEFAULT_INVITATION_VERSION : null,
             },
         },
     });
@@ -1191,29 +1232,48 @@ async function sendLegacyInvitationEmail(data: {
     invitation: { id: string; expiresAt: Date };
     respondent: { id: string; firstName: string; lastName: string; email: string };
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
-    template: { invitationSubject: string; invitationBodyMarkdown: string };
+    organizationName: string | null;
+    templateName: string | null;
     invitationUrl: string;
+    effectiveSubject: string;
+    effectiveBodyMarkdown: string;
+    subjectSource: "authored" | "default";
+    bodySource: "authored" | "default";
 }): Promise<void> {
-    const closeAtFormatted = data.campaign.closeAt
-        ? data.campaign.closeAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" })
-        : "ongoing";
-    const fullName = `${data.respondent.firstName} ${data.respondent.lastName}`.trim();
-    const substitute = (input: string): string =>
-        input
-            .replace(/\{\{respondentFirstName\}\}/g, data.respondent.firstName)
-            .replace(/\{\{respondentLastName\}\}/g, data.respondent.lastName)
-            .replace(/\{\{respondentFullName\}\}/g, fullName)
-            .replace(/\{\{campaignName\}\}/g, data.campaign.name)
-            .replace(/\{\{invitationUrl\}\}/g, data.invitationUrl)
-            .replace(/\{\{closeAt\}\}/g, closeAtFormatted);
-    const subject = substitute(data.template.invitationSubject);
-    const bodyText = substitute(data.template.invitationBodyMarkdown);
+    // Build the SAME InvitationVars the branded path uses so {{organizationName}}
+    // / {{templateName}} (and every other token) resolve here too. The old legacy
+    // substitute() didn't know those tokens.
+    const vars: InvitationVars = {
+        respondent: {
+            firstName: data.respondent.firstName,
+            lastName: data.respondent.lastName,
+            email: data.respondent.email,
+        },
+        organizationName: data.organizationName,
+        campaignName: data.campaign.name,
+        templateName: data.templateName,
+        coachName: null,
+        invitationUrl: data.invitationUrl,
+        closeAt: data.campaign.closeAt,
+    };
+
+    // Subject through the shared SUBJECT_ALLOW path: allowlist + control-char /
+    // #t= stripping. Closes the credential-in-subject-header leak the old
+    // ad-hoc substitute() had (it would substitute {{invitationUrl}} into the
+    // subject and pass CR/LF straight through).
+    const subject = renderSubject(data.effectiveSubject, vars);
+
+    // Body: interpolate via the shared token map (resolves org/template tokens),
+    // then keep the legacy plain rendering (escape → paragraph-wrap → blue CTA).
+    const bodyText = interpolateTokens(data.effectiveBodyMarkdown, buildTokenValues(vars));
     const escaped = escapeHtml(bodyText);
     const paragraphs = escaped
         .split(/\n\s*\n/)
         .map((p) => `<p style="margin:0 0 12px;color:#374151;">${p.replace(/\n/g, "<br/>")}</p>`)
         .join("");
     const html = `<div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;">${paragraphs}<br/><div style="text-align:center;"><a href="${data.invitationUrl}" style="display:inline-block;background-color:#1D4ED8;color:#ffffff;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">Start the assessment</a></div></div>`;
+
+    const usedDefault = data.subjectSource === "default" || data.bodySource === "default";
     await sendEmailViaSMTP({
         to: data.respondent.email,
         subject,
@@ -1225,6 +1285,10 @@ async function sendLegacyInvitationEmail(data: {
                 campaignId: data.campaign.id,
                 invitationId: data.invitation.id,
                 respondentId: data.respondent.id,
+                renderer: "legacy",
+                subjectSource: data.subjectSource,
+                bodySource: data.bodySource,
+                defaultVersion: usedDefault ? DEFAULT_INVITATION_VERSION : null,
             },
         },
     });

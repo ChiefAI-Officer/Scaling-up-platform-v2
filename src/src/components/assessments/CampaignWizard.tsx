@@ -38,6 +38,10 @@ import {
   UserPlus,
 } from "lucide-react";
 import { isCEOFamily } from "@/lib/assessments/respondent-levels";
+import {
+  DEFAULT_INVITATION_BODY,
+  DEFAULT_INVITATION_SUBJECT,
+} from "@/lib/assessments/invitation-defaults";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -1840,7 +1844,7 @@ function ReviewStep({
               {state.invitationSubject.trim() ||
               state.invitationBodyMarkdown.trim()
                 ? "Custom subject/body set for this campaign"
-                : "Optional — leave blank to use the template default"}
+                : "Optional — leave blank to send the default invitation shown below"}
             </p>
           </div>
           <span className="text-xs font-medium text-muted-foreground">
@@ -1870,6 +1874,14 @@ function ReviewStep({
               <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
                 {"{{closeAt}}"}
               </code>
+              ,{" "}
+              <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                {"{{organizationName}}"}
+              </code>
+              ,{" "}
+              <code className="px-1 py-0.5 bg-muted rounded text-[10px]">
+                {"{{templateName}}"}
+              </code>
               .
             </p>
             <div className="space-y-1">
@@ -1883,7 +1895,7 @@ function ReviewStep({
                   onChange({ invitationSubject: e.target.value })
                 }
                 maxLength={200}
-                placeholder="Leave blank to use template default"
+                placeholder={DEFAULT_INVITATION_SUBJECT}
                 className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                 data-testid="invitation-subject-input"
               />
@@ -1899,7 +1911,7 @@ function ReviewStep({
                 }
                 maxLength={5000}
                 rows={8}
-                placeholder="Leave blank to use template default"
+                placeholder={DEFAULT_INVITATION_BODY}
                 className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background text-foreground font-mono focus:outline-none focus:ring-2 focus:ring-primary/30"
                 data-testid="invitation-body-input"
               />
