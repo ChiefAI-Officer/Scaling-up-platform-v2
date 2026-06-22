@@ -100,6 +100,62 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     expect(screen.queryByText("Question Two")).not.toBeInTheDocument();
   });
 
+  it("G1: a section WITH a description renders the 'What this section covers' callout AND its question on the SAME screen (no separate Begin step)", () => {
+    // Wave G merged the per-section intro into the same page as its questions —
+    // applied UNIFORMLY, including the LIVE public quiz (G1). A described section
+    // must render its "What this section covers" callout + first question TOGETHER,
+    // with NO intermediate "Begin section" affordance.
+    const describedSections = [
+      { stableKey: "S1", sortOrder: 1, name: "Strategy", description: "How you set direction." },
+      { stableKey: "S2", sortOrder: 2, name: "Section Two" },
+    ];
+    const describedQuestions = [
+      {
+        stableKey: "q1",
+        sortOrder: 1,
+        sectionStableKey: "S1",
+        type: "SLIDER_LIKERT",
+        label: "Strategy Question",
+        isRequired: true,
+        scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" },
+      },
+      {
+        stableKey: "q2",
+        sortOrder: 2,
+        sectionStableKey: "S2",
+        type: "SLIDER_LIKERT",
+        label: "Question Two",
+        isRequired: true,
+        scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" },
+      },
+    ];
+
+    render(
+      <PublicQuizClient
+        {...baseProps}
+        sections={describedSections}
+        questions={describedQuestions}
+      />,
+    );
+    reachFormStep();
+
+    // On the FIRST screen, simultaneously (no intermediate click):
+    // the description callout label, the description text, AND the question label.
+    expect(screen.getByText(/what this section covers/i)).toBeInTheDocument();
+    expect(screen.getByText(/how you set direction/i)).toBeInTheDocument();
+    expect(screen.getByText("Strategy Question")).toBeInTheDocument();
+
+    // No "Begin section" affordance — the merged page has no separate intro step.
+    expect(
+      screen.queryByRole("button", { name: /begin section/i }),
+    ).not.toBeInTheDocument();
+
+    // The only forward affordance is the pager's Next/Submit button.
+    expect(
+      screen.getByRole("button", { name: /next|submit/i }),
+    ).toBeInTheDocument();
+  });
+
   it("submits the unchanged payload shape and shows results in-place on success (Task 7)", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
