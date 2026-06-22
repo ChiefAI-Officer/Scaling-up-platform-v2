@@ -246,11 +246,76 @@ describe("seed-qsp-v2-assessment", () => {
     ]);
     tx.assessmentTemplateVersion.create.mockResolvedValue({ id: "ver-v2-new-id" });
 
-    // With forceSupersedeDraft: true, a hash mismatch on a published version
-    // creates a new DRAFT version (no throw).
+    // A hash mismatch on a PUBLISHED latest version appends a new DRAFT WITHOUT
+    // needing force (force only protects an unpublished divergent DRAFT).
     const result = await runSeedV2(client);
     expect(result.state).toBe("A");
     expect(result.versionId).toBe("ver-v2-new-id");
+    expect(tx.assessmentTemplateVersion.create).toHaveBeenCalled();
+  });
+
+  it("P5_closing has a non-empty description and counts stay 5/22", () => {
+    const content = buildQspV2Content();
+    const p5 = content.sections.find((s) => s.stableKey === "P5_closing");
+    expect(p5).toBeDefined();
+    expect(typeof p5?.description).toBe("string");
+    expect(p5?.description).toBe("Final reflections before you wrap up.");
+    // Don't break the existing State-A counts.
+    expect(content.sections).toHaveLength(5);
+    expect(content.questions).toHaveLength(22);
+  });
+
+  it("fail-closed by default — rejects when latest is a divergent unpublished DRAFT (no force)", async () => {
+    const client = makeMockClient();
+    const tx = client._tx;
+
+    // Template exists; latest version is an UNPUBLISHED DRAFT with a different hash.
+    tx.assessmentTemplate.findUnique.mockResolvedValue({
+      id: "tmpl-v2-id",
+      deletedAt: null,
+      invitationSubject: "Please complete your Quarterly Session Prep",
+      invitationBodyMarkdown: "",
+    });
+    tx.assessmentTemplateVersion.findMany.mockResolvedValue([
+      {
+        id: "draft-ver-id",
+        versionNumber: 1,
+        contentHash: "differs-from-new",
+        publishedAt: null,
+      },
+    ]);
+
+    // No force → must reject (protects reviewer edits on the unpublished draft).
+    await expect(runSeedV2(client)).rejects.toThrow(/unpublished draft/i);
+
+    // version.create must NOT have been called.
+    expect(tx.assessmentTemplateVersion.create).not.toHaveBeenCalled();
+  });
+
+  it("explicit force appends — supersedes a divergent unpublished DRAFT when force: true", async () => {
+    const client = makeMockClient();
+    const tx = client._tx;
+
+    // Same divergent-unpublished-DRAFT setup as the fail-closed test.
+    tx.assessmentTemplate.findUnique.mockResolvedValue({
+      id: "tmpl-v2-id",
+      deletedAt: null,
+      invitationSubject: "Please complete your Quarterly Session Prep",
+      invitationBodyMarkdown: "",
+    });
+    tx.assessmentTemplateVersion.findMany.mockResolvedValue([
+      {
+        id: "draft-ver-id",
+        versionNumber: 1,
+        contentHash: "differs-from-new",
+        publishedAt: null,
+      },
+    ]);
+    tx.assessmentTemplateVersion.create.mockResolvedValue({ id: "ver-v2-forced-id" });
+
+    const result = await runSeedV2(client, { force: true });
+    expect(result.state).toBe("A");
+    expect(result.versionId).toBe("ver-v2-forced-id");
     expect(tx.assessmentTemplateVersion.create).toHaveBeenCalled();
   });
 

@@ -182,6 +182,7 @@ export function buildQspV2Content(): QspV2Content {
       stableKey: "P5_closing",
       sortOrder: 5,
       name: "PART 5: Closing",
+      description: "Final reflections before you wrap up.",
     },
   ];
 
@@ -450,12 +451,16 @@ export interface SeedResult {
   state: "A" | "B" | "C" | "D";
   templateId: string;
   versionId: string;
+  versionNumber: number;
   sectionCount: number;
   questionCount: number;
   contentHash: string;
 }
 
-export async function runSeed(client: PrismaClient): Promise<SeedResult> {
+export async function runSeed(
+  client: PrismaClient,
+  opts: { force?: boolean } = {}
+): Promise<SeedResult> {
   const content = buildQspV2Content();
 
   const result = await client.$transaction(async (tx) => {
@@ -486,7 +491,7 @@ export async function runSeed(client: PrismaClient): Promise<SeedResult> {
       tx as unknown as Parameters<typeof ensureTemplateVersionContent>[0],
       sys.id,
       content,
-      { forceSupersedeDraft: true }
+      { forceSupersedeDraft: opts.force ?? false }
     );
 
     await ensureAccessGroupAndTemplateLink(
@@ -500,6 +505,7 @@ export async function runSeed(client: PrismaClient): Promise<SeedResult> {
       state: seedResult.action === "created" ? ("A" as const) : ("B" as const),
       templateId: seedResult.templateId,
       versionId: seedResult.versionId,
+      versionNumber: seedResult.versionNumber,
       sectionCount: content.sections.length,
       questionCount: content.questions.length,
       contentHash: seedResult.contentHash,
@@ -592,7 +598,18 @@ async function ensureAccessGroupAndTemplateLink(
 // ─── Main ────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const result = await runSeed(db);
+  // Fail-closed by default. Operators must explicitly opt in to superseding a
+  // divergent unpublished DRAFT (e.g. reviewer edits) via QSP_V2_SEED_FORCE=1.
+  const force = process.env.QSP_V2_SEED_FORCE === "1";
+  if (force) {
+    console.warn(
+      "[seed-qsp-v2-assessment] QSP_V2_SEED_FORCE=1 — a divergent unpublished " +
+        "DRAFT version (if any) WILL be superseded by a new DRAFT. Reviewer edits " +
+        "on that draft may be lost. Proceeding with forceSupersedeDraft: true."
+    );
+  }
+
+  const result = await runSeed(db, { force });
 
   console.log(
     JSON.stringify({
@@ -600,6 +617,7 @@ async function main(): Promise<void> {
       state: result.state,
       templateId: result.templateId,
       versionId: result.versionId,
+      versionNumber: result.versionNumber,
       contentHash: result.contentHash,
       sectionCount: result.sectionCount,
       questionCount: result.questionCount,
