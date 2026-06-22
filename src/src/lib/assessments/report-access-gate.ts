@@ -7,8 +7,11 @@
  * adapter with only ids (+ generatedAt for group) + `defaultReportGateDeps()`;
  * they never see `ReportDb`/casts or the rate-limit/audit protocol.
  *
- * PR1 ships the GROUP adapter (a no-op migration — group already matches the
- * gate's target shape). PR2 adds `viewRespondentReport`.
+ * PR1 shipped the GROUP adapter (a no-op migration — group already matched the
+ * gate's target shape). PR2 adds the RESPONDENT adapter, which carries the
+ * always-on surface's intentional fold-ins: fail-closed audit + IP/UA, the
+ * strengthened rate-limit key, and structured `assessment.respondent_report.*`
+ * metrics (retiring the ad-hoc console.info).
  */
 
 import { headers } from "next/headers";
@@ -24,6 +27,11 @@ import {
   getCampaignGroupReport,
   type GroupReportResult,
 } from "@/lib/assessments/group-report";
+import {
+  getRespondentReport,
+  type RespondentReportOutcome,
+} from "@/lib/assessments/respondent-report";
+import { reportConfigFor } from "@/lib/assessments/report-config";
 import { isGroupReportEnabled } from "@/lib/assessments/wave-f-flags";
 
 /** First-hop client IP, mirroring the current report routes' extraction byte-for-byte. */
@@ -103,6 +111,59 @@ export async function viewGroupReport(
       };
     },
     auditFailureFields: (o) => (o.kind === "ok" ? { template: o.provenance.templateAlias } : {}),
+    metricRole,
+  });
+
+  return { outcome, metricRole };
+}
+
+/**
+ * Per-respondent Results report adapter (PR2). Requires a signed-in actor
+ * (redirect-login). Strengthened rate-limit key — actor + campaign + respondent
+ * + IP (the old route keyed on IP only; ADR-0012 fix #2). Audit = fail-closed
+ * VIEW_REPORT (+ IP/UA). Returns { outcome, metricRole } so the page attributes
+ * its page-owned `view` metric.
+ */
+export async function viewRespondentReport(
+  deps: ReportGateDeps,
+  args: { campaignId: string; respondentId: string },
+): Promise<{ outcome: RespondentReportOutcome; metricRole: string | null }> {
+  const actor = await getApiActor();
+  const h = await headers();
+  const ip = ipFromHeaders(h);
+  const userAgent = h.get("user-agent");
+  const actorKey = actor?.coachId ?? actor?.userId ?? "anon";
+  const metricRole = actor?.role ?? null;
+  const reportDb = db as unknown as Parameters<typeof getRespondentReport>[0];
+
+  const outcome = await viewReport<RespondentReportOutcome>(deps, {
+    surface: "respondent",
+    actor,
+    noActorPolicy: "redirect-login",
+    flagGate: undefined,
+    ip,
+    userAgent,
+    // fix #2: was IP-only `report:${ip}` — now actor+campaign+respondent+IP.
+    rateLimitKey: `report:${actorKey}:${args.campaignId}:${args.respondentId}:${ip}`,
+    rateLimitConfig: RateLimits.standard,
+    // actor is non-null on the load path (redirect-login throws above for null).
+    load: () => getRespondentReport(reportDb, actor!, args.campaignId, args.respondentId),
+    classify: (o) => (o.status === "ok" ? "ok" : o.status === "forbidden" ? "forbidden" : "not-found"),
+    auditOf: (o) => {
+      if (o.status !== "ok") throw new Error("unreachable: auditOf on non-ok respondent outcome");
+      return {
+        entityType: "AssessmentSubmission",
+        action: "VIEW_REPORT",
+        entityId: o.report.provenance.submissionId,
+        changes: {
+          kind: "respondent-report",
+          templateAlias: o.report.templateAlias ?? null,
+          reportType: reportConfigFor(o.report.templateAlias).reportType,
+          versionId: o.report.provenance.versionId,
+          contentHash: o.report.provenance.contentHash,
+        },
+      };
+    },
     metricRole,
   });
 
