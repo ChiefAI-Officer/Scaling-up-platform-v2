@@ -33,6 +33,12 @@ jest.mock("@/lib/auth/authorization", () => ({
   isPrivilegedRole: jest.fn((role: string) => role === "ADMIN" || role === "STAFF"),
 }));
 
+// Real api-actor-gate (drives off the mocked getApiActor above); only rate-limit is mocked.
+jest.mock("@/lib/rate-limit", () => ({
+  withRateLimit: jest.fn().mockResolvedValue({ allowed: true, headers: {} }),
+  RateLimits: { auth: {}, standard: {}, search: {}, registration: {}, webhook: {} },
+}));
+
 jest.mock("@/lib/db", () => ({
   db: {
     fileAttachment: {
@@ -62,6 +68,7 @@ import {
   mapFileForClient,
 } from "@/lib/files/file-service";
 import { getApiActor, canManageCoachData } from "@/lib/auth/authorization";
+import { withRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 
 // ---------------------------------------------------------------------------
@@ -133,8 +140,13 @@ describe("Files API", () => {
   // GET /api/files
   // -----------------------------------------------------------------------
   describe("GET /api/files", () => {
-    it("returns list of files for workshop", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(authenticatedSession());
+    it("returns the file list for a privileged (ADMIN) actor", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
       const mockFiles = [
         { id: "f1", filename: "report.pdf" },
         { id: "f2", filename: "slides.pptx" },
@@ -155,8 +167,18 @@ describe("Files API", () => {
       );
     });
 
+    it("returns 403 for a non-privileged COACH (list is admin-tooling only)", async () => {
+      // beforeEach sets getApiActor -> COACH
+      const response = await GET(
+        buildGetRequest("http://localhost/api/files?workshopId=ws-1")
+      );
+
+      expect(response.status).toBe(403);
+      expect(listFiles).not.toHaveBeenCalled();
+    });
+
     it("returns 401 when not authenticated", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(null);
+      (getApiActor as jest.Mock).mockResolvedValue(null);
 
       const response = await GET(
         buildGetRequest("http://localhost/api/files")
@@ -237,15 +259,34 @@ describe("Files API", () => {
       expect(response.status).toBe(400);
       expect(body.error).toBe("No file provided");
     });
+
+    it("returns 429 when the upload rate limit is exceeded", async () => {
+      (getServerSession as jest.Mock).mockResolvedValue(authenticatedSession());
+      (withRateLimit as jest.Mock).mockResolvedValueOnce({
+        allowed: false,
+        headers: { "Retry-After": "60" },
+      });
+      const file = new File(["content"], "doc.pdf", { type: "application/pdf" });
+
+      const response = await POST(buildPostRequest({ file, workshopId: "ws-1" }));
+
+      expect(response.status).toBe(429);
+      expect(uploadFile).not.toHaveBeenCalled();
+    });
   });
 
   // -----------------------------------------------------------------------
   // GET /api/files/[id]
   // -----------------------------------------------------------------------
   describe("GET /api/files/[id]", () => {
-    it("returns single file", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(authenticatedSession());
-      const mockFile = { id: "file-1", filename: "report.pdf" };
+    it("returns the file for a coach who owns its workshop (status passes the attachment gate)", async () => {
+      // beforeEach actor: COACH user-1 / coach-1
+      const mockFile = {
+        id: "file-1",
+        filename: "report.pdf",
+        uploadedBy: "user-1",
+        workshop: { coachId: "coach-1", status: "PRE_EVENT" },
+      };
       (getFile as jest.Mock).mockResolvedValue(mockFile);
       (mapFileForClient as jest.Mock).mockImplementation((f) => f);
 
@@ -260,8 +301,30 @@ describe("Files API", () => {
       expect(body.data.id).toBe("file-1");
     });
 
+    it("returns 403 when the actor may not read the file (other coach's workshop, not uploader)", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-2",
+        email: "other@example.com",
+        role: "COACH",
+        coachId: "coach-2",
+      });
+      (getFile as jest.Mock).mockResolvedValue({
+        id: "file-1",
+        filename: "secret.pdf",
+        uploadedBy: "user-1",
+        workshop: { coachId: "coach-1", status: "PRE_EVENT" },
+      });
+
+      const response = await GET_BY_ID(
+        {} as Parameters<typeof GET_BY_ID>[0],
+        routeParams("file-1")
+      );
+
+      expect(response.status).toBe(403);
+    });
+
     it("returns 401 when not authenticated", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(null);
+      (getApiActor as jest.Mock).mockResolvedValue(null);
 
       const response = await GET_BY_ID(
         {} as Parameters<typeof GET_BY_ID>[0],
@@ -273,7 +336,6 @@ describe("Files API", () => {
     });
 
     it("returns 404 when file not found", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(authenticatedSession());
       (getFile as jest.Mock).mockResolvedValue(null);
 
       const response = await GET_BY_ID(

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/auth";
+import { requireAdminApiActor } from "@/lib/auth/api-actor-gate";
 import { createWorkflow, listWorkflows, duplicateWorkflow } from "@/lib/workflows/workflow-service";
 import { z } from "zod";
 
@@ -48,9 +49,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Workflows are an admin-domain resource (admin-only UI). Create + duplicate
+  // require ADMIN — the prior code only gated `isTemplate`, leaving non-template
+  // create and duplicate open to any authenticated user (co-validate find).
+  const gate = await requireAdminApiActor();
+  if (!gate.ok) {
+    return NextResponse.json(
+      { error: gate.status === 401 ? "Unauthorized" : "Forbidden" },
+      { status: gate.status }
+    );
   }
 
   const bodyValidation = createWorkflowSchema.safeParse(await request.json());
@@ -69,20 +76,15 @@ export async function POST(request: NextRequest) {
 
   // Duplicate existing workflow if requested
   if (duplicateFromId) {
-    const workflow = await duplicateWorkflow(duplicateFromId, session.user.id, name);
+    const workflow = await duplicateWorkflow(duplicateFromId, gate.actor.userId, name);
     return NextResponse.json({ success: true, data: workflow }, { status: 201 });
-  }
-
-  // Only admins can create templates
-  if (isTemplate && session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "Only admins can create workflow templates" }, { status: 403 });
   }
 
   const workflow = await createWorkflow({
     name: name.trim(),
     description: description?.trim(),
     isTemplate: isTemplate ?? false,
-    createdBy: session.user.id,
+    createdBy: gate.actor.userId,
   });
 
   return NextResponse.json({ success: true, data: workflow }, { status: 201 });

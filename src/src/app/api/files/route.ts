@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth/auth";
+import { requirePrivilegedApiActor } from "@/lib/auth/api-actor-gate";
+import { withRateLimit, RateLimits } from "@/lib/rate-limit";
 import { uploadFile, listFiles, mapFileForClient, validateFile } from "@/lib/files/file-service";
 import { z } from "zod";
 
@@ -22,9 +24,14 @@ const fileUploadMetaSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // The file list is admin-tooling only (file-manager, workflow-editor). Gate to
+  // privileged actors; listFiles has no per-owner scoping.
+  const gate = await requirePrivilegedApiActor();
+  if (!gate.ok) {
+    return NextResponse.json(
+      { error: gate.status === 401 ? "Unauthorized" : "Forbidden" },
+      { status: gate.status }
+    );
   }
 
   const queryValidation = filesQuerySchema.safeParse(
@@ -44,6 +51,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimit = await withRateLimit(request, RateLimits.standard);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: rateLimit.headers }
+    );
+  }
+
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -3,8 +3,19 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { acceptInviteSchema } from "@/lib/validations";
+import { withRateLimit, RateLimits } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  // Unauthenticated, account-creating endpoint — rate-limit token guessing /
+  // account-creation abuse (the only auth route previously without a limiter).
+  const rateLimit = await withRateLimit(request, RateLimits.auth);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests" },
+      { status: 429, headers: rateLimit.headers }
+    );
+  }
+
   try {
     const body = await request.json();
     const validation = acceptInviteSchema.safeParse(body);

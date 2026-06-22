@@ -179,6 +179,45 @@ export function canRoleAccessAttachment(input: {
   return statusRank(normalizedStatus) >= statusRank(effectiveMinStatus);
 }
 
+/**
+ * Canonical file-READ authorization, mirroring app/api/files/[id]/download/route.ts:
+ * ADMIN/STAFF may read any file; a COACH who owns the file's workshop is gated by
+ * the attachment-status policy; otherwise the original uploader may read a file
+ * not attached to a workshop. Used by the metadata GET (which exposes blobUrl, a
+ * direct content reference) so reading metadata is never weaker than downloading.
+ */
+export function canReadFile(input: {
+  actor: { role: string; userId: string; coachId: string | null };
+  file: {
+    uploadedBy: string;
+    workshop?: { coachId: string | null; status: string | null } | null;
+  };
+}): boolean {
+  const { actor, file } = input;
+
+  if (actor.role === "ADMIN" || actor.role === "STAFF") {
+    return true;
+  }
+
+  if (
+    actor.role === "COACH" &&
+    actor.coachId &&
+    file.workshop?.coachId === actor.coachId
+  ) {
+    return canRoleAccessAttachment({
+      recipientRole: "COACH",
+      workshopStatus: file.workshop?.status,
+    });
+  }
+
+  // Uploader fallback for files not linked to a workshop.
+  if (file.uploadedBy === actor.userId) {
+    return true;
+  }
+
+  return false;
+}
+
 export function getProtectedFileUrl(fileId: string, token: string): string {
   const appUrl = process.env.APP_URL || "http://localhost:3000";
   return `${appUrl}/api/files/${fileId}/download?token=${encodeURIComponent(token)}`;

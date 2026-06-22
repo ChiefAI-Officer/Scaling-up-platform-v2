@@ -7,8 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
+import { requireAdminApiActor } from "@/lib/auth/api-actor-gate";
 import { createSurveyForWorkshop } from "@/lib/surveys/survey-service";
 import { z } from "zod";
 
@@ -19,9 +18,12 @@ const assignSurveySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireAdminApiActor();
+  if (!gate.ok) {
+    return NextResponse.json(
+      { error: gate.status === 401 ? "Unauthorized" : "Forbidden" },
+      { status: gate.status }
+    );
   }
 
   const bodyValidation = assignSurveySchema.safeParse(await request.json());
