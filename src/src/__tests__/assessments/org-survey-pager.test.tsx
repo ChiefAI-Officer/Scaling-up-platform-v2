@@ -133,6 +133,58 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     expect(orphanField).toBeInTheDocument();
   });
 
+  it("G1: a section WITH a description renders the 'What this section covers' callout AND its question on the SAME screen (no separate Begin step)", async () => {
+    // Wave G merged the per-section intro into the same page as its questions,
+    // applied UNIFORMLY across the public AND invited flows (G1). A described
+    // section must render its "What this section covers" callout + question
+    // TOGETHER, with NO intermediate "Begin section" affordance.
+    const describedSurveyData = {
+      ...surveyData,
+      sections: [
+        { stableKey: "S1", sortOrder: 1, name: "Strategy", description: "How you set direction." },
+      ],
+      questions: [
+        {
+          stableKey: "q1",
+          sortOrder: 1,
+          sectionStableKey: "S1",
+          type: "SLIDER_LIKERT",
+          label: "Strategy Question",
+          isRequired: true,
+          scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" },
+        },
+      ],
+    };
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: describedSurveyData }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, data: { submissionId: "sub_1" } }),
+      } as Response);
+    }) as unknown as typeof fetch;
+
+    await reachPager();
+
+    // On the FIRST screen, simultaneously (no intermediate click):
+    // the description callout label, the description text, AND the question label.
+    expect(await screen.findByText(/what this section covers/i)).toBeInTheDocument();
+    expect(screen.getByText(/how you set direction/i)).toBeInTheDocument();
+    expect(screen.getByText("Strategy Question")).toBeInTheDocument();
+
+    // No "Begin section" affordance — the merged page has no separate intro step.
+    expect(
+      screen.queryByRole("button", { name: /begin section/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it("submits BOTH answers and reaches thank-you (no dead-end)", async () => {
     await reachPager();
 
