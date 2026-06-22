@@ -78,6 +78,7 @@ describe("emitGroupReportMetric", () => {
     const payload = lastMarker(infoSpy);
     expect(payload).toEqual({
       marker: "assessment.group_report.view",
+      surface: "group",
       role: "COACH",
       reportType: "qualitative",
       template: "lva",
@@ -99,6 +100,7 @@ describe("emitGroupReportMetric", () => {
     const payload = lastMarker(infoSpy);
     expect(payload).toEqual({
       marker: "assessment.group_report.empty",
+      surface: "group",
       role: "ADMIN",
       completedCount: 0,
     });

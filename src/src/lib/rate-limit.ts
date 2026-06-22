@@ -6,7 +6,7 @@
 
 import Redis from "ioredis";
 
-interface RateLimitConfig {
+export interface RateLimitConfig {
   interval: number; // Time window in milliseconds
   maxRequests: number; // Max requests per interval
 }
