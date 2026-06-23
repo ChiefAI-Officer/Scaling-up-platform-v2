@@ -393,6 +393,22 @@ export function buildQualitativeModel(
   const reportFilter = templateAlias ? REPORT_FILTERS[templateAlias] : undefined;
   const suppressedSections = new Set(reportFilter?.suppressSections ?? []);
 
+  // Conditional follow-ups (ADR-0014). Gate only when a VALID MULTI_CHOICE gate
+  // question exists in THIS pinned version → fail open otherwise (never hide on
+  // schema weirdness). A valid gate with a missing/non-array answer → empty set
+  // → all prefix-matching follow-ups hidden ("no factors flagged").
+  const cf = reportFilter?.conditionalFollowups;
+  const gateMeta = cf ? metaByKey.get(cf.gateKey) : undefined;
+  const gateValid = !!cf && gateMeta?.type === "MULTI_CHOICE";
+  const gateAnswer = cf ? answerByKey.get(cf.gateKey) : undefined;
+  const checkedFactorKeys = new Set<string>(
+    gateValid && Array.isArray(gateAnswer) ? (gateAnswer as unknown[]).map(String) : [],
+  );
+  const isHiddenFollowup = (key: string): boolean =>
+    gateValid &&
+    key.startsWith(cf!.followupPrefix) &&
+    !checkedFactorKeys.has(key.slice(cf!.followupPrefix.length));
+
   /** Shapes a present answer row into a QualItem (shared with the orphan bucket). */
   const toItem = (key: string, meta: QMeta, value: unknown): QualItem => {
     const item: QualItem = {
@@ -428,6 +444,7 @@ export function buildQualitativeModel(
 
     const items: QualItem[] = [];
     for (const { key, meta } of questions) {
+      if (isHiddenFollowup(key)) continue;
       const value = answerByKey.get(key);
       if (!isReportAnswerPresent(meta.type, value)) continue;
       items.push(toItem(key, meta, value));
@@ -459,6 +476,7 @@ export function buildQualitativeModel(
   const orphanItems: QualItem[] = [];
   for (const [key, meta] of questionEntries) {
     if (assignedKeys.has(key)) continue;
+    if (isHiddenFollowup(key)) continue;
     const value = answerByKey.get(key);
     if (!isReportAnswerPresent(meta.type, value)) continue;
     orphanItems.push(toItem(key, meta, value));

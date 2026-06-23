@@ -699,3 +699,86 @@ describe("LVA section suppression (Wave I)", () => {
     expect(model.sections.map((s) => s.stableKey)).toContain("S3_strengths");
   });
 });
+
+// ── LVA conditional follow-ups (Wave I, ADR-0014) ───────────────────────────
+
+const lvaGate = (
+  s4: unknown,
+  explanations: Record<string, unknown>,
+  opts: { gateType?: string; omitGate?: boolean } = {},
+) => ({
+  templateAlias: "leadership-vision-alignment",
+  sections: [{ stableKey: "S5_explained", name: "Obstacles Explained" }],
+  questionsByKey: {
+    // `omitGate` drops the gate QUESTION from the pinned version entirely (the
+    // "no gate question in the version" fail-open path). A valid gate with a
+    // missing/empty ANSWER is the *empty-selection* path (gate stays present).
+    ...(opts.omitGate
+      ? {}
+      : {
+          S4_biggest_obstacles: {
+            type: opts.gateType ?? "MULTI_CHOICE",
+            label: "Pick the obstacles",
+            sectionStableKey: "S4_obstacles",
+            options: [
+              { key: "sales", label: "Sales" }, { key: "cash", label: "Cash" },
+              { key: "execution", label: "Execution" }, { key: "the_leadership", label: "The Leadership" },
+            ],
+          },
+        }),
+    S5_why_sales: { type: "TEXT", label: "Why is Sales a hindrance?", sectionStableKey: "S5_explained" },
+    S5_why_cash: { type: "TEXT", label: "Why is Cash a hindrance?", sectionStableKey: "S5_explained" },
+    S5_why_execution: { type: "TEXT", label: "Why is Execution a hindrance?", sectionStableKey: "S5_explained" },
+    S5_why_the_leadership: { type: "TEXT", label: "Why is The Leadership a hindrance?", sectionStableKey: "S5_explained" },
+    S5_other_factor: { type: "TEXT", label: "Another factor?", sectionStableKey: "S5_explained" },
+    S5_change_one_thing: { type: "TEXT", label: "Change one thing?", sectionStableKey: "S5_explained" },
+  },
+  rawAnswers: [
+    ...(opts.omitGate ? [] : [{ stableKey: "S4_biggest_obstacles", value: s4 }]),
+    ...Object.entries(explanations).map(([stableKey, value]) => ({ stableKey, value })),
+  ],
+});
+const s5Keys = (m: ReturnType<typeof buildQualitativeModel>) =>
+  (m.sections.find((s) => s.stableKey === "S5_explained")?.items ?? []).map((i) => i.stableKey);
+
+describe("LVA conditional follow-ups (Wave I)", () => {
+  it("renders S5_why_<f> only for checked factors; drops unchecked-but-typed", () => {
+    const m = buildQualitativeModel(lvaGate(["sales", "cash"], {
+      S5_why_sales: "lost reps", S5_why_cash: "long receivables",
+      S5_why_execution: "no cadence", S5_why_the_leadership: "friction",
+    }));
+    const k = s5Keys(m);
+    expect(k).toEqual(expect.arrayContaining(["S5_why_sales", "S5_why_cash"]));
+    expect(k).not.toContain("S5_why_execution");
+    expect(k).not.toContain("S5_why_the_leadership");
+  });
+  it("always renders the non-followup S5 questions", () => {
+    const k = s5Keys(buildQualitativeModel(lvaGate(["sales"], { S5_other_factor: "hiring", S5_change_one_thing: "rhythm" })));
+    expect(k).toEqual(expect.arrayContaining(["S5_other_factor", "S5_change_one_thing"]));
+  });
+  it("omits a checked-but-blank follow-up", () => {
+    expect(s5Keys(buildQualitativeModel(lvaGate(["sales"], { S5_why_sales: "   " })))).not.toContain("S5_why_sales");
+  });
+  it("valid gate + empty selection → all S5_why_ hidden", () => {
+    expect(s5Keys(buildQualitativeModel(lvaGate([], { S5_why_sales: "x" })))).not.toContain("S5_why_sales");
+  });
+  it("FAIL-OPEN: no gate question in the version → renders answered-only", () => {
+    expect(s5Keys(buildQualitativeModel(lvaGate(["sales"], { S5_why_sales: "x" }, { omitGate: true })))).toContain("S5_why_sales");
+  });
+  it("FAIL-OPEN: gate present but NOT MULTI_CHOICE → renders answered-only", () => {
+    expect(s5Keys(buildQualitativeModel(lvaGate(["sales"], { S5_why_sales: "x" }, { gateType: "TEXT" })))).toContain("S5_why_sales");
+  });
+  it("gates orphaned follow-ups too: an unchecked orphaned S5_why_ is NOT in Additional responses", () => {
+    const m = buildQualitativeModel({
+      templateAlias: "leadership-vision-alignment",
+      sections: [],
+      questionsByKey: {
+        S4_biggest_obstacles: { type: "MULTI_CHOICE", label: "g", options: [{ key: "sales", label: "Sales" }, { key: "cash", label: "Cash" }] },
+        S5_why_cash: { type: "TEXT", label: "Why Cash?" },
+      },
+      rawAnswers: [{ stableKey: "S4_biggest_obstacles", value: ["sales"] }, { stableKey: "S5_why_cash", value: "x" }],
+    });
+    const add = m.sections.find((s) => s.stableKey === "__additional_responses__");
+    expect((add?.items ?? []).map((i) => i.stableKey)).not.toContain("S5_why_cash");
+  });
+});
