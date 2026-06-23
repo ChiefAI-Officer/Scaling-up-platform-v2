@@ -30,6 +30,18 @@ export type FanoutRecipient = { registrationId: string; email: string };
 export type FanoutOutcome = { parentId: string; sent: number; skipped: number };
 
 /**
+ * Shared SMTP terminal-vs-transient classifier. A terminal error (bad auth /
+ * permanent reject) will recur on every retry, so it stops the batch and records
+ * FAILED rather than burning Inngest retries. Everything else is treated as
+ * transient (rethrown → Inngest retry → the reused parent skips prior SENTs).
+ * Single source of truth for the two Inngest send functions.
+ */
+export function isTerminalSmtpError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /EAUTH|535|Invalid login|Authentication/i.test(msg);
+}
+
+/**
  * Upsert (create-or-reuse) the single parent execution row for a delivery batch,
  * keyed by the unique `deliveryBatchKey`. `update: {}` means a retry of the same
  * batch returns the existing row (with its already-SENT children) rather than a

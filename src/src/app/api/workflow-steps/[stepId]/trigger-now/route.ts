@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { inngest } from "@/inngest/client";
@@ -90,9 +91,19 @@ export async function POST(
         );
     }
 
+    // PR-3 (audit Inngest dedup): stamp a per-click idempotency id. Inngest
+    // retries of this single send replay the same manualTriggerId → the function
+    // reuses one delivery parent and skips already-SENT recipients on retry. A
+    // fresh click mints a new id → a new parent → a full re-send (the manual
+    // re-test behavior admins rely on, paired with forceResend below).
     await inngest.send({
         name: "workflow/step.trigger",
-        data: { stepId, workshopId: cleanWorkshopId, forceResend: true },
+        data: {
+            stepId,
+            workshopId: cleanWorkshopId,
+            forceResend: true,
+            manualTriggerId: randomUUID(),
+        },
     });
 
     // After firing — check for a recent SMTP failure so the UI can show actionable context.
