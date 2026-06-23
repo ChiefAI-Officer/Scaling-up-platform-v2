@@ -16,6 +16,8 @@ import {
   buildQualitativeModel,
   REPORT_FILTERS,
 } from "@/lib/assessments/qualitative-report-model";
+import { buildQuestionMetaByKey } from "@/lib/assessments/question-meta";
+import { buildLvaContent } from "../../../../prisma/seed-lva-assessment";
 
 // ── isReportAnswerPresent ──────────────────────────────────────────────────
 
@@ -768,17 +770,73 @@ describe("LVA conditional follow-ups (Wave I)", () => {
   it("FAIL-OPEN: gate present but NOT MULTI_CHOICE → renders answered-only", () => {
     expect(s5Keys(buildQualitativeModel(lvaGate(["sales"], { S5_why_sales: "x" }, { gateType: "TEXT" })))).toContain("S5_why_sales");
   });
-  it("gates orphaned follow-ups too: an unchecked orphaned S5_why_ is NOT in Additional responses", () => {
+  it("gates orphaned follow-ups too: a CHECKED orphaned S5_why_ IS present and an unchecked one is NOT (both directions)", () => {
+    // Gate selects "sales" (checked) but NOT "cash" (unchecked). Both S5_why_
+    // follow-ups are ORPHANS (no section, not referenced by any section list),
+    // so they route through the "Additional responses" bucket — and the gate
+    // must still apply there: checked → present, unchecked → absent.
     const m = buildQualitativeModel({
       templateAlias: "leadership-vision-alignment",
       sections: [],
       questionsByKey: {
         S4_biggest_obstacles: { type: "MULTI_CHOICE", label: "g", options: [{ key: "sales", label: "Sales" }, { key: "cash", label: "Cash" }] },
+        S5_why_sales: { type: "TEXT", label: "Why Sales?" },
         S5_why_cash: { type: "TEXT", label: "Why Cash?" },
       },
-      rawAnswers: [{ stableKey: "S4_biggest_obstacles", value: ["sales"] }, { stableKey: "S5_why_cash", value: "x" }],
+      rawAnswers: [
+        { stableKey: "S4_biggest_obstacles", value: ["sales"] },
+        { stableKey: "S5_why_sales", value: "x" },
+        { stableKey: "S5_why_cash", value: "x" },
+      ],
     });
     const add = m.sections.find((s) => s.stableKey === "__additional_responses__");
-    expect((add?.items ?? []).map((i) => i.stableKey)).not.toContain("S5_why_cash");
+    const addKeys = (add?.items ?? []).map((i) => i.stableKey);
+    // Positive control: the CHECKED orphaned follow-up IS in the bucket.
+    expect(addKeys).toContain("S5_why_sales");
+    // Negative control: the UNCHECKED orphaned follow-up is NOT.
+    expect(addKeys).not.toContain("S5_why_cash");
+  });
+});
+
+// ── Real-seed integration (Wave I, ADR-0014) ────────────────────────────────
+// Proves the filter's hard-coded keys (suppressSections / gateKey / followupPrefix)
+// match the ACTUAL LVA seed content — not a hand-built QMeta fixture. If the seed
+// renames a section/question stableKey or changes the S4 option keys, this fails.
+
+describe("LVA report filter against the REAL seed (integration)", () => {
+  it("suppresses S3 and gates S5 on the REAL LVA seed content", () => {
+    const content = buildLvaContent();
+    const questionsByKey = buildQuestionMetaByKey(content.questions);
+    const model = buildQualitativeModel({
+      templateAlias: "leadership-vision-alignment",
+      sections: content.sections,
+      questionsByKey,
+      rawAnswers: [
+        // Answer every S3 strength so the section would render if NOT suppressed.
+        ...content.questions
+          .filter((q) => q.stableKey.startsWith("S3_"))
+          .map((q) => ({ stableKey: q.stableKey, value: 2 })),
+        // Flag sales + cash (NOT execution) → only those two S5_why_ explained.
+        { stableKey: "S4_biggest_obstacles", value: ["sales", "cash"] },
+        { stableKey: "S5_why_sales", value: "real-sales" },
+        { stableKey: "S5_why_cash", value: "real-cash" },
+        { stableKey: "S5_why_execution", value: "real-exec-UNCHECKED" },
+        { stableKey: "S5_other_factor", value: "real-other" },
+      ],
+    });
+
+    const keys = model.sections.map((s) => s.stableKey);
+    // S3_strengths is suppressed by the LVA report filter.
+    expect(keys).not.toContain("S3_strengths");
+
+    const s5 = model.sections
+      .find((s) => s.stableKey === "S5_explained")
+      ?.items.map((i) => i.stableKey) ?? [];
+    // Checked factors' "why" rows + the always-on S5_other_factor survive.
+    expect(s5).toEqual(
+      expect.arrayContaining(["S5_why_sales", "S5_why_cash", "S5_other_factor"]),
+    );
+    // The unchecked "execution" explanation is gated out even though it was typed.
+    expect(s5).not.toContain("S5_why_execution");
   });
 });

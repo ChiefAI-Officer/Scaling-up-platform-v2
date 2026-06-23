@@ -90,6 +90,41 @@ function lvaReport(overrides: Partial<RespondentReport> = {}): RespondentReport 
   });
 }
 
+/**
+ * Wave I (ADR-0014) LVA fixture WITH the obstacle gate present, exercising the
+ * conditional-followup filter end-to-end through the screen renderer:
+ *   - S4_obstacles holds the MULTI_CHOICE gate answered ["sales"] (NOT "cash")
+ *   - S5_explained holds both S5_why_sales (checked → renders) and S5_why_cash
+ *     (unchecked → gated out) with distinctive sentinel answer text.
+ * A separate helper so the shared lvaReport() used by other tests is unchanged.
+ */
+function lvaReportWithObstacles(): RespondentReport {
+  return baseReport({
+    sections: [
+      { stableKey: "S4_obstacles", name: "Biggest obstacles to growth" },
+      { stableKey: "S5_explained", name: "Obstacles and challenges explained" },
+    ],
+    questionsByKey: {
+      S4_biggest_obstacles: {
+        type: "MULTI_CHOICE",
+        label: "Pick the three biggest obstacles",
+        sectionStableKey: "S4_obstacles",
+        options: [
+          { key: "sales", label: "Sales" },
+          { key: "cash", label: "Cash" },
+        ],
+      },
+      S5_why_sales: { type: "TEXT", label: "Why is Sales a hindrance?", sectionStableKey: "S5_explained" },
+      S5_why_cash: { type: "TEXT", label: "Why is Cash a hindrance?", sectionStableKey: "S5_explained" },
+    },
+    rawAnswers: [
+      { stableKey: "S4_biggest_obstacles", value: ["sales"] }, // only sales flagged
+      { stableKey: "S5_why_sales", value: "CHECKED_SALES_TEXT" }, // checked → renders
+      { stableKey: "S5_why_cash", value: "UNCHECKED_CASH_TEXT" }, // unchecked → gated out
+    ],
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // Dispatch
 // ════════════════════════════════════════════════════════════════════════════
@@ -227,5 +262,13 @@ describe("QualitativeReport — content", () => {
     expect(section.textContent).toContain("Strategy");
     // The raw keys must not leak into the rendered output.
     expect(section.textContent).not.toContain("the_leadership");
+  });
+
+  // ── Wave I (ADR-0014) — conditional follow-up gating end-to-end ───────────
+  it("renders only the checked obstacle explanation, not the unchecked one (screen)", () => {
+    render(<QualitativeReport report={lvaReportWithObstacles()} />);
+    const root = screen.getByTestId("qualitative-report");
+    expect(root.textContent).toContain("CHECKED_SALES_TEXT");
+    expect(root.textContent).not.toContain("UNCHECKED_CASH_TEXT");
   });
 });
