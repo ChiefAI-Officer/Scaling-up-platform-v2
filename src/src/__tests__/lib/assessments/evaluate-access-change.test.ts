@@ -153,12 +153,20 @@ function buildTx(state: {
     assessmentCampaign: {
       findMany: jest.fn(
         async (args: {
-          where?: { createdByCoachId?: string; status?: { in?: string[] } };
+          where?: {
+            createdByCoachId?: string | { in?: string[] };
+            status?: { in?: string[] };
+          };
         }) => {
-          const coachId = args?.where?.createdByCoachId;
+          // Supports the batched `{ in: [...] }` query (and the legacy string form).
+          const coachWhere = args?.where?.createdByCoachId;
+          const coachIds =
+            typeof coachWhere === "string"
+              ? [coachWhere]
+              : coachWhere?.in ?? null;
           const statusIn = args?.where?.status?.in;
           return (state.campaigns ?? []).filter((c) => {
-            if (coachId && c.createdByCoachId !== coachId) return false;
+            if (coachIds && !coachIds.includes(c.createdByCoachId)) return false;
             if (statusIn && !statusIn.includes(c.status)) return false;
             return true;
           });
