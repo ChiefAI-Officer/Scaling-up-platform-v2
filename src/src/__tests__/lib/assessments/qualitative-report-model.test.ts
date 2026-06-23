@@ -840,3 +840,35 @@ describe("LVA report filter against the REAL seed (integration)", () => {
     expect(s5).not.toContain("S5_why_execution");
   });
 });
+
+// ── LVA filter provenance (Wave I, R2-M4) ───────────────────────────────────
+
+describe("LVA filter provenance (Wave I)", () => {
+  it("reports suppressed-section and hidden-followup counts for LVA", () => {
+    const m = buildQualitativeModel(lvaGate(["sales"], { S5_why_sales: "x", S5_why_cash: "y" }));
+    expect(m.filterProvenance).toEqual(
+      expect.objectContaining({ filterId: "lva-cond-v1", hiddenFollowupCount: 1 }),
+    );
+  });
+  it("counts a suppressed section", () => {
+    const m = buildQualitativeModel({
+      templateAlias: "leadership-vision-alignment",
+      sections: [{ stableKey: "S3_strengths", name: "S" }, { stableKey: "S2_vision", name: "V" }],
+      questionsByKey: {
+        S3_a: { type: "SLIDER_LIKERT", label: "a", sectionStableKey: "S3_strengths", min: 1, max: 3 },
+        S2_a: { type: "TEXT", label: "v", sectionStableKey: "S2_vision" },
+      },
+      rawAnswers: [{ stableKey: "S3_a", value: 2 }, { stableKey: "S2_a", value: "hi" }],
+    });
+    expect(m.filterProvenance?.suppressedSectionCount).toBe(1);
+  });
+  it("returns no filterProvenance for a template without a filter", () => {
+    const m = buildQualitativeModel({
+      templateAlias: "qsp-v2",
+      sections: [{ stableKey: "P1", name: "P1" }],
+      questionsByKey: { p: { type: "TEXT", label: "p", sectionStableKey: "P1" } },
+      rawAnswers: [{ stableKey: "p", value: "x" }],
+    });
+    expect(m.filterProvenance).toBeUndefined();
+  });
+});

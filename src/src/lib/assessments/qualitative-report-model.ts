@@ -77,6 +77,20 @@ export interface QualSection {
 
 export interface QualitativeModel {
   sections: QualSection[];
+  /**
+   * Wave I (R2-M4) — non-PII provenance of the per-alias report filter
+   * (REPORT_FILTERS). Present ONLY when the template alias has a filter entry
+   * (i.e. `reportFilter` was applied). Records what the filter DID to the
+   * rendered body without changing the stored versionId/contentHash:
+   * how many sections were suppressed and how many conditional follow-ups were
+   * hidden. Ids + integer counts only — never answer text. Consumed by the
+   * report-email outbox log (the durable trace once emails are purged).
+   */
+  filterProvenance?: {
+    filterId: string;
+    suppressedSectionCount: number;
+    hiddenFollowupCount: number;
+  };
 }
 
 export interface QMeta {
@@ -409,6 +423,12 @@ export function buildQualitativeModel(
     key.startsWith(cf!.followupPrefix) &&
     !checkedFactorKeys.has(key.slice(cf!.followupPrefix.length));
 
+  // Wave I (R2-M4) — non-PII provenance counters. Incremented as the filter
+  // suppresses sections / hides follow-ups below, surfaced in filterProvenance
+  // ONLY when a reportFilter is active. Counts only — no answer text.
+  let suppressedSectionCount = 0;
+  let hiddenFollowupCount = 0;
+
   /** Shapes a present answer row into a QualItem (shared with the orphan bucket). */
   const toItem = (key: string, meta: QMeta, value: unknown): QualItem => {
     const item: QualItem = {
@@ -439,12 +459,22 @@ export function buildQualitativeModel(
   const out: QualSection[] = [];
 
   for (const section of sectionList) {
-    if (suppressedSections.has(section.stableKey)) continue;
+    if (suppressedSections.has(section.stableKey)) {
+      suppressedSectionCount++;
+      continue;
+    }
     const questions = questionsBySection.get(section.stableKey) ?? [];
 
     const items: QualItem[] = [];
     for (const { key, meta } of questions) {
-      if (isHiddenFollowup(key)) continue;
+      if (isHiddenFollowup(key)) {
+        // Count only follow-ups the gate actually SUPPRESSED — i.e. an answered
+        // follow-up that would otherwise have rendered. An unchecked follow-up
+        // with no present answer would have been dropped anyway (presence
+        // check), so it is not a filter-attributable suppression.
+        if (isReportAnswerPresent(meta.type, answerByKey.get(key))) hiddenFollowupCount++;
+        continue;
+      }
       const value = answerByKey.get(key);
       if (!isReportAnswerPresent(meta.type, value)) continue;
       items.push(toItem(key, meta, value));
@@ -476,7 +506,12 @@ export function buildQualitativeModel(
   const orphanItems: QualItem[] = [];
   for (const [key, meta] of questionEntries) {
     if (assignedKeys.has(key)) continue;
-    if (isHiddenFollowup(key)) continue;
+    if (isHiddenFollowup(key)) {
+      // Count once per hidden item, but only when it carried a present answer
+      // (same rationale as the section loop above).
+      if (isReportAnswerPresent(meta.type, answerByKey.get(key))) hiddenFollowupCount++;
+      continue;
+    }
     const value = answerByKey.get(key);
     if (!isReportAnswerPresent(meta.type, value)) continue;
     orphanItems.push(toItem(key, meta, value));
@@ -490,5 +525,18 @@ export function buildQualitativeModel(
     });
   }
 
-  return { sections: out };
+  const model: QualitativeModel = { sections: out };
+
+  // Wave I (R2-M4) — attach filter provenance ONLY when a filter is active for
+  // this alias. Non-PII: filter id + integer counts (no answer text). The
+  // outbox log reads this verbatim (never recomputes).
+  if (reportFilter) {
+    model.filterProvenance = {
+      filterId: REPORT_FILTER_VERSION,
+      suppressedSectionCount,
+      hiddenFollowupCount,
+    };
+  }
+
+  return model;
 }

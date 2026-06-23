@@ -32,6 +32,10 @@ import {
   type RespondentReportOutcome,
 } from "@/lib/assessments/respondent-report";
 import { reportConfigFor } from "@/lib/assessments/report-config";
+import {
+  REPORT_FILTERS,
+  REPORT_FILTER_VERSION,
+} from "@/lib/assessments/qualitative-report-model";
 import { isGroupReportEnabled } from "@/lib/assessments/wave-f-flags";
 
 /** First-hop client IP, mirroring the current report routes' extraction byte-for-byte. */
@@ -161,6 +165,15 @@ export async function viewRespondentReport(
           reportType: reportConfigFor(o.report.templateAlias).reportType,
           versionId: o.report.provenance.versionId,
           contentHash: o.report.provenance.contentHash,
+          // R2-M4 — when the alias has a code-only report filter (REPORT_FILTERS),
+          // record WHICH filter governed this view. The filter mutates the
+          // rendered body WITHOUT bumping versionId/contentHash, so this id is
+          // the audit link to the suppression/gating semantics. Counts are NOT
+          // recorded here (they'd require recomputing the model at the loader) —
+          // they live on the model's filterProvenance + the email outbox marker.
+          ...(o.report.templateAlias && REPORT_FILTERS[o.report.templateAlias]
+            ? { reportFilterId: REPORT_FILTER_VERSION }
+            : {}),
         },
       };
     },

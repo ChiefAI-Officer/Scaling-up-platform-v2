@@ -51,6 +51,7 @@ import {
   type QualSection,
 } from "@/lib/assessments/qualitative-report-model";
 import { buildQuestionMetaByKey } from "@/lib/assessments/question-meta";
+import { emitReportMetric } from "@/lib/assessments/report-metrics";
 
 export type ReportEmailRecipientRole = "TAKER_COPY" | "REFERRING_COACH";
 
@@ -432,6 +433,20 @@ function buildQualitativeBodySections(report: RespondentReport): {
     questionsByKey: report.questionsByKey,
     rawAnswers: report.rawAnswers,
   });
+
+  // R2-M4 — durable, NON-PII provenance of what the report filter did to THIS
+  // email body. Emails are later purged, so this structured marker (filter id +
+  // integer counts only — never answer text/PII) is the lasting audit trace of
+  // a code-only, retroactive content change (REPORT_FILTERS) that does NOT bump
+  // the stored versionId/contentHash. Read verbatim from the model; never
+  // recomputed. Emitted only when a filter was active (filterProvenance set).
+  if (model.filterProvenance) {
+    emitReportMetric("respondent", "email", {
+      filterId: model.filterProvenance.filterId,
+      suppressedSectionCount: model.filterProvenance.suppressedSectionCount,
+      hiddenFollowupCount: model.filterProvenance.hiddenFollowupCount,
+    });
+  }
 
   const parts: string[] = [];
   let bytes = 0;
