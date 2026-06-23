@@ -302,7 +302,7 @@ export const triggerWorkflowStep = inngest.createFunction(
                         isTerminalError: isTerminalSmtpError,
                         sendOne: async ({ registrationId }) => {
                             const reg = regById.get(registrationId);
-                            if (!reg) return;
+                            if (!reg) throw new Error(`fan-out invariant: registration ${registrationId} missing from batch map`);
                             const personalContext: WorkflowContext = {
                                 ...baseContext,
                                 registrantName: `${reg.firstName} ${reg.lastName}`,
@@ -450,7 +450,7 @@ export const triggerWorkflowStep = inngest.createFunction(
                         sendOne: async ({ registrationId }) => {
                             const reg = regById.get(registrationId);
                             const surveyLink = linkByReg.get(registrationId);
-                            if (!reg || !surveyLink) return;
+                            if (!reg || !surveyLink) throw new Error(`fan-out invariant: registration ${registrationId} missing reg/link in batch maps`);
                             const personalContext: WorkflowContext = {
                                 ...baseContext,
                                 registrantName: `${reg.firstName} ${reg.lastName}`,
@@ -605,7 +605,7 @@ export const triggerWorkflowStep = inngest.createFunction(
                         isTerminalError: isTerminalSmtpError,
                         sendOne: async ({ registrationId }) => {
                             const reg = regById.get(registrationId);
-                            if (!reg) return;
+                            if (!reg) throw new Error(`fan-out invariant: registration ${registrationId} missing from batch map`);
                             const personalContext: WorkflowContext = {
                                 ...baseContext,
                                 registrantName: `${reg.firstName} ${reg.lastName}`,

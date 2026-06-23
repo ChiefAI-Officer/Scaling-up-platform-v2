@@ -40,6 +40,45 @@ describe("ensureExecutionParent", () => {
       status: "SCHEDULED",
     });
   });
+
+  it("recovers from a concurrent-create race (P2002) by re-reading the winning parent", async () => {
+    // Two concurrent runs raced the create; this one lost the unique-index race.
+    const upsert = jest.fn().mockRejectedValue(
+      Object.assign(new Error("Unique constraint failed"), { code: "P2002" }),
+    );
+    const findUnique = jest.fn().mockResolvedValue({ id: "winner-parent" });
+    const client = { workflowStepExecution: { upsert, findUnique } };
+
+    const id = await ensureExecutionParent(client as never, {
+      deliveryBatchKey: "manual:click-1:step-1",
+      stepId: "step-1",
+      workshopId: "ws-1",
+    });
+
+    // Returns the winner's id instead of failing the batch.
+    expect(id).toBe("winner-parent");
+    expect(findUnique).toHaveBeenCalledWith({
+      where: { deliveryBatchKey: "manual:click-1:step-1" },
+      select: { id: true },
+    });
+  });
+
+  it("rethrows a non-P2002 error (does not swallow real failures)", async () => {
+    const upsert = jest.fn().mockRejectedValue(
+      Object.assign(new Error("connection reset"), { code: "P1001" }),
+    );
+    const findUnique = jest.fn();
+    const client = { workflowStepExecution: { upsert, findUnique } };
+
+    await expect(
+      ensureExecutionParent(client as never, {
+        deliveryBatchKey: "manual:click-1:step-1",
+        stepId: "step-1",
+        workshopId: "ws-1",
+      }),
+    ).rejects.toThrow("connection reset");
+    expect(findUnique).not.toHaveBeenCalled();
+  });
 });
 
 function clientWithSentChildren(sentRegistrationIds: string[]) {

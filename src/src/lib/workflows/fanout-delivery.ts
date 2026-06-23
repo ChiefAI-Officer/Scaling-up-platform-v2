@@ -56,19 +56,40 @@ export async function ensureExecutionParent(
     scheduledFor?: Date;
   }
 ): Promise<string> {
-  const row = await client.workflowStepExecution.upsert({
-    where: { deliveryBatchKey: args.deliveryBatchKey },
-    create: {
-      deliveryBatchKey: args.deliveryBatchKey,
-      stepId: args.stepId,
-      workshopId: args.workshopId,
-      status: "SCHEDULED",
-      scheduledFor: args.scheduledFor ?? new Date(),
-    },
-    update: {},
-    select: { id: true },
-  });
-  return row.id;
+  try {
+    const row = await client.workflowStepExecution.upsert({
+      where: { deliveryBatchKey: args.deliveryBatchKey },
+      create: {
+        deliveryBatchKey: args.deliveryBatchKey,
+        stepId: args.stepId,
+        workshopId: args.workshopId,
+        status: "SCHEDULED",
+        scheduledFor: args.scheduledFor ?? new Date(),
+      },
+      update: {},
+      select: { id: true },
+    });
+    return row.id;
+  } catch (err) {
+    // Prisma upsert is NOT atomic on a unique column: two concurrent runs with
+    // the same deliveryBatchKey can both miss the row and race the create — the
+    // loser throws a P2002 unique violation. Re-read the winner instead of
+    // failing the whole batch (which on the immediate path would otherwise
+    // record a spurious FAILED parent for that one attempt).
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      (err as { code?: string }).code === "P2002"
+    ) {
+      const existing = await client.workflowStepExecution.findUnique({
+        where: { deliveryBatchKey: args.deliveryBatchKey },
+        select: { id: true },
+      });
+      if (existing) return existing.id;
+    }
+    throw err;
+  }
 }
 
 /**
