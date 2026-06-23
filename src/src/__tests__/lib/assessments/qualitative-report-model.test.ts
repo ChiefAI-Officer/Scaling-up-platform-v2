@@ -205,9 +205,8 @@ describe("buildQualitativeModel", () => {
     expect(model.sections[0].kind).toBe("metric-table");
   });
 
-  it("assigns 'rating' for the LVA strengths section (16 SLIDER 1-3) and carries min/max", () => {
+  it("assigns 'rating' for an all-slider 1-3 section and carries min/max", () => {
     const model = buildQualitativeModel({
-      templateAlias: "leadership-vision-alignment",
       sections: [{ stableKey: "S3_strengths", name: "Strengths and Weaknesses" }],
       questionsByKey: {
         S3_sales: {
@@ -664,5 +663,39 @@ describe("REPORT_FILTERS (Wave I)", () => {
   it("has no entry for unaffected templates", () => {
     expect(REPORT_FILTERS["qsp-v2"]).toBeUndefined();
     expect(REPORT_FILTERS["RockHabits"]).toBeUndefined();
+  });
+});
+
+describe("LVA section suppression (Wave I)", () => {
+  it("omits S3_strengths for LVA even when every factor is answered", () => {
+    const model = buildQualitativeModel({
+      templateAlias: "leadership-vision-alignment",
+      sections: [
+        { stableKey: "S3_strengths", name: "Strengths and Weaknesses" },
+        { stableKey: "S2_vision", name: "Vision" },
+      ],
+      questionsByKey: {
+        S3_sales: { type: "SLIDER_LIKERT", label: "Sales", sectionStableKey: "S3_strengths", min: 1, max: 3 },
+        S2_products: { type: "TEXT", label: "Products", sectionStableKey: "S2_vision" },
+      },
+      rawAnswers: [
+        { stableKey: "S3_sales", value: 1 },
+        { stableKey: "S2_products", value: "robots" },
+      ],
+    });
+    const keys = model.sections.map((s) => s.stableKey);
+    expect(keys).not.toContain("S3_strengths");
+    expect(keys).toContain("S2_vision");
+    expect(keys).not.toContain("__additional_responses__");
+  });
+
+  it("does NOT suppress for a template without a REPORT_FILTERS entry", () => {
+    const model = buildQualitativeModel({
+      templateAlias: "qsp-v2",
+      sections: [{ stableKey: "S3_strengths", name: "Strengths" }],
+      questionsByKey: { S3_a: { type: "SLIDER_LIKERT", label: "A", sectionStableKey: "S3_strengths", min: 1, max: 3 } },
+      rawAnswers: [{ stableKey: "S3_a", value: 2 }],
+    });
+    expect(model.sections.map((s) => s.stableKey)).toContain("S3_strengths");
   });
 });

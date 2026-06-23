@@ -389,6 +389,10 @@ export function buildQualitativeModel(
 
   const aliasMap = templateAlias ? SECTION_PRESENTATION[templateAlias] : undefined;
 
+  // Wave I (ADR-0014) — per-alias report filter.
+  const reportFilter = templateAlias ? REPORT_FILTERS[templateAlias] : undefined;
+  const suppressedSections = new Set(reportFilter?.suppressSections ?? []);
+
   /** Shapes a present answer row into a QualItem (shared with the orphan bucket). */
   const toItem = (key: string, meta: QMeta, value: unknown): QualItem => {
     const item: QualItem = {
@@ -419,6 +423,7 @@ export function buildQualitativeModel(
   const out: QualSection[] = [];
 
   for (const section of sectionList) {
+    if (suppressedSections.has(section.stableKey)) continue;
     const questions = questionsBySection.get(section.stableKey) ?? [];
 
     const items: QualItem[] = [];

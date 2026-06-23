@@ -176,13 +176,20 @@ describe("QualitativeReport — content", () => {
     expect(section.textContent).toMatch(/\b0\b/);
   });
 
-  it("renders a rating item showing the respondent's pick (Weak/Average/Strong for 1–3)", () => {
+  it("does NOT render the S3 strengths matrix for LVA (it lives in the group report)", () => {
     render(<QualitativeReport report={lvaReport()} />);
-    const section = screen.getByTestId("qual-section-S3_strengths");
-    // Factor labels present.
-    expect(section.textContent).toContain("Sales");
-    expect(section.textContent).toContain("Culture");
-    // The Weak/Average/Strong vocabulary is used for the 1–3 scale.
+    expect(screen.queryByTestId("qual-section-S3_strengths")).not.toBeInTheDocument();
+  });
+
+  it("renders Weak/Average/Strong for an all-slider 1-3 section (non-LVA)", () => {
+    const report = baseReport({
+      templateAlias: undefined,
+      sections: [{ stableKey: "ratings", name: "Ratings" }],
+      questionsByKey: { r_sales: { type: "SLIDER_LIKERT", label: "Sales", sectionStableKey: "ratings", min: 1, max: 3 } },
+      rawAnswers: [{ stableKey: "r_sales", value: 1 }],
+    });
+    render(<QualitativeReport report={report} />);
+    const section = screen.getByTestId("qual-section-ratings");
     expect(section.textContent).toMatch(/Weak/);
     expect(section.textContent).toMatch(/Strong/);
   });
