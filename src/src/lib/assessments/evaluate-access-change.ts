@@ -124,7 +124,7 @@ export interface AccessChangeTx {
   assessmentCampaign: {
     findMany: (args: {
       where?: {
-        createdByCoachId?: string;
+        createdByCoachId?: string | { in: string[] };
         status?: { in?: string[] };
         deletedAt?: Date | null;
       };
@@ -365,7 +365,6 @@ export async function evaluateAccessChange(
         status: { in: ["DRAFT", "ACTIVE"] },
         deletedAt: null,
       },
-      select: { createdByCoachId: true },
     });
     const coachesWithWorkload = new Set(
       activeCampaigns.map((c) => c.createdByCoachId)
