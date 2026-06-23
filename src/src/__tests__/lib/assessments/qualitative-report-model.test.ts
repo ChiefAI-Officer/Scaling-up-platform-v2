@@ -14,6 +14,7 @@
 import {
   isReportAnswerPresent,
   buildQualitativeModel,
+  REPORT_FILTERS,
 } from "@/lib/assessments/qualitative-report-model";
 
 // ── isReportAnswerPresent ──────────────────────────────────────────────────
@@ -650,5 +651,18 @@ describe("buildQualitativeModel", () => {
       expect(model.sections[0].name).toBe("Additional responses");
       expect(model.sections[0].items.map((i) => i.stableKey)).toEqual(["orphan_q"]);
     });
+  });
+});
+
+describe("REPORT_FILTERS (Wave I)", () => {
+  it("declares the LVA suppress + conditional-followup contract", () => {
+    expect(REPORT_FILTERS["leadership-vision-alignment"]).toEqual({
+      suppressSections: ["S3_strengths"],
+      conditionalFollowups: { gateKey: "S4_biggest_obstacles", followupPrefix: "S5_why_" },
+    });
+  });
+  it("has no entry for unaffected templates", () => {
+    expect(REPORT_FILTERS["qsp-v2"]).toBeUndefined();
+    expect(REPORT_FILTERS["RockHabits"]).toBeUndefined();
   });
 });

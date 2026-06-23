@@ -197,6 +197,27 @@ export const SECTION_PRESENTATION: Record<
 };
 
 /**
+ * Per-alias report filter (ADR-0014). Reproduces Esperto conditional output at the
+ * report layer — NOT via a survey-form conditional engine. One conditional follow-up
+ * group per template by design (YAGNI; widen `conditionalFollowups` to an array only
+ * if a future template needs multiple). Unknown alias → no filtering.
+ */
+export interface ReportFilterConfig {
+  suppressSections?: string[];
+  conditionalFollowups?: { gateKey: string; followupPrefix: string };
+}
+
+export const REPORT_FILTERS: Readonly<Record<string, ReportFilterConfig>> = {
+  "leadership-vision-alignment": {
+    suppressSections: ["S3_strengths"],
+    conditionalFollowups: { gateKey: "S4_biggest_obstacles", followupPrefix: "S5_why_" },
+  },
+};
+
+/** Bump when the filter's semantics change — recorded in audit/metrics provenance. */
+export const REPORT_FILTER_VERSION = "lva-cond-v1";
+
+/**
  * Type-driven fallback for sections/aliases not in SECTION_PRESENTATION,
  * classifying from a bare list of question TYPES:
  *   - all NUMBER                 → metric-table
