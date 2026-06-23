@@ -1,0 +1,136 @@
+/**
+ * PR-3 (audit Inngest dedup) — shared fan-out delivery for attendee-targeted
+ * workflow steps (EMAIL_ATTENDEES, SEND_SURVEY_LINK, SEND_FILE_LINK) across both
+ * trigger-workflow-step.ts and execute-workflow.ts.
+ *
+ * The retry-resend bug came from each invocation creating a FRESH parent row, so
+ * a transient-SMTP throw → Inngest retry → new parent → prior recipients re-sent.
+ * Fix: anchor on ONE reused parent per logical delivery batch and skip recipients
+ * that already have a SENT child under it.
+ *
+ *   ensureExecutionParent()  — upsert/reuse the single parent row, keyed by a
+ *     SEMANTIC deliveryBatchKey (not raw Inngest runId, which only dedupes one
+ *     run's retries — not duplicate event emission or concurrent runs).
+ *   sendFanoutRecipients()   — load the parent's SENT children, skip them, send
+ *     the rest, record each SENT immediately, roll the parent up.
+ *
+ * Residual: at-least-once (a crash between a successful send and its SENT-write
+ * re-sends that single recipient on retry). Exactly-once needs a provider-side
+ * idempotency key — out of scope.
+ */
+
+import type { Prisma } from "@prisma/client";
+import type { db } from "@/lib/db";
+import { recordRecipientExecution, finalizeParentRollup } from "./recipient-execution";
+
+type Client = Prisma.TransactionClient | typeof db;
+
+export type FanoutRecipient = { registrationId: string; email: string };
+
+export type FanoutOutcome = { parentId: string; sent: number; skipped: number };
+
+/**
+ * Upsert (create-or-reuse) the single parent execution row for a delivery batch,
+ * keyed by the unique `deliveryBatchKey`. `update: {}` means a retry of the same
+ * batch returns the existing row (with its already-SENT children) rather than a
+ * fresh parent.
+ */
+export async function ensureExecutionParent(
+  client: Client,
+  args: {
+    deliveryBatchKey: string;
+    stepId: string;
+    workshopId: string;
+    scheduledFor?: Date;
+  }
+): Promise<string> {
+  const row = await client.workflowStepExecution.upsert({
+    where: { deliveryBatchKey: args.deliveryBatchKey },
+    create: {
+      deliveryBatchKey: args.deliveryBatchKey,
+      stepId: args.stepId,
+      workshopId: args.workshopId,
+      status: "SCHEDULED",
+      scheduledFor: args.scheduledFor ?? new Date(),
+    },
+    update: {},
+    select: { id: true },
+  });
+  return row.id;
+}
+
+/**
+ * Send to each recipient at most once per parent. Recipients with an existing
+ * SENT child under `parentId` (from a prior run of the same batch) are skipped.
+ * `sendOne` builds + sends the actual email. A non-terminal (transient) error is
+ * rethrown so Inngest retries — the parent is reused, so the recipients already
+ * sent are skipped on the next run. A terminal error records the recipient FAILED
+ * and stops the batch.
+ */
+export async function sendFanoutRecipients(
+  client: Client,
+  args: {
+    parentId: string;
+    stepId: string;
+    workshopId: string;
+    recipients: FanoutRecipient[];
+    sendOne: (recipient: FanoutRecipient) => Promise<void>;
+    isTerminalError?: (err: unknown) => boolean;
+  }
+): Promise<FanoutOutcome> {
+  const priorSent = await client.workflowStepExecution.findMany({
+    where: { parentId: args.parentId, status: "SENT" },
+    select: { registrationId: true },
+  });
+  const alreadySent = new Set(
+    priorSent.map((r) => r.registrationId).filter((id): id is string => !!id)
+  );
+
+  const seenEmail = new Set<string>();
+  let sent = 0;
+  let skipped = 0;
+
+  for (const recipient of args.recipients) {
+    const normalizedEmail = recipient.email.toLowerCase();
+    if (alreadySent.has(recipient.registrationId) || seenEmail.has(normalizedEmail)) {
+      skipped++;
+      continue;
+    }
+    seenEmail.add(normalizedEmail);
+
+    try {
+      await args.sendOne(recipient);
+      await recordRecipientExecution(client, {
+        parentId: args.parentId,
+        stepId: args.stepId,
+        workshopId: args.workshopId,
+        registrationId: recipient.registrationId,
+        recipientEmail: recipient.email,
+        status: "SENT",
+      });
+      sent++;
+    } catch (err) {
+      const terminal = args.isTerminalError ? args.isTerminalError(err) : false;
+      if (!terminal) {
+        // Transient — let Inngest retry; the parent is reused so this recipient
+        // (not yet recorded SENT) is retried while prior SENT ones are skipped.
+        throw err;
+      }
+      // Terminal — record the failure and stop the batch (the cause, e.g. an
+      // auth failure, affects every remaining recipient).
+      await recordRecipientExecution(client, {
+        parentId: args.parentId,
+        stepId: args.stepId,
+        workshopId: args.workshopId,
+        registrationId: recipient.registrationId,
+        recipientEmail: recipient.email,
+        status: "FAILED",
+        errorMessage: err instanceof Error ? err.message : String(err),
+      });
+      break;
+    }
+  }
+
+  await finalizeParentRollup(client, args.parentId);
+  return { parentId: args.parentId, sent, skipped };
+}
