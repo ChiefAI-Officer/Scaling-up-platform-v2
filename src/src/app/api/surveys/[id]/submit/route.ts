@@ -43,7 +43,14 @@ export async function POST(
     );
   }
 
-  const bodyValidation = submitSurveyBodySchema.safeParse(await request.json());
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const bodyValidation = submitSurveyBodySchema.safeParse(rawBody);
   if (!bodyValidation.success) {
     return NextResponse.json(
       { error: "Invalid request body", details: bodyValidation.error.issues },

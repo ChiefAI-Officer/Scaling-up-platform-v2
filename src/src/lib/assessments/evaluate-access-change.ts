@@ -124,7 +124,7 @@ export interface AccessChangeTx {
   assessmentCampaign: {
     findMany: (args: {
       where?: {
-        createdByCoachId?: string;
+        createdByCoachId?: string | { in: string[] };
         status?: { in?: string[] };
         deletedAt?: Date | null;
       };
@@ -350,22 +350,28 @@ export async function evaluateAccessChange(
   applyChange(snapAfter, change);
 
   // ── Step 5: identify coaches whose effective access dropped to zero ──
-  const forcedZeroCoachIds: string[] = [];
-  for (const cid of affectedCoachIds) {
-    const after = effectiveTemplatesForCoach(snapAfter, cid);
-    if (after.size === 0) {
-      // Coach lands at zero — block only if they hold active workload.
-      const campaigns = await tx.assessmentCampaign.findMany({
-        where: {
-          createdByCoachId: cid,
-          status: { in: ["DRAFT", "ACTIVE"] },
-          deletedAt: null,
-        },
-      });
-      if (campaigns.length > 0) {
-        forcedZeroCoachIds.push(cid);
-      }
-    }
+  // Collect zero-access coaches in-memory first, then check active workload in
+  // ONE query — was an N+1 findMany per coach inside the serializable lock
+  // (minimize lock-hold time / contention).
+  const zeroCoachIds = affectedCoachIds.filter(
+    (cid) => effectiveTemplatesForCoach(snapAfter, cid).size === 0
+  );
+
+  let forcedZeroCoachIds: string[] = [];
+  if (zeroCoachIds.length > 0) {
+    const activeCampaigns = await tx.assessmentCampaign.findMany({
+      where: {
+        createdByCoachId: { in: zeroCoachIds },
+        status: { in: ["DRAFT", "ACTIVE"] },
+        deletedAt: null,
+      },
+    });
+    const coachesWithWorkload = new Set(
+      activeCampaigns.map((c) => c.createdByCoachId)
+    );
+    forcedZeroCoachIds = zeroCoachIds.filter((cid) =>
+      coachesWithWorkload.has(cid)
+    );
   }
 
   // ── Step 6: block decision ──
