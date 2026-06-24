@@ -220,7 +220,7 @@ describe("Files API", () => {
     });
 
     it("returns 401 when not authenticated", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(null);
+      (getApiActor as jest.Mock).mockResolvedValue(null);
 
       const file = new File(["content"], "doc.pdf", {
         type: "application/pdf",
@@ -230,6 +230,63 @@ describe("Files API", () => {
 
       expect(response.status).toBe(401);
       expect(uploadFile).not.toHaveBeenCalled();
+    });
+
+    it("returns 404 when uploading to a missing workshop", async () => {
+      (validateFile as jest.Mock).mockReturnValue(null);
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue(null);
+      const file = new File(["content"], "doc.pdf", { type: "application/pdf" });
+
+      const response = await POST(buildPostRequest({ file, workshopId: "missing-ws" }));
+      const body = await response.json();
+
+      expect(response.status).toBe(404);
+      expect(body.error).toBe("Workshop not found");
+      expect(uploadFile).not.toHaveBeenCalled();
+    });
+
+    it("blocks a coach from uploading to another coach's workshop", async () => {
+      (validateFile as jest.Mock).mockReturnValue(null);
+      (db.workshop.findUnique as jest.Mock).mockResolvedValue({ coachId: "coach-2" });
+      const file = new File(["content"], "doc.pdf", { type: "application/pdf" });
+
+      const response = await POST(buildPostRequest({ file, workshopId: "ws-other" }));
+
+      expect(response.status).toBe(403);
+      expect(uploadFile).not.toHaveBeenCalled();
+    });
+
+    it("blocks non-privileged workflow-step attachment on upload", async () => {
+      (validateFile as jest.Mock).mockReturnValue(null);
+      const file = new File(["content"], "doc.pdf", { type: "application/pdf" });
+
+      const response = await POST(buildPostRequest({ file, workflowStepId: "step-1" }));
+
+      expect(response.status).toBe(403);
+      expect(uploadFile).not.toHaveBeenCalled();
+    });
+
+    it("allows a privileged actor to upload directly to a workflow step", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      (validateFile as jest.Mock).mockReturnValue(null);
+      const mockRecord = { id: "f-new", filename: "doc.pdf", workflowStepId: "step-1" };
+      (uploadFile as jest.Mock).mockResolvedValue(mockRecord);
+      const file = new File(["content"], "doc.pdf", { type: "application/pdf" });
+
+      const response = await POST(buildPostRequest({ file, workflowStepId: "step-1" }));
+
+      expect(response.status).toBe(201);
+      expect(uploadFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uploadedBy: "admin-1",
+          workflowStepId: "step-1",
+        })
+      );
     });
 
     it("returns 400 for invalid file (validation fails)", async () => {

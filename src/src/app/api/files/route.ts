@@ -4,9 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
 import { requirePrivilegedApiActor } from "@/lib/auth/api-actor-gate";
+import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
+import { db } from "@/lib/db";
 import { withRateLimit, RateLimits } from "@/lib/rate-limit";
 import { uploadFile, listFiles, mapFileForClient, validateFile } from "@/lib/files/file-service";
 import { z } from "zod";
@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -90,10 +90,29 @@ export async function POST(request: NextRequest) {
 
   const { workshopId, workflowStepId, category } = metadataValidation.data;
 
+  if (workflowStepId && !isPrivilegedRole(actor.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (workshopId) {
+    const workshop = await db.workshop.findUnique({
+      where: { id: workshopId },
+      select: { coachId: true },
+    });
+
+    if (!workshop) {
+      return NextResponse.json({ error: "Workshop not found" }, { status: 404 });
+    }
+
+    if (!canManageCoachData(actor, workshop.coachId)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
   try {
     const record = await uploadFile({
       file,
-      uploadedBy: session.user.id,
+      uploadedBy: actor.userId,
       workshopId,
       workflowStepId,
       category,
