@@ -81,10 +81,9 @@ Terminal state:
 
 Current evidence:
 
-- PR #85 is open, checks are green, review is requested from `jcbdelo26`, and
-  auto-merge is armed.
-- Do not bypass the review rule with admin merge for this milestone; the handoff
-  explicitly asks to prove the review/merge workflow.
+- PR #85 merged on 2026-06-24 at `55e8430`.
+- Production health was checked after the merge sequence and returned `200`
+  with database healthy.
 
 ### M2 - Reconcile The Tree
 
@@ -101,13 +100,13 @@ Current evidence:
 - Local merged branches for #81, #83, and #84 were pruned.
 - Remote `fix/audit-pr1-security` was deleted; `fix/audit-pr3-inngest-dedup`
   was already absent when deletion was attempted.
-- Local branches intentionally retained while open: `chore/sot-wave-i-cond-obstacles`
-  (#85) and `codex/agent-harness-map` (#86).
+- PR #85 and #86 branches were deleted by GitHub auto-merge and then pruned
+  locally after `main` fast-forwarded to `e6e85bc`.
 
 ### M3 - Resume The Gated Wave Roadmap
 
 Do not pick unilaterally. Present the queue and get the user's explicit choice.
-Do not start M3 implementation while #85 is still waiting for required approval.
+Do not start M3 implementation without the selected wave's per-wave plan.
 
 Candidate queue:
 
@@ -117,6 +116,14 @@ Candidate queue:
 - Wave K: coach logo on reports plus Esperto historical import admin-to-coach move.
 - Wave H: admin nav grouped dropdowns. Parked on Jeff's nod for the nav preview.
 - Auto-send launch: flip `WAVE_D_AUTO_SEND_ENABLED` on Vercel Production and redeploy.
+
+Current evidence:
+
+- User approved Wave I follow-on on 2026-06-25.
+- Per-wave plan artifact:
+  `docs/specs/v7.6/18i-followon-lva-survey-form-conditional-plan.md`.
+- Implementation remains gated on that plan; no feature code in the planning
+  branch.
 
 Required gate for any feature wave:
 
