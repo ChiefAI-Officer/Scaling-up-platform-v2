@@ -16,6 +16,7 @@ const txMock = {
   assessmentCampaignParticipant: {
     updateMany: jest.fn(),
     create: jest.fn(),
+    createMany: jest.fn(),
     update: jest.fn(),
   },
 };
@@ -90,6 +91,9 @@ beforeEach(() => {
       respondentId: args.data.respondentId,
       isCEO: args.data.isCEO,
     }),
+  );
+  txMock.assessmentCampaignParticipant.createMany.mockImplementation((args) =>
+    Promise.resolve({ count: args.data.length }),
   );
   txMock.assessmentCampaignParticipant.update.mockResolvedValue({});
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
@@ -206,19 +210,25 @@ describe("POST /participants", () => {
       where: { campaignId: "c1", isCEO: true },
       data: { isCEO: false },
     });
-    // Both rows created.
-    expect(txMock.assessmentCampaignParticipant.create).toHaveBeenCalledTimes(2);
+    // Both rows created in a single createMany (no per-row N+1).
+    expect(txMock.assessmentCampaignParticipant.createMany).toHaveBeenCalledTimes(1);
+    const createManyData = (
+      txMock.assessmentCampaignParticipant.createMany as jest.Mock
+    ).mock.calls[0][0].data as Array<{
+      respondentId: string;
+      isCEO: boolean;
+      teamPathAtAdd: string[];
+      teamLabelsAtAdd: string[];
+    }>;
+    expect(createManyData).toHaveLength(2);
     // r2 was added with isCEO=true; r1 with isCEO=false.
-    const callDataList = (txMock.assessmentCampaignParticipant.create as jest.Mock).mock.calls.map(
-      (c) => c[0].data,
-    );
-    const r2Call = callDataList.find((d) => d.respondentId === "r2");
-    const r1Call = callDataList.find((d) => d.respondentId === "r1");
-    expect(r2Call.isCEO).toBe(true);
-    expect(r1Call.isCEO).toBe(false);
-    expect(r1Call.teamPathAtAdd).toEqual(["t1"]);
-    expect(r1Call.teamLabelsAtAdd).toEqual(["Engineering"]);
-    expect(r2Call.teamPathAtAdd).toEqual([]);
+    const r2Row = createManyData.find((d) => d.respondentId === "r2")!;
+    const r1Row = createManyData.find((d) => d.respondentId === "r1")!;
+    expect(r2Row.isCEO).toBe(true);
+    expect(r1Row.isCEO).toBe(false);
+    expect(r1Row.teamPathAtAdd).toEqual(["t1"]);
+    expect(r1Row.teamLabelsAtAdd).toEqual(["Engineering"]);
+    expect(r2Row.teamPathAtAdd).toEqual([]);
   });
 
   it("idempotent: skips already-attached respondents", async () => {
@@ -235,9 +245,12 @@ describe("POST /participants", () => {
       detailParams("c1"),
     );
     expect(res.status).toBe(201);
-    expect(txMock.assessmentCampaignParticipant.create).toHaveBeenCalledTimes(1);
-    const data = (txMock.assessmentCampaignParticipant.create as jest.Mock).mock.calls[0][0].data;
-    expect(data.respondentId).toBe("r2");
+    expect(txMock.assessmentCampaignParticipant.createMany).toHaveBeenCalledTimes(1);
+    const createManyData = (
+      txMock.assessmentCampaignParticipant.createMany as jest.Mock
+    ).mock.calls[0][0].data as Array<{ respondentId: string }>;
+    expect(createManyData).toHaveLength(1);
+    expect(createManyData[0].respondentId).toBe("r2");
     const body = await res.json();
     expect(body.data.added).toBe(1);
     expect(body.data.skipped).toBe(1);

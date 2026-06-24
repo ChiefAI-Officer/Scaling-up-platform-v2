@@ -16,10 +16,14 @@ import {
 } from "@/lib/workflows/workflow-service";
 import { STEP_TYPES, TRIGGER_TYPES } from "@/lib/workflows/workflow-types";
 import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
+import { recordRecipientExecution } from "@/lib/workflows/recipient-execution";
+// PR-3 (audit Inngest dedup): reuse-or-synthesize ONE parent per delivery batch
+// + send-each-recipient-at-most-once across retries.
 import {
-    recordRecipientExecution,
-    finalizeParentRollup,
-} from "@/lib/workflows/recipient-execution";
+    ensureExecutionParent,
+    sendFanoutRecipients,
+    isTerminalSmtpError,
+} from "@/lib/workflows/fanout-delivery";
 import { buildLocationString } from "@/lib/ics-generator";
 import { formatTimeWithZone, formatZoneAbbrev } from "@/lib/utils";
 import {
@@ -65,10 +69,19 @@ export const triggerWorkflowStep = inngest.createFunction(
     async ({ event, step }) => {
         const { stepId, workshopId } = event.data;
 
-        // Idempotency guard: skip if already SENT, unless forceResend is set (manual re-trigger)
+        // PR-3 (audit dedup): a stable delivery-batch key for this manual trigger.
+        // The trigger-now route mints a fresh manualTriggerId per click, so retries
+        // of one click reuse the parent (skip already-SENT recipients) while a new
+        // click gets a new key → new parent → full re-send. The id:-less fallback
+        // only covers legacy events in flight across the deploy.
+        const manualBatchKey = `manual:${event.data.manualTriggerId ?? `${stepId}:${workshopId}`}`;
+
+        // Idempotency guard: skip if already SENT, unless forceResend is set (manual re-trigger).
+        // PR-3: filter to parentId:null so a per-recipient child SENT row can't trip
+        // this step-level guard (which would under-send the unsent recipients).
         const existingSent = await step.run("check-idempotency", async () => {
             return db.workflowStepExecution.findFirst({
-                where: { stepId, workshopId, status: "SENT" },
+                where: { stepId, workshopId, status: "SENT", parentId: null },
                 select: { id: true },
             });
         });
@@ -219,20 +232,6 @@ export const triggerWorkflowStep = inngest.createFunction(
                         },
                     });
 
-                    // Wave 6 follow-on Part 2: pre-create parent row so
-                    // per-recipient children attach + parent transitions
-                    // via update (parity with execute-workflow.ts).
-                    const parentRow = await db.workflowStepExecution.create({
-                        data: {
-                            stepId: workflowStep.id,
-                            workshopId: workshop.id,
-                            status: "SCHEDULED",
-                            scheduledFor: new Date(),
-                        },
-                        select: { id: true },
-                    });
-                    const parentId = parentRow.id;
-
                     const canAttach = canDeliverWorkflowAttachments({
                         recipientRole,
                         workshopStatus: workshop.status,
@@ -269,37 +268,59 @@ export const triggerWorkflowStep = inngest.createFunction(
                           })
                         : [];
 
-                    const sentEmails = new Set<string>();
-                    for (const reg of registrations) {
-                        const normalizedEmail = reg.email.toLowerCase();
-                        if (sentEmails.has(normalizedEmail)) {
-                            console.warn(
-                                `[trigger-workflow-step] Skipping duplicate email ${reg.email} for step ${workflowStep.id}`
+                    // PR-3 (audit dedup): reuse ONE parent per manual trigger
+                    // (keyed by the per-click manualTriggerId) so an Inngest
+                    // retry of this trigger skips already-SENT attendees. A new
+                    // click = new key = new parent = full re-send.
+                    const parentId = await ensureExecutionParent(db, {
+                        deliveryBatchKey: `${manualBatchKey}:${workflowStep.id}`,
+                        stepId: workflowStep.id,
+                        workshopId: workshop.id,
+                    });
+
+                    if (registrations.length === 0) {
+                        await db.workflowStepExecution.update({
+                            where: { id: parentId },
+                            data: {
+                                status: "SKIPPED",
+                                executedAt: new Date(),
+                                errorMessage: "No recipients at scheduled time",
+                            },
+                        });
+                        return;
+                    }
+
+                    const regById = new Map(registrations.map((r) => [r.id, r]));
+                    await sendFanoutRecipients(db, {
+                        parentId,
+                        stepId: workflowStep.id,
+                        workshopId: workshop.id,
+                        recipients: registrations.map((r) => ({
+                            registrationId: r.id,
+                            email: r.email,
+                        })),
+                        isTerminalError: isTerminalSmtpError,
+                        sendOne: async ({ registrationId }) => {
+                            const reg = regById.get(registrationId);
+                            if (!reg) throw new Error(`fan-out invariant: registration ${registrationId} missing from batch map`);
+                            const personalContext: WorkflowContext = {
+                                ...baseContext,
+                                registrantName: `${reg.firstName} ${reg.lastName}`,
+                                registrantEmail: reg.email,
+                                registrantCompany: reg.company || "",
+                            };
+                            const personalSubject = interpolateTemplate(
+                                workflowStep.subject ||
+                                    workflowStep.emailTemplate?.subject ||
+                                    "",
+                                personalContext
                             );
-                            continue;
-                        }
-                        sentEmails.add(normalizedEmail);
-
-                        const personalContext: WorkflowContext = {
-                            ...baseContext,
-                            registrantName: `${reg.firstName} ${reg.lastName}`,
-                            registrantEmail: reg.email,
-                            registrantCompany: reg.company || "",
-                        };
-                        const personalSubject = interpolateTemplate(
-                            workflowStep.subject ||
-                                workflowStep.emailTemplate?.subject ||
-                                "",
-                            personalContext
-                        );
-                        const personalBody = interpolateTemplate(
-                            workflowStep.body ||
-                                workflowStep.emailTemplate?.body ||
-                                "",
-                            personalContext
-                        );
-
-                        try {
+                            const personalBody = interpolateTemplate(
+                                workflowStep.body ||
+                                    workflowStep.emailTemplate?.body ||
+                                    "",
+                                personalContext
+                            );
                             await sendEmailViaSMTP({
                                 to: reg.email,
                                 subject: personalSubject,
@@ -320,53 +341,8 @@ export const triggerWorkflowStep = inngest.createFunction(
                                     },
                                 },
                             });
-                            // Wave 6 follow-on Part 2: per-recipient SENT child.
-                            await recordRecipientExecution(db, {
-                                parentId,
-                                stepId: workflowStep.id,
-                                workshopId: workshop.id,
-                                registrationId: reg.id,
-                                recipientEmail: reg.email,
-                                status: "SENT",
-                            });
-                        } catch (smtpErr) {
-                            const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
-                            const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
-                            console.error(`[trigger-workflow-step] EMAIL_ATTENDEES sendEmailViaSMTP failed for ${reg.email}:`, smtpErr);
-                            if (!isTerminalAuthError) {
-                                // Transient error — let Inngest retry
-                                throw smtpErr;
-                            }
-                            // Terminal auth error — transition the existing
-                            // parent to FAILED via update (was a second create).
-                            await db.workflowStepExecution.update({
-                                where: { id: parentId },
-                                data: {
-                                    status: "FAILED",
-                                    executedAt: new Date(),
-                                    errorMessage: msg || "SMTP send failed",
-                                },
-                            });
-                            return; // Note: if partial-send occurred, prior attendees already received the email
-                        }
-                    }
-
-                    // Wave 6 follow-on Part 2: transition parent SCHEDULED →
-                    // terminal via update. Also fixes latent BUG-MAY4-1b twin —
-                    // post-loop create previously wrote unconditional SENT
-                    // even with 0 registrants. Now reflects actual sends.
-                    const emailsSent = sentEmails.size;
-                    await db.workflowStepExecution.update({
-                        where: { id: parentId },
-                        data: {
-                            status: emailsSent > 0 ? "SENT" : "SKIPPED",
-                            executedAt: new Date(),
-                            ...(emailsSent === 0
-                                ? { errorMessage: "No recipients at scheduled time" }
-                                : {}),
                         },
                     });
-                    await finalizeParentRollup(db, parentId);
                     return;
                 }
 
@@ -405,23 +381,23 @@ export const triggerWorkflowStep = inngest.createFunction(
                         return;
                     }
 
-                    // Wave 6 follow-on: pre-create the parent row before the
-                    // loop so per-recipient child rows have a parentId to
-                    // attach to (parity with execute-workflow.ts's pre-loop
-                    // scheduleWorkflowExecution path).
-                    const parentRow = await db.workflowStepExecution.create({
-                        data: {
-                            stepId: workflowStep.id,
-                            workshopId: workshop.id,
-                            status: "SCHEDULED",
-                            scheduledFor: new Date(),
-                        },
-                        select: { id: true },
+                    // PR-3 (audit dedup): reuse ONE parent per manual trigger.
+                    const parentId = await ensureExecutionParent(db, {
+                        deliveryBatchKey: `${manualBatchKey}:${workflowStep.id}`,
+                        stepId: workflowStep.id,
+                        workshopId: workshop.id,
                     });
-                    const parentId = parentRow.id;
 
                     const surveyType = resolveSurveyType(workflowStep);
-                    let sentCount = 0;
+
+                    // Resolve each recipient's survey link up front. A link-gen
+                    // failure records a per-recipient FAILED child under the
+                    // reused parent and drops that recipient; the rest fan out.
+                    const regById = new Map(registrations.map((r) => [r.id, r]));
+                    const linkByReg = new Map<
+                        string,
+                        { surveyUrl: string; surveyId: string }
+                    >();
                     for (const reg of registrations) {
                         const surveyLink = await getOrCreateSurveyLink({
                             workshopId: workshop.id,
@@ -429,11 +405,7 @@ export const triggerWorkflowStep = inngest.createFunction(
                             surveyType,
                             templateId: workflowStep.surveyTemplateId ?? undefined,
                         });
-
                         if (!surveyLink) {
-                            // Wave 6 follow-on: per-recipient FAILED child
-                            // row so the on-call manual repro produces the
-                            // same evidence as a scheduled fire.
                             await recordRecipientExecution(db, {
                                 parentId,
                                 stepId: workflowStep.id,
@@ -445,34 +417,63 @@ export const triggerWorkflowStep = inngest.createFunction(
                             });
                             continue;
                         }
+                        linkByReg.set(reg.id, surveyLink);
+                    }
 
-                        const personalContext: WorkflowContext = {
-                            ...baseContext,
-                            registrantName: `${reg.firstName} ${reg.lastName}`,
-                            registrantEmail: reg.email,
-                            registrantCompany: reg.company || "",
-                            surveyUrl: surveyLink.surveyUrl,
-                        };
-
-                        const defaultSubject =
-                            surveyType === SURVEY_TYPES.PRE_WORKSHOP
-                                ? `Pre-Workshop Survey: ${workshop.title}`
-                                : `Workshop Feedback: ${workshop.title}`;
-                        const defaultBody =
-                            surveyType === SURVEY_TYPES.PRE_WORKSHOP
-                                ? `<p>Hi {{registrantName}},</p><p>Please complete your pre-workshop survey here:</p><p><a href="{{surveyUrl}}">Complete Survey</a></p>`
-                                : `<p>Hi {{registrantName}},</p><p>Please share your workshop feedback here:</p><p><a href="{{surveyUrl}}">Open Survey</a></p>`;
-
-                        const personalSubject = interpolateTemplate(
-                            workflowStep.subject || defaultSubject,
-                            personalContext
-                        );
-                        const personalBody = interpolateTemplate(
-                            workflowStep.body || defaultBody,
-                            personalContext
-                        );
-
-                        try {
+                    const sendable = registrations.filter((r) =>
+                        linkByReg.has(r.id)
+                    );
+                    if (sendable.length === 0) {
+                        // Every recipient failed link generation → nothing to
+                        // send. Finalize the reused parent FAILED with the legacy
+                        // operator-facing message (per-recipient FAILED children
+                        // carry the granular "link_generation_failed" reason).
+                        await db.workflowStepExecution.update({
+                            where: { id: parentId },
+                            data: {
+                                status: "FAILED",
+                                executedAt: new Date(),
+                                errorMessage: "No survey link could be generated",
+                            },
+                        });
+                        return;
+                    }
+                    await sendFanoutRecipients(db, {
+                        parentId,
+                        stepId: workflowStep.id,
+                        workshopId: workshop.id,
+                        recipients: sendable.map((r) => ({
+                            registrationId: r.id,
+                            email: r.email,
+                        })),
+                        isTerminalError: isTerminalSmtpError,
+                        sendOne: async ({ registrationId }) => {
+                            const reg = regById.get(registrationId);
+                            const surveyLink = linkByReg.get(registrationId);
+                            if (!reg || !surveyLink) throw new Error(`fan-out invariant: registration ${registrationId} missing reg/link in batch maps`);
+                            const personalContext: WorkflowContext = {
+                                ...baseContext,
+                                registrantName: `${reg.firstName} ${reg.lastName}`,
+                                registrantEmail: reg.email,
+                                registrantCompany: reg.company || "",
+                                surveyUrl: surveyLink.surveyUrl,
+                            };
+                            const defaultSubject =
+                                surveyType === SURVEY_TYPES.PRE_WORKSHOP
+                                    ? `Pre-Workshop Survey: ${workshop.title}`
+                                    : `Workshop Feedback: ${workshop.title}`;
+                            const defaultBody =
+                                surveyType === SURVEY_TYPES.PRE_WORKSHOP
+                                    ? `<p>Hi {{registrantName}},</p><p>Please complete your pre-workshop survey here:</p><p><a href="{{surveyUrl}}">Complete Survey</a></p>`
+                                    : `<p>Hi {{registrantName}},</p><p>Please share your workshop feedback here:</p><p><a href="{{surveyUrl}}">Open Survey</a></p>`;
+                            const personalSubject = interpolateTemplate(
+                                workflowStep.subject || defaultSubject,
+                                personalContext
+                            );
+                            const personalBody = interpolateTemplate(
+                                workflowStep.body || defaultBody,
+                                personalContext
+                            );
                             await sendEmailViaSMTP({
                                 to: reg.email,
                                 subject: personalSubject,
@@ -491,59 +492,8 @@ export const triggerWorkflowStep = inngest.createFunction(
                                     },
                                 },
                             });
-                            sentCount++;
-                            // Wave 6 follow-on: per-recipient SENT child row.
-                            await recordRecipientExecution(db, {
-                                parentId,
-                                stepId: workflowStep.id,
-                                workshopId: workshop.id,
-                                registrationId: reg.id,
-                                recipientEmail: reg.email,
-                                status: "SENT",
-                            });
-                        } catch (smtpErr) {
-                            const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
-                            const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
-                            console.error(`[trigger-workflow-step] SEND_SURVEY_LINK sendEmailViaSMTP failed for ${reg.email}:`, smtpErr);
-                            if (!isTerminalAuthError) {
-                                // Transient error — let Inngest retry
-                                throw smtpErr;
-                            }
-                            // Terminal auth error — transition the existing
-                            // parent row to FAILED (Wave 6 follow-on: was a
-                            // second create()).
-                            await db.workflowStepExecution.update({
-                                where: { id: parentId },
-                                data: {
-                                    status: "FAILED",
-                                    executedAt: new Date(),
-                                    errorMessage: msg || "SMTP send failed",
-                                },
-                            });
-                            return; // Note: if partial-send occurred, prior attendees already received the email
-                        }
-                    }
-
-                    // Wave 6 follow-on: transition the pre-created parent row
-                    // to its terminal status via update (was a second create()).
-                    await db.workflowStepExecution.update({
-                        where: { id: parentId },
-                        data: {
-                            status: sentCount > 0 ? "SENT" : "SKIPPED",
-                            executedAt: new Date(),
-                            ...(sentCount === 0
-                                ? {
-                                      errorMessage:
-                                          "No survey link could be generated",
-                                  }
-                                : {}),
                         },
                     });
-
-                    // Roll the parent up over actual children (FAILED > SENT
-                    // > SKIPPED). With link-gen FAILED children present, a
-                    // partial-failure step surfaces as FAILED on the parent.
-                    await finalizeParentRollup(db, parentId);
                     return;
                 }
 
@@ -624,40 +574,55 @@ export const triggerWorkflowStep = inngest.createFunction(
                     });
                     const fileLinks = buildFileLinksHtml(protectedLinks);
 
-                    // Wave 6 follow-on Part 2: pre-create parent so per-recipient
-                    // children attach + post-loop update (parity with SEND_SURVEY_LINK).
-                    const parentRow = await db.workflowStepExecution.create({
-                        data: {
-                            stepId: workflowStep.id,
-                            workshopId: workshop.id,
-                            status: "SCHEDULED",
-                            scheduledFor: new Date(),
-                        },
-                        select: { id: true },
+                    // PR-3 (audit dedup): reuse ONE parent per manual trigger.
+                    const parentId = await ensureExecutionParent(db, {
+                        deliveryBatchKey: `${manualBatchKey}:${workflowStep.id}`,
+                        stepId: workflowStep.id,
+                        workshopId: workshop.id,
                     });
-                    const parentId = parentRow.id;
 
-                    let fileEmailsSent = 0;
-                    for (const reg of registrations) {
-                        const personalContext: WorkflowContext = {
-                            ...baseContext,
-                            registrantName: `${reg.firstName} ${reg.lastName}`,
-                            registrantEmail: reg.email,
-                            registrantCompany: reg.company || "",
-                            fileLinks,
-                        };
-                        const personalSubject = interpolateTemplate(
-                            workflowStep.subject ||
-                                `Workshop Files: ${workshop.title}`,
-                            personalContext
-                        );
-                        const personalBody = interpolateTemplate(
-                            workflowStep.body ||
-                                `<p>Hi {{registrantName}},</p><p>Your workshop files are ready:</p>{{fileLinks}}`,
-                            personalContext
-                        );
+                    if (registrations.length === 0) {
+                        await db.workflowStepExecution.update({
+                            where: { id: parentId },
+                            data: {
+                                status: "SKIPPED",
+                                executedAt: new Date(),
+                                errorMessage: "No recipients at scheduled time",
+                            },
+                        });
+                        return;
+                    }
 
-                        try {
+                    const regById = new Map(registrations.map((r) => [r.id, r]));
+                    await sendFanoutRecipients(db, {
+                        parentId,
+                        stepId: workflowStep.id,
+                        workshopId: workshop.id,
+                        recipients: registrations.map((r) => ({
+                            registrationId: r.id,
+                            email: r.email,
+                        })),
+                        isTerminalError: isTerminalSmtpError,
+                        sendOne: async ({ registrationId }) => {
+                            const reg = regById.get(registrationId);
+                            if (!reg) throw new Error(`fan-out invariant: registration ${registrationId} missing from batch map`);
+                            const personalContext: WorkflowContext = {
+                                ...baseContext,
+                                registrantName: `${reg.firstName} ${reg.lastName}`,
+                                registrantEmail: reg.email,
+                                registrantCompany: reg.company || "",
+                                fileLinks,
+                            };
+                            const personalSubject = interpolateTemplate(
+                                workflowStep.subject ||
+                                    `Workshop Files: ${workshop.title}`,
+                                personalContext
+                            );
+                            const personalBody = interpolateTemplate(
+                                workflowStep.body ||
+                                    `<p>Hi {{registrantName}},</p><p>Your workshop files are ready:</p>{{fileLinks}}`,
+                                personalContext
+                            );
                             await sendEmailViaSMTP({
                                 to: reg.email,
                                 subject: personalSubject,
@@ -675,52 +640,8 @@ export const triggerWorkflowStep = inngest.createFunction(
                                     },
                                 },
                             });
-                            fileEmailsSent++;
-                            // Wave 6 follow-on Part 2: per-recipient SENT child.
-                            await recordRecipientExecution(db, {
-                                parentId,
-                                stepId: workflowStep.id,
-                                workshopId: workshop.id,
-                                registrationId: reg.id,
-                                recipientEmail: reg.email,
-                                status: "SENT",
-                            });
-                        } catch (smtpErr) {
-                            const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
-                            const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
-                            console.error(`[trigger-workflow-step] SEND_FILE_LINK sendEmailViaSMTP failed for ${reg.email}:`, smtpErr);
-                            if (!isTerminalAuthError) {
-                                // Transient error — let Inngest retry
-                                throw smtpErr;
-                            }
-                            // Terminal auth error — transition existing parent
-                            // to FAILED via update (was a second create).
-                            await db.workflowStepExecution.update({
-                                where: { id: parentId },
-                                data: {
-                                    status: "FAILED",
-                                    executedAt: new Date(),
-                                    errorMessage: msg || "SMTP send failed",
-                                },
-                            });
-                            return; // Note: if partial-send occurred, prior attendees already received the email
-                        }
-                    }
-
-                    // Wave 6 follow-on Part 2: transition parent SCHEDULED →
-                    // terminal via update. Preserves BUG-MAY4 fix: 0 registrants
-                    // → SKIPPED, not false SENT.
-                    await db.workflowStepExecution.update({
-                        where: { id: parentId },
-                        data: {
-                            status: fileEmailsSent > 0 ? "SENT" : "SKIPPED",
-                            executedAt: new Date(),
-                            ...(fileEmailsSent === 0
-                                ? { errorMessage: "No recipients at scheduled time" }
-                                : {}),
                         },
                     });
-                    await finalizeParentRollup(db, parentId);
                     return;
                 }
 

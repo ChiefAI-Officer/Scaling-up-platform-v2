@@ -80,10 +80,12 @@ export async function sendEmailViaSMTP(options: SendEmailOptions): Promise<void>
       try {
         await transporter.verify();
         console.log("[smtp-transport] SMTP verify() succeeded: host=" + process.env.SMTP_HOST);
+        // Only latch on success — a failed verify must not permanently suppress
+        // re-verification for the rest of the process lifetime.
+        _verified = true;
       } catch (verifyErr) {
         console.error("[smtp-transport] SMTP verify() FAILED:", verifyErr);
       }
-      _verified = true;
     }
     await transporter.sendMail({
       from: process.env.SMTP_FROM || '"Scaling Up Platform" <noreply@scalingup.com>',

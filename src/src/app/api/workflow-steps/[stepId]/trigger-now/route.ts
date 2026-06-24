@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { inngest } from "@/inngest/client";
@@ -66,36 +67,50 @@ export async function POST(
 
     const cleanWorkshopId = workshopId.trim();
 
-    const step = await db.workflowStep.findUnique({
-        where: { id: stepId },
-        select: { id: true },
-    });
-    if (!step) {
+    try {
+        const step = await db.workflowStep.findUnique({
+            where: { id: stepId },
+            select: { id: true },
+        });
+        if (!step) {
+            return NextResponse.json(
+                { error: "Workflow step not found" },
+                { status: 404, headers: rateLimit.headers }
+            );
+        }
+
+        // Block only if currently in-flight (PENDING). SENT steps are allowed to re-trigger
+        // so admins can test workflows repeatedly. Manual trigger retries reuse the same
+        // manualTriggerId in Inngest, while a fresh click mints a new delivery parent.
+        const inFlight = await db.workflowStepExecution.findFirst({
+            where: { stepId, workshopId: cleanWorkshopId, status: "PENDING" },
+        });
+        if (inFlight) {
+            return NextResponse.json(
+                { error: "This step is currently being processed" },
+                { status: 409, headers: rateLimit.headers }
+            );
+        }
+
+        await inngest.send({
+            name: "workflow/step.trigger",
+            data: {
+                stepId,
+                workshopId: cleanWorkshopId,
+                forceResend: true,
+                manualTriggerId: randomUUID(),
+            },
+        });
+    } catch (err) {
+        // DB or Inngest outage - return a structured 5xx instead of a raw 500.
+        console.error("[trigger-now] Failed to trigger workflow step:", err);
         return NextResponse.json(
-            { error: "Workflow step not found" },
-            { status: 404, headers: rateLimit.headers }
+            { error: "Failed to trigger workflow step" },
+            { status: 500, headers: rateLimit.headers }
         );
     }
 
-    // Block only if currently in-flight (PENDING). SENT steps are allowed to re-trigger
-    // so admins can test workflows repeatedly. The Inngest function's idempotency guard
-    // skips re-sends for scheduled runs but respects forceResend=true for manual triggers.
-    const inFlight = await db.workflowStepExecution.findFirst({
-        where: { stepId, workshopId: cleanWorkshopId, status: "PENDING" },
-    });
-    if (inFlight) {
-        return NextResponse.json(
-            { error: "This step is currently being processed" },
-            { status: 409, headers: rateLimit.headers }
-        );
-    }
-
-    await inngest.send({
-        name: "workflow/step.trigger",
-        data: { stepId, workshopId: cleanWorkshopId, forceResend: true },
-    });
-
-    // After firing — check for a recent SMTP failure so the UI can show actionable context.
+    // After firing, check for a recent SMTP failure so the UI can show actionable context.
     // 24h window prevents stale errors from surfacing as false-positive warnings.
     let recentFailure: { errorMessage: string | null } | null = null;
     try {
@@ -111,7 +126,7 @@ export async function POST(
             select: { errorMessage: true },
         });
     } catch (err) {
-        // Non-fatal — Inngest event already sent
+        // Non-fatal - Inngest event already sent.
         console.error("[trigger-now] Failed to query recent executions for failure context:", err);
     }
 
