@@ -4,8 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
+import { requireAdminApiActor } from "@/lib/auth/api-actor-gate";
 import { updateQuestion, deleteQuestion } from "@/lib/surveys/survey-service";
 import { QUESTION_TYPES } from "@/lib/surveys/survey-types";
 import type { QuestionType } from "@/lib/surveys/survey-types";
@@ -31,9 +30,12 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; questionId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireAdminApiActor();
+  if (!gate.ok) {
+    return NextResponse.json(
+      { error: gate.status === 401 ? "Unauthorized" : "Forbidden" },
+      { status: gate.status }
+    );
   }
 
   const paramsValidation = surveyQuestionParamsSchema.safeParse(await params);
@@ -63,9 +65,12 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string; questionId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireAdminApiActor();
+  if (!gate.ok) {
+    return NextResponse.json(
+      { error: gate.status === 401 ? "Unauthorized" : "Forbidden" },
+      { status: gate.status }
+    );
   }
 
   const paramsValidation = surveyQuestionParamsSchema.safeParse(await params);

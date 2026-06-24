@@ -4,8 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
+import { requireAdminApiActor } from "@/lib/auth/api-actor-gate";
 import { updateWorkflowStep, deleteWorkflowStep } from "@/lib/workflows/workflow-service";
 import { STEP_TYPES, TRIGGER_TYPES } from "@/lib/workflows/workflow-types";
 import type { StepType, TriggerType } from "@/lib/workflows/workflow-types";
@@ -35,9 +34,12 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; stepId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireAdminApiActor();
+  if (!gate.ok) {
+    return NextResponse.json(
+      { error: gate.status === 401 ? "Unauthorized" : "Forbidden" },
+      { status: gate.status }
+    );
   }
 
   const paramsValidation = workflowStepRouteParamsSchema.safeParse(await params);
@@ -95,9 +97,12 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string; stepId: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const gate = await requireAdminApiActor();
+  if (!gate.ok) {
+    return NextResponse.json(
+      { error: gate.status === 401 ? "Unauthorized" : "Forbidden" },
+      { status: gate.status }
+    );
   }
 
   const paramsValidation = workflowStepRouteParamsSchema.safeParse(await params);
