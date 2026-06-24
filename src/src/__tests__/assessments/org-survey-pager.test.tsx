@@ -41,6 +41,7 @@ import { invitedDraftKey } from "@/lib/assessments/use-answer-draft";
 
 const ALIAS = "team-invited";
 const RESPONDENT_KEY = "resp-123";
+const LVA_ALIAS = "leadership-vision-alignment";
 
 const surveyData = {
   campaign: { name: "Invited Assessment", alias: ALIAS },
@@ -312,6 +313,118 @@ describe("OrgSurveyClient — SectionPager wiring + hidden-orphan fix", () => {
     // The stale key is gone; only the two real questions are POSTed.
     expect(keys).not.toContain("removedQ");
     expect(keys.sort()).toEqual(["orphanReq", "q1"]);
+  });
+
+  it("LVA follow-on: shows S5_why fields only for checked S4 factors and prunes hidden typed answers", async () => {
+    const lvaSurveyData = {
+      ...surveyData,
+      campaign: {
+        ...surveyData.campaign,
+        templateAlias: LVA_ALIAS,
+      },
+      sections: [{ stableKey: "S5", sortOrder: 1, name: "Obstacles" }],
+      questions: [
+        {
+          stableKey: "S4_biggest_obstacles",
+          sortOrder: 1,
+          sectionStableKey: "S5",
+          type: "MULTI_CHOICE",
+          label: "Which factors are hindering you?",
+          isRequired: false,
+          options: [
+            { key: "sales", label: "Sales" },
+            { key: "cash", label: "Cash" },
+          ],
+        },
+        {
+          stableKey: "S5_why_sales",
+          sortOrder: 2,
+          sectionStableKey: "S5",
+          type: "TEXT",
+          label: "Why is Sales a hindrance?",
+          isRequired: false,
+        },
+        {
+          stableKey: "S5_why_cash",
+          sortOrder: 3,
+          sectionStableKey: "S5",
+          type: "TEXT",
+          label: "Why is Cash a hindrance?",
+          isRequired: false,
+        },
+        {
+          stableKey: "S5_other_factor",
+          sortOrder: 4,
+          sectionStableKey: "S5",
+          type: "TEXT",
+          label: "Other factor",
+          isRequired: false,
+        },
+        {
+          stableKey: "S5_change_one_thing",
+          sortOrder: 5,
+          sectionStableKey: "S5",
+          type: "TEXT",
+          label: "What would you change?",
+          isRequired: false,
+        },
+      ],
+    };
+    global.fetch = jest.fn((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true, data: lvaSurveyData }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, data: { submissionId: "sub_lva_1" } }),
+      } as Response);
+    }) as unknown as typeof fetch;
+
+    await reachPager();
+
+    expect(await screen.findByText("Which factors are hindering you?")).toBeInTheDocument();
+    expect(screen.getByText("Other factor")).toBeInTheDocument();
+    expect(screen.getByText("What would you change?")).toBeInTheDocument();
+    expect(screen.queryByText("Why is Sales a hindrance?")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Sales"));
+    expect(await screen.findByText("Why is Sales a hindrance?")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Why is Sales a hindrance/i), {
+      target: { value: "Need a better sales cadence" },
+    });
+
+    fireEvent.click(screen.getByLabelText("Cash"));
+    expect(await screen.findByText("Why is Cash a hindrance?")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Why is Cash a hindrance/i), {
+      target: { value: "Collections are slow" },
+    });
+
+    fireEvent.click(screen.getByLabelText("Sales"));
+    await waitFor(() =>
+      expect(screen.queryByText("Why is Sales a hindrance?")).not.toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => {
+      const calls = (global.fetch as jest.Mock).mock.calls;
+      expect(calls.some(([u]) => String(u).includes("/submit"))).toBe(true);
+    });
+
+    const submitCall = (global.fetch as jest.Mock).mock.calls.find(([u]) =>
+      String(u).includes("/submit"),
+    );
+    const body = JSON.parse((submitCall[1] as RequestInit).body as string);
+    const answerKeys = body.answers.map((a: { stableKey: string }) => a.stableKey);
+    expect(answerKeys).toContain("S4_biggest_obstacles");
+    expect(answerKeys).toContain("S5_why_cash");
+    expect(answerKeys).not.toContain("S5_why_sales");
   });
 
   it("keeps the participant ON the pager (inline error, not a terminal screen) when submit fails (R2-M1)", async () => {

@@ -29,6 +29,10 @@ import {
 } from "@/lib/assessments/use-answer-draft";
 import { pruneAnswersToQuestions } from "@/lib/assessments/prune-answers";
 import {
+  filterVisibleSurveyQuestions,
+  visibleSurveyQuestionKeys,
+} from "@/lib/assessments/form-visibility";
+import {
   WelcomeShellHeader,
   WelcomeExpectations,
   WelcomeStats,
@@ -74,6 +78,7 @@ interface SurveyData {
   campaign: {
     name: string;
     alias: string;
+    templateAlias?: string | null;
     organizationName?: string | null;
     /** Task 6b: when true, append ?results=1 to the thank-you redirect. */
     sendResultsToRespondent?: boolean;
@@ -219,14 +224,29 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     () => deriveTimeEstimate(sortedQuestions.length),
     [sortedQuestions.length],
   );
+  const templateAlias = surveyData?.campaign.templateAlias ?? null;
+  const visibleQuestions = useMemo<Question[]>(
+    () =>
+      filterVisibleSurveyQuestions({
+        templateAlias,
+        questions: sortedQuestions as PagerQuestion[],
+        answers,
+      }) as Question[],
+    [templateAlias, sortedQuestions, answers],
+  );
 
   // The set of stableKeys that map to a currently-rendered question. Used both
   // to prune a stale localStorage draft on hydrate AND to prune the POST body
   // pre-submit (Wave C R3-M2) so an answer whose question no longer exists can
   // never reach the server and trap the user.
   const knownKeys = useMemo(
-    () => new Set(sortedQuestions.map((q) => q.stableKey)),
-    [sortedQuestions],
+    () =>
+      visibleSurveyQuestionKeys({
+        templateAlias,
+        questions: sortedQuestions as PagerQuestion[],
+        answers,
+      }),
+    [templateAlias, sortedQuestions, answers],
   );
 
   // Hydrate prune (secondary): once questions are known, prune the answer state
@@ -245,7 +265,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     if (phase.kind !== "ready") return;
     setSubmitError(null);
 
-    const required = phase.data.questions.filter((q) => q.isRequired);
+    const required = visibleQuestions.filter((q) => q.isRequired);
     const missing = required
       .filter((q) => !isAnswered(answers[q.stableKey]))
       .map((q) => q.label);
@@ -264,7 +284,8 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     // so even an all-optional survey must have ≥1 answered question before we
     // POST. Mirrors the public quiz client guard. Surface this inline (non-terminal)
     // so the participant stays on the pager and can answer a question.
-    const answeredCount = Object.values(answers).filter((v) =>
+    const pruned = pruneAnswersToQuestions(answers, knownKeys);
+    const answeredCount = Object.values(pruned).filter((v) =>
       isAnswered(v)
     ).length;
     if (answeredCount === 0) {
@@ -276,7 +297,6 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     // currently-rendered question (a stale localStorage draft) so it can't
     // reach the server. Persist the pruned map back if it changed so the local
     // state + autosaved draft stay in sync.
-    const pruned = pruneAnswersToQuestions(answers, knownKeys);
     if (pruned !== answers) setAnswers(pruned);
 
     const submittingData = phase.data;
@@ -418,7 +438,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   // invisible submit dead-end.
   const pages = buildSectionPages(
     sortedSections as PagerSection[],
-    sortedQuestions as PagerQuestion[]
+    visibleQuestions as PagerQuestion[]
   );
 
   return (
