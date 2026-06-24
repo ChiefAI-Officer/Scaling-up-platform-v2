@@ -182,22 +182,22 @@ export async function POST(
         });
       }
 
-      const rows: Array<{ id: string; respondentId: string; isCEO: boolean }> = [];
-
-      for (const r of respondentsToAdd) {
+      // Single batched insert (no per-row N+1). The created rows are never read
+      // back — only the count feeds `added`/`skipped` — so createMany is exact.
+      const createData = respondentsToAdd.map((r) => {
         const path = buildTeamPath(r.teamId, teamsById);
-        const row = await tx.assessmentCampaignParticipant.create({
-          data: {
-            campaignId,
-            respondentId: r.id,
-            isCEO: data.ceoRespondentId === r.id,
-            teamPathAtAdd: path.ids,
-            teamLabelsAtAdd: path.labels,
-          },
-          select: { id: true, respondentId: true, isCEO: true },
-        });
-        rows.push(row);
-      }
+        return {
+          campaignId,
+          respondentId: r.id,
+          isCEO: data.ceoRespondentId === r.id,
+          teamPathAtAdd: path.ids,
+          teamLabelsAtAdd: path.labels,
+        };
+      });
+
+      const result = await tx.assessmentCampaignParticipant.createMany({
+        data: createData,
+      });
 
       // If the chosen CEO is an *already-existing* participant, set its
       // flag here. (We just un-set every prior CEO above.)
@@ -216,7 +216,7 @@ export async function POST(
         });
       }
 
-      return rows;
+      return result.count;
     });
 
     await logAudit({
@@ -238,8 +238,8 @@ export async function POST(
       {
         success: true,
         data: {
-          added: created.length,
-          skipped: data.respondentIds.length - created.length,
+          added: created,
+          skipped: data.respondentIds.length - created,
           ceoRespondentId: data.ceoRespondentId ?? null,
         },
       },

@@ -113,19 +113,28 @@ export async function sendFanoutRecipients(
 ): Promise<FanoutOutcome> {
   const priorSent = await client.workflowStepExecution.findMany({
     where: { parentId: args.parentId, status: "SENT" },
-    select: { registrationId: true },
+    select: { registrationId: true, recipientEmail: true },
   });
   const alreadySent = new Set(
     priorSent.map((r) => r.registrationId).filter((id): id is string => !!id)
   );
+  const seenEmail = new Set(
+    priorSent
+      .map((r) => r.recipientEmail?.trim().toLowerCase())
+      .filter((email): email is string => !!email)
+  );
 
-  const seenEmail = new Set<string>();
   let sent = 0;
   let skipped = 0;
 
   for (const recipient of args.recipients) {
-    const normalizedEmail = recipient.email.toLowerCase();
-    if (alreadySent.has(recipient.registrationId) || seenEmail.has(normalizedEmail)) {
+    const normalizedEmail = recipient.email.trim().toLowerCase();
+    if (alreadySent.has(recipient.registrationId)) {
+      seenEmail.add(normalizedEmail);
+      skipped++;
+      continue;
+    }
+    if (seenEmail.has(normalizedEmail)) {
       skipped++;
       continue;
     }

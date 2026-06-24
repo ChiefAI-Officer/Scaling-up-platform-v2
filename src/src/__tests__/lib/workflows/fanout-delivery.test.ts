@@ -81,11 +81,17 @@ describe("ensureExecutionParent", () => {
   });
 });
 
-function clientWithSentChildren(sentRegistrationIds: string[]) {
+function clientWithSentChildren(
+  sentChildren: Array<string | { registrationId: string; recipientEmail?: string | null }>
+) {
   return {
     workflowStepExecution: {
       findMany: jest.fn().mockResolvedValue(
-        sentRegistrationIds.map((registrationId) => ({ registrationId })),
+        sentChildren.map((child) =>
+          typeof child === "string"
+            ? { registrationId: child, recipientEmail: null }
+            : child,
+        ),
       ),
     },
   };
@@ -147,6 +153,26 @@ describe("sendFanoutRecipients", () => {
     expect(sendOne).toHaveBeenCalledTimes(1);
     expect(out.sent).toBe(1);
     expect(out.skipped).toBe(1);
+  });
+
+  it("SKIPS duplicate emails that were already SENT by another registration on a prior run", async () => {
+    const client = clientWithSentChildren([
+      { registrationId: "r1", recipientEmail: "dup@x.com" },
+    ]);
+    const sendOne = jest.fn().mockResolvedValue(undefined);
+
+    const out = await sendFanoutRecipients(client as never, {
+      parentId: "parent-1",
+      stepId: "step-1",
+      workshopId: "ws-1",
+      recipients: [recip("r2", "DUP@x.com"), recip("r3", "other@x.com")],
+      sendOne,
+    });
+
+    expect(sendOne).toHaveBeenCalledTimes(1);
+    expect(sendOne).toHaveBeenCalledWith(recip("r3", "other@x.com"));
+    expect(recordRecipientExecution).toHaveBeenCalledTimes(1);
+    expect(out).toEqual({ parentId: "parent-1", sent: 1, skipped: 1 });
   });
 
   it("rethrows a transient send error so Inngest retries (parent reused → prior sends skipped next run)", async () => {

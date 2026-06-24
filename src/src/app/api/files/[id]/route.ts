@@ -16,6 +16,7 @@ import {
   unlinkFileFromWorkflowStep,
   mapFileForClient,
 } from "@/lib/files/file-service";
+import { canReadFile } from "@/lib/files/file-access";
 import { z } from "zod";
 
 const fileRouteParamsSchema = z.object({
@@ -33,8 +34,8 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -51,6 +52,12 @@ export async function GET(
 
   if (!file) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
+  }
+
+  // Reading metadata exposes blobUrl (direct content access), so gate it with
+  // the same READ policy as the download route (mirrored in canReadFile).
+  if (!canReadFile({ actor, file })) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   return NextResponse.json({ success: true, data: mapFileForClient(file) });

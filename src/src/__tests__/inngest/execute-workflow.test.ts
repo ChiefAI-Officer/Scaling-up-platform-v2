@@ -781,10 +781,8 @@ describe("execute-workflow Inngest function", () => {
     findUnique.mockResolvedValue(assignment);
 
     // Make the third step (execute-step-2-EMAIL_COACH) fail
-    let callCount = 0;
     mockStep.run.mockImplementation(
       async (name: string, fn: () => Promise<unknown>) => {
-        callCount++;
         // The execute-step-2-EMAIL_COACH will be the 4th call
         // calls: fetch-assignment, execute-step-0-NOTIFICATION, execute-step-1-NOTIFICATION, execute-step-2-EMAIL_COACH
         if (name === "execute-step-2-EMAIL_COACH") {
