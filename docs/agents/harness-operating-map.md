@@ -16,6 +16,14 @@ this file is the loop controller.
   - #81 security audit merged.
   - #83 Inngest fan-out email dedup merged at `04e40b2` and deployed.
   - #84 Wave I LVA conditional-obstacles report filter merged at `91a67ff` and deployed.
+- Branch protection on `main`:
+  - Admins are enforced.
+  - One approving review is required.
+  - Stale reviews are dismissed.
+  - Conversation resolution is required.
+- Current write/admin collaborators: `GabrielChiefAIOfficer` and `jcbdelo26`.
+  Gabriel-authored PRs therefore need `jcbdelo26` or another future
+  write/admin collaborator for the required non-author approval.
 
 ## Long Autonomous Loop Goal
 
@@ -36,8 +44,10 @@ Terminal state:
 Current evidence:
 
 - Permission is already `ADMIN`.
-- The second-approver workflow still needs a human confirmation for the durable
-  operating model.
+- The second-approver workflow is active on `main`. For the current repo shape,
+  `jcbdelo26` is the only non-author admin approver for Gabriel-authored PRs.
+- Repo auto-merge and delete-branch-on-merge are enabled, so a green PR can merge
+  automatically after required approval.
 
 ### M1 - Land Stranded Wave I SoT Docs
 
@@ -63,11 +73,18 @@ Validation:
 
 Terminal state:
 
-- Commit message: `docs(sot): Wave I - LVA conditional obstacles shipped (prod)`.
-- PR to `main`.
+- Commit message: `docs(sot): Wave I — LVA conditional obstacles shipped (prod)`.
+- PR #85 to `main`.
 - Required approval obtained.
 - PR merged.
 - Production deploy/health checked if Vercel deploys docs-only commits.
+
+Current evidence:
+
+- PR #85 is open, checks are green, review is requested from `jcbdelo26`, and
+  auto-merge is armed.
+- Do not bypass the review rule with admin merge for this milestone; the handoff
+  explicitly asks to prove the review/merge workflow.
 
 ### M2 - Reconcile The Tree
 
@@ -80,12 +97,17 @@ Actions:
 
 Current evidence:
 
-- Stash list is empty as of this map.
-- Merged remote branches were pruned after #84.
+- Stash list is empty.
+- Local merged branches for #81, #83, and #84 were pruned.
+- Remote `fix/audit-pr1-security` was deleted; `fix/audit-pr3-inngest-dedup`
+  was already absent when deletion was attempted.
+- Local branches intentionally retained while open: `chore/sot-wave-i-cond-obstacles`
+  (#85) and `codex/agent-harness-map` (#86).
 
 ### M3 - Resume The Gated Wave Roadmap
 
 Do not pick unilaterally. Present the queue and get the user's explicit choice.
+Do not start M3 implementation while #85 is still waiting for required approval.
 
 Candidate queue:
 
