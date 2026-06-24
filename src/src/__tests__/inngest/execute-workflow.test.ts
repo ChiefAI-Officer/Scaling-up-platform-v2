@@ -781,10 +781,8 @@ describe("execute-workflow Inngest function", () => {
     findUnique.mockResolvedValue(assignment);
 
     // Make the third step (execute-step-2-EMAIL_COACH) fail
-    let callCount = 0;
     mockStep.run.mockImplementation(
       async (name: string, fn: () => Promise<unknown>) => {
-        callCount++;
         // The execute-step-2-EMAIL_COACH will be the 4th call
         // calls: fetch-assignment, execute-step-0-NOTIFICATION, execute-step-1-NOTIFICATION, execute-step-2-EMAIL_COACH
         if (name === "execute-step-2-EMAIL_COACH") {
@@ -1382,12 +1380,15 @@ describe("execute-workflow Inngest function", () => {
       await invoke();
 
       expect(mockSendEmail).not.toHaveBeenCalled();
-      const skippedCall = executionCreate.mock.calls.find(
-        ([arg]: [{ data?: Record<string, unknown> }]) => arg?.data?.status === "SKIPPED"
+      // PR-3: every recipient failed link-gen → the reused parent is finalized
+      // FAILED, keeping the operator-facing message (regression guard). The
+      // per-recipient FAILED child carries the granular "link_generation_failed".
+      const failedFinalize = (db.workflowStepExecution.update as jest.Mock).mock.calls.find(
+        ([arg]: [{ data?: Record<string, unknown> }]) =>
+          arg?.data?.status === "FAILED" &&
+          arg?.data?.errorMessage === "No survey link could be generated"
       );
-      expect(skippedCall).toBeDefined();
-      // Genuine link-gen failure path keeps its specific message — regression guard
-      expect(skippedCall?.[0]?.data?.errorMessage).toBe("No survey link could be generated");
+      expect(failedFinalize).toBeDefined();
     });
 
     it("SEND_FILE_LINK with 0 registrants: records SKIPPED, sends no emails", async () => {
@@ -1580,11 +1581,11 @@ describe("execute-workflow Inngest function", () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ surveyId: "survey-2", surveyUrl: "https://app.test/s/2" });
 
-      // After children are written, finalizeParentRollup reads them
-      executionFindManyMock.mockResolvedValueOnce([
-        { status: "FAILED" },
-        { status: "SENT" },
-      ]);
+      // PR-3: sendFanoutRecipients first queries prior-SENT children (skip set
+      // — none on a fresh run), THEN finalizeParentRollup reads all children.
+      executionFindManyMock
+        .mockResolvedValueOnce([]) // skip-set query (no prior SENT)
+        .mockResolvedValueOnce([{ status: "FAILED" }, { status: "SENT" }]); // rollup
 
       await invoke();
 
@@ -1616,6 +1617,51 @@ describe("execute-workflow Inngest function", () => {
           call[0]?.data?.status === "FAILED"
       );
       expect(rollupUpdate).toBeDefined();
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // PR-3 (audit Inngest dedup): retry-resend protection
+  // ------------------------------------------------------------------
+  describe("PR-3: retry dedup on the immediate path", () => {
+    it("EMAIL_ATTENDEES immediate path synthesizes ONE parent (deliveryBatchKey) and skips prior-SENT recipients on replay", async () => {
+      // IMMEDIATE trigger → no future sendAt → executionId undefined → the
+      // step had no parent before PR-3 (the Q-C gap). It now synthesizes one
+      // via ensureExecutionParent so an Inngest retry reuses it.
+      const assignment = makeAssignment({
+        steps: [
+          makeStep({
+            id: "step-att",
+            stepType: "EMAIL_ATTENDEES",
+            triggerType: "IMMEDIATE",
+            subject: "Hi",
+            body: "Body",
+          }),
+        ],
+      });
+      findUnique.mockResolvedValue(assignment);
+      registrationFindMany.mockResolvedValue([
+        { id: "reg-1", email: "a@test.com", firstName: "A", lastName: "B", company: "" },
+        { id: "reg-2", email: "b@test.com", firstName: "B", lastName: "C", company: "" },
+      ]);
+      // A prior retry already SENT reg-1 under the reused (synthesized) parent.
+      (db.workflowStepExecution.findMany as jest.Mock).mockResolvedValue([
+        { registrationId: "reg-1", status: "SENT" },
+      ]);
+
+      await invoke();
+
+      // reg-1 (already SENT) is skipped; only reg-2 is emailed — no re-send.
+      expect(mockSendEmail).toHaveBeenCalledTimes(1);
+      expect(mockSendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: "b@test.com" })
+      );
+      // Parent synthesized via upsert keyed by a deliveryBatchKey (not a bare create).
+      const parentUpsert = (db.workflowStepExecution.upsert as jest.Mock).mock.calls.find(
+        (call) =>
+          call[0]?.create?.status === "SCHEDULED" && call[0]?.where?.deliveryBatchKey
+      );
+      expect(parentUpsert).toBeDefined();
     });
   });
 

@@ -979,6 +979,12 @@ model WorkflowStepExecution {
   // Inngest tracking
   inngestEventId String? // For cancellation/retry tracking
 
+  // PR-3 (audit Inngest dedup): semantic idempotency key for one fan-out delivery
+  // batch. Set on the parent row; unique so a retry of the same batch reuses the
+  // existing parent (and skips its already-SENT children). NULL on legacy/child
+  // rows — Postgres treats NULLs as distinct, so many NULLs coexist.
+  deliveryBatchKey String? @unique
+
   createdAt DateTime @default(now())
 
   step WorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
