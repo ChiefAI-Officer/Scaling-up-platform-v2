@@ -28,7 +28,8 @@ export type ReportMetricEvent =
   | "render_failure" // the load/audit path threw
   | "audit_failure" // the fail-closed audit write threw
   | "degraded" // >=1 answer failed normalization (submission kept)
-  | "orphan_submission"; // >=1 submission whose respondent isn't a participant
+  | "orphan_submission" // >=1 submission whose respondent isn't a participant
+  | "email"; // a report EMAIL was rendered/enqueued (durable filter-provenance trace; R2-M4)
 
 const SURFACE_NAMESPACE: Record<ReportSurface, string> = {
   respondent: "respondent_report",

@@ -299,6 +299,18 @@ describe("buildLvaContent()", () => {
     }
   });
 
+  it("every S5_why_ follow-up has a matching S4 option key (Wave I gate invariant)", () => {
+    const s4 = content.questions.find((q) => q.stableKey === "S4_biggest_obstacles");
+    const optionKeys = new Set(
+      ((s4 as { options?: Array<{ key: string }> } | undefined)?.options ?? []).map((o) => o.key),
+    );
+    const followups = content.questions.filter((q) => q.stableKey.startsWith("S5_why_"));
+    expect(followups.length).toBeGreaterThan(0);
+    for (const q of followups) {
+      expect(optionKeys.has(q.stableKey.slice("S5_why_".length))).toBe(true);
+    }
+  });
+
   // ── S6 Focus Areas ───────────────────────────────────────────────────────
 
   it("S6 has exactly 1 NUMBER (rehire %) + 14 TEXT (all required)", () => {

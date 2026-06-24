@@ -14,7 +14,10 @@
 import {
   isReportAnswerPresent,
   buildQualitativeModel,
+  REPORT_FILTERS,
 } from "@/lib/assessments/qualitative-report-model";
+import { buildQuestionMetaByKey } from "@/lib/assessments/question-meta";
+import { buildLvaContent } from "../../../../prisma/seed-lva-assessment";
 
 // ── isReportAnswerPresent ──────────────────────────────────────────────────
 
@@ -204,9 +207,8 @@ describe("buildQualitativeModel", () => {
     expect(model.sections[0].kind).toBe("metric-table");
   });
 
-  it("assigns 'rating' for the LVA strengths section (16 SLIDER 1-3) and carries min/max", () => {
+  it("assigns 'rating' for an all-slider 1-3 section and carries min/max", () => {
     const model = buildQualitativeModel({
-      templateAlias: "leadership-vision-alignment",
       sections: [{ stableKey: "S3_strengths", name: "Strengths and Weaknesses" }],
       questionsByKey: {
         S3_sales: {
@@ -650,5 +652,223 @@ describe("buildQualitativeModel", () => {
       expect(model.sections[0].name).toBe("Additional responses");
       expect(model.sections[0].items.map((i) => i.stableKey)).toEqual(["orphan_q"]);
     });
+  });
+});
+
+describe("REPORT_FILTERS (Wave I)", () => {
+  it("declares the LVA suppress + conditional-followup contract", () => {
+    expect(REPORT_FILTERS["leadership-vision-alignment"]).toEqual({
+      suppressSections: ["S3_strengths"],
+      conditionalFollowups: { gateKey: "S4_biggest_obstacles", followupPrefix: "S5_why_" },
+    });
+  });
+  it("has no entry for unaffected templates", () => {
+    expect(REPORT_FILTERS["qsp-v2"]).toBeUndefined();
+    expect(REPORT_FILTERS["RockHabits"]).toBeUndefined();
+  });
+});
+
+describe("LVA section suppression (Wave I)", () => {
+  it("omits S3_strengths for LVA even when every factor is answered", () => {
+    const model = buildQualitativeModel({
+      templateAlias: "leadership-vision-alignment",
+      sections: [
+        { stableKey: "S3_strengths", name: "Strengths and Weaknesses" },
+        { stableKey: "S2_vision", name: "Vision" },
+      ],
+      questionsByKey: {
+        S3_sales: { type: "SLIDER_LIKERT", label: "Sales", sectionStableKey: "S3_strengths", min: 1, max: 3 },
+        S2_products: { type: "TEXT", label: "Products", sectionStableKey: "S2_vision" },
+      },
+      rawAnswers: [
+        { stableKey: "S3_sales", value: 1 },
+        { stableKey: "S2_products", value: "robots" },
+      ],
+    });
+    const keys = model.sections.map((s) => s.stableKey);
+    expect(keys).not.toContain("S3_strengths");
+    expect(keys).toContain("S2_vision");
+    expect(keys).not.toContain("__additional_responses__");
+  });
+
+  it("does NOT suppress for a template without a REPORT_FILTERS entry", () => {
+    const model = buildQualitativeModel({
+      templateAlias: "qsp-v2",
+      sections: [{ stableKey: "S3_strengths", name: "Strengths" }],
+      questionsByKey: { S3_a: { type: "SLIDER_LIKERT", label: "A", sectionStableKey: "S3_strengths", min: 1, max: 3 } },
+      rawAnswers: [{ stableKey: "S3_a", value: 2 }],
+    });
+    expect(model.sections.map((s) => s.stableKey)).toContain("S3_strengths");
+  });
+});
+
+// ── LVA conditional follow-ups (Wave I, ADR-0014) ───────────────────────────
+
+const lvaGate = (
+  s4: unknown,
+  explanations: Record<string, unknown>,
+  opts: { gateType?: string; omitGate?: boolean } = {},
+) => ({
+  templateAlias: "leadership-vision-alignment",
+  sections: [{ stableKey: "S5_explained", name: "Obstacles Explained" }],
+  questionsByKey: {
+    // `omitGate` drops the gate QUESTION from the pinned version entirely (the
+    // "no gate question in the version" fail-open path). A valid gate with a
+    // missing/empty ANSWER is the *empty-selection* path (gate stays present).
+    ...(opts.omitGate
+      ? {}
+      : {
+          S4_biggest_obstacles: {
+            type: opts.gateType ?? "MULTI_CHOICE",
+            label: "Pick the obstacles",
+            sectionStableKey: "S4_obstacles",
+            options: [
+              { key: "sales", label: "Sales" }, { key: "cash", label: "Cash" },
+              { key: "execution", label: "Execution" }, { key: "the_leadership", label: "The Leadership" },
+            ],
+          },
+        }),
+    S5_why_sales: { type: "TEXT", label: "Why is Sales a hindrance?", sectionStableKey: "S5_explained" },
+    S5_why_cash: { type: "TEXT", label: "Why is Cash a hindrance?", sectionStableKey: "S5_explained" },
+    S5_why_execution: { type: "TEXT", label: "Why is Execution a hindrance?", sectionStableKey: "S5_explained" },
+    S5_why_the_leadership: { type: "TEXT", label: "Why is The Leadership a hindrance?", sectionStableKey: "S5_explained" },
+    S5_other_factor: { type: "TEXT", label: "Another factor?", sectionStableKey: "S5_explained" },
+    S5_change_one_thing: { type: "TEXT", label: "Change one thing?", sectionStableKey: "S5_explained" },
+  },
+  rawAnswers: [
+    ...(opts.omitGate ? [] : [{ stableKey: "S4_biggest_obstacles", value: s4 }]),
+    ...Object.entries(explanations).map(([stableKey, value]) => ({ stableKey, value })),
+  ],
+});
+const s5Keys = (m: ReturnType<typeof buildQualitativeModel>) =>
+  (m.sections.find((s) => s.stableKey === "S5_explained")?.items ?? []).map((i) => i.stableKey);
+
+describe("LVA conditional follow-ups (Wave I)", () => {
+  it("renders S5_why_<f> only for checked factors; drops unchecked-but-typed", () => {
+    const m = buildQualitativeModel(lvaGate(["sales", "cash"], {
+      S5_why_sales: "lost reps", S5_why_cash: "long receivables",
+      S5_why_execution: "no cadence", S5_why_the_leadership: "friction",
+    }));
+    const k = s5Keys(m);
+    expect(k).toEqual(expect.arrayContaining(["S5_why_sales", "S5_why_cash"]));
+    expect(k).not.toContain("S5_why_execution");
+    expect(k).not.toContain("S5_why_the_leadership");
+  });
+  it("always renders the non-followup S5 questions", () => {
+    const k = s5Keys(buildQualitativeModel(lvaGate(["sales"], { S5_other_factor: "hiring", S5_change_one_thing: "rhythm" })));
+    expect(k).toEqual(expect.arrayContaining(["S5_other_factor", "S5_change_one_thing"]));
+  });
+  it("omits a checked-but-blank follow-up", () => {
+    expect(s5Keys(buildQualitativeModel(lvaGate(["sales"], { S5_why_sales: "   " })))).not.toContain("S5_why_sales");
+  });
+  it("valid gate + empty selection → all S5_why_ hidden", () => {
+    expect(s5Keys(buildQualitativeModel(lvaGate([], { S5_why_sales: "x" })))).not.toContain("S5_why_sales");
+  });
+  it("FAIL-OPEN: no gate question in the version → renders answered-only", () => {
+    expect(s5Keys(buildQualitativeModel(lvaGate(["sales"], { S5_why_sales: "x" }, { omitGate: true })))).toContain("S5_why_sales");
+  });
+  it("FAIL-OPEN: gate present but NOT MULTI_CHOICE → renders answered-only", () => {
+    expect(s5Keys(buildQualitativeModel(lvaGate(["sales"], { S5_why_sales: "x" }, { gateType: "TEXT" })))).toContain("S5_why_sales");
+  });
+  it("gates orphaned follow-ups too: a CHECKED orphaned S5_why_ IS present and an unchecked one is NOT (both directions)", () => {
+    // Gate selects "sales" (checked) but NOT "cash" (unchecked). Both S5_why_
+    // follow-ups are ORPHANS (no section, not referenced by any section list),
+    // so they route through the "Additional responses" bucket — and the gate
+    // must still apply there: checked → present, unchecked → absent.
+    const m = buildQualitativeModel({
+      templateAlias: "leadership-vision-alignment",
+      sections: [],
+      questionsByKey: {
+        S4_biggest_obstacles: { type: "MULTI_CHOICE", label: "g", options: [{ key: "sales", label: "Sales" }, { key: "cash", label: "Cash" }] },
+        S5_why_sales: { type: "TEXT", label: "Why Sales?" },
+        S5_why_cash: { type: "TEXT", label: "Why Cash?" },
+      },
+      rawAnswers: [
+        { stableKey: "S4_biggest_obstacles", value: ["sales"] },
+        { stableKey: "S5_why_sales", value: "x" },
+        { stableKey: "S5_why_cash", value: "x" },
+      ],
+    });
+    const add = m.sections.find((s) => s.stableKey === "__additional_responses__");
+    const addKeys = (add?.items ?? []).map((i) => i.stableKey);
+    // Positive control: the CHECKED orphaned follow-up IS in the bucket.
+    expect(addKeys).toContain("S5_why_sales");
+    // Negative control: the UNCHECKED orphaned follow-up is NOT.
+    expect(addKeys).not.toContain("S5_why_cash");
+  });
+});
+
+// ── Real-seed integration (Wave I, ADR-0014) ────────────────────────────────
+// Proves the filter's hard-coded keys (suppressSections / gateKey / followupPrefix)
+// match the ACTUAL LVA seed content — not a hand-built QMeta fixture. If the seed
+// renames a section/question stableKey or changes the S4 option keys, this fails.
+
+describe("LVA report filter against the REAL seed (integration)", () => {
+  it("suppresses S3 and gates S5 on the REAL LVA seed content", () => {
+    const content = buildLvaContent();
+    const questionsByKey = buildQuestionMetaByKey(content.questions);
+    const model = buildQualitativeModel({
+      templateAlias: "leadership-vision-alignment",
+      sections: content.sections,
+      questionsByKey,
+      rawAnswers: [
+        // Answer every S3 strength so the section would render if NOT suppressed.
+        ...content.questions
+          .filter((q) => q.stableKey.startsWith("S3_"))
+          .map((q) => ({ stableKey: q.stableKey, value: 2 })),
+        // Flag sales + cash (NOT execution) → only those two S5_why_ explained.
+        { stableKey: "S4_biggest_obstacles", value: ["sales", "cash"] },
+        { stableKey: "S5_why_sales", value: "real-sales" },
+        { stableKey: "S5_why_cash", value: "real-cash" },
+        { stableKey: "S5_why_execution", value: "real-exec-UNCHECKED" },
+        { stableKey: "S5_other_factor", value: "real-other" },
+      ],
+    });
+
+    const keys = model.sections.map((s) => s.stableKey);
+    // S3_strengths is suppressed by the LVA report filter.
+    expect(keys).not.toContain("S3_strengths");
+
+    const s5 = model.sections
+      .find((s) => s.stableKey === "S5_explained")
+      ?.items.map((i) => i.stableKey) ?? [];
+    // Checked factors' "why" rows + the always-on S5_other_factor survive.
+    expect(s5).toEqual(
+      expect.arrayContaining(["S5_why_sales", "S5_why_cash", "S5_other_factor"]),
+    );
+    // The unchecked "execution" explanation is gated out even though it was typed.
+    expect(s5).not.toContain("S5_why_execution");
+  });
+});
+
+// ── LVA filter provenance (Wave I, R2-M4) ───────────────────────────────────
+
+describe("LVA filter provenance (Wave I)", () => {
+  it("reports suppressed-section and hidden-followup counts for LVA", () => {
+    const m = buildQualitativeModel(lvaGate(["sales"], { S5_why_sales: "x", S5_why_cash: "y" }));
+    expect(m.filterProvenance).toEqual(
+      expect.objectContaining({ filterId: "lva-cond-v1", hiddenFollowupCount: 1 }),
+    );
+  });
+  it("counts a suppressed section", () => {
+    const m = buildQualitativeModel({
+      templateAlias: "leadership-vision-alignment",
+      sections: [{ stableKey: "S3_strengths", name: "S" }, { stableKey: "S2_vision", name: "V" }],
+      questionsByKey: {
+        S3_a: { type: "SLIDER_LIKERT", label: "a", sectionStableKey: "S3_strengths", min: 1, max: 3 },
+        S2_a: { type: "TEXT", label: "v", sectionStableKey: "S2_vision" },
+      },
+      rawAnswers: [{ stableKey: "S3_a", value: 2 }, { stableKey: "S2_a", value: "hi" }],
+    });
+    expect(m.filterProvenance?.suppressedSectionCount).toBe(1);
+  });
+  it("returns no filterProvenance for a template without a filter", () => {
+    const m = buildQualitativeModel({
+      templateAlias: "qsp-v2",
+      sections: [{ stableKey: "P1", name: "P1" }],
+      questionsByKey: { p: { type: "TEXT", label: "p", sectionStableKey: "P1" } },
+      rawAnswers: [{ stableKey: "p", value: "x" }],
+    });
+    expect(m.filterProvenance).toBeUndefined();
   });
 });

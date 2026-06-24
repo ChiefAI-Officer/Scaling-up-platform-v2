@@ -162,6 +162,41 @@ describe("buildReportEmailHtml — qualitative dispatch", () => {
     // The raw keys must NOT leak into the rendered body.
     expect(bodyHtml).not.toContain("the_leadership");
   });
+
+  // ── Wave I (ADR-0014) — conditional follow-up gating end-to-end (email) ────
+  it("emails only the checked obstacle explanation, not the unchecked one", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: qualReport({
+        templateAlias: "leadership-vision-alignment",
+        sections: [
+          { stableKey: "S4_obstacles", name: "Biggest Obstacles" },
+          { stableKey: "S5_explained", name: "Obstacles and Challenges Explained" },
+        ],
+        questionsByKey: {
+          S4_biggest_obstacles: {
+            type: "MULTI_CHOICE",
+            label: "Pick the three biggest obstacles",
+            sectionStableKey: "S4_obstacles",
+            options: [
+              { key: "sales", label: "Sales" },
+              { key: "cash", label: "Cash" },
+            ],
+          },
+          S5_why_sales: { type: "TEXT", label: "Why is Sales a hindrance?", sectionStableKey: "S5_explained" },
+          S5_why_cash: { type: "TEXT", label: "Why is Cash a hindrance?", sectionStableKey: "S5_explained" },
+        },
+        // Only "sales" is flagged → the cash explanation is gated out of the email.
+        rawAnswers: [
+          { stableKey: "S4_biggest_obstacles", value: ["sales"] },
+          { stableKey: "S5_why_sales", value: "CHECKED_SALES_TEXT" },
+          { stableKey: "S5_why_cash", value: "UNCHECKED_CASH_TEXT" },
+        ],
+      }),
+      recipientRole: "TAKER_COPY",
+    });
+    expect(bodyHtml).toContain("CHECKED_SALES_TEXT");
+    expect(bodyHtml).not.toContain("UNCHECKED_CASH_TEXT");
+  });
 });
 
 // ── R2-H3 — escape everything respondent-controlled ──────────────────────────
