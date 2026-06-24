@@ -6,6 +6,25 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-06-24 — Wave I: LVA conditional obstacles + strengths-matrix removal (deferred #29) <!-- ENTRY_ISO:2026-06-24 ENTRY_SLUG:wave-i-lva-conditional-obstacles -->
+
+**PR #84 (`91a67ff`), prod — report-layer only, NO migration / NO seed change / NO feature flag; retroactive; revert-safe.** Makes the LVA per-respondent report match Esperto (deferred item #29 — Jeff's June-22 "way too many questions" #1).
+
+**What shipped:**
+- **S3 16-factor strengths matrix dropped** from the LVA individual report (it remains in the Wave F group/CEO report, which uses its own `group-report-model.ts` — untouched).
+- **S5 "Why is X a hindrance?" follow-ups gated on the checked S4 obstacle factors:** once a *valid MULTI_CHOICE* gate exists in the pinned version, every `S5_why_<factor>` renders only if `<factor>` ∈ the `S4_biggest_obstacles` answer. The always-on S5 questions (`S5_other_factor`, `S5_change_one_thing`) and the S4 picks list are never gated; `isReportAnswerPresent` stays the second gate (checked-but-blank omitted).
+- **Mechanism:** a per-alias `REPORT_FILTERS` map + `REPORT_FILTER_VERSION` in `qualitative-report-model.ts` (mirrors `SECTION_PRESENTATION`): `{ suppressSections, conditionalFollowups: { gateKey, followupPrefix } }`. `buildQualitativeModel` applies a shared `isHiddenFollowup` predicate in BOTH the per-section item loop AND the orphan "Additional responses" loop. **Fail-open** when the gate is absent/non-MULTI_CHOICE (answered-only); a valid gate with an empty/non-array answer hides all follow-ups. Both consumers (`QualitativeReport.tsx`, `report-email.ts`) read the filtered model.
+- **Provenance (traceability of a code-only retroactive change):** model returns `filterProvenance` (filterId + suppressed-section + hidden-followup counts); a non-PII `assessment.respondent_report.email` metric on the outbox; `reportFilterId` on the `VIEW_REPORT` audit. ADR-0014.
+- **Read-only pre-merge audit** `scripts/audit-lva-report-filter-impact.mjs` (requires `AUDIT_READONLY_URL`; `SET TRANSACTION READ ONLY`; SELECT-only; creds redacted).
+
+**Retroactivity (intentional, per ADR-0010 precedent):** every already-submitted LVA report re-renders on deploy. Pre-merge prod audit (user-approved): **6 of 7** completed LVA reports trim ≥1 over-filled explanation (each 3+), 1 fail-open (pinned version with no usable S4) — confirming the over-fill Jeff flagged is real and widespread.
+
+**Process:** brainstorm → `/grill-with-docs` → `/grill-me` → user-approved + signed preview mockup → 3-round `/claudex:plan` adversarial loop → subagent-driven TDD → whole-branch review **MERGE-READY** (0 Critical / 0 Important). Real-seed integration + screen + email gated-followup e2e + seed-invariant; **zero new test failures**; `CI=true npx next build --turbopack` clean; ESLint 0/0. Spec `docs/specs/v7.6/18i-wave-i-lva-conditional-obstacles-design.md` + plan `18i-…-implementation-plan.md` + ADR-0014.
+
+**Deferred follow-ons:** survey-form conditional (only show `S5_why_<factor>` for checked factors in the survey itself — a larger client change, separate wave); on-screen `view`-metric provenance counts.
+
+---
+
 ### 2026-06-22 — Report access gate: unify the assessment report-view protocol (ADR-0012) <!-- ENTRY_ISO:2026-06-22 ENTRY_SLUG:report-access-gate -->
 
 **Shipped to prod** (PR #73 squash `2a942d5` + PR #78 squash `51c0d3a`). Additive — no migration, no feature flag; both report loaders untouched.
