@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues for this repo live as GitHub Issues on `jcbdelo26/Scaling-up-platform-v2`. Use the `gh` CLI for all operations.
+Issues for this repo live as GitHub Issues on `ChiefAI-Officer/Scaling-up-platform-v2`. Use the `gh` CLI for all operations.
 
 ## Conventions
 
@@ -11,7 +11,7 @@ Issues for this repo live as GitHub Issues on `jcbdelo26/Scaling-up-platform-v2`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 
-`gh` infers the repo automatically when run inside the clone at `/Users/diushianstand/Scaling-up-platform-v2`.
+`gh` infers the repo automatically when run inside the clone at `D:/Scaling-up-platform-v2`.
 
 ## When a skill says "publish to the issue tracker"
 

@@ -4,16 +4,20 @@
 
 This is a **single-context** repo. Domain documentation lives at:
 
-- `CLAUDE.md` — primary source of truth: project context, tech stack, data model, API routes, quirks, sprint history
-- No `CONTEXT.md` exists yet — created lazily by `/grill-with-docs` when terms get resolved
-- No `docs/adr/` exists yet — created lazily when architectural decisions crystallize
+- `AGENTS.md` - short front-door map for agent work.
+- `docs/agents/harness-operating-map.md` - current autonomous-loop and harness plan.
+- `CLAUDE.md` - primary source of truth: project context, tech stack, data model, API routes, quirks, sprint history.
+- No `CONTEXT.md` exists yet - created lazily by `/grill-with-docs` when terms get resolved.
+- `docs/adr/` - architectural decisions that have crystallized.
 
 ## Before exploring, read these
 
-1. **`CLAUDE.md`** at the repo root — contains the full data model, API surface, authorization model, and all known quirks. Read the relevant sections before making changes.
-2. **`docs/agents/`** — issue tracker config, triage labels, this file.
-3. If `CONTEXT.md` exists at the root, read it for domain glossary.
-4. If `docs/adr/` exists, read ADRs touching the area you're working in.
+1. **`AGENTS.md`** at the repo root - start here for the short operating map.
+2. **`docs/agents/harness-operating-map.md`** - read for the active autonomous-loop plan.
+3. **`CLAUDE.md`** at the repo root - contains the full data model, API surface, authorization model, and all known quirks. Read the relevant sections before making changes.
+4. **`docs/agents/`** - issue tracker config, triage labels, this file.
+5. If `CONTEXT.md` exists at the root, read it for domain glossary.
+6. If `docs/adr/` exists, read ADRs touching the area you're working in.
 
 ## Key domain vocabulary (from CLAUDE.md)
 
