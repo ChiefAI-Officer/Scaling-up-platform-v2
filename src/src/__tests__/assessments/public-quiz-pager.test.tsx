@@ -31,6 +31,7 @@ import { PublicQuizClient } from "@/components/assessments/public-quiz-client";
 import { publicDraftKey } from "@/lib/assessments/use-answer-draft";
 
 const ALIAS = "team-alpha";
+const LVA_ALIAS = "leadership-vision-alignment";
 
 const sections = [
   { stableKey: "S1", sortOrder: 1, name: "Section One" },
@@ -273,6 +274,116 @@ describe("PublicQuizClient — SectionPager wiring", () => {
     // The stale key is gone; only the two real questions are POSTed.
     expect(keys).not.toContain("removedQ");
     expect(keys.sort()).toEqual(["q1", "q2"]);
+  });
+
+  it("LVA follow-on: shows S5_why fields only for checked S4 factors and prunes hidden typed answers", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_lva_public_1",
+          scoreResult: {
+            perQuestion: [],
+            perSection: [],
+            overallTotal: 0,
+            overallAverage: 0,
+            countAchieved: 0,
+            tier: null,
+            tierMetricValue: 0,
+            unansweredKeys: [],
+          },
+        },
+      }),
+    });
+    render(
+      <PublicQuizClient
+        {...baseProps}
+        templateName="Leadership Vision Alignment"
+        templateAlias={LVA_ALIAS}
+        sections={[{ stableKey: "S5", sortOrder: 1, name: "Obstacles" }]}
+        questions={[
+          {
+            stableKey: "S4_biggest_obstacles",
+            sortOrder: 1,
+            sectionStableKey: "S5",
+            type: "MULTI_CHOICE",
+            label: "Which factors are hindering you?",
+            isRequired: false,
+            options: [
+              { key: "sales", label: "Sales" },
+              { key: "cash", label: "Cash" },
+            ],
+          },
+          {
+            stableKey: "S5_why_sales",
+            sortOrder: 2,
+            sectionStableKey: "S5",
+            type: "TEXT",
+            label: "Why is Sales a hindrance?",
+            isRequired: false,
+          },
+          {
+            stableKey: "S5_why_cash",
+            sortOrder: 3,
+            sectionStableKey: "S5",
+            type: "TEXT",
+            label: "Why is Cash a hindrance?",
+            isRequired: false,
+          },
+          {
+            stableKey: "S5_other_factor",
+            sortOrder: 4,
+            sectionStableKey: "S5",
+            type: "TEXT",
+            label: "Other factor",
+            isRequired: false,
+          },
+          {
+            stableKey: "S5_change_one_thing",
+            sortOrder: 5,
+            sectionStableKey: "S5",
+            type: "TEXT",
+            label: "What would you change?",
+            isRequired: false,
+          },
+        ]}
+      />,
+    );
+    reachFormStep();
+
+    expect(screen.getByText("Which factors are hindering you?")).toBeInTheDocument();
+    expect(screen.getByText("Other factor")).toBeInTheDocument();
+    expect(screen.getByText("What would you change?")).toBeInTheDocument();
+    expect(screen.queryByText("Why is Sales a hindrance?")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Sales"));
+    expect(await screen.findByText("Why is Sales a hindrance?")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Why is Sales a hindrance/i), {
+      target: { value: "Need cleaner pipeline ownership" },
+    });
+
+    fireEvent.click(screen.getByLabelText("Cash"));
+    expect(await screen.findByText("Why is Cash a hindrance?")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Why is Cash a hindrance/i), {
+      target: { value: "Receivables are lagging" },
+    });
+
+    fireEvent.click(screen.getByLabelText("Sales"));
+    await waitFor(() =>
+      expect(screen.queryByText("Why is Sales a hindrance?")).not.toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    const answerKeys = body.answers.map((a: { stableKey: string }) => a.stableKey);
+    expect(answerKeys).toContain("S4_biggest_obstacles");
+    expect(answerKeys).toContain("S5_why_cash");
+    expect(answerKeys).not.toContain("S5_why_sales");
   });
 
   it("still renders the intro and info phases with the public-taker fields intact", () => {

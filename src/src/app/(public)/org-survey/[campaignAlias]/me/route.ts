@@ -7,7 +7,7 @@
  * the respondent needs to render the form.
  *
  * Returns:
- *   { campaign: { name, alias, organizationName }, version: { language }, sections, questions }
+ *   { campaign: { name, alias, templateAlias, organizationName }, version: { language }, sections, questions }
  *
  * Any lifecycle-gate failure → 410. No session → 401.
  */
@@ -45,6 +45,7 @@ export async function GET(
         campaign: {
           include: {
             organization: { select: { name: true } },
+            template: { select: { alias: true } },
             version: {
               select: {
                 id: true,
@@ -99,6 +100,7 @@ export async function GET(
           campaign: {
             name: invitation.campaign.name,
             alias: invitation.campaign.alias,
+            templateAlias: invitation.campaign.template?.alias ?? null,
             organizationName: invitation.campaign.organization?.name ?? null,
             // Task 6b: expose toggle so the client can branch thank-you copy.
             sendResultsToRespondent: invitation.campaign.sendResultsToRespondent,

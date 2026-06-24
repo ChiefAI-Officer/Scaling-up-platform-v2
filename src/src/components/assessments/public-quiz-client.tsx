@@ -12,6 +12,10 @@ import {
 import { useAnswerDraft, publicDraftKey } from "@/lib/assessments/use-answer-draft";
 import { pruneAnswersToQuestions } from "@/lib/assessments/prune-answers";
 import {
+  filterVisibleSurveyQuestions,
+  visibleSurveyQuestionKeys,
+} from "@/lib/assessments/form-visibility";
+import {
   WelcomeShellHeader,
   WelcomeExpectations,
   WelcomeStats,
@@ -80,6 +84,7 @@ interface PublicQuizClientProps {
   campaignName: string;
   campaignDescription: string | null;
   templateName: string;
+  templateAlias?: string | null;
   isOpen: boolean;
   status: "DRAFT" | "ACTIVE" | "CLOSED";
   openAtIso: string;
@@ -95,6 +100,7 @@ export function PublicQuizClient({
   campaignName,
   campaignDescription,
   templateName,
+  templateAlias,
   isOpen,
   status,
   openAtIso,
@@ -149,14 +155,28 @@ export function PublicQuizClient({
   // Hook must run unconditionally at the top level, before any early return.
   const draftKey = useMemo(() => publicDraftKey(campaignAlias), [campaignAlias]);
   const { clearDraft } = useAnswerDraft(draftKey, answers, setAnswers);
+  const visibleQuestions = useMemo<QuestionDef[]>(
+    () =>
+      filterVisibleSurveyQuestions({
+        templateAlias,
+        questions: sortedQuestions as PagerQuestion[],
+        answers,
+      }) as QuestionDef[],
+    [templateAlias, sortedQuestions, answers],
+  );
 
   // The set of stableKeys that map to a currently-rendered question. Used both
   // to prune a stale localStorage draft on hydrate AND to prune the POST body
   // pre-submit (Wave C R3-M2) so an answer whose question no longer exists can
   // never reach the server.
   const knownKeys = useMemo(
-    () => new Set(sortedQuestions.map((q) => q.stableKey)),
-    [sortedQuestions],
+    () =>
+      visibleSurveyQuestionKeys({
+        templateAlias,
+        questions: sortedQuestions as PagerQuestion[],
+        answers,
+      }),
+    [templateAlias, sortedQuestions, answers],
   );
 
   // Hydrate prune (secondary): once questions are known, prune the answer state
@@ -407,7 +427,7 @@ export function PublicQuizClient({
     setAnswers((cur) => ({ ...cur, [key]: value }));
   }
 
-  const requiredQuestions = sortedQuestions.filter((q) => q.isRequired);
+  const requiredQuestions = visibleQuestions.filter((q) => q.isRequired);
   const missingRequired = requiredQuestions.filter((q) => {
     const v = answers[q.stableKey];
     if (v === undefined) return true;
@@ -418,7 +438,8 @@ export function PublicQuizClient({
   // The submit endpoint rejects an empty `answers` array (Zod `.min(1)`), so an
   // all-optional quiz must still have at least one answered question before we
   // allow a POST — otherwise the server 400s on a zero-answer payload.
-  const answeredCount = Object.values(answers).filter((v) => isAnswered(v)).length;
+  const visibleAnswers = pruneAnswersToQuestions(answers, knownKeys);
+  const answeredCount = Object.values(visibleAnswers).filter((v) => isAnswered(v)).length;
   const canSubmit = missingRequired.length === 0 && answeredCount > 0;
 
   async function handleSubmit() {
@@ -474,7 +495,7 @@ export function PublicQuizClient({
   // accessible QuestionInput; we own the answer state and the submit POST.
   const pages = buildSectionPages(
     sortedSections as PagerSection[],
-    sortedQuestions as PagerQuestion[],
+    visibleQuestions as PagerQuestion[],
   );
 
   return (

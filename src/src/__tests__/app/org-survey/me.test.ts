@@ -16,6 +16,7 @@ jest.mock("next/server", () => ({
 // `var` hoists with jest.mock — `const` does not, which causes a
 // `ReferenceError: Cannot access 'sessionState' before initialization`
 // at test-suite load time.
+// eslint-disable-next-line no-var
 var sessionState: {
   invitationId: string | undefined;
   campaignAlias: string | undefined;
@@ -79,6 +80,7 @@ describe("GET me", () => {
         status: "CLOSED",
         openAt: new Date(Date.now() - 1000),
         closeAt: null,
+        template: { alias: "leadership-vision-alignment" },
         version: {
           id: "v1",
           language: "en",
@@ -107,6 +109,7 @@ describe("GET me", () => {
         status: "ACTIVE",
         openAt: new Date(Date.now() - 1000),
         closeAt: null,
+        template: { alias: "leadership-vision-alignment" },
         version: {
           id: "v1",
           language: "en",
@@ -119,13 +122,14 @@ describe("GET me", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       data: {
-        campaign: { name: string; alias: string };
+        campaign: { name: string; alias: string; templateAlias: string | null };
         version: { language: string };
         sections: unknown[];
         questions: unknown[];
       };
     };
     expect(body.data.campaign.alias).toBe("demo");
+    expect(body.data.campaign.templateAlias).toBe("leadership-vision-alignment");
     expect(body.data.version.language).toBe("en");
     expect(body.data.questions).toEqual([{ stableKey: "q1" }]);
   });

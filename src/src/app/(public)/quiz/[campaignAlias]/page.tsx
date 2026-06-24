@@ -75,6 +75,7 @@ export default async function PublicQuizPage({
       campaignName={campaign.name}
       campaignDescription={campaign.description}
       templateName={campaign.template.name}
+      templateAlias={campaign.template.alias}
       isOpen={isOpen}
       status={campaign.status}
       openAtIso={campaign.openAt.toISOString()}
