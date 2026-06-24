@@ -6,6 +6,20 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-06-25 — Wave I follow-on: LVA survey-form conditional obstacle follow-ups <!-- ENTRY_ISO:2026-06-25 ENTRY_SLUG:wave-i-followon-lva-survey-form-conditionals -->
+
+**PR #88 (`8f13181`), prod — participant survey form only, LVA-only, NO migration / NO seed change / NO feature flag.** Completes the Wave I follow-on so the LVA form now matches the report-layer contract from PR #84: the per-factor `S5_why_<factor>` text boxes are visible only for factors currently checked in `S4_biggest_obstacles`.
+
+**What shipped:**
+- **Client-safe visibility helper** `lib/assessments/form-visibility.ts`, keyed only by template alias `leadership-vision-alignment` and stable keys (`S4_biggest_obstacles` + `S5_why_`). Unknown aliases return unchanged; malformed/pinned versions fail open when the S4 gate is missing or not `MULTI_CHOICE`.
+- **Invited org survey + public quiz clients** now build pages, required-question validation, and stale-answer pruning from the visible question set. Hidden typed `S5_why_` answers are pruned before submit, so stale autosave or uncheck/recheck paths cannot leak hidden follow-up text into the payload.
+- **Always-on S5 fields remain visible**: `S5_other_factor` and `S5_change_one_thing` are not gated. `S4_biggest_obstacles` itself remains visible. `S3_strengths` stays unchanged in the survey form per the follow-on plan.
+- **Template alias propagation** added to the invited `/org-survey/[campaignAlias]/me` response and passed through the public quiz page so the client rule is keyed by the pinned template, not by campaign URL.
+
+**Verification:** TDD red/green for the pure helper and both client paths. Targeted pack green: `form-visibility.test.ts`, `org-survey-pager.test.tsx`, `public-quiz-pager.test.tsx`, and `/org-survey/me.test.ts` (**30 tests**). ESLint clean on changed files. `CI=true npx next build --turbopack` completed successfully locally (with existing local-env warnings for missing `DATABASE_URL` and Inngest keys). GitHub checks green: Build, Migration Safety Gate, Vercel, Vercel Preview Comments. Production health after merge: `/api/health` returned 200 with database healthy.
+
+---
+
 ### 2026-06-24 — Wave I: LVA conditional obstacles + strengths-matrix removal (deferred #29) <!-- ENTRY_ISO:2026-06-24 ENTRY_SLUG:wave-i-lva-conditional-obstacles -->
 
 **PR #84 (`91a67ff`), prod — report-layer only, NO migration / NO seed change / NO feature flag; retroactive; revert-safe.** Makes the LVA per-respondent report match Esperto (deferred item #29 — Jeff's June-22 "way too many questions" #1).
