@@ -29,6 +29,10 @@ export type FanoutRecipient = { registrationId: string; email: string };
 
 export type FanoutOutcome = { parentId: string; sent: number; skipped: number };
 
+// SMTP auth-failure signatures that recur on every retry (bad auth / permanent
+// reject). Shared by the terminal-vs-transient classifier and the redactor.
+const SMTP_AUTH_PATTERN = /EAUTH|535|Invalid login|Authentication/i;
+
 /**
  * Shared SMTP terminal-vs-transient classifier. A terminal error (bad auth /
  * permanent reject) will recur on every retry, so it stops the batch and records
@@ -38,7 +42,21 @@ export type FanoutOutcome = { parentId: string; sent: number; skipped: number };
  */
 export function isTerminalSmtpError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  return /EAUTH|535|Invalid login|Authentication/i.test(msg);
+  return SMTP_AUTH_PATTERN.test(msg);
+}
+
+/**
+ * Map a send error to a STABLE, non-sensitive code for storage in
+ * `WorkflowStepExecution.errorMessage`. That field is rendered in the admin
+ * workflow-executions panel and the "trigger now" operator toast, so it must
+ * never carry raw SMTP server text (hostnames, credential hints, 5xx detail).
+ * The raw error is kept only in `console.error` (ephemeral server logs).
+ */
+export function redactSmtpError(
+  err: unknown
+): "smtp_auth_failed" | "smtp_send_failed" {
+  const msg = err instanceof Error ? err.message : String(err);
+  return SMTP_AUTH_PATTERN.test(msg) ? "smtp_auth_failed" : "smtp_send_failed";
 }
 
 /**
@@ -159,7 +177,12 @@ export async function sendFanoutRecipients(
         throw err;
       }
       // Terminal — record the failure and stop the batch (the cause, e.g. an
-      // auth failure, affects every remaining recipient).
+      // auth failure, affects every remaining recipient). Store only a redacted
+      // code; keep the raw error in the server log for debugging.
+      console.error(
+        `[fanout-delivery] terminal send error for ${recipient.registrationId}:`,
+        err
+      );
       await recordRecipientExecution(client, {
         parentId: args.parentId,
         stepId: args.stepId,
@@ -167,7 +190,7 @@ export async function sendFanoutRecipients(
         registrationId: recipient.registrationId,
         recipientEmail: recipient.email,
         status: "FAILED",
-        errorMessage: err instanceof Error ? err.message : String(err),
+        errorMessage: redactSmtpError(err),
       });
       break;
     }

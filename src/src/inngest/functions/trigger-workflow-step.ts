@@ -23,6 +23,7 @@ import {
     ensureExecutionParent,
     sendFanoutRecipients,
     isTerminalSmtpError,
+    redactSmtpError,
 } from "@/lib/workflows/fanout-delivery";
 import { buildLocationString } from "@/lib/ics-generator";
 import { formatTimeWithZone, formatZoneAbbrev } from "@/lib/utils";
@@ -718,14 +719,15 @@ export const triggerWorkflowStep = inngest.createFunction(
                         },
                     });
                 } catch (smtpErr) {
-                    const msg = smtpErr instanceof Error ? smtpErr.message : String(smtpErr);
-                    const isTerminalAuthError = /EAUTH|535|Invalid login|Authentication/i.test(msg);
                     console.error(`[trigger-workflow-step] sendEmailViaSMTP failed for ${recipient}:`, smtpErr);
-                    if (!isTerminalAuthError) {
+                    // Shared classifier (was a duplicated inline regex) — keeps the
+                    // terminal-vs-transient rule identical to the fan-out path.
+                    if (!isTerminalSmtpError(smtpErr)) {
                         // Transient error — let Inngest retry
                         throw smtpErr;
                     }
-                    // Terminal auth error — record FAILED and stop retrying
+                    // Terminal auth error — record FAILED (redacted code, never raw
+                    // SMTP text — this surfaces in the admin UI) and stop retrying.
                     await db.workflowStepExecution.create({
                         data: {
                             stepId: workflowStep.id,
@@ -733,7 +735,7 @@ export const triggerWorkflowStep = inngest.createFunction(
                             status: "FAILED",
                             scheduledFor: new Date(),
                             executedAt: new Date(),
-                            errorMessage: msg || "SMTP send failed",
+                            errorMessage: redactSmtpError(smtpErr),
                         },
                     });
                     return; // Do not re-throw — stops Inngest retry loop for auth errors
