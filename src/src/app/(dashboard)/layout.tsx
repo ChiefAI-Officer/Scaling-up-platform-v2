@@ -7,25 +7,7 @@ import { AdminNavLinks } from "@/components/layout/admin-nav-links";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SignOutButton } from "@/components/layout/sign-out-button";
-
-const navLinks = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/workshops", label: "All Workshops" },
-  { href: "/templates", label: "Templates" },
-  { href: "/admin/workflows", label: "Workflows" },
-  { href: "/admin/surveys", label: "Surveys" },
-  { href: "/admin/assessments", label: "Assessments" },
-  { href: "/admin/files", label: "Files" },
-  { href: "/partners", label: "Partners" },
-  { href: "/coaches", label: "Coaches" },
-  { href: "/admin/approvals", label: "Approvals" },
-  { href: "/admin/registrations", label: "Registrations" },
-  { href: "/admin/refunds-needed", label: "Refunds" },
-  { href: "/admin/transactional-emails", label: "Emails" },
-  { href: "/admin/categories", label: "Categories" },
-  { href: "/admin/pricing", label: "Pricing" },
-  { href: "/admin/financials", label: "Financials" },
-];
+import { getAdminNavBadgeCounts } from "@/lib/nav/admin-nav-badges";
 
 export default async function DashboardLayout({
   children,
@@ -41,6 +23,8 @@ export default async function DashboardLayout({
   if (!session.user?.role || session.user.role === "COACH") {
     redirect("/unauthorized");
   }
+
+  const counts = await getAdminNavBadgeCounts();
 
   const userInitial = (session.user.name || session.user.email || "A").charAt(0).toUpperCase();
 
@@ -73,15 +57,15 @@ export default async function DashboardLayout({
                 </Link>
               </div>
               {/* Desktop nav */}
-              <AdminNavLinks links={navLinks} />
+              <AdminNavLinks counts={counts} />
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="hidden xl:inline text-sm text-muted-foreground max-w-[180px] truncate" aria-label="Logged in user">
                 {session.user.email}
               </span>
               <ThemeToggle />
-              <Separator orientation="vertical" className="hidden lg:block h-5" />
-              <div className="hidden lg:flex items-center gap-2">
+              <Separator orientation="vertical" className="hidden xl:block h-5" />
+              <div className="hidden xl:flex items-center gap-2">
                 <Link
                   href="/admin/settings"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap"
@@ -90,11 +74,11 @@ export default async function DashboardLayout({
                 </Link>
                 <SignOutButton className="text-sm text-destructive hover:text-destructive/80 transition-colors duration-200 whitespace-nowrap" />
               </div>
-              <div className="hidden lg:flex h-8 w-8 rounded-full bg-primary/10 text-primary items-center justify-center text-sm font-semibold flex-shrink-0">
+              <div className="hidden xl:flex h-8 w-8 rounded-full bg-primary/10 text-primary items-center justify-center text-sm font-semibold flex-shrink-0">
                 {userInitial}
               </div>
               {/* Mobile/tablet hamburger */}
-              <AdminMobileNav links={navLinks} email={session.user.email || ""} />
+              <AdminMobileNav counts={counts} email={session.user.email || ""} />
             </div>
           </div>
         </div>
