@@ -63,4 +63,9 @@ describe("AdminMobileNav (Wave H)", () => {
     const approvals = screen.getByText("Approvals").closest("a")!;
     expect(within(approvals).queryByText("0")).not.toBeInTheDocument();
   });
+
+  it("renders no '→' gateway arrow on the Assessments mobile link", () => {
+    open();
+    expect(screen.getByText("Assessments").closest("a")).not.toHaveTextContent("→");
+  });
 });

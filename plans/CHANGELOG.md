@@ -6,6 +6,22 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-06-26 — Wave H follow-on: admin-nav visual redesign (visible chevrons + drop the → arrow) <!-- ENTRY_ISO:2026-06-26 ENTRY_SLUG:wave-h-nav-redesign -->
+
+**Branch `feat/wave-h-nav-redesign` (PR open; additive — no migration, no flag, revert-safe). Owner-approved visual polish of the grouped admin nav from the prior entry; the information architecture is UNCHANGED** — same 16 routes, Approvals standalone, identical grouping (verified by the adversarial regression review: `adminNavHrefs()` still returns the exact 16-href set).
+
+The owner reviewed the live grouped bar and flagged two things: the dropdown chevrons were a near-invisible 10px `▾` glyph, and a `→` "gateway" affordance next to Assessments that nobody could decode. Redesigned via `/frontend-design` → an interactive mockup the owner approved ("much better") → a Workflow (one implementer + three adversarial reviewers: fidelity / regression / quality-a11y-tokens; 2 fidelity findings folded in).
+
+- **Visible chevrons:** the 10px `▾` text glyph → a 16px lucide `ChevronDown` that rotates 180° on open (`transition-transform`), on both desktop triggers and mobile group headers.
+- **The `→` gateway arrow is gone:** removed entirely. The `gateway?: boolean` field on `NavLink`, the `gateway: true` on the Assessments entry, and BOTH render blocks (desktop `TopLink` + mobile standalone link) were deleted; Assessments is now a plain top-level link. Double-locked by tests (`admin-nav-model` asserts no `gateway` prop; `admin-nav-links` + `admin-mobile-nav` assert no `→` on the Assessments link).
+- **Polished dropdowns + spacing:** roomier hit targets (`itemBase` `px-2`→`px-3`, `rounded-md`→`rounded-lg`); an `xl`-only hairline rule after the "Scaling Up" wordmark; panels `rounded-md`→`rounded-xl` with `rounded-lg` leaf rows.
+- **Real open animation:** the implementer first reached for shadcn's `animate-in fade-in-0 zoom-in-95` classes — but the **fidelity reviewer caught that `tailwindcss-animate` is NOT installed in this project, so those classes are silently dead app-wide** (dialog/popover/select share the same no-op). Replaced with a real `@keyframes nav-panel-pop` + `.nav-panel-pop` rule in `globals.css` (neutralized for reduced-motion by the existing global block).
+- **Overflow fix (caught by local browser smoke at 1280px):** the added width (hairline + `px-3`) re-broke the `xl` fit Wave H had tuned — Financials collided with the right-cluster email. Fixed by gating the top-bar user-email span `xl`→`2xl` (it returns on wide screens); the full nav look is preserved. jsdom can't see this — a live 1280px render caught it.
+
+**Verified:** 23/23 nav tests green (model test rewritten + 3 new arrow/chevron assertions), ESLint clean on changed files, `CI=true npx next build --turbopack` clean, browser-smoked at 1280px (no overflow; Workshops dropdown opens with chevron rotation + pop + Configuration divider) and 390px (hamburger, arrow-free). Files: `lib/nav/admin-nav-model.ts`, `components/layout/admin-nav-links.tsx`, `components/layout/admin-mobile-nav.tsx`, `app/(dashboard)/layout.tsx`, `app/globals.css`, + 3 nav test files.
+
+---
+
 ### 2026-06-26 — Wave H: grouped admin nav (disclosure dropdowns + pending badges) <!-- ENTRY_ISO:2026-06-26 ENTRY_SLUG:wave-h-grouped-admin-nav -->
 
 **Branch `feat/wave-h-admin-nav` (PR open; additive — no migration, no flag, revert-safe).** Replaces the flat, overflowing 16-item ADMIN/STAFF top nav with a grouped disclosure nav: `Dashboard | Workshops▾ | Approvals⦿ | Assessments→ | Automation▾ | People▾ | Financials▾` (7 top-level entries; full item→group mapping in [Spec 17h §C](../docs/specs/v7.6/17h-wave-h-admin-nav-design.md) + [ADR-0013](../docs/adr/0013-grouped-admin-nav-supersedes-wireframe-24-flat-add.md)).

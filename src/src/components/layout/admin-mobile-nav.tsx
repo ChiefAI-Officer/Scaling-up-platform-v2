@@ -127,14 +127,7 @@ export function AdminMobileNav({ counts, email }: { counts: BadgeCounts; email: 
                         : "text-foreground hover:bg-accent/60"
                     )}
                   >
-                    <span>
-                      {entry.label}
-                      {entry.gateway ? (
-                        <span aria-hidden className="ml-1 opacity-70">
-                          →
-                        </span>
-                      ) : null}
-                    </span>
+                    <span>{entry.label}</span>
                     {entry.badge ? <MobileBadge badge={entry.badge} counts={counts} /> : null}
                   </Link>
                 );

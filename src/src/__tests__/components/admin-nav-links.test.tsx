@@ -113,4 +113,21 @@ describe("AdminNavLinks (desktop, Wave H)", () => {
     fireEvent.keyDown(links[0], { key: "ArrowDown" });
     expect(document.activeElement).toBe(links[1]);
   });
+
+  it("renders a real svg chevron on the group trigger that rotates 180° when open", () => {
+    renderNav();
+    const trigger = screen.getByRole("button", { name: /Workshops/i });
+    const chevron = trigger.querySelector("svg");
+    expect(chevron).toBeTruthy();
+    expect(chevron?.getAttribute("class") ?? "").not.toMatch(/rotate-180/);
+
+    fireEvent.click(trigger);
+    const openChevron = screen.getByRole("button", { name: /Workshops/i }).querySelector("svg");
+    expect(openChevron?.getAttribute("class") ?? "").toMatch(/rotate-180/);
+  });
+
+  it("renders no '→' gateway arrow on the Assessments link", () => {
+    renderNav();
+    expect(screen.getByText("Assessments").closest("a")).not.toHaveTextContent("→");
+  });
 });

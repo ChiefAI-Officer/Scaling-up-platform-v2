@@ -230,6 +230,19 @@ html {
   to { transform: rotate(360deg); }
 }
 
+@keyframes nav-panel-pop {
+  from { opacity: 0; transform: translateY(-6px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Admin nav dropdown open animation (Wave H redesign).
+   tailwindcss-animate is not installed in this project, so the shadcn
+   animate-in/zoom-in classes are no-ops; this delivers the approved pop.
+   The prefers-reduced-motion block above neutralizes it for that audience. */
+.nav-panel-pop {
+  animation: nav-panel-pop 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* --- Focus-visible ring utility --- */
 :focus-visible {
   outline: 2px solid hsl(var(--ring));

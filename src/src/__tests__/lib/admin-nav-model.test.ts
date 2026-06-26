@@ -51,12 +51,14 @@ describe("admin-nav-model", () => {
     expect(leaves.find((l) => l.href === "/admin/surveys")?.label).toBe("Workshop Surveys");
   });
 
-  it("Assessments is a gateway link into its own lane", () => {
+  it("Assessments is a plain top-level link (no gateway arrow)", () => {
     const assessments = ADMIN_NAV.find(
       (e): e is NavLink => e.kind === "link" && e.label === "Assessments"
     );
-    expect(assessments?.gateway).toBe(true);
+    expect(assessments?.kind).toBe("link");
     expect(assessments?.href).toBe("/admin/assessments");
+    expect(assessments).not.toHaveProperty("gateway");
+    expect((assessments as { gateway?: unknown })?.gateway).toBeUndefined();
   });
 
   it("Financials group carries a rolled-up refunds badge and nests Refunds", () => {
