@@ -44,8 +44,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: src/.nvmrc
           cache: npm
@@ -68,8 +68,8 @@ jobs:
     # "pending" forever on PRs that don't touch migrations and block every merge.
     # The check only greps migration SQL files — it's instant and needs no DB.
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: src/.nvmrc
       - run: node scripts/check-migration-safety.mjs
