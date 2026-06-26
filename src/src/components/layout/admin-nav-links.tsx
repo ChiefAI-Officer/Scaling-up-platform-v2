@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNavLinkActive } from "@/lib/nav-utils";
 import {
@@ -20,7 +21,7 @@ const BADGE_NOUN: Record<BadgeKey, string> = {
 };
 
 const itemBase =
-  "inline-flex items-center px-2 py-2 rounded-md text-sm font-medium transition-colors duration-200 whitespace-nowrap cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2";
+  "inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 whitespace-nowrap cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2";
 
 function CountBadge({ badge, counts }: { badge: BadgeKey; counts: BadgeCounts }) {
   const count = counts[badge];
@@ -50,11 +51,6 @@ function TopLink({ entry, counts }: { entry: NavLinkEntry; counts: BadgeCounts }
       )}
     >
       {entry.label}
-      {entry.gateway ? (
-        <span aria-hidden className="ml-1 opacity-70">
-          →
-        </span>
-      ) : null}
       {entry.badge ? <CountBadge badge={entry.badge} counts={counts} /> : null}
     </Link>
   );
@@ -123,9 +119,13 @@ function GroupMenu({
       >
         {group.label}
         {!isOpen && group.badge ? <CountBadge badge={group.badge} counts={counts} /> : null}
-        <span aria-hidden className="text-[10px] opacity-70">
-          ▾
-        </span>
+        <ChevronDown
+          aria-hidden
+          className={cn(
+            "h-4 w-4 text-muted-foreground/70 transition-transform duration-200",
+            isOpen && "rotate-180 text-primary"
+          )}
+        />
       </button>
 
       {isOpen ? (
@@ -135,7 +135,7 @@ function GroupMenu({
           role="group"
           aria-label={group.label}
           onKeyDown={onPanelKeyDown}
-          className="absolute left-0 top-full z-50 mt-2 min-w-[224px] rounded-md border bg-card p-1.5 shadow-lg"
+          className="absolute left-0 top-full z-50 mt-2 min-w-[244px] rounded-xl border bg-card p-1.5 shadow-lg nav-panel-pop"
         >
           {group.sections.map((section, si) => (
             <div key={si}>
@@ -153,7 +153,7 @@ function GroupMenu({
                     aria-current={leafActive ? "page" : undefined}
                     onClick={onClose}
                     className={cn(
-                      "flex items-center justify-between gap-3 rounded-sm px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-inset",
+                      "flex items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-inset",
                       leafActive
                         ? "bg-primary/10 text-primary font-medium"
                         : "text-foreground hover:bg-accent"

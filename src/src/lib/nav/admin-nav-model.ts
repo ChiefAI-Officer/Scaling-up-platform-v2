@@ -5,10 +5,10 @@
  * (admin-mobile-nav) render paths and their tests. Pure data + helpers — no React.
  *
  * Taxonomy (Spec 17h §C, owner-approved June 26 2026):
- *   Dashboard | Workshops ▾ | Approvals ⦿ | Assessments → | Automation ▾ | People ▾ | Financials ▾
+ *   Dashboard | Workshops ▾ | Approvals ⦿ | Assessments | Automation ▾ | People ▾ | Financials ▾
  *
  * Group labels are menu-only (they do not navigate); only leaves and the two
- * direct links (Dashboard, Approvals) + the Assessments gateway navigate.
+ * direct links (Dashboard, Approvals) + the Assessments link navigate.
  */
 
 export type BadgeKey = "approvals" | "refunds";
@@ -40,8 +40,6 @@ export interface NavLink {
   kind: "link";
   label: string;
   href: string;
-  /** Renders the "→" gateway affordance (the Assessments lane). */
-  gateway?: boolean;
   badge?: BadgeKey;
 }
 
@@ -71,7 +69,7 @@ export const ADMIN_NAV: NavEntry[] = [
     ],
   },
   { kind: "link", label: "Approvals", href: "/admin/approvals", badge: "approvals" },
-  { kind: "link", label: "Assessments", href: "/admin/assessments", gateway: true },
+  { kind: "link", label: "Assessments", href: "/admin/assessments" },
   {
     kind: "group",
     label: "Automation",
@@ -117,7 +115,7 @@ export function groupLeaves(group: NavGroup): NavLeaf[] {
   return group.sections.flatMap((s) => s.items);
 }
 
-/** All navigable destinations (links + gateway + every group leaf), in nav order. */
+/** All navigable destinations (links + every group leaf), in nav order. */
 export function adminNavHrefs(): string[] {
   const out: string[] = [];
   for (const entry of ADMIN_NAV) {

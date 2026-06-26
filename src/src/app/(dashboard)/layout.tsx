@@ -56,11 +56,13 @@ export default async function DashboardLayout({
                   Scaling Up
                 </Link>
               </div>
+              {/* Hairline rule after the wordmark (desktop only) */}
+              <div aria-hidden className="hidden xl:block w-px h-6 bg-border ml-4" />
               {/* Desktop nav */}
               <AdminNavLinks counts={counts} />
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <span className="hidden xl:inline text-sm text-muted-foreground max-w-[180px] truncate" aria-label="Logged in user">
+              <span className="hidden 2xl:inline text-sm text-muted-foreground max-w-[180px] truncate" aria-label="Logged in user">
                 {session.user.email}
               </span>
               <ThemeToggle />
