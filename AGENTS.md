@@ -18,7 +18,7 @@ documents so the working context stays small and reliable.
 | Production branch | `main` |
 | Vercel root directory | `src` |
 | Codex git identity | `Gabriel Lacsam <gabriel@chiefaiofficer.com>` |
-| GitHub permission verified | `ADMIN` on 2026-06-24 |
+| GitHub permission verified | `MAINTAIN` on 2026-06-25 |
 
 Recent production baseline:
 
