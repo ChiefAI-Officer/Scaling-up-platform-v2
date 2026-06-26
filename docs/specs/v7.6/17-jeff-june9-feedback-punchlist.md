@@ -16,8 +16,8 @@ This spec catalogues waves at **two depths**. **A GATED wave MUST NOT be impleme
 | B — Workshop HTML | ✅ BUILD-READY — grilled + Codex-reviewed (senior-eng/ops/security) + signed off 2026-06-12 |
 | C — Survey UX | 🚧 GATED — needs brainstorm + grill + user approval |
 | D — Campaign setup | 🚧 GATED — needs brainstorm + grill + user approval |
-| E — Report polish | 🚧 GATED — needs brainstorm + grill + Jeff's #33 diffs |
-| F — Net-new | 🚧 GATED — needs own spec + ADR + Jeff design call |
+| E — Report polish | 🚧 GATED — needs brainstorm + grill + owner #33 diffs |
+| F — Net-new | 🚧 GATED — needs own spec + ADR + owner design call |
 
 When a wave clears its gate, flip its row to BUILD-READY here and link its plan.
 
@@ -44,7 +44,7 @@ Each wave ships independently behind the build gate + targeted tests. Waves C–
 
 ## Full catalog — all 33 items
 
-Decision column legend: **A–F** = wave; *[confirm]* = recommended default, to be finalized at that wave's brainstorm; *[verify]* = likely already shipped, verify against live; *[needs Jeff]* = blocked on external input.
+Decision column legend: **A–F** = wave; *[confirm]* = recommended default, to be finalized at that wave's brainstorm; *[verify]* = likely already shipped, verify against live; *[needs owner]* = blocked on owner decision/input.
 
 | # | Area | Jeff's ask (verbatim, condensed) | Decision | Wave |
 |---|------|----------------------------------|----------|------|
@@ -76,11 +76,11 @@ Decision column legend: **A–F** = wave; *[confirm]* = recommended default, to 
 | 26 | QSPv2 – Decimals | First question says rate with one decimal. Remove decimals — whole numbers 1–10 only. | Scale config: whole-number step, no decimal; update seed content + input. | E |
 | 27 | QSPv2 Output | Remove "Score Summary – All Sections". | Remove score-summary section for the QSPv2 report variant. | E |
 | 28 | QSPv1 Output | Same as QSPv2: remove score summary + footer cleanup. | Apply #25 + #27 to the QSPv1 variant. | E |
-| 29 | Vision Alignment – Questions | Questions (esp. "Obstacles and Challenges" section) don't match Jeff's source material. | **Content recheck** of the LVA template against Jeff's source. Contradicts our verbatim Esperto reseed — needs Jeff's source doc to reconcile. *[needs Jeff]* | E |
+| 29 | Vision Alignment – Questions | Questions (esp. "Obstacles and Challenges" section) don't match Jeff's source material. | **Content recheck** of the LVA template against Jeff's source. Contradicts our verbatim Esperto reseed — needs the authoritative source doc to reconcile. *[needs owner]* | E |
 | 30 | Vision Alignment PDF | Remove the "All Sections" section. | Remove the per-section table for the LVA report variant. | E |
 | 31 | Vision Alignment Layout | Restructure the report — currently one long unbroken block. | Break LVA report into readable sections/cards. | E |
 | 32 | SU Full – Benchmarking | Missing industry benchmarking (answers vs industry standards) from the Esperto version. Discuss universal vs report-specific. | **Net-new — own spec; Jeff wants a design discussion first.** | F |
-| 33 | All Reports – Accuracy | Reports close but not 100% aligned; Jeff will send a full side-by-side diff. | Awaiting Jeff's detailed diffs; folds into Wave E as they arrive. *[needs Jeff]* | E |
+| 33 | All Reports – Accuracy | Reports close but not 100% aligned; owner to provide a full side-by-side diff. | Awaiting owner's detailed diffs; folds into Wave E as they arrive. *[needs owner]* | E |
 
 ---
 
