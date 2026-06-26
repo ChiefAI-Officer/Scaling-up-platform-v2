@@ -98,7 +98,7 @@ export function AdminMobileNav({ counts, email }: { counts: BadgeCounts; email: 
   const close = () => setOpen(false);
 
   return (
-    <div className="lg:hidden">
+    <div className="xl:hidden">
       <button
         onClick={() => setOpen(!open)}
         className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent"

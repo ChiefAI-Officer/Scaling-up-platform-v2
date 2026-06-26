@@ -64,8 +64,8 @@ export default async function DashboardLayout({
                 {session.user.email}
               </span>
               <ThemeToggle />
-              <Separator orientation="vertical" className="hidden lg:block h-5" />
-              <div className="hidden lg:flex items-center gap-2">
+              <Separator orientation="vertical" className="hidden xl:block h-5" />
+              <div className="hidden xl:flex items-center gap-2">
                 <Link
                   href="/admin/settings"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 whitespace-nowrap"
@@ -74,7 +74,7 @@ export default async function DashboardLayout({
                 </Link>
                 <SignOutButton className="text-sm text-destructive hover:text-destructive/80 transition-colors duration-200 whitespace-nowrap" />
               </div>
-              <div className="hidden lg:flex h-8 w-8 rounded-full bg-primary/10 text-primary items-center justify-center text-sm font-semibold flex-shrink-0">
+              <div className="hidden xl:flex h-8 w-8 rounded-full bg-primary/10 text-primary items-center justify-center text-sm font-semibold flex-shrink-0">
                 {userInitial}
               </div>
               {/* Mobile/tablet hamburger */}

@@ -204,7 +204,7 @@ export function AdminNavLinks({ counts }: { counts: BadgeCounts }) {
   }, [openGroup]);
 
   return (
-    <div ref={navRef} className="hidden lg:ml-6 lg:flex lg:items-center lg:space-x-0.5">
+    <div ref={navRef} className="hidden xl:ml-6 xl:flex xl:items-center xl:space-x-0.5">
       {ADMIN_NAV.map((entry) =>
         entry.kind === "link" ? (
           <TopLink key={entry.href} entry={entry} counts={counts} />
