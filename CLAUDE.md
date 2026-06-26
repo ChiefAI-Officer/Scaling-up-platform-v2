@@ -13,7 +13,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | Key | Value |
 |-----|-------|
 | **Source Path** | `D:\The CTO Project\Scaling Up Platform v2\src` |
-| **Repository** | `github.com/jcbdelo26/Scaling-up-platform-v2` (deploys from `main`) |
+| **Repository** | `github.com/ChiefAI-Officer/Scaling-up-platform-v2` (deploys from `main`) |
 | **Live URL** | `scaling-up-platform-v2.vercel.app` |
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
@@ -396,7 +396,7 @@ Security improvements ship with every sprint — no separate security sprint nee
 
 ### Issue tracker
 
-Issues live as GitHub Issues on `jcbdelo26/Scaling-up-platform-v2`. See `docs/agents/issue-tracker.md`.
+Issues live as GitHub Issues on `ChiefAI-Officer/Scaling-up-platform-v2`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
