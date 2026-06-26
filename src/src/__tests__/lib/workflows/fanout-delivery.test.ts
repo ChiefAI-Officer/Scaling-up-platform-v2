@@ -11,7 +11,11 @@ jest.mock("@/lib/workflows/recipient-execution", () => ({
   finalizeParentRollup: jest.fn().mockResolvedValue(undefined),
 }));
 
-import { sendFanoutRecipients, ensureExecutionParent } from "@/lib/workflows/fanout-delivery";
+import {
+  sendFanoutRecipients,
+  ensureExecutionParent,
+  redactSmtpError,
+} from "@/lib/workflows/fanout-delivery";
 import {
   recordRecipientExecution,
   finalizeParentRollup,
@@ -213,12 +217,61 @@ describe("sendFanoutRecipients", () => {
       isTerminalError: () => true,
     });
 
+    // The stored errorMessage is a REDACTED stable code, not the raw SMTP text
+    // (raw "EAUTH 535 Invalid login" would leak server detail into the admin UI).
     expect(recordRecipientExecution).toHaveBeenCalledWith(
       client,
-      expect.objectContaining({ registrationId: "r1", status: "FAILED" }),
+      expect.objectContaining({
+        registrationId: "r1",
+        status: "FAILED",
+        errorMessage: "smtp_auth_failed",
+      }),
     );
     expect(sendOne).toHaveBeenCalledTimes(1); // stopped after the terminal failure
     expect(finalizeParentRollup).toHaveBeenCalled();
     expect(out.sent).toBe(0);
+  });
+
+  it("redacts a non-auth terminal error to smtp_send_failed (no raw text stored)", async () => {
+    const client = clientWithSentChildren([]);
+    const sendOne = jest
+      .fn()
+      .mockRejectedValue(new Error("550 5.1.1 mailbox host=mx.internal unavailable"));
+
+    await sendFanoutRecipients(client as never, {
+      parentId: "parent-1",
+      stepId: "step-1",
+      workshopId: "ws-1",
+      recipients: [recip("r1", "a@x.com")],
+      sendOne,
+      isTerminalError: () => true,
+    });
+
+    expect(recordRecipientExecution).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({
+        registrationId: "r1",
+        status: "FAILED",
+        errorMessage: "smtp_send_failed",
+      }),
+    );
+  });
+});
+
+describe("redactSmtpError", () => {
+  it("maps auth failures (EAUTH / 535 / Invalid login / Authentication) to smtp_auth_failed", () => {
+    expect(redactSmtpError(new Error("EAUTH"))).toBe("smtp_auth_failed");
+    expect(redactSmtpError(new Error("535 5.7.8 Authentication credentials invalid"))).toBe(
+      "smtp_auth_failed",
+    );
+    expect(redactSmtpError(new Error("Invalid login: user@host"))).toBe("smtp_auth_failed");
+    expect(redactSmtpError("Authentication failed")).toBe("smtp_auth_failed");
+  });
+
+  it("maps any other error to smtp_send_failed (never echoes raw text)", () => {
+    expect(redactSmtpError(new Error("ETIMEDOUT 10.0.0.1:587"))).toBe("smtp_send_failed");
+    expect(redactSmtpError(new Error("550 mailbox unavailable"))).toBe("smtp_send_failed");
+    expect(redactSmtpError("connection reset")).toBe("smtp_send_failed");
+    expect(redactSmtpError(undefined)).toBe("smtp_send_failed");
   });
 });
