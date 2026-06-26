@@ -110,7 +110,7 @@ Dashboard   |   Workshops ▾   |   Approvals ⦿   |   Assessments →   |   Au
   The **coach portal nav is untouched**; the **assessments-lane sidebar is untouched**.
 - **No per-item role gating added.** Current posture is layout-level gating only; Wave H keeps it.
   (STAFF sees the same nav as ADMIN, matching today.)
-- **Mobile/tablet:** `AdminMobileNav` (hamburger, below `lg`) gets the same grouped structure as
+- **Mobile/tablet:** `AdminMobileNav` (hamburger, below `xl` — raised from `lg` after a browser smoke caught a 1024px overflow) gets the same grouped structure as
   collapsible sections — **collapsed by default, with the group containing the current route
   auto-expanded** (Codex review). Badges show in mobile too.
 
