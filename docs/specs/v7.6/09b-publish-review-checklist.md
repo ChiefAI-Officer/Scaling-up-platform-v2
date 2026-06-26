@@ -26,7 +26,7 @@ The implementation does NOT touch prod automatically. To seed the new DRAFT vers
 
 For **every** template: open the new DRAFT in the admin editor, confirm the questions render and read verbatim-correct, then Publish.
 
-| Template | Scoring model | Safe to publish as-is? | What Jeff must confirm first |
+| Template | Scoring model | Safe to publish as-is? | What owner must confirm first |
 |---|---|---|---|
 | **Rockefeller** | items-passed → 3 bands (verbatim messages) | Yes, with one check | Band edges **17 / 33** are consistent with the Logic sheet but not uniquely pinned — confirm the exact Low/OK and OK/Great integers. |
 | **QSP v1** | none (aggregation-only → neutral tier) | **Yes** | Nothing scoring-wise (no bands). Spot-check question wording. |

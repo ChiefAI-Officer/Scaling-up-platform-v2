@@ -92,12 +92,12 @@ Two related Jeff Verdun emails on May 6, 2026 fold into this sprint:
 
 ---
 
-## Open needs-info — blocked on Jeff
+## Open needs-info — awaiting owner decision
 
 | ID | What's blocked | Asked Jeff? |
 |----|----------------|-------------|
 | ENH-MAY6-6 | Affiliate code: provider name + URL pattern for new affiliate (replacing iDev) | Not yet — pending follow-up email |
-| Q-MAY6-2 | HubSpot lookup feasibility — Jeff is asking IF it's possible | Not yet — needs feasibility doc |
+| Q-MAY6-2 | HubSpot lookup feasibility — owner to determine IF it's possible | Not yet — needs feasibility doc |
 
 ---
 
@@ -110,7 +110,7 @@ _Populated as work begins on each ticket. Format: ID → commit hash → notes._
 - Codex round-1 catch: `discounts: undefined` was being spread into `sessions.create` params. Refactored to build `Stripe.Checkout.SessionCreateParams` object explicitly and only set `params.discounts = discounts` when validated. Key now absent (not undefined) when no code.
 - 4 new RED→GREEN guards + 1 flipped existing test. 20 stripe tests passing. ESLint clean (also dropped unused `eslint-disable` directive at file top).
 - Sequencing: Codex round-2 argued ship coupon FIRST (revenue/control-plane bug, not polish); accepted over Jeff's "easy first" hint.
-- BUG-MAY6-4a (audit prior cross-workshop redemptions) remains `ready-for-human` — refund/comp posture per case requires Jeff's judgment.
+- BUG-MAY6-4a (audit prior cross-workshop redemptions) remains `ready-for-human` — refund/comp posture per case requires owner's judgment.
 
 ---
 
@@ -217,7 +217,7 @@ UI surfaces batch — three independent UI improvements shipped together.
 - Output: CSV to stdout with columns `registration_id, email, name, workshop_code, workshop_title, amount, redeemed_promo_code, redeemed_workshop_code, verdict, session_id`. Verdict is `OK` / `MISMATCH` / `no_session_id` / `no_metadata` / `stripe_error`.
 - Approach: query `Registration` rows with `stripePaymentId` set + `paymentStatus = COMPLETED`. For each, retrieve the Stripe checkout session and read `total_details.breakdown.discounts`. For each discount, retrieve the promotion code (or fall back to coupon-level metadata). Compare metadata.workshopCode against the registration's workshop.workshopCode.
 - Flags: `--since YYYY-MM-DD` to scope by date, `--limit N` to cap row count for performance.
-- Read-only / dry-run only. No DB writes. No Stripe writes. No auto-refunds — operator hands MISMATCH rows to Jeff for per-case judgment per memory rule.
+- Read-only / dry-run only. No DB writes. No Stripe writes. No auto-refunds — operator hands MISMATCH rows to the owner for per-case judgment per memory rule.
 - Smoke-test: not run yet — operator can run via `npx tsx scripts/audit-cross-workshop-coupons.ts --limit 5` to verify shape, then drop the limit for the full sweep.
 
 ---
@@ -247,7 +247,7 @@ UI surfaces batch — three independent UI improvements shipped together.
 - Deterministic parent.id via `inngestRunId` for forceResend audit trail.
 - Error redaction codes (sanitized strings in errorMessage instead of raw provider errors).
 - Ops follow-ons from claudex round 3: structured logging/alerts/runbook for parent/child workflow execution state, PII retention/erasure policy for recipient email audit data, concurrency limit + load test.
-- ENH-MAY6-6 (affiliate provider switch) — still `needs-info` from Jeff.
+- ENH-MAY6-6 (affiliate provider switch) — still `needs-info` (owner).
 - ENH-MAY6-9 (aggregator promoted to top-level toolset) — still `ready-for-human` (design pass).
 - ENH-MAY6-11 (coach-editable thanks-for-registering + thanks-for-attending emails) — still `ready-for-human` (product call).
 - Q-MAY6-1, Q-MAY6-2 — questions, not tasks.
