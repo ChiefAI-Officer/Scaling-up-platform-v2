@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ApprovalThread } from "@/components/approvals/approval-thread";
 import { formatTimestamp } from "@/lib/utils";
@@ -49,6 +50,7 @@ interface ApprovalsApiResponse {
 const FILTERS: FilterStatus[] = ["PENDING", "COUNTER_OFFERED", "INFO_REQUESTED", "APPROVED", "DENIED", "ALL"];
 
 export default function ApprovalsPage() {
+  const router = useRouter();
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [filter, setFilter] = useState<FilterStatus>("PENDING");
   const [processing, setProcessing] = useState<string | null>(null);
@@ -116,6 +118,8 @@ export default function ApprovalsPage() {
           approval.id === approvalId ? { ...approval, status: newStatus } : approval
         )
       );
+      // Re-render the layout so the nav Approvals badge reflects the new count.
+      router.refresh();
     } catch (err) {
       console.error("Action failed:", err);
       setActionError("Unexpected error — please try again");
@@ -155,6 +159,7 @@ export default function ApprovalsPage() {
       setApprovals((prev) =>
         prev.map((a) => a.id === counterOfferModalId ? { ...a, status: "COUNTER_OFFERED" as ApprovalStatus } : a)
       );
+      router.refresh();
       setCounterOfferModalId(null);
       setCounterOfferAmount("");
       setCounterOfferNoteInput("");
