@@ -81,23 +81,26 @@ describe("viewGroupReport adapter", () => {
     expect(lastOpts().metricRole).toBeNull();
   });
 
-  it("classify maps kinds → dispositions (empty/notApplicable → passthrough)", async () => {
+  it("classify maps kinds → dispositions (notEnabled → not-found; empty/notApplicable → passthrough)", async () => {
     mockGetApiActor.mockResolvedValue({ userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null });
     await viewGroupReport({} as never, { campaignId: "c", generatedAt: new Date() });
     const { classify } = lastOpts();
     expect(classify({ kind: "ok" })).toBe("ok");
     expect(classify({ kind: "forbidden" })).toBe("forbidden");
+    // Wave J (J-3): the loader's dark on/off → SILENT 404 (no audit, no leak).
+    expect(classify({ kind: "notEnabled" })).toBe("not-found");
     expect(classify({ kind: "empty" })).toBe("passthrough");
     expect(classify({ kind: "notApplicable" })).toBe("passthrough");
   });
 
-  it("flagGate calls isGroupReportEnabled(actor, {id})", async () => {
+  it("has NO pre-rate-limit flagGate (enablement moved into the loader — Wave J J-3)", async () => {
     const actor = { userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null };
     mockGetApiActor.mockResolvedValue(actor);
     await viewGroupReport({} as never, { campaignId: "camp-9", generatedAt: new Date() });
-    const ok = lastOpts().flagGate();
-    expect(mockIsEnabled).toHaveBeenCalledWith(actor, { id: "camp-9" });
-    expect(ok).toBe(true);
+    // The adapter no longer pre-binds an alias-blind flagGate; the rate limiter
+    // runs first and the loader makes the alias-aware enablement decision.
+    expect(lastOpts().flagGate).toBeUndefined();
+    expect(mockIsEnabled).not.toHaveBeenCalled();
   });
 
   it("auditOf builds the GROUP_REPORT_VIEW spec from ok provenance", async () => {

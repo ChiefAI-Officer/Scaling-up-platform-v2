@@ -114,17 +114,25 @@ export function isGroupReportEnabled(
 /**
  * Template aliases the group report is surfaced for.
  *
- * Per Jeff (2026-06-18): the aggregate/CEO group report is wanted on the
+ * Per Jeff (2026-06-18): the aggregate/CEO group report was first wanted on the
  * Leadership Vision Alignment assessment ONLY — NOT on the scored reports
  * (Rockefeller / Five Dysfunctions), which over-showed in the mockup and
- * confused him. The generic scored group engine remains in the codebase but
- * is intentionally NOT surfaced (unreachable) — add an alias here to surface it.
+ * confused him. Wave J (J-3, 2026-06-28) adds Scaling Up Full — the (already
+ * built) SCORED group engine — behind its own independent WAVE_J_SUFULL_GROUP_*
+ * flag set + an enforced publish gate. The remaining scored templates stay
+ * built but unreachable — add an alias here to surface one.
  *
  * Single source of truth: gates BOTH the loader (group-report.ts) and the
  * CampaignDetail entry point.
  */
 export const GROUP_REPORT_ALIASES: readonly string[] = [
   "leadership-vision-alignment",
+  // Wave J (J-3): Scaling Up Full surfaces the (already-built) SCORED group
+  // engine. Added ATOMICALLY with the three publish gates (loader + route +
+  // entry point) in this same commit — there is no intermediate window where
+  // the alias is allowlisted but a DRAFT/unpublished version could be reached.
+  // Independently flag-gated by WAVE_J_SUFULL_GROUP_* (see isGroupReportEnabled).
+  "scaling-up-full",
 ];
 
 /** Whether a campaign's template alias is surfaced for the group report. */

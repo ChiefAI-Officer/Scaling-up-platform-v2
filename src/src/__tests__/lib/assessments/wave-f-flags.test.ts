@@ -188,19 +188,25 @@ describe("null / undefined safety", () => {
   });
 });
 
-describe("isGroupReportAlias (LVA-only surface — Jeff 2026-06-18)", () => {
-  it("allowlist is exactly the LVA alias", () => {
-    expect(GROUP_REPORT_ALIASES).toEqual(["leadership-vision-alignment"]);
+describe("isGroupReportAlias (allowlisted surfaces — LVA + SU-Full)", () => {
+  it("allowlist is exactly LVA + SU-Full (Wave J J-3)", () => {
+    expect(GROUP_REPORT_ALIASES).toEqual([
+      "leadership-vision-alignment",
+      "scaling-up-full",
+    ]);
   });
 
   it("returns true for the LVA alias", () => {
     expect(isGroupReportAlias("leadership-vision-alignment")).toBe(true);
   });
 
-  it("returns false for scored templates (not surfaced)", () => {
+  it("returns true for the SU-Full alias (Wave J J-3 — added atomically with the gates)", () => {
+    expect(isGroupReportAlias("scaling-up-full")).toBe(true);
+  });
+
+  it("returns false for the remaining scored templates (not surfaced)", () => {
     expect(isGroupReportAlias("RockHabits")).toBe(false);
     expect(isGroupReportAlias("five-dysfunctions")).toBe(false);
-    expect(isGroupReportAlias("scaling-up-full")).toBe(false);
   });
 
   it("returns false for other qualitative templates (LVA only for now)", () => {

@@ -36,7 +36,6 @@ import {
   REPORT_FILTERS,
   REPORT_FILTER_VERSION,
 } from "@/lib/assessments/qualitative-report-model";
-import { isGroupReportEnabled } from "@/lib/assessments/wave-f-flags";
 
 /** First-hop client IP, mirroring the current report routes' extraction byte-for-byte. */
 export function ipFromHeaders(h: Headers): string {
@@ -88,13 +87,26 @@ export async function viewGroupReport(
     surface: "group",
     actor,
     noActorPolicy: "tolerate",
-    flagGate: () => isGroupReportEnabled(actor, { id: args.campaignId }),
+    // Wave J (J-3): NO pre-rate-limit flagGate. The enablement decision moved
+    // INTO the loader (the single source of truth) so the rate limiter runs
+    // FIRST and the alias-aware flag check can see template.alias without an
+    // unauthenticated pre-rate-limit DB lookup. The loader returns `notEnabled`
+    // when off, which classify → "not-found" → a SILENT dark 404 (identical
+    // observable semantics to the old flagGate, enumeration-safe, no audit).
+    flagGate: undefined,
     ip,
     userAgent,
     rateLimitKey: `group-report:${actorKey}:${args.campaignId}:${ip}`,
     rateLimitConfig: RateLimits.standard,
     load: () => getCampaignGroupReport(reportDb, actor, args.campaignId, args.generatedAt),
-    classify: (o) => (o.kind === "ok" ? "ok" : o.kind === "forbidden" ? "forbidden" : "passthrough"),
+    classify: (o) =>
+      o.kind === "ok"
+        ? "ok"
+        : o.kind === "forbidden"
+          ? "forbidden"
+          : o.kind === "notEnabled"
+            ? "not-found"
+            : "passthrough",
     auditOf: (o) => {
       if (o.kind !== "ok") throw new Error("unreachable: auditOf on non-ok group outcome");
       return {

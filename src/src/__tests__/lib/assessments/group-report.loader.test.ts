@@ -43,6 +43,9 @@ const VERSION = {
   id: "ver-1",
   versionNumber: 2,
   contentHash: "vhash-1",
+  // Wave J (J-3): the loader selects publishedAt. LVA is never gated on it, but
+  // the default fixture is a published version so it reads realistically.
+  publishedAt: new Date("2026-05-15T00:00:00Z"),
   sections: [{ stableKey: "s1", name: "Section One" }],
   questions: [
     {
@@ -62,6 +65,10 @@ function makeCampaign(overrides: Record<string, unknown> = {}) {
     id: "camp-1",
     accessMode: "INVITED",
     organizationId: "org-1",
+    // Wave J (J-3): the loader reads createdByCoachId for the alias-aware
+    // enablement decision (LVA coach/org canary). Null is fine when the global
+    // WAVE_F flag is on (which the test harness sets in beforeEach).
+    createdByCoachId: null,
     templateId: "tpl-1",
     versionId: "ver-1",
     deletedAt: null,
@@ -171,6 +178,22 @@ function callLoader(
 beforeEach(() => {
   jest.clearAllMocks();
   mockCanViewGroupReport.mockResolvedValue(true);
+  // Wave J (J-3): the loader now makes the alias-aware enablement decision
+  // (single source of truth). Default the harness to "LVA enabled" so the
+  // existing LVA tests exercise the post-flag path; clear the SU-Full vars so
+  // a stray env value can't leak between tests.
+  process.env.WAVE_F_GROUP_REPORT_ENABLED = "1";
+  delete process.env.WAVE_F_GROUP_REPORT_CANARY;
+  delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
+  delete process.env.WAVE_J_SUFULL_GROUP_CANARY;
+  delete process.env.WAVE_J_SUFULL_GROUP_KILL;
+});
+
+afterEach(() => {
+  delete process.env.WAVE_F_GROUP_REPORT_ENABLED;
+  delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
+  delete process.env.WAVE_J_SUFULL_GROUP_CANARY;
+  delete process.env.WAVE_J_SUFULL_GROUP_KILL;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -187,6 +210,8 @@ test("PUBLIC campaign → notApplicable (no model built)", async () => {
   expect(res.kind).toBe("notApplicable");
   if (res.kind !== "notApplicable") return;
   expect(res.reason).toBe("public");
+  // Wave J (J-3): notApplicable carries the alias for page copy + the metric.
+  expect(res.templateAlias).toBe("leadership-vision-alignment");
   // No submissions / participants need to be loaded for a non-applicable report.
   expect(mock._findManySubmissions).not.toHaveBeenCalled();
 });
@@ -205,7 +230,113 @@ test("non-LVA INVITED campaign → notApplicable (unsupported-template; scored e
   expect(res.kind).toBe("notApplicable");
   if (res.kind !== "notApplicable") return;
   expect(res.reason).toBe("unsupported-template");
+  // Wave J (J-3): the alias is carried even for unsupported templates.
+  expect(res.templateAlias).toBe("RockHabits");
   expect(mock._findManySubmissions).not.toHaveBeenCalled();
+});
+
+// ── Wave J (J-3) — alias-aware enablement (single source of truth) ───────────
+
+test("flag OFF → notEnabled (dark; before authz / cohort load / model build)", async () => {
+  // The enablement decision now lives in the loader. With the global LVA flag
+  // off (and no canary), an existing INVITED LVA campaign returns `notEnabled`,
+  // which the route's classify maps to a SILENT 404 — and authz is NEVER
+  // consulted (dark to everyone, including admins).
+  delete process.env.WAVE_F_GROUP_REPORT_ENABLED;
+  const mock = makeMockDb({ campaign: makeCampaign() });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("notEnabled");
+  expect(mockCanViewGroupReport).not.toHaveBeenCalled();
+  expect(mock._findManySubmissions).not.toHaveBeenCalled();
+});
+
+test("DRAFT SU-Full → notApplicable(unpublished, templateAlias) even with WAVE_J on", async () => {
+  process.env.WAVE_J_SUFULL_GROUP_ENABLED = "1";
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      template: { alias: "scaling-up-full", name: "Scaling Up Full" },
+      version: { ...VERSION, publishedAt: null }, // DRAFT / unpublished
+    }),
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("notApplicable");
+  if (res.kind !== "notApplicable") return;
+  expect(res.reason).toBe("unpublished");
+  expect(res.templateAlias).toBe("scaling-up-full");
+  // The publish guard fires BEFORE the cohort load / model build.
+  expect(mock._findManySubmissions).not.toHaveBeenCalled();
+});
+
+test("PUBLISHED SU-Full (WAVE_J on) → ok (publish guard passes)", async () => {
+  process.env.WAVE_J_SUFULL_GROUP_ENABLED = "1";
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      template: { alias: "scaling-up-full", name: "Scaling Up Full" },
+      version: { ...VERSION, publishedAt: new Date("2026-06-01T00:00:00Z") },
+    }),
+    participants: PARTICIPANTS,
+    submissions: [makeSubmission("resp-ceo", 3)],
+    invitedCount: 1,
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("ok");
+  if (res.kind !== "ok") return;
+  expect(res.provenance.templateAlias).toBe("scaling-up-full");
+});
+
+test("published LVA campaign still loads ok (guard only bites SU-Full)", async () => {
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      version: { ...VERSION, publishedAt: new Date("2026-05-15T00:00:00Z") },
+    }),
+    participants: PARTICIPANTS,
+    submissions: [makeSubmission("resp-ceo", 3)],
+    invitedCount: 1,
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("ok");
+});
+
+test("null-publishedAt LVA campaign STILL loads ok (publish guard is SU-Full-scoped)", async () => {
+  // R3-H1 regression: a legacy/imported LVA version with a null publishedAt
+  // must NOT be regressed by the SU-Full publish guard.
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      version: { ...VERSION, publishedAt: null },
+    }),
+    participants: PARTICIPANTS,
+    submissions: [makeSubmission("resp-ceo", 3)],
+    invitedCount: 1,
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("ok");
+  if (res.kind !== "ok") return;
+  expect(res.provenance.templateAlias).toBe("leadership-vision-alignment");
+});
+
+test("SU-Full enabled ONLY by WAVE_J — the LVA WAVE_F flag does not enable it", async () => {
+  // WAVE_F on (from beforeEach), WAVE_J off → SU-Full is NOT enabled.
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      template: { alias: "scaling-up-full", name: "Scaling Up Full" },
+      version: { ...VERSION, publishedAt: new Date("2026-06-01T00:00:00Z") },
+    }),
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("notEnabled");
+  expect(mockCanViewGroupReport).not.toHaveBeenCalled();
 });
 
 test("campaign not found (null) → forbidden", async () => {
