@@ -10,47 +10,38 @@
  * (`@/lib/assessments/wave-d-feature-flags`):
  *   - false when unset / "" / "0" / "false"
  *   - true only for "1" / "true" / "TRUE" / "yes"
+ *
+ * Wave J extension: SU-Full uses a completely independent set of env vars
+ * (`WAVE_J_SUFULL_GROUP_ENABLED`, `WAVE_J_SUFULL_GROUP_CANARY`,
+ * `WAVE_J_SUFULL_GROUP_KILL`) so LVA and SU-Full can be launched/killed
+ * independently. The SU-Full canary is campaign-id-only (R4-M blast-radius cap):
+ * coach or org ids in the canary list do NOT match, preventing a single
+ * env entry from exposing many campaigns at once.
  */
 
-function isTruthy(v: string | undefined): boolean {
+function isOn(v: string | undefined): boolean {
   return v === "1" || v === "true" || v === "TRUE" || v === "yes";
 }
 
 /**
- * Whether the group report is enabled for this actor + campaign.
- *
- * - Returns true if WAVE_F_GROUP_REPORT_ENABLED is truthy (global launch),
- *   regardless of actor/campaign (so null args still return true).
- * - Else returns true if a canary identifier matches the comma-separated
- *   WAVE_F_GROUP_REPORT_CANARY allowlist — matched against actor.coachId,
- *   campaign.createdByCoachId, campaign.organizationId, or campaign.id.
- *   This canaries specific coaches/orgs/campaigns while the global flag is
- *   still off.
- * - Else false (default OFF).
- *
- * Pure + never-throwing: null/undefined actor or campaign and missing fields
- * are treated as non-matching.
+ * LVA/default canary: matches actor.coachId, campaign.createdByCoachId,
+ * campaign.organizationId, or campaign.id against the comma-separated list.
  */
-export function isGroupReportEnabled(
+function canaryMatches(
+  csv: string | undefined,
   actor: { coachId?: string | null } | null,
   campaign: {
-    id: string;
+    id?: string;
     createdByCoachId?: string | null;
     organizationId?: string | null;
   } | null
 ): boolean {
-  if (isTruthy(process.env.WAVE_F_GROUP_REPORT_ENABLED)) {
-    return true;
-  }
-
-  const allowlist = (process.env.WAVE_F_GROUP_REPORT_CANARY ?? "")
+  const allowlist = (csv ?? "")
     .split(",")
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
 
-  if (allowlist.length === 0) {
-    return false;
-  }
+  if (allowlist.length === 0) return false;
 
   const candidates = [
     actor?.coachId,
@@ -60,6 +51,64 @@ export function isGroupReportEnabled(
   ].filter((value): value is string => typeof value === "string" && value.length > 0);
 
   return candidates.some((value) => allowlist.includes(value));
+}
+
+/**
+ * SU-Full canary: campaign-id-ONLY (R4-M blast-radius cap).
+ * Coach ids and org ids in the canary list are intentionally ignored —
+ * one env entry cannot expose many/large campaigns past the cohort cap.
+ */
+function sufCanaryMatches(
+  csv: string | undefined,
+  campaign: { id?: string } | null
+): boolean {
+  if (!campaign?.id) return false;
+  const allowlist = (csv ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return allowlist.includes(campaign.id);
+}
+
+/**
+ * Whether the group report is enabled for this actor + campaign.
+ *
+ * For SU-Full (`campaign.template.alias === "scaling-up-full"`), uses the
+ * independent Wave J flag set:
+ * - `WAVE_J_SUFULL_GROUP_KILL` hard-overrides everything (even a matching canary).
+ * - `WAVE_J_SUFULL_GROUP_ENABLED` enables globally.
+ * - `WAVE_J_SUFULL_GROUP_CANARY` enables by exact campaign id only.
+ *
+ * For all other aliases (including LVA), uses the original Wave F flags:
+ * - `WAVE_F_GROUP_REPORT_ENABLED` enables globally.
+ * - `WAVE_F_GROUP_REPORT_CANARY` matches coach/org/campaign id.
+ *
+ * Pure + never-throwing: null/undefined actor or campaign and missing fields
+ * are treated as non-matching.
+ */
+export function isGroupReportEnabled(
+  actor: { coachId?: string | null } | null,
+  campaign: {
+    id?: string;
+    createdByCoachId?: string | null;
+    organizationId?: string | null;
+    template?: { alias?: string | null } | null;
+  } | null
+): boolean {
+  if (campaign?.template?.alias === "scaling-up-full") {
+    // Hard kill overrides any canary (R2-H3)
+    if (isOn(process.env.WAVE_J_SUFULL_GROUP_KILL)) return false;
+    return (
+      isOn(process.env.WAVE_J_SUFULL_GROUP_ENABLED) ||
+      sufCanaryMatches(process.env.WAVE_J_SUFULL_GROUP_CANARY, campaign)
+    );
+  }
+
+  // LVA and all other aliases: original Wave F behaviour, byte-for-byte.
+  return (
+    isOn(process.env.WAVE_F_GROUP_REPORT_ENABLED) ||
+    canaryMatches(process.env.WAVE_F_GROUP_REPORT_CANARY, actor, campaign)
+  );
 }
 
 /**
