@@ -675,3 +675,27 @@ describe("BrandedReport — robustness (H10)", () => {
     expect(screen.getByTestId("report-cover")).toBeInTheDocument();
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// Wave J Task 2 regression (R1-M3): per-respondent SU-Full STILL renders tier
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("BrandedReport — Wave J regression: SU-Full per-respondent tier band", () => {
+  /**
+   * showTier:false in report-config is consumed ONLY by the group renderer this
+   * wave.  BrandedReport (the per-respondent report) deliberately ignores it —
+   * per-respondent tier suppression is deferred (ADR-0015 scope).
+   * This test locks that contract: the tier band must still render for a
+   * scaling-up-full report even after report-config gains showTier:false.
+   */
+  it("per-respondent SU-Full BrandedReport STILL renders its tier band (deferred)", () => {
+    // templateAlias drives reportConfigFor() — without "scaling-up-full" this would
+    // exercise the DEFAULT config (showTier:true) instead of the SU-Full entry
+    // (showTier:false). Set the real alias so the test proves BrandedReport ignores
+    // showTier:false rather than never hitting that path.
+    render(
+      <BrandedReport report={{ ...suFullReport(), templateAlias: "scaling-up-full" }} />,
+    );
+    expect(screen.queryByTestId("overall-band")).not.toBeNull();
+  });
+});
