@@ -1358,11 +1358,26 @@
 /* ── Rating (stacked Weak/Average/Strong) ────────────────────────────────── */
 .su-public-brand .su-group-rat-row {
   display: grid;
-  grid-template-columns: 210px 1fr 52px;
+  grid-template-columns: 210px 1fr 52px 42px;
   gap: 12px;
   align-items: center;
   margin: 7px 0;
   font-size: 13px;
+}
+/* Wave L (L4b) — verbatim Esperto section intro under the heading. */
+.su-public-brand .su-group-sec-intro {
+  color: #6b6480;
+  font-size: 13.5px;
+  margin: 6px 0 16px;
+  padding-left: 17px;
+  max-width: 72ch;
+  line-height: 1.5;
+}
+/* Wave L (L3) — per-factor n (denominators can differ across factors). */
+.su-public-brand .su-group-rat-n {
+  color: #9089a3;
+  font-size: 11.5px;
+  text-align: right;
 }
 .su-public-brand .su-group-rat-lab {
   text-align: right;
@@ -1692,7 +1707,7 @@
     padding: 24px 20px 10px;
   }
   .su-public-brand .su-group-rat-row {
-    grid-template-columns: 1fr 1.6fr 40px;
+    grid-template-columns: 1fr 1.6fr 40px 34px;
   }
   .su-public-brand .su-group-obs {
     grid-template-columns: 1fr 1.6fr 40px;

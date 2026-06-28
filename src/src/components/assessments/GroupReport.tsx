@@ -48,6 +48,12 @@ export interface GroupReportProvenance {
   versionLabel?: string | null;
   /** Designated CEO's display name, when one is designated. */
   ceoName?: string | null;
+  /**
+   * Wave L — the template alias (e.g. "leadership-vision-alignment"). Drives the
+   * LVA-only verbatim section intros + the 0–10 scaled-rating legend in the
+   * qualitative renderer. Absent/other alias → no LVA-specific display.
+   */
+  templateAlias?: string | null;
 }
 
 export interface GroupReportProps extends GroupReportProvenance {

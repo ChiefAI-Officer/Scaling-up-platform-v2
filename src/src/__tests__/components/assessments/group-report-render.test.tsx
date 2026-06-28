@@ -59,6 +59,7 @@ function qualitativeReport(
 ): CampaignGroupReport {
   return {
     reportType: "qualitative",
+    provenance: { groupRenderVersion: "lva-fidelity-v1", scaleDegraded: false },
     respondents: RESPONDENTS,
     respondentCount: 3,
     degraded: false,
@@ -116,11 +117,13 @@ function qualitativeReport(
           stableKey: "S3_strengths",
           name: "Organizational Strengths & Weaknesses",
           presentation: "rating",
-          // already sorted by mean desc by the model
+          // already sorted by mean desc by the model. scaledValue = the Esperto
+          // 0–10 value DERIVED FROM BUCKET COUNTS (NOT the raw mean): 2S+1A→8.4,
+          // 2A+1W→3.4, 1A+2W→1.7 (R1-M4 — the reverted "7.2" midpoint is wrong).
           factors: [
-            { stableKey: "F_recruit", label: "Recruitment of new staff", strong: 2, avg: 1, weak: 0, mean: 2.7, n: 3 },
-            { stableKey: "F_culture", label: "Culture", strong: 0, avg: 2, weak: 1, mean: 1.7, n: 3 },
-            { stableKey: "F_cash", label: "Cash", strong: 0, avg: 1, weak: 2, mean: 1.3, n: 3 },
+            { stableKey: "F_recruit", label: "Recruitment of new staff", strong: 2, avg: 1, weak: 0, mean: 2.7, scaledValue: 8.4, n: 3 },
+            { stableKey: "F_culture", label: "Culture", strong: 0, avg: 2, weak: 1, mean: 1.7, scaledValue: 3.4, n: 3 },
+            { stableKey: "F_cash", label: "Cash", strong: 0, avg: 1, weak: 2, mean: 1.3, scaledValue: 1.7, n: 3 },
           ],
         },
         {
@@ -148,6 +151,7 @@ function scoredReport(
 ): CampaignGroupReport {
   return {
     reportType: "scored",
+    provenance: { groupRenderVersion: "lva-fidelity-v1", scaleDegraded: false },
     respondents: RESPONDENTS,
     respondentCount: 4,
     degraded: false,
@@ -262,15 +266,33 @@ describe("QualitativeGroupReport", () => {
     expect(within(qa).queryByText(/Kathy HR/)).not.toBeInTheDocument();
   });
 
-  it("renders rating factors in the given (mean-desc) order with mean + n", () => {
-    render(<QualitativeGroupReport report={qualitativeReport()} {...provenance()} />);
+  it("renders rating factors in the given (mean-desc) order with the 0–10 scaled value + per-factor n", () => {
+    render(
+      <QualitativeGroupReport
+        report={qualitativeReport()}
+        {...provenance({ templateAlias: "leadership-vision-alignment" })}
+      />,
+    );
     const ratingSection = screen.getByTestId("group-rating-S3_strengths");
     const factorLabels = within(ratingSection)
       .getAllByTestId(/group-rating-factor-/)
       .map((el) => el.getAttribute("data-factor"));
     expect(factorLabels).toEqual(["F_recruit", "F_culture", "F_cash"]);
-    // means rendered
-    expect(within(ratingSection).getByText("2.7")).toBeInTheDocument();
+    // L3 (R1-M4): the BUCKET-DERIVED 0–10 scaled value is rendered (NOT the raw
+    // mean 2.7, NOT the reverted midpoint 7.2). F_recruit (2S+1A) → 8.4.
+    expect(within(ratingSection).getByText("8.4")).toBeInTheDocument();
+    expect(within(ratingSection).queryByText("2.7")).not.toBeInTheDocument();
+    expect(within(ratingSection).queryByText("7.2")).not.toBeInTheDocument();
+    // L3 (R1-M5): an exact one-decimal value keeps its decimal (3.4 not "3").
+    expect(within(ratingSection).getByText("3.4")).toBeInTheDocument();
+    expect(within(ratingSection).getByText("1.7")).toBeInTheDocument();
+    // per-factor n shown (denominators can differ across factors)
+    expect(within(ratingSection).getAllByText("n=3").length).toBe(3);
+    // the 0–10 legend (NOT the raw 1–3 legend)
+    expect(
+      within(ratingSection).getByText(/value on a 0–10 scale \(10 = strong\)/),
+    ).toBeInTheDocument();
+    expect(within(ratingSection).queryByText(/1–3 scale/)).not.toBeInTheDocument();
     // a Strong/Average/Weak legend present
     expect(within(ratingSection).getByText(/Strong/)).toBeInTheDocument();
     expect(within(ratingSection).getByText(/Average/)).toBeInTheDocument();
@@ -287,6 +309,63 @@ describe("QualitativeGroupReport", () => {
     // includes 0%
     expect(within(choices).getByText("0%")).toBeInTheDocument();
     expect(within(choices).getAllByText("67%").length).toBeGreaterThan(0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// Wave L — LVA verbatim section intros (L4b) + mirrored report labels (L4a)
+// ══════════════════════════════════════════════════════════════════════════
+
+describe("Wave L — LVA section intros + report labels", () => {
+  it("renders the verbatim S3 + S4 intros under their headings when templateAlias is LVA", () => {
+    render(
+      <QualitativeGroupReport
+        report={qualitativeReport()}
+        {...provenance({ templateAlias: "leadership-vision-alignment" })}
+      />,
+    );
+    expect(
+      screen.getByTestId("group-section-intro-S3_strengths"),
+    ).toHaveTextContent(
+      "The team rated the company with 16 factors that affect the success of an organization. Each factor was rated with 'strong', 'average' or 'weak'.",
+    );
+    expect(
+      screen.getByTestId("group-section-intro-S4_obstacles"),
+    ).toHaveTextContent(
+      "We asked about the biggest constraints to reach the goals of the company. This is what the team rated:",
+    );
+  });
+
+  it("renders NO section intros when templateAlias is not LVA", () => {
+    render(
+      <QualitativeGroupReport
+        report={qualitativeReport()}
+        {...provenance({ templateAlias: "qsp-v2" })}
+      />,
+    );
+    expect(
+      screen.queryByTestId("group-section-intro-S3_strengths"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("group-section-intro-S4_obstacles"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders NO intro for a section that has none (S2_vision is in the map, S5/S6 are not)", () => {
+    render(
+      <QualitativeGroupReport
+        report={qualitativeReport()}
+        {...provenance({ templateAlias: "leadership-vision-alignment" })}
+      />,
+    );
+    // S2_vision IS in the intro map → present.
+    expect(
+      screen.getByTestId("group-section-intro-S2_vision"),
+    ).toBeInTheDocument();
+    // S1_financials is a metric-table in this fixture → its intro is present too.
+    expect(
+      screen.getByTestId("group-section-intro-S1_financials"),
+    ).toBeInTheDocument();
   });
 });
 

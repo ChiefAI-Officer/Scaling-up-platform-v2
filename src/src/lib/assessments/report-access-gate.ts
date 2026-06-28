@@ -111,6 +111,11 @@ export async function viewGroupReport(
           completedCount: o.provenance.completedCount,
           invitedCount: o.provenance.invitedCount,
           submissionIds: o.provenance.submissionIds,
+          // Wave L (R2-M1): the code-only render ruleset (scale + labels +
+          // intros) carries no contentHash bump, so record its version + the
+          // S3 scale-degraded signal to keep a viewed report attributable.
+          groupRenderVersion: o.report.provenance.groupRenderVersion,
+          scaleDegraded: o.report.provenance.scaleDegraded,
         },
       };
     },
