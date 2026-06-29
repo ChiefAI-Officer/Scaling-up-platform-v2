@@ -12,6 +12,7 @@ import {
   s3ValuesInDomain,
   factorSlugOf,
   lvaReportFactorLabel,
+  lvaReportQuestionLabel,
   lvaSectionIntro,
   LVA_REPORT_FACTOR_LABELS,
   LVA_SECTION_INTROS,
@@ -175,5 +176,46 @@ describe("lvaSectionIntro — verbatim Esperto section intros", () => {
 describe("GROUP_RENDER_VERSION", () => {
   it("is the stable lva-fidelity-v1 provenance constant", () => {
     expect(GROUP_RENDER_VERSION).toBe("lva-fidelity-v1");
+  });
+});
+
+describe("lvaReportQuestionLabel — S5 'why' heading consistency", () => {
+  it("rewrites the factor name in an S5 heading to the report label (the 6 that differ)", () => {
+    expect(
+      lvaReportQuestionLabel(
+        "S5_why_recruitment",
+        "Why is Recruitment of new employees a hindrance?",
+      ),
+    ).toBe("Why is Recruitment of new staff a hindrance?");
+    expect(
+      lvaReportQuestionLabel("S5_why_retaining_staff", "Why is Retaining staff a hindrance?"),
+    ).toBe("Why is Keeping employees a hindrance?");
+    expect(
+      lvaReportQuestionLabel("S5_why_growth_financing", "Why is Growth Financing a hindrance?"),
+    ).toBe("Why is Financing growth a hindrance?");
+    expect(
+      lvaReportQuestionLabel("S5_why_the_leadership", "Why is The leadership a hindrance?"),
+    ).toBe("Why is The Leadership a hindrance?");
+  });
+
+  it("leaves a non-differing factor unchanged (survey label == report label)", () => {
+    expect(
+      lvaReportQuestionLabel("S5_why_culture", "Why is Culture a hindrance?"),
+    ).toBe("Why is Culture a hindrance?");
+  });
+
+  it("does not touch the always-on S5 questions or non-S5 keys", () => {
+    expect(
+      lvaReportQuestionLabel("S5_other_factor", "Is another factor hindering your growth? If so, which?"),
+    ).toBe("Is another factor hindering your growth? If so, which?");
+    expect(lvaReportQuestionLabel("S2_main_products", "What are the main products?")).toBe(
+      "What are the main products?",
+    );
+  });
+
+  it("is template-agnostic: swaps the name inside any wording, not a hardcoded heading", () => {
+    expect(
+      lvaReportQuestionLabel("S5_why_recruitment", "Recruitment of new employees — explain"),
+    ).toBe("Recruitment of new staff — explain");
   });
 });

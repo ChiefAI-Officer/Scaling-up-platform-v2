@@ -113,6 +113,42 @@ export function lvaReportFactorLabel(key: string, fallback: string): string {
   return LVA_REPORT_FACTOR_LABELS[factorSlugOf(key)] ?? fallback;
 }
 
+/**
+ * The SURVEY factor wording for the ~6 factors that differ from the report
+ * wording. Used only to find-and-replace the factor name inside an S5
+ * "Why is <factor> a hindrance?" question label so the explained-obstacles
+ * section matches the report labels used everywhere else (avoids the
+ * within-report inconsistency, e.g. "Recruitment of new staff" in the rating
+ * section vs "Recruitment of new employees" in the S5 heading).
+ */
+const LVA_SURVEY_FACTOR_LABELS: Readonly<Record<string, string>> = {
+  recruitment: "Recruitment of new employees",
+  retaining_staff: "Retaining staff",
+  leadership_team: "Leadership Team",
+  the_leadership: "The leadership",
+  internal_comms: "Internal communications",
+  growth_financing: "Growth Financing",
+};
+
+/**
+ * Rewrite an S5 "Why is <factor> a hindrance?" question label so the embedded
+ * factor name uses the Esperto REPORT label, matching the rating + obstacles
+ * sections. Only the `S5_why_<slug>` follow-ups are touched (and only the ~6
+ * slugs whose report wording differs); every other question label is returned
+ * unchanged. Substring-replace (not a hardcoded heading) so it survives a
+ * change to the question-text template. Pure — never throws.
+ */
+export function lvaReportQuestionLabel(key: string, label: string): string {
+  if (!key.startsWith("S5_why_")) return label;
+  const slug = key.slice("S5_why_".length);
+  const survey = LVA_SURVEY_FACTOR_LABELS[slug];
+  const report = LVA_REPORT_FACTOR_LABELS[slug];
+  if (survey && report && label.includes(survey)) {
+    return label.replace(survey, report);
+  }
+  return label;
+}
+
 // ─── L4b — verbatim section intros ───────────────────────────────────────────
 
 /**
