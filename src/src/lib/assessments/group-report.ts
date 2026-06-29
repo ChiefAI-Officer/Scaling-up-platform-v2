@@ -163,6 +163,19 @@ export interface GroupReportProvenance {
   assessmentName: string;
   /** Pinned version label "<alias>-v<versionNumber>" for the "as of" line. */
   versionLabel: string;
+  /**
+   * Wave J / J-2 — Peers benchmark application metadata, copied from the BUILT
+   * model (NOT a fresh `benchmarksFor` call) so it reflects ACTUAL application:
+   *  - `benchmarkVersion` is set ONLY when ≥1 peer row was attached to the
+   *    scored report (undefined for non-SU-Full, an empty cohort, or a key
+   *    mismatch),
+   *  - `benchmarkKeyMismatch` is true when the report carried a key the
+   *    benchmark does not cover — the launch-blocking, fail-closed signal
+   *    (Peers are then cleared in the model) that flows to the audit/metric.
+   * Both stay absent on the `empty` branch (no model is built there).
+   */
+  benchmarkVersion?: string;
+  benchmarkKeyMismatch?: boolean;
 }
 
 export type GroupReportResult =
@@ -434,6 +447,14 @@ export async function getCampaignGroupReport(
       };
 
       const report = buildGroupReportModel(input);
+
+      // Wave J / J-2 — copy the Peers benchmark application metadata from the
+      // BUILT model (NOT a fresh benchmarksFor call) so provenance reflects what
+      // ACTUALLY applied: version set only when ≥1 peer row attached; mismatch
+      // true (and version undefined) when the report's keys drifted from the
+      // benchmark. Both stay undefined when nothing applied (non-SU-Full / empty).
+      provenance.benchmarkVersion = report.benchmarkVersion;
+      provenance.benchmarkKeyMismatch = report.benchmarkKeyMismatch;
 
       return { kind: "ok", report, provenance } as const;
     },
