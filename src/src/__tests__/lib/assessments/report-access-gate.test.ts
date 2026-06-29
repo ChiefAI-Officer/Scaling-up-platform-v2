@@ -109,7 +109,9 @@ describe("viewGroupReport adapter", () => {
     await viewGroupReport({} as never, { campaignId: "camp-X", generatedAt: gen });
     const spec = lastOpts().auditOf({
       kind: "ok",
-      report: {},
+      report: {
+        provenance: { groupRenderVersion: "lva-fidelity-v1", scaleDegraded: true },
+      },
       provenance: {
         versionId: "v-1",
         templateAlias: "lva",
@@ -133,6 +135,9 @@ describe("viewGroupReport adapter", () => {
       completedCount: 3,
       invitedCount: 5,
       submissionIds: ["s1", "s2"],
+      // Wave L (R2-M1) — the render-ruleset provenance is recorded in the audit.
+      groupRenderVersion: "lva-fidelity-v1",
+      scaleDegraded: true,
     });
   });
 
@@ -143,7 +148,9 @@ describe("viewGroupReport adapter", () => {
     await viewGroupReport({} as never, { campaignId: "camp-SU", generatedAt: gen });
     const spec = lastOpts().auditOf({
       kind: "ok",
-      report: {},
+      // post-Wave-L: auditOf reads o.report.provenance render-version too,
+      // so the synthetic report must carry it (real loader always sets it).
+      report: { provenance: { groupRenderVersion: "lva-fidelity-v1", scaleDegraded: false } },
       provenance: {
         versionId: "v-2",
         templateAlias: "scaling-up-full",
@@ -168,7 +175,9 @@ describe("viewGroupReport adapter", () => {
     await viewGroupReport({} as never, { campaignId: "camp-LVA", generatedAt: gen });
     const spec = lastOpts().auditOf({
       kind: "ok",
-      report: {},
+      // post-Wave-L: auditOf reads o.report.provenance render-version too,
+      // so the synthetic report must carry it (real loader always sets it).
+      report: { provenance: { groupRenderVersion: "lva-fidelity-v1", scaleDegraded: false } },
       provenance: {
         versionId: "v-3",
         templateAlias: "leadership-vision-alignment",

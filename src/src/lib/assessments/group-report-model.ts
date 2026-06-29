@@ -51,6 +51,14 @@ import {
 } from "@/lib/assessments/qualitative-report-model";
 import { stripLegacyDecimalSuffix } from "@/lib/assessments/question-label";
 import { benchmarksFor } from "@/lib/assessments/su-full-benchmarks";
+import {
+  GROUP_RENDER_VERSION,
+  LVA_TEMPLATE_ALIAS,
+  lvaReportFactorLabel,
+  lvaReportQuestionLabel,
+  scaledRatingValue,
+  s3ValuesInDomain,
+} from "@/lib/assessments/lva-report-display";
 
 // ─── Input contract (plain data — no DB) ────────────────────────────────────
 
@@ -169,7 +177,15 @@ export interface GroupRatingFactor {
   strong: number;
   avg: number;
   weak: number;
+  /** Raw mean on the stored scale (1–3 for LVA S3). The SORT KEY + provenance. */
   mean: number;
+  /**
+   * Wave L (L3) — the factor's value on Esperto's 0–10 axis (LVA S3 ONLY:
+   * Weak=0/Avg=5/Strong=10, mean over all contributors incl. CEO, ceil to 1dp).
+   * `null` for any non-LVA / non-S3 section, AND for an LVA S3 factor that has
+   * an out-of-domain (≠{1,2,3}) value — the renderer falls back to raw `mean`.
+   */
+  scaledValue: number | null;
   n: number;
 }
 
@@ -362,9 +378,23 @@ export interface GroupScoredQuestion {
   n: number;
 }
 
+/**
+ * Wave L (L3) — model render provenance. Code-only display ruleset version + a
+ * degraded signal for the S3 0–10 scaling. `scaleDegraded` flips true when an
+ * LVA S3 factor carries an out-of-domain (≠{1,2,3}) value and its scaledValue is
+ * therefore suppressed (the renderer falls back to raw mean). Carried into the
+ * GROUP_REPORT_VIEW audit so a viewed report is attributable to the exact ruleset.
+ */
+export interface GroupRenderProvenance {
+  groupRenderVersion: string;
+  scaleDegraded: boolean;
+}
+
 export interface CampaignGroupReport {
   /** scored | qualitative — resolved from reportConfigFor(alias). */
   reportType: ReportType;
+  /** Wave L — the render-ruleset version + the S3 scale-degraded signal. */
+  provenance: GroupRenderProvenance;
   /** Cohort members in display order (CEO first, then alphabetical by name). */
   respondents: GroupRespondent[];
   /** Count of completed submissions in the cohort. */
@@ -644,12 +674,21 @@ function buildMetricTableSection(
  * values over answerers. Factors sorted by mean DESC. Null when none survive.
  */
 function buildRatingSection(
+  alias: string | undefined,
   stableKey: string,
   name: string,
   questions: Array<{ key: string; meta: QuestionMeta }>,
   respondents: GroupRespondent[],
   answersByRespondent: AnswersByRespondent,
+  /** Wave L — flipped true when an LVA S3 factor has an out-of-domain value. */
+  signal: { scaleDegraded: boolean },
 ): GroupRatingSection | null {
+  // Wave L (L3): the Esperto 0–10 scaled value is LVA-S3-specific. The 0/5/10
+  // mapping must NOT leak into the generic rating contract — gate it on the LVA
+  // alias AND the S3 section key. Non-LVA / non-S3 keep scaledValue null.
+  const isLvaStrengths =
+    alias === LVA_TEMPLATE_ALIAS && stableKey === "S3_strengths";
+
   const factors: GroupRatingFactor[] = [];
   for (const { key, meta } of questions) {
     const values: number[] = [];
@@ -667,17 +706,34 @@ function buildRatingSection(
     const weak = values.filter((v) => v === min).length;
     const avg = values.length - strong - weak;
 
+    // Wave L (L3): the 0–10 scaled display value, ONLY for LVA S3 AND ONLY when
+    // every contributing value is in the {1,2,3} domain (imported/legacy rows
+    // can break this even though the live survey can't). An out-of-domain factor
+    // → scaledValue null (renderer falls back to raw mean) + scaleDegraded.
+    let scaledValue: number | null = null;
+    if (isLvaStrengths) {
+      if (s3ValuesInDomain(values)) {
+        scaledValue = scaledRatingValue(strong, avg, weak);
+      } else {
+        signal.scaleDegraded = true;
+      }
+    }
+
     factors.push({
       stableKey: key,
-      label: stripLegacyDecimalSuffix(meta.label),
+      label: isLvaStrengths
+        ? lvaReportFactorLabel(key, stripLegacyDecimalSuffix(meta.label))
+        : stripLegacyDecimalSuffix(meta.label),
       strong,
       avg,
       weak,
       mean: meanOf(values),
+      scaledValue,
       n: values.length,
     });
   }
   if (factors.length === 0) return null;
+  // Sort stays keyed on raw `mean` (monotonic with scaledValue for in-domain S3).
   factors.sort((a, b) => b.mean - a.mean);
   return { stableKey, name, presentation: "rating", factors };
 }
@@ -691,6 +747,7 @@ function buildRatingSection(
  * options.
  */
 function buildChoicesSection(
+  alias: string | undefined,
   stableKey: string,
   name: string,
   question: { key: string; meta: QuestionMeta },
@@ -700,6 +757,10 @@ function buildChoicesSection(
   const { key, meta } = question;
   const options = meta.options ?? [];
   if (options.length === 0) return null;
+
+  // Wave L (L4a): for LVA, the obstacle option labels use the Esperto *report*
+  // labels (the bare factor slug → report label override), not the survey labels.
+  const isLva = alias === LVA_TEMPLATE_ALIAS;
 
   // Tally selections + count answerers (only respondents whose normalized
   // answer is a present, non-empty string[] count toward the denominator).
@@ -715,7 +776,8 @@ function buildChoicesSection(
 
   const tallied: GroupChoiceOption[] = options.map((o) => {
     const count = counts.get(o.key) ?? 0;
-    return { key: o.key, label: o.label, count, pct: round((count / n) * 100), n };
+    const label = isLva ? lvaReportFactorLabel(o.key, o.label) : o.label;
+    return { key: o.key, label, count, pct: round((count / n) * 100), n };
   });
   tallied.sort((a, b) => b.pct - a.pct || b.count - a.count);
 
@@ -739,12 +801,20 @@ function buildChoicesSection(
  * A question nobody answered is omitted; null when no block survives.
  */
 function buildQaSection(
+  alias: string | undefined,
   stableKey: string,
   name: string,
   questions: Array<{ key: string; meta: QuestionMeta }>,
   respondents: GroupRespondent[],
   answersByRespondent: AnswersByRespondent,
 ): GroupQaSection | null {
+  // Wave L follow-on: in the LVA "Obstacles and Challenges Explained" section,
+  // rewrite each S5 "Why is <factor> a hindrance?" heading to the Esperto REPORT
+  // factor label so it matches the rating/obstacles labels (no within-report
+  // "staff" vs "employees" mismatch). No-op for non-LVA / non-S5_why labels.
+  const isLva = alias === LVA_TEMPLATE_ALIAS;
+  const qaLabel = (key: string, raw: string): string =>
+    isLva ? lvaReportQuestionLabel(key, raw) : raw;
   const out: GroupQaQuestion[] = [];
 
   for (const { key, meta } of questions) {
@@ -766,7 +836,7 @@ function buildQaSection(
       if (values.length === 0) continue;
       out.push({
         stableKey: key,
-        label: stripLegacyDecimalSuffix(meta.label),
+        label: qaLabel(key, stripLegacyDecimalSuffix(meta.label)),
         kind: "number",
         perRespondent,
         mean: meanOf(values),
@@ -797,7 +867,7 @@ function buildQaSection(
     if (answers.length === 0) continue;
     out.push({
       stableKey: key,
-      label: stripLegacyDecimalSuffix(meta.label),
+      label: qaLabel(key, stripLegacyDecimalSuffix(meta.label)),
       kind: "text",
       answers,
     });
@@ -820,6 +890,8 @@ function buildQualitativeSections(
   questionsByKey: Record<string, QuestionMeta>,
   respondents: GroupRespondent[],
   answersByRespondent: AnswersByRespondent,
+  /** Wave L — flipped by buildRatingSection when an LVA S3 value is out-of-domain. */
+  signal: { scaleDegraded: boolean },
 ): GroupQualitativeSection[] {
   const sectionList = parseGroupSections(sectionsRaw);
   const questionsBySection = groupQuestionsBySection(questionsByKey, sectionList);
@@ -849,11 +921,13 @@ function buildQualitativeSections(
         break;
       case "rating":
         built = buildRatingSection(
+          alias,
           section.stableKey,
           section.name,
           questions,
           respondents,
           answersByRespondent,
+          signal,
         );
         break;
       case "choices": {
@@ -862,6 +936,7 @@ function buildQualitativeSections(
         const mc = questions.find((q) => q.meta.type === "MULTI_CHOICE");
         built = mc
           ? buildChoicesSection(
+              alias,
               section.stableKey,
               section.name,
               mc,
@@ -869,6 +944,7 @@ function buildQualitativeSections(
               answersByRespondent,
             )
           : buildQaSection(
+              alias,
               section.stableKey,
               section.name,
               questions,
@@ -880,6 +956,7 @@ function buildQualitativeSections(
       // "qa", "percent-bar", and any future kind → qa block (defensive).
       default:
         built = buildQaSection(
+          alias,
           section.stableKey,
           section.name,
           questions,
@@ -1432,6 +1509,8 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
   // qualitative templates (LVA/QSP) and any non-SU-Full scored template.
   let benchmarkVersion: string | undefined;
   let benchmarkKeyMismatch = false;
+  // Wave L (L3) — the S3 0–10-scale degraded signal (out-of-domain values).
+  const scaleSignal = { scaleDegraded: false };
 
   if (reportType === "qualitative") {
     qualitative = {
@@ -1441,6 +1520,7 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
         questionsByKey,
         respondents,
         answersByRespondent,
+        scaleSignal,
       ),
     };
   } else {
@@ -1466,6 +1546,10 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
 
   return {
     reportType,
+    provenance: {
+      groupRenderVersion: GROUP_RENDER_VERSION,
+      scaleDegraded: scaleSignal.scaleDegraded,
+    },
     respondents,
     respondentCount: respondents.length,
     degraded,

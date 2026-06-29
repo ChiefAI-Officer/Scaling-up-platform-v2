@@ -208,7 +208,11 @@ describe("qualitative S4 — choices", () => {
 
     // labels not keys
     expect(s4.options.every((o) => !/^[a-z_]+$/.test(o.label) || o.label.includes(" ") || /[A-Z]/.test(o.label))).toBe(true);
-    expect(s4.options.some((o) => o.label === "Recruitment of new employees")).toBe(true);
+    // Wave L (L4a): LVA S4 option labels use the Esperto REPORT labels, so the
+    // "recruitment" slug renders as "Recruitment of new staff" (the override),
+    // NOT the survey label "Recruitment of new employees".
+    expect(s4.options.some((o) => o.label === "Recruitment of new staff")).toBe(true);
+    expect(s4.options.some((o) => o.label === "Recruitment of new employees")).toBe(false);
 
     // an unpicked option is present at 0%
     const innovation = s4.options.find((o) => o.label === "Innovation")!;

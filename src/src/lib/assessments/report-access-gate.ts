@@ -126,6 +126,11 @@ export async function viewGroupReport(
           // Task 7 (Wave J): benchmark provenance for SU-Full audit trail.
           benchmarkVersion: o.provenance.benchmarkVersion ?? null,
           benchmarkKeyMismatch: o.provenance.benchmarkKeyMismatch ?? false,
+          // Wave L (R2-M1): the code-only render ruleset (scale + labels +
+          // intros) carries no contentHash bump, so record its version + the
+          // S3 scale-degraded signal to keep a viewed report attributable.
+          groupRenderVersion: o.report.provenance.groupRenderVersion,
+          scaleDegraded: o.report.provenance.scaleDegraded,
         },
       };
     },
