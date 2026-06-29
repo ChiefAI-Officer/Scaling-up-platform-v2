@@ -54,6 +54,7 @@ import {
   GROUP_RENDER_VERSION,
   LVA_TEMPLATE_ALIAS,
   lvaReportFactorLabel,
+  lvaReportQuestionLabel,
   scaledRatingValue,
   s3ValuesInDomain,
 } from "@/lib/assessments/lva-report-display";
@@ -763,12 +764,20 @@ function buildChoicesSection(
  * A question nobody answered is omitted; null when no block survives.
  */
 function buildQaSection(
+  alias: string | undefined,
   stableKey: string,
   name: string,
   questions: Array<{ key: string; meta: QuestionMeta }>,
   respondents: GroupRespondent[],
   answersByRespondent: AnswersByRespondent,
 ): GroupQaSection | null {
+  // Wave L follow-on: in the LVA "Obstacles and Challenges Explained" section,
+  // rewrite each S5 "Why is <factor> a hindrance?" heading to the Esperto REPORT
+  // factor label so it matches the rating/obstacles labels (no within-report
+  // "staff" vs "employees" mismatch). No-op for non-LVA / non-S5_why labels.
+  const isLva = alias === LVA_TEMPLATE_ALIAS;
+  const qaLabel = (key: string, raw: string): string =>
+    isLva ? lvaReportQuestionLabel(key, raw) : raw;
   const out: GroupQaQuestion[] = [];
 
   for (const { key, meta } of questions) {
@@ -790,7 +799,7 @@ function buildQaSection(
       if (values.length === 0) continue;
       out.push({
         stableKey: key,
-        label: stripLegacyDecimalSuffix(meta.label),
+        label: qaLabel(key, stripLegacyDecimalSuffix(meta.label)),
         kind: "number",
         perRespondent,
         mean: meanOf(values),
@@ -821,7 +830,7 @@ function buildQaSection(
     if (answers.length === 0) continue;
     out.push({
       stableKey: key,
-      label: stripLegacyDecimalSuffix(meta.label),
+      label: qaLabel(key, stripLegacyDecimalSuffix(meta.label)),
       kind: "text",
       answers,
     });
@@ -898,6 +907,7 @@ function buildQualitativeSections(
               answersByRespondent,
             )
           : buildQaSection(
+              alias,
               section.stableKey,
               section.name,
               questions,
@@ -909,6 +919,7 @@ function buildQualitativeSections(
       // "qa", "percent-bar", and any future kind → qa block (defensive).
       default:
         built = buildQaSection(
+          alias,
           section.stableKey,
           section.name,
           questions,
