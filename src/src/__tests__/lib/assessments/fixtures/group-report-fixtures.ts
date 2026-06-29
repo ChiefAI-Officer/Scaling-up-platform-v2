@@ -769,3 +769,19 @@ export function fixtureScalingUpFullDegraded(): GroupReportInput {
     ),
   };
 }
+
+/**
+ * Scaling Up Full with NO CEO submission (the CEO participant never completed).
+ * The team (dee, ed) still aggregates and the Peers benchmark still attaches —
+ * so `devPeersTeam` (= teamAvg − peers) remains the standing signal even with
+ * no CEO column. Used by Task 5 (J-2) to assert the no-CEO Peers fallback.
+ *
+ *   people teamAvg (dee 4, ed 2) = 3 ; ceo null ; peers 6.1 ; devPeersTeam = 3 - 6.1
+ */
+export function fixtureScalingUpFullNoCeo(): GroupReportInput {
+  const base = fixtureScalingUpFull();
+  return {
+    ...base,
+    submissions: base.submissions.filter((s) => s.respondentId !== "s-ceo"),
+  };
+}

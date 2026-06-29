@@ -1547,6 +1547,23 @@
   font-weight: 400;
   font-size: 10px;
 }
+/* Peers benchmark column (Wave J / J-2) — a subtle accent, distinct from CEO.
+   Covers the header th too (lower specificity is sufficient). */
+.su-public-brand .su-group-peers {
+  color: #6b6480;
+}
+/* Horizontal scroll for the now-wider profile table (Peers + Dev·Peers cols)
+   so it scrolls instead of clipping on mobile / narrow print. */
+.su-public-brand .su-group-prof-scroll {
+  overflow-x: auto;
+}
+/* Provisional-benchmark footnote under the profile table. */
+.su-public-brand .su-group-footnote {
+  margin: 10px 0 0;
+  font-size: 11px;
+  font-style: italic;
+  color: #6b6480;
+}
 .su-public-brand .su-group-dev .su-group-dev-arrow {
   font-size: 10px;
   margin-right: 3px;

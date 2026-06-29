@@ -1,0 +1,30 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`su-full-benchmarks value-lock benchmark values are version-locked (bump SU_FULL_BENCHMARKS_VERSION on any value change) 1`] = `
+{
+  "b": {
+    "domain": {
+      "cash": 7.8,
+      "execution": 5.8,
+      "people": 6.1,
+      "strategy": 5,
+      "you": 5.4,
+    },
+    "scaleUp": 53.1,
+    "section": {
+      "S_CASH": 7.8,
+      "S_EXEC_LT": 4.5,
+      "S_EXEC_OP": 5.6,
+      "S_EXEC_SIT": 6.6,
+      "S_EXEC_SM": 6.4,
+      "S_PEOPLE_CC": 6.3,
+      "S_PEOPLE_YE": 5.9,
+      "S_STRATEGY": 5,
+      "S_YOU_IC": 4.6,
+      "S_YOU_LEAD": 6.1,
+    },
+    "version": "2026-06-28.cohort1.provisional",
+  },
+  "v": "2026-06-28.cohort1.provisional",
+}
+`;

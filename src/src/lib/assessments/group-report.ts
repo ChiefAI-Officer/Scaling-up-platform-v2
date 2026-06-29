@@ -33,7 +33,10 @@ import {
   canViewGroupReport,
   asAccessDb,
 } from "@/lib/assessments/access-control";
-import { isGroupReportAlias } from "@/lib/assessments/wave-f-flags";
+import {
+  isGroupReportAlias,
+  isGroupReportEnabled,
+} from "@/lib/assessments/wave-f-flags";
 import {
   buildGroupReportModel,
   type CampaignGroupReport,
@@ -95,6 +98,10 @@ interface RawCampaign {
   id: string;
   accessMode: "INVITED" | "PUBLIC";
   organizationId: string;
+  // Ownership pointer — read so the alias-aware enablement decision (LVA's
+  // coach/org canary) can run INSIDE the loader after the rate limiter, with
+  // NO pre-rate-limit DB lookup (Wave J J-3 single source of truth).
+  createdByCoachId: string | null;
   templateId: string;
   versionId: string;
   // Display names threaded through provenance for the T8 renderer — read in
@@ -104,6 +111,10 @@ interface RawCampaign {
   version: {
     id: string;
     versionNumber: number;
+    // Wave J (J-3): NULL until an admin publishes. The SU-Full-scoped publish
+    // guard reads this; LVA is never gated on it (legacy/imported LVA versions
+    // may legitimately carry a null publishedAt).
+    publishedAt: Date | null;
     questions: unknown;
     sections: unknown;
     scoringConfig: unknown;
@@ -152,10 +163,40 @@ export interface GroupReportProvenance {
   assessmentName: string;
   /** Pinned version label "<alias>-v<versionNumber>" for the "as of" line. */
   versionLabel: string;
+  /**
+   * Wave J / J-2 — Peers benchmark application metadata, copied from the BUILT
+   * model (NOT a fresh `benchmarksFor` call) so it reflects ACTUAL application:
+   *  - `benchmarkVersion` is set ONLY when ≥1 peer row was attached to the
+   *    scored report (undefined for non-SU-Full, an empty cohort, or a key
+   *    mismatch),
+   *  - `benchmarkKeyMismatch` is true when the report carried a key the
+   *    benchmark does not cover — the launch-blocking, fail-closed signal
+   *    (Peers are then cleared in the model) that flows to the audit/metric.
+   * Both stay absent on the `empty` branch (no model is built there).
+   */
+  benchmarkVersion?: string;
+  benchmarkKeyMismatch?: boolean;
 }
 
 export type GroupReportResult =
-  | { kind: "notApplicable"; reason: "public" | "unsupported-template" }
+  | {
+      kind: "notApplicable";
+      /**
+       * Why the report does not apply. `public`/`unsupported-template` are
+       * pre-existing; `unpublished` (Wave J J-3) is the SU-Full-scoped publish
+       * guard — an OBSERVABLE state (the page shows a panel + the metric), it
+       * must NEVER collapse into a dark 404.
+       */
+      reason: "public" | "unsupported-template" | "unpublished";
+      /** The campaign's template alias (for the page copy + the metric). */
+      templateAlias: string;
+    }
+  // Wave J (J-3): the alias-aware feature-flag decision is made HERE (single
+  // source of truth) — moved off the gate's pre-rate-limit flagGate so the rate
+  // limiter runs FIRST and the decision can see template.alias without an
+  // unauthenticated pre-rate-limit lookup. The gate's classify maps this to a
+  // SILENT `not-found` (dark 404, enumeration-safe, no audit, no model build).
+  | { kind: "notEnabled" }
   | { kind: "forbidden" }
   | { kind: "empty"; provenance: GroupReportProvenance }
   | { kind: "ok"; report: CampaignGroupReport; provenance: GroupReportProvenance };
@@ -218,6 +259,7 @@ export async function getCampaignGroupReport(
           id: true,
           accessMode: true,
           organizationId: true,
+          createdByCoachId: true,
           templateId: true,
           versionId: true,
           organization: { select: { name: true } },
@@ -226,6 +268,7 @@ export async function getCampaignGroupReport(
             select: {
               id: true,
               versionNumber: true,
+              publishedAt: true,
               questions: true,
               sections: true,
               scoringConfig: true,
@@ -240,6 +283,27 @@ export async function getCampaignGroupReport(
         return { kind: "forbidden" } as const;
       }
 
+      // Wave J (J-3) — ALIAS-AWARE FEATURE-FLAG GATE (single source of truth).
+      // This is the dark on/off switch (WAVE_F_* for LVA, independent WAVE_J_*
+      // for SU-Full + the campaign-id canary). It lives HERE (not on the gate's
+      // pre-rate-limit flagGate) so: (a) the rate limiter — which the route runs
+      // BEFORE this loader — always fires first, and (b) the decision can see
+      // template.alias + the ownership pointers without any pre-rate-limit DB
+      // lookup. Disabled → `notEnabled`, which the gate's classify maps to a
+      // SILENT 404 (enumeration-safe; no authz consult, no cohort load, no
+      // model build, no audit). Run BEFORE authz so a disabled campaign is dark
+      // to everyone, including admins.
+      if (
+        !isGroupReportEnabled(actor, {
+          id: campaign.id,
+          createdByCoachId: campaign.createdByCoachId,
+          organizationId: campaign.organizationId,
+          template: { alias: campaign.template.alias },
+        })
+      ) {
+        return { kind: "notEnabled" } as const;
+      }
+
       // Authorization — STRICTER bulk-PII gate (admin/staff bypass; coach
       // currency checks). actor may be null (unauthenticated) → forbidden.
       const allowed = actor
@@ -251,17 +315,39 @@ export async function getCampaignGroupReport(
 
       // INVITED-only: a PUBLIC campaign has no team group report.
       if (campaign.accessMode !== "INVITED") {
-        return { kind: "notApplicable", reason: "public" } as const;
+        return {
+          kind: "notApplicable",
+          reason: "public",
+          templateAlias: campaign.template.alias,
+        } as const;
       }
 
-      // LVA-only surface (Jeff 2026-06-18): the group report is wanted on the
-      // Leadership Vision Alignment assessment only — not the scored reports.
-      // The generic scored engine stays built but unreachable; gate here so a
-      // non-allowlisted INVITED campaign never builds/audits a group report.
+      // Allowlisted surface: LVA (Jeff 2026-06-18) + SU-Full (Wave J J-3). The
+      // generic scored engine stays built but unreachable for any other alias;
+      // gate here so a non-allowlisted INVITED campaign never builds/audits a
+      // group report.
       if (!isGroupReportAlias(campaign.template.alias)) {
         return {
           kind: "notApplicable",
           reason: "unsupported-template",
+          templateAlias: campaign.template.alias,
+        } as const;
+      }
+
+      // Wave J (J-3) — ENFORCED PUBLISH GUARD, SU-Full-SCOPED (R3-H1). A DRAFT /
+      // unpublished SU-Full version (publishedAt == null) must NOT surface the
+      // group report — even when the flag is on. This is OBSERVABLE
+      // (notApplicable, not a 404): the page shows a panel + emits a metric. It
+      // is deliberately scoped to SU-Full so a legacy/imported LVA version with
+      // a null publishedAt is NEVER regressed (LVA stays byte-for-byte).
+      if (
+        campaign.template.alias === "scaling-up-full" &&
+        campaign.version.publishedAt == null
+      ) {
+        return {
+          kind: "notApplicable",
+          reason: "unpublished",
+          templateAlias: campaign.template.alias,
         } as const;
       }
 
@@ -361,6 +447,14 @@ export async function getCampaignGroupReport(
       };
 
       const report = buildGroupReportModel(input);
+
+      // Wave J / J-2 — copy the Peers benchmark application metadata from the
+      // BUILT model (NOT a fresh benchmarksFor call) so provenance reflects what
+      // ACTUALLY applied: version set only when ≥1 peer row attached; mismatch
+      // true (and version undefined) when the report's keys drifted from the
+      // benchmark. Both stay undefined when nothing applied (non-SU-Full / empty).
+      provenance.benchmarkVersion = report.benchmarkVersion;
+      provenance.benchmarkKeyMismatch = report.benchmarkKeyMismatch;
 
       return { kind: "ok", report, provenance } as const;
     },

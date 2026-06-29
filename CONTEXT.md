@@ -62,7 +62,7 @@ _Avoid_: assuming Esperto's codes equal our stableKeys — they never do; the cr
 ### Results & scoring (three distinct "band"-like concepts — do not conflate)
 
 **Scoring tier** (a.k.a. band):
-The overall result band of a *scored* assessment (Rockefeller: Low / OK / Great; Scaling Up Full: Not-ready / On-the-way / Exemplary). Every published version needs ≥1 tier.
+The overall result band of a *scored* assessment (Rockefeller: Low / OK / Great; Scaling Up Full: Not-ready / On-the-way / Exemplary). Every published version needs ≥1 tier. **Note:** Scaling Up Full's tier is computed and stored in `ScoreResult` but **render-suppressed** — its reports show peer-deviation instead of a band (ADR-0015); the tier is hidden, not removed.
 _Avoid_: calling per-question advice or invitation progress a "tier".
 
 **Per-question recommendation**:
@@ -75,6 +75,10 @@ _Avoid_: confusing this with a scoring tier.
 
 **ScaleUp Score**:
 Scaling Up Full's overall weighted 0–100 score (can exceed 100 via bonus). Its exact weighting formula is owned by Esperto and not in our source export.
+
+**Peers (benchmark)**:
+The industry-average reference values shown alongside a Scaling Up Full score — "companies with a comparable size who have preceded you in taking the assessment." A respondent's standing is expressed as **deviation from Peers** (▲/▼), *not* a tier band (Esperto has no bands, and we lack the peer distribution to compute its "X% score higher" percentile — see ADR-0015). Our Peers values are seeded PROVISIONAL from a single Esperto sample cohort, on the platform's 0–10 scale.
+_Avoid_: "percentile" (we show direction vs the peer mean, not a percentile); conflating Peers (external benchmark) with **Team avg** (this campaign's other leaders).
 
 **Pass** (Rockefeller):
 A checklist item counts as "passed" when rated **2 or 3** on its 0–3 scale (a 0 or 1 does not pass). The Rockefeller result tier is driven by the count of passed items out of 40.

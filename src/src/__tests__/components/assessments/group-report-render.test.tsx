@@ -413,6 +413,184 @@ describe("ScoredGroupReport", () => {
     expect(band).toHaveTextContent(/On Track/);
     expect(band).toHaveTextContent(/Needs Focus/);
   });
+
+  // ── Wave J / J-2 — Peers benchmark + tier suppression (SU-Full) ────────────
+
+  /** SU-Full-shaped scored report: domains + ScaleUp + peers, tier suppressed. */
+  function suFullReport(
+    overrides: Partial<CampaignGroupReport> = {},
+  ): CampaignGroupReport {
+    const base = scoredReport();
+    return scoredReport({
+      showTier: false,
+      benchmarkVersion: "2026-06",
+      scored: {
+        ...base.scored!,
+        sections: [
+          {
+            stableKey: "people",
+            name: "People",
+            ceo: 8.0,
+            teamAvg: 6.5,
+            dev: 1.5,
+            n: 3,
+            peers: 6.1,
+            devPeers: 1.9,
+            devPeersTeam: 0.4,
+          },
+          // a section with a NULL peer — must render plain "—", never "(N<2)"
+          {
+            stableKey: "cash",
+            name: "Cash",
+            ceo: 5.0,
+            teamAvg: 4.0,
+            dev: 1.0,
+            n: 2,
+            peers: null,
+            devPeers: null,
+            devPeersTeam: null,
+          },
+        ],
+        domains: [
+          {
+            // distinct key so the domain row's testid does not collide with the
+            // "people" SECTION row (both ProfileTables emit group-scored-*-${key})
+            key: "people_dom",
+            label: "People",
+            ceo: 8.0,
+            teamAvg: 6.5,
+            dev: 1.5,
+            n: 3,
+            peers: 6.2,
+            devPeers: 1.8,
+            devPeersTeam: 0.3,
+          },
+        ],
+        scaleUpScore: {
+          ceo: 72.0,
+          teamAvg: 60.0,
+          peers: 53.1,
+          devPeers: 18.9,
+        },
+      },
+      ...overrides,
+    });
+  }
+
+  it("renders Peers + Dev·Peers (domain/section + ScaleUp), hides the tier", () => {
+    render(
+      <ScoredGroupReport
+        report={suFullReport()}
+        {...provenance({ assessmentName: "Scaling Up Full", versionLabel: "su-full-v2" })}
+      />,
+    );
+    // Peers column header present
+    expect(screen.getAllByText(/^Peers$/).length).toBeGreaterThan(0);
+    // section Peers + Dev·Peers values
+    const peopleSection = screen.getByTestId("group-scored-section-people");
+    expect(within(peopleSection).getByTestId("group-scored-peers-people")).toHaveTextContent("6.1");
+    expect(within(peopleSection).getByTestId("group-scored-devpeers-people")).toHaveTextContent("1.9");
+    // ScaleUp peers
+    expect(screen.getByTestId("group-scored-scaleup-peers")).toHaveTextContent("53.1");
+    expect(screen.getByTestId("group-scored-scaleup-devpeers")).toHaveTextContent(/18\.9/);
+    // tier suppressed
+    expect(screen.queryByTestId("group-scored-ceo-tier")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("group-scored-tier-band")).not.toBeInTheDocument();
+    // provisional footnote present
+    expect(screen.getByText(/provisional/i)).toBeInTheDocument();
+  });
+
+  it("omits Peers + keeps tier when no peers (LVA-style, showTier unset)", () => {
+    render(
+      <ScoredGroupReport
+        report={scoredReport()}
+        {...provenance({ assessmentName: "Rockefeller Habits", versionLabel: "rock-v2" })}
+      />,
+    );
+    // no Peers header
+    expect(screen.queryByText(/^Peers$/)).not.toBeInTheDocument();
+    // tier STILL shows (showTier undefined → show, back-compat)
+    expect(screen.getByTestId("group-scored-ceo-tier")).toBeInTheDocument();
+    // no provisional footnote
+    expect(screen.queryByText(/provisional/i)).not.toBeInTheDocument();
+  });
+
+  it("renders a missing peer as a plain '—', never '(N<2)'", () => {
+    render(
+      <ScoredGroupReport
+        report={suFullReport()}
+        {...provenance({ assessmentName: "Scaling Up Full", versionLabel: "su-full-v2" })}
+      />,
+    );
+    const cashRow = screen.getByTestId("group-scored-section-cash");
+    const peerDev = within(cashRow).getByTestId("group-scored-devpeers-cash");
+    expect(peerDev).toHaveTextContent("—");
+    expect(peerDev).not.toHaveTextContent("N<2");
+    expect(peerDev).not.toHaveTextContent("N&lt;2");
+  });
+
+  it("no-CEO → shows the 'Team vs Peers' deviation as the standing signal", () => {
+    const noCeoRespondents = RESPONDENTS.filter((r) => !r.isCEO);
+    const base = suFullReport({ respondents: noCeoRespondents, respondentCount: 2 });
+    // model truth: no CEO → ScaleUp ceo + devPeers are null (devPeers = ceo −
+    // peers), so the ScaleUp deviation figure suppresses (no "Dev · Peers").
+    const report: CampaignGroupReport = {
+      ...base,
+      scored: {
+        ...base.scored!,
+        scaleUpScore: { ceo: null, teamAvg: 60.0, peers: 53.1, devPeers: null },
+      },
+    };
+    render(
+      <ScoredGroupReport
+        report={report}
+        {...provenance({ assessmentName: "Scaling Up Full", versionLabel: "su-full-v2", completedCount: 2 })}
+      />,
+    );
+    // no-CEO standing-signal header (the section/domain table deviation column)
+    expect(screen.getAllByText(/Team vs Peers/i).length).toBeGreaterThan(0);
+    // no "Dev · Peers" anywhere (that's the CEO-present variant — table header
+    // AND the ScaleUp deviation figure, both suppressed without a CEO)
+    expect(screen.queryByText(/Dev · Peers/i)).not.toBeInTheDocument();
+    // devPeersTeam value rendered (0.4) in the people section
+    const peopleSection = screen.getByTestId("group-scored-section-people");
+    expect(within(peopleSection).getByTestId("group-scored-devpeers-people")).toHaveTextContent("0.4");
+  });
+
+  it("no-CEO ScaleUp → shows the Peers figure but NO blank deviation figure", () => {
+    const noCeoRespondents = RESPONDENTS.filter((r) => !r.isCEO);
+    const base = suFullReport({ respondents: noCeoRespondents, respondentCount: 2 });
+    // model truth: with no CEO the ScaleUp headline carries peers but a null
+    // devPeers (devPeers = ceo − peers; ceo is null).
+    const report: CampaignGroupReport = {
+      ...base,
+      scored: {
+        ...base.scored!,
+        scaleUpScore: { ceo: null, teamAvg: 60.0, peers: 53.1, devPeers: null },
+      },
+    };
+    render(
+      <ScoredGroupReport
+        report={report}
+        {...provenance({ assessmentName: "Scaling Up Full", versionLabel: "su-full-v2", completedCount: 2 })}
+      />,
+    );
+    // Peers figure still present
+    expect(screen.getByTestId("group-scored-scaleup-peers")).toHaveTextContent("53.1");
+    // NO deviation figure (no blank "—" under a "Dev · Peers"/"Team vs Peers" label)
+    expect(screen.queryByTestId("group-scored-scaleup-devpeers")).not.toBeInTheDocument();
+  });
+
+  it("shows a provisional-benchmark footnote naming the version", () => {
+    render(
+      <ScoredGroupReport
+        report={suFullReport()}
+        {...provenance({ assessmentName: "Scaling Up Full", versionLabel: "su-full-v2" })}
+      />,
+    );
+    const note = screen.getByText(/provisional/i);
+    expect(note).toHaveTextContent(/2026-06/);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════

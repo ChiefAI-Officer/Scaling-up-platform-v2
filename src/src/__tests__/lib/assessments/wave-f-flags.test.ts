@@ -188,19 +188,25 @@ describe("null / undefined safety", () => {
   });
 });
 
-describe("isGroupReportAlias (LVA-only surface — Jeff 2026-06-18)", () => {
-  it("allowlist is exactly the LVA alias", () => {
-    expect(GROUP_REPORT_ALIASES).toEqual(["leadership-vision-alignment"]);
+describe("isGroupReportAlias (allowlisted surfaces — LVA + SU-Full)", () => {
+  it("allowlist is exactly LVA + SU-Full (Wave J J-3)", () => {
+    expect(GROUP_REPORT_ALIASES).toEqual([
+      "leadership-vision-alignment",
+      "scaling-up-full",
+    ]);
   });
 
   it("returns true for the LVA alias", () => {
     expect(isGroupReportAlias("leadership-vision-alignment")).toBe(true);
   });
 
-  it("returns false for scored templates (not surfaced)", () => {
+  it("returns true for the SU-Full alias (Wave J J-3 — added atomically with the gates)", () => {
+    expect(isGroupReportAlias("scaling-up-full")).toBe(true);
+  });
+
+  it("returns false for the remaining scored templates (not surfaced)", () => {
     expect(isGroupReportAlias("RockHabits")).toBe(false);
     expect(isGroupReportAlias("five-dysfunctions")).toBe(false);
-    expect(isGroupReportAlias("scaling-up-full")).toBe(false);
   });
 
   it("returns false for other qualitative templates (LVA only for now)", () => {
@@ -212,5 +218,100 @@ describe("isGroupReportAlias (LVA-only surface — Jeff 2026-06-18)", () => {
     expect(isGroupReportAlias(null)).toBe(false);
     expect(isGroupReportAlias(undefined)).toBe(false);
     expect(isGroupReportAlias("")).toBe(false);
+  });
+});
+
+// ─── Task 1: SU-Full independent flag + kill precedence + campaign-id-only canary ───
+
+const SUF_GLOBAL = "WAVE_J_SUFULL_GROUP_ENABLED";
+const SUF_CANARY = "WAVE_J_SUFULL_GROUP_CANARY";
+const SUF_KILL   = "WAVE_J_SUFULL_GROUP_KILL";
+
+describe("SU-Full independent flag (Task 1)", () => {
+  afterEach(() => {
+    delete process.env[SUF_GLOBAL];
+    delete process.env[SUF_CANARY];
+    delete process.env[SUF_KILL];
+  });
+
+  it("SU-Full enablement is independent of LVA + has kill precedence over canary", () => {
+    const suf = { template: { alias: "scaling-up-full" } };
+    const lva = { template: { alias: "leadership-vision-alignment" } };
+    process.env.WAVE_F_GROUP_REPORT_ENABLED = "1";
+    delete process.env[SUF_GLOBAL];
+    delete process.env[SUF_CANARY];
+    delete process.env[SUF_KILL];
+    expect(isGroupReportEnabled(null, lva)).toBe(true);
+    expect(isGroupReportEnabled(null, suf)).toBe(false);  // LVA-on ≠ SU-Full-on
+    process.env[SUF_GLOBAL] = "1";
+    expect(isGroupReportEnabled(null, suf)).toBe(true);
+    process.env[SUF_GLOBAL] = "0";                        // SU-Full global off
+    expect(isGroupReportEnabled(null, suf)).toBe(false);
+    expect(isGroupReportEnabled(null, lva)).toBe(true);   // LVA unaffected
+    // kill precedence: a stale canary must NOT bypass the kill switch
+    process.env[SUF_CANARY] = "coach-1";
+    process.env[SUF_KILL] = "1";
+    expect(isGroupReportEnabled({ coachId: "coach-1" }, suf)).toBe(false);
+  });
+
+  it("SU-Full canary accepts campaign.id", () => {
+    const suf = { id: "camp-suf", template: { alias: "scaling-up-full" } };
+    process.env[SUF_CANARY] = "camp-suf";
+    delete process.env[SUF_GLOBAL];
+    delete process.env[SUF_KILL];
+    expect(isGroupReportEnabled(null, suf)).toBe(true);
+  });
+
+  it("SU-Full canary: coach id does NOT match (campaign-id-only)", () => {
+    const suf = { id: "camp-suf", template: { alias: "scaling-up-full" } };
+    process.env[SUF_CANARY] = "coach-allowed";
+    delete process.env[SUF_GLOBAL];
+    delete process.env[SUF_KILL];
+    expect(isGroupReportEnabled({ coachId: "coach-allowed" }, suf)).toBe(false);
+  });
+
+  it("SU-Full canary: org id does NOT match (campaign-id-only)", () => {
+    const suf = { id: "camp-suf", organizationId: "org-allowed", template: { alias: "scaling-up-full" } };
+    process.env[SUF_CANARY] = "org-allowed";
+    delete process.env[SUF_GLOBAL];
+    delete process.env[SUF_KILL];
+    expect(isGroupReportEnabled(null, suf)).toBe(false);
+  });
+
+  it("SU-Full canary: createdByCoachId does NOT match (campaign-id-only)", () => {
+    const suf = { id: "camp-suf", createdByCoachId: "coach-creator", template: { alias: "scaling-up-full" } };
+    process.env[SUF_CANARY] = "coach-creator";
+    delete process.env[SUF_GLOBAL];
+    delete process.env[SUF_KILL];
+    expect(isGroupReportEnabled(null, suf)).toBe(false);
+  });
+
+  it("WAVE_J_SUFULL_GROUP_KILL does not affect LVA", () => {
+    const lva = { template: { alias: "leadership-vision-alignment" } };
+    process.env.WAVE_F_GROUP_REPORT_ENABLED = "1";
+    process.env[SUF_KILL] = "1";
+    expect(isGroupReportEnabled(null, lva)).toBe(true);
+  });
+
+  it("SU-Full is default-OFF (no env vars set)", () => {
+    const suf = { id: "camp-suf", template: { alias: "scaling-up-full" } };
+    delete process.env[SUF_GLOBAL];
+    delete process.env[SUF_CANARY];
+    delete process.env[SUF_KILL];
+    expect(isGroupReportEnabled(null, suf)).toBe(false);
+  });
+
+  it("non-SU-Full non-LVA alias still uses WAVE_F path", () => {
+    const rock = { id: "camp-r", template: { alias: "RockHabits" } };
+    process.env.WAVE_F_GROUP_REPORT_ENABLED = "1";
+    expect(isGroupReportEnabled(null, rock)).toBe(true);
+  });
+
+  it("null template alias falls through to WAVE_F path", () => {
+    const noAlias = { id: "camp-x", template: null };
+    process.env.WAVE_F_GROUP_REPORT_ENABLED = "1";
+    expect(isGroupReportEnabled(null, noAlias)).toBe(true);
+    process.env.WAVE_F_GROUP_REPORT_ENABLED = "0";
+    expect(isGroupReportEnabled(null, noAlias)).toBe(false);
   });
 });

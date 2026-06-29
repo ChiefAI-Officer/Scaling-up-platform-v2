@@ -202,19 +202,54 @@ beforeEach(() => {
 });
 
 describe("(report) campaign group report page", () => {
-  it("returns 404 (notFound) when the flag is OFF — loader NOT called", async () => {
+  it("returns 404 (notFound) when the loader reports notEnabled (flag OFF) — no audit, dark", async () => {
+    // Wave J (J-3): the enablement decision is now the LOADER's (single source
+    // of truth). The route has NO pre-rate-limit flagGate; a disabled campaign
+    // surfaces as `notEnabled` → classify "not-found" → a SILENT dark 404,
+    // enumeration-safe (no existence leak), and never audited.
     mockGetApiActor.mockResolvedValue(adminActor());
-    mockIsEnabled.mockReturnValue(false);
+    mockGetGroupReport.mockResolvedValue({ kind: "notEnabled" });
 
     await expect(Page(makeProps())).rejects.toThrow("NEXT_HTTP_ERROR_FALLBACK");
     expect(mockNotFound).toHaveBeenCalledTimes(1);
-    expect(mockGetGroupReport).not.toHaveBeenCalled();
     expect(mockAuditCreate).not.toHaveBeenCalled();
-    // Flag gate is passed {id: campaignId} from params.
-    expect(mockIsEnabled).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ id: "camp-1" }),
-    );
+    // The route no longer calls isGroupReportEnabled directly (loader owns it).
+    expect(mockIsEnabled).not.toHaveBeenCalled();
+  });
+
+  it("rate limiter runs BEFORE the loader (alias-hydration query) — no pre-auth DB lookup", async () => {
+    // R2-M5 ordering: the rate limiter must fire before any campaign/alias
+    // hydration. The loader is where the campaign (template.alias +
+    // version.publishedAt) is read, so assert the limiter was invoked first.
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetGroupReport.mockResolvedValue(okResult());
+
+    const node = await Page(makeProps());
+    renderToStaticMarkup(node as React.ReactElement);
+
+    expect(mockRateLimit).toHaveBeenCalledTimes(1);
+    expect(mockGetGroupReport).toHaveBeenCalledTimes(1);
+    const limiterOrder = mockRateLimit.mock.invocationCallOrder[0];
+    const loaderOrder = mockGetGroupReport.mock.invocationCallOrder[0];
+    expect(limiterOrder).toBeLessThan(loaderOrder);
+  });
+
+  it("renders the unpublished panel for a DRAFT SU-Full campaign (notApplicable, NOT a 404) — no audit", async () => {
+    // The publish-guard hit is OBSERVABLE — it must NEVER collapse into a 404.
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetGroupReport.mockResolvedValue({
+      kind: "notApplicable",
+      reason: "unpublished",
+      templateAlias: "scaling-up-full",
+    });
+
+    const node = await Page(makeProps());
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain('data-testid="group-report-not-applicable"');
+    expect(markup).toContain("not available yet");
+    expect(mockNotFound).not.toHaveBeenCalled();
+    expect(mockAuditCreate).not.toHaveBeenCalled();
   });
 
   it("fails closed (notFound) when rate-limit is exceeded — BEFORE the loader", async () => {

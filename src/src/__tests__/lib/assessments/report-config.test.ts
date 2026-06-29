@@ -2,17 +2,46 @@ import { reportConfigFor, DEFAULT_REPORT_CONFIG } from "@/lib/assessments/report
 
 describe("reportConfigFor", () => {
   it("Rockefeller stays scored but hides the score table (#24)", () => {
-    expect(reportConfigFor("RockHabits")).toEqual({ reportType: "scored", showScoreTable: false });
+    expect(reportConfigFor("RockHabits")).toEqual({
+      reportType: "scored",
+      showScoreTable: false,
+      showTier: true,
+    });
   });
   it("QSP v1/v2 + LVA are qualitative (#27/#28/#30/#31)", () => {
     for (const a of ["qsp-v1", "qsp-v2", "leadership-vision-alignment"]) {
       expect(reportConfigFor(a).reportType).toBe("qualitative");
     }
   });
-  it("keep-set + unknown + null fall back to scored + table", () => {
-    for (const a of ["five-dysfunctions", "scaling-up-full", "scaling-up-quick", "nope", null, undefined]) {
-      expect(reportConfigFor(a)).toEqual({ reportType: "scored", showScoreTable: true });
+  it("unknown + null fall back to scored + table", () => {
+    for (const a of ["five-dysfunctions", "scaling-up-quick", "nope", null, undefined]) {
+      expect(reportConfigFor(a)).toEqual({
+        reportType: "scored",
+        showScoreTable: true,
+        showTier: true,
+      });
     }
-    expect(DEFAULT_REPORT_CONFIG).toEqual({ reportType: "scored", showScoreTable: true });
+  });
+
+  // ── Wave J Task 2: showTier field ──────────────────────────────────────────
+
+  it("DEFAULT_REPORT_CONFIG.showTier is true (back-compat default)", () => {
+    expect(DEFAULT_REPORT_CONFIG.showTier).toBe(true);
+  });
+
+  it("reportConfigFor('RockHabits').showTier is true", () => {
+    expect(reportConfigFor("RockHabits").showTier).toBe(true);
+  });
+
+  it("reportConfigFor(null).showTier is true (falls back to default)", () => {
+    expect(reportConfigFor(null).showTier).toBe(true);
+  });
+
+  it("scaling-up-full has showTier:false (group renderer only; BrandedReport ignores it)", () => {
+    expect(reportConfigFor("scaling-up-full")).toEqual({
+      reportType: "scored",
+      showScoreTable: true,
+      showTier: false,
+    });
   });
 });

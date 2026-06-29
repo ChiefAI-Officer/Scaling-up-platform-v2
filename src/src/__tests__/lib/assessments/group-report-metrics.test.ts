@@ -165,4 +165,60 @@ describe("emitGroupReportMetric", () => {
     });
     expect(() => emitGroupReportMetric("view", { role: "ADMIN" })).not.toThrow();
   });
+
+  // Task 7 (Wave J): benchmark provenance fields on the view metric
+  it("carries benchmarkVersion and benchmarkKeyMismatch on the view metric", () => {
+    emitGroupReportMetric("view", {
+      role: "ADMIN",
+      template: "scaling-up-full",
+      benchmarkVersion: "2026-06-28.cohort1.provisional",
+      benchmarkKeyMismatch: false,
+    });
+    const payload = lastMarker(infoSpy);
+    expect(payload.benchmarkVersion).toBe("2026-06-28.cohort1.provisional");
+    expect(payload.benchmarkKeyMismatch).toBe(false);
+  });
+
+  it("emits benchmarkVersion: null + benchmarkKeyMismatch: false for LVA (no benchmark)", () => {
+    // The page applies `provenance.benchmarkVersion ?? null` and
+    // `provenance.benchmarkKeyMismatch ?? false`; for LVA (no benchmark fields
+    // on the provenance) those defaults resolve to null / false. This asserts
+    // those defaulted values flow through the emitter intact.
+    emitGroupReportMetric("view", {
+      role: "ADMIN",
+      template: "leadership-vision-alignment",
+      benchmarkVersion: null,
+      benchmarkKeyMismatch: false,
+    });
+    const payload = lastMarker(infoSpy);
+    // null is NOT undefined — it should be present (a defined signal)
+    expect("benchmarkVersion" in payload).toBe(true);
+    expect(payload.benchmarkVersion).toBeNull();
+    expect(payload.benchmarkKeyMismatch).toBe(false);
+  });
+
+  // Task 7 (Wave J): not_applicable metric carries reason + template
+  it("not_applicable metric carries reason and template for unpublished SU-Full", () => {
+    const notApplicableMetric = (reason: string, template: string) => {
+      emitGroupReportMetric("not_applicable", { role: "ADMIN", reason, template });
+      return lastMarker(infoSpy);
+    };
+    expect(notApplicableMetric("unpublished", "scaling-up-full")).toMatchObject({
+      reason: "unpublished",
+      template: "scaling-up-full",
+    });
+  });
+
+  it("not_applicable metric carries reason and template for unsupported-template", () => {
+    emitGroupReportMetric("not_applicable", {
+      role: "ADMIN",
+      reason: "unsupported-template",
+      template: "RockHabits",
+    });
+    const payload = lastMarker(infoSpy);
+    expect(payload).toMatchObject({
+      reason: "unsupported-template",
+      template: "RockHabits",
+    });
+  });
 });

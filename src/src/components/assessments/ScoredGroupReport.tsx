@@ -40,12 +40,29 @@ import {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** A directional deviation cell — ▲/▼ shows alignment direction, not good/bad. */
-function DevCell({ dev, testId }: { dev: number | null; testId: string }) {
+/**
+ * A directional deviation cell — ▲/▼ shows alignment direction, not good/bad.
+ *
+ * `reason` distinguishes the null-cell treatment:
+ *  - "team" (default): a null deviation means "N<2 non-CEO contributors" → the
+ *    cell prints "— (N<2)" to explain why there's no team comparison.
+ *  - "peer": a null deviation means the Peers benchmark has no value for this
+ *    row (omit-empty) → a plain "—" with NO "(N<2)" note (the peer is a static
+ *    benchmark, not a cohort sample, so an N-size note would be misleading).
+ */
+function DevCell({
+  dev,
+  testId,
+  reason = "team",
+}: {
+  dev: number | null;
+  testId: string;
+  reason?: "team" | "peer";
+}) {
   if (dev === null || !Number.isFinite(dev)) {
     return (
       <td className="su-group-dev na" data-testid={testId}>
-        — <span className="su-group-dev-note">(N&lt;2)</span>
+        —{reason === "team" && <span className="su-group-dev-note"> (N&lt;2)</span>}
       </td>
     );
   }
@@ -72,68 +89,108 @@ function ceoCell(v: number | null): string {
 
 // ── Alignment profile (sections / domains) ───────────────────────────────────
 
+interface ProfileRow {
+  key: string;
+  label: string;
+  ceo: number | null;
+  teamAvg: number | null;
+  dev: number | null;
+  /** Peers benchmark (Wave J / J-2) — undefined/null for non-SU-Full rows. */
+  peers?: number | null;
+  devPeers?: number | null;
+  devPeersTeam?: number | null;
+}
+
+/** A Peers numeric cell — "—" when null/absent. */
+function peerCell(v: number | null | undefined): string {
+  return v === null || v === undefined || !Number.isFinite(v) ? "—" : formatGroupNumber(v);
+}
+
 function ProfileTable({
   rows,
   hasCeo,
 }: {
-  rows: Array<{
-    key: string;
-    label: string;
-    ceo: number | null;
-    teamAvg: number | null;
-    dev: number | null;
-  }>;
+  rows: ProfileRow[];
   hasCeo: boolean;
 }) {
+  // Omit-empty: only show the Peers + peer-deviation columns when ≥1 row
+  // carries a finite peer benchmark.
+  const hasPeers = rows.some((r) => r.peers != null && Number.isFinite(r.peers));
   return (
-    <table className="su-group-prof" data-testid="group-scored-profile">
-      <thead>
-        <tr>
-          <th scope="col">Section</th>
-          {hasCeo && (
-            <th scope="col" className="su-group-ceo">
-              CEO
-            </th>
-          )}
-          <th scope="col">
-            Team avg<span className="su-group-prof-sub">(excl. CEO)</span>
-          </th>
-          {hasCeo && <th scope="col">Dev</th>}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.key} data-testid={`group-scored-section-${r.key}`}>
-            <th scope="row">{r.label}</th>
+    <div className="su-group-prof-scroll">
+      <table className="su-group-prof" data-testid="group-scored-profile">
+        <thead>
+          <tr>
+            <th scope="col">Section</th>
             {hasCeo && (
-              <td className="su-group-ceo" data-testid={`group-scored-ceo-${r.key}`}>
-                {ceoCell(r.ceo)}
-              </td>
+              <th scope="col" className="su-group-ceo">
+                CEO
+              </th>
             )}
-            <td data-testid={`group-scored-team-${r.key}`}>
-              {r.teamAvg === null ? (
-                <span className="su-group-na">—</span>
-              ) : (
-                formatGroupNumber(r.teamAvg)
-              )}
-            </td>
-            {hasCeo && <DevCell dev={r.dev} testId={`group-scored-dev-${r.key}`} />}
+            <th scope="col">
+              Team avg<span className="su-group-prof-sub">(excl. CEO)</span>
+            </th>
+            {hasCeo && <th scope="col">Dev</th>}
+            {hasPeers && (
+              <th scope="col" className="su-group-peers">
+                Peers
+              </th>
+            )}
+            {hasPeers && (
+              <th scope="col">{hasCeo ? "Dev · Peers" : "Team vs Peers"}</th>
+            )}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key} data-testid={`group-scored-section-${r.key}`}>
+              <th scope="row">{r.label}</th>
+              {hasCeo && (
+                <td className="su-group-ceo" data-testid={`group-scored-ceo-${r.key}`}>
+                  {ceoCell(r.ceo)}
+                </td>
+              )}
+              <td data-testid={`group-scored-team-${r.key}`}>
+                {r.teamAvg === null ? (
+                  <span className="su-group-na">—</span>
+                ) : (
+                  formatGroupNumber(r.teamAvg)
+                )}
+              </td>
+              {hasCeo && <DevCell dev={r.dev} testId={`group-scored-dev-${r.key}`} />}
+              {hasPeers && (
+                <td
+                  className="su-group-peers"
+                  data-testid={`group-scored-peers-${r.key}`}
+                >
+                  {peerCell(r.peers)}
+                </td>
+              )}
+              {hasPeers && (
+                <DevCell
+                  dev={(hasCeo ? r.devPeers : r.devPeersTeam) ?? null}
+                  testId={`group-scored-devpeers-${r.key}`}
+                  reason="peer"
+                />
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
-function toProfileRows(
-  sections: GroupScoredSection[],
-): Array<{ key: string; label: string; ceo: number | null; teamAvg: number | null; dev: number | null }> {
+function toProfileRows(sections: GroupScoredSection[]): ProfileRow[] {
   return sections.map((s) => ({
     key: s.stableKey,
     label: s.name,
     ceo: s.ceo,
     teamAvg: s.teamAvg,
     dev: s.dev,
+    peers: s.peers,
+    devPeers: s.devPeers,
+    devPeersTeam: s.devPeersTeam,
   }));
 }
 
@@ -156,6 +213,9 @@ function DomainsBlock({
           ceo: d.ceo,
           teamAvg: d.teamAvg,
           dev: d.dev,
+          peers: d.peers,
+          devPeers: d.devPeers,
+          devPeersTeam: d.devPeersTeam,
         }))}
         hasCeo={hasCeo}
       />
@@ -226,6 +286,19 @@ export function ScoredGroupReport(props: GroupReportProps) {
   const { report } = props;
   const scored = report.scored;
   const hasCeo = cohortHasCeo(report);
+  // Tier presentation policy (Wave J / J-2): SU-Full sets showTier=false to
+  // suppress the band; undefined → show (back-compat for every other scored
+  // template that predates the flag).
+  const showTier = report.showTier !== false;
+  // Omit-empty: a provisional Peers footnote only renders when ≥1 scored row
+  // (section OR domain) actually carries a finite peer benchmark.
+  const hasPeers =
+    !!scored &&
+    (scored.sections.some((s) => s.peers != null && Number.isFinite(s.peers)) ||
+      (scored.domains?.some((d) => d.peers != null && Number.isFinite(d.peers)) ??
+        false) ||
+      (scored.scaleUpScore?.peers != null &&
+        Number.isFinite(scored.scaleUpScore.peers)));
 
   return (
     <div className="su-public-brand su-report" data-testid="scored-group-report">
@@ -254,7 +327,7 @@ export function ScoredGroupReport(props: GroupReportProps) {
             <section className="su-group-sec" data-testid="group-scored-profile-section">
               <h2 className="su-group-sec-title">
                 Alignment profile
-                {hasCeo && scored.tier.ceo ? (
+                {showTier && hasCeo && scored.tier.ceo ? (
                   <span className="su-group-tier" data-testid="group-scored-ceo-tier">
                     CEO tier: {scored.tier.ceo}
                   </span>
@@ -267,7 +340,7 @@ export function ScoredGroupReport(props: GroupReportProps) {
               </p>
               <ProfileTable rows={toProfileRows(scored.sections)} hasCeo={hasCeo} />
 
-              {scored.tier.teamDistribution.length > 0 && (
+              {showTier && scored.tier.teamDistribution.length > 0 && (
                 <div
                   className="su-group-tierband"
                   data-testid="group-scored-tier-band"
@@ -279,6 +352,17 @@ export function ScoredGroupReport(props: GroupReportProps) {
                     </span>
                   ))}
                 </div>
+              )}
+
+              {hasPeers && (
+                <p
+                  className="su-group-footnote"
+                  data-testid="group-scored-peers-footnote"
+                >
+                  Peers = provisional industry benchmark (single Esperto cohort
+                  {report.benchmarkVersion ? `, v${report.benchmarkVersion}` : ""});
+                  not yet size-matched.
+                </p>
               )}
             </section>
 
@@ -308,6 +392,39 @@ export function ScoredGroupReport(props: GroupReportProps) {
                         : formatGroupNumber(scored.scaleUpScore.teamAvg)}
                     </span>
                   </span>
+                  {scored.scaleUpScore.peers != null &&
+                    Number.isFinite(scored.scaleUpScore.peers) && (
+                      <>
+                        <span className="su-group-scaleup-fig">
+                          <span className="su-group-scaleup-lab su-group-peers">
+                            Peers
+                          </span>
+                          <span
+                            className="su-group-scaleup-val"
+                            data-testid="group-scored-scaleup-peers"
+                          >
+                            {peerCell(scored.scaleUpScore.peers)}
+                          </span>
+                        </span>
+                        {/* ScaleUp Dev·Peers exists ONLY as the CEO deviation
+                            (devPeers = ceo − peers); the model carries no
+                            devPeersTeam for the headline. With no CEO it is
+                            null — show NO deviation figure rather than a blank
+                            "—" under a label promising a value. */}
+                        {scored.scaleUpScore.devPeers != null &&
+                          Number.isFinite(scored.scaleUpScore.devPeers) && (
+                            <span className="su-group-scaleup-fig">
+                              <span className="su-group-scaleup-lab">Dev · Peers</span>
+                              <span
+                                className="su-group-scaleup-val"
+                                data-testid="group-scored-scaleup-devpeers"
+                              >
+                                {peerCell(scored.scaleUpScore.devPeers)}
+                              </span>
+                            </span>
+                          )}
+                      </>
+                    )}
                 </div>
               </section>
             )}

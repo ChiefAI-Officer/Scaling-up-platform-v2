@@ -20,11 +20,13 @@ import {
   type GroupScoredDomain,
   type GroupScoredQuestion,
 } from "@/lib/assessments/group-report-model";
+import { SU_FULL_BENCHMARKS_VERSION } from "@/lib/assessments/su-full-benchmarks";
 import {
   fixtureRockefeller,
   fixtureRockefellerSparseCash,
   fixtureRockefellerNoCeo,
   fixtureScalingUpFull,
+  fixtureScalingUpFullNoCeo,
   fixtureScalingUpFullDegraded,
 } from "./fixtures/group-report-fixtures";
 
@@ -308,5 +310,89 @@ describe("scored aggregation — robustness", () => {
     // No tier rows → tier block still defined but empty.
     expect(scored.tier?.ceo ?? null).toBeNull();
     expect(scored.tier?.teamDistribution ?? []).toEqual([]);
+  });
+});
+
+// ── Peers benchmark (Task 5 / J-2) ───────────────────────────────────────────
+//
+// applyBenchmarks attaches Peers (devPeers vs CEO, devPeersTeam vs team) onto
+// the scored domains/sections/ScaleUp ONLY for the SU-Full alias; version flows
+// to the model ONLY when ≥1 row is applied; a benchmark key the report's keys
+// don't cover (seed/version drift) fails CLOSED — every peer is cleared.
+
+describe("scored Peers benchmark — SU-Full (J-2)", () => {
+  it("attaches Peers/devPeers to domains+sections+ScaleUp; version only on application; suppresses tier", () => {
+    const m = buildGroupReportModel(fixtureScalingUpFull());
+    // people: ceo 8, peers 6.1 → devPeers = 8 - 6.1 = +1.9.
+    const people = findDomain(m.scored!.domains!, "people")!;
+    expect(people.peers).toBe(6.1);
+    expect(people.devPeers).toBeCloseTo(8 - 6.1, 5);
+    // section asserted: S_PEOPLE_YE peer = 5.9.
+    expect(findSection(m.scored!.sections, "S_PEOPLE_YE")!.peers).toBe(5.9);
+    // ScaleUp: ceo 70, peers 53.1 → devPeers = +16.9.
+    expect(m.scored!.scaleUpScore!.peers).toBe(53.1);
+    expect(m.scored!.scaleUpScore!.devPeers).toBeCloseTo(70 - 53.1, 5);
+    // SU-Full suppresses the tier band in the group renderer (Task 2).
+    expect(m.showTier).toBe(false);
+    // version present (≥1 row applied); no key mismatch.
+    expect(m.benchmarkVersion).toBe(SU_FULL_BENCHMARKS_VERSION);
+    expect(m.benchmarkKeyMismatch).toBe(false);
+  });
+
+  it("non-SU-Full (Rockefeller): no peers attached; showTier true; no benchmarkVersion", () => {
+    const m = buildGroupReportModel(fixtureRockefeller());
+    for (const s of m.scored!.sections) {
+      expect(s.peers ?? null).toBeNull();
+      expect(s.devPeers ?? null).toBeNull();
+      expect(s.devPeersTeam ?? null).toBeNull();
+    }
+    expect(m.showTier).toBe(true);
+    expect(m.benchmarkVersion).toBeUndefined();
+    expect(m.benchmarkKeyMismatch).toBe(false);
+  });
+
+  it("no benchmarkVersion when nothing applied (empty Rockefeller cohort)", () => {
+    const input = { ...fixtureRockefeller(), submissions: [] };
+    expect(buildGroupReportModel(input).benchmarkVersion).toBeUndefined();
+  });
+
+  it("no-CEO: team-vs-peers deviation is the standing signal (devPeersTeam present)", () => {
+    const m = buildGroupReportModel(fixtureScalingUpFullNoCeo());
+    const people = m.scored!.domains!.find((d) => d.key === "people")!;
+    // No CEO → ceo null, devPeers null; the peer + team-vs-peer signal remains.
+    expect(people.ceo).toBeNull();
+    expect(people.peers).toBe(6.1);
+    expect(people.devPeers ?? null).toBeNull();
+    expect(people.devPeersTeam).toBeCloseTo((people.teamAvg ?? 0) - 6.1, 5);
+    // version still flows (rows applied even with no CEO).
+    expect(m.benchmarkVersion).toBe(SU_FULL_BENCHMARKS_VERSION);
+    expect(m.benchmarkKeyMismatch).toBe(false);
+  });
+
+  it("key-mismatch fail-closed: a report domain key the benchmark omits clears EVERY peer", () => {
+    // Inject an extra perDomain key ("extra") the benchmark does not cover →
+    // missing > 0 → fail closed: all peers cleared, mismatch flagged, no version.
+    const input = fixtureScalingUpFull();
+    for (const sub of input.submissions) {
+      const r = sub.result as {
+        perDomain: Array<{ key: string; label: string; averagePoints: number | null }>;
+      };
+      r.perDomain.push({ key: "extra", label: "Extra", averagePoints: 5 });
+    }
+    const m = buildGroupReportModel(input);
+    for (const d of m.scored!.domains!) {
+      expect(d.peers).toBeUndefined();
+      expect(d.devPeers).toBeUndefined();
+      expect(d.devPeersTeam).toBeUndefined();
+    }
+    for (const s of m.scored!.sections) {
+      expect(s.peers).toBeUndefined();
+      expect(s.devPeers).toBeUndefined();
+      expect(s.devPeersTeam).toBeUndefined();
+    }
+    expect(m.scored!.scaleUpScore!.peers).toBeUndefined();
+    expect(m.scored!.scaleUpScore!.devPeers).toBeUndefined();
+    expect(m.benchmarkKeyMismatch).toBe(true);
+    expect(m.benchmarkVersion).toBeUndefined();
   });
 });

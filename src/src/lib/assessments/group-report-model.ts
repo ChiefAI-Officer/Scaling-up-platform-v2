@@ -50,6 +50,7 @@ import {
   presentationKindForSection,
 } from "@/lib/assessments/qualitative-report-model";
 import { stripLegacyDecimalSuffix } from "@/lib/assessments/question-label";
+import { benchmarksFor } from "@/lib/assessments/su-full-benchmarks";
 import {
   GROUP_RENDER_VERSION,
   LVA_TEMPLATE_ALIAS,
@@ -313,6 +314,16 @@ export interface GroupScoredSection {
   teamAvg: number | null;
   dev: number | null;
   n: number;
+  /**
+   * Peers benchmark (Wave J / J-2). Attached ONLY for the SU-Full alias by
+   * `applyBenchmarks`; `undefined` for every other template (omit-empty so the
+   * renderer never shows a Peers column). `peers` = the static peer mean for
+   * this section; `devPeers = ceo - peers`; `devPeersTeam = teamAvg - peers`
+   * (the standing signal when there is no CEO column).
+   */
+  peers?: number | null;
+  devPeers?: number | null;
+  devPeersTeam?: number | null;
 }
 
 /**
@@ -326,12 +337,22 @@ export interface GroupScoredDomain {
   teamAvg: number | null;
   dev: number | null;
   n: number;
+  /** Peers benchmark (Wave J / J-2). See `GroupScoredSection` for semantics. */
+  peers?: number | null;
+  devPeers?: number | null;
+  devPeersTeam?: number | null;
 }
 
 /** The 0-100 ScaleUp Score headline: CEO value + CEO-excluded team mean. */
 export interface GroupScoredScaleUp {
   ceo: number | null;
   teamAvg: number | null;
+  /**
+   * Peers benchmark (Wave J / J-2). Attached ONLY for the SU-Full alias.
+   * `peers` = the static peer ScaleUp mean (0–100); `devPeers = ceo - peers`.
+   */
+  peers?: number | null;
+  devPeers?: number | null;
 }
 
 /**
@@ -394,6 +415,22 @@ export interface CampaignGroupReport {
   qualitative?: GroupQualitativeReport;
   /** Present when reportType === "scored" (sections EMPTY until T5). */
   scored?: GroupScoredReport;
+  /**
+   * Wave J / J-2 — Peers benchmark + tier presentation policy.
+   *
+   *  - `showTier` = reportConfigFor(alias).showTier — the group renderer's tier
+   *    band toggle (SU-Full suppresses it; everyone else shows it).
+   *  - `benchmarkVersion` = the applied Peers benchmark version string, ONLY
+   *    when ≥1 peer row was attached to the scored report; `undefined` when no
+   *    benchmark applied (non-SU-Full, empty cohort) OR on a key mismatch.
+   *  - `benchmarkKeyMismatch` = true when the scored report carried a
+   *    domain/section key the benchmark does not cover (seed/version drift):
+   *    Peers are then cleared entirely (fail-closed; never a partial table) and
+   *    this flag drives the audit/metric + the launch-blocking alert.
+   */
+  showTier?: boolean;
+  benchmarkVersion?: string;
+  benchmarkKeyMismatch?: boolean;
 }
 
 // ─── Raw answer-row guard (mirror qualitative-report-model posture) ─────────
@@ -1251,6 +1288,94 @@ function buildScoredTier(scoredMembers: ScoredMember[]): GroupScoredTier {
   return { ceo, teamDistribution };
 }
 
+// ─── Peers benchmark application (Wave J / J-2) ──────────────────────────────
+//
+// Attaches the static, versioned Peers benchmark onto the BUILT scored report.
+// SU-Full ONLY (benchmarksFor returns null for every other alias → no-op). The
+// `devOf` helper above (`ceo - x`) is reused for BOTH the CEO-vs-peer deviation
+// and the team-vs-peer deviation, so the standing signal survives a no-CEO
+// cohort (devPeersTeam = teamAvg - peers).
+
+/**
+ * Attaches Peers/devPeers (+ devPeersTeam on domains/sections) onto the scored
+ * report's domains, sections, and ScaleUp headline, and returns the application
+ * metadata for provenance/metrics.
+ *
+ *  - version flows out ONLY when ≥1 peer row was actually applied,
+ *  - FAIL-CLOSED on key skew (R3-Mc): if the report carries a domain/section
+ *    key the benchmark does not cover (a seed/version drift), EVERY attached
+ *    peer is cleared so the renderer omits Peers entirely (never a partial,
+ *    misleading table) and `keyMismatch:true` flows to the audit/metric + alert.
+ *
+ * Mutates `report` in place (it is freshly built by `buildScoredReport`).
+ */
+export function applyBenchmarks(
+  report: GroupScoredReport,
+  alias?: string | null,
+): { version?: string; keyMismatch: boolean } {
+  const b = benchmarksFor(alias);
+  if (!b) return { keyMismatch: false };
+
+  let applied = 0;
+  let missing = 0;
+
+  const fill = (
+    row: { ceo: number | null; teamAvg: number | null },
+    peer: number | undefined,
+    set: (p: number, dCeo: number | null, dTeam: number | null) => void,
+  ): void => {
+    if (typeof peer === "number") {
+      set(peer, devOf(row.ceo, peer), devOf(row.teamAvg, peer));
+      applied++;
+    } else {
+      missing++;
+    }
+  };
+
+  for (const d of report.domains ?? []) {
+    fill(d, b.domain[d.key as keyof typeof b.domain], (p, dc, dt) => {
+      d.peers = p;
+      d.devPeers = dc;
+      d.devPeersTeam = dt;
+    });
+  }
+  for (const s of report.sections) {
+    fill(s, b.section[s.stableKey as keyof typeof b.section], (p, dc, dt) => {
+      s.peers = p;
+      s.devPeers = dc;
+      s.devPeersTeam = dt;
+    });
+  }
+  if (report.scaleUpScore && typeof b.scaleUp === "number") {
+    report.scaleUpScore.peers = b.scaleUp;
+    report.scaleUpScore.devPeers = devOf(report.scaleUpScore.ceo, b.scaleUp);
+    applied++;
+  }
+
+  // FAIL-CLOSED on key skew (R3-Mc): a missing expected key means the seed /
+  // version drifted from the benchmark — do NOT show a partial/misleading Peers
+  // table. Clear EVERY peer so the renderer omits the column entirely.
+  if (missing > 0) {
+    for (const d of report.domains ?? []) {
+      d.peers = undefined;
+      d.devPeers = undefined;
+      d.devPeersTeam = undefined;
+    }
+    for (const s of report.sections) {
+      s.peers = undefined;
+      s.devPeers = undefined;
+      s.devPeersTeam = undefined;
+    }
+    if (report.scaleUpScore) {
+      report.scaleUpScore.peers = undefined;
+      report.scaleUpScore.devPeers = undefined;
+    }
+    return { version: undefined, keyMismatch: true };
+  }
+
+  return { version: applied > 0 ? b.version : undefined, keyMismatch: false };
+}
+
 // ─── Main builder ──────────────────────────────────────────────────────────
 
 /**
@@ -1271,7 +1396,8 @@ function buildScoredTier(scoredMembers: ScoredMember[]): GroupScoredTier {
  *   7. Empty cohort → respondentCount 0, empty respondents, no throw.
  */
 export function buildGroupReportModel(input: GroupReportInput): CampaignGroupReport {
-  const reportType = reportConfigFor(input?.alias).reportType;
+  const config = reportConfigFor(input?.alias);
+  const reportType = config.reportType;
   const questionsByKey = buildQuestionMetaByKey(input?.version?.questions);
 
   // Participant lookups: respondentId → profile (canonical name) + isCEO set.
@@ -1378,6 +1504,11 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
   let qualitative: GroupQualitativeReport | undefined;
   let scored: GroupScoredReport | undefined;
 
+  // Peers benchmark application metadata (Wave J / J-2). Set only on the scored
+  // path (benchmarksFor is alias-scoped to SU-Full); stays undefined/false for
+  // qualitative templates (LVA/QSP) and any non-SU-Full scored template.
+  let benchmarkVersion: string | undefined;
+  let benchmarkKeyMismatch = false;
   // Wave L (L3) — the S3 0–10-scale degraded signal (out-of-domain values).
   const scaleSignal = { scaleDegraded: false };
 
@@ -1406,6 +1537,11 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
       scoredMembers.push({ isCEO: m.isCEO, parsed });
     }
     scored = buildScoredReport(input?.version?.sections, questionsByKey, scoredMembers);
+    // Attach the static Peers benchmark (SU-Full only); the result drives the
+    // version + key-mismatch fields below (and the loader's provenance, T7).
+    const applied = applyBenchmarks(scored, input?.alias);
+    benchmarkVersion = applied.version;
+    benchmarkKeyMismatch = applied.keyMismatch;
   }
 
   return {
@@ -1419,6 +1555,9 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
     degraded,
     questionsByKey,
     answersByRespondent,
+    showTier: config.showTier,
+    ...(benchmarkVersion !== undefined ? { benchmarkVersion } : {}),
+    benchmarkKeyMismatch,
     ...(qualitative ? { qualitative } : {}),
     ...(scored ? { scored } : {}),
   };

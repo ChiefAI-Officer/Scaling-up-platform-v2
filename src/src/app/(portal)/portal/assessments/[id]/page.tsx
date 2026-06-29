@@ -75,13 +75,21 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       createdByCoachId: true,
       organizationId: true,
       template: { select: { alias: true } },
+      // Wave J (J-3): the SU-Full-scoped publish guard reads publishedAt so the
+      // entry-point link is gated lock-step with the loader (never show a link
+      // that would land on the loader's `notApplicable(unpublished)` panel).
+      version: { select: { publishedAt: true } },
     },
   });
   const canShowGroupReport =
     campaignForFlag !== null &&
     campaignForFlag.accessMode === "INVITED" &&
-    // LVA-only surface (Jeff 2026-06-18) — scored reports are not aggregated.
+    // Allowlisted surface — LVA (Jeff 2026-06-18) + SU-Full (Wave J J-3).
     isGroupReportAlias(campaignForFlag.template?.alias) &&
+    // SU-Full-SCOPED publish guard, lock-step with the loader (R3-H1). A DRAFT
+    // SU-Full version hides the link; LVA is NEVER gated on publishedAt.
+    (campaignForFlag.template?.alias !== "scaling-up-full" ||
+      campaignForFlag.version?.publishedAt != null) &&
     isGroupReportEnabled(actor, campaignForFlag) &&
     (await canViewGroupReport(asAccessDb(db), actor, id));
 

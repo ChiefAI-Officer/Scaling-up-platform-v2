@@ -53,18 +53,31 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
     generatedAt,
   });
 
-  // notApplicable (PUBLIC campaign) → a clean informative panel. No audit (gate).
+  // notApplicable → a clean informative panel. No audit (gate). The copy is
+  // reason-aware: Wave J (J-3) adds `unpublished` (a DRAFT SU-Full version),
+  // which must read accurately and NOT claim the campaign is public.
   if (outcome.kind === "notApplicable") {
-    emitGroupReportMetric("not_applicable", { role: metricRole });
+    // Task 7 (Wave J): emit reason + template so not_applicable outcomes are
+    // distinguishable in log-drain queries (unpublished vs unsupported-template
+    // vs public-campaign — all low-cardinality, PII-free).
+    emitGroupReportMetric("not_applicable", {
+      role: metricRole,
+      reason: outcome.reason,
+      template: outcome.templateAlias,
+    });
+    const isUnpublished = outcome.reason === "unpublished";
     return (
       <div className="su-report-page">
         <div className="su-group-empty" data-testid="group-report-not-applicable">
           <p className="su-group-empty-title">
-            Group report is available for invited campaigns only
+            {isUnpublished
+              ? "Group report is not available yet"
+              : "Group report is available for invited campaigns only"}
           </p>
           <p className="su-group-empty-sub">
-            This is a public campaign. The team group report aggregates the
-            answers of invited participants, so it does not apply here.
+            {isUnpublished
+              ? "This assessment's content has not been published yet. The team group report becomes available once an administrator publishes the assessment version."
+              : "This is a public campaign. The team group report aggregates the answers of invited participants, so it does not apply here."}
           </p>
         </div>
       </div>
@@ -115,6 +128,7 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
   }
 
   // The OK render marker, with wall-clock render latency.
+  // Task 7 (Wave J): also carry benchmark provenance (SU-Full only; null/undefined for LVA).
   emitGroupReportMetric("view", {
     role: metricRole,
     template: provenance.templateAlias,
@@ -123,6 +137,8 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
     invitedCount: provenance.invitedCount,
     orphanCount,
     degraded: report.degraded,
+    benchmarkVersion: provenance.benchmarkVersion ?? null,
+    benchmarkKeyMismatch: provenance.benchmarkKeyMismatch ?? false,
     // eslint-disable-next-line react-hooks/purity
     latencyMs: Date.now() - startedAt,
   });
