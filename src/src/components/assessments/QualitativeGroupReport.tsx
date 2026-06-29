@@ -46,6 +46,10 @@ import {
   cohortHasCeo,
   type GroupReportProps,
 } from "@/components/assessments/GroupReport";
+import {
+  LVA_TEMPLATE_ALIAS,
+  lvaSectionIntro,
+} from "@/lib/assessments/lva-report-display";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -136,7 +140,13 @@ function MetricTableSection({
 // ── Rating (stacked Weak/Average/Strong) ─────────────────────────────────────
 
 function RatingSectionBlock({ section }: { section: GroupRatingSection }) {
-  const totalN = section.factors[0]?.n ?? 0;
+  // Wave L (L3): when any factor carries a 0–10 scaledValue (LVA S3), the column
+  // is the Esperto 0–10 value (10 = strong); otherwise it's the raw scale mean.
+  // Edge case (rare imported/legacy LVA S3): if SOME factors are in-domain
+  // (scaled) and some out-of-domain (null → raw 1–3 mean), the legend reads
+  // "0–10" while a degraded row shows a 1–3 value. Accepted on this dark feature;
+  // scaleDegraded=true is recorded in provenance/audit for the operator.
+  const isScaled = section.factors.some((f) => f.scaledValue != null);
   return (
     <div
       className="su-group-rating"
@@ -147,6 +157,13 @@ function RatingSectionBlock({ section }: { section: GroupRatingSection }) {
         const sPct = (f.strong / denom) * 100;
         const aPct = (f.avg / denom) * 100;
         const wPct = (f.weak / denom) * 100;
+        // L3 (R1-M5): scaled values use a FIXED one-decimal formatter — never
+        // formatGroupNumber (which drops the decimal on 5.0/10.0). A null scaled
+        // value falls back to the raw mean (non-LVA / out-of-domain S3).
+        const value =
+          f.scaledValue != null
+            ? f.scaledValue.toFixed(1)
+            : formatGroupNumber(f.mean);
         return (
           <div
             className="su-group-rat-row"
@@ -166,7 +183,9 @@ function RatingSectionBlock({ section }: { section: GroupRatingSection }) {
               {f.avg > 0 && <span className="a" style={{ width: `${aPct}%` }} />}
               {f.weak > 0 && <span className="w" style={{ width: `${wPct}%` }} />}
             </span>
-            <span className="su-group-rat-val">{formatGroupNumber(f.mean)}</span>
+            <span className="su-group-rat-val">{value}</span>
+            {/* L3 (R1-L1): per-factor n — denominators can differ (partial S3). */}
+            <span className="su-group-rat-n">n={f.n}</span>
           </div>
         );
       })}
@@ -184,7 +203,9 @@ function RatingSectionBlock({ section }: { section: GroupRatingSection }) {
           Weak
         </span>
         <span className="su-group-legend-note">
-          value = mean on the 1–3 scale · n={totalN}
+          {isScaled
+            ? "value on a 0–10 scale (10 = strong)"
+            : "value = mean on the 1–3 scale"}
         </span>
       </div>
     </div>
@@ -313,6 +334,9 @@ export function QualitativeGroupReport(props: GroupReportProps) {
   const { report } = props;
   const hasCeo = cohortHasCeo(report);
   const sections = report.qualitative?.sections ?? [];
+  // Wave L (L4b): LVA renders a verbatim Esperto intro under each section
+  // heading (NOT the seed `description`). Other templates render no intro.
+  const isLva = props.templateAlias === LVA_TEMPLATE_ALIAS;
 
   return (
     <div
@@ -339,16 +363,27 @@ export function QualitativeGroupReport(props: GroupReportProps) {
         ) : (
           <>
             {!hasCeo && <GroupReportNoCeoNote ceoName={props.ceoName} />}
-            {sections.map((section) => (
-              <section
-                className="su-group-sec"
-                key={section.stableKey}
-                data-testid={`group-section-${section.stableKey}`}
-              >
-                <h2 className="su-group-sec-title">{section.name}</h2>
-                <SectionBody section={section} respondents={report.respondents} />
-              </section>
-            ))}
+            {sections.map((section) => {
+              const intro = isLva ? lvaSectionIntro(section.stableKey) : null;
+              return (
+                <section
+                  className="su-group-sec"
+                  key={section.stableKey}
+                  data-testid={`group-section-${section.stableKey}`}
+                >
+                  <h2 className="su-group-sec-title">{section.name}</h2>
+                  {intro ? (
+                    <p
+                      className="su-group-sec-intro"
+                      data-testid={`group-section-intro-${section.stableKey}`}
+                    >
+                      {intro}
+                    </p>
+                  ) : null}
+                  <SectionBody section={section} respondents={report.respondents} />
+                </section>
+              );
+            })}
           </>
         )}
       </div>

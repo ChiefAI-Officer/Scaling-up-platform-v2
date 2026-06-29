@@ -142,6 +142,7 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
         invitedCount={provenance.invitedCount}
         versionLabel={provenance.versionLabel}
         ceoName={ceoName}
+        templateAlias={provenance.templateAlias}
       />
     </div>
   );

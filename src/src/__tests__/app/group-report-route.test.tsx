@@ -177,6 +177,7 @@ function okResult() {
     kind: "ok",
     report: {
       reportType: "qualitative",
+      provenance: { groupRenderVersion: "lva-fidelity-v1", scaleDegraded: false },
       respondentCount: 3,
       respondents: [
         { respondentId: "r-ceo", name: "Jane CEO", jobTitle: "CEO", isCEO: true, isOrphan: false },
@@ -304,6 +305,9 @@ describe("(report) campaign group report page", () => {
         completedCount: 3,
         invitedCount: 5,
         submissionIds: ["sub-1", "sub-2", "sub-3"],
+        // Wave L — render-ruleset provenance recorded in the audit changes.
+        groupRenderVersion: "lva-fidelity-v1",
+        scaleDegraded: false,
       }),
     );
   });

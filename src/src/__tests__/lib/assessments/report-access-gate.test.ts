@@ -106,7 +106,9 @@ describe("viewGroupReport adapter", () => {
     await viewGroupReport({} as never, { campaignId: "camp-X", generatedAt: gen });
     const spec = lastOpts().auditOf({
       kind: "ok",
-      report: {},
+      report: {
+        provenance: { groupRenderVersion: "lva-fidelity-v1", scaleDegraded: true },
+      },
       provenance: {
         versionId: "v-1",
         templateAlias: "lva",
@@ -130,6 +132,9 @@ describe("viewGroupReport adapter", () => {
       completedCount: 3,
       invitedCount: 5,
       submissionIds: ["s1", "s2"],
+      // Wave L (R2-M1) — the render-ruleset provenance is recorded in the audit.
+      groupRenderVersion: "lva-fidelity-v1",
+      scaleDegraded: true,
     });
   });
 
