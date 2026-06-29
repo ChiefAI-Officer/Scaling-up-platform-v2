@@ -136,6 +136,55 @@ describe("viewGroupReport adapter", () => {
     });
   });
 
+  // Task 7 (Wave J): benchmarkVersion + benchmarkKeyMismatch in audit changes
+  it("auditOf includes benchmarkVersion + benchmarkKeyMismatch for SU-Full (audit changes)", async () => {
+    mockGetApiActor.mockResolvedValue({ userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null });
+    const gen = new Date("2026-06-29T00:00:00Z");
+    await viewGroupReport({} as never, { campaignId: "camp-SU", generatedAt: gen });
+    const spec = lastOpts().auditOf({
+      kind: "ok",
+      report: {},
+      provenance: {
+        versionId: "v-2",
+        templateAlias: "scaling-up-full",
+        contentHash: "hh",
+        ceoParticipantId: "p-2",
+        completedCount: 5,
+        invitedCount: 8,
+        submissionIds: ["s3"],
+        benchmarkVersion: "2026-06-28.cohort1.provisional",
+        benchmarkKeyMismatch: false,
+      },
+    });
+    expect(spec.changes).toMatchObject({
+      benchmarkVersion: "2026-06-28.cohort1.provisional",
+      benchmarkKeyMismatch: false,
+    });
+  });
+
+  it("auditOf records benchmarkVersion: null for LVA (no benchmark)", async () => {
+    mockGetApiActor.mockResolvedValue({ userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null });
+    const gen = new Date("2026-06-29T00:00:00Z");
+    await viewGroupReport({} as never, { campaignId: "camp-LVA", generatedAt: gen });
+    const spec = lastOpts().auditOf({
+      kind: "ok",
+      report: {},
+      provenance: {
+        versionId: "v-3",
+        templateAlias: "leadership-vision-alignment",
+        contentHash: "hhh",
+        ceoParticipantId: null,
+        completedCount: 2,
+        invitedCount: 4,
+        submissionIds: ["s4"],
+        // no benchmarkVersion field (undefined → ?? null)
+      },
+    });
+    expect(spec.changes.benchmarkVersion).toBeNull();
+    // ?? false default flows through when provenance carries no mismatch flag.
+    expect(spec.changes.benchmarkKeyMismatch).toBe(false);
+  });
+
   it("auditFailureFields returns { template } for ok, {} otherwise", async () => {
     mockGetApiActor.mockResolvedValue({ userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null });
     await viewGroupReport({} as never, { campaignId: "c", generatedAt: new Date() });

@@ -43,6 +43,13 @@ export interface GroupReportMetricFields {
   latencyMs?: number;
   /** Error CLASS name only (e.g. "Error") — NEVER the message (may carry PII). */
   errorClass?: string;
+  // Task 7 (Wave J): benchmark provenance — PII-safe, low-cardinality.
+  /** Benchmark dataset version string (e.g. "2026-06-28.cohort1.provisional"), or null when no benchmark applies. */
+  benchmarkVersion?: string | null;
+  /** True when a SU-Full report's benchmark key set didn't match the model keys. */
+  benchmarkKeyMismatch?: boolean;
+  /** Low-cardinality reason for a not_applicable outcome ("public" | "unpublished" | "unsupported-template"). */
+  reason?: string;
 }
 
 /**

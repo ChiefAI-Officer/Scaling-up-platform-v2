@@ -123,6 +123,9 @@ export async function viewGroupReport(
           completedCount: o.provenance.completedCount,
           invitedCount: o.provenance.invitedCount,
           submissionIds: o.provenance.submissionIds,
+          // Task 7 (Wave J): benchmark provenance for SU-Full audit trail.
+          benchmarkVersion: o.provenance.benchmarkVersion ?? null,
+          benchmarkKeyMismatch: o.provenance.benchmarkKeyMismatch ?? false,
         },
       };
     },
