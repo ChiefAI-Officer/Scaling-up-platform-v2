@@ -288,6 +288,11 @@ test("PUBLISHED SU-Full (WAVE_J on) → ok (publish guard passes)", async () => 
   expect(res.kind).toBe("ok");
   if (res.kind !== "ok") return;
   expect(res.provenance.templateAlias).toBe("scaling-up-full");
+  // benchmarkKeyMismatch is threaded through the provenance even when the
+  // minimal fixture has no sections to match (version stays undefined because
+  // applied=0; the key-mismatch=false because missing=0 too). The full
+  // benchmark-application path is tested at the model layer.
+  expect(res.provenance.benchmarkKeyMismatch).toBe(false);
 });
 
 test("published LVA campaign still loads ok (guard only bites SU-Full)", async () => {

@@ -276,12 +276,26 @@ describe("(report) campaign group report page", () => {
   it("renders the invited-only panel for a PUBLIC (notApplicable) campaign — no audit", async () => {
     mockGetApiActor.mockResolvedValue(adminActor());
     mockIsEnabled.mockReturnValue(true);
-    mockGetGroupReport.mockResolvedValue({ kind: "notApplicable", reason: "public" });
+    mockGetGroupReport.mockResolvedValue({ kind: "notApplicable", reason: "public", templateAlias: "lva" });
 
     const node = await Page(makeProps());
     const markup = renderToStaticMarkup(node as React.ReactElement);
 
     expect(markup).toContain("invited");
+    expect(mockNotFound).not.toHaveBeenCalled();
+    expect(mockAuditCreate).not.toHaveBeenCalled();
+  });
+
+  it("renders the unsupported-template panel for a non-aliased campaign — no audit", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockIsEnabled.mockReturnValue(true);
+    mockGetGroupReport.mockResolvedValue({ kind: "notApplicable", reason: "unsupported-template", templateAlias: "rock_habits" });
+
+    const node = await Page(makeProps());
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain("not available for this assessment type");
+    expect(markup).not.toContain("invited");
     expect(mockNotFound).not.toHaveBeenCalled();
     expect(mockAuditCreate).not.toHaveBeenCalled();
   });
