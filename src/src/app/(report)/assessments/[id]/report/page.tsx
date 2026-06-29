@@ -66,19 +66,22 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
       template: outcome.templateAlias,
     });
     const isUnpublished = outcome.reason === "unpublished";
+    const isUnsupported = outcome.reason === "unsupported-template";
+    const title = isUnpublished
+      ? "Group report is not available yet"
+      : isUnsupported
+        ? "Group report is not available for this assessment type"
+        : "Group report is available for invited campaigns only";
+    const subtitle = isUnpublished
+      ? "This assessment's content has not been published yet. The team group report becomes available once an administrator publishes the assessment version."
+      : isUnsupported
+        ? "The team group report is not supported for this assessment template."
+        : "This is a public campaign. The team group report aggregates the answers of invited participants, so it does not apply here.";
     return (
       <div className="su-report-page">
         <div className="su-group-empty" data-testid="group-report-not-applicable">
-          <p className="su-group-empty-title">
-            {isUnpublished
-              ? "Group report is not available yet"
-              : "Group report is available for invited campaigns only"}
-          </p>
-          <p className="su-group-empty-sub">
-            {isUnpublished
-              ? "This assessment's content has not been published yet. The team group report becomes available once an administrator publishes the assessment version."
-              : "This is a public campaign. The team group report aggregates the answers of invited participants, so it does not apply here."}
-          </p>
+          <p className="su-group-empty-title">{title}</p>
+          <p className="su-group-empty-sub">{subtitle}</p>
         </div>
       </div>
     );
