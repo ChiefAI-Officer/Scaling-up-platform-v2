@@ -304,3 +304,7 @@ Leadership teams are inherently small. The loader has no hard runtime cap (consi
 ---
 
 _Last updated: 2026-06-29 — Wave J Task 8 (dark, no flag flip)_
+
+## Launch-monitoring note — a fail-closed is not necessarily a bug
+
+`benchmarkKeyMismatch=true` (and the resulting cleared Peers columns) is the **intended** fail-closed when a submission's frozen result carries a domain/section key that the version's structure and the static benchmark don't both cover (seed/version drift). It is launch-blocking and alertable, but before treating an alert as a code bug, confirm the SU-Full seed's domain keys + section stableKeys still match `SU_FULL_BENCHMARK_KEYS` (the `su-full-benchmarks` integrity test). A legitimate mismatch means the benchmark needs a re-key + version bump, not a code fix.
