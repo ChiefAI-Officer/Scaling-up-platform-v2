@@ -545,6 +545,72 @@ test("same-version delta computed; cross-version shows value with no delta", asy
   expect(out.data.hasMultipleVersions).toBe(true);
 });
 
+test("degraded point is skipped from delta AND does not poison the same-version baseline", async () => {
+  // Regression (whole-branch review): a malformed result between two good
+  // same-version points must (a) get NO fabricated delta, and (b) NOT seed the
+  // version baseline — so the next good point deltas vs the last GOOD value.
+  const db = buildDb({
+    submissions: [
+      {
+        id: "sub-a",
+        campaignId: "camp-a",
+        respondentId: "resp-1",
+        submittedAt: new Date("2024-01-10T00:00:00Z"),
+        versionId: "v1",
+        result: buildResult({
+          overallAverage: 2,
+          perSection: [{ stableKey: "s1", name: "S1", averagePoints: 2 }],
+        }),
+      },
+      {
+        id: "sub-b", // malformed result, same version, chronologically in the middle
+        campaignId: "camp-b",
+        respondentId: "resp-1",
+        submittedAt: new Date("2025-01-10T00:00:00Z"),
+        versionId: "v1",
+        result: { garbage: true },
+      },
+      {
+        id: "sub-c",
+        campaignId: "camp-c",
+        respondentId: "resp-1",
+        submittedAt: new Date("2026-01-10T00:00:00Z"),
+        versionId: "v1",
+        result: buildResult({
+          overallAverage: 3.2,
+          perSection: [{ stableKey: "s1", name: "S1", averagePoints: 3.2 }],
+        }),
+      },
+    ],
+  });
+  const out = await getRespondentLongitudinal(
+    db,
+    makeActor(),
+    ORG_ID,
+    "resp-1",
+    TEMPLATE_ID,
+  );
+  expect(out.kind).toBe("ok");
+  if (out.kind !== "ok") return;
+  const [pGood1, pBad, pGood2] = out.data.points;
+
+  // Baseline good point — no predecessor.
+  expect(pGood1.overall.deltaComparable).toBe(false);
+
+  // Malformed point: degraded, NO fabricated delta.
+  expect(pBad.degraded).toBe(true);
+  expect(pBad.overall.deltaComparable).toBe(false);
+  expect(pBad.overall.delta).toBeUndefined();
+
+  // Next good same-version point deltas vs the last GOOD value (2), NOT the
+  // poisoned 0: 3.2 - 2 = 1.2.
+  expect(pGood2.overall.deltaComparable).toBe(true);
+  expect(pGood2.overall.delta).toBe(1.2);
+
+  // Only the final good point is comparable; the degraded one is excluded.
+  expect(out.data.comparableCount).toBe(1);
+});
+
 test("partitionPointsByVersion: delta is vs the previous SAME-version point, not merely previous chronological", () => {
   // Order: v1(2.0), v2(9.0), v1(5.0). The third point's delta must be vs the
   // FIRST v1 point (5 - 2 = 3), NOT vs the immediately-previous v2 point.

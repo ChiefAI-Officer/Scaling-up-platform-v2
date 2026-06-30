@@ -155,6 +155,15 @@ describe("RespondentLongitudinalView", () => {
     expect(badges[0].textContent).toMatch(/different version/i);
   });
 
+  it("ok: does NOT badge the baseline column of a single-version history", () => {
+    // Regression (whole-branch review): okData() is a single-version (v1) history —
+    // c1 is the baseline (deltaComparable:false only because nothing precedes it),
+    // c2 is comparable. Neither is a genuine version change, so NO "different
+    // version" badge should render anywhere.
+    render(<RespondentLongitudinalView outcome={ok(okData())} />);
+    expect(screen.queryByTestId("longitudinal-version-badge")).toBeNull();
+  });
+
   it("ok: renders a tier-movement row ONLY where a tier exists", () => {
     const withTier = okData({
       points: [

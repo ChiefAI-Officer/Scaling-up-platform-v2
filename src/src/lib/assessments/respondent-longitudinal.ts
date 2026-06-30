@@ -366,6 +366,20 @@ export function partitionPointsByVersion(
   let comparableCount = 0;
 
   for (const point of points) {
+    // A degraded (malformed-result) point has no trustworthy values — exclude it
+    // from delta computation AND from seeding the version baseline (ADR-0016:
+    // "skip the bad column"). Otherwise it would fabricate its own delta against
+    // the prior good point AND poison prevByVersion (seeding 0), corrupting the
+    // NEXT same-version point's delta. It stays in the list (rendered + flagged)
+    // but never participates in comparison.
+    if (point.degraded) {
+      point.overall.deltaComparable = false;
+      for (const row of point.rows) {
+        row.deltaComparable = false;
+      }
+      continue;
+    }
+
     const prev = prevByVersion.get(point.versionId);
 
     // Build this point's row-value lookup for the NEXT same-version point.

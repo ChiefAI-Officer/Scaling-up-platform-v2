@@ -306,7 +306,7 @@ function OkView({
               <th className="text-left px-3 py-2 font-semibold text-foreground">
                 Section
               </th>
-              {points.map((p) => (
+              {points.map((p, idx) => (
                 <th
                   key={p.campaignId}
                   className="text-right px-3 py-2 font-semibold text-foreground whitespace-nowrap"
@@ -318,7 +318,13 @@ function OkView({
                   >
                     {p.campaignLabel}
                   </div>
-                  {p.overall.deltaComparable === false && (
+                  {/* "different version" marks a genuine cross-version transition:
+                      a column that has a prior column (idx > 0) but no same-version
+                      predecessor to delta against. The baseline column (idx 0) is
+                      non-comparable simply because nothing precedes it — NOT a
+                      version change — so it gets no badge. Degraded columns carry
+                      the "*" marker instead. */}
+                  {idx > 0 && !p.degraded && p.overall.deltaComparable === false && (
                     <span
                       className="mt-1 inline-block rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
                       data-testid="longitudinal-version-badge"
@@ -446,12 +452,18 @@ function OverallTrendLine({
 }: {
   points: RespondentLongitudinalPoint[];
 }) {
+  // Degraded (malformed-result) points have no trustworthy value (average left
+  // at 0); plotting them would draw a fabricated plunge. Exclude them from the
+  // trend entirely — they remain visible + flagged in the table (ADR-0016
+  // "skip the bad column").
+  const valid = points.filter((p) => !p.degraded);
+
   // Prefer the ScaleUp 0-100 score where present (SU-Full/Quick), else the
   // overall average.
-  const useScaleUp = points.every(
-    (p) => typeof p.overall.scaleUpScore === "number",
-  );
-  const series = points.map((p) =>
+  const useScaleUp =
+    valid.length > 0 &&
+    valid.every((p) => typeof p.overall.scaleUpScore === "number");
+  const series = valid.map((p) =>
     useScaleUp ? (p.overall.scaleUpScore as number) : p.overall.average,
   );
 
@@ -464,10 +476,10 @@ function OverallTrendLine({
 
   const maxValue = Math.max(1, ...series);
   const yMax = niceCeiling(maxValue);
-  const n = points.length;
+  const n = valid.length;
   const xStep = (W - PAD_L - PAD_R) / Math.max(1, n - 1);
 
-  const plotted = points.map((p, i) => {
+  const plotted = valid.map((p, i) => {
     const value = series[i];
     const x = n === 1 ? (W - PAD_L - PAD_R) / 2 + PAD_L : PAD_L + i * xStep;
     const y = PAD_T + (1 - value / yMax) * (H - PAD_T - PAD_B);
