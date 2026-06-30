@@ -141,16 +141,32 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   const longitudinalRespondentIds: string[] = [];
   for (const row of respondents) {
     if (!row.hasSubmission) continue;
-    const eligible = await hasComparableLongitudinal(
-      longitudinalEligibilityDb,
-      actor,
-      {
-        organizationId: overview.campaign.organizationId,
-        respondentId: row.respondent.id,
-        templateId: overview.campaign.templateId,
-        templateAlias: overview.campaign.alias,
-      },
-    );
+    // hasComparableLongitudinal documents a "never throws → no link" contract,
+    // but guard the call site anyway: a throw here would otherwise kill the whole
+    // Server Component render (→ 500). On any throw, treat the row as ineligible.
+    let eligible = false;
+    try {
+      eligible = await hasComparableLongitudinal(
+        longitudinalEligibilityDb,
+        actor,
+        {
+          organizationId: overview.campaign.organizationId,
+          respondentId: row.respondent.id,
+          // overview.campaign.alias is the CAMPAIGN slug, not the template alias.
+          // Use the template alias selected on campaignForFlag so the scored-only
+          // scope gate evaluates correctly (a wrong alias → unknown → default
+          // "scored", letting qualitative templates wrongly hit the DB path).
+          templateId: overview.campaign.templateId,
+          templateAlias: campaignForFlag?.template?.alias,
+        },
+      );
+    } catch (err) {
+      // No PII — just the campaign + respondent ids for context.
+      console.error(
+        `[campaign-detail] longitudinal eligibility check failed (campaign=${id}, respondent=${row.respondent.id}):`,
+        err,
+      );
+    }
     if (eligible) longitudinalRespondentIds.push(row.respondent.id);
   }
 

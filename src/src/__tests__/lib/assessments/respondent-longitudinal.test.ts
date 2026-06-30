@@ -428,6 +428,29 @@ test("imported (CLOSED, back-dated) submission is included, no status filter", a
   expect(subCall.where.campaign).not.toHaveProperty("status");
 });
 
+// ── P0 regression: the submission query `where` must NOT carry a submittedAt ──
+// key. submittedAt is non-nullable (@default(now)); a `{ not: null }` filter is
+// an INVALID Prisma filter on a non-null column → runtime validation throw →
+// 500. The in-memory comparator + defensive null-drop still read submittedAt
+// (the field IS read for ordering — only the query-side filter is removed).
+test("submission query where does NOT include a submittedAt filter (invalid-filter regression)", async () => {
+  const db = buildDb({
+    submissions: [
+      {
+        id: "sub-1",
+        campaignId: "camp-1",
+        respondentId: "resp-1",
+        submittedAt: new Date("2024-01-10T00:00:00Z"),
+        versionId: "v1",
+        result: buildResult({ overallAverage: 3 }),
+      },
+    ],
+  });
+  await getRespondentLongitudinal(db, makeActor(), ORG_ID, "resp-1", TEMPLATE_ID);
+  const subCall = (db.assessmentSubmission.findMany as jest.Mock).mock.calls[0][0];
+  expect(subCall.where).not.toHaveProperty("submittedAt");
+});
+
 // ─── One-point-per-campaign collapse (R1-High-3) ────────────────────────────
 
 test("one-point collapse: a campaign with 2 matched subs yields ONE degraded point (latest)", async () => {

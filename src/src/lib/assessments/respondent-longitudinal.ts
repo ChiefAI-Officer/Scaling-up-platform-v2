@@ -214,10 +214,14 @@ export interface RespondentLongitudinalDb {
     }) => Promise<LongitudinalTemplateRow | null>;
   };
   assessmentSubmission: {
+    // submittedAt is non-nullable (@default(now)); rows exist only on submit, so
+    // every submission row is a real submission — no submittedAt filter is needed
+    // (and filtering `{ not: null }` is an invalid Prisma filter on a non-null
+    // column → runtime validation error). The in-memory submittedAt ordering +
+    // defensive null-drop below still read the (non-null) field.
     findMany: (args: {
       where: {
         respondentId: { in: string[] };
-        submittedAt: { not: null };
         campaign: {
           templateId: string;
           deletedAt: Date | null;
@@ -515,7 +519,9 @@ export async function getRespondentLongitudinal(
   const rawSubmissions = await db.assessmentSubmission.findMany({
     where: {
       respondentId: { in: cappedMatchedIds },
-      submittedAt: { not: null },
+      // No submittedAt filter: submittedAt is non-nullable (@default(now)); a row
+      // exists only once a submission is recorded, so every row qualifies here.
+      // The in-memory comparator + null-drop below still read submittedAt.
       campaign: { templateId, deletedAt: null },
     },
     include: {

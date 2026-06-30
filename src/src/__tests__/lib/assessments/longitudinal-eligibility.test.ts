@@ -236,11 +236,13 @@ describe("hasComparableLongitudinal", () => {
 
     expect(result).toBe(false);
     expect(calls.countWhere).toHaveLength(1);
-    // Count is scoped to the template + submitted + live campaign.
+    // Count is scoped to the template + live campaign. NO submittedAt filter:
+    // submittedAt is non-nullable, so `{ not: null }` would be an invalid Prisma
+    // filter (the P0 that 500'd) — every row is already a real submission.
     expect(calls.countWhere[0]).toMatchObject({
-      submittedAt: { not: null },
       campaign: { templateId: TEMPLATE_ID, deletedAt: null },
     });
+    expect(calls.countWhere[0]).not.toHaveProperty("submittedAt");
   });
 
   it("2 scored submissions → true", async () => {
@@ -354,5 +356,57 @@ describe("hasComparableLongitudinal", () => {
 
     expect(result).toBe(false);
     expect(calls.countWhere).toHaveLength(0);
+  });
+
+  // ── P0 regression: the count `where` must NOT carry a submittedAt key ──────
+  // submittedAt is non-nullable (@default(now)); a `{ not: null }` filter is an
+  // INVALID Prisma filter on a non-null column → runtime validation throw → 500.
+  // This guards against re-introducing that filter.
+  it("count where does NOT include a submittedAt key (invalid-filter regression)", async () => {
+    enableFlag();
+    const { db, calls } = makeDb({
+      entry: makeRespondent(),
+      emailRows: [makeRespondent()],
+      count: 2,
+    });
+
+    await hasComparableLongitudinal(db, makeActor(), baseArgs);
+
+    expect(calls.countWhere).toHaveLength(1);
+    expect(calls.countWhere[0]).not.toHaveProperty("submittedAt");
+  });
+
+  // ── "Never throws" contract: a DB error on any awaited delegate → false ────
+  it("resolves false (never throws) when assessmentSubmission.count throws", async () => {
+    enableFlag();
+    const db: LongitudinalEligibilityDb = {
+      orgRespondent: {
+        findFirst: async () => makeRespondent(),
+        findMany: async () => [makeRespondent()],
+      },
+      assessmentSubmission: {
+        count: async () => {
+          throw new Error("simulated DB failure");
+        },
+      },
+    };
+
+    await expect(
+      hasComparableLongitudinal(db, makeActor(), baseArgs),
+    ).resolves.toBe(false);
+  });
+
+  it("resolves false (never throws) when canAccessTemplate throws", async () => {
+    enableFlag();
+    mockCanAccessTemplate.mockRejectedValue(new Error("simulated access error"));
+    const { db } = makeDb({
+      entry: makeRespondent(),
+      emailRows: [makeRespondent()],
+      count: 5,
+    });
+
+    await expect(
+      hasComparableLongitudinal(db, makeActor(), baseArgs),
+    ).resolves.toBe(false);
   });
 });

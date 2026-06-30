@@ -83,10 +83,13 @@ export interface LongitudinalEligibilityDb {
     }) => Promise<EligibilityOrgRespondentRow[]>;
   };
   assessmentSubmission: {
+    // submittedAt is non-nullable (@default(now)); rows exist only on submit, so
+    // every submission row is a real submission — no submittedAt filter is needed
+    // (and filtering `{ not: null }` is an invalid Prisma filter on a non-null
+    // column → runtime validation error). See the where below.
     count: (args: {
       where: {
         respondentId: { in: string[] };
-        submittedAt: { not: null };
         campaign: {
           templateId: string;
           deletedAt: Date | null;
@@ -130,61 +133,72 @@ export async function hasComparableLongitudinal(
     return false;
   }
 
-  // 3. Current template access — a coach who LOST template access must not be
-  //    offered a link into that template's named PII (R2-High-2). Admin/STAFF
-  //    bypass inside canAccessTemplate.
-  const templateOk = await canAccessTemplate(asAccessDb(db), actor, templateId);
-  if (!templateOk) return false;
+  // Defense-in-depth (the docstring's literal "never throws" contract): the
+  // remaining steps each `await` a DB delegate (canAccessTemplate / findFirst /
+  // findMany / count) that can throw on a real DB error. Any throw here resolves
+  // to `false` (deny → no link) rather than propagating to the caller.
+  try {
+    // 3. Current template access — a coach who LOST template access must not be
+    //    offered a link into that template's named PII (R2-High-2). Admin/STAFF
+    //    bypass inside canAccessTemplate.
+    const templateOk = await canAccessTemplate(asAccessDb(db), actor, templateId);
+    if (!templateOk) return false;
 
-  // 4. Entry-respondent org-bind (R2-High-1) — the path respondentId MUST be a
-  //    LIVE OrgRespondent in this org. A stale / cross-org / soft-deleted id
-  //    must never seed the identity union ⇒ false (no link).
-  const entry = await db.orgRespondent.findFirst({
-    where: { id: respondentId, organizationId, deletedAt: null },
-  });
-  if (!entry) return false;
-
-  // 5. Match by normalizedEmail-within-org (GM-6) — union the LIVE same-org rows
-  //    sharing the entry respondent's email; fall back to the single entry id.
-  let matchedIds: string[];
-  if (entry.normalizedEmail && entry.normalizedEmail.trim() !== "") {
-    const sameEmailRows = await db.orgRespondent.findMany({
-      where: {
-        organizationId,
-        normalizedEmail: entry.normalizedEmail,
-        deletedAt: null,
-      },
-      take: MAX_MATCHED_RESPONDENTS,
+    // 4. Entry-respondent org-bind (R2-High-1) — the path respondentId MUST be a
+    //    LIVE OrgRespondent in this org. A stale / cross-org / soft-deleted id
+    //    must never seed the identity union ⇒ false (no link).
+    const entry = await db.orgRespondent.findFirst({
+      where: { id: respondentId, organizationId, deletedAt: null },
     });
-    const idSet = new Set<string>();
-    // Always include the entry id even if a stub omitted it from findMany.
-    idSet.add(entry.id);
-    for (const r of sameEmailRows) {
-      // Defense-in-depth: re-assert org + live even if a stub didn't filter.
-      if (r.organizationId === organizationId && r.deletedAt === null) {
-        idSet.add(r.id);
+    if (!entry) return false;
+
+    // 5. Match by normalizedEmail-within-org (GM-6) — union the LIVE same-org
+    //    rows sharing the entry respondent's email; fall back to the entry id.
+    let matchedIds: string[];
+    if (entry.normalizedEmail && entry.normalizedEmail.trim() !== "") {
+      const sameEmailRows = await db.orgRespondent.findMany({
+        where: {
+          organizationId,
+          normalizedEmail: entry.normalizedEmail,
+          deletedAt: null,
+        },
+        take: MAX_MATCHED_RESPONDENTS,
+      });
+      const idSet = new Set<string>();
+      // Always include the entry id even if a stub omitted it from findMany.
+      idSet.add(entry.id);
+      for (const r of sameEmailRows) {
+        // Defense-in-depth: re-assert org + live even if a stub didn't filter.
+        if (r.organizationId === organizationId && r.deletedAt === null) {
+          idSet.add(r.id);
+        }
       }
+      matchedIds = [...idSet];
+    } else {
+      matchedIds = [entry.id];
     }
-    matchedIds = [...idSet];
-  } else {
-    matchedIds = [entry.id];
+    // Deterministic cap (mirrors the loader): only ever lowers the count.
+    matchedIds.sort();
+    const cappedMatchedIds = matchedIds.slice(0, MAX_MATCHED_RESPONDENTS);
+
+    // 6. COUNT scored submissions for this template (submitted, live campaign).
+    //    ≥2 ⇒ a comparison exists. A COUNT, not the full loader — no result JSON
+    //    is read here.
+    const count = await db.assessmentSubmission.count({
+      where: {
+        respondentId: { in: cappedMatchedIds },
+        // No submittedAt filter: submittedAt is non-nullable (@default(now)); a
+        // row exists only once a submission is recorded, so every row counts.
+        campaign: { templateId, deletedAt: null },
+      },
+    });
+
+    return count >= MIN_COMPARABLE_SUBMISSIONS;
+  } catch {
+    // Honor the documented "never throws" contract literally: a DB error on the
+    // eligibility predicate must never break the caller's render — deny instead.
+    return false;
   }
-  // Deterministic cap (mirrors the loader): only ever lowers the count.
-  matchedIds.sort();
-  const cappedMatchedIds = matchedIds.slice(0, MAX_MATCHED_RESPONDENTS);
-
-  // 6. COUNT scored submissions for this template (submitted, live campaign).
-  //    ≥2 ⇒ a comparison exists. A COUNT, not the full loader — no result JSON
-  //    is read here.
-  const count = await db.assessmentSubmission.count({
-    where: {
-      respondentId: { in: cappedMatchedIds },
-      submittedAt: { not: null },
-      campaign: { templateId, deletedAt: null },
-    },
-  });
-
-  return count >= MIN_COMPARABLE_SUBMISSIONS;
 }
 
 // ────────────────────────────────────────────────────────────────────────
