@@ -591,6 +591,72 @@ describe("ScoredGroupReport", () => {
     const note = screen.getByText(/provisional/i);
     expect(note).toHaveTextContent(/2026-06/);
   });
+
+  // ── Wave J/K (Task 3) — Appendix B pseudonymized per-member domain grid ─────
+
+  /** SU-Full-shaped scored report carrying an Appendix B grid. */
+  function appendixBReport(
+    overrides: Partial<CampaignGroupReport> = {},
+  ): CampaignGroupReport {
+    const base = suFullReport();
+    return suFullReport({
+      scored: {
+        ...base.scored!,
+        appendixB: [
+          {
+            personLabel: "Person 1",
+            domainScores: { people: 8, strategy: 6, execution: 7, cash: 9 },
+          },
+          {
+            personLabel: "Person 2",
+            domainScores: { people: 4, strategy: 6, execution: 5, cash: null },
+          },
+        ],
+      },
+      ...overrides,
+    });
+  }
+
+  it("renders an Appendix B grid with Person rows + the 4 domain columns, NO names", () => {
+    render(
+      <ScoredGroupReport
+        report={appendixBReport()}
+        {...provenance({ assessmentName: "Scaling Up Full", versionLabel: "su-full-v2" })}
+      />,
+    );
+    const grid = screen.getByTestId("group-scored-appendix-b");
+    // pseudonymized Person rows
+    expect(within(grid).getByText("Person 1")).toBeInTheDocument();
+    expect(within(grid).getByText("Person 2")).toBeInTheDocument();
+    // the 4 domain column headers (People/Strategy/Execution/Cash), no "You"
+    expect(within(grid).getByText(/^People$/)).toBeInTheDocument();
+    expect(within(grid).getByText(/^Strategy$/)).toBeInTheDocument();
+    expect(within(grid).getByText(/^Execution$/)).toBeInTheDocument();
+    expect(within(grid).getByText(/^Cash$/)).toBeInTheDocument();
+    expect(within(grid).queryByText(/^You$/)).not.toBeInTheDocument();
+    // a cell value renders; a null cell renders "—"
+    const p2 = within(grid).getByTestId("group-scored-appendix-b-row-1");
+    expect(within(p2).getByText("4")).toBeInTheDocument();
+    expect(within(p2).getByText("—")).toBeInTheDocument();
+    // NO member names leak into the grid
+    expect(within(grid).queryByText(/John CEOExec/)).not.toBeInTheDocument();
+    expect(within(grid).queryByText(/Kathy HR/)).not.toBeInTheDocument();
+  });
+
+  it("renders NO Appendix B on a scored report without an appendixB block (Rockefeller)", () => {
+    render(
+      <ScoredGroupReport
+        report={scoredReport()}
+        {...provenance({ assessmentName: "Rockefeller Habits", versionLabel: "rock-v2" })}
+      />,
+    );
+    expect(screen.queryByTestId("group-scored-appendix-b")).not.toBeInTheDocument();
+  });
+
+  it("renders NO Appendix B for a qualitative report", () => {
+    render(<QualitativeGroupReport report={qualitativeReport()} {...provenance()} />);
+    expect(screen.queryByTestId("group-scored-appendix-b")).not.toBeInTheDocument();
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════
