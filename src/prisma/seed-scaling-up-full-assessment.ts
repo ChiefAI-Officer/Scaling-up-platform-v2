@@ -49,7 +49,7 @@ const db = new PrismaClient();
 export const ALIAS = "scaling-up-full";
 export const NAME = "Scaling Up Full Assessment";
 // v2 (Wave J-1): adds a CEO-only "About your company" background section with
-// three NUMBER FTE/freelance questions (non-scored) that feed the mid-survey
+// two NUMBER FTE/freelance questions (non-scored) that feed the mid-survey
 // growth-phase tile. The helper appends this as a NEW DRAFT v2 (superseding the
 // unpublished DRAFT v1 via forceSupersedeDraft); nothing publishes on seed.
 export const VERSION_NUMBER = 2;
