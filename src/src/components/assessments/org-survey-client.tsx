@@ -41,6 +41,10 @@ import {
 } from "@/components/assessments/assessment-welcome";
 import { formatTimestampDateTime } from "@/lib/utils";
 
+// Wave J-1 — SU-Full CEO-only background section gating.
+const SU_FULL_ALIAS = "scaling-up-full";
+const SU_FULL_BACKGROUND_SECTION = "S_BACKGROUND";
+
 interface ScaleConfig {
   min: number;
   max: number;
@@ -75,6 +79,10 @@ interface SurveyData {
   // to key the localStorage autosave draft per-respondent so two invitees of
   // the same campaign on a shared device never cross-hydrate each other.
   respondentKey?: string;
+  // Wave J-1: whether THIS respondent is the campaign CEO. Drives the SU-Full
+  // CEO-only behavior — the S_BACKGROUND page (CEO FTE questions) is shown only
+  // to the CEO, and the growth-phase interstitial fires only for the CEO.
+  isCEO?: boolean;
   campaign: {
     name: string;
     alias: string;
@@ -198,6 +206,14 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     };
   }, [campaignAlias]);
 
+  // Wave J-1: the SU-Full CEO background section is shown ONLY to the CEO. For
+  // every other respondent (team members) we DROP the whole S_BACKGROUND
+  // section and its questions at the source, so the welcome stats, visibility,
+  // pager, and section/progress counts all stay consistent — team members never
+  // see (nor answer) the CEO FTE questions.
+  const isCEO = surveyData?.isCEO === true;
+  const dropBackground = surveyData?.campaign.templateAlias === SU_FULL_ALIAS && !isCEO;
+
   const sortedSections = useMemo<Section[]>(() => {
     if (
       phase.kind !== "intro" &&
@@ -205,8 +221,10 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
       phase.kind !== "submitting"
     )
       return [];
-    return [...phase.data.sections].sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [phase]);
+    return [...phase.data.sections]
+      .filter((s) => !(dropBackground && s.stableKey === SU_FULL_BACKGROUND_SECTION))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [phase, dropBackground]);
 
   const sortedQuestions = useMemo<Question[]>(() => {
     if (
@@ -215,8 +233,12 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
       phase.kind !== "submitting"
     )
       return [];
-    return [...phase.data.questions].sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [phase]);
+    return [...phase.data.questions]
+      .filter(
+        (q) => !(dropBackground && q.sectionStableKey === SU_FULL_BACKGROUND_SECTION),
+      )
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [phase, dropBackground]);
 
   // Welcome stat chips + expectation copy derive from the ACTUAL data.
   const scaleLabel = useMemo(() => deriveScaleLabel(sortedQuestions), [sortedQuestions]);
@@ -470,6 +492,8 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             onExit={() => setPhase({ kind: "intro", data: phase.data })}
             assessmentName={data.campaign.name}
             companyName={data.campaign.organizationName ?? undefined}
+            templateAlias={data.campaign.templateAlias ?? undefined}
+            isCEO={data.isCEO === true}
             requireAtLeastOneAnswer
           />
         </div>

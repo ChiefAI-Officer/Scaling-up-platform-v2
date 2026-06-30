@@ -38,6 +38,11 @@ jest.mock("@/lib/db", () => ({
     assessmentInvitation: {
       findUnique: jest.fn(),
     },
+    // Wave J-1: the loader resolves the respondent's isCEO flag from the
+    // participant row. Default to a non-CEO participant.
+    assessmentCampaignParticipant: {
+      findUnique: jest.fn(() => Promise.resolve({ isCEO: false })),
+    },
   },
 }));
 

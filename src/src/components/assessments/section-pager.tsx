@@ -5,8 +5,16 @@ import { isAnswered, type SectionPage } from "@/lib/assessments/section-pages";
 import { QuestionInput } from "@/components/assessments/question-input";
 import { AssessmentShellHeader } from "@/components/assessments/AssessmentShellHeader";
 import { domainColor } from "@/lib/assessments/report-presentation";
+import { PhaseTile } from "@/components/assessments/phase-tile";
+import { computeGrowthPhase } from "@/lib/assessments/su-full-phase";
 
 type AnswersMap = Record<string, number | string | string[]>;
+
+/** SU-Full growth-phase interstitial gating (Wave J-1). */
+const SU_FULL_ALIAS = "scaling-up-full";
+/** The CEO background FTE question whose answer drives the growth phase. */
+const FTE_CONTRACT_KEY = "Q_FTE_CONTRACT";
+
 interface SectionPagerProps {
   pages: SectionPage[];
   answers: AnswersMap;
@@ -20,10 +28,25 @@ interface SectionPagerProps {
   companyName?: string;
   /** Public/optional surveys: require at least one answered question before submit. */
   requireAtLeastOneAnswer?: boolean;
+  /**
+   * Template alias of the assessment. Gates SU-Full-only behavior (the
+   * growth-phase interstitial). Unknown/other aliases behave exactly as before.
+   */
+  templateAlias?: string;
+  /**
+   * Whether THIS respondent is the campaign CEO. The growth-phase interstitial
+   * is SU-Full-only AND CEO-only (team members never see it).
+   */
+  isCEO?: boolean;
 }
 
-export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName, requireAtLeastOneAnswer }: SectionPagerProps) {
+export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName, requireAtLeastOneAnswer, templateAlias, isCEO }: SectionPagerProps) {
   const [sectionIndex, setSectionIndex] = React.useState(0);
+  // Wave J-1: when set, the SU-Full growth-phase interstitial is shown in place
+  // of the next section. Continue clears it and performs the real advance. It is
+  // NOT a counted section (the shell header / progress bar are not rendered on
+  // the tile). null = no tile showing.
+  const [phaseTile, setPhaseTile] = React.useState<ReturnType<typeof computeGrowthPhase>>(null);
   const page = pages[sectionIndex];
   const [showGateError, setShowGateError] = React.useState(false);
   const [invalidKeys, setInvalidKeys] = React.useState<Set<string>>(new Set());
@@ -41,6 +64,14 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
         <button type="button" className="wf-btn wf-btn-primary" onClick={onSubmit} disabled={submitting}>Submit</button>
       </div>
     );
+  }
+
+  // Wave J-1: the SU-Full growth-phase interstitial takes over the screen when
+  // set. It is NOT a counted section (no shell header / progress bar). Continue
+  // advances to the next real section. Rendered before the section UI so it
+  // fully replaces it while showing.
+  if (phaseTile) {
+    return <PhaseTile phase={phaseTile} onContinue={continueFromPhaseTile} />;
   }
 
   const isLast = sectionIndex === pages.length - 1;
@@ -67,10 +98,38 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     });
   }
 
+  // Wave J-1: the growth-phase interstitial fires ONCE, when a SU-Full CEO
+  // leaves the section that holds Q_FTE_CONTRACT, and only when the FTE answer
+  // resolves to a real phase. Anything else (other template, non-CEO, no/invalid
+  // FTE) skips it and advances normally — the CEO is never blocked.
+  function phaseTileForLeaving(currentPage: SectionPage): ReturnType<typeof computeGrowthPhase> {
+    if (templateAlias !== SU_FULL_ALIAS || !isCEO) return null;
+    const carriesFte = currentPage.questions.some((q) => q.stableKey === FTE_CONTRACT_KEY);
+    if (!carriesFte) return null;
+    const raw = answers[FTE_CONTRACT_KEY];
+    const fte = typeof raw === "number" ? raw : Number(raw);
+    return computeGrowthPhase(fte);
+  }
+
   function advance() {
+    // Intercept BEFORE incrementing: if leaving the SU-Full background section
+    // and a phase is computable, show the interstitial instead of the next
+    // section. Continue (continueFromPhaseTile) performs the real advance.
+    const tile = phaseTileForLeaving(page);
+    if (tile) {
+      setPhaseTile(tile);
+      setShowGateError(false);
+      setInvalidKeys(new Set());
+      return;
+    }
     setSectionIndex(sectionIndex + 1);
     setShowGateError(false);
     setInvalidKeys(new Set());
+    focusHeading();
+  }
+  function continueFromPhaseTile() {
+    setPhaseTile(null);
+    setSectionIndex(sectionIndex + 1);
     focusHeading();
   }
   function attemptSubmit() {

@@ -87,10 +87,28 @@ export async function GET(
       Record<string, unknown>
     >;
 
+    // Wave J-1: resolve whether THIS respondent is the campaign CEO. The flag
+    // lives on the AssessmentCampaignParticipant row (unique per
+    // campaignId+respondentId, matching this invitation). Drives the SU-Full
+    // CEO-only behavior: the CEO sees the S_BACKGROUND FTE section + the
+    // growth-phase interstitial; team members do not. Fail-safe: no participant
+    // row → not CEO.
+    const participant = await db.assessmentCampaignParticipant.findUnique({
+      where: {
+        campaignId_respondentId: {
+          campaignId: invitation.campaignId,
+          respondentId: invitation.respondentId,
+        },
+      },
+      select: { isCEO: true },
+    });
+    const isCEO = participant?.isCEO === true;
+
     return NextResponse.json(
       {
         success: true,
         data: {
+          isCEO,
           // Opaque per-respondent id (the invitation cuid) for keying the
           // client-side localStorage draft. The invitation id is scoped to
           // THIS respondent's own authenticated session, so returning it to

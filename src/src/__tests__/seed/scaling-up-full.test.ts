@@ -151,9 +151,10 @@ describe("seed-scaling-up-full-assessment", () => {
     expect(versionCreateCall.data.publishedAt).toBeNull();
     expect(versionCreateCall.data.publishedBy).toBeNull();
 
-    // 61 questions, 10 sections
-    expect(result.questionCount).toBe(61);
-    expect(result.sectionCount).toBe(10);
+    // v2 (Wave J-1): 63 questions (61 SLIDER + 2 NUMBER background) across
+    // 11 sections (10 scored + the CEO-only "About your company" background).
+    expect(result.questionCount).toBe(63);
+    expect(result.sectionCount).toBe(11);
   });
 
   it("State B — returns early without re-creating version on exact match", async () => {
@@ -249,7 +250,8 @@ describe("seed-scaling-up-full-assessment extraction audit", () => {
     const audit = runExtractionAudit();
     expect(audit.ok).toBe(true);
     expect(audit.domainCount).toBe(5);
-    expect(audit.sectionCount).toBe(10);
+    // v2 (Wave J-1): 11 sections (10 scored + the background section).
+    expect(audit.sectionCount).toBe(11);
     expect(audit.questionCount).toBeGreaterThanOrEqual(50);
     expect(audit.questionCount).toBeLessThanOrEqual(70);
   });
@@ -276,15 +278,54 @@ describe("seed-scaling-up-full-assessment extraction audit", () => {
     }
   });
 
-  it("every question is SLIDER_LIKERT 0-10 with 5 recommendation bands", () => {
+  it("every SLIDER_LIKERT question is 0-10 with 5 recommendation bands", () => {
     const content = buildSU();
-    for (const q of content.questions) {
-      expect(q.type).toBe("SLIDER_LIKERT");
+    const sliders = content.questions.filter(
+      (q) => q.type === "SLIDER_LIKERT"
+    ) as Array<{
+      scale: { min: number; max: number; step: number };
+      recommendations: unknown[];
+    }>;
+    expect(sliders).toHaveLength(61);
+    for (const q of sliders) {
       expect(q.scale.min).toBe(0);
       expect(q.scale.max).toBe(10);
       expect(q.scale.step).toBe(1);
       expect(q.recommendations).toHaveLength(5);
     }
+  });
+
+  it("v2 (Wave J-1) adds 2 non-scored NUMBER background questions with the expected stableKeys", () => {
+    const content = buildSU();
+    const numbers = content.questions.filter(
+      (q) => q.type === "NUMBER"
+    ) as Array<{
+      stableKey: string;
+      sectionStableKey: string;
+      isRequired: boolean;
+    }>;
+    expect(numbers.map((q) => q.stableKey).sort()).toEqual([
+      "Q_FREELANCE",
+      "Q_FTE_CONTRACT",
+    ]);
+    // All live in the background section.
+    for (const q of numbers) {
+      expect(q.sectionStableKey).toBe("S_BACKGROUND");
+    }
+    // The combined contract-FTE field is required; freelance is optional.
+    const byKey = Object.fromEntries(numbers.map((q) => [q.stableKey, q]));
+    expect(byKey["Q_FTE_CONTRACT"].isRequired).toBe(true);
+    expect(byKey["Q_FREELANCE"].isRequired).toBe(false);
+  });
+
+  it("v2 (Wave J-1) defines the S_BACKGROUND section (sortOrder 0, before Your Employees)", () => {
+    const content = buildSU();
+    const bg = content.sections.find((s) => s.stableKey === "S_BACKGROUND");
+    expect(bg).toBeDefined();
+    expect(bg!.sortOrder).toBe(0);
+    // Carries a domain so the meanOfDomains publish check (every section has a
+    // domain) holds; it contributes nothing to scoring (no SLIDER questions).
+    expect(bg!.domain).toBeTruthy();
   });
 
   it("scoringConfig has meanOfDomains rollup + scaleUpScore enabled", () => {

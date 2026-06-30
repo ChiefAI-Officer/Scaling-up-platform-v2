@@ -1517,6 +1517,66 @@
 }
 
 /* ===========================================================
+   Wave J-1 — SU-Full growth-phase mid-survey interstitial tile.
+   A branded full-screen card shown to the CEO right after the
+   S_BACKGROUND FTE section: "You've reached phase N - <Name>
+   phase" + the verbatim narrative + a Continue button. Scoped to
+   .su-assessment-brand only (ADR-0005) — no global selectors.
+   =========================================================== */
+.su-assessment-brand .su-phase-tile {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #ece8f2;
+  border-radius: 16px;
+  box-shadow: 0 18px 50px -24px rgba(82, 37, 131, 0.45);
+  padding: 2rem 1.75rem;
+  margin: 0 auto;
+  max-width: 36rem;
+  width: 100%;
+  text-align: left;
+}
+.su-assessment-brand .su-phase-eyebrow {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: hsl(var(--primary));
+  background: #f0e9fa;
+  padding: 0.3125rem 0.6875rem;
+  border-radius: 999px;
+}
+.su-assessment-brand .su-phase-heading {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  margin: 0.875rem 0 0.625rem;
+  color: var(--su-ink, #2b2440);
+}
+.su-assessment-brand .su-phase-heading:focus {
+  outline: 2px solid #522583;
+  outline-offset: 4px;
+}
+.su-assessment-brand .su-phase-narrative {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--su-ink, #2b2440);
+  margin: 0;
+  white-space: pre-line;
+}
+.su-assessment-brand .su-phase-nav {
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .su-assessment-brand .su-phase-tile { padding: 1.5rem 1.25rem; }
+}
+
+/* ===========================================================
    Welcome ("Screen 1") — de-bared invitation / lead-magnet.
    Branded app-shell header (white logo on purple) + value-prop
    "what to expect" list + stat chips + strong purple CTA.
