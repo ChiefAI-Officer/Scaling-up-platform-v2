@@ -297,6 +297,46 @@ export interface GroupScoredReport {
   scaleUpScore?: GroupScoredScaleUp;
   /** CEO tier label + the team's tier-label distribution (CEO-excluded). */
   tier: GroupScoredTier;
+  /**
+   * Wave J/K (Task 3) — Esperto "Anonymous Team" Appendix B: a pseudonymized,
+   * de-identified per-member domain grid. Present iff `domains` is present (i.e.
+   * SU-Full, the only scored group report carrying per-domain scores). One row
+   * per cohort member in display order (CEO first, then alphabetical). The CEO
+   * row is labelled "CEO" (a role, de-identified — matches the Esperto source);
+   * the non-CEO members are numbered "Person 1".."Person N". NO names, NO job
+   * titles. Cells carry each person's FROZEN per-domain averagePoints (verbatim,
+   * never recomputed) on the 4 domains People/Strategy/Execution/Cash; the
+   * CEO-personal "you" domain is excluded (source spec). `undefined` for any
+   * non-domain scored report so the renderer omits the grid entirely.
+   */
+  appendixB?: GroupAppendixBRow[];
+}
+
+/**
+ * The 4 domains shown in Appendix B — People/Strategy/Execution/Cash. The
+ * CEO-personal "you" domain is intentionally EXCLUDED (Esperto source spec:
+ * Appendix B columns are People/Strategy/Execution/Cash, NOT "You").
+ */
+export const APPENDIX_B_DOMAIN_KEYS = [
+  "people",
+  "strategy",
+  "execution",
+  "cash",
+] as const;
+
+export type AppendixBDomainKey = (typeof APPENDIX_B_DOMAIN_KEYS)[number];
+
+/**
+ * One pseudonymized Appendix B row: a de-identified "Person N" label + that
+ * person's 0–10 score per Appendix-B domain (`null` where they answered none in
+ * that domain). NO respondentId / name / jobTitle is carried — the row is fully
+ * de-identified at the data layer (the renderer never has a name to leak).
+ */
+export interface GroupAppendixBRow {
+  /** "CEO" for the CEO row; "Person 1".."Person N" for non-CEO members (display order). */
+  personLabel: string;
+  /** domain key → that person's frozen averagePoints, or null when unanswered. */
+  domainScores: Record<AppendixBDomainKey, number | null>;
 }
 
 /**
@@ -1267,6 +1307,46 @@ function buildScoredDomains(scoredMembers: ScoredMember[]): GroupScoredDomain[] 
   return domains;
 }
 
+/**
+ * Wave J/K (Task 3) — builds the pseudonymized Appendix B grid IN DISPLAY ORDER
+ * (the `respondents` array is already CEO-first then alphabetical), each row
+ * carrying that member's FROZEN per-domain averagePoints on the 4 Appendix-B
+ * domains (the "you" domain is excluded). A domain the member did not answer
+ * (absent from `parsed.domainAvg`) → null.
+ *
+ * Mirrors the `domains` aggregation's source (each member's parsed perDomain) so
+ * the grid can never drift from the by-domain matrix. PURE — never recomputes.
+ *
+ * Row labels match the Esperto source (18j-su-full-source-extract.md §133): the
+ * CEO row is labelled "CEO" (a ROLE, not a name — still de-identified, and not a
+ * privacy regression since the report is already CEO-vs-team); the non-CEO
+ * members are numbered "Person 1".."Person N" in their existing order. A no-CEO
+ * cohort simply numbers everyone "Person 1..N" (no CEO row).
+ *
+ * A member without a parsed result (its submission failed result parsing) is
+ * skipped — it never appears in `parsedById`, so it contributes no row.
+ */
+function buildAppendixB(
+  respondents: GroupRespondent[],
+  parsedById: Map<string, ParsedScoreResult>,
+): GroupAppendixBRow[] {
+  const rows: GroupAppendixBRow[] = [];
+  let personN = 0;
+  for (const r of respondents) {
+    const parsed = parsedById.get(r.respondentId);
+    if (!parsed) continue; // a member whose result didn't parse → no row
+    const domainScores = {} as Record<AppendixBDomainKey, number | null>;
+    for (const key of APPENDIX_B_DOMAIN_KEYS) {
+      const v = parsed.domainAvg.get(key);
+      domainScores[key] = typeof v === "number" ? v : null;
+    }
+    // CEO → "CEO" (role, de-identified); everyone else → "Person 1".."Person N".
+    const personLabel = r.isCEO ? "CEO" : `Person ${(personN += 1)}`;
+    rows.push({ personLabel, domainScores });
+  }
+  return rows;
+}
+
 /** CEO tier label + the non-CEO team's tier-label distribution. */
 function buildScoredTier(scoredMembers: ScoredMember[]): GroupScoredTier {
   let ceo: string | null = null;
@@ -1528,6 +1608,8 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
     // non-contributor that flips degraded (rule 5) — the submission still
     // stays in the cohort (it remains in `respondents`).
     const scoredMembers: ScoredMember[] = [];
+    // Keep a respondentId → parsed map (display-ordered Appendix B lookup).
+    const parsedById = new Map<string, ParsedScoreResult>();
     for (const m of members) {
       const parsed = parseScoreResult(m.result);
       if (parsed === null) {
@@ -1535,8 +1617,16 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
         continue;
       }
       scoredMembers.push({ isCEO: m.isCEO, parsed });
+      parsedById.set(m.respondentId, parsed);
     }
     scored = buildScoredReport(input?.version?.sections, questionsByKey, scoredMembers);
+    // Appendix B (Task 3) — the pseudonymized per-member domain grid. Built ONLY
+    // when the scored report carries per-domain scores (i.e. SU-Full), in the
+    // cohort's display order (`respondents`). Non-domain scored reports
+    // (Rockefeller / Five-D) leave appendixB undefined → renderer omits it.
+    if (scored.domains && scored.domains.length > 0) {
+      scored.appendixB = buildAppendixB(respondents, parsedById);
+    }
     // Attach the static Peers benchmark (SU-Full only); the result drives the
     // version + key-mismatch fields below (and the loader's provenance, T7).
     const applied = applyBenchmarks(scored, input?.alias);

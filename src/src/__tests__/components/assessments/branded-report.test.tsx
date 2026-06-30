@@ -677,25 +677,39 @@ describe("BrandedReport — robustness (H10)", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// Wave J Task 2 regression (R1-M3): per-respondent SU-Full STILL renders tier
+// SU-Full per-respondent tier-band suppression (ADR-0015)
 // ════════════════════════════════════════════════════════════════════════════
 
-describe("BrandedReport — Wave J regression: SU-Full per-respondent tier band", () => {
+describe("BrandedReport — SU-Full per-respondent tier suppression (ADR-0015)", () => {
   /**
-   * showTier:false in report-config is consumed ONLY by the group renderer this
-   * wave.  BrandedReport (the per-respondent report) deliberately ignores it —
-   * per-respondent tier suppression is deferred (ADR-0015 scope).
-   * This test locks that contract: the tier band must still render for a
-   * scaling-up-full report even after report-config gains showTier:false.
+   * SU Full has no tier band (ADR-0015: Esperto shows none; standing is
+   * peer-deviation, not a LOW/GOOD/TOP band). report-config keys this off the
+   * alias via `showTier:false`; BrandedReport honors it. The ScaleUp score
+   * ring/number and everything else still render — only the band + tier
+   * message are suppressed.
    */
-  it("per-respondent SU-Full BrandedReport STILL renders its tier band (deferred)", () => {
-    // templateAlias drives reportConfigFor() — without "scaling-up-full" this would
-    // exercise the DEFAULT config (showTier:true) instead of the SU-Full entry
-    // (showTier:false). Set the real alias so the test proves BrandedReport ignores
-    // showTier:false rather than never hitting that path.
+  it("hides the tier band + tier message when showTier is false (scaling-up-full)", () => {
+    // templateAlias drives reportConfigFor() — "scaling-up-full" selects the
+    // showTier:false entry. Without it, the DEFAULT config (showTier:true) would
+    // be exercised and the band would render.
     render(
       <BrandedReport report={{ ...suFullReport(), templateAlias: "scaling-up-full" }} />,
     );
+    // No tier band, no tier message.
+    expect(screen.queryByTestId("overall-band")).toBeNull();
+    const overall = screen.getByTestId("report-overall");
+    expect(overall.textContent).not.toContain("Scaling");
+    expect(overall.textContent).not.toContain("Solid foundation.");
+    // But the ScaleUp headline still renders.
+    expect(overall.textContent).toContain("72 / 100");
+  });
+
+  it("still renders the tier band for a showTier:true template (regression guard)", () => {
+    // Rockefeller (DEFAULT config / showTier:true) must keep its band + message.
+    render(<BrandedReport report={rockefellerReport()} />);
     expect(screen.queryByTestId("overall-band")).not.toBeNull();
+    const overall = screen.getByTestId("report-overall");
+    expect(overall.textContent).toContain("Strong — Scaling Well");
+    expect(overall.textContent).toContain("Your team is aligned.");
   });
 });

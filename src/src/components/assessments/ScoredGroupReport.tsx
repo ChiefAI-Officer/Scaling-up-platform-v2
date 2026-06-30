@@ -26,7 +26,9 @@ import type {
   GroupScoredSection,
   GroupScoredDomain,
   GroupScoredQuestion,
+  GroupAppendixBRow,
 } from "@/lib/assessments/group-report-model";
+import { APPENDIX_B_DOMAIN_KEYS } from "@/lib/assessments/group-report-model";
 import {
   GroupReportCover,
   GroupReportAsOf,
@@ -280,6 +282,64 @@ function QuestionBars({
   );
 }
 
+// ── Appendix B — pseudonymized per-member domain grid ────────────────────────
+
+/** Display labels for the 4 Appendix-B domains (People/Strategy/Execution/Cash). */
+const APPENDIX_B_DOMAIN_LABELS: Record<(typeof APPENDIX_B_DOMAIN_KEYS)[number], string> = {
+  people: "People",
+  strategy: "Strategy",
+  execution: "Execution",
+  cash: "Cash",
+};
+
+/**
+ * Appendix B (Task 3) — the Esperto "Anonymous Team" de-identified per-member
+ * grid: rows "Person 1".."Person N" (no names), columns the 4 domains
+ * People/Strategy/Execution/Cash (the CEO-personal "You" domain is excluded),
+ * cells = each person's 0–10 domain score ("—" when they answered none).
+ */
+function AppendixB({ rows }: { rows: GroupAppendixBRow[] }) {
+  return (
+    <section className="su-group-sec" data-testid="group-scored-appendix-b">
+      <h2 className="su-group-sec-title">Appendix B — team members (anonymized)</h2>
+      <p className="su-group-intro">
+        Each team member&rsquo;s domain scores, de-identified. Members are listed
+        as &ldquo;Person 1&rdquo;…&ldquo;Person N&rdquo; — names are not shown.
+      </p>
+      <div className="su-group-prof-scroll">
+        <table className="su-group-prof su-group-apxb" data-testid="group-scored-appendix-b-table">
+          <thead>
+            <tr>
+              <th scope="col">Member</th>
+              {APPENDIX_B_DOMAIN_KEYS.map((key) => (
+                <th scope="col" key={key}>
+                  {APPENDIX_B_DOMAIN_LABELS[key]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} data-testid={`group-scored-appendix-b-row-${i}`}>
+                <th scope="row">{row.personLabel}</th>
+                {APPENDIX_B_DOMAIN_KEYS.map((key) => (
+                  <td key={key} data-testid={`group-scored-appendix-b-cell-${i}-${key}`}>
+                    {row.domainScores[key] === null ? (
+                      <span className="su-group-na">—</span>
+                    ) : (
+                      formatGroupNumber(row.domainScores[key] as number)
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function ScoredGroupReport(props: GroupReportProps) {
@@ -306,6 +366,8 @@ export function ScoredGroupReport(props: GroupReportProps) {
         assessmentName={props.assessmentName}
         companyName={props.companyName}
         generatedAt={props.generatedAt}
+        coachLogoUrl={props.coachLogoUrl}
+        coachName={props.coachName}
       />
 
       <div className="su-group-body">
@@ -433,11 +495,20 @@ export function ScoredGroupReport(props: GroupReportProps) {
             {scored.questions.length > 0 && (
               <QuestionBars questions={scored.questions} hasCeo={hasCeo} />
             )}
+
+            {/* ── Appendix B — pseudonymized per-member grid (SU-Full) ──────── */}
+            {scored.appendixB && scored.appendixB.length > 0 && (
+              <AppendixB rows={scored.appendixB} />
+            )}
           </>
         )}
       </div>
 
-      <GroupReportFooter generatedAt={props.generatedAt} />
+      <GroupReportFooter
+        generatedAt={props.generatedAt}
+        coachLogoUrl={props.coachLogoUrl}
+        coachName={props.coachName}
+      />
     </div>
   );
 }

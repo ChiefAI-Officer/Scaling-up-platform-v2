@@ -757,6 +757,30 @@
   height: 22px;
 }
 
+/* ── Wave K: coach logo (reuse Coach.profileImage) ──────────────────────────
+ * Shown on the cover brandbar + footer-left alongside the white SU mark. The
+ * cover + footer are purple (#522583); arbitrary coach logos (transparent /
+ * dark / light) need a neutral chip so they never disappear into the purple.
+ * Constrained max-height + object-fit:contain keeps any aspect ratio sane. */
+.su-public-brand .su-report-coach-logo {
+  display: inline-block;
+  max-width: 100%;
+  object-fit: contain;
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.su-public-brand .su-report-coach-logo-cover {
+  max-height: 56px;
+  margin-left: 20px;
+  vertical-align: middle;
+}
+
+.su-public-brand .su-report-coach-logo-footer {
+  max-height: 40px;
+}
+
 .su-public-brand .su-report-provenance {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.65);
@@ -1563,6 +1587,16 @@
   font-size: 11px;
   font-style: italic;
   color: #6b6480;
+}
+/* Appendix B — pseudonymized per-member domain grid (Wave J/K, Task 3). Reuses
+   the scored profile table chrome; the member ("Person N") column stays left,
+   the 4 domain cells stay right-aligned (inherited from .su-group-prof td). */
+.su-public-brand .su-group-apxb tbody th[scope="row"] {
+  font-variant-numeric: normal;
+  white-space: nowrap;
+}
+.su-public-brand .su-group-apxb td {
+  font-variant-numeric: tabular-nums;
 }
 .su-public-brand .su-group-dev .su-group-dev-arrow {
   font-size: 10px;

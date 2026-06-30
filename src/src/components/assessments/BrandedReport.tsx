@@ -40,6 +40,7 @@ import {
 } from "@/lib/assessments/report-presentation";
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import { QualitativeReport } from "@/components/assessments/QualitativeReport";
+import { CoachLogo } from "@/components/assessments/CoachLogo";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -197,6 +198,12 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
   const hasScaleUpScore = typeof result.scaleUpScore === "number";
   const neutral = isNeutralTier(scoringConfig) && !hasScaleUpScore; // H11
   const headline = headlineForTierMetric(result, scoringConfig); // G2
+  // SU Full has no tier band (ADR-0015): Esperto shows none and we can't compute
+  // its percentile, so standing is expressed as peer-deviation in the group
+  // report — not a LOW/GOOD/TOP band here. report-config keys this off the alias.
+  // The ScaleUp score ring/number still renders; only the band + tier message
+  // are suppressed when showTier is false.
+  const showTier = reportConfigFor(report.templateAlias).showTier;
 
   // Per-question lookups.
   const pqByKey = new Map<string, PerQuestionResult>();
@@ -326,6 +333,12 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
               width={180}
               height={24}
             />
+            {/* Wave K: coach logo (Coach.profileImage); renders nothing when absent. */}
+            <CoachLogo
+              url={report.coachLogoUrl}
+              name={report.coachName}
+              variant="cover"
+            />
           </div>
           <h1 className="su-h1 su-report-title">{title}</h1>
           {showCampaignSubtitle && (
@@ -355,7 +368,7 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
         <span className="sr-only">
           {neutral
             ? "Submitted"
-            : `Overall score: ${headline.primary}${headline.label ? `, ${headline.label}` : ""}`}
+            : `Overall score: ${headline.primary}${showTier && headline.label ? `, ${headline.label}` : ""}`}
         </span>
         <div className="su-report-overall-main">
           {/* aria-hidden: the ring is decorative — the score is in the sr-only span above */}
@@ -380,13 +393,14 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
             {neutral ? (
               <div className="su-report-status">Submitted</div>
             ) : (
+              showTier &&
               headline.label && (
                 <div className="su-report-band" data-testid="overall-band">
                   {headline.label}
                 </div>
               )
             )}
-            {!neutral && result.tier?.message && (
+            {showTier && !neutral && result.tier?.message && (
               <p className="su-report-lede">{result.tier.message}</p>
             )}
           </div>
@@ -685,6 +699,12 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
 
       {/* ── 8. Footer ───────────────────────────────────────────────────── */}
       <footer className="su-report-footer" data-testid="report-footer">
+        {/* Wave K: coach logo (left); renders nothing when absent. */}
+        <CoachLogo
+          url={report.coachLogoUrl}
+          name={report.coachName}
+          variant="footer"
+        />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className="su-logo"

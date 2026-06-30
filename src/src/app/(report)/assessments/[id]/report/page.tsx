@@ -159,6 +159,8 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
         versionLabel={provenance.versionLabel}
         ceoName={ceoName}
         templateAlias={provenance.templateAlias}
+        coachLogoUrl={provenance.coachLogoUrl}
+        coachName={provenance.coachName}
       />
     </div>
   );

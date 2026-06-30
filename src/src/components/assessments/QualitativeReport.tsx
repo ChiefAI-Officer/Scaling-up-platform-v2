@@ -32,6 +32,7 @@ import {
   type QualItem,
   type QualSection,
 } from "@/lib/assessments/qualitative-report-model";
+import { CoachLogo } from "@/components/assessments/CoachLogo";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -306,6 +307,12 @@ export function QualitativeReport({ report }: { report: RespondentReport }) {
               width={180}
               height={24}
             />
+            {/* Wave K: coach logo (Coach.profileImage); renders nothing when absent. */}
+            <CoachLogo
+              url={report.coachLogoUrl}
+              name={report.coachName}
+              variant="cover"
+            />
           </div>
           <h1 className="su-h1 su-report-title">
             Your {report.assessmentName} Report
@@ -353,6 +360,12 @@ export function QualitativeReport({ report }: { report: RespondentReport }) {
 
       {/* ── 4. Footer (matches the cleaned BrandedReport footer) ───────────── */}
       <footer className="su-report-footer" data-testid="report-footer">
+        {/* Wave K: coach logo (left); renders nothing when absent. */}
+        <CoachLogo
+          url={report.coachLogoUrl}
+          name={report.coachName}
+          variant="footer"
+        />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className="su-logo"
