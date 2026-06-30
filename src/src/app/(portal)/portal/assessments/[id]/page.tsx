@@ -28,6 +28,10 @@ import {
   isGroupReportAlias,
 } from "@/lib/assessments/wave-f-flags";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
+import {
+  hasComparableLongitudinal,
+  asLongitudinalEligibilityDb,
+} from "@/lib/assessments/longitudinal-eligibility";
 import type { CustomSlide } from "@/lib/assessments/custom-slides";
 import type { CustomSlidesPanelSection } from "@/components/assessments/CustomSlidesPanel";
 
@@ -119,6 +123,37 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     ? projectSections(campaignForFlag?.version?.sections)
     : [];
 
+  // Wave N (#23) — per-row "over time" eligibility. Each submitted respondent
+  // gets a longitudinal entry link ONLY when `hasComparableLongitudinal` is
+  // true (flag on, scored template, current template access, ≥2 scored
+  // submissions for that person on this template). Computed SERVER-side here;
+  // the client receives ONLY the eligible id set + the templateId/org for the
+  // URL, and never recomputes auth. The flag short-circuits cheaply (no DB)
+  // when off, so the common dark state costs nothing.
+  //
+  // N+1 NOTE (accepted for v1 per the 18mn plan item 14): when the flag is ON
+  // this issues up to 2 reads per SUBMITTED respondent (an org-bind findFirst +
+  // a count, plus one findMany when an email is present). v1 rosters are small;
+  // a batched eligibility query is the documented follow-up if rosters grow.
+  // Only rows that have a submission in THIS campaign are evaluated — a person
+  // with no submission here would resolve false anyway, so we skip the work.
+  const longitudinalEligibilityDb = asLongitudinalEligibilityDb(db);
+  const longitudinalRespondentIds: string[] = [];
+  for (const row of respondents) {
+    if (!row.hasSubmission) continue;
+    const eligible = await hasComparableLongitudinal(
+      longitudinalEligibilityDb,
+      actor,
+      {
+        organizationId: overview.campaign.organizationId,
+        respondentId: row.respondent.id,
+        templateId: overview.campaign.templateId,
+        templateAlias: overview.campaign.alias,
+      },
+    );
+    if (eligible) longitudinalRespondentIds.push(row.respondent.id);
+  }
+
   return (
     <CampaignDetail
       initialOverview={overview}
@@ -129,6 +164,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       customSlidesEnabled={customSlidesEnabled}
       initialCustomSlides={initialCustomSlides}
       customSlidesSections={customSlidesSections}
+      longitudinalRespondentIds={longitudinalRespondentIds}
     />
   );
 }

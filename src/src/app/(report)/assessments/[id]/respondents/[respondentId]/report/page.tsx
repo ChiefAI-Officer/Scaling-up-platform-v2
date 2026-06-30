@@ -27,6 +27,12 @@ import { reportConfigFor } from "@/lib/assessments/report-config";
 import { emitReportMetric } from "@/lib/assessments/report-metrics";
 import { BrandedReport } from "@/components/assessments/BrandedReport";
 import { PrintReportButton } from "@/components/assessments/PrintReportButton";
+import { db } from "@/lib/db";
+import { getApiActor } from "@/lib/auth/authorization";
+import {
+  hasComparableLongitudinal,
+  asLongitudinalEligibilityDb,
+} from "@/lib/assessments/longitudinal-eligibility";
 
 // H15: never statically render or cache the report (PII).
 export const dynamic = "force-dynamic";
@@ -58,12 +64,83 @@ export default async function RespondentReportPage({ params }: PageProps) {
     reportType: reportConfigFor(report.templateAlias).reportType,
   });
 
+  // Wave N (#23) — "View across campaigns" entry link. The link is rendered
+  // ONLY when the longitudinal eligibility predicate is true: feature flag on,
+  // scored template, current template access, AND ≥2 scored submissions for
+  // this person on this template. Computed SERVER-side here (the gate already
+  // authorized the report); the campaign carries the organizationId + templateId
+  // the helper + URL need (the report payload only carries the alias). The
+  // actor is re-resolved (cheap; the gate consumed it internally). Fail-soft:
+  // any error / no actor / not-eligible ⇒ no link.
+  const longitudinal = await resolveLongitudinalEntry(id, respondentId);
+
   return (
     <div className="su-report-page">
       <div className="su-report-actions no-print">
         <PrintReportButton />
+        {longitudinal && (
+          // prefetch is irrelevant for a plain <a>, but per spec the
+          // longitudinal surface is NEVER prefetched: a plain anchor (not a
+          // Next <Link>) guarantees no prefetch of the named-PII view.
+          <a
+            href={longitudinal.href}
+            className="su-cta su-report-longitudinal-link"
+            data-testid="respondent-report-longitudinal-link"
+          >
+            View across campaigns
+          </a>
+        )}
       </div>
       <BrandedReport report={report} campaignLabel={report.campaignLabel} />
     </div>
   );
+}
+
+/**
+ * Resolve the Wave N "View across campaigns" entry for this report, or null
+ * when ineligible. Loads the campaign's organizationId + templateId (+ template
+ * alias) — the report payload carries only the alias, and the helper + URL need
+ * the ids — re-resolves the actor, and runs `hasComparableLongitudinal`.
+ * Fail-soft: a missing actor, a missing/soft-deleted campaign, or a thrown
+ * helper all resolve to null (no link), never a crash on the report render.
+ */
+async function resolveLongitudinalEntry(
+  campaignId: string,
+  respondentId: string,
+): Promise<{ href: string } | null> {
+  try {
+    const actor = await getApiActor();
+    if (!actor) return null;
+
+    const campaign = await db.assessmentCampaign.findFirst({
+      where: { id: campaignId, deletedAt: null },
+      select: {
+        organizationId: true,
+        templateId: true,
+        template: { select: { alias: true } },
+      },
+    });
+    if (!campaign) return null;
+
+    const eligible = await hasComparableLongitudinal(
+      asLongitudinalEligibilityDb(db),
+      actor,
+      {
+        organizationId: campaign.organizationId,
+        respondentId,
+        templateId: campaign.templateId,
+        templateAlias: campaign.template?.alias ?? null,
+      },
+    );
+    if (!eligible) return null;
+
+    const href =
+      `/portal/assessments/respondents/${encodeURIComponent(respondentId)}/longitudinal` +
+      `?templateId=${encodeURIComponent(campaign.templateId)}` +
+      `&organizationId=${encodeURIComponent(campaign.organizationId)}`;
+    return { href };
+  } catch {
+    // Never let the entry-link computation break the report render.
+    return null;
+  }
 }
