@@ -14,6 +14,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getInvitationSession } from "@/lib/assessments/invitation-cookie";
+import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
+import { loadSafeSlides } from "@/lib/assessments/load-safe-slides";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -104,11 +106,21 @@ export async function GET(
     });
     const isCEO = participant?.isCEO === true;
 
+    // Wave M (#19): coach-authored custom slides. Gated by the default-OFF flag
+    // (campaign-id canary + global enable + hard kill). When ON, parse + SANITIZE
+    // server-side (the client never sanitizes — R1-Med-2) and emit a typed
+    // SafeSlide[] payload the client weaves via mergeCustomSlides. Flag-off ⇒
+    // omit the field entirely so the participant flow is byte-for-byte unchanged.
+    const customSlides = isCustomSlidesEnabled(invitation.campaignId)
+      ? loadSafeSlides(invitation.campaign.customSlides)
+      : undefined;
+
     return NextResponse.json(
       {
         success: true,
         data: {
           isCEO,
+          ...(customSlides && customSlides.length > 0 ? { customSlides } : {}),
           // Opaque per-respondent id (the invitation cuid) for keying the
           // client-side localStorage draft. The invitation id is scoped to
           // THIS respondent's own authenticated session, so returning it to

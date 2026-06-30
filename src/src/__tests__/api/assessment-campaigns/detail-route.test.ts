@@ -146,7 +146,23 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
     expect(res.status).toBe(404);
   });
 
-  it("409 when status !== DRAFT", async () => {
+  it("409 only when CLOSED (CLOSED is read-only)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
+      id: "c1",
+      organizationId: "org-1",
+      templateId: "tpl-1",
+      createdByCoachId: "coach-1",
+      status: "CLOSED",
+    });
+    const res = await PATCH(
+      patchReq({ name: "Renamed" }) as never,
+      detailParams("c1"),
+    );
+    expect(res.status).toBe(409);
+  });
+
+  it("200 on an ACTIVE campaign (editable since commit 223721f — lock only CLOSED)", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(coachActor);
     (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue({
       id: "c1",
@@ -155,11 +171,15 @@ describe("PATCH /api/assessment-campaigns/[id]", () => {
       createdByCoachId: "coach-1",
       status: "ACTIVE",
     });
+    (db.assessmentCampaign.update as jest.Mock).mockResolvedValue({
+      id: "c1",
+      name: "Renamed",
+    });
     const res = await PATCH(
       patchReq({ name: "Renamed" }) as never,
       detailParams("c1"),
     );
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(200);
   });
 
   it("happy path updates name", async () => {

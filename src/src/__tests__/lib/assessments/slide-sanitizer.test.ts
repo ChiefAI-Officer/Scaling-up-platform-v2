@@ -176,6 +176,18 @@ describe("sanitizeSlideHtml — preserves safe content", () => {
     expect(html).toMatch(/src="data:image\/png;base64,/);
   });
 
+  test("forces referrerpolicy=\"no-referrer\" on every <img> (R2-Low-1 tracking-pixel guard)", () => {
+    // External https image with no author referrerpolicy → forced.
+    const ext = sanitizeSlideHtml('<img src="https://acme.com/logo.png" alt="logo">').html;
+    expect(ext).toMatch(/referrerpolicy="no-referrer"/);
+    // A coach-supplied permissive value is overridden, not honoured.
+    const overridden = sanitizeSlideHtml(
+      '<img src="https://acme.com/logo.png" referrerpolicy="unsafe-url" alt="logo">',
+    ).html;
+    expect(overridden).toMatch(/referrerpolicy="no-referrer"/);
+    expect(overridden).not.toMatch(/unsafe-url/i);
+  });
+
   test("keeps headings, paragraphs, lists, em, blockquote, hr together (no false warnings)", () => {
     const input =
       "<h2>Title</h2><p>Intro <em>emphasis</em> and <strong>bold</strong>.</p>" +

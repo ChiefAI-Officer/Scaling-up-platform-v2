@@ -64,7 +64,11 @@ const ALLOWED_TAGS = [
 // (dropped by omission). srcset is intentionally NOT listed for <img>.
 const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
   a: ["href", "title", "target", "rel"],
-  img: ["src", "alt", "title", "width", "height"],
+  // `referrerpolicy` is force-set to "no-referrer" in transformTags (R2-Low-1:
+  // external images are a coach-controlled tracking-pixel vector — never leak
+  // the survey URL / participant referer). Allowed here so the transform's value
+  // survives sanitization.
+  img: ["src", "alt", "title", "width", "height", "referrerpolicy"],
 };
 
 // data:image/* but NOT data:image/svg+xml (case-insensitive, tolerant of
@@ -128,6 +132,10 @@ export function sanitizeSlideHtml(raw: string): SanitizeSlideResult {
           // data:image/* (png/jpeg/gif/webp) survive the scheme allowlist.
           delete attribs.src;
         }
+        // R2-Low-1: force `referrerpolicy="no-referrer"` on every slide <img>
+        // so an external (https) image can't observe the survey URL / referer
+        // as a tracking pixel. Overrides any coach-supplied value.
+        attribs.referrerpolicy = "no-referrer";
         return { tagName, attribs };
       },
     },

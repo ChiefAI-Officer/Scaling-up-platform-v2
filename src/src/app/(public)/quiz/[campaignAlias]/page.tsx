@@ -11,6 +11,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { PublicQuizClient } from "@/components/assessments/public-quiz-client";
+import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
+import { loadSafeSlides } from "@/lib/assessments/load-safe-slides";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -41,6 +43,8 @@ export default async function PublicQuizPage({
       closeAt: true,
       versionId: true,
       deletedAt: true,
+      // Wave M (#19): coach-authored custom slides (raw CustomSlide[] JSON).
+      customSlides: true,
       template: { select: { id: true, name: true, alias: true } },
     },
   });
@@ -67,6 +71,16 @@ export default async function PublicQuizPage({
     campaign.openAt <= now &&
     (campaign.closeAt === null || campaign.closeAt >= now);
 
+  // Wave M (#19): coach-authored custom slides. Gated by the default-OFF flag.
+  // When ON, parse + SANITIZE server-side (the client never sanitizes —
+  // R1-Med-2) into a typed SafeSlide[]; flag-off ⇒ empty so the client merge is
+  // a no-op and the public flow is byte-for-byte unchanged. (v1 has no PUBLIC
+  // authoring path, so this is normally empty — the renderer support is plumbed
+  // ahead of the authoring path per spec §4.)
+  const customSlides = isCustomSlidesEnabled(campaign.id)
+    ? loadSafeSlides(campaign.customSlides)
+    : [];
+
   // Render the client directly (no constrained wrapper) so the full-bleed
   // branded welcome shell matches the org-survey flow + the approved mockup.
   return (
@@ -82,6 +96,7 @@ export default async function PublicQuizPage({
       closeAtIso={campaign.closeAt ? campaign.closeAt.toISOString() : null}
       sections={version.sections as unknown}
       questions={version.questions as unknown}
+      customSlides={customSlides}
     />
   );
 }
