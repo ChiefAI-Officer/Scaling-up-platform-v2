@@ -29,17 +29,22 @@ import { TemplateVersionForPublishSchema } from "../../lib/assessments/scoring";
 const content = buildScalingUpFullContent();
 
 type Rec = { minScore: number; maxScore: number; text: string };
-type Q = { stableKey: string; recommendations: Rec[] };
-const questions = content.questions as Q[];
+type Q = { stableKey: string; type: string; recommendations: Rec[] };
+// These tests are about the 5-stop RECOMMENDATION library, which lives on the
+// SLIDER_LIKERT questions only. v2 (Wave J-1) adds 3 non-scored NUMBER
+// background questions (no recommendations) — scope past them here.
+const questions = (content.questions as Q[]).filter(
+  (q) => q.type === "SLIDER_LIKERT"
+);
 
 // ─── 1. Band count ────────────────────────────────────────────────────────
 
 describe("SU Full 5-stop recommendations — band count", () => {
-  it("has exactly 61 questions", () => {
+  it("has exactly 61 scored questions", () => {
     expect(questions).toHaveLength(61);
   });
 
-  it("every question has exactly 5 recommendation bands", () => {
+  it("every scored question has exactly 5 recommendation bands", () => {
     for (const q of questions) {
       expect(q.recommendations).toHaveLength(5);
     }

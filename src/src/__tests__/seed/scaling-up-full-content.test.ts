@@ -30,20 +30,38 @@ const content = buildScalingUpFullContent();
 // ─── 1. Questions ─────────────────────────────────────────────────────────
 
 describe("buildScalingUpFullContent() — questions", () => {
-  it("has exactly 61 questions", () => {
-    expect(content.questions).toHaveLength(61);
+  it("has 64 questions (61 SLIDER + 3 NUMBER background) in v2", () => {
+    expect(content.questions).toHaveLength(64);
   });
 
-  it("every question is SLIDER_LIKERT on a 0-10 scale", () => {
-    for (const q of content.questions as Array<{
+  it("has exactly 61 SLIDER_LIKERT scored questions", () => {
+    const sliders = (content.questions as Array<{ type: string }>).filter(
+      (q) => q.type === "SLIDER_LIKERT"
+    );
+    expect(sliders).toHaveLength(61);
+  });
+
+  it("every SLIDER_LIKERT question is on a 0-10 scale", () => {
+    const sliders = (content.questions as Array<{
       type: string;
       scale: { min: number; max: number };
       stableKey: string;
-    }>) {
-      expect(q.type).toBe("SLIDER_LIKERT");
+    }>).filter((q) => q.type === "SLIDER_LIKERT");
+    for (const q of sliders) {
       expect(q.scale.min).toBe(0);
       expect(q.scale.max).toBe(10);
     }
+  });
+
+  it("the 3 background questions are non-scored NUMBER inputs", () => {
+    const numbers = (content.questions as Array<{ type: string; stableKey: string }>).filter(
+      (q) => q.type === "NUMBER"
+    );
+    expect(numbers.map((q) => q.stableKey).sort()).toEqual([
+      "Q_FREELANCE",
+      "Q_FTE_PERMANENT",
+      "Q_FTE_TEMPORARY",
+    ]);
   });
 });
 
@@ -137,11 +155,13 @@ describe("buildScalingUpFullContent() — scaleUpScore + rollup", () => {
 // ─── 5. Per-question recommendations preserved ───────────────────────────
 
 describe("buildScalingUpFullContent() — recommendations preserved", () => {
-  it("every question has exactly 5 recommendation bands", () => {
-    for (const q of content.questions as Array<{
+  it("every SLIDER_LIKERT question has exactly 5 recommendation bands", () => {
+    const sliders = (content.questions as Array<{
+      type: string;
       recommendations?: unknown[];
       stableKey: string;
-    }>) {
+    }>).filter((q) => q.type === "SLIDER_LIKERT");
+    for (const q of sliders) {
       expect(q.recommendations).toHaveLength(5);
     }
   });

@@ -48,7 +48,11 @@ const db = new PrismaClient();
 
 export const ALIAS = "scaling-up-full";
 export const NAME = "Scaling Up Full Assessment";
-export const VERSION_NUMBER = 1;
+// v2 (Wave J-1): adds a CEO-only "About your company" background section with
+// three NUMBER FTE/freelance questions (non-scored) that feed the mid-survey
+// growth-phase tile. The helper appends this as a NEW DRAFT v2 (superseding the
+// unpublished DRAFT v1 via forceSupersedeDraft); nothing publishes on seed.
+export const VERSION_NUMBER = 2;
 export const LANGUAGE = "enUS";
 
 const TEMPLATE_DESCRIPTION =
@@ -139,6 +143,22 @@ interface SectionDef {
 }
 
 const SECTIONS: SectionDef[] = [
+  // Background section (Wave J-1) — CEO-only "About your company" block.
+  // Hosts the NON-SCORED NUMBER FTE/freelance questions that drive the
+  // mid-survey growth-phase tile (Task B gates CEO-only visibility; this seed
+  // only DEFINES the questions). sortOrder 0 places it before "Your Employees"
+  // (sortOrder 1). It carries domain "people" purely to satisfy the
+  // meanOfDomains publish-time requirement that every section has a domain —
+  // it contributes ZERO to scoring because it holds no SLIDER_LIKERT questions
+  // (domain/section/ScaleUp rollups only sum SLIDER_LIKERT answers).
+  {
+    stableKey: "S_BACKGROUND",
+    sortOrder: 0,
+    name: "About your company",
+    description:
+      "A few quick numbers about your company. These help us place your company's growth phase — they are not scored.",
+    domain: "people",
+  },
   // People domain
   {
     stableKey: "S_PEOPLE_YE",
@@ -853,9 +873,63 @@ interface QuestionPayload {
 const ANCHOR_MIN = "Strongly disagree";
 const ANCHOR_MAX = "Strongly agree";
 
+// ─── Background NUMBER questions (Wave J-1) ───────────────────────────────
+//
+// CEO-only "About your company" headcount questions. These are NUMBER (not
+// slider) and are NON-SCORED: scoring.ts only scores SLIDER_LIKERT and skips
+// TEXT/NUMBER/MULTI_CHOICE, so they do NOT affect domain/section/ScaleUp
+// rollups. Q_FTE_PERMANENT + Q_FTE_TEMPORARY drive the growth-phase tile
+// (su-full-phase.ts); Q_FREELANCE is captured for fidelity but EXCLUDED from
+// the phase calc. Visibility is gated to the CEO by the survey plumbing
+// (Task B) — the seed only DEFINES these questions.
+interface BackgroundNumberPayload {
+  stableKey: string;
+  sortOrder: number;
+  type: "NUMBER";
+  label: string;
+  sectionStableKey: string;
+  isRequired: boolean;
+}
+
+// sortOrders 62–64 sit after the 61 SLIDER questions (1–61) so the seed
+// integrity guard's duplicate-sortOrder check stays satisfied.
+const BACKGROUND_QUESTION_DEFS: BackgroundNumberPayload[] = [
+  {
+    stableKey: "Q_FTE_PERMANENT",
+    sortOrder: 62,
+    type: "NUMBER",
+    label:
+      "How many permanent employees (FTE) does your company have?",
+    sectionStableKey: "S_BACKGROUND",
+    isRequired: true,
+  },
+  {
+    stableKey: "Q_FTE_TEMPORARY",
+    sortOrder: 63,
+    type: "NUMBER",
+    label:
+      "How many temporary employees (FTE) does your company have?",
+    // Optional — a blank answer counts as 0 in the phase calc.
+    sectionStableKey: "S_BACKGROUND",
+    isRequired: false,
+  },
+  {
+    stableKey: "Q_FREELANCE",
+    sortOrder: 64,
+    type: "NUMBER",
+    label:
+      "How many freelancers / contractors do you work with?",
+    // Optional — captured for fidelity, EXCLUDED from the growth-phase calc.
+    sectionStableKey: "S_BACKGROUND",
+    isRequired: false,
+  },
+];
+
+type AnyQuestionPayload = QuestionPayload | BackgroundNumberPayload;
+
 function buildSectionsAndQuestions(): {
   sections: SectionPayload[];
-  questions: QuestionPayload[];
+  questions: AnyQuestionPayload[];
 } {
   const sections: SectionPayload[] = SECTIONS.map((s) => ({
     stableKey: s.stableKey,
@@ -865,7 +939,7 @@ function buildSectionsAndQuestions(): {
     domain: s.domain,
   }));
 
-  const questions: QuestionPayload[] = QUESTION_DEFS.map((q, idx) => {
+  const sliderQuestions: QuestionPayload[] = QUESTION_DEFS.map((q, idx) => {
     const sortOrder = idx + 1;
     return {
       // Pad to 2 digits so sortOrder ordering matches lexical ordering.
@@ -895,6 +969,12 @@ function buildSectionsAndQuestions(): {
     };
   });
 
+  // Append the CEO-only background NUMBER questions after the 61 sliders.
+  const questions: AnyQuestionPayload[] = [
+    ...sliderQuestions,
+    ...BACKGROUND_QUESTION_DEFS,
+  ];
+
   return { sections, questions };
 }
 
@@ -902,7 +982,7 @@ function buildSectionsAndQuestions(): {
 
 export function buildTemplateContent(): {
   sections: SectionPayload[];
-  questions: QuestionPayload[];
+  questions: AnyQuestionPayload[];
   scoringConfig: typeof SCORING_CONFIG;
 } {
   const { sections, questions } = buildSectionsAndQuestions();
@@ -934,7 +1014,7 @@ export function buildScalingUpFullContent(): SeedContent {
 // ─── Content hash (deterministic) ────────────────────────────────────────
 
 export function computeContentHash(input: {
-  questions: QuestionPayload[];
+  questions: AnyQuestionPayload[];
   sections: SectionPayload[];
   scoringConfig: unknown;
   reportConfig: null;
@@ -1306,14 +1386,11 @@ export function runExtractionAudit(): {
     );
   }
 
-  // Each question: SLIDER_LIKERT, scale [0, 10], 3 recommendation bands
+  // Each SLIDER_LIKERT question: scale [0, 10], 5 recommendation bands.
+  // Non-slider questions (the Wave J-1 background NUMBER questions) are
+  // intentionally non-scored and carry no scale/recommendations — skip them.
   for (const q of content.questions) {
-    if (q.type !== "SLIDER_LIKERT") {
-      throw new Error(
-        `[seed-scaling-up-full-assessment] extraction audit FAILED: question ` +
-          `${q.stableKey} is not SLIDER_LIKERT`
-      );
-    }
+    if (q.type !== "SLIDER_LIKERT") continue;
     if (q.scale.min !== 0 || q.scale.max !== 10 || q.scale.step !== 1) {
       throw new Error(
         `[seed-scaling-up-full-assessment] extraction audit FAILED: question ` +
@@ -1381,7 +1458,12 @@ async function main(): Promise<void> {
     const seedResult = await ensureTemplateVersionContent(
       tx as unknown as Parameters<typeof ensureTemplateVersionContent>[0],
       sys.id,
-      content
+      content,
+      // v2 (Wave J-1) supersedes the existing unpublished DRAFT v1. The helper
+      // fail-closes on a differing unpublished DRAFT unless we opt in here. It
+      // still APPENDS a new DRAFT v2 (it does NOT mutate v1, and never
+      // publishes). On a fresh DB it creates v1 and this flag is a harmless no-op.
+      { forceSupersedeDraft: true }
     );
 
     await ensureAccessGroupAndTemplateLink(

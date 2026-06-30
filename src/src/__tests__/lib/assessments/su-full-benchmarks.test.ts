@@ -61,8 +61,18 @@ describe("su-full-benchmarks key integrity vs seed", () => {
   ).domains
     .map((d) => d.key)
     .sort();
+  // Per-section 0-100 Peers benchmarks cover the SCORED report sections only.
+  // v2 (Wave J-1) adds a non-scored "About your company" background section
+  // (NUMBER FTE inputs, no SLIDER questions) that has no section score and
+  // therefore no benchmark — exclude any section with no SLIDER_LIKERT question.
+  const scoredSectionKeys = new Set(
+    (content.questions as Array<{ type: string; sectionStableKey?: string }>)
+      .filter((q) => q.type === "SLIDER_LIKERT" && q.sectionStableKey)
+      .map((q) => q.sectionStableKey as string)
+  );
   const seedSections = (content.sections as Array<{ stableKey: string }>)
     .map((s) => s.stableKey)
+    .filter((key) => scoredSectionKeys.has(key))
     .sort();
 
   it("benchmark domain keys exactly match seed scoringConfig.domains", () => {
