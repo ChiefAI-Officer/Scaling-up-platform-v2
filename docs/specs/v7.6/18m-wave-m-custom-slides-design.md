@@ -26,6 +26,7 @@ additive nullable column; no destructive migration.
 | Q4 | **Default-OFF flag** `WAVE_M_CUSTOM_SLIDES_ENABLED` gates the editor **and** slide rendering. |
 | — | **Content** = sanitized HTML (chosen in scope question), **no token interpolation** (slides are static promos → zero token-exfil surface). |
 | — | **Caps:** ≤10 slides/campaign; ≤20 KB sanitized HTML per slide. |
+| — | **Placement: coach-side, per-campaign** (decided 2026-06-30, user). Jeff's #19 says only *"during campaign setup"* — silent on role; campaign setup lives in the coach portal today, and per-campaign authoring lets a coach personalize their own campaign. **Considered + rejected: admin/template-level** (one shared "Verve-slide" promo per assessment, staff-owned) — simpler and arguably closer to the literal "Verve slide" example, but it can't be personalized per campaign, so per-campaign coach authoring won. (A template-level default + coach override is a possible later hybrid.) |
 | — | **Authoring v1 = coach wizard (INVITED campaigns only)** + CampaignDetail panel. Renderer is shared, so public-campaign slides are a small future plumb, not v1. |
 
 ## 3. Data model (one additive nullable column)
