@@ -151,9 +151,9 @@ describe("seed-scaling-up-full-assessment", () => {
     expect(versionCreateCall.data.publishedAt).toBeNull();
     expect(versionCreateCall.data.publishedBy).toBeNull();
 
-    // v2 (Wave J-1): 64 questions (61 SLIDER + 3 NUMBER background) across
+    // v2 (Wave J-1): 63 questions (61 SLIDER + 2 NUMBER background) across
     // 11 sections (10 scored + the CEO-only "About your company" background).
-    expect(result.questionCount).toBe(64);
+    expect(result.questionCount).toBe(63);
     expect(result.sectionCount).toBe(11);
   });
 
@@ -295,7 +295,7 @@ describe("seed-scaling-up-full-assessment extraction audit", () => {
     }
   });
 
-  it("v2 (Wave J-1) adds 3 non-scored NUMBER background questions with the expected stableKeys", () => {
+  it("v2 (Wave J-1) adds 2 non-scored NUMBER background questions with the expected stableKeys", () => {
     const content = buildSU();
     const numbers = content.questions.filter(
       (q) => q.type === "NUMBER"
@@ -306,17 +306,15 @@ describe("seed-scaling-up-full-assessment extraction audit", () => {
     }>;
     expect(numbers.map((q) => q.stableKey).sort()).toEqual([
       "Q_FREELANCE",
-      "Q_FTE_PERMANENT",
-      "Q_FTE_TEMPORARY",
+      "Q_FTE_CONTRACT",
     ]);
     // All live in the background section.
     for (const q of numbers) {
       expect(q.sectionStableKey).toBe("S_BACKGROUND");
     }
-    // Permanent FTE is required; temporary + freelance are optional.
+    // The combined contract-FTE field is required; freelance is optional.
     const byKey = Object.fromEntries(numbers.map((q) => [q.stableKey, q]));
-    expect(byKey["Q_FTE_PERMANENT"].isRequired).toBe(true);
-    expect(byKey["Q_FTE_TEMPORARY"].isRequired).toBe(false);
+    expect(byKey["Q_FTE_CONTRACT"].isRequired).toBe(true);
     expect(byKey["Q_FREELANCE"].isRequired).toBe(false);
   });
 

@@ -30,8 +30,8 @@ const content = buildScalingUpFullContent();
 // ─── 1. Questions ─────────────────────────────────────────────────────────
 
 describe("buildScalingUpFullContent() — questions", () => {
-  it("has 64 questions (61 SLIDER + 3 NUMBER background) in v2", () => {
-    expect(content.questions).toHaveLength(64);
+  it("has 63 questions (61 SLIDER + 2 NUMBER background) in v2", () => {
+    expect(content.questions).toHaveLength(63);
   });
 
   it("has exactly 61 SLIDER_LIKERT scored questions", () => {
@@ -59,8 +59,7 @@ describe("buildScalingUpFullContent() — questions", () => {
     );
     expect(numbers.map((q) => q.stableKey).sort()).toEqual([
       "Q_FREELANCE",
-      "Q_FTE_PERMANENT",
-      "Q_FTE_TEMPORARY",
+      "Q_FTE_CONTRACT",
     ]);
   });
 });

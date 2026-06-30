@@ -5,9 +5,10 @@
  * shows a mid-survey interstitial tile ("You've reached phase N - <Name> phase")
  * with a verbatim narrative. This module is the pure foundation for that feature:
  *
- *   - `computeGrowthPhase(permanentFte, temporaryFte)` resolves the phase band.
- *     Driver = permanentFte + temporaryFte. Freelancers/contractors are EXCLUDED
- *     (captured in the seed for fidelity but never fed into the calc).
+ *   - `computeGrowthPhase(contractFte)` resolves the phase band. Driver = the
+ *     single "permanent or temporary contract" FTE figure (the verbatim Esperto
+ *     survey field). Freelancers/contractors are EXCLUDED (captured in the seed
+ *     for fidelity but never fed into the calc).
  *   - `GROWTH_PHASE_BANDS` + `GROWTH_PHASE_NARRATIVES` are exported so the survey
  *     plumbing (Task B) and the interstitial UI (Task C) can import them directly.
  *
@@ -18,6 +19,14 @@
  *   50–149 → Phase 4  Delegation
  *   150+   → Phase 5  Standardization
  *   driver <= 0, non-finite, or NaN → no phase (returns null)
+ *
+ * Driver-field caveat (source extract C1, line ~186): a SINGLE CEO sample (7
+ * permanent + 2 temporary = 9 combined) rendered as Pioneering/P1 (1–7), which
+ * would suggest the phase keys on PERMANENT FTE only. But the verbatim in-survey
+ * background question is ONE combined field — "Number of employees with a
+ * permanent or temporary contract (full-time equivalent)" (source lines 85–86) —
+ * so we drive the phase off that single combined figure, matching the live
+ * survey. Revisit only if a non-N=1 sample contradicts the combined-field reading.
  *
  * Narratives are the **in-survey interstitial tile** copy, transcribed VERBATIM
  * from the Esperto workbook v2-tab screenshots (P1=img56, P2=img48, P3=img53,
@@ -41,7 +50,7 @@ export interface GrowthPhase {
 interface GrowthPhaseBand {
   number: GrowthPhaseNumber;
   name: string;
-  /** Inclusive lower bound on the driver (permanent + temporary FTE). */
+  /** Inclusive lower bound on the driver (the combined contract FTE figure). */
   min: number;
   /** Inclusive upper bound; null = open-ended (Phase 5). */
   max: number | null;
@@ -129,25 +138,20 @@ function phaseFor(number: GrowthPhaseNumber): GrowthPhase {
 /**
  * Resolve a company growth phase from employee headcount.
  *
- * @param permanentFte  permanent employees (FTE)
- * @param temporaryFte  temporary employees (FTE) — blank should be passed as 0
- * @returns the matching GrowthPhase, or null when the driver (perm + temp) is
- *          <= 0 or not a finite number (no phase computable).
+ * @param contractFte  the combined "permanent or temporary contract" FTE figure
+ *                     (the single verbatim Esperto survey field; freelancers are
+ *                     captured separately and EXCLUDED). A blank answer should be
+ *                     passed as 0 (→ no phase).
+ * @returns the matching GrowthPhase, or null when contractFte is <= 0 or not a
+ *          finite number (no phase computable).
  */
-export function computeGrowthPhase(
-  permanentFte: number,
-  temporaryFte: number
-): GrowthPhase | null {
-  if (!Number.isFinite(permanentFte) || !Number.isFinite(temporaryFte)) {
-    return null;
-  }
-  const driver = permanentFte + temporaryFte;
-  if (!Number.isFinite(driver) || driver <= 0) {
+export function computeGrowthPhase(contractFte: number): GrowthPhase | null {
+  if (!Number.isFinite(contractFte) || contractFte <= 0) {
     return null;
   }
 
   const band = GROWTH_PHASE_BANDS.find(
-    (b) => driver >= b.min && (b.max === null || driver <= b.max)
+    (b) => contractFte >= b.min && (b.max === null || contractFte <= b.max)
   );
   if (!band) return null;
 

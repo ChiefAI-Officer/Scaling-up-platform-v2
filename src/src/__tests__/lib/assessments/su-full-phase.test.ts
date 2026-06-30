@@ -3,7 +3,8 @@
  *
  * Tests the pure phase-band resolver + the verbatim in-survey phase narratives.
  *
- * Phase bands (driver = permanentFte + temporaryFte; freelance EXCLUDED):
+ * Phase bands (driver = the single combined "permanent or temporary contract"
+ * FTE figure; freelance EXCLUDED):
  *   1–7    → Phase 1 "Pioneering"
  *   8–24   → Phase 2 "Organization"
  *   25–49  → Phase 3 "Management"
@@ -40,50 +41,52 @@ describe("computeGrowthPhase — band worked examples", () => {
   ];
 
   it.each(cases)(
-    "permanent %i + temp 0 → Phase %i",
-    (permanent, expectedPhase) => {
-      const phase = computeGrowthPhase(permanent, 0);
+    "contract FTE %i → Phase %i",
+    (contractFte, expectedPhase) => {
+      const phase = computeGrowthPhase(contractFte);
       expect(phase).not.toBeNull();
       expect(phase!.number).toBe(expectedPhase);
     }
   );
 });
 
-describe("computeGrowthPhase — freelance exclusion / driver = perm + temp", () => {
-  it("permanent 7 + temp 0 → Phase 1 (freelance is never an argument here)", () => {
-    expect(computeGrowthPhase(7, 0)!.number).toBe(1);
+describe("computeGrowthPhase — band-boundary transitions (single combined FTE)", () => {
+  it("7 → Phase 1, 8 → Phase 2 (P1/P2 boundary)", () => {
+    expect(computeGrowthPhase(7)!.number).toBe(1);
+    expect(computeGrowthPhase(8)!.number).toBe(2);
   });
 
-  it("permanent 7 + temp 1 → 8 combined → Phase 2", () => {
-    expect(computeGrowthPhase(7, 1)!.number).toBe(2);
+  it("24 → Phase 2, 25 → Phase 3 (P2/P3 boundary)", () => {
+    expect(computeGrowthPhase(24)!.number).toBe(2);
+    expect(computeGrowthPhase(25)!.number).toBe(3);
   });
 
-  it("permanent 24 + temp 1 → 25 combined → Phase 3", () => {
-    expect(computeGrowthPhase(24, 1)!.number).toBe(3);
+  it("49 → Phase 3, 50 → Phase 4 (P3/P4 boundary)", () => {
+    expect(computeGrowthPhase(49)!.number).toBe(3);
+    expect(computeGrowthPhase(50)!.number).toBe(4);
   });
 
-  it("permanent 49 + temp 100 → 149 combined → Phase 4", () => {
-    expect(computeGrowthPhase(49, 100)!.number).toBe(4);
+  it("149 → Phase 4, 150 → Phase 5 (P4/P5 boundary)", () => {
+    expect(computeGrowthPhase(149)!.number).toBe(4);
+    expect(computeGrowthPhase(150)!.number).toBe(5);
   });
 });
 
 describe("computeGrowthPhase — no-phase edges", () => {
   it("0 → null (no phase)", () => {
-    expect(computeGrowthPhase(0, 0)).toBeNull();
+    expect(computeGrowthPhase(0)).toBeNull();
   });
 
   it("negative → null", () => {
-    expect(computeGrowthPhase(-5, 0)).toBeNull();
-    expect(computeGrowthPhase(5, -10)).toBeNull();
+    expect(computeGrowthPhase(-5)).toBeNull();
   });
 
   it("NaN driver → null", () => {
-    expect(computeGrowthPhase(NaN, 0)).toBeNull();
-    expect(computeGrowthPhase(5, NaN)).toBeNull();
+    expect(computeGrowthPhase(NaN)).toBeNull();
   });
 
   it("non-finite (Infinity) → null", () => {
-    expect(computeGrowthPhase(Infinity, 0)).toBeNull();
+    expect(computeGrowthPhase(Infinity)).toBeNull();
   });
 });
 
@@ -97,9 +100,9 @@ describe("GrowthPhase shape — number / name / heading", () => {
   ];
 
   it.each(expected)(
-    "driver %i → number %i, name %s, heading %s",
-    (driver, number, name, heading) => {
-      const phase = computeGrowthPhase(driver, 0) as GrowthPhase;
+    "contract FTE %i → number %i, name %s, heading %s",
+    (contractFte, number, name, heading) => {
+      const phase = computeGrowthPhase(contractFte) as GrowthPhase;
       expect(phase.number).toBe(number);
       expect(phase.name).toBe(name);
       expect(phase.heading).toBe(heading);
@@ -111,20 +114,20 @@ describe("GrowthPhase shape — number / name / heading", () => {
 
 describe("Esperto quirk — P3 and P4 narratives are identical", () => {
   it("P3.narrative === P4.narrative (source artifact, replicated as-is)", () => {
-    const p3 = computeGrowthPhase(40, 0) as GrowthPhase;
-    const p4 = computeGrowthPhase(100, 0) as GrowthPhase;
+    const p3 = computeGrowthPhase(40) as GrowthPhase;
+    const p4 = computeGrowthPhase(100) as GrowthPhase;
     expect(p3.narrative).toBe(p4.narrative);
   });
 
   it("the shared P3/P4 body references the 'Growth gobbles up cash' paragraph", () => {
-    const p3 = computeGrowthPhase(40, 0) as GrowthPhase;
+    const p3 = computeGrowthPhase(40) as GrowthPhase;
     expect(p3.narrative).toContain("Growth gobbles up cash");
   });
 });
 
 describe("verbatim narrative anchors (source-faithful)", () => {
   it("P1 narrative is the Pioneering creativity/energy copy", () => {
-    const p1 = computeGrowthPhase(3, 0) as GrowthPhase;
+    const p1 = computeGrowthPhase(3) as GrowthPhase;
     expect(p1.narrative).toContain(
       "actively involved co-worker"
     );
@@ -132,13 +135,13 @@ describe("verbatim narrative anchors (source-faithful)", () => {
   });
 
   it("P2 narrative is the Organization management-processes copy", () => {
-    const p2 = computeGrowthPhase(15, 0) as GrowthPhase;
+    const p2 = computeGrowthPhase(15) as GrowthPhase;
     expect(p2.narrative).toContain("management processes require development");
     expect(p2.narrative).toContain("HR/Marketing/Sales/Operations");
   });
 
   it("P5 narrative is the Standardization bureaucracy copy", () => {
-    const p5 = computeGrowthPhase(200, 0) as GrowthPhase;
+    const p5 = computeGrowthPhase(200) as GrowthPhase;
     expect(p5.narrative).toContain("bureaucracy");
     expect(p5.narrative).toContain("managers must continually develop into leaders");
   });

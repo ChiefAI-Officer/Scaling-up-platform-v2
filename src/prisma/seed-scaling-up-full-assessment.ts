@@ -878,10 +878,12 @@ const ANCHOR_MAX = "Strongly agree";
 // CEO-only "About your company" headcount questions. These are NUMBER (not
 // slider) and are NON-SCORED: scoring.ts only scores SLIDER_LIKERT and skips
 // TEXT/NUMBER/MULTI_CHOICE, so they do NOT affect domain/section/ScaleUp
-// rollups. Q_FTE_PERMANENT + Q_FTE_TEMPORARY drive the growth-phase tile
-// (su-full-phase.ts); Q_FREELANCE is captured for fidelity but EXCLUDED from
-// the phase calc. Visibility is gated to the CEO by the survey plumbing
-// (Task B) — the seed only DEFINES these questions.
+// rollups. Labels are VERBATIM from the Esperto background screen (source
+// extract lines 85-86). Q_FTE_CONTRACT (the single combined "permanent or
+// temporary contract" FTE field) drives the growth-phase tile (su-full-phase.ts);
+// Q_FREELANCE is captured for fidelity but EXCLUDED from the phase calc.
+// Visibility is gated to the CEO by the survey plumbing (Task B) — the seed
+// only DEFINES these questions.
 interface BackgroundNumberPayload {
   stableKey: string;
   sortOrder: number;
@@ -891,34 +893,25 @@ interface BackgroundNumberPayload {
   isRequired: boolean;
 }
 
-// sortOrders 62–64 sit after the 61 SLIDER questions (1–61) so the seed
+// sortOrders 62–63 sit after the 61 SLIDER questions (1–61) so the seed
 // integrity guard's duplicate-sortOrder check stays satisfied.
 const BACKGROUND_QUESTION_DEFS: BackgroundNumberPayload[] = [
   {
-    stableKey: "Q_FTE_PERMANENT",
+    // The single combined contract-FTE field — drives the growth-phase tile.
+    stableKey: "Q_FTE_CONTRACT",
     sortOrder: 62,
     type: "NUMBER",
     label:
-      "How many permanent employees (FTE) does your company have?",
+      "Number of employees with a permanent or temporary contract (full-time equivalent)",
     sectionStableKey: "S_BACKGROUND",
     isRequired: true,
   },
   {
-    stableKey: "Q_FTE_TEMPORARY",
+    stableKey: "Q_FREELANCE",
     sortOrder: 63,
     type: "NUMBER",
     label:
-      "How many temporary employees (FTE) does your company have?",
-    // Optional — a blank answer counts as 0 in the phase calc.
-    sectionStableKey: "S_BACKGROUND",
-    isRequired: false,
-  },
-  {
-    stableKey: "Q_FREELANCE",
-    sortOrder: 64,
-    type: "NUMBER",
-    label:
-      "How many freelancers / contractors do you work with?",
+      "Average number of freelance employees (full-time equivalent)",
     // Optional — captured for fidelity, EXCLUDED from the growth-phase calc.
     sectionStableKey: "S_BACKGROUND",
     isRequired: false,
