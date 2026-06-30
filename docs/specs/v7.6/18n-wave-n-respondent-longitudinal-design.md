@@ -37,17 +37,26 @@ The stable identity is **`OrgRespondent.id` within an org** — `OrgRespondent` 
 same person re-invited to a later campaign keeps the same `respondentId`. `AssessmentSubmission` links
 `respondentId` + `campaignId` and is indexed `[respondentId, submittedAt]`.
 
-A longitudinal view is therefore keyed by **(respondentId, templateId)**:
+A longitudinal view is keyed by **(person, templateId)**, where *person* = **all `OrgRespondent` rows in the
+org sharing the entry respondent's `normalizedEmail`** (see GM-6 below — this supersedes a naïve
+`respondentId`-only match), falling back to the single `respondentId` when there's no email:
 
 ```
+let emails = normalizedEmail of the entry OrgRespondent
 all AssessmentSubmission
   where respondent.organizationId = org
-    and respondent.id            = respondentId
+    and (respondent.normalizedEmail = emails   -- union external + email rows for the same person
+         OR respondent.id            = respondentId)   -- fallback when no email
     and campaign.templateId      = templateId
     and submittedAt is not null
   order by submittedAt asc
 ```
 
+- **Match by email-within-org**, not `respondentId` alone: the same human can be two `OrgRespondent` rows (an
+  Esperto import without an email, then a fresh invite by email — the dedup key includes `dedupeSource`), and
+  `respondentId`-only would split their Year-1/Year-2 history. `normalizedEmail` is populated + indexed
+  (`@@index([organizationId, normalizedEmail])`). **Residual limitation:** a person who is two rows with *no
+  shared email* still won't link — fix is operational (reuse the roster row) + a future admin merge tool.
 - **Per-template** because you cannot compare an LVA score to a Rockefeller score — the comparison axis is
   one assessment over time.
 - **Public takers** (`respondentId = null`) are excluded — they have no stable cross-campaign identity.
@@ -109,10 +118,13 @@ Backed by `GET /api/.../respondent-longitudinal` (flag-gated; 401 unauth; 404 on
 
 - **Authz:** `canAccessOrganization` (admins bypass); 404 on fail (no org-id enumeration).
 - **Read-only**, frozen-result only; no mutation, no re-score.
-- **Audit + rate-limit:** reuse the report-access-gate posture (fail-closed audit `RESPONDENT_LONGITUDINAL_VIEW`
-  with actor/IP-UA/respondent/template + counts; per-actor+respondent+IP rate-limit before the load; `no-store`
-  via middleware). This keeps the new PII surface inside the same protocol as the per-respondent report and
-  group report.
+- **`no-store` + a lightweight audit** (`RESPONDENT_LONGITUDINAL_VIEW`: actor / org / template / matched
+  emails / submission counts). **(grill-me trim, supersedes the original heavier draft):** this matches the
+  sibling **cohort trends** route (authz-only + portal page) but adds an audit line + `no-store` because this
+  is *named single-person* PII. We deliberately **do NOT** put it behind the full report-access-gate or add a
+  rate-limiter — `canAccessOrganization` already 404s non-owners, and a coach viewing their own org's people is
+  not a tokened, enumerable surface like a report link. (If abuse ever appears, the rate-limiter is an easy
+  add.)
 
 ## 8. Testing (TDD targets)
 
@@ -149,6 +161,25 @@ Backed by `GET /api/.../respondent-longitudinal` (flag-gated; 401 unauth; 404 on
 Merge dark (flag default-OFF). Launch = set `WAVE_N_RESPONDENT_LONGITUDINAL_ENABLED=1` on Vercel Production +
 redeploy after a prod smoke (a respondent with ≥2 scored campaigns shows deltas; qualitative → not-applicable;
 flag-off → 404). Kill = zero the flag + redeploy. Short `18n-ops-runbook.md` ships with the implementation.
+
+## 10.5 grill-me hardening (2026-06-30 — AUTHORITATIVE; supersedes the body where noted)
+
+A second adversarial pass (`/grill-me`, code-grounded) refined four points:
+
+- **GM-1 Include Esperto-imported submissions.** Imported submissions carry a real frozen `ScoreResult`
+  (`results-commit.ts:383`) and pin a published version, and submissions are one-per-respondent-per-campaign
+  (partial unique on `(campaignId, respondentId)`). So a person's imported history shows alongside platform
+  results — this is literally Jeff's "Year 1 vs Year 2." Order by their back-dated `submittedAt`; the
+  same-version delta rule (Q6) still applies (Esperto-import version vs platform version → values shown,
+  deltas suppressed).
+- **GM-2 Trim the protection (supersedes §7).** `canAccessOrganization` (404) + `no-store` + one lightweight
+  audit event — matching the sibling cohort-trends posture, not the heavier report-access-gate; no rate-limiter.
+- **GM-6 Match by email-within-org (supersedes §3's `respondentId` framing).** Union `OrgRespondent` rows in
+  the org sharing the entry respondent's `normalizedEmail` (fallback to `respondentId`), so Esperto-external and
+  platform-email rows for the same person link. Residual no-shared-email split documented.
+- **All-different-versions degrade.** If every one of a person's submissions is on a different version, the view
+  still renders all columns/values with zero deltas + a one-line "all on different versions — values shown,
+  not compared" note (a natural extension of Q6).
 
 ## 11. Explicitly out of scope (v1)
 

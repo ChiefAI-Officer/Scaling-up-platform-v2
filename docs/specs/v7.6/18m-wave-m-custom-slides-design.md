@@ -114,9 +114,14 @@ Mounted in **two places**:
 
 ## 7. Security
 
-- **Sanitize on save AND re-sanitize on render** (defense in depth) via `sanitizeCustomHtml` — the Wave B
-  coach-safe config (strips `<script>`, event handlers, `javascript:` URLs; allows branded markup + inline
-  styles per its allowlist).
+- **Sanitize on save AND re-sanitize on render** (defense in depth) via a **stricter, slide-specific
+  `sanitizeSlideHtml` profile** — NOT the existing `sanitizeCustomHtml` as-is. **(grill-me correction:**
+  `sanitize-custom-html.ts:38` documents itself as an **admin-trusted surface** — it allows `<style>` +
+  `<iframe>` and does NOT scheme-validate inline-style `url()`/`@import` — and says *"revisit if it ever
+  becomes coach-writable."* Wave M is exactly that.) The slide profile **drops `<style>` and `<iframe>`** and
+  strips/scheme-validates inline-style `url()`/`@import` (no CSS bleed/exfil into the survey chrome), while
+  keeping `<img>` (https/data), links (https/mailto/tel), and text formatting. A youtube/vimeo video embed is
+  a deliberate later add, not v1.
 - **No interpolation** → no `{{token}}` exfil surface (unlike the Wave-D invitation HTML, which needed a
   token validator). Slides are static.
 - **Caps:** ≤10 slides; ≤20 KB sanitized HTML/slide; title length-capped. Post-sanitization length check
@@ -160,6 +165,27 @@ Merge dark (flag default-OFF). Launch = set `WAVE_M_CUSTOM_SLIDES_ENABLED=1` on 
 redeploy, after a prod smoke (author a slide on a test INVITED campaign, confirm it renders as an uncounted
 page in `/org-survey`, confirm flag-off control). Kill = zero the flag + redeploy. A short `18m-ops-runbook.md`
 ships with the implementation (flag-flip order + smoke + rollback), per house pattern.
+
+## 10.5 grill-me hardening (2026-06-30 — AUTHORITATIVE; supersedes the body where noted)
+
+A second adversarial pass (`/grill-me`, code-grounded) refined four points:
+
+- **GM-3 Sanitizer (supersedes §7):** use a stricter `sanitizeSlideHtml` profile (drop `<style>`/`<iframe>`,
+  validate/strip inline-style `url()`/`@import`); the existing `sanitizeCustomHtml` is admin-trusted by its own
+  documentation and must not be reused as-is for a coach-writable, participant-facing surface.
+- **GM-4 Rendering (refines §4):** slides are array pages but render as **interstitials with NO shell
+  header / section counter** — matching the existing non-counted `phaseTile` pattern
+  (`section-pager.tsx:47`). `totalSections`/`currentSection` count `kind==="section"` pages only, so the
+  counter never sees a slide. Resume is unaffected: `sectionIndex` is local state (starts at 0, not persisted);
+  autosave stores answers only. **Mockup correction:** the participant slide must NOT show a "Section N of M"
+  strip (the published mockup showed one — to be fixed).
+- **GM-5 Ordering & empties:** an `end` slide renders **after** the auto-appended "Other" orphan page
+  (`section-pages.ts:40`), so `mergeCustomSlides` appends `end` slides at the very tail. A slide with neither a
+  title nor non-empty sanitized HTML is **rejected on save** and skipped at render. The required-answer gate is
+  a no-op on a zero-question slide page (code-confirmed) — no special handling.
+- **GM-7 Persistence ordering:** `customSlides` are written in the **campaign-create payload** (atomic, at
+  `DRAFT` creation) so they exist before activation/immediate-send can make the survey reachable; the
+  CampaignDetail `PATCH` (DRAFT+ACTIVE) handles later edits.
 
 ## 11. Explicitly out of scope (v1)
 
