@@ -37,7 +37,7 @@ describe("reportConfigFor", () => {
     expect(reportConfigFor(null).showTier).toBe(true);
   });
 
-  it("scaling-up-full has showTier:false (group renderer only; BrandedReport ignores it)", () => {
+  it("scaling-up-full has showTier:false (honored by BOTH the group renderer and BrandedReport)", () => {
     expect(reportConfigFor("scaling-up-full")).toEqual({
       reportType: "scored",
       showScoreTable: true,
