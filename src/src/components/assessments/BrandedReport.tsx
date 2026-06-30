@@ -40,6 +40,7 @@ import {
 } from "@/lib/assessments/report-presentation";
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import { QualitativeReport } from "@/components/assessments/QualitativeReport";
+import { CoachLogo } from "@/components/assessments/CoachLogo";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -331,6 +332,12 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
               alt="Scaling Up"
               width={180}
               height={24}
+            />
+            {/* Wave K: coach logo (Coach.profileImage); renders nothing when absent. */}
+            <CoachLogo
+              url={report.coachLogoUrl}
+              name={report.coachName}
+              variant="cover"
             />
           </div>
           <h1 className="su-h1 su-report-title">{title}</h1>
@@ -692,6 +699,12 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
 
       {/* ── 8. Footer ───────────────────────────────────────────────────── */}
       <footer className="su-report-footer" data-testid="report-footer">
+        {/* Wave K: coach logo (left); renders nothing when absent. */}
+        <CoachLogo
+          url={report.coachLogoUrl}
+          name={report.coachName}
+          variant="footer"
+        />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className="su-logo"

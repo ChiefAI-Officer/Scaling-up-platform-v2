@@ -347,6 +347,8 @@ export function QualitativeGroupReport(props: GroupReportProps) {
         assessmentName={props.assessmentName}
         companyName={props.companyName}
         generatedAt={props.generatedAt}
+        coachLogoUrl={props.coachLogoUrl}
+        coachName={props.coachName}
       />
 
       <div className="su-group-body">
@@ -388,7 +390,11 @@ export function QualitativeGroupReport(props: GroupReportProps) {
         )}
       </div>
 
-      <GroupReportFooter generatedAt={props.generatedAt} />
+      <GroupReportFooter
+        generatedAt={props.generatedAt}
+        coachLogoUrl={props.coachLogoUrl}
+        coachName={props.coachName}
+      />
     </div>
   );
 }

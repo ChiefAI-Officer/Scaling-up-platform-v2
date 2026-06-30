@@ -320,7 +320,7 @@ function AppendixB({ rows }: { rows: GroupAppendixBRow[] }) {
           </thead>
           <tbody>
             {rows.map((row, i) => (
-              <tr key={row.personLabel} data-testid={`group-scored-appendix-b-row-${i}`}>
+              <tr key={i} data-testid={`group-scored-appendix-b-row-${i}`}>
                 <th scope="row">{row.personLabel}</th>
                 {APPENDIX_B_DOMAIN_KEYS.map((key) => (
                   <td key={key} data-testid={`group-scored-appendix-b-cell-${i}-${key}`}>
@@ -366,6 +366,8 @@ export function ScoredGroupReport(props: GroupReportProps) {
         assessmentName={props.assessmentName}
         companyName={props.companyName}
         generatedAt={props.generatedAt}
+        coachLogoUrl={props.coachLogoUrl}
+        coachName={props.coachName}
       />
 
       <div className="su-group-body">
@@ -502,7 +504,11 @@ export function ScoredGroupReport(props: GroupReportProps) {
         )}
       </div>
 
-      <GroupReportFooter generatedAt={props.generatedAt} />
+      <GroupReportFooter
+        generatedAt={props.generatedAt}
+        coachLogoUrl={props.coachLogoUrl}
+        coachName={props.coachName}
+      />
     </div>
   );
 }

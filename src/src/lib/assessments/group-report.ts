@@ -108,6 +108,13 @@ interface RawCampaign {
   // the SAME snapshot (no second un-snapshotted round-trip).
   organization: { name: string };
   template: { alias: string; name: string };
+  // Wave K: the creator coach's logo (Coach.profileImage) + name for the
+  // <img alt>, read in the same snapshot. Null on admin PUBLIC campaigns.
+  creatorCoach: {
+    profileImage: string | null;
+    firstName: string;
+    lastName: string;
+  } | null;
   version: {
     id: string;
     versionNumber: number;
@@ -163,6 +170,14 @@ export interface GroupReportProvenance {
   assessmentName: string;
   /** Pinned version label "<alias>-v<versionNumber>" for the "as of" line. */
   versionLabel: string;
+  /**
+   * Wave K — the creator coach's logo URL (Coach.profileImage), shown on the
+   * group report cover + footer-left. Null when there is no creator coach or
+   * no profileImage (admin PUBLIC campaigns) → SU-logo-only fallback.
+   */
+  coachLogoUrl: string | null;
+  /** Wave K — the coach's display name, used as the logo `<img alt>`. */
+  coachName: string | null;
   /**
    * Wave J / J-2 — Peers benchmark application metadata, copied from the BUILT
    * model (NOT a fresh `benchmarksFor` call) so it reflects ACTUAL application:
@@ -264,6 +279,14 @@ export async function getCampaignGroupReport(
           versionId: true,
           organization: { select: { name: true } },
           template: { select: { alias: true, name: true } },
+          // Wave K: coach logo (no migration — reuses Coach.profileImage).
+          creatorCoach: {
+            select: {
+              profileImage: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
           version: {
             select: {
               id: true,
@@ -399,6 +422,14 @@ export async function getCampaignGroupReport(
         submissionRows,
       );
 
+      // Wave K: coach logo — reuse Coach.profileImage. Null on admin PUBLIC
+      // campaigns (no creator coach) or when the coach has no profileImage.
+      const creatorCoach = campaign.creatorCoach;
+      const coachLogoUrl = creatorCoach?.profileImage ?? null;
+      const coachName = creatorCoach
+        ? `${creatorCoach.firstName} ${creatorCoach.lastName}`
+        : null;
+
       const provenance: GroupReportProvenance = {
         generatedAt,
         completedCount: submissionRows.length,
@@ -411,6 +442,8 @@ export async function getCampaignGroupReport(
         companyName: campaign.organization.name,
         assessmentName: campaign.template.name,
         versionLabel: `${templateAlias}-v${campaign.version.versionNumber}`,
+        coachLogoUrl,
+        coachName,
       };
 
       // 0 completed → empty (provenance still carries the invitation counts).

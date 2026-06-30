@@ -74,6 +74,14 @@ interface RawSubmission {
     organization: {
       name: string;
     };
+    // Wave K: the creator coach's logo (Coach.profileImage) + name for the
+    // <img alt>. Null on admin PUBLIC campaigns (createdByCoachId null) — the
+    // report renders SU-logo-only in that case (graceful fallback).
+    creatorCoach: {
+      profileImage: string | null;
+      firstName: string;
+      lastName: string;
+    } | null;
     version: RawVersion;
   };
 }
@@ -131,6 +139,15 @@ export interface RespondentReport {
    * from context) and on submissions with no ?coach= param.
    */
   referringCoachEmail?: string | null;
+  /**
+   * Wave K — the creator coach's logo URL (Coach.profileImage), shown on the
+   * report cover + footer-left alongside the Scaling Up mark. Null when there
+   * is no creator coach or the coach has no profileImage (admin PUBLIC
+   * campaigns) → the report renders exactly as before (SU logo only).
+   */
+  coachLogoUrl?: string | null;
+  /** Wave K — the coach's display name, used as the logo `<img alt>`. */
+  coachName?: string | null;
 }
 
 export type RespondentReportOutcome =
@@ -206,6 +223,16 @@ export async function getRespondentReport(
             organization: {
               select: { name: true },
             },
+            // Wave K: the creator coach's logo + name (no migration — reuses
+            // the existing Coach.profileImage). Nullable relation: null on
+            // admin PUBLIC campaigns (createdByCoachId null).
+            creatorCoach: {
+              select: {
+                profileImage: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
             version: {
               select: {
                 id: true,
@@ -246,6 +273,15 @@ export async function getRespondentReport(
         ? submission.campaign.name
         : null;
 
+    // Wave K: coach logo — reuse the existing Coach.profileImage. Null when
+    // there's no creator coach or no profileImage (admin PUBLIC campaigns) →
+    // the renderer shows SU-logo-only (graceful fallback, no broken image).
+    const creatorCoach = submission.campaign.creatorCoach;
+    const coachLogoUrl = creatorCoach?.profileImage ?? null;
+    const coachName = creatorCoach
+      ? `${creatorCoach.firstName} ${creatorCoach.lastName}`
+      : null;
+
     const report: RespondentReport = {
       respondentName: `${submission.respondent.firstName} ${submission.respondent.lastName}`,
       jobTitle: submission.respondent.jobTitle ?? null,
@@ -267,6 +303,8 @@ export async function getRespondentReport(
         templateName: submission.campaign.template.name,
       },
       degraded,
+      coachLogoUrl,
+      coachName,
     };
 
     return { status: "ok", report } as const;

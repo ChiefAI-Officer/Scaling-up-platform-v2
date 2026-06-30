@@ -74,6 +74,13 @@ function makeCampaign(overrides: Record<string, unknown> = {}) {
     deletedAt: null,
     organization: { name: "Acme Corp" },
     template: { alias: "leadership-vision-alignment", name: "Leadership Vision Alignment" },
+    // Wave K: the creator coach's logo (Coach.profileImage) is threaded into
+    // provenance for the group renderer. Null on admin PUBLIC campaigns.
+    creatorCoach: {
+      profileImage: "https://cdn.example.com/coach-logo.png",
+      firstName: "Dana",
+      lastName: "Coach",
+    },
     version: VERSION,
     ...overrides,
   };
@@ -569,4 +576,76 @@ test("only SUBMITTED / non-null-respondentId submissions feed the cohort", async
   // The invitation count query excludes revoked invitations.
   const countWhere = mock._countInvitations.mock.calls[0][0].where;
   expect(JSON.stringify(countWhere)).toContain("revokedAt");
+});
+
+// ── Wave K — coach logo on the group report (reuse Coach.profileImage) ────────
+
+test("Wave K: campaign select includes creatorCoach.profileImage (+ name for alt)", async () => {
+  const mock = makeMockDb({
+    campaign: makeCampaign(),
+    participants: PARTICIPANTS,
+    submissions: [makeSubmission("resp-ceo", 3)],
+    invitedCount: 1,
+  });
+
+  await callLoader(mock);
+
+  const selectArg = mock._findFirstCampaign.mock.calls[0][0].select;
+  const creatorCoachSelect = selectArg.creatorCoach.select;
+  expect(creatorCoachSelect).toEqual(
+    expect.objectContaining({
+      profileImage: true,
+      firstName: true,
+      lastName: true,
+    }),
+  );
+});
+
+test("Wave K: provenance carries coachLogoUrl + coachName from creatorCoach", async () => {
+  const mock = makeMockDb({
+    campaign: makeCampaign(),
+    participants: PARTICIPANTS,
+    submissions: [makeSubmission("resp-ceo", 3)],
+    invitedCount: 1,
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("ok");
+  if (res.kind !== "ok") return;
+  expect(res.provenance.coachLogoUrl).toBe("https://cdn.example.com/coach-logo.png");
+  expect(res.provenance.coachName).toBe("Dana Coach");
+});
+
+test("Wave K: coachLogoUrl is null when creatorCoach is null (admin PUBLIC-created)", async () => {
+  const mock = makeMockDb({
+    campaign: makeCampaign({ creatorCoach: null }),
+    participants: PARTICIPANTS,
+    submissions: [makeSubmission("resp-ceo", 3)],
+    invitedCount: 1,
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("ok");
+  if (res.kind !== "ok") return;
+  expect(res.provenance.coachLogoUrl).toBeNull();
+  expect(res.provenance.coachName).toBeNull();
+});
+
+test("Wave K: coachLogoUrl is null on the empty branch (no model, but provenance carries coach)", async () => {
+  const mock = makeMockDb({
+    campaign: makeCampaign(),
+    participants: PARTICIPANTS,
+    submissions: [],
+    invitedCount: 3,
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("empty");
+  if (res.kind !== "empty") return;
+  // The empty branch still stamps the coach onto provenance (cover/footer render).
+  expect(res.provenance.coachLogoUrl).toBe("https://cdn.example.com/coach-logo.png");
+  expect(res.provenance.coachName).toBe("Dana Coach");
 });

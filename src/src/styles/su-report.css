@@ -757,6 +757,30 @@
   height: 22px;
 }
 
+/* ── Wave K: coach logo (reuse Coach.profileImage) ──────────────────────────
+ * Shown on the cover brandbar + footer-left alongside the white SU mark. The
+ * cover + footer are purple (#522583); arbitrary coach logos (transparent /
+ * dark / light) need a neutral chip so they never disappear into the purple.
+ * Constrained max-height + object-fit:contain keeps any aspect ratio sane. */
+.su-public-brand .su-report-coach-logo {
+  display: inline-block;
+  max-width: 100%;
+  object-fit: contain;
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+.su-public-brand .su-report-coach-logo-cover {
+  max-height: 56px;
+  margin-left: 20px;
+  vertical-align: middle;
+}
+
+.su-public-brand .su-report-coach-logo-footer {
+  max-height: 40px;
+}
+
 .su-public-brand .su-report-provenance {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.65);

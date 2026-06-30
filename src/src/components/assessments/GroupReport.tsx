@@ -28,6 +28,7 @@
 import type { CampaignGroupReport } from "@/lib/assessments/group-report-model";
 import { QualitativeGroupReport } from "@/components/assessments/QualitativeGroupReport";
 import { ScoredGroupReport } from "@/components/assessments/ScoredGroupReport";
+import { CoachLogo } from "@/components/assessments/CoachLogo";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -54,6 +55,13 @@ export interface GroupReportProvenance {
    * qualitative renderer. Absent/other alias → no LVA-specific display.
    */
   templateAlias?: string | null;
+  /**
+   * Wave K — the creator coach's logo URL (Coach.profileImage), shown on the
+   * group report cover + footer-left. Null/absent → SU-logo-only fallback.
+   */
+  coachLogoUrl?: string | null;
+  /** Wave K — the coach's display name, used as the logo `<img alt>`. */
+  coachName?: string | null;
 }
 
 export interface GroupReportProps extends GroupReportProvenance {
@@ -106,7 +114,12 @@ export function GroupReportCover({
   assessmentName,
   companyName,
   generatedAt,
-}: Pick<GroupReportProvenance, "assessmentName" | "companyName" | "generatedAt">) {
+  coachLogoUrl,
+  coachName,
+}: Pick<
+  GroupReportProvenance,
+  "assessmentName" | "companyName" | "generatedAt" | "coachLogoUrl" | "coachName"
+>) {
   return (
     <section className="su-report-cover" data-testid="group-report-cover">
       <div className="su-stripe-h" />
@@ -120,6 +133,8 @@ export function GroupReportCover({
             width={180}
             height={24}
           />
+          {/* Wave K: coach logo (Coach.profileImage); renders nothing when absent. */}
+          <CoachLogo url={coachLogoUrl} name={coachName} variant="cover" />
         </div>
         <span className="su-group-kind">Group Report</span>
         <h1 className="su-h1 su-report-title">Your {assessmentName} Report</h1>
@@ -203,9 +218,19 @@ export function GroupReportEmpty() {
   );
 }
 
-export function GroupReportFooter({ generatedAt }: { generatedAt: Date }) {
+export function GroupReportFooter({
+  generatedAt,
+  coachLogoUrl,
+  coachName,
+}: {
+  generatedAt: Date;
+  coachLogoUrl?: string | null;
+  coachName?: string | null;
+}) {
   return (
     <footer className="su-report-footer" data-testid="group-report-footer">
+      {/* Wave K: coach logo (left); renders nothing when absent. */}
+      <CoachLogo url={coachLogoUrl} name={coachName} variant="footer" />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         className="su-logo"

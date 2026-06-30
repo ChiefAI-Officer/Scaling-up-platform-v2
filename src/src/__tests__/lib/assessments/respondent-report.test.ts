@@ -98,6 +98,11 @@ const GOOD_SUBMISSION = {
     organization: {
       name: "Acme Corp",
     },
+    creatorCoach: {
+      profileImage: "https://cdn.example.com/coach-logo.png",
+      firstName: "Dana",
+      lastName: "Coach",
+    },
     version: GOOD_VERSION,
   },
 };
@@ -408,4 +413,98 @@ test("assessmentName === template.name and campaignLabel === campaign.name when 
   // Campaign label is the coach's own label (differs from template name)
   expect(result.report.campaignLabel).toBe("Acme Q1 Campaign");
   expect(result.report.campaignLabel).not.toBe(result.report.assessmentName);
+});
+
+// ── Wave K — coach logo (reuse Coach.profileImage; no migration) ────────────
+
+test("Wave K: select includes campaign.creatorCoach.profileImage (+ name for alt)", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  const { $transaction, _txFindFirst } = makeMockDb(GOOD_SUBMISSION);
+
+  await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  const selectArg = _txFindFirst.mock.calls[0][0].select;
+  const creatorCoachSelect = selectArg.campaign.select.creatorCoach.select;
+  expect(creatorCoachSelect).toEqual(
+    expect.objectContaining({
+      profileImage: true,
+      firstName: true,
+      lastName: true,
+    }),
+  );
+});
+
+test("Wave K: coachLogoUrl + coachName surface from campaign.creatorCoach", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  const { $transaction } = makeMockDb(GOOD_SUBMISSION);
+
+  const result = await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  expect(result.status).toBe("ok");
+  if (result.status !== "ok") return;
+  expect(result.report.coachLogoUrl).toBe("https://cdn.example.com/coach-logo.png");
+  expect(result.report.coachName).toBe("Dana Coach");
+});
+
+test("Wave K: coachLogoUrl is null when creatorCoach is null (admin PUBLIC campaign)", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  const noCoachSubmission = {
+    ...GOOD_SUBMISSION,
+    campaign: {
+      ...GOOD_SUBMISSION.campaign,
+      creatorCoach: null,
+    },
+  };
+  const { $transaction } = makeMockDb(
+    noCoachSubmission as unknown as typeof GOOD_SUBMISSION,
+  );
+
+  const result = await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  expect(result.status).toBe("ok");
+  if (result.status !== "ok") return;
+  expect(result.report.coachLogoUrl).toBeNull();
+  expect(result.report.coachName).toBeNull();
+});
+
+test("Wave K: coachLogoUrl is null when coach has no profileImage", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  const noImageSubmission = {
+    ...GOOD_SUBMISSION,
+    campaign: {
+      ...GOOD_SUBMISSION.campaign,
+      creatorCoach: { profileImage: null, firstName: "Dana", lastName: "Coach" },
+    },
+  };
+  const { $transaction } = makeMockDb(
+    noImageSubmission as unknown as typeof GOOD_SUBMISSION,
+  );
+
+  const result = await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  expect(result.status).toBe("ok");
+  if (result.status !== "ok") return;
+  expect(result.report.coachLogoUrl).toBeNull();
+  // coachName still resolves (used for alt when an image IS present elsewhere)
+  expect(result.report.coachName).toBe("Dana Coach");
 });
