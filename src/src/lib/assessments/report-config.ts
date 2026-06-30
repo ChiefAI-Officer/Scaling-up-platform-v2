@@ -6,11 +6,13 @@ export interface ReportConfig {
   /** Whether the scored renderer shows the "All sections" score/average table. */
   showScoreTable: boolean;
   /**
-   * Whether to show the tier band in the GROUP report renderer (Wave J).
+   * Whether to show the tier band (ADR-0015).
    *
-   * NOTE: consumed ONLY by the group renderer this wave.
-   * `BrandedReport` (the per-respondent report) deliberately ignores this field —
-   * per-respondent tier suppression is deferred (ADR-0015 scope).
+   * Honored by BOTH the GROUP report renderer (Wave J) AND the per-respondent
+   * `BrandedReport`. When false, the tier band + tier message are suppressed
+   * (the ScaleUp score ring/number and all other sections still render).
+   * SU Full has no tier band: Esperto shows none and we can't compute its
+   * percentile, so standing is expressed as peer-deviation.
    */
   showTier: boolean;
 }
@@ -37,9 +39,9 @@ const REPORT_CONFIG: Readonly<Record<string, ReportConfig>> = {
     showTier: true,
   }, // #30/#31
   /**
-   * SU Full: scored group report with tier band suppressed in the GROUP renderer.
-   * showTier:false is intentionally NOT propagated to BrandedReport (per-respondent
-   * tier suppression is deferred — ADR-0015 scope).
+   * SU Full: scored report with the tier band suppressed (ADR-0015) in BOTH the
+   * group renderer and the per-respondent BrandedReport — Esperto shows no tier;
+   * standing is peer-deviation. The ScaleUp score + score table still render.
    */
   "scaling-up-full": { reportType: "scored", showScoreTable: true, showTier: false },
 };
