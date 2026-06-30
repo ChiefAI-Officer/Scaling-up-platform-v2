@@ -1246,6 +1246,7 @@ model AssessmentCampaign {
   sendResultsToRespondent Boolean                  @default(false)
   notifyCoachOnCompletion Boolean                  @default(false)
   invitationBodyHtml      String?                  // optional rich-HTML invitation body
+  customSlides            Json?                    // Wave M — coach-authored branded interstitial slides (CustomSlide[]); null = none. Additive, default-OFF behind WAVE_M_CUSTOM_SLIDES_ENABLED.
   createdBy           String
   createdByCoachId    String?                      // v7.6: role-specific coach ownership pointer (nullable so admin PUBLIC campaigns can omit)
   createdAt           DateTime                     @default(now())
