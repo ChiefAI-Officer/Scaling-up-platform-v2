@@ -6,7 +6,7 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
-### 2026-06-30 — Waves M + N: custom slides (#19) + per-respondent longitudinal (#23), MERGED DARK <!-- ENTRY_ISO:2026-06-30 ENTRY_SLUG:waves-mn-custom-slides-longitudinal -->
+### 2026-06-30 — Waves M + N: custom slides (#19) + per-respondent longitudinal (#23), LAUNCHED <!-- ENTRY_ISO:2026-06-30 ENTRY_SLUG:waves-mn-custom-slides-longitudinal -->
 
 **Waves M + N merged to production via PR #108 (squash `7d4a87d`) — additive, both behind default-OFF flags, so merging changed nothing live.** Closes the last two buildable items from Jeff's June-9 punch-list (Spec 17): #19 custom slides + #23 comparison reporting. Launch is a separate flag-flip.
 
@@ -27,7 +27,7 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 **Deferred (non-blocking, documented in the specs):** `/admin/observability` panel for the new metric (the `RESPONDENT_LONGITUDINAL_VIEW` audit + the log metrics already emit); per-row eligibility N+1 on CampaignDetail (zero DB reads when the flag is off; fine for v1 small rosters); public-campaign slide *authoring* (the renderer already supports public, there's just no admin authoring path yet).
 
-**To LAUNCH (separate from this merge):** flip `WAVE_M_CUSTOM_SLIDES_ENABLED` / `WAVE_N_RESPONDENT_LONGITUDINAL_ENABLED` on Vercel **Production** + redeploy after a prod smoke (M: author a slide on a test INVITED campaign → renders uncounted in `/org-survey`; N: a respondent with ≥2 scored campaigns shows deltas, qualitative → not-applicable, flag-off → 404). Kill = zero the flag + redeploy.
+**LAUNCHED 2026-06-30:** flipped `WAVE_M_CUSTOM_SLIDES_ENABLED` + `WAVE_N_RESPONDENT_LONGITUDINAL_ENABLED` `=1` on Vercel **Production** (non-sensitive, verified `=1`) + redeployed (deploy `7gwoftxjt`, aliased `platformtest.scalingup.com`, ✓ Ready). Kill = zero the flag + redeploy. **Smoke contract:** M — author a slide on a test INVITED campaign → renders uncounted in `/org-survey`; N — a respondent with ≥2 scored campaigns shows deltas, qualitative → not-applicable, flag-off → 404. NOT yet functionally smoked with a logged-in coach (do via Playwright on explicit ask — do NOT auto-invoke test-live-app).
 
 ### 2026-06-30 — Waves B/D/F + Wave J LAUNCHED to production (ops session) <!-- ENTRY_ISO:2026-06-30 ENTRY_SLUG:waves-bdf-production-launch -->
 
