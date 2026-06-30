@@ -6,7 +6,7 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
-### 2026-06-30 — Waves B/D/F + Wave J LAUNCHED to production (ops session) <!-- ENTRY_ISO:2026-06-30 ENTRY_SLUG:waves-bdf-production-launch -->
+### 2026-06-30 — Waves B/D/F + Wave J LAUNCHED to production (ops session) <!-- ENTRY_ISO:2026-06-30 ENTRY_SLUG:waves-bdfj-production-launch -->
 
 **Operational session — NO code change, NO migration.** Flipped the six default-OFF flags that had been merged-dark from `""` (off) to `1` (on) on Vercel **Production** and redeployed (deployment `qtb9atk2k`, `● Ready`; prod alias `platformtest.scalingup.com`).
 
