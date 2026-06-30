@@ -24,6 +24,10 @@ import {
   type PagerQuestion,
 } from "@/lib/assessments/section-pages";
 import {
+  mergeCustomSlides,
+  type SafeSlide,
+} from "@/lib/assessments/custom-slides";
+import {
   useAnswerDraft,
   invitedDraftKey,
 } from "@/lib/assessments/use-answer-draft";
@@ -94,6 +98,13 @@ interface SurveyData {
   version: { language: string };
   sections: Section[];
   questions: Question[];
+  /**
+   * Wave M (#19): already-sanitized custom slides emitted by the /me route
+   * (SERVER-sanitized into `safeHtml`). Present only when the campaign has
+   * slides AND the WAVE_M flag is on; otherwise omitted ⇒ the mergeCustomSlides
+   * no-op leaves the section pages unchanged. The client never sanitizes.
+   */
+  customSlides?: SafeSlide[];
 }
 
 type Phase =
@@ -458,9 +469,15 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   // collects orphan questions (no/blank sectionStableKey) into a trailing
   // "Other" page — so a required orphan is now answerable instead of an
   // invisible submit dead-end.
-  const pages = buildSectionPages(
-    sortedSections as PagerSection[],
-    visibleQuestions as PagerQuestion[]
+  // Wave M (#19): weave any server-sanitized custom slides into the page array
+  // (pure; no-op when data.customSlides is empty/undefined). The client never
+  // sanitizes — slides arrive as already-safe SafeSlide[] from /me.
+  const { pages } = mergeCustomSlides(
+    buildSectionPages(
+      sortedSections as PagerSection[],
+      visibleQuestions as PagerQuestion[]
+    ),
+    data.customSlides ?? []
   );
 
   return (

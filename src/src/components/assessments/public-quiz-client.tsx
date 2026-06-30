@@ -9,6 +9,10 @@ import {
   type PagerSection,
   type PagerQuestion,
 } from "@/lib/assessments/section-pages";
+import {
+  mergeCustomSlides,
+  type SafeSlide,
+} from "@/lib/assessments/custom-slides";
 import { useAnswerDraft, publicDraftKey } from "@/lib/assessments/use-answer-draft";
 import { pruneAnswersToQuestions } from "@/lib/assessments/prune-answers";
 import {
@@ -91,6 +95,13 @@ interface PublicQuizClientProps {
   closeAtIso: string | null;
   sections: unknown;
   questions: unknown;
+  /**
+   * Wave M (#19): already-sanitized custom slides (SERVER-sanitized into
+   * `safeHtml` by the page loader). Empty/omitted ⇒ the mergeCustomSlides
+   * no-op leaves the section pages unchanged. v1 has no PUBLIC authoring path,
+   * so this is normally empty.
+   */
+  customSlides?: SafeSlide[];
 }
 
 type Step = "intro" | "info" | "form" | "results" | "error";
@@ -107,6 +118,7 @@ export function PublicQuizClient({
   closeAtIso,
   sections: rawSections,
   questions: rawQuestions,
+  customSlides,
 }: PublicQuizClientProps) {
   const sections = useMemo(() => toSections(rawSections), [rawSections]);
   const questions = useMemo(() => toQuestions(rawQuestions), [rawQuestions]);
@@ -493,9 +505,15 @@ export function PublicQuizClient({
   // One section per screen via the shared SectionPager. It derives total
   // questions + progress internally and renders each question through the
   // accessible QuestionInput; we own the answer state and the submit POST.
-  const pages = buildSectionPages(
-    sortedSections as PagerSection[],
-    visibleQuestions as PagerQuestion[],
+  // Wave M (#19): weave any server-sanitized custom slides into the page array
+  // (pure; no-op when customSlides is empty/undefined). The client never
+  // sanitizes — slides arrive as already-safe SafeSlide[].
+  const { pages } = mergeCustomSlides(
+    buildSectionPages(
+      sortedSections as PagerSection[],
+      visibleQuestions as PagerQuestion[],
+    ),
+    customSlides ?? [],
   );
 
   return (

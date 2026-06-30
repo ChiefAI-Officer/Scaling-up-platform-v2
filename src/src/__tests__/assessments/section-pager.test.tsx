@@ -2,6 +2,16 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { SectionPager } from "@/components/assessments/section-pager";
 import { buildSectionPages, type PagerSection, type PagerQuestion } from "@/lib/assessments/section-pages";
+import { mergeCustomSlides, type SafeSlide } from "@/lib/assessments/custom-slides";
+
+/**
+ * Build the PagerPage[] the SectionPager now consumes. With no slides this is
+ * just `buildSectionPages` wrapped as `kind:"section"` pages (the production
+ * clients always go through mergeCustomSlides, so the test mirrors that).
+ */
+function makePages(secs: PagerSection[], qs: PagerQuestion[], slides: SafeSlide[] = []) {
+  return mergeCustomSlides(buildSectionPages(secs, qs), slides).pages;
+}
 
 const sections: PagerSection[] = [
   { stableKey: "S0", sortOrder: 1, name: "Welcome", description: "Intro copy" },
@@ -15,7 +25,7 @@ function setup(extra: Partial<React.ComponentProps<typeof SectionPager>> = {}) {
   const onAnswerChange = jest.fn();
   const onSubmit = jest.fn();
   const onExit = jest.fn();
-  const pages = buildSectionPages(sections, questions);
+  const pages = makePages(sections, questions);
   const utils = render(
     <SectionPager pages={pages} answers={extra.answers ?? {}}
       onAnswerChange={onAnswerChange} onSubmit={onSubmit} onExit={onExit} submitting={false} {...extra} />,
@@ -45,7 +55,7 @@ describe("SectionPager", () => {
     const qs: PagerQuestion[] = [
       { stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } },
     ];
-    const pages = buildSectionPages(secs, qs);
+    const pages = makePages(secs, qs);
     const { container } = render(
       <SectionPager pages={pages} answers={{}} onAnswerChange={jest.fn()} onSubmit={jest.fn()} submitting={false} />,
     );
@@ -69,7 +79,7 @@ describe("SectionPager", () => {
     const qs: PagerQuestion[] = [
       { stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } },
     ];
-    const pages = buildSectionPages(secs, qs);
+    const pages = makePages(secs, qs);
     const { container } = render(
       <SectionPager pages={pages} answers={{}} onAnswerChange={jest.fn()} onSubmit={jest.fn()} submitting={false} />,
     );
@@ -95,7 +105,7 @@ describe("SectionPager", () => {
     fireEvent.click(screen.getByRole("button", { name: /submit/i }));
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText(/please answer/i)).toBeInTheDocument();
-    const pages = buildSectionPages(sections, questions);
+    const pages = makePages(sections, questions);
     rerender(<SectionPager pages={pages} answers={{ q1: 0 }} onAnswerChange={onAnswerChange} onSubmit={onSubmit} submitting={false} />);
     fireEvent.click(screen.getByRole("button", { name: /submit/i }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -129,7 +139,7 @@ describe("SectionPager", () => {
     // The change is reported with the literal 0 (not undefined / no-op).
     expect(onAnswerChange).toHaveBeenCalledWith("q1", 0);
     // SectionPager is controlled: the parent now feeds the recorded answer back.
-    const pages = buildSectionPages(sections, questions);
+    const pages = makePages(sections, questions);
     rerender(<SectionPager pages={pages} answers={{ q1: 0 }} onAnswerChange={onAnswerChange} onSubmit={onSubmit} submitting={false} />);
     // 0 satisfies the required gate → Submit fires.
     fireEvent.click(screen.getByRole("button", { name: /submit/i }));
@@ -181,7 +191,7 @@ describe("SectionPager", () => {
       { stableKey: "q1", sortOrder: 1, sectionStableKey: "S1", type: "SLIDER_LIKERT", label: "Q1", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } },
       { stableKey: "q2", sortOrder: 2, sectionStableKey: "S2", type: "SLIDER_LIKERT", label: "Q2", isRequired: false, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } },
     ];
-    const pages = buildSectionPages(secs, qs);
+    const pages = makePages(secs, qs);
     render(<SectionPager pages={pages} answers={{ q1: 1 }} onAnswerChange={jest.fn()} onSubmit={jest.fn()} submitting={false} />);
     // Intro + questions on one page — description comes from section.description (ADR-0004).
     expect(screen.getByText("Strategy intro")).toBeInTheDocument();
@@ -212,7 +222,7 @@ describe("SectionPager", () => {
   it("answering a flagged question clears ONLY its invalid state", () => {
     const onAnswerChange = jest.fn();
     const onSubmit = jest.fn();
-    const pages = buildSectionPages(sections, questions);
+    const pages = makePages(sections, questions);
     const { rerender } = render(
       <SectionPager pages={pages} answers={{}} onAnswerChange={onAnswerChange} onSubmit={onSubmit} submitting={false} />,
     );
@@ -223,7 +233,7 @@ describe("SectionPager", () => {
     // Answer the slider (controlled → feed the value back through rerender).
     fireEvent.click(screen.getByRole("slider", { name: "Q1" }));
     expect(onAnswerChange).toHaveBeenCalledWith("q1", 0);
-    const pages2 = buildSectionPages(sections, questions);
+    const pages2 = makePages(sections, questions);
     rerender(<SectionPager pages={pages2} answers={{ q1: 0 }} onAnswerChange={onAnswerChange} onSubmit={onSubmit} submitting={false} />);
     expect(screen.getByRole("slider", { name: "Q1" })).not.toHaveAttribute("aria-invalid");
   });
@@ -234,7 +244,7 @@ describe("SectionPager", () => {
       { stableKey: "t1", sortOrder: 1, sectionStableKey: "T1", type: "TEXT", label: "Tell us why", isRequired: true },
     ];
     const onAnswerChange = jest.fn();
-    const pages = buildSectionPages(secs, qs);
+    const pages = makePages(secs, qs);
     const { rerender } = render(
       <SectionPager pages={pages} answers={{}} onAnswerChange={onAnswerChange} onSubmit={jest.fn()} submitting={false} />,
     );
@@ -246,7 +256,7 @@ describe("SectionPager", () => {
     // Type whitespace only — isAnswered("   ") is false, so the flag must STAY.
     fireEvent.change(textarea, { target: { value: "   " } });
     expect(onAnswerChange).toHaveBeenCalledWith("t1", "   ");
-    const pages2 = buildSectionPages(secs, qs);
+    const pages2 = makePages(secs, qs);
     rerender(<SectionPager pages={pages2} answers={{ t1: "   " }} onAnswerChange={onAnswerChange} onSubmit={jest.fn()} submitting={false} />);
     expect(screen.getByRole("textbox", { name: "Tell us why" })).toHaveAttribute("aria-invalid", "true");
   });
@@ -258,7 +268,7 @@ describe("SectionPager", () => {
       { stableKey: "o2", sortOrder: 2, sectionStableKey: "O1", type: "TEXT", label: "Optional B", isRequired: false },
     ];
     const onSubmit = jest.fn();
-    const pages = buildSectionPages(secs, qs);
+    const pages = makePages(secs, qs);
     const { container } = render(
       <SectionPager pages={pages} answers={{}} onAnswerChange={jest.fn()} onSubmit={onSubmit} submitting={false} requireAtLeastOneAnswer />,
     );
@@ -274,7 +284,7 @@ describe("SectionPager", () => {
 
   it("double-clicking Submit (after answering the required question) calls onSubmit at most once", () => {
     const onSubmit = jest.fn();
-    const pages = buildSectionPages(sections, questions);
+    const pages = makePages(sections, questions);
     render(<SectionPager pages={pages} answers={{ q1: 2 }} onAnswerChange={jest.fn()} onSubmit={onSubmit} submitting={false} />);
     fireEvent.click(screen.getByRole("button", { name: /next/i }));
     const submit = screen.getByRole("button", { name: /submit/i });

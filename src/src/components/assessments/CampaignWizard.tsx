@@ -42,6 +42,11 @@ import {
   DEFAULT_INVITATION_BODY,
   DEFAULT_INVITATION_SUBJECT,
 } from "@/lib/assessments/invitation-defaults";
+import type { CustomSlide } from "@/lib/assessments/custom-slides";
+import {
+  CustomSlidesPanel,
+  type CustomSlidesPanelSection,
+} from "@/components/assessments/CustomSlidesPanel";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -160,20 +165,51 @@ interface WizardState {
   /** IMMEDIATELY: invitations send at creation (openAt forced to now by server).
    *  ON_OPEN: invitations send when campaign opens (openAt must be future). */
   inviteTiming: "IMMEDIATELY" | "ON_OPEN";
+  // Wave M (#19) — coach-authored custom slides on this campaign. Static
+  // sanitized HTML interstitials. Empty = none. NOT persisted to the draft
+  // (slides are authored in-session; see persistDraft).
+  customSlides: CustomSlide[];
+  /** Resolved published versionId for the picked template — sent as
+   *  `expectedVersionId` so the server anchor-validates against the same
+   *  version the picker's sections came from. "" until resolved. */
+  customSlidesVersionId: string;
+  /** Sections of the resolved version — drives the "Before section" picker. */
+  customSlidesSections: CustomSlidesPanelSection[];
 }
 
-const STEPS = [
-  { id: 0, title: "Organization" },
-  { id: 1, title: "Template" },
-  { id: 2, title: "Participants" },
-  { id: 3, title: "Schedule" },
-  { id: 4, title: "Review" },
-];
+interface StepDef {
+  id: number;
+  title: string;
+}
 
-function StepIndicator({ current }: { current: number }) {
+/**
+ * Build the ordered step list. The "Custom slides" step (Wave M) is inserted
+ * before Review ONLY when the flag is on; step ids are assigned by position so
+ * `state.step` stays a contiguous 0..N index whether or not the slides step is
+ * present. Review is always the last step.
+ */
+function buildSteps(customSlidesEnabled: boolean): StepDef[] {
+  const titles = [
+    "Organization",
+    "Template",
+    "Participants",
+    "Schedule",
+    ...(customSlidesEnabled ? ["Custom slides"] : []),
+    "Review",
+  ];
+  return titles.map((title, id) => ({ id, title }));
+}
+
+function StepIndicator({
+  current,
+  steps,
+}: {
+  current: number;
+  steps: StepDef[];
+}) {
   return (
     <ol className="wf-stepper">
-      {STEPS.map((s) => {
+      {steps.map((s) => {
         const done = current > s.id;
         const active = current === s.id;
         const itemCls = `wf-stepper-item${active ? " is-active" : ""}${
@@ -213,6 +249,7 @@ export function CampaignWizard({
   autoSend = false,
   resultsEmailEnabled = false,
   coachNotifyEnabled = false,
+  customSlidesEnabled = false,
 }: {
   /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -238,6 +275,15 @@ export function CampaignWizard({
    * the checkbox is hidden AND notifyCoachOnCompletion is never sent true.
    */
   coachNotifyEnabled?: boolean;
+  /**
+   * Wave M (#19) — gate the optional "Custom slides" step + the `customSlides`
+   * create-payload field behind WAVE_M_CUSTOM_SLIDES_ENABLED (mirrors the
+   * server flag, computed server-side with the GLOBAL gate since no campaign id
+   * exists yet). When false (the default merge state) the step is absent AND
+   * `customSlides`/`expectedVersionId` are never sent — the server also ignores
+   * the field when its flag is off, so a stale client can't persist slides.
+   */
+  customSlidesEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -263,6 +309,9 @@ export function CampaignWizard({
       sendResultsToRespondent: false,
       notifyCoachOnCompletion: false,
       inviteTiming: "IMMEDIATELY" as const,
+      customSlides: [],
+      customSlidesVersionId: "",
+      customSlidesSections: [],
     };
   });
 
@@ -342,6 +391,10 @@ export function CampaignWizard({
           // Task 10 — inviteTiming defaults to IMMEDIATELY if not persisted.
           inviteTiming:
             parsed.inviteTiming === "ON_OPEN" ? "ON_OPEN" : "IMMEDIATELY",
+          // Wave M — slides are authored in-session, not persisted to the draft.
+          customSlides: [],
+          customSlidesVersionId: "",
+          customSlidesSections: [],
         };
         if (!cancelled) {
           setPendingDraft({
@@ -436,9 +489,19 @@ export function CampaignWizard({
     }
   }, []);
 
+  // Wave M — the step list (and therefore Review's index + the clamp ceiling)
+  // depends on whether the optional "Custom slides" step is present.
+  const steps = useMemo(
+    () => buildSteps(customSlidesEnabled),
+    [customSlidesEnabled],
+  );
+  const lastStepIndex = steps.length - 1;
+  const reviewStepIndex = lastStepIndex; // Review is always last.
+  const slidesStepIndex = customSlidesEnabled ? reviewStepIndex - 1 : -1;
+
   const next = () =>
     setState((s) => {
-      const updated = { ...s, step: Math.min(s.step + 1, 4) };
+      const updated = { ...s, step: Math.min(s.step + 1, lastStepIndex) };
       flushSave(updated);
       return updated;
     });
@@ -448,6 +511,53 @@ export function CampaignWizard({
       flushSave(updated);
       return updated;
     });
+
+  // Wave M — resolve the picked template's published version (id + sections)
+  // so the slides step can show the "Before section" picker and post
+  // `expectedVersionId`. Re-fetch whenever the template changes; if the
+  // resolved version id changes, drop any now-stale `before-section` anchors
+  // that no longer match a known section (the server would 400 them anyway).
+  useEffect(() => {
+    if (!customSlidesEnabled || !state.templateId) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/assessment-templates/${state.templateId}/version-sections`,
+        );
+        const body = await res.json();
+        if (cancelled) return;
+        if (res.ok && body.success) {
+          const versionId = String(body.data.versionId ?? "");
+          const sections = (body.data.sections ??
+            []) as CustomSlidesPanelSection[];
+          const knownKeys = new Set(sections.map((s) => s.stableKey));
+          setState((s) => ({
+            ...s,
+            customSlidesVersionId: versionId,
+            customSlidesSections: sections,
+            // Drop slides whose before-section anchor no longer resolves.
+            customSlides:
+              s.customSlidesVersionId === versionId
+                ? s.customSlides
+                : s.customSlides.filter(
+                    (sl) =>
+                      sl.position.kind !== "before-section" ||
+                      knownKeys.has(sl.position.sectionStableKey),
+                  ),
+          }));
+        }
+      } catch {
+        // best-effort; the slides step still renders (picker shows start/end
+        // only), and the server re-validates on create.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [customSlidesEnabled, state.templateId]);
 
   const canActivate =
     state.organizationId &&
@@ -531,6 +641,19 @@ export function CampaignWizard({
           ceoRespondentId:
             attachParticipantsInCreate && state.ceoRespondentId
               ? state.ceoRespondentId
+              : undefined,
+          // Wave M (#19) — custom slides on the create payload. Only sent when
+          // the flag is ON; the server also ignores the field when its flag is
+          // off. `expectedVersionId` lets the server anchor-validate the slides
+          // against the same version the picker's sections came from (a
+          // publish-race between section-load and create ⇒ 400, never a silent
+          // bad anchor). Sent RAW html — the server sanitizes on save.
+          customSlides: customSlidesEnabled ? state.customSlides : undefined,
+          expectedVersionId:
+            customSlidesEnabled &&
+            state.customSlides.length > 0 &&
+            state.customSlidesVersionId !== ""
+              ? state.customSlidesVersionId
               : undefined,
         }),
       });
@@ -690,7 +813,7 @@ export function CampaignWizard({
         {saveIndicator}
       </div>
 
-      <StepIndicator current={state.step} />
+      <StepIndicator current={state.step} steps={steps} />
 
       <div className="bg-card border border-border rounded-xl p-6 min-h-[400px]">
         {state.step === 0 && (
@@ -770,7 +893,18 @@ export function CampaignWizard({
             onNext={next}
           />
         )}
-        {state.step === 4 && (
+        {customSlidesEnabled && state.step === slidesStepIndex && (
+          <SlidesStep
+            slides={state.customSlides}
+            sections={state.customSlidesSections}
+            onChange={(next) =>
+              setState((s) => ({ ...s, customSlides: next }))
+            }
+            onBack={back}
+            onNext={next}
+          />
+        )}
+        {state.step === reviewStepIndex && (
           <ReviewStep
             state={state}
             submitting={submitting}
@@ -1711,6 +1845,50 @@ function ScheduleStep({
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Button>
         <Button onClick={onNext} disabled={!valid}>
+          Next <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Optional Step — Custom slides (Wave M #19) ──────────────────────────
+
+function SlidesStep({
+  slides,
+  sections,
+  onChange,
+  onBack,
+  onNext,
+}: {
+  slides: CustomSlide[];
+  sections: CustomSlidesPanelSection[];
+  onChange: (next: CustomSlide[]) => void;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold text-foreground">
+          Custom slides
+          <span className="ml-2 text-sm font-normal text-muted-foreground">
+            optional
+          </span>
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Add branded interstitial pages your participants see inside the
+          assessment. Leave empty to skip.
+        </p>
+      </div>
+
+      <CustomSlidesPanel value={slides} onChange={onChange} sections={sections} />
+
+      <div className="flex justify-between pt-4">
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back
+        </Button>
+        <Button onClick={onNext}>
           Next <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>

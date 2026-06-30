@@ -39,6 +39,10 @@ _Avoid_: "title slide" as a distinct object, or a `SECTION_INTRO` question type 
 The way a respondent answers an assessment: **exactly one section per screen** (optionally preceded by that section's **intro slide**), with Back/Next navigation, a "Section N of M" label, and a progress bar by questions answered — replacing the legacy single long-scroll form. Both the public (`/quiz/[campaignAlias]`) and invited (`/org-survey/[campaignAlias]`) experiences use it. (`/me` is the invited flow's data API endpoint, not its page route.)
 _Avoid_: "page" (a section is not a route), "step" for the intro slide (the intro slide is a sub-view of a section, not a counted step).
 
+**Custom slide** (campaign-authored):
+A coach-authored, branded interstitial screen woven into a campaign's **Section pager** — a non-question page (sanitized HTML body, optional title) placed at the **start**, **before a chosen section**, or at the **end** (the last page before submit). It is **campaign-scoped** (stored on the Campaign, not the Template Version) and holds no answers, so it is **never counted** in "Section N of M". Where a **Section intro slide** renders a section's own fields, a Custom slide is free promo/instructional content the coach writes (Esperto's "Verne slide").
+_Avoid_: confusing a Custom slide (campaign-level, coach-authored, sanitized HTML) with a **Section intro slide** (template-level, the section's own `description`); "post-submit slide" — a closing slide is the last page *before* submission, there is no after-submit slide.
+
 ### Historical import (Esperto)
 
 **Historical import** (a.k.a. **Esperto import**):
@@ -90,6 +94,13 @@ An instrument with no real scoring — Quarterly Session Prep v1 and v2. Respons
 The branded, printable **per-respondent** document a coach/admin views for *one* completed submission — cover, overall result, per-section breakdown, scores table, recommendations (when present), conclusion. It is the human-readable view that **replaces the raw answer (`stableKey`) view**. It is per individual.
 _Avoid_: conflating the per-respondent **Results report** with a cohort **Aggregate report** (Esperto's "group" / "self-comparison" report — the facilitator's all-responses dashboard; shipped for LVA in Wave F).
 
+**Cohort trend** (a.k.a. longitudinal trend):
+The coach-facing view that charts an **Organization**'s *aggregate* results for one scored **Template** across its successive **Campaigns** over time (per-campaign means + per-question sparklines). It answers "is this whole team improving each quarter?" — every person is invisible inside the average. (Already shipped at `/portal/assessments/trends`.)
+
+**Per-respondent longitudinal comparison** (a.k.a. comparison report):
+The coach-facing view that tracks **one Respondent**'s results across the successive **Campaigns** they completed for the same scored **Template** — overall score, per-section deltas, and tier movement over time. It is the single-person counterpart to the **Cohort trend**. **Scored templates only** (LVA / QSP have no trendable metric — ADR-0016); deltas are computed only between submissions on the same **Template Version** (cross-version values are shown, but not deltaed). Authorized exactly like the Cohort trend (`canAccessOrganization`).
+_Avoid_: conflating it with the **Cohort trend** (aggregate, everyone at once) or the per-campaign **Aggregate report** (one campaign's whole cohort side by side) — this is *one person across campaigns*.
+
 ### Viewing reports
 
 **Report access gate**:
@@ -103,6 +114,8 @@ _Avoid_: "middleware" (the real `no-store` response header is set in Next middle
 - A scored **Template Version** defines **Scoring Tiers**; a Scaling Up Full version additionally defines **Domains** and per-question **Recommendations**.
 - A **Respondent**'s progress in a campaign is an **Invitation status band**; their answers, once submitted, may produce a **Scoring tier** result.
 - A **Results report** (per-respondent) and an **Aggregate report** (cohort) are both viewed through the **Report access gate**, which wraps each one's **loader**.
+- A **Cohort trend** aggregates one scored **Template**'s results across an **Organization**'s **Campaigns** over time; a **Per-respondent longitudinal comparison** does the same for a single **Respondent** (scored templates only — ADR-0016).
+- A **Campaign** may carry coach-authored **Custom slides** that its **Section pager** weaves in as non-question pages.
 
 ## Example dialogue
 

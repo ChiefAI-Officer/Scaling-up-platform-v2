@@ -15,6 +15,12 @@ import {
   type PagerSection,
   type PagerQuestion,
 } from "@/lib/assessments/section-pages";
+import { mergeCustomSlides, type SafeSlide } from "@/lib/assessments/custom-slides";
+
+/** PagerPage[] for the SectionPager (no slides ⇒ section pages wrapped). */
+function makePages(secs: PagerSection[], qs: PagerQuestion[], slides: SafeSlide[] = []) {
+  return mergeCustomSlides(buildSectionPages(secs, qs), slides).pages;
+}
 
 const sections: PagerSection[] = [
   { stableKey: "S_BACKGROUND", sortOrder: 0, name: "Background" },
@@ -43,7 +49,7 @@ const questions: PagerQuestion[] = [
 function renderPager(
   extra: Partial<React.ComponentProps<typeof SectionPager>> = {},
 ) {
-  const pages = buildSectionPages(sections, questions);
+  const pages = makePages(sections, questions);
   return render(
     <SectionPager
       pages={pages}

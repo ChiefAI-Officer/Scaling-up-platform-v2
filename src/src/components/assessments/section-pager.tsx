@@ -1,7 +1,8 @@
 // src/src/components/assessments/section-pager.tsx
 "use client";
 import React from "react";
-import { isAnswered, type SectionPage } from "@/lib/assessments/section-pages";
+import { isAnswered } from "@/lib/assessments/section-pages";
+import type { PagerPage } from "@/lib/assessments/custom-slides";
 import { QuestionInput } from "@/components/assessments/question-input";
 import { AssessmentShellHeader } from "@/components/assessments/AssessmentShellHeader";
 import { domainColor } from "@/lib/assessments/report-presentation";
@@ -10,13 +11,29 @@ import { computeGrowthPhase } from "@/lib/assessments/su-full-phase";
 
 type AnswersMap = Record<string, number | string | string[]>;
 
+/**
+ * Wave M: flatten the questions across SECTION pages only. Slide pages carry no
+ * questions, so the answered/total counters never see them.
+ */
+function sectionQuestions(pages: PagerPage[]) {
+  return pages.flatMap((p) => (p.kind === "section" ? p.questions : []));
+}
+
 /** SU-Full growth-phase interstitial gating (Wave J-1). */
 const SU_FULL_ALIAS = "scaling-up-full";
 /** The CEO background FTE question whose answer drives the growth phase. */
 const FTE_CONTRACT_KEY = "Q_FTE_CONTRACT";
 
 interface SectionPagerProps {
-  pages: SectionPage[];
+  /**
+   * The pager page array. A discriminated union of `kind:"section"` pages (the
+   * normal questionnaire sections, incl. the trailing "Other" orphan page) and
+   * `kind:"slide"` pages (Wave M coach-authored interstitials). Callers that
+   * have no custom slides pass section pages wrapped via `mergeCustomSlides`
+   * (which wraps every `SectionPage` as `{kind:"section", ...}`), so the
+   * existing flows behave byte-for-byte unchanged.
+   */
+  pages: PagerPage[];
   answers: AnswersMap;
   onAnswerChange: (stableKey: string, value: number | string | string[]) => void;
   onSubmit: () => void;
@@ -75,15 +92,29 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
   }
 
   const isLast = sectionIndex === pages.length - 1;
-  const answeredCount = pages.flatMap((p) => p.questions).filter((q) => isAnswered(answers[q.stableKey])).length;
-  const total = pages.flatMap((p) => p.questions).length;
+  // Wave M: slide pages carry no questions. `pageQuestions` returns [] on a
+  // slide, so every question-counting / gating path below is a no-op on a
+  // slide (R3-Low-2 exhaustive kind handling).
+  const pageQuestions = page.kind === "section" ? page.questions : [];
+  // answered/total count questions across SECTION pages only (slides have none).
+  const answeredCount = sectionQuestions(pages).filter((q) => isAnswered(answers[q.stableKey])).length;
+  const total = sectionQuestions(pages).length;
+  // "Section N of M": denominator + active index count `kind==="section"` pages
+  // ONLY (slides are rendered-but-uncounted, like the existing phase tile / the
+  // "Other" page). active = the 1-based ordinal of the current page among the
+  // section pages; on a slide it carries the most-recently-passed section's
+  // ordinal so the header would read correctly — but slides render NO header.
+  const totalSections = pages.filter((p) => p.kind === "section").length;
+  const currentSection = pages
+    .slice(0, sectionIndex + 1)
+    .filter((p) => p.kind === "section").length;
 
   function focusHeading() { requestAnimationFrame(() => headingRef.current?.focus()); }
   function focusFirstInvalid(stableKey: string) {
     requestAnimationFrame(() => document.getElementById(`q-${stableKey}`)?.focus());
   }
   function focusFirstAnswerable() {
-    const first = page.questions[0];
+    const first = pageQuestions[0];
     if (first) requestAnimationFrame(() => document.getElementById(`q-${first.stableKey}`)?.focus());
   }
 
@@ -102,8 +133,12 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
   // leaves the section that holds Q_FTE_CONTRACT, and only when the FTE answer
   // resolves to a real phase. Anything else (other template, non-CEO, no/invalid
   // FTE) skips it and advances normally — the CEO is never blocked.
-  function phaseTileForLeaving(currentPage: SectionPage): ReturnType<typeof computeGrowthPhase> {
+  function phaseTileForLeaving(currentPage: PagerPage): ReturnType<typeof computeGrowthPhase> {
     if (templateAlias !== SU_FULL_ALIAS || !isCEO) return null;
+    // Slide pages carry no questions → the phase tile never fires when leaving
+    // a slide (R3-Low-2: a slide adjacent to the SU-Full phase-tile section must
+    // not break the trigger).
+    if (currentPage.kind !== "section") return null;
     const carriesFte = currentPage.questions.some((q) => q.stableKey === FTE_CONTRACT_KEY);
     if (!carriesFte) return null;
     const raw = answers[FTE_CONTRACT_KEY];
@@ -133,7 +168,7 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     focusHeading();
   }
   function attemptSubmit() {
-    const totalAnswered = pages.flatMap((p) => p.questions).filter((q) => isAnswered(answers[q.stableKey])).length;
+    const totalAnswered = sectionQuestions(pages).filter((q) => isAnswered(answers[q.stableKey])).length;
     if (requireAtLeastOneAnswer && totalAnswered === 0) {
       setGateMessage("Please answer at least one question before submitting.");
       setShowGateError(true);
@@ -145,7 +180,9 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     onSubmit();
   }
   function handleNext() {
-    const unanswered = page.questions.filter((q) => q.isRequired && !isAnswered(answers[q.stableKey]));
+    // The required-answer gate is a no-op on a slide page (pageQuestions === []),
+    // so a slide's forward button always advances (or submits, if trailing).
+    const unanswered = pageQuestions.filter((q) => q.isRequired && !isAnswered(answers[q.stableKey]));
     if (unanswered.length > 0) {
       setInvalidKeys(new Set(unanswered.map((q) => q.stableKey)));
       setGateMessage("Please answer all required questions before continuing.");
@@ -163,19 +200,62 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     focusHeading();
   }
 
+  // Wave M: a custom-slide page renders as a branded interstitial — NO shell
+  // header / NO "Section N of M" counter / NO progress bar (mirrors the
+  // uncounted PhaseTile pattern). Optional title → sanitized HTML body (already
+  // sanitized SERVER-SIDE by sanitizeSlideHtml; the client only injects it via
+  // the raw-HTML prop, never sanitizes — the sanitizer is server-only, Wave M/N
+  // item 5/6) → a single forward button (Submit when this slide is the trailing
+  // page). Back behaves normally (Back at page 0 ⇒ onExit, via handleBack).
+  if (page.kind === "slide") {
+    const slideHtml = { __html: page.safeHtml };
+    return (
+      <div className="su-assessment-brand survey-section">
+        <section className="su-custom-slide" aria-labelledby={page.title?.trim() ? "su-slide-heading" : undefined}>
+          {/* Always a focusable heading so advance() lands focus on the
+              interstitial (a11y). When the slide has no title it is rendered
+              empty + aria-hidden (a focus anchor only). */}
+          <h2
+            ref={headingRef}
+            tabIndex={-1}
+            id={page.title?.trim() ? "su-slide-heading" : undefined}
+            className="su-slide-heading"
+            aria-hidden={page.title?.trim() ? undefined : true}
+          >
+            {page.title?.trim() ? page.title : null}
+          </h2>
+          <div className="su-slide-body" dangerouslySetInnerHTML={slideHtml} />
+        </section>
+
+        {/* A trailing END slide is the Submit page; the survey-wide
+            requireAtLeastOneAnswer gate (attemptSubmit) can block it, so the
+            slide must surface that non-field alert too. */}
+        {showGateError ? <p role="alert" className="survey-error">{gateMessage}</p> : null}
+
+        <div className="survey-nav">
+          <button type="button" className="wf-btn wf-btn-secondary" onClick={handleBack}>Back</button>
+          <button type="button" className="wf-btn wf-btn-primary" onClick={handleNext} disabled={submitting}>{isLast ? "Submit" : "Next"}</button>
+        </div>
+      </div>
+    );
+  }
+
+  // From here, `page` is a SECTION page (the slide branch returned above).
+  const sectionPage = page;
+
   // Domain accent for the section-intro rail. Neutral grey when the section
   // carries no domain (report-presentation handles the fallback).
-  const accent = domainColor(page.domain ?? "");
+  const accent = domainColor(sectionPage.domain ?? "");
   // Step label = the section's own partLabel ("Fundamental 1" in the mockup)
   // when present. The shell header already carries the canonical "Section N of
   // M", so we degrade gracefully (omit the step label) rather than duplicate it.
-  const stepLabel = page.partLabel?.trim() ? page.partLabel : null;
+  const stepLabel = sectionPage.partLabel?.trim() ? sectionPage.partLabel : null;
 
   return (
     <div className="su-assessment-brand survey-section">
       <AssessmentShellHeader
-        currentSection={sectionIndex + 1}
-        totalSections={pages.length}
+        currentSection={currentSection}
+        totalSections={totalSections}
         assessmentName={assessmentName}
         companyName={companyName}
         answeredCount={answeredCount}
@@ -190,19 +270,19 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
         <div className="su-intro-rail" aria-hidden="true" />
         {stepLabel ? <span className="su-intro-label">{stepLabel}</span> : null}
         <h2 ref={headingRef} tabIndex={-1} className="survey-section-title">
-          {page.name}
+          {sectionPage.name}
         </h2>
-        {page.description?.trim() ? (
+        {sectionPage.description?.trim() ? (
           <div className="su-intro-covers">
             <span className="su-intro-covers-k">What this section covers</span>
-            <p className="su-intro-desc">{page.description}</p>
+            <p className="su-intro-desc">{sectionPage.description}</p>
           </div>
         ) : null}
       </section>
 
-      {page.questions.length > 0 ? (
+      {sectionPage.questions.length > 0 ? (
         <ul className="survey-question-list">
-          {page.questions.map((q) => (
+          {sectionPage.questions.map((q) => (
             <li key={q.stableKey} className="survey-question">
               <label htmlFor={`q-${q.stableKey}`} className="survey-question-label">
                 {q.label}{q.isRequired ? <span className="survey-required" aria-hidden="true"> *</span> : null}

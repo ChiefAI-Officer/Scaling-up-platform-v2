@@ -25,7 +25,7 @@ import {
 import { liveCampaignWhere } from "@/lib/assessments/campaign-live";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   CampaignCreateError,
   resolvePublishedTemplateVersion,
@@ -41,6 +41,13 @@ import {
   validateInvitationHtml,
   MAX_INVITATION_HTML_LENGTH,
 } from "@/lib/assessments/email-html-sanitizer";
+import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
+import {
+  prepareCustomSlidesForSave,
+  sectionStableKeysOf,
+  slidesAuditMeta,
+  type PersistedSlide,
+} from "@/lib/assessments/custom-slides-write";
 import { inngest } from "@/inngest/client";
 // Import the event name from the side-effect-free constants module (NOT the
 // fan-out function module) so the route never evaluates inngest.createFunction.
@@ -278,6 +285,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Wave M (#19) — custom slides on the CREATE payload (flag-gated WRITE).
+    //
+    //   - Flag OFF → the `customSlides` field is IGNORED entirely (persist
+    //     null). No campaign id exists yet ⇒ the gate is GLOBAL-only
+    //     (`isCustomSlidesEnabled()` with no id) so a hidden/stale client can
+    //     never seed participant-facing HTML that surfaces on launch
+    //     (R1-High-1).
+    //   - Flag ON  → validate with `CustomSlidesArraySchema` + caps, then
+    //     anchor-validate (R2-High-1) every `before-section` slide against the
+    //     RESOLVED pinned version's sections. The wizard posts `expectedVersionId`;
+    //     if it mismatches the resolved version (publish-raced between load and
+    //     save) ⇒ 400. Each html is sanitized on save + the post-sanitization
+    //     20KB cap enforced. The result is persisted INSIDE the create tx and
+    //     audited there (R3-Med-2) so slide HTML is never reachable without its
+    //     audit row.
+    // ─────────────────────────────────────────────────────────────────────
+    const rawBodyObj = (body ?? {}) as Record<string, unknown>;
+    let customSlidesToStore: PersistedSlide[] | null = null;
+    let slidesStrippedAny = false;
+    if (isCustomSlidesEnabled() && rawBodyObj.customSlides !== undefined) {
+      const expectedVersionId = rawBodyObj.expectedVersionId;
+      if (
+        typeof expectedVersionId === "string" &&
+        expectedVersionId.length > 0 &&
+        expectedVersionId !== version.id
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "expectedVersionId does not match the campaign's resolved assessment version — reload and re-author the slides.",
+          },
+          { status: 400 }
+        );
+      }
+      // Load the resolved version's sections for anchor-validation. (The
+      // create-service return type omits `sections`, so fetch it directly.)
+      const versionForAnchors = await db.assessmentTemplateVersion.findUnique({
+        where: { id: version.id },
+        select: { sections: true },
+      });
+      const knownSectionKeys = sectionStableKeysOf(versionForAnchors?.sections);
+      const prepared = prepareCustomSlidesForSave(
+        rawBodyObj.customSlides,
+        knownSectionKeys
+      );
+      if (!prepared.ok) {
+        return NextResponse.json(
+          { success: false, error: prepared.error },
+          { status: prepared.status }
+        );
+      }
+      customSlidesToStore = prepared.slides;
+      slidesStrippedAny = prepared.strippedAny;
+    }
+
     const orgSlug = slugifyForAlias(org.name);
     const tmplSlug = slugifyForAlias(template.alias || template.id);
     const ts = buildAliasTimestamp(new Date());
@@ -357,6 +421,9 @@ export async function POST(request: NextRequest) {
     // the fields to locals here.
     const createdByUserId = actor.userId;
     const createdByCoachId = actor.coachId;
+    // Bound for use inside the create-tx audit closures (TS control-flow
+    // narrowing of `actor` does not flow into nested function declarations).
+    const performedByEmail = actor.email;
     // Shared create payload. `alias` is overridden on the P2002 fallback path.
     function campaignCreateData(alias: string) {
       return {
@@ -377,6 +444,13 @@ export async function POST(request: NextRequest) {
         invitationBodyHtml: invitationBodyHtmlToStore,
         sendResultsToRespondent: data.sendResultsToRespondent,
         notifyCoachOnCompletion: data.notifyCoachOnCompletion,
+        // Wave M (#19): sanitized slides (flag-gated) or null. `Prisma.JsonNull`
+        // is required for a nullable `Json?` column (plain `null` is rejected);
+        // the persisted shape is the sanitized PersistedSlide[] (sanitize-on-save).
+        customSlides:
+          customSlidesToStore === null
+            ? Prisma.JsonNull
+            : (customSlidesToStore as unknown as Prisma.InputJsonValue),
         createdBy: createdByUserId,
         createdByCoachId,
       };
@@ -388,6 +462,38 @@ export async function POST(request: NextRequest) {
         "code" in error &&
         (error as { code: string }).code === "P2002"
       );
+    }
+
+    // The CREATE audit `changes` body. Shared by the post-commit logAudit (no
+    // slides) and the in-tx tx.auditLog.create (slides present, R3-Med-2). When
+    // slides are persisted it carries PII-free slide metadata (count + per-slide
+    // html hash/length/position) — never the slide bodies.
+    function buildCreateAuditChanges(created: {
+      templateId: string;
+      organizationId: string;
+      versionId: string;
+      alias: string;
+      status: string;
+    }): Record<string, unknown> {
+      return {
+        templateId: created.templateId,
+        organizationId: created.organizationId,
+        versionId: created.versionId,
+        alias: created.alias,
+        status: created.status,
+        inviteTiming,
+        waveD: isWaveDCreate,
+        participantsAttached: isWaveDCreate
+          ? (data.participantIds?.length ?? 0)
+          : 0,
+        autoSendEmitted: goesActiveAndSends,
+        ...(customSlidesToStore !== null
+          ? {
+              customSlides: slidesAuditMeta(customSlidesToStore),
+              customSlidesSanitizerStripped: slidesStrippedAny,
+            }
+          : {}),
+      };
     }
 
     let campaign;
@@ -479,6 +585,22 @@ export async function POST(request: NextRequest) {
               }),
             });
           }
+          // Wave M (R3-Med-2): when participant-facing slides are persisted, the
+          // CREATE audit row is written INSIDE this tx (NOT the post-commit
+          // swallowing logAudit) so slide HTML can never become reachable
+          // without its audit row. An audit-insert failure aborts the whole
+          // create.
+          if (customSlidesToStore !== null) {
+            await tx.auditLog.create({
+              data: {
+                entityType: "AssessmentCampaign",
+                entityId: created.id,
+                action: "CREATE",
+                performedBy: performedByEmail,
+                changes: JSON.stringify(buildCreateAuditChanges(created)),
+              },
+            });
+          }
           return created;
         });
       }
@@ -499,19 +621,42 @@ export async function POST(request: NextRequest) {
       // ───────────────────────────────────────────────────────────────────
       // Legacy create — unchanged behavior: DRAFT, no participant attach here,
       // no auto-send. (initialStatus is DRAFT on this path by construction.)
+      //
+      // Wave M (R3-Med-2): when slides are persisted on this path too, the
+      // create + CREATE audit run in ONE tx so slide HTML is never reachable
+      // without its audit row. Without slides the behavior is byte-for-byte
+      // the original plain create + post-commit logAudit.
       // ───────────────────────────────────────────────────────────────────
-      try {
-        campaign = await db.assessmentCampaign.create({
-          data: campaignCreateData(aliasBase),
+      async function createLegacy(alias: string) {
+        if (customSlidesToStore === null) {
+          return db.assessmentCampaign.create({
+            data: campaignCreateData(alias),
+          });
+        }
+        return db.$transaction(async (tx) => {
+          const created = await tx.assessmentCampaign.create({
+            data: campaignCreateData(alias),
+          });
+          await tx.auditLog.create({
+            data: {
+              entityType: "AssessmentCampaign",
+              entityId: created.id,
+              action: "CREATE",
+              performedBy: performedByEmail,
+              changes: JSON.stringify(buildCreateAuditChanges(created)),
+            },
+          });
+          return created;
         });
+      }
+      try {
+        campaign = await createLegacy(aliasBase);
       } catch (error) {
         if (isP2002(error)) {
           const aliasFallback = `${aliasBase}_${Math.random()
             .toString(36)
             .slice(2, 8)}`;
-          campaign = await db.assessmentCampaign.create({
-            data: campaignCreateData(aliasFallback),
-          });
+          campaign = await createLegacy(aliasFallback);
         } else {
           throw error;
         }
@@ -535,28 +680,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await logAudit({
-      entityType: "AssessmentCampaign",
-      entityId: campaign.id,
-      action: "CREATE",
-      performedBy: actor.email,
-      changes: {
-        templateId: campaign.templateId,
-        organizationId: campaign.organizationId,
-        versionId: campaign.versionId,
-        alias: campaign.alias,
-        status: campaign.status,
-        inviteTiming,
-        waveD: isWaveDCreate,
-        participantsAttached: isWaveDCreate
-          ? (data.participantIds?.length ?? 0)
-          : 0,
-        autoSendEmitted: goesActiveAndSends,
-        bulkRespondentsCreated: bulkResult?.created.length ?? 0,
-        bulkRespondentsSkipped: bulkResult?.skipped.length ?? 0,
-        bulkRespondentsErrors: bulkResult?.errors.length ?? 0,
-      },
-    });
+    // Wave M (R3-Med-2): when slides were persisted, the CREATE audit row was
+    // ALREADY written inside the create transaction (so slide HTML is never
+    // reachable without its audit row). Skip the post-commit logAudit then to
+    // avoid a duplicate audit row; otherwise audit here as before.
+    if (customSlidesToStore === null) {
+      await logAudit({
+        entityType: "AssessmentCampaign",
+        entityId: campaign.id,
+        action: "CREATE",
+        performedBy: actor.email,
+        changes: {
+          ...buildCreateAuditChanges(campaign),
+          bulkRespondentsCreated: bulkResult?.created.length ?? 0,
+          bulkRespondentsSkipped: bulkResult?.skipped.length ?? 0,
+          bulkRespondentsErrors: bulkResult?.errors.length ?? 0,
+        },
+      });
+    }
 
     // ───────────────────────────────────────────────────────────────────────
     // Task 9 (Wave D) — POST-COMMIT, guarded auto-send emit (IMMEDIATELY only).
