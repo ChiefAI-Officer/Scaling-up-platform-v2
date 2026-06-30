@@ -604,11 +604,12 @@ describe("ScoredGroupReport", () => {
         ...base.scored!,
         appendixB: [
           {
-            personLabel: "Person 1",
+            // CEO row — labelled "CEO" (a role, de-identified, not "Person 1").
+            personLabel: "CEO",
             domainScores: { people: 8, strategy: 6, execution: 7, cash: 9 },
           },
           {
-            personLabel: "Person 2",
+            personLabel: "Person 1",
             domainScores: { people: 4, strategy: 6, execution: 5, cash: null },
           },
         ],
@@ -617,7 +618,7 @@ describe("ScoredGroupReport", () => {
     });
   }
 
-  it("renders an Appendix B grid with Person rows + the 4 domain columns, NO names", () => {
+  it("renders an Appendix B grid with a 'CEO' row + Person rows + the 4 domain columns, NO names", () => {
     render(
       <ScoredGroupReport
         report={appendixBReport()}
@@ -625,19 +626,19 @@ describe("ScoredGroupReport", () => {
       />,
     );
     const grid = screen.getByTestId("group-scored-appendix-b");
-    // pseudonymized Person rows
+    // a distinguished "CEO" row (a role, de-identified) + a numbered Person row
+    expect(within(grid).getByText("CEO")).toBeInTheDocument();
     expect(within(grid).getByText("Person 1")).toBeInTheDocument();
-    expect(within(grid).getByText("Person 2")).toBeInTheDocument();
     // the 4 domain column headers (People/Strategy/Execution/Cash), no "You"
     expect(within(grid).getByText(/^People$/)).toBeInTheDocument();
     expect(within(grid).getByText(/^Strategy$/)).toBeInTheDocument();
     expect(within(grid).getByText(/^Execution$/)).toBeInTheDocument();
     expect(within(grid).getByText(/^Cash$/)).toBeInTheDocument();
     expect(within(grid).queryByText(/^You$/)).not.toBeInTheDocument();
-    // a cell value renders; a null cell renders "—"
-    const p2 = within(grid).getByTestId("group-scored-appendix-b-row-1");
-    expect(within(p2).getByText("4")).toBeInTheDocument();
-    expect(within(p2).getByText("—")).toBeInTheDocument();
+    // a cell value renders; a null cell renders "—" (Person 1 row = row index 1)
+    const person1 = within(grid).getByTestId("group-scored-appendix-b-row-1");
+    expect(within(person1).getByText("4")).toBeInTheDocument();
+    expect(within(person1).getByText("—")).toBeInTheDocument();
     // NO member names leak into the grid
     expect(within(grid).queryByText(/John CEOExec/)).not.toBeInTheDocument();
     expect(within(grid).queryByText(/Kathy HR/)).not.toBeInTheDocument();

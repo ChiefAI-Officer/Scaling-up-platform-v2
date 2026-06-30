@@ -301,12 +301,13 @@ export interface GroupScoredReport {
    * Wave J/K (Task 3) — Esperto "Anonymous Team" Appendix B: a pseudonymized,
    * de-identified per-member domain grid. Present iff `domains` is present (i.e.
    * SU-Full, the only scored group report carrying per-domain scores). One row
-   * per cohort member in display order (CEO first, then alphabetical), labelled
-   * "Person 1".."Person N" — NO names, NO job titles. Cells carry each person's
-   * FROZEN per-domain averagePoints (verbatim, never recomputed) on the 4
-   * domains People/Strategy/Execution/Cash; the CEO-personal "you" domain is
-   * excluded (source spec). `undefined` for any non-domain scored report so the
-   * renderer omits the grid entirely.
+   * per cohort member in display order (CEO first, then alphabetical). The CEO
+   * row is labelled "CEO" (a role, de-identified — matches the Esperto source);
+   * the non-CEO members are numbered "Person 1".."Person N". NO names, NO job
+   * titles. Cells carry each person's FROZEN per-domain averagePoints (verbatim,
+   * never recomputed) on the 4 domains People/Strategy/Execution/Cash; the
+   * CEO-personal "you" domain is excluded (source spec). `undefined` for any
+   * non-domain scored report so the renderer omits the grid entirely.
    */
   appendixB?: GroupAppendixBRow[];
 }
@@ -332,7 +333,7 @@ export type AppendixBDomainKey = (typeof APPENDIX_B_DOMAIN_KEYS)[number];
  * de-identified at the data layer (the renderer never has a name to leak).
  */
 export interface GroupAppendixBRow {
-  /** "Person 1", "Person 2", … — assigned by the cohort's display order. */
+  /** "CEO" for the CEO row; "Person 1".."Person N" for non-CEO members (display order). */
   personLabel: string;
   /** domain key → that person's frozen averagePoints, or null when unanswered. */
   domainScores: Record<AppendixBDomainKey, number | null>;
@@ -1307,34 +1308,41 @@ function buildScoredDomains(scoredMembers: ScoredMember[]): GroupScoredDomain[] 
 }
 
 /**
- * Wave J/K (Task 3) — builds the pseudonymized Appendix B grid: one "Person N"
- * row per cohort member IN DISPLAY ORDER (the `respondents` array is already
- * CEO-first then alphabetical), each carrying that member's FROZEN per-domain
- * averagePoints on the 4 Appendix-B domains (the "you" domain is excluded). A
- * domain the member did not answer (absent from `parsed.domainAvg`) → null.
+ * Wave J/K (Task 3) — builds the pseudonymized Appendix B grid IN DISPLAY ORDER
+ * (the `respondents` array is already CEO-first then alphabetical), each row
+ * carrying that member's FROZEN per-domain averagePoints on the 4 Appendix-B
+ * domains (the "you" domain is excluded). A domain the member did not answer
+ * (absent from `parsed.domainAvg`) → null.
  *
  * Mirrors the `domains` aggregation's source (each member's parsed perDomain) so
  * the grid can never drift from the by-domain matrix. PURE — never recomputes.
  *
- * The CEO is included as a Person row too (the grid is de-identified, so the CEO
- * is not distinguished by name; only the cohort's display order positions them).
+ * Row labels match the Esperto source (18j-su-full-source-extract.md §133): the
+ * CEO row is labelled "CEO" (a ROLE, not a name — still de-identified, and not a
+ * privacy regression since the report is already CEO-vs-team); the non-CEO
+ * members are numbered "Person 1".."Person N" in their existing order. A no-CEO
+ * cohort simply numbers everyone "Person 1..N" (no CEO row).
+ *
  * A member without a parsed result (its submission failed result parsing) is
- * skipped — it never appears in `parsedById`, so it contributes no Person row.
+ * skipped — it never appears in `parsedById`, so it contributes no row.
  */
 function buildAppendixB(
   respondents: GroupRespondent[],
   parsedById: Map<string, ParsedScoreResult>,
 ): GroupAppendixBRow[] {
   const rows: GroupAppendixBRow[] = [];
+  let personN = 0;
   for (const r of respondents) {
     const parsed = parsedById.get(r.respondentId);
-    if (!parsed) continue; // a member whose result didn't parse → no Person row
+    if (!parsed) continue; // a member whose result didn't parse → no row
     const domainScores = {} as Record<AppendixBDomainKey, number | null>;
     for (const key of APPENDIX_B_DOMAIN_KEYS) {
       const v = parsed.domainAvg.get(key);
       domainScores[key] = typeof v === "number" ? v : null;
     }
-    rows.push({ personLabel: `Person ${rows.length + 1}`, domainScores });
+    // CEO → "CEO" (role, de-identified); everyone else → "Person 1".."Person N".
+    const personLabel = r.isCEO ? "CEO" : `Person ${(personN += 1)}`;
+    rows.push({ personLabel, domainScores });
   }
   return rows;
 }

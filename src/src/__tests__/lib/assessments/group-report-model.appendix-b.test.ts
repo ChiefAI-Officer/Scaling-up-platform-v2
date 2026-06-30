@@ -4,8 +4,10 @@
  *
  * Esperto's "Anonymous Team" group report carries an Appendix B — a de-identified
  * per-person grid:
- *   - rows  = "Person 1", "Person 2", … (NO names, NO job titles), in the
- *             cohort's existing display order (CEO first, then alphabetical),
+ *   - rows  = the CEO row labelled "CEO" (a role, de-identified — matches the
+ *             Esperto source 18j-su-full-source-extract.md §133) + the non-CEO
+ *             members numbered "Person 1".."Person N", in the cohort's display
+ *             order (CEO first, then alphabetical). NO names, NO job titles.
  *   - cols  = the 4 domains People · Strategy · Execution · Cash (the "you"
  *             domain is CEO-personal and EXCLUDED),
  *   - cells = that person's 0–10 domain score (their frozen per-domain
@@ -29,16 +31,17 @@ import {
 } from "./fixtures/group-report-fixtures";
 
 describe("scored Appendix B — SU-Full pseudonymized per-member domain grid", () => {
-  it("emits one row per respondent labelled 'Person N' in display order, with NO names", () => {
+  it("labels the CEO row 'CEO' + numbers the non-CEO members 'Person N' in display order, with NO names", () => {
     const m = buildGroupReportModel(fixtureScalingUpFull());
     const appendixB = m.scored!.appendixB!;
     expect(appendixB).toBeDefined();
-    // CEO (Sue) + 2 team (Dee, Ed) = 3 rows.
+    // CEO (Sue, first) + 2 team (Dee, Ed) = 3 rows. CEO row = "CEO"; the
+    // non-CEO members are numbered Person 1, Person 2 (Esperto source).
     expect(appendixB).toHaveLength(3);
     expect(appendixB.map((r) => r.personLabel)).toEqual([
+      "CEO",
       "Person 1",
       "Person 2",
-      "Person 3",
     ]);
     // pseudonymized — no name / jobTitle field leaks onto a row.
     for (const row of appendixB) {
@@ -66,23 +69,24 @@ describe("scored Appendix B — SU-Full pseudonymized per-member domain grid", (
 
   it("cells equal each person's frozen per-domain averagePoints (verbatim, never recomputed)", () => {
     const m = buildGroupReportModel(fixtureScalingUpFull());
-    const [p1, p2, p3] = m.scored!.appendixB!;
-    // Sue (CEO): people 8, strategy 6, execution 7, cash 9 (you 5 excluded).
-    expect(p1.domainScores).toEqual({
+    const [ceo, p1, p2] = m.scored!.appendixB!;
+    // CEO (Sue): people 8, strategy 6, execution 7, cash 9 (you 5 excluded).
+    expect(ceo.personLabel).toBe("CEO");
+    expect(ceo.domainScores).toEqual({
       people: 8,
       strategy: 6,
       execution: 7,
       cash: 9,
     });
-    // Dee: people 4, strategy 6, execution 5, cash 3.
-    expect(p2.domainScores).toEqual({
+    // Person 1 = Dee: people 4, strategy 6, execution 5, cash 3.
+    expect(p1.domainScores).toEqual({
       people: 4,
       strategy: 6,
       execution: 5,
       cash: 3,
     });
-    // Ed: people 2, strategy 6, execution 3, cash 3.
-    expect(p3.domainScores).toEqual({
+    // Person 2 = Ed: people 2, strategy 6, execution 3, cash 3.
+    expect(p2.domainScores).toEqual({
       people: 2,
       strategy: 6,
       execution: 3,
@@ -99,22 +103,27 @@ describe("scored Appendix B — SU-Full pseudonymized per-member domain grid", (
     };
     r.perDomain.find((d) => d.key === "cash")!.averagePoints = null;
     const m = buildGroupReportModel(input);
-    // Person 2 (Dee) → cash null; her other domains unchanged.
-    const p2 = m.scored!.appendixB![1];
-    expect(p2.domainScores.cash).toBeNull();
-    expect(p2.domainScores.people).toBe(4);
+    // Dee is Person 1 (the first non-CEO) → cash null; her other domains unchanged.
+    const p1 = m.scored!.appendixB![1];
+    expect(p1.personLabel).toBe("Person 1");
+    expect(p1.domainScores.cash).toBeNull();
+    expect(p1.domainScores.people).toBe(4);
   });
 
-  it("includes the CEO as Person 1 (de-identified; CEO not distinguished)", () => {
+  it("labels the CEO row 'CEO' (a role, de-identified — not 'Person 1')", () => {
     const m = buildGroupReportModel(fixtureScalingUpFull());
-    // CEO is first in display order → Person 1 = Sue's (CEO) scores.
-    expect(m.scored!.appendixB![0].domainScores.people).toBe(8);
+    // CEO is first in display order → row label "CEO" with Sue's (CEO) scores.
+    const ceoRow = m.scored!.appendixB![0];
+    expect(ceoRow.personLabel).toBe("CEO");
+    expect(ceoRow.domainScores.people).toBe(8);
   });
 
-  it("no-CEO cohort still emits Person rows for the team", () => {
+  it("no-CEO cohort numbers everyone 'Person N' (no CEO row)", () => {
     const m = buildGroupReportModel(fixtureScalingUpFullNoCeo());
     const appendixB = m.scored!.appendixB!;
     expect(appendixB.map((r) => r.personLabel)).toEqual(["Person 1", "Person 2"]);
+    // No "CEO" row in a no-CEO cohort.
+    expect(appendixB.some((r) => r.personLabel === "CEO")).toBe(false);
     // Person 1 = Dee (alphabetical, no CEO) → people 4.
     expect(appendixB[0].domainScores.people).toBe(4);
   });
