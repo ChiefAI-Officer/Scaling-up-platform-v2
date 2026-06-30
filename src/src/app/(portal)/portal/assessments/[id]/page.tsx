@@ -27,6 +27,9 @@ import {
   isGroupReportEnabled,
   isGroupReportAlias,
 } from "@/lib/assessments/wave-f-flags";
+import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
+import type { CustomSlide } from "@/lib/assessments/custom-slides";
+import type { CustomSlidesPanelSection } from "@/components/assessments/CustomSlidesPanel";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -71,14 +74,20 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     where: { id, deletedAt: null },
     select: {
       id: true,
+      status: true,
       accessMode: true,
       createdByCoachId: true,
       organizationId: true,
+      // Wave M (#19): the stored (already-sanitized) slides feed the editor's
+      // initial value AND its CAS sentinel; versionId resolves the section
+      // anchors for the "Before section" picker.
+      customSlides: true,
       template: { select: { alias: true } },
       // Wave J (J-3): the SU-Full-scoped publish guard reads publishedAt so the
       // entry-point link is gated lock-step with the loader (never show a link
       // that would land on the loader's `notApplicable(unpublished)` panel).
-      version: { select: { publishedAt: true } },
+      // Wave M: also read the version's sections for the slide-position picker.
+      version: { select: { id: true, publishedAt: true, sections: true } },
     },
   });
   const canShowGroupReport =
@@ -93,6 +102,23 @@ export default async function CampaignDetailPage({ params }: PageProps) {
     isGroupReportEnabled(actor, campaignForFlag) &&
     (await canViewGroupReport(asAccessDb(db), actor, id));
 
+  // Wave M (#19) — custom-slides editor. Gated by the per-campaign flag
+  // (canary/global/kill) AND status ∈ {DRAFT, ACTIVE} (CLOSED is read-only,
+  // mirrors the PATCH route's 409). Computed SERVER-side; the client receives a
+  // boolean + the stored slides (initial value + CAS sentinel) + the version's
+  // sections (the "Before section" picker).
+  const slidesStatus = campaignForFlag?.status ?? null;
+  const customSlidesEnabled =
+    campaignForFlag !== null &&
+    (slidesStatus === "DRAFT" || slidesStatus === "ACTIVE") &&
+    isCustomSlidesEnabled(id);
+  const initialCustomSlides = customSlidesEnabled
+    ? toCustomSlides(campaignForFlag?.customSlides)
+    : [];
+  const customSlidesSections = customSlidesEnabled
+    ? projectSections(campaignForFlag?.version?.sections)
+    : [];
+
   return (
     <CampaignDetail
       initialOverview={overview}
@@ -100,6 +126,53 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       customHtmlEmailEnabled={waveDCustomHtmlEmailEnabled()}
       canViewGroupReport={canShowGroupReport}
       groupReportHref={`/assessments/${id}/report`}
+      customSlidesEnabled={customSlidesEnabled}
+      initialCustomSlides={initialCustomSlides}
+      customSlidesSections={customSlidesSections}
     />
   );
+}
+
+/**
+ * Coerce the persisted `customSlides` JSON (Prisma `Json` ⇒ `unknown`) to a
+ * `CustomSlide[]` the editor can load. Defensive: a malformed row is dropped.
+ * The stored shape IS the editor shape (id, title?, html [sanitized], position,
+ * sortOrder); the editor sends back the unchanged stored value as the CAS
+ * sentinel, so we must pass through the stored value faithfully.
+ */
+function toCustomSlides(json: unknown): CustomSlide[] {
+  if (!Array.isArray(json)) return [];
+  const out: CustomSlide[] = [];
+  for (const s of json) {
+    if (!s || typeof s !== "object") continue;
+    const rec = s as Record<string, unknown>;
+    if (typeof rec.id !== "string") continue;
+    if (typeof rec.html !== "string") continue;
+    if (typeof rec.sortOrder !== "number") continue;
+    const pos = rec.position;
+    if (!pos || typeof pos !== "object") continue;
+    out.push(rec as unknown as CustomSlide);
+  }
+  return out;
+}
+
+/** Project a version's `sections` JSON to `{ stableKey, name }[]`, sorted. */
+function projectSections(sectionsJson: unknown): CustomSlidesPanelSection[] {
+  if (!Array.isArray(sectionsJson)) return [];
+  const rows: Array<{ stableKey: string; name: string; sortOrder: number }> = [];
+  for (const s of sectionsJson) {
+    if (!s || typeof s !== "object") continue;
+    const rec = s as { stableKey?: unknown; name?: unknown; sortOrder?: unknown };
+    if (typeof rec.stableKey !== "string") continue;
+    const key = rec.stableKey.trim();
+    if (key.length === 0) continue;
+    rows.push({
+      stableKey: key,
+      name:
+        typeof rec.name === "string" && rec.name.trim() !== "" ? rec.name : key,
+      sortOrder: typeof rec.sortOrder === "number" ? rec.sortOrder : 0,
+    });
+  }
+  rows.sort((a, b) => a.sortOrder - b.sortOrder);
+  return rows.map(({ stableKey, name }) => ({ stableKey, name }));
 }

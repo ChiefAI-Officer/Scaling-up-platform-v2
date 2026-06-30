@@ -42,6 +42,11 @@ import {
 } from "@/components/ui/dialog";
 import { AssessmentResultView } from "./AssessmentResultView";
 import { CampaignStatusMetrics } from "./CampaignStatusMetrics";
+import {
+  CustomSlidesPanel,
+  type CustomSlidesPanelSection,
+} from "./CustomSlidesPanel";
+import type { CustomSlide } from "@/lib/assessments/custom-slides";
 import type {
   CampaignOverview,
   CampaignRespondentRow,
@@ -77,6 +82,21 @@ export interface CampaignDetailProps {
   canViewGroupReport?: boolean;
   /** Wave F #22 (T10) — `/assessments/<id>/report`; only used when the capability is true. */
   groupReportHref?: string;
+  /**
+   * Wave M (#19) — gate the custom-slides editor. Computed SERVER-side
+   * (per-campaign flag AND status ∈ {DRAFT, ACTIVE}); the client receives ONLY
+   * the boolean and never recomputes the gate. Fail-closed: absent/false → no
+   * editor.
+   */
+  customSlidesEnabled?: boolean;
+  /**
+   * Wave M (#19) — the campaign's stored (already-sanitized) slides. Both the
+   * editor's initial value AND the PATCH CAS sentinel `expectedCustomSlides`
+   * derive from this exact value, so it must be the faithful stored value.
+   */
+  initialCustomSlides?: CustomSlide[];
+  /** Wave M (#19) — the pinned version's sections — the "Before section" picker. */
+  customSlidesSections?: CustomSlidesPanelSection[];
 }
 
 interface OrgRespondentRow {
@@ -166,6 +186,9 @@ export function CampaignDetail({
   customHtmlEmailEnabled = false,
   canViewGroupReport = false,
   groupReportHref,
+  customSlidesEnabled = false,
+  initialCustomSlides = [],
+  customSlidesSections = [],
 }: CampaignDetailProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -230,6 +253,18 @@ export function CampaignDetail({
   );
   const [emailHtmlError, setEmailHtmlError] = useState<string | null>(null);
   const [emailSaving, setEmailSaving] = useState(false);
+
+  // Wave M (#19) — custom-slides editor state. `slidesValue` is the controlled
+  // editor list; `slidesLoaded` is the CAS sentinel (the exact stored value the
+  // editor opened with — sent as `expectedCustomSlides` so a concurrent edit in
+  // another tab ⇒ 409, never a silent clobber, mirroring Wave B).
+  const [slidesOpen, setSlidesOpen] = useState(false);
+  const [slidesValue, setSlidesValue] = useState<CustomSlide[]>(initialCustomSlides);
+  const [slidesLoaded, setSlidesLoaded] = useState<CustomSlide[]>(initialCustomSlides);
+  const [slidesSaving, setSlidesSaving] = useState(false);
+  const [slidesError, setSlidesError] = useState<string | null>(null);
+  const [slidesWarning, setSlidesWarning] = useState<string | null>(null);
+
   const emailDirty =
     emailSubject !== (overview.campaign.invitationSubject ?? "") ||
     emailBody !== (overview.campaign.invitationBodyMarkdown ?? "") ||
@@ -695,6 +730,74 @@ export function CampaignDetail({
       setEmailSaving(false);
     }
   }
+
+  // Wave M (#19) — persist custom slides via PATCH with a CAS sentinel. The
+  // server re-sanitizes the raw `html` on save; the CAS sentinel is the EXACT
+  // stored value the editor opened with (`slidesLoaded`), so a concurrent edit
+  // ⇒ 409 → "reload" message + router.refresh() to reseed from the server.
+  async function handleSaveSlides() {
+    if (slidesSaving) return;
+    setSlidesSaving(true);
+    setSlidesError(null);
+    setSlidesWarning(null);
+    try {
+      const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customSlides: slidesValue,
+          // REQUIRED CAS sentinel — the value currently stored, so the server
+          // can detect a concurrent edit and 409 instead of clobbering.
+          expectedCustomSlides:
+            slidesLoaded.length === 0 ? null : slidesLoaded,
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        setSlidesError(
+          "These slides changed in another tab — reload and re-apply.",
+        );
+        // Reseed the editor from the server's current state on next render.
+        router.refresh();
+        return;
+      }
+      if (!res.ok || body.success === false) {
+        const reason =
+          typeof body.error === "string" ? body.error : `HTTP ${res.status}`;
+        setSlidesError(reason);
+        return;
+      }
+      // Success: the new stored value becomes the editor's CAS anchor. The
+      // server returns the sanitized persisted array on `data.customSlides`.
+      const stored = Array.isArray(body?.data?.customSlides)
+        ? (body.data.customSlides as CustomSlide[])
+        : slidesValue;
+      setSlidesValue(stored);
+      setSlidesLoaded(stored);
+      if (body?.data?.customSlides == null && slidesValue.length === 0) {
+        // No-op save of an empty list — keep both in sync.
+        setSlidesValue([]);
+        setSlidesLoaded([]);
+      }
+      toast({
+        title: "Custom slides saved",
+        description:
+          slidesValue.length === 0
+            ? "All custom slides removed."
+            : `${slidesValue.length} custom slide(s) applied.`,
+      });
+    } catch (err) {
+      setSlidesError(
+        err instanceof Error ? err.message : "Network error — please try again.",
+      );
+    } finally {
+      setSlidesSaving(false);
+    }
+  }
+
+  // The editor is dirty when its value diverges from the loaded (stored) value.
+  const slidesDirty =
+    JSON.stringify(slidesValue) !== JSON.stringify(slidesLoaded);
 
   // Refetch the respondents list from the server. Used after add/remove
   // mutations so the row + stats agree by construction.
@@ -1261,6 +1364,95 @@ export function CampaignDetail({
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : null}
                   Save
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Wave M (#19) — custom slides editor. Shown only when the per-campaign
+          flag is on AND status ∈ {DRAFT, ACTIVE} (computed server-side). */}
+      {customSlidesEnabled && (
+        <div
+          className="bg-card border border-border rounded-xl"
+          data-testid="campaign-custom-slides-card"
+        >
+          <button
+            type="button"
+            onClick={() => setSlidesOpen((v) => !v)}
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-muted/30 transition-colors"
+            data-testid="custom-slides-toggle"
+          >
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">
+                Custom slides
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {slidesLoaded.length > 0
+                  ? `${slidesLoaded.length} branded slide(s) shown inside the assessment`
+                  : "Add branded interstitial pages inside the assessment"}
+              </p>
+            </div>
+            <span className="text-xs font-medium text-muted-foreground">
+              {slidesOpen ? "Hide" : "Edit"}
+            </span>
+          </button>
+          {slidesOpen && (
+            <div className="px-4 pb-4 space-y-3 border-t border-border pt-4">
+              {slidesError && (
+                <div
+                  role="alert"
+                  className="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md text-sm"
+                  data-testid="custom-slides-error"
+                >
+                  {slidesError}
+                </div>
+              )}
+              {slidesWarning && (
+                <div
+                  role="status"
+                  className="bg-warning/10 border border-warning/20 text-warning-foreground px-3 py-2 rounded-md text-sm"
+                  data-testid="custom-slides-banner-warning"
+                >
+                  {slidesWarning}
+                </div>
+              )}
+              <CustomSlidesPanel
+                value={slidesValue}
+                onChange={(next) => {
+                  setSlidesValue(next);
+                  setSlidesError(null);
+                }}
+                sections={customSlidesSections}
+                disabled={slidesSaving}
+              />
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSlidesValue(slidesLoaded);
+                    setSlidesError(null);
+                    setSlidesWarning(null);
+                    setSlidesOpen(false);
+                  }}
+                  disabled={slidesSaving}
+                  className="inline-flex items-center text-xs font-medium px-3 py-1.5 rounded-md border border-border bg-card text-foreground hover:bg-muted disabled:opacity-50"
+                  data-testid="custom-slides-cancel"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveSlides}
+                  disabled={slidesSaving || !slidesDirty}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="custom-slides-save"
+                >
+                  {slidesSaving ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : null}
+                  Save slides
                 </button>
               </div>
             </div>
