@@ -14,6 +14,10 @@ _Avoid_: quiz, survey, questionnaire (the public route is `/quiz/...` and the le
 An immutable-once-published snapshot of a template's questions + sections + scoringConfig. A campaign pins exactly one version; editing published content requires a *new* version.
 _Avoid_: revision, draft (a draft is just a version with `publishedAt = null`).
 
+**Active version** (a.k.a. live version):
+Among a template's published versions, the **latest** one — the version a *new* **Campaign** automatically pins. Older published versions stay published only to keep serving the campaigns already sent with them. There is exactly one Active version per template+language, and correction is **forward-only**: publish a newer version to supersede — never resurrect an older one (that would break longitudinal comparability, see ADR-0016).
+_Avoid_: treating every "Published" version as interchangeable — only the Active (latest published) version goes out on new sends.
+
 **Domain** (Scaling Up Full only):
 One of the five top-level categories a Scaling Up Full question rolls up into: **People, Strategy, Execution, Cash, You**.
 _Avoid_: section (a section is a finer grouping within a domain), category, pillar.
@@ -46,7 +50,7 @@ _Avoid_: confusing a Custom slide (campaign-level, coach-authored, sanitized HTM
 ### Historical import (Esperto)
 
 **Historical import** (a.k.a. **Esperto import**):
-Bringing a company's pre-existing Esperto ("Scaling Up Toolkit") assessment data into the platform so coaches see past results alongside new ones. It runs in two phases: a **Roster import** (the people) followed by a **Results import** (their past answers + result). It is admin-operated and staging-first — a parsed preview is always reviewed before anything is committed.
+Bringing a company's pre-existing Esperto ("Scaling Up Toolkit") assessment data into the platform so coaches see past results alongside new ones. It runs in two phases: a **Roster import** (the people) followed by a **Results import** (their past answers + result). It is **coach-operated** (scoped to the coach's own companies) and staging-first — a parsed preview is always reviewed before anything is committed. *(Was admin-operated; moved coach-side 2026-07-01. The one delicate step — the **crosswalk** — is made safe by guardrails, not by role-gating; see the roadmap P3 + ADR.)*
 _Avoid_: "migration" (that means a database schema change here), "sync" (it is a one-directional, point-in-time load, not an ongoing two-way sync).
 
 **Roster import** (Historical import, phase 1):
