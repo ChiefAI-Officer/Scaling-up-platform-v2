@@ -1094,6 +1094,7 @@ model Organization {
   id            String    @id @default(cuid())
   name          String
   externalId    String?   @unique // Prisma full-unique dropped; replaced with partial WHERE NOT NULL via raw SQL
+  espertoSuFullCid String? // Wave O — pinned lazily on the org's first successful SU-Full historical import; a later import batch whose file `cid` differs is a wrong-org signal. null = no SU-Full import yet. Additive, default-OFF behind WAVE_O_ESPERTO_SUFULL_IMPORT.
   ownerCoachId  String    // v7.6: single owning coach (replaces v7.5 createdBy + OrganizationMembership)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -1247,6 +1248,7 @@ model AssessmentCampaign {
   notifyCoachOnCompletion Boolean                  @default(false)
   invitationBodyHtml      String?                  // optional rich-HTML invitation body
   customSlides            Json?                    // Wave M — coach-authored branded interstitial slides (CustomSlide[]); null = none. Additive, default-OFF behind WAVE_M_CUSTOM_SLIDES_ENABLED.
+  importManifest          Json?                    // Wave O — historical Esperto SU-Full import round manifest (cid provenance, canonical roundLabel, batch content fingerprint, per-respondent {saltedMidHash, saltedReportIdHash, answerHash} for exact/superset/divergent reuse reconciliation, versionId, crosswalkId, skip reasons); null = not an imported round. Additive, default-OFF behind WAVE_O_ESPERTO_SUFULL_IMPORT.
   createdBy           String
   createdByCoachId    String?                      // v7.6: role-specific coach ownership pointer (nullable so admin PUBLIC campaigns can omit)
   createdAt           DateTime                     @default(now())

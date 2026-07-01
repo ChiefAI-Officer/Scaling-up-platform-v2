@@ -1,72 +1,143 @@
-# Plan — Issue #10: Assessment Tool with Team Hierarchies & Longitudinal Reporting
+# Historical Esperto Import — completion plan (SU-Full first)
 
-> **Status (May 27 2026)**: v7.6 spec locked (specs 01–08). **Current priority — the setup-first "flip"** (May 26 Jeff redirect): coaches manage Company→Team→Users *first*, then campaigns pick existing members. See [08 Members & Teams lane](docs/specs/v7.6/08-members-teams-lane.md) — contract-first Slices 1–5 on branch `feat/assessment-setup-first` (subagent-driven dev). Engine + seeds (Rockefeller / QSP v1+v2 / Scaling Up Full / LVA) already in prod. Prior Tasks 5–9 (May 17) are parked behind the flip.
+## Context
+The assessment module **is** the Esperto replacement, but import today only covers **Members (roster)** + **QSP-v2 results** — both admin and coach surfaces run the same pipeline and accept only those two. Coaches/admins **cannot** bring in historical **Scaling Up Full**, **Rockefeller**, or **LVA** results, which is the marquee gap for actually retiring Esperto.
 
-## Spec library (v7.6 — canonical, locked May 15-16)
+Studied 2026-07-01 against the real exports in `From Jeff/Exports/_extracted`: SU-Full is **de-risked to recompute-not-store**. Our `scoreSubmission` already fully scores SU-Full (per-section/domain, 0–100 ScaleUp score, tier); every report reads only the **frozen ScoreResult**; the Peers benchmark is a **separate seeded lookup** (`su-full-benchmarks.ts`), not part of the result. So we import the **raw answers** and recompute — Esperto's `processed` block (Phase, indexTotal, peer stats) is never rendered and is dropped.
 
-| Spec | Scope |
-|---|---|
-| [01 Schema](docs/specs/v7.6/01-schema.md) | Prisma models, raw SQL, partial unique indexes, triggers |
-| [02 Service-layer rules](docs/specs/v7.6/02-service-layer-rules.md) | INTERSECTION RBAC, evaluateAccessChange, canCreateCampaign, ownership transfer, ACCESS_POLICY_VERSION |
-| [03 Seed Rockefeller](docs/specs/v7.6/03-seed-rockefeller.md) | resolveSystemUser, advisory lock, 6 states, ensureAccessGroupAndTemplateLink |
-| [04 Deploy runbook](docs/specs/v7.6/04-deploy-runbook.md) | dotenv-cli (mandatory), DB fingerprint, migrate-diff baseline, PITR, rollback |
-| [05 Wireframes Wave 5](docs/specs/v7.6/05-wireframes-wave5.md) | Wave 2 revisions + Wave 5 deliverables (markdown + HTML acceptance criteria) |
-| [06 Observability](docs/specs/v7.6/06-observability.md) | 7 metrics, 6 alert gates, /admin/observability deploy-time dashboard |
-| [07 Bootstrap runbook](docs/specs/v7.6/07-bootstrap-runbook.md) | Admin first-time setup (bulk-add certified coaches to default group) |
-| [08 Members & Teams lane](docs/specs/v7.6/08-members-teams-lane.md) | **Setup-first flip (current priority)**: (A+) Company=Organization as a unified team tree, 12 locked decisions, contract-first Slices 1–5, Esperto UX parity |
+Outcome: coaches can import a company's historical SU-Full (and later Rockefeller/LVA) results, which then render as normal per-respondent reports and feed the longitudinal/cohort views.
 
-## Locked-decisions ledger (one line each)
+**Wave home:** **Wave O — Historical SU-Full import.** Ships behind a single default-OFF flag `WAVE_O_ESPERTO_SUFULL_IMPORT` (3-lever KILL/ENABLED/CANARY, `lib/assessments/wave-o-flags.ts`, mirrors `wave-n-flags.ts`). Merges dark; the flag only flips once the Phase-2 crosswalk is verified + `locked:true`.
 
-| # | Decision | Spec file |
-|---|---|---|
-| 1 | Hierarchy flip: admins create coaches + assessments; coaches create orgs + participants | 01-schema, 02-service-layer-rules |
-| 2 | AccessGroup replaces TemplateAccessGrant (groups grant template access) | 01-schema, 02-service-layer-rules |
-| 3 | Organization.ownerCoachId NOT NULL (single coach owner); OrganizationMembership dropped | 01-schema, 02-service-layer-rules |
-| 4 | Public quizzes = templates + public-mode config (existing AssessmentCampaign.accessMode shape) | 01-schema, 05-wireframes-wave5 |
-| 5 | NEW: admin aggregate reporting dashboard, MVP = single template selector + all-time | 06-observability, 05-wireframes-wave5 |
-| 6 | INTERSECTION RBAC (not union); ACCESS_POLICY_VERSION env var for runtime flip + shadow mode | 02-service-layer-rules |
-| 7 | Self-signed coach lands with zero assessment access until admin adds to a group | 02-service-layer-rules, 07-bootstrap-runbook |
-| 8 | Admin aggregate dashboard MVP shape: template selector + version selector, no filters on day 1 | 06-observability |
-| 9 | Deploy via .env.production.local + dotenv-cli (one-shot injection); local .env NEVER overwritten | 04-deploy-runbook |
-| 10 | Setup-first flip (May 26): user structure before campaigns; wizard picks existing members (not inline-create); (A+) Company=Organization presented Esperto-style as a unified tree | 08-members-teams-lane |
+## Approach (principles)
+- **Recompute, don't store** Esperto's `processed` block. Import raw → `scoreSubmission` recomputes.
+- **Per-template crosswalks, authored once, reused.** Verify positional mappings against the Esperto source (in `From Jeff/`) using the QSP lock-checklist pattern; ship `locked:false` → flip `locked:true` only after verification.
+- **Reuse the existing pipeline.** `classify.ts` already tags `restricted-individual`; reuse `commitResultsImport`'s submission-create + scoring + Imported-campaign logic (CLOSED, back-dated — ADR-0006).
+- **One import batch = one round = one campaign, single company (grill-confirmed; hardened R1).** The SU-Full export carries **no round/wave identifier** — only `cid` (company), `mid` (person), `date` (verified against the real files). A **restricted-individual file is ONE respondent**, so a "round" is a **set of per-person files uploaded together** — the import is a genuine multi-file batch (R1-H1), not a one-file-at-a-time flow. Rules:
+  - **(a) One `cid` per batch (R1-M1).** Mixed-company batches are rejected up front. This sidesteps the partial-commit hazard in `commitResultsImport` (each campaign commits in its own transaction — a multi-company batch could half-succeed). One company, one round, one campaign, one transaction.
+  - **(b) Coach-supplied round label = stable idempotency key (R1-H2).** The coach names the round at import (e.g. "2025 Annual", "Year 1"); the campaign `externalId = esperto:sufull:<cid>:<slug(roundLabel)>`. This is **stable regardless of which files are in the batch** — unlike the earlier `earliest-submittedAt-date` key, which drifts when the file set changes or an earlier row is unresolved/skipped. It also removes reliance on *inferring* round boundaries from dates, which fails silently when two rounds have **disjoint participants** (staff turnover → no repeated `(cid,mid)` → nothing to detect).
+  - **(c) Dup-person check is a secondary sanity net, not the boundary.** A single round should never list the same `(cid,mid)` twice; if it does, reject the batch ("looks like two rounds — import separately"). But the *round boundary itself* is the coach's label (b), never this heuristic.
+  - *(Supersedes both the earlier "group all files by `cid`" note AND the interim `earliest-date` key — either would have merged or duplicated rounds and broken the longitudinal comparison.)*
+- **Roster-first is required (forced by the data).** Longitudinal matches a person across campaigns by `normalizedEmail`-within-org; the email comes from the **Members roster**, not the Individual file (which only has `mid`). So the coach must import the company's Members roster before SU-Full results — same as QSP. Unresolved `mid` → **skip that person** (inherit QSP behavior: no auto-create, no error). Honest-framing UI (item 5) must state the roster-first order.
+- **Import authz must match normal campaign-create (R1-H3, CRITICAL).** The normal create path runs `canCreateCampaign(asAccessDb(db), actor, templateId)` — which enforces **certification status** (`CERTIFIED_STATUS`, not `DEACTIVATED_STATUS`) **and** template entitlement via `canAccessTemplate()` (access-group INTERSECTION policy) — before `resolvePublishedTemplateVersion` (`access-control.ts:218-237`; `assessment-campaigns/route.ts:225-245`). **The coach import route today applies NONE of this** — only auth + coach gate + org scoping (`app/api/assessments/import/route.ts`). So flipping the Wave O flag would let any coach with a matching roster mint SU-Full campaigns **outside access-group policy**. Fix: after resolving the SU-Full template, **both coach import preview AND commit call the same `canCreateCampaign` gate** (403 on fail). Admin route stays admin-only/unrestricted (fine).
+- **Pin latest-published version, degrade gracefully (grill-confirmed).** Each import attaches to the currently-published SU-Full version (same as QSP). Only v1 is published today, so all imports compare cleanly. If a future v2 ever splits two rounds onto different versions, the existing ADR-0016 rule shows scores **without deltas** rather than crashing. No version-picker UI.
+- **Drop the Aggregate export** — recompute the cohort/group view ourselves (Wave F already does; the sample's `group*` values are unreliable/0 anyway). No second group-report code path (grill-confirmed 2026-07-01).
+- Coach + admin **share the pipeline**, so coverage lands on both automatically; coach org-scoping is already enforced.
+- **Rollout: coach self-serve is the END STATE, reached via canary (grill + R3-H3).** No *permanent* admin gatekeeping — once fully rolled out, any entitled coach imports their own clients' history (the grilled decision holds). But the *path there* uses the CANARY lever, not a day-one global flip: admin/pilot org → small allowlist (success metrics + rollback criteria) → global `ENABLED=1`. The `locked:true` crosswalk + the flag + the canary ramp are the layered safety. *(Canary ramp CONFIRMED by user 2026-07-01; coach self-serve remains the end state.)*
+- **Dark-window UX (grill-confirmed): fully dark behind the flag.** Until Phase 2 verifies the crosswalk and the flag flips, SU-Full import **does not appear** — no greyed "coming soon", no upload-then-refuse dead-end. Matches how Waves M/N shipped.
+- **Imported report: labeled; fidelity bounded by the pinned version (grill + R1-H4).** An imported SU-Full renders like a fresh report — domain scores + peer comparison (seeded benchmark) — stamped **"Imported from Esperto (historical)"**. Esperto's non-reproducible 0–100 index isn't shown anyway (ADR-0015). **The growth-phase tile is NOT part of baseline Wave O fidelity:** the FTE keys `Q_FTE_CONTRACT`/`Q_FREELANCE` that drive it exist only in the **DRAFT v2 (Wave J-1), `publishedAt:null`** — the currently-published v1 has no FTE question (verified: `seed-scaling-up-full-assessment.ts:50-54, 901-918, 1208`). Since we pin latest-*published*, imports today attach to v1 → the tile simply does not render (`computeGrowthPhase` returns `null`, no error — verified `su-full-phase.ts:148-157` + tests). **The phase tile lights up automatically, with zero Wave O code change, once Wave J publishes an FTE-bearing SU-Full version — Wave O does NOT depend on or block on the Jeff-gated Wave J.** No overpromise: baseline imported report = domain scores + peers + label.
 
-## Active Notion tasks (May 14 + May 17)
+## Work items
 
-| Task | Status | Spec ref |
-|---|---|---|
-| Task 0 — memory file | shipped May 14 | (memory dir, not spec) |
-| Task 1 — Wave 1 polish | shipped May 14 | 05-wireframes-wave5 |
-| Task 2 — schema migration v7.5 | artifacts; live DB pending | 01-schema |
-| Task 3 — Rockefeller seed | shipped May 14 | 03-seed-rockefeller |
-| Task 4 — scoreSubmission + golden fixture | shipped May 14 | (no v7.6 spec — pure function) |
-| Task 5 — amend v7.5 migration (AccessGroup + ownership flip) | next | 01-schema |
-| Task 6 — Wave 2 wireframe revisions | queued | 05-wireframes-wave5 |
-| Task 7 — Wave 5 wireframes (markdown + HTML) | queued | 05-wireframes-wave5 |
-| Task 8 — memory file update | queued | (memory dir) |
-| Task 9 — local .env DATABASE_URL mismatch resolution | HIGH priority, blocks deploy | 04-deploy-runbook |
+0. **Add the Wave O flag** — new `src/src/lib/assessments/wave-o-flags.ts` exporting `isEspertoSuFullImportEnabled({ organizationId? })`, mirroring `wave-n-flags.ts` (KILL > ENABLED > CANARY, call-time `process.env` reads, no caching). Both import routes + the import UI gate the SU-Full path on it. Default-OFF.
 
-## Deployment path (one-paragraph summary; details in 04-deploy-runbook)
+1. **Accept a `restricted-individual` BATCH end-to-end** (behind the Wave O flag).
+   - **Multi-file batch envelope (R1-H1).** A restricted-individual file is **one respondent**, so the preview/commit contract takes a **set of files** (+ a coach-supplied `roundLabel`, + optional aggregate files) as one batch — not a single file. UI = multi-file upload; API = array payload. The batch is parsed, then all individuals are grouped into **one campaign** (see batch rules in Approach).
+   - **Single-`cid` guard (R1-M1).** Reject a batch spanning more than one `cid` before any write ("one company per import"), so the reused `commitResultsImport` (per-campaign transaction) can't half-commit a round.
+   - **Separate restricted adapter, crosswalk-by-alias (R1-M2).** Restricted exports have **no `variant`** — the existing results path selects the crosswalk via `report.personal[0].variant`, which would select nothing here. New adapter in `src/src/lib/assessments/esperto-import/results-plan.ts` resolves the crosswalk with `getCrosswalkByTemplateAlias("scaling-up-full")` and **never enters the variant path**. It flattens the flat `raw` object → answers keyed via crosswalk (**bare codes** like `Q3_1`, no `raw_` prefix); resolves respondent by `mid` → `OrgRespondent.externalId` (roster join key; unresolved → **skip**, inherit QSP); sets each submission's `submittedAt` to the file `date` (back-dated; feeds the longitudinal sort).
+   - **Stable idempotency + reuse metadata refresh (R1-H2/M3).** Campaign `externalId = esperto:sufull:<cid>:<slug(roundLabel)>`. Secondary net: a repeated `(cid,mid)` within one batch → reject ("looks like two rounds — import separately"). **The label alone is NOT sufficient identity — hardened in item 1b** (content fingerprint + collision reject + per-submission answer hash + DB-level date bounds).
+   - **Authz parity (R1-H3).** Both preview and commit on the coach route resolve the SU-Full template then call `canCreateCampaign(...)` (certification + access-group entitlement) — 403 on fail — matching normal campaign-create.
+   - Reuse `results-commit.ts` `commitResultsImport` per-submission create + `scoreSubmission` recompute (`allowMissingRequired: true`).
+   - **`restricted-aggregate` handling, explicit for preview vs commit (R1-L2).** Aggregate files in a batch are **never** written. At **preview**: surfaced as an explicit `ignoredArtifacts` warning ("cohort file ignored; group view is recomputed from individuals"). At **commit**: recorded as `skippedArtifacts` in the response schema (audit trail) — never block the batch.
 
-Local `.env` is NEVER modified. Pull Vercel prod env to `.env.production.local`. All prod commands flow through `npx dotenv-cli -e .env.production.local -- <cmd>`. Mandatory preflight: `src/scripts/db-fingerprint.ts` confirms `ASSESSMENT_PROD_EXPECTED_HOST` match before any destructive command. Migration baselining uses `prisma migrate diff` (not `--from-empty`) to verify schema parity before `prisma migrate resolve --applied` on historic migrations. PITR snapshot captured before any deploy step. See [04-deploy-runbook](docs/specs/v7.6/04-deploy-runbook.md).
+1b. **Import safety & data-integrity guardrails (R2 — Phase 1; this IS the anti-corruption layer).**
+   - **Per-respondent completeness gate (R2-H1).** `allowMissingRequired:true` must not mint authoritative-looking partial scores. In the adapter/preview, check each respondent's mapped answers against the pinned version's **scorable** keys; a respondent missing scorables (or out-of-range) is **flagged in preview and skipped by default** (explicit reason, like unresolved-member) — never silently scored partial. Only complete respondents commit + score.
+   - **Round identity = label + content fingerprint (R2-H2; R3-L1 salted-hash).** The coach label alone is untrusted identity. Persist a **canonical round manifest** on the campaign: `cid`, canonical `slug(roundLabel)`, sorted **salted hashes** of source `reportid`/`mid` (never raw — R3-L1: raw ids live only transiently in-memory during parse), and a **batch content fingerprint (hash)**. Reject **slug collisions** (same key, different fingerprint) with a clear 409 ("this label is already used for a different round"). Same-key reuse: **exact fingerprint → no-op**; **superset (late respondents) → audited append**; **divergent → 409**.
+   - **Per-submission answer hash; corrections explicit, not silent (R2-H3).** Persist a **salted hash of `reportid`** + a **raw-answer hash** per imported submission. Re-import of the same `mid`/round: **hash match → no-op**; **hash differs → 409** ("already imported with different answers; use the correction path"), never the create-only silent skip. (Supersession UX is a follow-on; the *detection* ships in Phase 1.)
+   - **Append binds to the campaign's pinned version, NOT latest-published (R3-H2).** New campaigns pin latest-published; but a **late-respondent append to an existing round scores against that campaign's already-pinned `versionId`** (read from the manifest), never re-resolving latest-published — otherwise a version published between the original import and the append would produce **mixed-version submissions inside one historical round**. If the published version changed between **preview and commit**, reject and re-preview. Regressions for both windows (publish between preview/commit; publish between original-import/late-append).
+   - **Explicit target org + provenance, never infer from `mid` (R2-M3, CRITICAL).** The coach **selects the target organization explicitly**; we do NOT attach based on whichever coach-owned org happens to contain a matching `mid` (that can import company B's round into org A and skip the rest). Record the file `cid` as campaign provenance; Phase 1 adds `cid` capture on roster import so a batch's `cid` can be verified against the target org; if a large fraction of the batch's `mid`s don't resolve in the chosen org, **block/warn** (wrong-org/files signal).
+   - **Entitlement re-check at the write (R2-M1).** Re-run `canCreateCampaign` inside/adjacent to the commit transaction (txn client), so a certification/access-group revocation during a long parse can't still leave a written campaign.
+   - **Order-independent date bounds + unique-violation = reuse (R2-M2).** Compute campaign `openAt`/`closeAt` via **DB-level min/max over persisted submissions**, not the in-request batch; map a unique-constraint violation on campaign `externalId` to **reuse-retry**, not a generic 500.
+   - **Strict zod at the boundary (R2-M4).** Validate `roundLabel` (length + charset + canonical form), `cid`/`mid` (length/format), and `date` (ISO parse + sane historical bounds — not future, not absurdly old) before any processing.
+   - **Redacted audit manifest (R2-M5).** Commit writes an in-transaction manifest — artifact **hashes**, counts, `cid`, canonical label, `versionId`, crosswalk identity, skipped-respondent reasons — with **no raw tokens/emails/demographics** (D12). Retries reuse it.
+   - **Mismatched aggregate `cid` = acknowledged warning (R2-L1).** A supplied aggregate whose `cid` ≠ the individual batch's `cid` raises a preview warning requiring explicit acknowledgment (wrong-files signal), not a silent drop.
 
-## What v7.6 does NOT do
+2. **Author the SU-Full crosswalk** — new `src/src/lib/assessments/esperto-import/crosswalks/scaling-up-full.ts`, `templateAlias:"scaling-up-full"`.
+   - Map sliders `Q3_1…Q12_10` → `Q01…Q61` (verify order against `From Jeff/` SU-Full source + `prisma/seed-scaling-up-full-assessment.ts`); map `Q1*/Q2*` financials + FTE.
+   - `droppedKeys` (with reasons): `Q13o*` firmographics, `geslacht/leeftijd/country/postcode`, `Q16/Q17`, `Q12open`, `ScoreSchatting`, all `processed.*`.
+   - Register in `crosswalks/index.ts`; ship `locked:false` → verify → `locked:true`.
 
-- Does NOT push the foundation slice (Tasks 0–4) to prod yet (gated on Task 9).
-- Does NOT begin AccessGroup API/UI implementation (Wave 5 wireframes lock first).
-- Does NOT begin Wave 3 (output/report) wireframes (separate slice).
-- Does NOT touch coach onboarding/invite flow beyond welcome-email correction (no welcome email is sent by /api/auth/coach-signup today).
-- Does NOT introduce CRUD APIs or routes (still pure foundation per May 14 scope rule).
+3. **FTE/background mapping — version-aware, and NOT a Wave O blocker (R1-H4).** Map Esperto employee/financial answers → `Q_FTE_CONTRACT` (+ optional `Q_FREELANCE`) **only when the pinned published version actually contains those stableKeys.** Today's published v1 does not (they live in the draft v2, Wave J-1), so `validateCrosswalkAgainstVersion` must treat the FTE mapping as **conditional** — against v1 the FTE source values are simply dropped (unmapped, like the firmographics) and the phase tile is absent. When Wave J publishes the FTE-bearing version, imports pin it and the tile appears with no Wave O change. **Do not gate the Wave O flag flip on Wave J.**
 
-## Decision provenance
+4. **Rockefeller + LVA crosswalks — EXPLICITLY OUT OF WAVE O SCOPE (R1-L1).** Not built here; blocked on obtaining their real Esperto exports from Jeff (spec 12 §14). Wave O must leave their stubs **inaccessible**: `crosswalks/rockefeller.ts`/`lva.ts` stay empty/`locked:false`, and a **test asserts an import attempt against those templates is refused** (no crosswalk → reject), so a future implementer can't accidentally activate an unverified mapping. When their exports arrive they'll come as `"report"` kind (like QSP) → no routing change, just crosswalk authoring + lock, in a later wave.
 
-All 6 rounds of Codex adversarial review (May 14 Rounds 1-3 + May 16 Rounds 1-3) archived at [plans/history/v6-v7.5-archive.md](plans/history/v6-v7.5-archive.md) for traceability. The v7.6 spec files supersede all prior content.
+5. **Honest UI framing** — `EspertoImportClient.tsx` + the two import pages: state which instruments are actually supported (stop implying "all historical Esperto data"); surface the cohort caveat (imported results use our seeded Peers benchmark, ADR-0015); state the roster-first order (Members roster must be imported before SU-Full results).
 
-## Source-of-truth deltas (companion updates)
+6. **Tests + fixtures** — **SANITIZED fixtures only** (structure intact, identity + demographics faked) per **D12**; the real files in `From Jeff/Exports/` are **gitignored and carry real PII** — never commit them or a derived copy. Strip `geslacht/leeftijd/country/postcode`/names/emails when building fixtures. Unit: crosswalk exhaustiveness (`validateCrosswalkExhaustive`) + `validateCrosswalkAgainstVersion` (incl. FTE-key-absent-in-v1 → conditional drop, R1-H4); adapter flatten/resolve + crosswalk-by-alias selection (R1-M2); recompute yields expected domain averages; **multi-file batch groups N individuals → one campaign** (R1-H1); **single-`cid` guard rejects a mixed-company batch** (R1-M1); **round-label keying**: two rounds with disjoint participants → two campaigns, re-import same label → no-op + refreshed `openAt/closeAt` (R1-H2/M3); dup-`(cid,mid)` tripwire rejects; **authz: uncertified or non-entitled coach is 403 on both preview and commit** (R1-H3); **Rockefeller/LVA import refused** (R1-L1); aggregate file → preview warning + commit `skippedArtifacts`, never written (R1-L2). **R2 guardrail tests:** incomplete respondent (missing scorables) → skipped-with-reason, not partial-scored (H1); slug collision same-label/different-fingerprint → 409, exact re-import → no-op, superset → audited append (H2); divergent per-submission answer-hash → 409 not silent-skip (H3); import with no explicit target org → rejected, low-`mid`-resolution batch → block/warn (M3); in-txn entitlement re-check blocks a mid-request revocation (M1); concurrent same-label commits → order-independent `openAt/closeAt`, unique-violation → reuse not 500 (M2); zod rejects oversized/control-char label, non-ISO/future/ancient date (M4); audit manifest contains hashes+counts but **no raw email/`mid`/demographics** (M5); mismatched aggregate `cid` → ack-required warning (L1). E2E: multi-file preview→commit a sanitized SU-Full round → Imported CLOSED campaign + scored submissions + per-respondent report + longitudinal pick-up.
+   - **Privacy-by-data:** SU-Full carries demographic PII we don't render — the crosswalk **drops** it (item 2). Note: the pre-existing committed-PII leak (GH issue #40) is a separate history-scrub, not this plan.
 
-- `CLAUDE.md` "Last Updated" reflects v7.6 lock + deploy-pending state.
-- `plans/CHANGELOG.md` carries the full v7.6 delta as a single appended entry.
-- `~/.claude/projects/-Users-diushianstand-Scaling-up-platform-v2/memory/project_assessment_tool.md` reflects the new hierarchy paragraph, AccessGroups paragraph, Wave 2 approval status, and Wave 5 ETA.
+7. **Ops & rollout safety (R3 — deploy safely, watch in flight, revert cleanly).**
+   - **Rollback beyond the kill switch (R3-H1).** The flag KILL only stops *new* imports; an already-written bad batch keeps feeding reports/longitudinal. Add a **quarantine/purge path**: because imported campaigns are CLOSED + isolated (ADR-0006) and carry the `esperto:sufull:<cid>:<slug>` externalId + manifest, ship a tested script that **soft-deletes/hides or purges one batch by externalId/manifest**, recomputes any affected date bounds, and defines **post-rollback smoke queries**. Rollback is by-batch, not all-or-nothing.
+   - **Mandatory canary rollout (R3-H3) — reconciles with the "self-serve" decision.** Coach self-serve stays the **end state** (no permanent admin gatekeeping — the grilled call holds), but we *reach* it through the existing CANARY lever, not a day-one global flip: **admin/pilot org → small coach/org allowlist (with success metrics + rollback criteria) → `WAVE_O_ESPERTO_SUFULL_IMPORT_ENABLED=1` global.** One crosswalk/scoring bug then hits one pilot, not every org. *(CONFIRMED by user 2026-07-01.)*
+   - **Batch caps + per-campaign serialization (R3-M1).** Define SU-Full limits (max files, max respondents, max aggregate bytes per batch) validated up front; **serialize commits per campaign `externalId`** (advisory lock — also closes the R2-M2 date-bounds race); document a synchronous timeout budget, or chunk/background the commit if a batch can exceed it on serverless.
+   - **PII-safe observability (R3-M2).** Emit structured `assessment.esperto_import.*` markers for preview/commit attempts, skip/block reasons, 409 conflicts, latency, batch size, flag state, and crosswalk/version identity (hashes/counts only, no raw PII). Add alert queries/dashboard panels + a synthetic alert smoke that **gates canary and global promotion**.
+   - **Wave O runbook (R3-M3).** Author `docs/specs/v7.6/18o-wave-o-*` mirroring the F/J runbooks: env preflight, canary commands, kill/promote-previous, data quarantine/rollback, observability queries, on-call decision tree, live smoke script.
+   - **Versioned request schema + stale-client + QSP untouched (R3-M4).** The restricted SU-Full batch payload (target-org, round-label, ack fields) gets a `batchKind`/`schemaVersion`; a stale client missing new fields gets a clear error (not a silent mis-import); the **existing QSP `report` results payload path is preserved unchanged** (backwards compat).
 
-## Restructuring discipline (persistent rule)
+## Critical files
+- Pipeline: `src/src/lib/assessments/esperto-import/{classify,parse,types,results-plan,results-commit}.ts`
+- Crosswalks: `.../crosswalks/{types,index,qsp-v2}.ts` (pattern) → new `scaling-up-full.ts`, fill `rockefeller.ts`/`lva.ts`
+- Routes: `src/src/app/api/{admin/assessments,assessments}/import/route.ts`
+- Flag: new `src/src/lib/assessments/wave-o-flags.ts` (mirrors `wave-n-flags.ts`)
+- UI: `src/src/components/**/EspertoImportClient.tsx`, `.../admin/assessments/import/page.tsx`, `.../portal/members/import/page.tsx`
+- Scoring (reuse, no change): `src/src/lib/assessments/scoring.ts`; longitudinal (reuse, no change): `src/src/lib/assessments/respondent-longitudinal.ts`; template: `prisma/seed-scaling-up-full-assessment.ts`
 
-Future plan revisions land in the appropriate spec file under `docs/specs/v7.6/` (or a future `docs/specs/v7.7/` if a major spec bump happens). Do NOT append to PLAN.md. Do NOT inline new spec content in a Notion task. The hub stays thin.
+## Verification
+- `CI=true npx next build --turbopack` green.
+- Targeted Jest on `esperto-import/*`, crosswalks, the adapter, and the Wave O flag.
+- Live Playwright smoke (explicit): import ABC Corp roster (Members) then a SU-Full **round (multi-file)** → confirm the Imported campaign is CLOSED, scored SU-Full per-respondent reports render, and longitudinal includes them.
+- **Rollback smoke (R3-H1):** quarantine/purge that batch by `externalId`/manifest → confirm its campaign disappears from reports + longitudinal and any shared date bounds recompute; run the post-rollback smoke queries.
+- **Rollout gates (R3):** the observability alert smoke (R3-M2) must be green and canary success metrics met **before** promoting `ENABLED=1` globally; runbook `18o` preflight run before each flag change.
+- House rules: TDD/subagent-driven; on push update SoT (CLAUDE.md anchor + `plans/CHANGELOG.md` + fold the "import corrected: only Members+QSP worked; SU-Full recompute-not-store" facts into `plans/assessment-hardening-roadmap.md`); create the granular Notion task; write **ADR-0017** ("historical import is coach-operated + recompute-not-store").
+
+## Phasing
+- **Phase 1 — safe plumbing + anti-corruption layer (mergeable dark, ~5–8 days — grew with the R2 guardrails):** item 0 (Wave O flag) + item 1 (accept a `restricted-individual` **batch** end-to-end: multi-file envelope, single-`cid`, crosswalk-by-alias, round-label key) + **item 1b (the R2 data-integrity guardrails: completeness gate, content fingerprint, per-submission answer hash, explicit target org + `cid` provenance, in-txn entitlement re-check, DB-level date bounds, strict zod, redacted audit manifest)** + item 5 (honest framing incl. roster-first order) + drop the Aggregate + item 6 Phase-1 tests with **sanitized** fixtures. **No crosswalk, no mapping risk** — the SU-Full crosswalk stays `locked:false` (import refused) AND the Wave O flag stays OFF until Phase 2, so nothing reaches real data yet; item 1b is what makes the eventual flip safe.
+- **Phase 2 — SU-Full crosswalk, gated (~5–7 days, verification-dominated):** item 2 (crosswalk) + item 3 (FTE fallback) + item 6 crosswalk tests. Ship `locked:false`; flip `locked:true` **only after a PR-reviewed lock-checklist** verifies the **6 count-tied families** (the four 5-item blocks Q5/Q7/Q9/Q11 + the two 6-item blocks Q6/Q10) against the Esperto source — QSP pattern, spec 12a §5b. A premature `locked:true` binds answers to the wrong questions and corrupts historical aggregates.
+- **Parked follow-on:** item 4 (Rockefeller/LVA) — blocked on Jeff's sample exports; stays parked.
+
+## Dependencies / open
+- Rockefeller & LVA real Esperto exports (from Jeff) — blocks item 4 only.
+- SU-Full crosswalk positional verification against the source (we have it in `From Jeff/`).
+- ADR-0006 (imported = CLOSED), ADR-0015 (peers seeded), ADR-0016 (longitudinal reads frozen result) all hold — no conflicts.
+- **Growth-phase tile** depends on Wave J publishing an FTE-bearing SU-Full version — Wave O renders without it and does **not** block on Wave J (R1-H4).
+- **New UX surface:** the coach supplies a short **round label** per import (drives the stable idempotency key) — small addition to the import UI (R1-H2).
+
+## Changelog
+
+### Round 1 (Senior-engineer review) — all 9 findings accepted, 2 fact-checked against code
+- **H1 (multi-file batch) — TOOK.** A restricted-individual file is one respondent; the earlier plan implied single-file import, which would split one round into one-campaign-per-person. Reworked to a first-class multi-file batch envelope (set of files + round label → one campaign).
+- **H2 (unstable idempotency key + tripwire blind spot) — TOOK.** The `earliest-submittedAt-date` key drifts with the file set, and the `(cid,mid)` tripwire can't detect two rounds with *disjoint* participants (staff turnover). Replaced with a **coach-supplied round label** as the stable key `esperto:sufull:<cid>:<slug(roundLabel)>`; dup-person check demoted to a secondary sanity net.
+- **H3 (missing coach entitlement gate) — TOOK, verified.** Confirmed the coach import route applies only auth+coach+org scoping, while normal create runs `canCreateCampaign` (certification + access-group INTERSECTION via `canAccessTemplate`, `access-control.ts:218-237`). Added authz-parity requirement to preview AND commit.
+- **H4 (phase-tile vs published version) — TOOK, verified.** Confirmed FTE keys live only in the DRAFT v2 (Wave J-1, `publishedAt:null`); published v1 has none. Downgraded the report-fidelity claim: baseline = domain scores + peers + label; phase tile appears automatically once Wave J publishes an FTE-bearing version. Wave O does not block on Wave J. FTE crosswalk mapping made version-aware (conditional in `validateCrosswalkAgainstVersion`).
+- **M1 (partial commit across companies) — TOOK.** `commitResultsImport` commits per-campaign; a multi-cid batch could half-succeed. Added a **single-`cid`-per-batch** guard.
+- **M2 (no `variant` on restricted exports) — TOOK.** The existing results path selects crosswalks by `report.personal[0].variant`; restricted files have none. Specified a **separate restricted adapter** that resolves via `getCrosswalkByTemplateAlias("scaling-up-full")`.
+- **M3 (stale campaign date bounds on reuse) — TOOK.** On idempotent reuse, recompute/update `openAt`/`closeAt` to span all present submissions; exact re-imports no-op.
+- **L1 (Rockefeller/LVA scope ambiguity) — TOOK.** Marked item 4 explicitly out of Wave O scope + added a test that imports against those templates are refused (stubs stay inaccessible).
+- **L2 (aggregate accept-and-drop underspecified) — TOOK.** Specified preview = `ignoredArtifacts` warning, commit = `skippedArtifacts` audit entry; never written, never blocking.
+- **Rejected:** none. Round 1 was substantive across the board; no findings were style-only or based on a misread of the plan.
+
+### Round 2 (Security & data-integrity review) — all 9 findings accepted; consolidated into new item 1b
+- **H1 (partial scores via `allowMissingRequired`) — TOOK.** Added a per-respondent completeness gate: incomplete respondents are skipped-with-reason in preview, never silently scored partial.
+- **H2 (round label is untrusted identity) — TOOK.** This is the flip-side of R1-H2's own fix. Added a canonical round manifest + batch content fingerprint; slug collisions with different content → 409; only exact-retry or audited late-append reuse allowed.
+- **H3 (create-only reuse silently drops corrections) — TOOK.** Persist `reportid` + per-submission raw-answer hash; divergent hash → 409, not silent skip. Supersession UX deferred; detection ships Phase 1.
+- **M1 (entitlement TOCTOU) — TOOK.** Re-run `canCreateCampaign` inside/adjacent to the commit transaction.
+- **M2 (date-bounds race / unique-key collisions) — TOOK.** Compute `openAt/closeAt` via DB-level min/max over persisted rows; map unique-violation to reuse-retry.
+- **M3 (wrong-org import via `mid` inference) — TOOK (critical).** Require explicit target-org selection + `cid` provenance (capture `cid` on roster import); block/warn on low-resolution batches. Was a genuine silent-cross-company-corruption path.
+- **M4 (input validation) — TOOK.** Strict zod on label/`cid`/`mid`/`date` (charset, length, ISO parse, sane historical bounds).
+- **M5 (audit redaction/provenance) — TOOK.** In-txn redacted manifest (hashes + counts + ids + versionId + crosswalk id + skip reasons), no raw PII per D12.
+- **L1 (silent aggregate cid-mismatch) — TOOK.** Mismatched aggregate `cid` → acknowledged preview warning (wrong-files signal), not a silent drop.
+- **Rejected:** none. Several R2 findings hardened the very fixes R1 introduced (round-label identity, reuse metadata) — the loop is doing its job. Phase 1 estimate bumped to ~5–8 days to absorb item 1b.
+
+### Round 3 (Ops & SRE review) — all 8 findings accepted; new item 7 + two inline fixes
+- **H1 (kill switch ≠ rollback) — TOOK.** Added a by-batch quarantine/purge path (externalId/manifest) + recompute date bounds + post-rollback smoke; kill switch alone left bad data live.
+- **H2 (late append scores against newer version) — TOOK.** Appends now bind to the campaign's already-pinned `versionId` (from manifest), never latest-published; reject if the published version changed between preview and commit. Prevents mixed-version submissions inside one round.
+- **H3 (global self-serve = wide blast radius) — TOOK, reconciled.** Kept the grilled "coach self-serve" as the END STATE but routed rollout through the CANARY lever (pilot → allowlist → global) with metrics + rollback criteria. Flagged as a user-facing nuance for sign-off; not a reversal of the self-serve decision.
+- **M1 (no caps / serverless + DB pressure) — TOOK.** Batch caps + per-`externalId` commit serialization (advisory lock, also closes the R2-M2 race) + documented timeout budget / chunked commit.
+- **M2 (no observability) — TOOK.** PII-safe `assessment.esperto_import.*` markers + alerts + a synthetic smoke that gates canary/global promotion.
+- **M3 (no runbook) — TOOK.** Wave O runbook `docs/specs/v7.6/18o-*` mirroring F/J.
+- **M4 (stale-client / schema skew) — TOOK.** Versioned request schema (`batchKind`/`schemaVersion`), clear stale-client error, QSP `report` path preserved unchanged (backwards compat).
+- **L1 (manifest PII contradiction) — TOOK.** Durable manifest stores **salted hashes** of `reportid`/`mid`, not raw; raw ids only transiently in-parse. Fixed a contradiction I introduced in R2.
+- **Rejected:** none. R3 also surfaced the flip-side of R1/R2 fixes (version-pinning → mixed-version appends; manifest → PII contradiction), which is why three rounds was the right call.
+
+### Loop outcome
+Three rounds, 26 findings, **all material, all accepted, zero rejected/style-only** — a signal the original plan was directionally right but under-hardened on batch semantics, idempotency/identity, authz parity, and ops/rollout. The plan is now substantially stronger. **Decisions locked 2026-07-01:** canary ramp CONFIRMED (self-serve end state, canary path). **Next: user reviews this PLAN.md + Changelog, then greenlights Phase 1 TDD build (nothing built yet — awaiting review).**

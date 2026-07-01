@@ -12,18 +12,31 @@
  * Staging-first by design: an operator PREVIEWS a parsed plan before any
  * COMMIT writes, and nothing here ever sends email (imported invitations are
  * born SUBMITTED). The client component drives the whole two-step workflow.
+ *
+ * Headline/copy (Wave O Part A): reworded from the prior "Import historical
+ * Esperto data" — that overclaimed support for ALL historical Esperto data
+ * when only Members (roster) + QSP-v2 (results) actually work today.
+ * Deliberately does NOT name SU-Full/Rockefeller/LVA — this line is scoped to
+ * what unconditionally works, so it never drifts out of sync with the
+ * suFullImportEnabled flag state below.
  */
 
 export const dynamic = "force-dynamic";
 
 import { EspertoImportClient } from "@/components/admin/esperto-import/EspertoImportClient";
+import { isEspertoSuFullImportEnabled } from "@/lib/assessments/wave-o-flags";
 
 export default function AdminEspertoImportPage() {
+  // Global-only check (no per-org opts) — a deliberate Phase-1 simplification.
+  // Per-org canary visibility for the Phase 2+ pilot rollout is a deferred
+  // follow-on; see docs/specs/v7.6/18o-ops-runbook.md §3.
+  const suFullImportEnabled = isEspertoSuFullImportEnabled();
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-bold text-foreground">
-          Import historical Esperto data
+          Import from Esperto
         </h1>
         <p className="text-sm text-muted-foreground">
           Admin-only. Backfill people (rosters) and past answers (results) from
@@ -33,9 +46,15 @@ export default function AdminEspertoImportPage() {
           it. Nothing here sends email — imported responses are recorded as
           already submitted.
         </p>
+        <p className="text-sm text-muted-foreground">
+          Supported today:{" "}
+          <span className="font-medium text-foreground">Members rosters</span>{" "}
+          and <span className="font-medium text-foreground">QSP-v2 results</span>.
+          Other Esperto assessment types aren&apos;t available for import yet.
+        </p>
       </header>
 
-      <EspertoImportClient />
+      <EspertoImportClient suFullImportEnabled={suFullImportEnabled} />
     </div>
   );
 }

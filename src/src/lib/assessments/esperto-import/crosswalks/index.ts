@@ -16,21 +16,24 @@ import type { Crosswalk } from "./types";
 import { qspV2Crosswalk } from "./qsp-v2";
 import { rockefellerCrosswalk } from "./rockefeller";
 import { lvaCrosswalk } from "./lva";
+import { scalingUpFullCrosswalk } from "./scaling-up-full";
 
 export type { Crosswalk, CrosswalkEntry, CrosswalkQuestionType } from "./types";
 export { qspV2Crosswalk } from "./qsp-v2";
 export { rockefellerCrosswalk } from "./rockefeller";
 export { lvaCrosswalk } from "./lva";
+export { scalingUpFullCrosswalk } from "./scaling-up-full";
 
 // ────────────────────────────────────────────────────────────────────────
 // Registry
 // ────────────────────────────────────────────────────────────────────────
 
-/** All known crosswalks. Stubs (Rockefeller/LVA) are present but `locked:false`. */
+/** All known crosswalks. Stubs (Rockefeller/LVA/SU-Full) are present but `locked:false`. */
 export const ALL_CROSSWALKS: readonly Crosswalk[] = [
   qspV2Crosswalk,
   rockefellerCrosswalk,
   lvaCrosswalk,
+  scalingUpFullCrosswalk,
 ];
 
 /**

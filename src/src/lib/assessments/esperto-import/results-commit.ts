@@ -178,14 +178,14 @@ export interface ResultsCommitDb {
  * the hash is only ever inserted once. Imported invitations are inert (status
  * SUBMITTED, no email), so this token is never used to authenticate anyone.
  */
-function importInvitationTokenHash(externalId: string, respondentId: string): string {
+export function importInvitationTokenHash(externalId: string, respondentId: string): string {
   return createHash("sha256")
     .update(`esperto-import\u0000${externalId}\u0000${respondentId}`)
     .digest("hex");
 }
 
 /** Slugify a string for use in a deterministic campaign alias. */
-function slugifyForAlias(s: string): string {
+export function slugifyForAlias(s: string): string {
   return (
     s
       .toLowerCase()
