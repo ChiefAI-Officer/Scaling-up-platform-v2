@@ -26,7 +26,11 @@ import {
   generateRawToken,
   hashToken,
 } from "@/lib/assessments/invitation-tokens";
-import { resolveCoachName } from "@/lib/assessments/invitation-email";
+import {
+  resolveCoachName,
+  resolveCoachLogo,
+} from "@/lib/assessments/invitation-email";
+import { isInviteEmailChromeEnabled } from "@/lib/assessments/wave-p-flags";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
 
 const RESENDABLE_STATUSES = new Set(["PENDING", "SENT", "VIEWED"]);
@@ -89,6 +93,8 @@ export async function POST(
             closeAt: true,
             status: true,
             externalId: true,
+            organizationId: true,
+            templateId: true,
             invitationSubject: true,
             invitationBodyMarkdown: true,
             invitationBodyHtml: true,
@@ -102,10 +108,14 @@ export async function POST(
             organization: {
               select: {
                 name: true,
-                owner: { select: { firstName: true, lastName: true } },
+                owner: {
+                  select: { firstName: true, lastName: true, profileImage: true },
+                },
               },
             },
-            creatorCoach: { select: { firstName: true, lastName: true } },
+            creatorCoach: {
+              select: { firstName: true, lastName: true, profileImage: true },
+            },
           },
         },
       },
@@ -164,6 +174,27 @@ export async function POST(
       c.organization?.owner ?? null
     );
 
+    // Wave P — invitation-email chrome (#2.1 coach logo + #2.4 larger CTA).
+    // Flag evaluated ONCE per send; logo identity MIRRORS resolveCoachName.
+    const chrome = isInviteEmailChromeEnabled({
+      organizationId: c.organizationId,
+      templateId: c.templateId,
+    })
+      ? ("waveP" as const)
+      : ("legacy" as const);
+    const { coachLogoUrl, logoRejectedReason } = resolveCoachLogo(
+      c.creatorCoach ?? null,
+      c.organization?.owner ?? null
+    );
+    // PII-free observability: variant + logo-gate outcome only — NEVER the URL.
+    console.log("[assessment-resend] email-chrome", {
+      campaignId,
+      invitationId,
+      chromeVariant: chrome,
+      logoIncluded: chrome === "waveP" && logoRejectedReason === null,
+      logoRejectedReason,
+    });
+
     // Reorder: send FIRST with the freshly-minted token, then rotate the
     // tokenHash on the row only after the send resolves. On send failure we
     // return 502 WITHOUT rotating, so the recipient's prior link stays valid.
@@ -194,6 +225,8 @@ export async function POST(
         templateName: c.template?.name ?? null,
         rawToken,
         baseUrl: appUrl,
+        chrome,
+        coachLogoUrl,
       });
     } catch (sendErr) {
       console.error(

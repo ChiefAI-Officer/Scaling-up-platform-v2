@@ -255,3 +255,36 @@ describe("sendInvitesBatch", () => {
     expect(result.results).toHaveLength(3);
   });
 });
+
+// ── Wave P — chrome + coachLogoUrl threading (route/fan-out → mailer) ───────
+describe("sendInvitesBatch — Wave P chrome + coachLogoUrl passthrough", () => {
+  it("threads chrome + coachLogoUrl through to the mailer", async () => {
+    const { deps, sendEmail } = makeDeps();
+    await sendInvitesBatch(deps, {
+      campaign: CAMPAIGN,
+      recipients: [participant("r1")],
+      baseUrl: "https://app.example.com",
+      ...NAMES,
+      chrome: "waveP",
+      coachLogoUrl: "https://blob.example.com/coach.png",
+    });
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chrome: "waveP",
+        coachLogoUrl: "https://blob.example.com/coach.png",
+      })
+    );
+  });
+
+  it("defaults to legacy chrome + null logo when the caller passes neither", async () => {
+    const { deps, sendEmail } = makeDeps();
+    await sendInvitesBatch(deps, {
+      campaign: CAMPAIGN,
+      recipients: [participant("r1")],
+      baseUrl: "https://app.example.com",
+    });
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ chrome: "legacy", coachLogoUrl: null })
+    );
+  });
+});

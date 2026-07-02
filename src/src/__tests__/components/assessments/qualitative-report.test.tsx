@@ -272,3 +272,29 @@ describe("QualitativeReport — content", () => {
     expect(root.textContent).not.toContain("UNCHECKED_CASH_TEXT");
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// Wave P (Jeff #5) — greeting guard: an email display-name is never greeted
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("QualitativeReport — greeting guard (Wave P)", () => {
+  it("greets 'Dear there' when respondentName is an email (blank-name fallback)", () => {
+    render(
+      <QualitativeReport
+        report={lvaReport({ respondentName: "jane@example.com" })}
+      />,
+    );
+    const root = screen.getByTestId("qualitative-report");
+    expect(root.textContent).toMatch(/Dear there,/);
+    expect(root.textContent).not.toMatch(/Dear jane@example\.com/);
+    // Full-name display sites (cover "for: …") still show the email — accepted.
+    expect(root.textContent).toContain("jane@example.com");
+  });
+
+  it("still greets by first name for a normal name", () => {
+    render(<QualitativeReport report={lvaReport()} />);
+    expect(
+      screen.getByTestId("qualitative-report").textContent,
+    ).toMatch(/Dear John,/);
+  });
+});

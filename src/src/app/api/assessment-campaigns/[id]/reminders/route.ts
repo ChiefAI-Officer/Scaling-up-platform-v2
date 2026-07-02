@@ -41,7 +41,11 @@ import {
   generateRawToken,
   hashToken,
 } from "@/lib/assessments/invitation-tokens";
-import { resolveCoachName } from "@/lib/assessments/invitation-email";
+import {
+  resolveCoachName,
+  resolveCoachLogo,
+} from "@/lib/assessments/invitation-email";
+import { isInviteEmailChromeEnabled } from "@/lib/assessments/wave-p-flags";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -122,10 +126,14 @@ export async function POST(
         organization: {
           select: {
             name: true,
-            owner: { select: { firstName: true, lastName: true } },
+            owner: {
+              select: { firstName: true, lastName: true, profileImage: true },
+            },
           },
         },
-        creatorCoach: { select: { firstName: true, lastName: true } },
+        creatorCoach: {
+          select: { firstName: true, lastName: true, profileImage: true },
+        },
         participants: {
           include: {
             respondent: {
@@ -246,6 +254,27 @@ export async function POST(
     const organizationName = campaign.organization?.name ?? null;
     const templateName = campaign.template?.name ?? null;
 
+    // Wave P — invitation-email chrome (#2.1 coach logo + #2.4 larger CTA).
+    // Flag evaluated ONCE per send (campaign-level); logo identity MIRRORS
+    // resolveCoachName (creator coach ?? org owner).
+    const chrome = isInviteEmailChromeEnabled({
+      organizationId: campaign.organizationId,
+      templateId: campaign.templateId,
+    })
+      ? ("waveP" as const)
+      : ("legacy" as const);
+    const { coachLogoUrl, logoRejectedReason } = resolveCoachLogo(
+      campaign.creatorCoach ?? null,
+      campaign.organization?.owner ?? null
+    );
+    // PII-free observability: variant + logo-gate outcome only — NEVER the URL.
+    console.log("[assessment-reminders] email-chrome", {
+      campaignId,
+      chromeVariant: chrome,
+      logoIncluded: chrome === "waveP" && logoRejectedReason === null,
+      logoRejectedReason,
+    });
+
     // Batch cap — keep SMTP latency inside the serverless budget. Targets
     // beyond the cap are reported via `remaining` so the caller can chunk.
     const capped = targets.slice(0, MAX_REMINDER_BATCH);
@@ -314,6 +343,8 @@ export async function POST(
           templateName,
           rawToken,
           baseUrl: appUrl,
+          chrome,
+          coachLogoUrl,
         });
       } catch (sendErr) {
         console.error(

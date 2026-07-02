@@ -730,3 +730,58 @@ describe("runInviteFanout", () => {
     expect(markCall.data.invitesSentAt).toEqual(FIXED_NOW);
   });
 });
+
+// ── Wave P — invitation-email chrome wiring (flag → sendInvitesBatch input) ──
+describe("runInviteFanout — Wave P chrome + coach logo wiring", () => {
+  const FLAG = "WAVE_P_INVITE_EMAIL_ENABLED";
+  beforeEach(() => jest.clearAllMocks());
+  afterEach(() => {
+    delete process.env[FLAG];
+  });
+
+  it("flag ON: passes chrome=waveP + the CREATOR coach's profileImage into the batch input", async () => {
+    process.env[FLAG] = "1";
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue({
+      ...makeCampaign(),
+      creatorCoach: {
+        firstName: "Carla",
+        lastName: "Coach",
+        profileImage: "https://blob.example.com/carla.png",
+      },
+    });
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+    const [, batchInput] = deps.sendInvitesBatch.mock.calls[0];
+    expect(batchInput.chrome).toBe("waveP");
+    expect(batchInput.coachLogoUrl).toBe("https://blob.example.com/carla.png");
+  });
+
+  it("creatorCoach=null + org owner present: the OWNER's profileImage is used", async () => {
+    process.env[FLAG] = "1";
+    const deps = makeDeps();
+    deps.findUnique.mockResolvedValue({
+      ...makeCampaign(),
+      creatorCoach: null,
+      organization: {
+        name: "Acme Corp",
+        owner: {
+          firstName: "Olivia",
+          lastName: "Owner",
+          profileImage: "https://blob.example.com/olivia.png",
+        },
+      },
+    });
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+    const [, batchInput] = deps.sendInvitesBatch.mock.calls[0];
+    expect(batchInput.chrome).toBe("waveP");
+    expect(batchInput.coachLogoUrl).toBe("https://blob.example.com/olivia.png");
+  });
+
+  it("flag OFF (default): passes chrome=legacy + null logo when no coach has an image", async () => {
+    const deps = makeDeps();
+    await runInviteFanout(deps, { campaignId: CAMPAIGN_ID });
+    const [, batchInput] = deps.sendInvitesBatch.mock.calls[0];
+    expect(batchInput.chrome).toBe("legacy");
+    expect(batchInput.coachLogoUrl).toBeNull();
+  });
+});

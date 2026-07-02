@@ -713,3 +713,31 @@ describe("BrandedReport — SU-Full per-respondent tier suppression (ADR-0015)",
     expect(overall.textContent).toContain("Your team is aligned.");
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// Wave P (Jeff #5) — conclusion greeting guard: an email name is never greeted
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("BrandedReport — conclusion greeting guard (Wave P)", () => {
+  it("greets 'Keep Scaling, there.' when respondentName is an email (blank-name fallback)", () => {
+    render(
+      <BrandedReport
+        report={{ ...rockefellerReport(), respondentName: "jane@example.com" }}
+      />,
+    );
+    const conclusion = screen.getByTestId("report-conclusion");
+    expect(conclusion.textContent).toContain("Keep Scaling, there.");
+    expect(conclusion.textContent).not.toContain("jane@example.com");
+  });
+
+  it("still greets by first name for a normal name (regression guard)", () => {
+    render(
+      <BrandedReport
+        report={{ ...rockefellerReport(), respondentName: "Sarah Chen" }}
+      />,
+    );
+    expect(screen.getByTestId("report-conclusion").textContent).toContain(
+      "Keep Scaling, Sarah.",
+    );
+  });
+});

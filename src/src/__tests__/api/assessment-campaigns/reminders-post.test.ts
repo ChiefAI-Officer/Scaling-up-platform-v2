@@ -532,3 +532,93 @@ describe("POST /api/assessment-campaigns/[id]/reminders", () => {
     expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(200);
   });
 });
+
+// ── Wave P — invitation-email chrome wiring (flag → mailer) ─────────────────
+describe("POST /reminders — Wave P chrome + coach logo wiring", () => {
+  const FLAG = "WAVE_P_INVITE_EMAIL_ENABLED";
+  afterEach(() => {
+    delete process.env[FLAG];
+  });
+
+  function mockCampaignWith(overrides: Record<string, unknown>) {
+    const campaign = { ...baseCampaign, ...overrides };
+    (db.assessmentCampaign.findUnique as jest.Mock).mockImplementation((args) =>
+      Promise.resolve(
+        args?.include
+          ? { ...campaign, participants: ACTIVE_PARTICIPANTS }
+          : campaign
+      )
+    );
+  }
+
+  it("flag ON: every reminder send receives chrome=waveP + the CREATOR coach's profileImage", async () => {
+    process.env[FLAG] = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockCampaignWith({
+      creatorCoach: {
+        firstName: "Pat",
+        lastName: "Coach",
+        profileImage: "https://blob.example.com/pat.png",
+      },
+      organization: {
+        name: "Acme Corp",
+        owner: {
+          firstName: "Owner",
+          lastName: "Coach",
+          profileImage: "https://blob.example.com/owner.png",
+        },
+      },
+    });
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledTimes(2);
+    for (const [payload] of (sendAssessmentInvitationEmail as jest.Mock).mock.calls) {
+      expect(payload).toEqual(
+        expect.objectContaining({
+          chrome: "waveP",
+          coachLogoUrl: "https://blob.example.com/pat.png",
+        })
+      );
+    }
+  });
+
+  it("creatorCoach=null + org owner present: the OWNER's profileImage is used", async () => {
+    process.env[FLAG] = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockCampaignWith({
+      creatorCoach: null,
+      organization: {
+        name: "Acme Corp",
+        owner: {
+          firstName: "Owner",
+          lastName: "Coach",
+          profileImage: "https://blob.example.com/owner.png",
+        },
+      },
+    });
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chrome: "waveP",
+        coachLogoUrl: "https://blob.example.com/owner.png",
+      })
+    );
+  });
+
+  it("flag OFF (default): mailer receives chrome=legacy", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockCampaignWith({
+      creatorCoach: {
+        firstName: "Pat",
+        lastName: "Coach",
+        profileImage: "https://blob.example.com/pat.png",
+      },
+    });
+    const res = await POST(emptyReq() as never, detailParams("c1"));
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ chrome: "legacy" })
+    );
+  });
+});

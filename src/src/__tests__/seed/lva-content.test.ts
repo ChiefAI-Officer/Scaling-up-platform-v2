@@ -226,10 +226,10 @@ describe("buildLvaContent()", () => {
     }
   });
 
-  it("both 'Leadership Team' and 'The leadership' are distinct slider factors", () => {
+  it("both 'Leadership team' and 'The leadership' are distinct slider factors", () => {
     const sliders = content.questions.filter((q) => q.type === "SLIDER_LIKERT");
     const labels = sliders.map((q) => q.label);
-    expect(labels).toContain("Leadership Team");
+    expect(labels).toContain("Leadership team");
     expect(labels).toContain("The leadership");
   });
 

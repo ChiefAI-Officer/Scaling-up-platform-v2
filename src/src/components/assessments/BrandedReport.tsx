@@ -39,6 +39,7 @@ import {
   headlineForTierMetric,
 } from "@/lib/assessments/report-presentation";
 import { reportConfigFor } from "@/lib/assessments/report-config";
+import { greetingName } from "@/lib/assessments/respondent-display-name";
 import { QualitativeReport } from "@/components/assessments/QualitativeReport";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 
@@ -677,7 +678,9 @@ export function BrandedReport({ report, assessmentName, campaignLabel }: Branded
       {/* ── 7. Conclusion ───────────────────────────────────────────────── */}
       <section className="su-report-conclusion" data-testid="report-conclusion">
         <h3 className="su-h2 su-report-conclude-title">
-          Keep Scaling, {report.respondentName.split(" ")[0]}.
+          {/* Wave P (Jeff #5): greetingName — never greet with the email
+              fallback ("Keep Scaling, jane@example.com" → "…, there"). */}
+          Keep Scaling, {greetingName(report.respondentName)}.
         </h3>
         <p>
           You&apos;ve completed your assessment. Turn these results into a

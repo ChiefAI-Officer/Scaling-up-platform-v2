@@ -20,6 +20,13 @@ export interface InvitationVars {
   coachName: string | null;
   invitationUrl: string;
   closeAt: Date | null;
+  /**
+   * Wave P — coach logo for the branded-shell header (Jeff #2.1). Rendered
+   * ONLY when the caller opts into chrome:"waveP" AND the URL passes
+   * `safeImageSrc` (https-only). Ignored entirely by the legacy chrome and by
+   * the full-HTML override path.
+   */
+  coachLogoUrl?: string | null;
 }
 
 function formatCloseAt(d: Date): string {
@@ -126,6 +133,24 @@ function safeHref(raw: string): string | null {
   }
   if (url.startsWith("/")) return url;                 // root-relative
   return null;                                         // anything else (encoded, malformed)
+}
+
+/**
+ * Returns a safe image src or null — STRICTER than `safeHref`: HTTPS only
+ * (the email sanitizer already strips http: images — stay consistent).
+ * Rejects http:, javascript:, data:, protocol-relative, bare filenames,
+ * empty/null, and anything `new URL` cannot parse.
+ */
+export function safeImageSrc(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string") return null;
+  const url = raw.trim();
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Markdown-lite (links + bold), escape-first ──────────────────────────────
@@ -239,10 +264,35 @@ const PURPLE = "#522583";
 const PURPLE_DEEP = "#3d1a63";
 const D_PEOPLE = "#E4002B", D_STRATEGY = "#00A6CE", D_EXECUTION = "#FFB81C", D_CASH = "#43B02A";
 
-export function buildInvitationEmailHtml(input: { bodyMarkdown: string; vars: InvitationVars }): string {
+/** Chrome variant for the branded shell. "legacy" (the default) is byte-identical to pre-Wave-P output. */
+export type InvitationChrome = "legacy" | "waveP";
+
+export function buildInvitationEmailHtml(input: {
+  bodyMarkdown: string;
+  vars: InvitationVars;
+  /**
+   * Wave P chrome (Jeff #2.1 coach logo + #2.4 larger CTA). DEFAULT "legacy":
+   * output stays BYTE-IDENTICAL to today regardless of coachLogoUrl. The
+   * module never reads the flag — callers evaluate `isInviteEmailChromeEnabled`
+   * once per send and pass the variant.
+   */
+  chrome?: InvitationChrome;
+}): string {
   const { bodyMarkdown, vars } = input;
+  const waveP = (input.chrome ?? "legacy") === "waveP";
   const bodyHtml = renderHtmlBody(bodyMarkdown, vars);
   const orgLine = vars.organizationName ? escapeHtml(vars.organizationName) : "";
+  // Coach logo (waveP only): https-gated src, escaped; alt = coach name,
+  // control-char-stripped + escaped (no attribute breakout). Fixed max sizes
+  // so an oversized image cannot blow up the 560px layout. No logo URL or a
+  // failed gate → header byte-identical to legacy.
+  const logoSrc = waveP ? safeImageSrc(vars.coachLogoUrl) : null;
+  const coachLogoImg = logoSrc
+    ? `\n    <img src="${escapeHtml(logoSrc)}" alt="${escapeHtml(stripControlChars(vars.coachName ?? ""))}" style="display:block;border:0;outline:none;max-height:40px;max-width:200px;height:auto;width:auto;margin-top:12px;" />`
+    : "";
+  // CTA button (waveP: larger padding + font — label/colors/radius/weight unchanged).
+  const ctaPadding = waveP ? "18px 40px" : "14px 30px";
+  const ctaFontSize = waveP ? "17px" : "15px";
   return `
 <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
@@ -254,13 +304,13 @@ export function buildInvitationEmailHtml(input: { bodyMarkdown: string; vars: In
     </tr>
   </table>
   <div style="background:${PURPLE};background-image:linear-gradient(135deg,${PURPLE},${PURPLE_DEEP});padding:28px 32px;">
-    <img src="cid:${SU_LOGO_CID}" alt="Scaling Up" width="180" style="display:block;border:0;outline:none;max-width:180px;height:auto;" />
+    <img src="cid:${SU_LOGO_CID}" alt="Scaling Up" width="180" style="display:block;border:0;outline:none;max-width:180px;height:auto;" />${coachLogoImg}
     ${orgLine ? `<div style="margin-top:14px;font-size:13px;color:#ffffff;opacity:0.85;">${orgLine}</div>` : ""}
   </div>
   <div style="padding:28px 32px 8px;">
     ${bodyHtml}
     <div style="text-align:center;margin:24px 0 8px;">
-      <a href="${escapeHtml(vars.invitationUrl)}" style="display:inline-block;background:${PURPLE};color:#ffffff;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Start the assessment</a>
+      <a href="${escapeHtml(vars.invitationUrl)}" style="display:inline-block;background:${PURPLE};color:#ffffff;padding:${ctaPadding};text-decoration:none;border-radius:8px;font-weight:700;font-size:${ctaFontSize};">Start the assessment</a>
     </div>
     <p style="color:#9ca3af;font-size:12px;margin-top:20px;">If the button doesn't work, paste this into your browser:<br/><span style="word-break:break-all;color:#6b7280;">${escapeHtml(vars.invitationUrl)}</span></p>
   </div>
@@ -275,4 +325,35 @@ export function resolveCoachName(creatorCoach: CoachName, ownerCoach: CoachName)
   if (!pick) return null;
   const name = `${pick.firstName ?? ""} ${pick.lastName ?? ""}`.trim();
   return name.length > 0 ? name : null;
+}
+
+// ── Coach-logo resolver (Wave P) ────────────────────────────────────────────
+type CoachLogo = { profileImage: string | null } | null;
+
+/**
+ * Resolve the coach logo for the Wave-P email chrome. Logo identity MIRRORS
+ * `resolveCoachName`: pick = creator coach ?? org owner (the org owner IS a
+ * Coach row), then take that coach's profileImage — so name and logo always
+ * come from the same coach (a creator coach with no image does NOT fall
+ * through to the owner's image).
+ *
+ * `logoRejectedReason` is PII-free observability for the send paths:
+ *  - "no-coach"    — no coach picked at all
+ *  - "no-image"    — the picked coach has no profileImage
+ *  - "invalid-url" — profileImage present but fails the https-only `safeImageSrc` gate
+ *  - null          — usable logo
+ *
+ * A rejected URL is returned as null (never the raw value) so a downstream
+ * consumer logging the mailer payload can't leak an unvetted string.
+ */
+export function resolveCoachLogo(
+  creatorCoach: CoachLogo,
+  ownerCoach: CoachLogo,
+): { coachLogoUrl: string | null; logoRejectedReason: "no-coach" | "no-image" | "invalid-url" | null } {
+  const pick = creatorCoach ?? ownerCoach;
+  if (!pick) return { coachLogoUrl: null, logoRejectedReason: "no-coach" };
+  const coachLogoUrl = pick.profileImage ?? null;
+  if (!coachLogoUrl) return { coachLogoUrl: null, logoRejectedReason: "no-image" };
+  if (!safeImageSrc(coachLogoUrl)) return { coachLogoUrl: null, logoRejectedReason: "invalid-url" };
+  return { coachLogoUrl, logoRejectedReason: null };
 }

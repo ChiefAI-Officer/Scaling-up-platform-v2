@@ -266,12 +266,16 @@ export function buildQspV2Content(): QspV2Content {
       isRequired: true,
     },
 
-    // image14: 3 TEXT boxes for core-values stories (no asterisk = optional)
+    // image14: 3 TEXT boxes for core-values stories (no asterisk = optional).
+    // Labels are deliberately differentiated with "(Story N of 3)" suffixes
+    // (Jeff item #3, 2026-07-02) — Esperto shows the identical label thrice.
+    // The 3 slots themselves remain Esperto-faithful: the import crosswalk
+    // (Q5a/b/c) depends on all three stableKeys.
     {
       stableKey: "P1_core_values_story_1",
       sortOrder: 9,
       type: "TEXT",
-      label: "Which employees have demonstrated that they live the core values? Why? Share the stories.",
+      label: "Which employees have demonstrated that they live the core values? Why? Share the stories. (Story 1 of 3)",
       sectionStableKey: "P1_retrospective",
       isRequired: false,
     },
@@ -279,7 +283,7 @@ export function buildQspV2Content(): QspV2Content {
       stableKey: "P1_core_values_story_2",
       sortOrder: 10,
       type: "TEXT",
-      label: "Which employees have demonstrated that they live the core values? Why? Share the stories.",
+      label: "Which employees have demonstrated that they live the core values? Why? Share the stories. (Story 2 of 3)",
       sectionStableKey: "P1_retrospective",
       isRequired: false,
     },
@@ -287,7 +291,7 @@ export function buildQspV2Content(): QspV2Content {
       stableKey: "P1_core_values_story_3",
       sortOrder: 11,
       type: "TEXT",
-      label: "Which employees have demonstrated that they live the core values? Why? Share the stories.",
+      label: "Which employees have demonstrated that they live the core values? Why? Share the stories. (Story 3 of 3)",
       sectionStableKey: "P1_retrospective",
       isRequired: false,
     },

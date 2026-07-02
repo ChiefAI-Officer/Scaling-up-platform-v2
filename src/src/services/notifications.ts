@@ -1113,6 +1113,16 @@ export async function sendAssessmentInvitationEmail(data: {
     templateName?: string | null;
     rawToken: string;
     baseUrl: string;
+    /**
+     * Wave P — invitation-email chrome (coach logo + larger CTA). Callers
+     * evaluate `isInviteEmailChromeEnabled` once per send and pass the
+     * variant; this chokepoint never reads the flag. Defaults to "legacy"
+     * (byte-identical branded shell). The full-HTML override path is
+     * EXCLUDED: chrome/logo never alter a custom-HTML invitation.
+     */
+    chrome?: "legacy" | "waveP";
+    /** Wave P — coach logo (creator coach ?? org owner profileImage; https-gated at render). */
+    coachLogoUrl?: string | null;
 }): Promise<void> {
     const trimmedBase = data.baseUrl.replace(/\/+$/, "");
     const invitationUrl = `${trimmedBase}/org-survey/${data.campaign.alias}#t=${data.rawToken}`;
@@ -1161,6 +1171,7 @@ export async function sendAssessmentInvitationEmail(data: {
         coachName: data.coachName ?? null,
         invitationUrl,
         closeAt: data.campaign.closeAt,
+        coachLogoUrl: data.coachLogoUrl ?? null,
     };
 
     // Subject ALWAYS comes from invitationSubject (token-allowlisted path) —
@@ -1194,7 +1205,7 @@ export async function sendAssessmentInvitationEmail(data: {
         text = renderFullTextBody(fullHtml, vars);
         attachments = [];
     } else {
-        html = buildInvitationEmailHtml({ bodyMarkdown: effectiveBodyMarkdown, vars });
+        html = buildInvitationEmailHtml({ bodyMarkdown: effectiveBodyMarkdown, vars, chrome: data.chrome ?? "legacy" });
         text = renderTextBody(effectiveBodyMarkdown, vars);
     }
 

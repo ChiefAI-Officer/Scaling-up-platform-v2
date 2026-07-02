@@ -68,6 +68,14 @@ export type InviteMailer = (data: {
   templateName: string | null;
   rawToken: string;
   baseUrl: string;
+  /**
+   * Wave P — invitation-email chrome variant (coach logo + larger CTA).
+   * Callers evaluate `isInviteEmailChromeEnabled` once per send; the mailer
+   * never reads the flag. Defaults to "legacy" (byte-identical output).
+   */
+  chrome?: "legacy" | "waveP";
+  /** Wave P — coach logo (creator coach ?? org owner profileImage). Only rendered under chrome:"waveP" + https gate. */
+  coachLogoUrl?: string | null;
 }) => Promise<void>;
 
 export interface SendInvitesDeps {
@@ -109,6 +117,14 @@ export interface SendInvitesInput {
   organizationName?: string | null;
   coachName?: string | null;
   templateName?: string | null;
+  /**
+   * Wave P — invitation-email chrome variant, evaluated ONCE per send by the
+   * caller (flag: `isInviteEmailChromeEnabled({ organizationId, templateId })`).
+   * Defaults to "legacy".
+   */
+  chrome?: "legacy" | "waveP";
+  /** Wave P — coach logo (creator coach ?? org owner profileImage; mirrors resolveCoachName). */
+  coachLogoUrl?: string | null;
 }
 
 export interface SendInvitesResult {
@@ -139,6 +155,8 @@ export async function sendInvitesBatch(
   const organizationName = input.organizationName ?? null;
   const coachName = input.coachName ?? null;
   const templateName = input.templateName ?? null;
+  const chrome = input.chrome ?? "legacy";
+  const coachLogoUrl = input.coachLogoUrl ?? null;
 
   if (recipients.length > INVITE_BATCH_CAP) {
     throw new Error(
@@ -244,6 +262,8 @@ export async function sendInvitesBatch(
         templateName,
         rawToken,
         baseUrl,
+        chrome,
+        coachLogoUrl,
       });
 
       await db.assessmentInvitation.update({
