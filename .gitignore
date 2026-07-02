@@ -50,3 +50,7 @@ Thumbs.db
 # is required and tracked separately (see spec 12 §14); this ignore does NOT resolve it.
 From Jeff/*
 !From Jeff/style-guide/
+
+# Progress-report deliverables — built locally, sent to Jeff directly; too large (~2.5 MB each) to track
+Scaling-Up-Progress-Update-*.html
+Scaling-Up-Progress-Update-*.pdf
