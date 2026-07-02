@@ -327,6 +327,14 @@ describe("buildRealRestrictedCommitDb — $transaction re-wraps the tx client", 
     });
     expect(sawAcquireRoundLock).toBe(true);
   });
+
+  it("passes an explicit transaction budget (Prisma's 5s default cannot fit a 300-file batch)", async () => {
+    const prisma = makePrismaLike();
+    const commitDb = buildRealRestrictedCommitDb(prisma);
+    await commitDb.$transaction(async () => null);
+    const opts = (prisma.$transaction as jest.Mock).mock.calls[0][1];
+    expect(opts).toEqual({ maxWait: 10_000, timeout: 55_000 });
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────
