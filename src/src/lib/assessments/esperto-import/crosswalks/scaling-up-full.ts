@@ -46,12 +46,15 @@
  *     domain scores (order-independent mean). [ ] optional: confirm with a
  *     distinct-per-row submission if per-statement fidelity is ever disputed.
  *
- *   FTE / NON-SLIDER: the phase-tile FTE drivers are Q1o2_2 (permanent/temp
- *     FTE) and Q1o2_3 (freelance) — confirmed by the same decode. They are
- *     DROPPED here because the currently-published v1 has no FTE stableKeys
- *     (they live in the Wave J draft); when an FTE-bearing version publishes,
- *     move Q1o2_2/Q1o2_3 to `map` (→ Q_FTE_CONTRACT / Q_FREELANCE) and the
- *     growth-phase tile lights up with no other Wave O change.
+ *   FTE / NON-SLIDER (Phase 3a, 2026-07-02): the phase-tile FTE drivers are
+ *     Q1o2_2 (permanent/temp FTE) and Q1o2_3 (freelance) — confirmed by the
+ *     same controlled decode (sentinels 20 / 2). Originally DROPPED against
+ *     the then-published slider-only v1; the launch preflight found prod now
+ *     publishes the FTE-bearing v3 whose REQUIRED Q_FTE_CONTRACT would make
+ *     the completeness gate skip every respondent — so both are now MAPPED
+ *     (→ Q_FTE_CONTRACT / Q_FREELANCE, NUMBER). This also had to land BEFORE
+ *     any real import exists: answerHash covers mapped answers, so a later
+ *     remap would reclassify same-file re-imports as divergent.
  * ─────────────────────────────────────────────────────────────────────────
  */
 
@@ -133,12 +136,13 @@ export const scalingUpFullCrosswalk: Crosswalk = {
     { espertoKey: "Q6_4", stableKey: "Q59", ourType: "SLIDER_LIKERT" },
     { espertoKey: "Q6_5", stableKey: "Q60", ourType: "SLIDER_LIKERT" },
     { espertoKey: "Q6_6", stableKey: "Q61", ourType: "SLIDER_LIKERT" },
+    // ── FTE / growth-phase drivers (Phase 3a — see lock checklist) ─────────
+    { espertoKey: "Q1o2_2", stableKey: "Q_FTE_CONTRACT", ourType: "NUMBER" },
+    { espertoKey: "Q1o2_3", stableKey: "Q_FREELANCE", ourType: "NUMBER" },
   ],
   droppedKeys: [
-    // CEO background intake (Q1o*) — recompute-not-store; not in published v1.
+    // CEO background intake (Q1o*) — recompute-not-store.
     { key: "Q1o1_1", reason: "CEO background: years the company has existed — firmographic, not a scored survey answer" },
-    { key: "Q1o2_2", reason: "FTE headcount (permanent/temporary contract) — drives the growth-phase tile; DROPPED against published v1 (no FTE stableKey). Map to Q_FTE_CONTRACT once an FTE-bearing version publishes (Wave J)" },
-    { key: "Q1o2_3", reason: "freelance FTE count — companion to Q1o2_2; DROPPED against published v1. Map to Q_FREELANCE once an FTE-bearing version publishes (Wave J)" },
     { key: "Q1o4", reason: "CEO background: number of leadership positions — firmographic, not scored" },
     // CEO revenue / growth firmographics (Q2o*).
     { key: "Q2o1_1", reason: "revenue/growth firmographic — CEO-only intake, not a scored survey answer" },

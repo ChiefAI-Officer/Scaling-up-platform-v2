@@ -244,9 +244,12 @@ function expectedSuFullMap(): Array<[string, string]> {
   return out;
 }
 
-/** The 29 non-slider raw keys the export carries that we intentionally drop. */
+/** The 27 non-slider raw keys the export carries that we intentionally drop.
+ * (Q1o2_2/Q1o2_3 moved to `map` in Phase 3a — the published version is now
+ * FTE-bearing v3, whose REQUIRED Q_FTE_CONTRACT would otherwise make the
+ * completeness gate skip every respondent.) */
 const SU_FULL_DROPPED = [
-  "Q1o1_1", "Q1o2_2", "Q1o2_3", "Q1o4",
+  "Q1o1_1", "Q1o4",
   "Q2o1_1", "Q2o1_2", "Q2o1_3", "Q2o2_2", "Q2o2_3",
   "Q12open",
   "Q13o1_1", "Q13o2_1", "Q13o3", "Q13o4", "Q13o5_1",
@@ -267,8 +270,8 @@ describe("scalingUpFullCrosswalk", () => {
     expect(scalingUpFullCrosswalk.locked).toBe(true);
   });
 
-  it("maps exactly the 61 verified sliders (Q3_1…Q12_10 → Q01…Q61, ascending), all SLIDER_LIKERT", () => {
-    expect(scalingUpFullCrosswalk.map).toHaveLength(61);
+  it("maps the 61 verified sliders (Q3_1…Q12_10 → Q01…Q61, ascending) + 2 FTE NUMBER entries = 63", () => {
+    expect(scalingUpFullCrosswalk.map).toHaveLength(63);
     const byKey = new Map(scalingUpFullCrosswalk.map.map((e) => [e.espertoKey, e]));
     for (const [espertoKey, stableKey] of expectedSuFullMap()) {
       const entry = byKey.get(espertoKey);
@@ -278,14 +281,18 @@ describe("scalingUpFullCrosswalk", () => {
     }
   });
 
-  it("covers stableKeys Q01…Q61 with no duplicates", () => {
+  it("covers stableKeys Q01…Q61 + Q_FTE_CONTRACT + Q_FREELANCE with no duplicates", () => {
     const stableKeys = scalingUpFullCrosswalk.map.map((e) => e.stableKey).sort();
-    const expected = Array.from({ length: 61 }, (_, i) => `Q${String(i + 1).padStart(2, "0")}`).sort();
+    const expected = [
+      ...Array.from({ length: 61 }, (_, i) => `Q${String(i + 1).padStart(2, "0")}`),
+      "Q_FTE_CONTRACT",
+      "Q_FREELANCE",
+    ].sort();
     expect(stableKeys).toEqual(expected);
-    expect(new Set(stableKeys).size).toBe(61);
+    expect(new Set(stableKeys).size).toBe(63);
   });
 
-  it("drops exactly the 29 non-slider keys (firmographics/demographics/free-text), each with a reason", () => {
+  it("drops exactly the 27 non-slider keys (firmographics/demographics/free-text), each with a reason", () => {
     const dropped = scalingUpFullCrosswalk.droppedKeys.map((d) => d.key).sort();
     expect(dropped).toEqual([...SU_FULL_DROPPED].sort());
     for (const d of scalingUpFullCrosswalk.droppedKeys) {
@@ -293,13 +300,13 @@ describe("scalingUpFullCrosswalk", () => {
     }
   });
 
-  it("keeps the FTE keys (Q1o2_2 permanent, Q1o2_3 freelance) in droppedKeys, NOT in map", () => {
-    const mapped = new Set(scalingUpFullCrosswalk.map.map((e) => e.espertoKey));
+  it("maps the FTE keys (Phase 3a): Q1o2_2 → Q_FTE_CONTRACT, Q1o2_3 → Q_FREELANCE, both NUMBER, not dropped", () => {
+    const byKey = new Map(scalingUpFullCrosswalk.map.map((e) => [e.espertoKey, e]));
     const dropped = new Set(scalingUpFullCrosswalk.droppedKeys.map((d) => d.key));
-    for (const fte of ["Q1o2_2", "Q1o2_3"]) {
-      expect(mapped.has(fte)).toBe(false);
-      expect(dropped.has(fte)).toBe(true);
-    }
+    expect(byKey.get("Q1o2_2")).toEqual({ espertoKey: "Q1o2_2", stableKey: "Q_FTE_CONTRACT", ourType: "NUMBER" });
+    expect(byKey.get("Q1o2_3")).toEqual({ espertoKey: "Q1o2_3", stableKey: "Q_FREELANCE", ourType: "NUMBER" });
+    expect(dropped.has("Q1o2_2")).toBe(false);
+    expect(dropped.has("Q1o2_3")).toBe(false);
   });
 
   it("is EXHAUSTIVE over the real restricted export (every raw key mapped or dropped)", () => {
