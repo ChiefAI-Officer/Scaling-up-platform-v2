@@ -12,6 +12,15 @@
  *    leadership visin alignment assement.xlsx"
  * Adversarially verified against individual + group Esperto reports.
  *
+ * Two DELIBERATE departures from the verbatim xlsx copy (Jeff items #14 and
+ * #17, 2026-07-02) — a future fidelity audit must NOT flag these as drift:
+ *   - "Leadership Team" → "Leadership team" in both factor lists (sentence
+ *     case, matching the 13 sentence-case sibling factors). This also
+ *     propagates to the derived S5 "Why is … a hindrance?" label (intended).
+ *   - S6_core_values reworded to "What are your core values? If not yet set,
+ *     what do you think the top 3 should be?" (was "What do you think are the
+ *     core values of the organization? Mention at least three.").
+ *
  * ─── Structure ────────────────────────────────────────────────────────────
  * S0 Welcome              — no questions (intro only)
  * S1 Company in 3 Years   — 9 NUMBER (THREE-YEAR ASPIRATIONAL figures)
@@ -105,11 +114,14 @@ const SCORING_CONFIG = {
 // index 49) while the matrix row uses "The leadership" (lowercase l, xlsx
 // index 34). Both are intentional — they reference the same factor but the
 // xlsx stores distinct strings in the two locations. We mirror the source.
+//
+// Deliberate departure: "Leadership team" is sentence-cased in BOTH lists
+// (xlsx has "Leadership Team") per Jeff item #14, 2026-07-02. Not drift.
 
 const FACTORS_FOR_MATRIX = [
   "Recruitment of new employees",
   "Retaining staff",
-  "Leadership Team",
+  "Leadership team",
   "The leadership",
   "Culture",
   "Internal communications",
@@ -128,7 +140,7 @@ const FACTORS_FOR_MATRIX = [
 const FACTORS_FOR_CHECKBOX = [
   "Recruitment of new employees",
   "Retaining staff",
-  "Leadership Team",
+  "Leadership team",
   "The Leadership",
   "Culture",
   "Internal communications",
@@ -582,7 +594,10 @@ function buildSectionsAndQuestions(): {
       stableKey: "S6_core_values",
       sortOrder: ++sortOrder,
       type: "TEXT",
-      label: "What do you think are the core values of the organization? Mention at least three.",
+      // Deliberate departure from the xlsx copy ("What do you think are the
+      // core values of the organization? Mention at least three.") — reworded
+      // per Jeff item #17, 2026-07-02. stableKey unchanged.
+      label: "What are your core values? If not yet set, what do you think the top 3 should be?",
       sectionStableKey: "S6_focus",
       isRequired: true,
     },

@@ -240,3 +240,174 @@ describe("resolveCoachName — creatorCoach ?? owner", () => {
     expect(resolveCoachName(null, null)).toBeNull();
   });
 });
+
+// ── Wave P — invitation-email chrome (coach logo + larger CTA) ──────────────
+// The module is pure: it never reads the flag. Callers pass chrome:"waveP".
+// Default (no chrome arg / chrome:"legacy") must be BYTE-IDENTICAL to the
+// pre-Wave-P output, regardless of coachLogoUrl.
+
+import { resolveCoachLogo } from "@/lib/assessments/invitation-email";
+
+describe("buildInvitationEmailHtml — Wave P chrome", () => {
+  const HTTPS_LOGO = "https://blob.example.com/coach-logo.png";
+
+  it("legacy chrome (explicit) + a coachLogoUrl is byte-identical to the no-args build", () => {
+    const before = buildInvitationEmailHtml({ bodyMarkdown: "Hi {{firstName}}", vars: baseVars });
+    const after = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi {{firstName}}",
+      vars: { ...baseVars, coachLogoUrl: HTTPS_LOGO },
+      chrome: "legacy",
+    });
+    expect(after).toBe(before);
+  });
+
+  it("legacy HTML regression anchor (inline snapshot, fixed inputs)", () => {
+    const html = buildInvitationEmailHtml({ bodyMarkdown: "Hi {{firstName}}", vars: baseVars });
+    expect(html).toMatchInlineSnapshot(`
+"<div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;background:#ffffff;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td width="25%" style="height:6px;background:#E4002B;font-size:0;line-height:0;">&nbsp;</td>
+      <td width="25%" style="height:6px;background:#00A6CE;font-size:0;line-height:0;">&nbsp;</td>
+      <td width="25%" style="height:6px;background:#FFB81C;font-size:0;line-height:0;">&nbsp;</td>
+      <td width="25%" style="height:6px;background:#43B02A;font-size:0;line-height:0;">&nbsp;</td>
+    </tr>
+  </table>
+  <div style="background:#522583;background-image:linear-gradient(135deg,#522583,#3d1a63);padding:28px 32px;">
+    <img src="cid:sulogo" alt="Scaling Up" width="180" style="display:block;border:0;outline:none;max-width:180px;height:auto;" />
+    <div style="margin-top:14px;font-size:13px;color:#ffffff;opacity:0.85;">Acme Corp</div>
+  </div>
+  <div style="padding:28px 32px 8px;">
+    <p style="margin:0 0 14px;color:#374151;font-size:15px;line-height:1.6;">Hi Jane</p>
+    <div style="text-align:center;margin:24px 0 8px;">
+      <a href="https://app.test/org-survey/abc#t=SECRET" style="display:inline-block;background:#522583;color:#ffffff;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">Start the assessment</a>
+    </div>
+    <p style="color:#9ca3af;font-size:12px;margin-top:20px;">If the button doesn't work, paste this into your browser:<br/><span style="word-break:break-all;color:#6b7280;">https://app.test/org-survey/abc#t=SECRET</span></p>
+  </div>
+  <div style="padding:18px 32px;border-top:1px solid #e5e7eb;color:#9ca3af;font-size:12px;">&mdash; Scaling Up Platform</div>
+</div>"
+`);
+  });
+
+  it("waveP + valid https logo renders the coach logo img (escaped src + alt)", () => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: { ...baseVars, coachLogoUrl: HTTPS_LOGO },
+      chrome: "waveP",
+    });
+    expect(html).toContain(`src="${HTTPS_LOGO}"`);
+    expect(html).toContain('alt="Pat Coach"');
+    // SU logo + header untouched
+    expect(html).toContain('src="cid:sulogo"');
+    // capped so an oversized image can't blow up the 560px layout
+    expect(html).toContain("max-height:40px");
+  });
+
+  it("waveP escapes a src that needs escaping (no attribute breakout)", () => {
+    const url = 'https://x.example/a?b=1&c="onerror=alert(1)';
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: { ...baseVars, coachLogoUrl: url },
+      chrome: "waveP",
+    });
+    expect(html).not.toContain('c="onerror');
+    expect(html).toContain("&amp;c=&quot;onerror");
+  });
+
+  it.each([
+    ["http", "http://insecure.example/logo.png"],
+    ["javascript", "javascript:alert(1)"],
+    ["data", "data:image/png;base64,AAAA"],
+    ["bare filename", "logo.png"],
+    ["empty string", ""],
+    ["null", null],
+  ])("waveP rejects %s logo URL but keeps the rest of the waveP chrome", (_label, url) => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: { ...baseVars, coachLogoUrl: url },
+      chrome: "waveP",
+    });
+    // exactly one <img (the SU CID logo) — no coach logo img
+    expect(html.match(/<img /g)).toHaveLength(1);
+    expect(html).toContain('src="cid:sulogo"');
+    // waveP CTA still applied
+    expect(html).toContain("padding:18px 40px");
+    expect(html).toContain("font-size:17px");
+  });
+
+  it("waveP escapes + control-strips the coach name in alt (no attribute breakout)", () => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: {
+        ...baseVars,
+        coachLogoUrl: HTTPS_LOGO,
+        coachName: '"><img src=x onerror=alert(1)>\r\nEvil <Coach>',
+      },
+      chrome: "waveP",
+    });
+    expect(html).not.toContain('alt=""><img');
+    expect(html).not.toContain("<img src=x");
+    expect(html).not.toMatch(/alt="[^"]*[\r\n]/);
+    // escaped forms present instead
+    expect(html).toContain("&quot;&gt;&lt;img");
+  });
+
+  it("waveP enlarges the CTA button; legacy keeps the exact current values", () => {
+    const waveP = buildInvitationEmailHtml({ bodyMarkdown: "Hi", vars: baseVars, chrome: "waveP" });
+    expect(waveP).toContain("padding:18px 40px");
+    expect(waveP).toContain("font-size:17px;");
+    expect(waveP).toContain("Start the assessment");
+    expect(waveP).toContain("border-radius:8px");
+    expect(waveP).toContain("font-weight:700");
+
+    const legacy = buildInvitationEmailHtml({ bodyMarkdown: "Hi", vars: baseVars });
+    expect(legacy).toContain("padding:14px 30px");
+    expect(legacy).toContain("font-size:15px;");
+    expect(legacy).not.toContain("padding:18px 40px");
+  });
+
+  it("full-HTML override ignores coachLogoUrl entirely (chrome excluded)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { renderFullHtmlBody } = require("@/lib/assessments/invitation-email");
+    const raw = '<p>Hi {{respondentFirstName}}</p><a href="{{invitationUrl}}">Start</a>';
+    const plain = renderFullHtmlBody(raw, baseVars);
+    const withLogo = renderFullHtmlBody(raw, { ...baseVars, coachLogoUrl: HTTPS_LOGO });
+    expect(withLogo).toBe(plain);
+    expect(withLogo).not.toContain(HTTPS_LOGO);
+  });
+});
+
+describe("resolveCoachLogo — mirrors resolveCoachName identity (creatorCoach ?? owner)", () => {
+  it("prefers the creator coach's profileImage", () => {
+    expect(
+      resolveCoachLogo(
+        { profileImage: "https://x.example/creator.png" },
+        { profileImage: "https://x.example/owner.png" },
+      ),
+    ).toEqual({ coachLogoUrl: "https://x.example/creator.png", logoRejectedReason: null });
+  });
+
+  it("falls back to the org owner when there is no creator coach", () => {
+    expect(resolveCoachLogo(null, { profileImage: "https://x.example/owner.png" })).toEqual({
+      coachLogoUrl: "https://x.example/owner.png",
+      logoRejectedReason: null,
+    });
+  });
+
+  it("does NOT fall through to the owner when the creator coach has no image (same pick as resolveCoachName)", () => {
+    expect(
+      resolveCoachLogo({ profileImage: null }, { profileImage: "https://x.example/owner.png" }),
+    ).toEqual({ coachLogoUrl: null, logoRejectedReason: "no-image" });
+  });
+
+  it("reports no-coach when neither is present", () => {
+    expect(resolveCoachLogo(null, null)).toEqual({ coachLogoUrl: null, logoRejectedReason: "no-coach" });
+  });
+
+  it("reports invalid-url for a non-https image and nulls the URL (never forwards the raw value)", () => {
+    expect(resolveCoachLogo({ profileImage: "http://x.example/logo.png" }, null)).toEqual({
+      coachLogoUrl: null,
+      logoRejectedReason: "invalid-url",
+    });
+  });
+});

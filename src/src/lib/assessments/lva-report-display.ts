@@ -124,6 +124,10 @@ export function lvaReportFactorLabel(key: string, fallback: string): string {
 const LVA_SURVEY_FACTOR_LABELS: Readonly<Record<string, string>> = {
   recruitment: "Recruitment of new employees",
   retaining_staff: "Retaining staff",
+  // Wave P (Jeff #14) sentence-cased the SEED to "Leadership team", which
+  // already matches the report label — new versions need no rewrite. This
+  // find-string stays "Leadership Team" for campaigns pinned to pre-Wave-P
+  // versions, whose S5 headings still carry the old wording.
   leadership_team: "Leadership Team",
   the_leadership: "The leadership",
   internal_comms: "Internal communications",

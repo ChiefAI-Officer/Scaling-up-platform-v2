@@ -262,3 +262,76 @@ describe("POST /api/assessment-campaigns/[id]/invitations/[invitationId]/resend"
     expect(db.assessmentInvitation.update).not.toHaveBeenCalled();
   });
 });
+
+// ── Wave P — invitation-email chrome wiring (flag → mailer) ─────────────────
+describe("POST /resend — Wave P chrome + coach logo wiring", () => {
+  const FLAG = "WAVE_P_INVITE_EMAIL_ENABLED";
+  afterEach(() => {
+    delete process.env[FLAG];
+  });
+
+  function mockInvitationWithCoaches(
+    creatorCoach: { firstName: string; lastName: string; profileImage: string | null } | null,
+    owner: { firstName: string; lastName: string; profileImage: string | null } | null
+  ) {
+    const inv = buildInvitation();
+    (db.assessmentInvitation.findUnique as jest.Mock).mockResolvedValue({
+      ...inv,
+      campaign: {
+        ...inv.campaign,
+        organizationId: "org-1",
+        templateId: "tpl-1",
+        creatorCoach,
+        organization: { name: "Acme Corp", owner },
+      },
+    });
+  }
+
+  it("flag ON: mailer receives chrome=waveP + the CREATOR coach's profileImage", async () => {
+    process.env[FLAG] = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockInvitationWithCoaches(
+      { firstName: "Pat", lastName: "Coach", profileImage: "https://blob.example.com/pat.png" },
+      { firstName: "Owner", lastName: "Coach", profileImage: "https://blob.example.com/owner.png" }
+    );
+    const res = await POST(emptyReq() as never, detailParams("c1", "inv-1"));
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chrome: "waveP",
+        coachLogoUrl: "https://blob.example.com/pat.png",
+      })
+    );
+  });
+
+  it("creatorCoach=null + org owner present: the OWNER's profileImage is used", async () => {
+    process.env[FLAG] = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockInvitationWithCoaches(null, {
+      firstName: "Owner",
+      lastName: "Coach",
+      profileImage: "https://blob.example.com/owner.png",
+    });
+    const res = await POST(emptyReq() as never, detailParams("c1", "inv-1"));
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chrome: "waveP",
+        coachLogoUrl: "https://blob.example.com/owner.png",
+      })
+    );
+  });
+
+  it("flag OFF (default): mailer receives chrome=legacy", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    mockInvitationWithCoaches(
+      { firstName: "Pat", lastName: "Coach", profileImage: "https://blob.example.com/pat.png" },
+      null
+    );
+    const res = await POST(emptyReq() as never, detailParams("c1", "inv-1"));
+    expect(res.status).toBe(200);
+    expect(sendAssessmentInvitationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ chrome: "legacy" })
+    );
+  });
+});

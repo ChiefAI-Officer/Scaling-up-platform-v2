@@ -502,3 +502,90 @@ describe("buildReportEmailHtml — score table gating (#24)", () => {
     expect(bodyHtml).toContain("Score summary");
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// Wave P (Jeff item #5) — email fallback for blank respondent names
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("Wave P — blank-name respondent falls back to email (coach-facing) but never in greetings", () => {
+  function blankNameArgs(): Parameters<typeof buildRespondentReportFromSubmission>[0] {
+    return {
+      result: {} as ScoreResult,
+      publicTaker: { firstName: "", lastName: "", email: "jane@example.com" },
+      assessmentName: "Scaling Up 4 Decisions Assessment",
+      campaignLabel: null,
+      sections: [],
+      questions: [],
+      scoringConfig: {},
+      rawAnswers: [],
+      submittedAt: new Date("2026-07-02T10:00:00Z"),
+      submissionId: "sub-blank",
+      templateAlias: "four-decisions",
+    };
+  }
+
+  it("buildRespondentReportFromSubmission uses the email as respondentName when the name is blank", () => {
+    const report = buildRespondentReportFromSubmission(blankNameArgs());
+    expect(report.respondentName).toBe("jane@example.com");
+  });
+
+  it("coach subject carries the email and does NOT start with a space", () => {
+    const report = buildRespondentReportFromSubmission(blankNameArgs());
+    const { subject } = buildReportEmailHtml({
+      report: fourDecisionsReport({ respondentName: report.respondentName }),
+      recipientRole: "REFERRING_COACH",
+    });
+    expect(subject).toContain("jane@example.com");
+    expect(subject).toContain("completed");
+    expect(subject.startsWith(" ")).toBe(false);
+  });
+
+  it("coach 'your client' lead-in carries the email (no empty <strong></strong>)", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({ respondentName: "jane@example.com" }),
+      recipientRole: "REFERRING_COACH",
+    });
+    expect(bodyHtml).not.toContain("<strong></strong>");
+    expect(bodyHtml).toContain("jane@example.com");
+  });
+
+  it("respondent-facing conclusion greets 'there', never the email", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({ respondentName: "jane@example.com" }),
+      recipientRole: "TAKER_COPY",
+    });
+    expect(bodyHtml).toContain("Keep scaling, there.");
+    expect(bodyHtml).not.toContain("Keep scaling, jane@example.com");
+  });
+
+  it("coach-facing conclusion shows the email when the name is an email (never 'there')", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({ respondentName: "jane@example.com" }),
+      recipientRole: "REFERRING_COACH",
+    });
+    expect(bodyHtml).toContain("Follow up with jane@example.com.");
+    expect(bodyHtml).not.toContain("Follow up with there.");
+  });
+
+  it("qualitative respondent email greets 'Dear there' when the name is an email", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({
+        respondentName: "jane@example.com",
+        templateAlias: "leadership-vision-alignment",
+      }),
+      recipientRole: "TAKER_COPY",
+    });
+    expect(bodyHtml).toContain("Dear there");
+    expect(bodyHtml).not.toContain("Dear jane@example.com");
+  });
+
+  it("a normally-named respondent is unchanged (greeting + coach subject)", () => {
+    const report = fourDecisionsReport({ respondentName: "Jane Doe" });
+    const taker = buildReportEmailHtml({ report, recipientRole: "TAKER_COPY" });
+    const coach = buildReportEmailHtml({ report, recipientRole: "REFERRING_COACH" });
+    expect(taker.bodyHtml).toContain("Keep scaling, Jane.");
+    expect(coach.subject).toBe(
+      "Jane Doe completed the Scaling Up 4 Decisions Assessment",
+    );
+  });
+});

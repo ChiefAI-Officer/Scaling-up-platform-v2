@@ -19,6 +19,7 @@ import {
   asAccessDb,
 } from "@/lib/assessments/access-control";
 import type { ScoreResult } from "@/lib/assessments/scoring";
+import { respondentDisplayName } from "@/lib/assessments/respondent-display-name";
 import {
   buildQuestionMetaByKey,
   type QuestionMeta,
@@ -62,6 +63,8 @@ interface RawSubmission {
     id: string;
     firstName: string;
     lastName: string;
+    /** Wave P (Jeff #5): display-name fallback when the roster name is blank. */
+    email: string;
     jobTitle?: string | null;
   };
   campaign: {
@@ -207,6 +210,8 @@ export async function getRespondentReport(
             id: true,
             firstName: true,
             lastName: true,
+            // Wave P (Jeff #5): fallback display name when the roster name is blank
+            email: true,
             jobTitle: true,
           },
         },
@@ -283,7 +288,13 @@ export async function getRespondentReport(
       : null;
 
     const report: RespondentReport = {
-      respondentName: `${submission.respondent.firstName} ${submission.respondent.lastName}`,
+      // Wave P (Jeff #5): blank roster name → fall back to the respondent's
+      // email (trim-before-truthiness; never a truthy " " or a generic).
+      respondentName: respondentDisplayName(
+        submission.respondent.firstName,
+        submission.respondent.lastName,
+        submission.respondent.email,
+      ),
       jobTitle: submission.respondent.jobTitle ?? null,
       companyName: submission.campaign.organization.name,
       assessmentName,

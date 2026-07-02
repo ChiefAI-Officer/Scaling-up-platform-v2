@@ -27,6 +27,7 @@
  */
 
 import type { RespondentReport } from "@/lib/assessments/respondent-report";
+import { greetingName } from "@/lib/assessments/respondent-display-name";
 import {
   buildQualitativeModel,
   type QualItem,
@@ -50,11 +51,10 @@ function formatSubmittedAt(d: Date): string {
   }
 }
 
-function firstNameOf(fullName: string): string {
-  const trimmed = fullName.trim();
-  if (trimmed === "") return "there";
-  return trimmed.split(/\s+/)[0];
-}
+// Greeting derivation is shared (Wave P, Jeff #5): greetingName degrades to
+// "there" for blank values AND for email addresses — respondentName may be
+// the email fallback when the roster name is blank, and an email must never
+// appear in a "Dear …" greeting.
 
 /** Render the respondent's value as display text (arrays join with commas). */
 function answerText(value: unknown): string {
@@ -289,7 +289,7 @@ export function QualitativeReport({ report }: { report: RespondentReport }) {
   });
 
   const who = attribution(report.respondentName, report.jobTitle);
-  const firstName = firstNameOf(report.respondentName);
+  const firstName = greetingName(report.respondentName);
   const submitted = formatSubmittedAt(report.submittedAt);
 
   return (

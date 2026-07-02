@@ -47,7 +47,11 @@
 import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
-import { resolveCoachName } from "@/lib/assessments/invitation-email";
+import {
+  resolveCoachName,
+  resolveCoachLogo,
+} from "@/lib/assessments/invitation-email";
+import { isInviteEmailChromeEnabled } from "@/lib/assessments/wave-p-flags";
 import {
   sendInvitesBatch as realSendInvitesBatch,
   INVITE_BATCH_CAP,
@@ -92,6 +96,9 @@ interface FanoutCampaignRow {
   status: string;
   inviteTiming: string;
   deletedAt: Date | null;
+  /** Wave P — chrome-flag scoping (org/template canary). Present on the include load. */
+  organizationId?: string;
+  templateId?: string;
   invitationSubject: string | null;
   invitationBodyMarkdown: string | null;
   invitationBodyHtml: string | null;
@@ -102,9 +109,17 @@ interface FanoutCampaignRow {
   };
   organization: {
     name: string | null;
-    owner: { firstName: string; lastName: string } | null;
+    owner: {
+      firstName: string;
+      lastName: string;
+      profileImage?: string | null;
+    } | null;
   } | null;
-  creatorCoach: { firstName: string; lastName: string } | null;
+  creatorCoach: {
+    firstName: string;
+    lastName: string;
+    profileImage?: string | null;
+  } | null;
   participants: Array<{
     respondentId: string;
     respondent: {
@@ -218,10 +233,14 @@ export async function runInviteFanout(
         organization: {
           select: {
             name: true,
-            owner: { select: { firstName: true, lastName: true } },
+            owner: {
+              select: { firstName: true, lastName: true, profileImage: true },
+            },
           },
         },
-        creatorCoach: { select: { firstName: true, lastName: true } },
+        creatorCoach: {
+          select: { firstName: true, lastName: true, profileImage: true },
+        },
         participants: {
           include: {
             respondent: {
@@ -305,6 +324,29 @@ export async function runInviteFanout(
   const organizationName = campaign.organization?.name ?? null;
   const templateName = campaign.template?.name ?? null;
 
+  // Wave P — invitation-email chrome (#2.1 coach logo + #2.4 larger CTA).
+  // Flag evaluated ONCE per fan-out run; logo identity MIRRORS resolveCoachName
+  // (creator coach ?? org owner — the owner IS a Coach row).
+  const chrome = isInviteEmailChromeEnabled({
+    organizationId: campaign.organizationId,
+    templateId: campaign.templateId,
+  })
+    ? ("waveP" as const)
+    : ("legacy" as const);
+  const coachLogo = resolveCoachLogo(
+    campaign.creatorCoach ? { profileImage: campaign.creatorCoach.profileImage ?? null } : null,
+    campaign.organization?.owner
+      ? { profileImage: campaign.organization.owner.profileImage ?? null }
+      : null,
+  );
+  // PII-free observability: variant + logo-gate outcome only — NEVER the URL.
+  console.log("[assessment-invite-fanout] email-chrome", {
+    campaignId,
+    chromeVariant: chrome,
+    logoIncluded: chrome === "waveP" && coachLogo.logoRejectedReason === null,
+    logoRejectedReason: coachLogo.logoRejectedReason,
+  });
+
   const batches = chunk(recipients, INVITE_BATCH_CAP);
 
   // -------------------------------------------------------------------------
@@ -369,6 +411,8 @@ export async function runInviteFanout(
           organizationName,
           coachName,
           templateName,
+          chrome,
+          coachLogoUrl: coachLogo.coachLogoUrl,
         },
       ),
     );

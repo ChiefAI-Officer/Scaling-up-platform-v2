@@ -46,6 +46,10 @@ import {
 } from "@/lib/assessments/report-presentation";
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
+  respondentDisplayName,
+  greetingName,
+} from "@/lib/assessments/respondent-display-name";
+import {
   buildQualitativeModel,
   type QualItem,
   type QualSection,
@@ -142,7 +146,14 @@ export function buildRespondentReportFromSubmission(
     questionByKey[key] = meta.label;
   }
 
-  const name = `${args.publicTaker.firstName.trim()} ${args.publicTaker.lastName.trim()}`.trim();
+  // Wave P (Jeff #5): blank roster/quiz name falls back to the taker's EMAIL
+  // so coach-facing surfaces never render a leading-space subject or an empty
+  // <strong></strong>. Respondent-facing greetings guard via greetingName.
+  const name = respondentDisplayName(
+    args.publicTaker.firstName,
+    args.publicTaker.lastName,
+    args.publicTaker.email,
+  );
 
   return {
     respondentName: name,
@@ -254,11 +265,9 @@ function formatSubmittedAt(d: Date): string {
   }
 }
 
-function firstName(full: string): string {
-  const trimmed = full.trim();
-  if (trimmed === "") return "there";
-  return trimmed.split(/\s+/)[0];
-}
+// Greeting derivation lives in the shared respondent-display-name module
+// (Wave P): first whitespace token, degrading to "there" for blank values AND
+// for email addresses (the blank-name display fallback must never be greeted).
 
 // ── Qualitative email body (Wave E, Task 11) ───────────────────────────────
 //
@@ -592,7 +601,7 @@ export function buildReportEmailHtml({
   const escName = escapeHtml(report.respondentName);
   const escTitle = escapeHtml(report.assessmentName);
   const escDate = escapeHtml(formatSubmittedAt(report.submittedAt));
-  const escFirst = escapeHtml(firstName(report.respondentName));
+  const escFirst = escapeHtml(greetingName(report.respondentName));
   const escHeadlinePrimary = escapeHtml(headline.primary);
   const escHeadlineLabel = escapeHtml(headline.label);
   const escTierMessage =
@@ -885,9 +894,12 @@ export function buildReportEmailHtml({
       ? `<tr><td style="padding:18px 32px 0;font-size:14px;color:${INK};line-height:1.5;">Your client <strong>${escName}</strong> just completed the Scaling Up 4 Decisions Assessment. Their full results are below.</td></tr>`
       : "";
 
+  // Coach-facing: an email-fallback identity must stay visible (Jeff #5) —
+  // only the respondent's own greeting degrades to "there".
+  const escCoachRef = report.respondentName.includes("@") ? escName : escFirst;
   const conclusionTitle =
     recipientRole === "REFERRING_COACH"
-      ? `Follow up with ${escFirst}.`
+      ? `Follow up with ${escCoachRef}.`
       : `Keep scaling, ${escFirst}.`;
   const conclusionBody =
     recipientRole === "REFERRING_COACH"

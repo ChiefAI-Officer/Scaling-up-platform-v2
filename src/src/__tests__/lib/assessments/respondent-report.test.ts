@@ -508,3 +508,68 @@ test("Wave K: coachLogoUrl is null when coach has no profileImage", async () => 
   // coachName still resolves (used for alt when an image IS present elsewhere)
   expect(result.report.coachName).toBe("Dana Coach");
 });
+
+// ── Wave P (Jeff #5): blank-name respondent falls back to email ───────────
+
+test("Wave P: blank first/last name → respondentName falls back to the respondent's email", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  const blankNameSubmission = {
+    ...GOOD_SUBMISSION,
+    respondent: {
+      ...GOOD_SUBMISSION.respondent,
+      firstName: "",
+      lastName: "",
+      email: "alice@example.com",
+    },
+  };
+  const { $transaction } = makeMockDb(
+    blankNameSubmission as unknown as typeof GOOD_SUBMISSION,
+  );
+
+  const result = await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  expect(result.status).toBe("ok");
+  if (result.status !== "ok") return;
+  // Never " " (the truthy-single-space trap) or "" — the email is shown.
+  expect(result.report.respondentName).toBe("alice@example.com");
+});
+
+test("Wave P: the submission select fetches respondent.email (fallback source)", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  const { $transaction, _txFindFirst } = makeMockDb(GOOD_SUBMISSION);
+
+  await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  const callArgs = _txFindFirst.mock.calls[0][0];
+  expect(callArgs.select.respondent.select.email).toBe(true);
+});
+
+test("Wave P: a normally-named respondent still renders first+last (no email leakage)", async () => {
+  mockCanManageCampaign.mockResolvedValue(true);
+  const named = {
+    ...GOOD_SUBMISSION,
+    respondent: { ...GOOD_SUBMISSION.respondent, email: "alice@example.com" },
+  };
+  const { $transaction } = makeMockDb(named as unknown as typeof GOOD_SUBMISSION);
+
+  const result = await getRespondentReport(
+    { $transaction } as unknown as Parameters<typeof getRespondentReport>[0],
+    makeActor(),
+    "camp-1",
+    "resp-1",
+  );
+
+  expect(result.status).toBe("ok");
+  if (result.status !== "ok") return;
+  expect(result.report.respondentName).toBe("Alice Smith");
+});

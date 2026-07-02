@@ -35,7 +35,11 @@ import {
 } from "@/lib/assessments/access-control";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
-import { resolveCoachName } from "@/lib/assessments/invitation-email";
+import {
+  resolveCoachName,
+  resolveCoachLogo,
+} from "@/lib/assessments/invitation-email";
+import { isInviteEmailChromeEnabled } from "@/lib/assessments/wave-p-flags";
 import { sendAssessmentInvitationEmail } from "@/services/notifications";
 import {
   sendInvitesBatch,
@@ -95,10 +99,14 @@ export async function POST(
         organization: {
           select: {
             name: true,
-            owner: { select: { firstName: true, lastName: true } },
+            owner: {
+              select: { firstName: true, lastName: true, profileImage: true },
+            },
           },
         },
-        creatorCoach: { select: { firstName: true, lastName: true } },
+        creatorCoach: {
+          select: { firstName: true, lastName: true, profileImage: true },
+        },
         participants: {
           include: {
             respondent: {
@@ -207,6 +215,27 @@ export async function POST(
     const organizationName = campaign.organization?.name ?? null;
     const templateName = campaign.template?.name ?? null;
 
+    // Wave P — invitation-email chrome (#2.1 coach logo + #2.4 larger CTA).
+    // Flag evaluated ONCE per send; logo identity MIRRORS resolveCoachName
+    // (creator coach ?? org owner — the owner IS a Coach row).
+    const chrome = isInviteEmailChromeEnabled({
+      organizationId: campaign.organizationId,
+      templateId: campaign.templateId,
+    })
+      ? ("waveP" as const)
+      : ("legacy" as const);
+    const { coachLogoUrl, logoRejectedReason } = resolveCoachLogo(
+      campaign.creatorCoach ?? null,
+      campaign.organization?.owner ?? null
+    );
+    // PII-free observability: variant + logo-gate outcome only — NEVER the URL.
+    console.log("[assessment-invite] email-chrome", {
+      campaignId,
+      chromeVariant: chrome,
+      logoIncluded: chrome === "waveP" && logoRejectedReason === null,
+      logoRejectedReason,
+    });
+
     // Shared per-recipient create+send (also used by the Wave-D fan-out).
     const { results } = await sendInvitesBatch(
       { db, sendEmail: sendAssessmentInvitationEmail },
@@ -237,6 +266,8 @@ export async function POST(
         organizationName,
         coachName,
         templateName,
+        chrome,
+        coachLogoUrl,
       }
     );
 
