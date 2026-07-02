@@ -16,9 +16,9 @@
  * Headline/copy (Wave O Part A): reworded from the prior "Import historical
  * Esperto data" — that overclaimed support for ALL historical Esperto data
  * when only Members (roster) + QSP-v2 (results) actually work today.
- * Deliberately does NOT name SU-Full/Rockefeller/LVA — this line is scoped to
- * what unconditionally works, so it never drifts out of sync with the
- * suFullImportEnabled flag state below.
+ * Names SU-Full only when the suFullImportEnabled flag below is true (Wave O
+ * Phase 3c); still deliberately does NOT name Rockefeller/LVA, which remain
+ * unsupported.
  */
 
 export const dynamic = "force-dynamic";
@@ -48,7 +48,8 @@ export default function AdminEspertoImportPage() {
         </p>
         <p className="text-sm text-muted-foreground">
           Supported today:{" "}
-          <span className="font-medium text-foreground">Members rosters</span>,{" "}
+          <span className="font-medium text-foreground">Members rosters</span>
+          {suFullImportEnabled ? ", " : " and "}
           <span className="font-medium text-foreground">QSP-v2 results</span>
           {suFullImportEnabled ? (
             <>
