@@ -14,9 +14,9 @@
  * Headline/copy (Wave O Part A): reworded from the prior "Import historical
  * Esperto data" — that overclaimed support for ALL historical Esperto data
  * when only Members (roster) + QSP-v2 (results) actually work today.
- * Deliberately does NOT name SU-Full/Rockefeller/LVA — this line is scoped to
- * what unconditionally works, so it never drifts out of sync with the
- * suFullImportEnabled flag state below.
+ * Names SU-Full only when the suFullImportEnabled flag below is true (Wave O
+ * Phase 3c); still deliberately does NOT name Rockefeller/LVA, which remain
+ * unsupported.
  */
 
 import Link from "next/link";
@@ -56,10 +56,10 @@ export default async function CoachEspertoImportPage() {
             Teams.
           </p>
           <p className="text-muted-foreground">
-            Supported today: Members rosters, QSP-v2 results
+            Supported today: Members rosters
             {suFullImportEnabled
-              ? ", and Scaling Up Full (historical results)"
-              : ""}
+              ? ", QSP-v2 results, and Scaling Up Full (historical results)"
+              : " and QSP-v2 results"}
             . Other Esperto assessment types aren&apos;t available for import
             yet.
           </p>
