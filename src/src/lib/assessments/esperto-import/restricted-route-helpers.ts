@@ -298,8 +298,21 @@ export interface RestrictedCommitPrismaLike {
   auditLog: {
     create: (args: { data: object }) => Promise<unknown>;
   };
-  $transaction: <T>(fn: (tx: RestrictedCommitPrismaLike) => Promise<T>) => Promise<T>;
+  $transaction: <T>(
+    fn: (tx: RestrictedCommitPrismaLike) => Promise<T>,
+    opts?: { maxWait?: number; timeout?: number },
+  ) => Promise<T>;
 }
+
+/**
+ * Explicit interactive-transaction budget for the restricted commit. Prisma's
+ * 5s default cannot fit the documented 300-file batch cap (serial invitation
+ * upsert + submission create per respondent) nor a high-latency client, and an
+ * expiry mid-commit burns the whole batch (atomic rollback, but always-fail).
+ * 55s stays under the route's 60s `maxDuration`; `maxWait` covers pool
+ * acquisition + advisory-lock contention from a concurrent same-round commit.
+ */
+const RESTRICTED_COMMIT_TX_OPTIONS = { maxWait: 10_000, timeout: 55_000 };
 
 /**
  * Adapt a Prisma-shaped client (`db` or a `tx` inside `db.$transaction`) into
@@ -351,7 +364,7 @@ export function buildRealRestrictedCommitDb(
       await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
     },
     $transaction: (fn) =>
-      client.$transaction((tx) => fn(adapt(tx))),
+      client.$transaction((tx) => fn(adapt(tx)), RESTRICTED_COMMIT_TX_OPTIONS),
   });
 
   return adapt(prisma);
