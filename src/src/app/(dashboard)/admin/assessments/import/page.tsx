@@ -48,9 +48,17 @@ export default function AdminEspertoImportPage() {
         </p>
         <p className="text-sm text-muted-foreground">
           Supported today:{" "}
-          <span className="font-medium text-foreground">Members rosters</span>{" "}
-          and <span className="font-medium text-foreground">QSP-v2 results</span>.
-          Other Esperto assessment types aren&apos;t available for import yet.
+          <span className="font-medium text-foreground">Members rosters</span>,{" "}
+          <span className="font-medium text-foreground">QSP-v2 results</span>
+          {suFullImportEnabled ? (
+            <>
+              , and{" "}
+              <span className="font-medium text-foreground">
+                Scaling Up Full (historical results)
+              </span>
+            </>
+          ) : null}
+          . Other Esperto assessment types aren&apos;t available for import yet.
         </p>
       </header>
 

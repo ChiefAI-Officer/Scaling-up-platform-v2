@@ -309,8 +309,12 @@ export interface RestrictedCommitPrismaLike {
  * 5s default cannot fit the documented 300-file batch cap (serial invitation
  * upsert + submission create per respondent) nor a high-latency client, and an
  * expiry mid-commit burns the whole batch (atomic rollback, but always-fail).
- * 55s stays under the route's 60s `maxDuration`; `maxWait` covers pool
- * acquisition + advisory-lock contention from a concurrent same-round commit.
+ * `maxWait` bounds connection-pool acquisition only; advisory-lock waits from
+ * a concurrent same-round commit run INSIDE the open tx and consume `timeout`.
+ * The 55s budget fits the route's 60s `maxDuration` only when pre-commit
+ * parse/plan work + pool wait stay small (worst case maxWait+timeout ≈ 65s);
+ * on overrun Vercel kills the function → opaque 504, but Postgres rolls back
+ * on connection close, so atomicity holds and no partial batch is committed.
  */
 const RESTRICTED_COMMIT_TX_OPTIONS = { maxWait: 10_000, timeout: 55_000 };
 

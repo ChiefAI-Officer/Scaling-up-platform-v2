@@ -56,8 +56,12 @@ export default async function CoachEspertoImportPage() {
             Teams.
           </p>
           <p className="text-muted-foreground">
-            Supported today: Members rosters and QSP-v2 results. Other Esperto
-            assessment types aren&apos;t available for import yet.
+            Supported today: Members rosters, QSP-v2 results
+            {suFullImportEnabled
+              ? ", and Scaling Up Full (historical results)"
+              : ""}
+            . Other Esperto assessment types aren&apos;t available for import
+            yet.
           </p>
         </div>
       </FadeUp>
