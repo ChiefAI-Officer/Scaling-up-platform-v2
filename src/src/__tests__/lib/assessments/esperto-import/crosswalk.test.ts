@@ -15,10 +15,12 @@
  */
 
 import reportQspV2 from "./fixtures/report-qsp-v2.json";
+import restrictedIndividual from "./fixtures/restricted-individual.json";
 
 import { qspV2Crosswalk } from "../../../../lib/assessments/esperto-import/crosswalks/qsp-v2";
 import { rockefellerCrosswalk } from "../../../../lib/assessments/esperto-import/crosswalks/rockefeller";
 import { lvaCrosswalk } from "../../../../lib/assessments/esperto-import/crosswalks/lva";
+import { scalingUpFullCrosswalk } from "../../../../lib/assessments/esperto-import/crosswalks/scaling-up-full";
 import {
   getCrosswalkByVariant,
   getCrosswalkByTemplateAlias,
@@ -208,5 +210,114 @@ describe("validateCrosswalkAgainstVersion", () => {
     const result = validateCrosswalkAgainstVersion(qspV2Crosswalk, version);
     expect(result.ok).toBe(false);
     expect(result.problems.join(" ")).toContain("P1_rate_success_rocks");
+  });
+});
+
+// ── SU-Full crosswalk content (verified via live-Esperto controlled decode) ──
+
+/**
+ * Family → (stableKey block) as VERIFIED 2026-07-02 by a controlled ScaleUp2
+ * submission (each display section filled with a distinct constant, then the
+ * saved answers read back by code). `[espertoFamily, count, startStableKey]`;
+ * within-block order ascending (Q<n>_1 → first stableKey …).
+ */
+const SU_FULL_FAMILIES: Array<[string, number, number]> = [
+  ["Q8", 8, 1], // Your Employees        → Q01–Q08
+  ["Q7", 5, 9], // Company Culture       → Q09–Q13
+  ["Q4", 7, 14], // Strategy             → Q14–Q20
+  ["Q3", 4, 21], // Leadership Team      → Q21–Q24
+  ["Q5", 5, 25], // Operational Processes→ Q25–Q29
+  ["Q9", 5, 30], // Sales & Marketing    → Q30–Q34
+  ["Q10", 6, 35], // Scalability/Innov/Tech → Q35–Q40
+  ["Q11", 5, 41], // Cash                → Q41–Q45
+  ["Q12", 10, 46], // Your Leadership    → Q46–Q55
+  ["Q6", 6, 56], // Internal Communication → Q56–Q61
+];
+
+function expectedSuFullMap(): Array<[string, string]> {
+  const out: Array<[string, string]> = [];
+  for (const [fam, count, start] of SU_FULL_FAMILIES) {
+    for (let i = 1; i <= count; i++) {
+      out.push([`${fam}_${i}`, `Q${String(start + i - 1).padStart(2, "0")}`]);
+    }
+  }
+  return out;
+}
+
+/** The 29 non-slider raw keys the export carries that we intentionally drop. */
+const SU_FULL_DROPPED = [
+  "Q1o1_1", "Q1o2_2", "Q1o2_3", "Q1o4",
+  "Q2o1_1", "Q2o1_2", "Q2o1_3", "Q2o2_2", "Q2o2_3",
+  "Q12open",
+  "Q13o1_1", "Q13o2_1", "Q13o3", "Q13o4", "Q13o5_1",
+  "Q13o6_1", "Q13o6_2", "Q13o7_1", "Q13o7_2", "Q13o8_1",
+  "Q16", "Q17", "ScoreSchatting",
+  "country", "geslacht", "leeftijd", "postcode", "provincie", "state",
+];
+
+/** Actual export answer keys from the sanitized restricted-individual fixture. */
+function restrictedRawKeys(): string[] {
+  return Object.keys((restrictedIndividual as { raw: Record<string, unknown> }).raw);
+}
+
+describe("scalingUpFullCrosswalk", () => {
+  it("targets the scaling-up-full alias, no Esperto variant, LOCKED (decoded 2026-07-02)", () => {
+    expect(scalingUpFullCrosswalk.templateAlias).toBe("scaling-up-full");
+    expect(scalingUpFullCrosswalk.espertoVariant).toBeNull();
+    expect(scalingUpFullCrosswalk.locked).toBe(true);
+  });
+
+  it("maps exactly the 61 verified sliders (Q3_1…Q12_10 → Q01…Q61, ascending), all SLIDER_LIKERT", () => {
+    expect(scalingUpFullCrosswalk.map).toHaveLength(61);
+    const byKey = new Map(scalingUpFullCrosswalk.map.map((e) => [e.espertoKey, e]));
+    for (const [espertoKey, stableKey] of expectedSuFullMap()) {
+      const entry = byKey.get(espertoKey);
+      expect(entry).toBeDefined();
+      expect(entry!.stableKey).toBe(stableKey);
+      expect(entry!.ourType).toBe("SLIDER_LIKERT");
+    }
+  });
+
+  it("covers stableKeys Q01…Q61 with no duplicates", () => {
+    const stableKeys = scalingUpFullCrosswalk.map.map((e) => e.stableKey).sort();
+    const expected = Array.from({ length: 61 }, (_, i) => `Q${String(i + 1).padStart(2, "0")}`).sort();
+    expect(stableKeys).toEqual(expected);
+    expect(new Set(stableKeys).size).toBe(61);
+  });
+
+  it("drops exactly the 29 non-slider keys (firmographics/demographics/free-text), each with a reason", () => {
+    const dropped = scalingUpFullCrosswalk.droppedKeys.map((d) => d.key).sort();
+    expect(dropped).toEqual([...SU_FULL_DROPPED].sort());
+    for (const d of scalingUpFullCrosswalk.droppedKeys) {
+      expect(d.reason.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps the FTE keys (Q1o2_2 permanent, Q1o2_3 freelance) in droppedKeys, NOT in map", () => {
+    const mapped = new Set(scalingUpFullCrosswalk.map.map((e) => e.espertoKey));
+    const dropped = new Set(scalingUpFullCrosswalk.droppedKeys.map((d) => d.key));
+    for (const fte of ["Q1o2_2", "Q1o2_3"]) {
+      expect(mapped.has(fte)).toBe(false);
+      expect(dropped.has(fte)).toBe(true);
+    }
+  });
+
+  it("is EXHAUSTIVE over the real restricted export (every raw key mapped or dropped)", () => {
+    const rawKeys = restrictedRawKeys();
+    expect(rawKeys).toHaveLength(90); // 61 sliders + 29 non-slider
+    const result = validateCrosswalkExhaustive(scalingUpFullCrosswalk, rawKeys);
+    expect(result.unknownKeys).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("passes pinned-version compatibility when Q01…Q61 exist as scaled sliders", () => {
+    const version = versionFromCrosswalk(scalingUpFullCrosswalk);
+    const result = validateCrosswalkAgainstVersion(scalingUpFullCrosswalk, version);
+    expect(result.problems).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("resolves by template alias and is reachable from the registry", () => {
+    expect(getCrosswalkByTemplateAlias("scaling-up-full")).toBe(scalingUpFullCrosswalk);
   });
 });
