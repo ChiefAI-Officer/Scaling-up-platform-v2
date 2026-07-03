@@ -298,3 +298,74 @@ describe("QualitativeReport — greeting guard (Wave P)", () => {
     ).toMatch(/Dear John,/);
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// Wave R (R-2b, Jeff #4) — TEXT answers inside "rating" sections must render
+// full-width (question on its own row, answer below), never squeezed into the
+// narrow statement-table rating column.
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("QualitativeReport — Wave R full-width TEXT in rating sections", () => {
+  // 2 sliders + 1 TEXT → majority SLIDER_LIKERT → "rating" kind via the
+  // type-driven fallback (classifyPresentationByTypes), same as QSP v2's
+  // P1_retrospective renders on the alias map.
+  const ratingWithText = () =>
+    baseReport({
+      sections: [{ stableKey: "ratings", name: "Ratings" }],
+      questionsByKey: {
+        r_overall: { type: "SLIDER_LIKERT", label: "Overall rating", sectionStableKey: "ratings", min: 1, max: 10 },
+        r_expl: { type: "TEXT", label: "Please explain your rating.", sectionStableKey: "ratings" },
+        r_next: { type: "SLIDER_LIKERT", label: "Next quarter outlook", sectionStableKey: "ratings", min: 1, max: 10 },
+      },
+      rawAnswers: [
+        { stableKey: "r_overall", value: 7 },
+        { stableKey: "r_expl", value: "We shipped the rebuild and it changed everything for the team." },
+        { stableKey: "r_next", value: 8 },
+      ],
+    });
+
+  it("renders a TEXT item as a full-width row (colspan cell), not in the rating column", () => {
+    render(<QualitativeReport report={ratingWithText()} />);
+    const row = screen.getByTestId("qual-item-r_expl");
+    const cell = row.querySelector("td.su-stmt-text");
+    expect(cell).not.toBeNull();
+    expect(cell).toHaveAttribute("colspan", "2");
+    expect(row.querySelector(".su-stmt-rate")).toBeNull();
+    expect(cell!.textContent).toContain("Please explain your rating.");
+    expect(cell!.textContent).toContain(
+      "We shipped the rebuild and it changed everything for the team.",
+    );
+  });
+
+  it("keeps slider statements in the two-column label/rate shape", () => {
+    render(<QualitativeReport report={ratingWithText()} />);
+    const row = screen.getByTestId("qual-item-r_overall");
+    expect(row.querySelector(".su-stmt-label")).not.toBeNull();
+    expect(row.querySelector(".su-stmt-rate")).not.toBeNull();
+    expect(row.querySelector(".su-stmt-text")).toBeNull();
+  });
+
+  it("preserves item order — the TEXT row sits between its neighbouring sliders", () => {
+    render(<QualitativeReport report={ratingWithText()} />);
+    const rows = [...screen.getByTestId("qual-section-ratings").querySelectorAll("tbody tr")];
+    const keys = rows.map((r) => r.getAttribute("data-testid"));
+    expect(keys).toEqual([
+      "qual-item-r_overall",
+      "qual-item-r_expl",
+      "qual-item-r_next",
+    ]);
+  });
+
+  it("question and answer stack vertically inside the full-width cell", () => {
+    render(<QualitativeReport report={ratingWithText()} />);
+    const cell = screen
+      .getByTestId("qual-item-r_expl")
+      .querySelector("td.su-stmt-text")!;
+    const q = cell.querySelector(".su-stmt-text-q");
+    const a = cell.querySelector(".su-stmt-text-a");
+    expect(q).not.toBeNull();
+    expect(a).not.toBeNull();
+    expect(q!.textContent).toBe("Please explain your rating.");
+    expect(a!.textContent).toContain("We shipped the rebuild");
+  });
+});

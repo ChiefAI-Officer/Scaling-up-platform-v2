@@ -1188,9 +1188,9 @@
   cursor: pointer;
   /* accent-color drives thumb + filled track in modern browsers */
   accent-color: #522583;
-  /* Custom track height for a meatier feel */
-  height: 6px;
-  border-radius: 3px;
+  /* Custom track height for a meatier feel (Wave R: 14px thick track) */
+  height: 14px;
+  border-radius: 7px;
   /* Firefox track override */
   -moz-range-track: none;
 }
@@ -1203,8 +1203,8 @@
 }
 /* WebKit: track (base, overridden by unanswered/answered rules above) */
 .su-assessment-brand .survey-slider::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: 3px;
+  height: 14px;
+  border-radius: 7px;
   background: linear-gradient(to right, #522583 0%, #522583 var(--pct, 0%), #e4e4e4 var(--pct, 0%), #e4e4e4 100%);
 }
 /* WebKit: thumb — unanswered: invisible; answered: visible purple */
@@ -1234,7 +1234,7 @@
   border: 3px solid #fff;
   box-shadow: 0 2px 8px rgba(82, 37, 131, 0.35);
   cursor: pointer;
-  margin-top: -12px; /* vertically centre on the 6px track (30px thumb) */
+  margin-top: -8px; /* vertically centre on the 14px track (30px thumb): (14 − 30) / 2 */
   transition: box-shadow 0.12s, transform 0.1s;
 }
 .su-assessment-brand .survey-slider::-webkit-slider-thumb:hover,
@@ -1244,13 +1244,13 @@
 }
 /* Firefox: track */
 .su-assessment-brand .survey-slider::-moz-range-track {
-  height: 6px;
-  border-radius: 3px;
+  height: 14px;
+  border-radius: 7px;
   background: #e4e4e4;
 }
 .su-assessment-brand .survey-slider::-moz-range-progress {
-  height: 6px;
-  border-radius: 3px 0 0 3px;
+  height: 14px;
+  border-radius: 7px 0 0 7px;
   background: #522583;
 }
 /* Firefox: thumb */
@@ -1272,14 +1272,30 @@
   margin-top: 0.6rem;
   padding: 0 2px;
 }
+/* Wave R: ticks are tappable <button>s — equal-slice flex hit areas
+   (flex: 1 divides the row into zero-dead-zone touch slices; vertical
+   padding brings the target to ~32px tall — WCAG 2.5.8 AA). */
 .su-assessment-brand .survey-slider-tick {
-  min-width: 1.5rem;
+  /* button resets */
+  background: none;
+  border: 0;
+  font-family: inherit;
+  padding: 0.6rem 0;
+  cursor: pointer;
+  /* equal-slice hit areas (replaces the old min-width: 1.5rem) */
+  flex: 1;
   text-align: center;
   font-size: 0.8rem;
   font-weight: 600;
   color: #9b8bb4;          /* muted purple-grey */
   line-height: 1;
   transition: color 0.1s, transform 0.1s;
+}
+.su-assessment-brand .survey-slider-tick:hover:not(:disabled) {
+  color: #522583;
+}
+.su-assessment-brand .survey-slider-tick:disabled {
+  cursor: default;
 }
 /* Selected tick — purple + slightly larger */
 .su-assessment-brand .survey-slider-tick.is-current {

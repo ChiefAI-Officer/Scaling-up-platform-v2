@@ -225,17 +225,32 @@ function RatingBlock({ who, items }: { who: string; items: QualItem[] }) {
             </tr>
           </thead>
           <tbody>
-            {otherItems.map((item) => (
-              <tr
-                key={item.stableKey}
-                data-testid={`qual-item-${item.stableKey}`}
-              >
-                <td className="su-stmt-label">{item.label}</td>
-                <td className="su-stmt-rate">
-                  <span>{itemText(item)}</span>
-                </td>
-              </tr>
-            ))}
+            {otherItems.map((item) =>
+              /* Wave R (R-2b, Jeff #4): free-form TEXT answers get a full-width
+                 row — question on its own line, answer below — instead of being
+                 squeezed into the narrow rating column. Order is preserved. */
+              item.type === "TEXT" ? (
+                <tr
+                  key={item.stableKey}
+                  data-testid={`qual-item-${item.stableKey}`}
+                >
+                  <td className="su-stmt-text" colSpan={2}>
+                    <div className="su-stmt-text-q">{item.label}</div>
+                    <div className="su-stmt-text-a">{itemText(item)}</div>
+                  </td>
+                </tr>
+              ) : (
+                <tr
+                  key={item.stableKey}
+                  data-testid={`qual-item-${item.stableKey}`}
+                >
+                  <td className="su-stmt-label">{item.label}</td>
+                  <td className="su-stmt-rate">
+                    <span>{itemText(item)}</span>
+                  </td>
+                </tr>
+              ),
+            )}
           </tbody>
         </table>
       )}

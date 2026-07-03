@@ -649,10 +649,14 @@
   margin: 0;
 }
 
+/* Wave R (R-2, Jeff #4): stacked layout — question on its own row, answer
+   full-width below (screen AND print, all row types). Explicit q→a spacing:
+   Tailwind preflight zeroes the default `dd` indent/margins, so the gap must
+   be declared here, not inherited from browser defaults. */
 .su-public-brand .su-report-dl-row {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   padding: 14px 0;
   border-bottom: 1px solid #e4e4e4;
 }
@@ -811,7 +815,6 @@
   .su-public-brand .su-report-additional { padding: 32px 24px; }
   .su-public-brand .su-report-conclusion { padding: 32px 24px; }
   .su-public-brand .su-report-footer { padding: 16px 24px; flex-direction: column; align-items: flex-start; }
-  .su-public-brand .su-report-dl-row { grid-template-columns: 1fr; gap: 6px; }
   .su-public-brand .su-report-print-btn { position: static; margin: 16px auto; display: block; width: fit-content; }
 }
 
@@ -880,8 +883,10 @@
     break-inside: avoid;
   }
 
+  /* Wave R (R-2): keep each stacked question+answer row on one page. */
   .su-public-brand .su-report-dl-row {
     break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   /* Footer: keep together; add reserved top padding so it never bleeds into
@@ -1217,6 +1222,27 @@
   border-radius: 8px;
   padding: 4px 10px;
   font-variant-numeric: tabular-nums;
+}
+
+/* Wave R (R-2b, Jeff #4): free-form TEXT answers inside a statement table get
+   a full-width row — question on its own line, answer below — instead of
+   being squeezed into the 96px rating column. */
+.su-public-brand .su-stmt-text {
+  vertical-align: top;
+}
+.su-public-brand .su-stmt-text-q {
+  color: #1a1322;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 6px;
+}
+.su-public-brand .su-stmt-text-a {
+  font-size: 14px;
+  color: #3a3346;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* ── Responsive (screen) ─────────────────────────────────────────────────── */

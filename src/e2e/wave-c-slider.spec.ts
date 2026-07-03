@@ -89,24 +89,24 @@ function buildHtml(): string {
           aria-valuemin="0" aria-valuemax="10"
           aria-valuetext="Not yet answered"
         />
-        <div class="survey-slider-ticks" aria-hidden="true">
-          <span class="survey-slider-tick">0</span>
-          <span class="survey-slider-tick">1</span>
-          <span class="survey-slider-tick">2</span>
-          <span class="survey-slider-tick">3</span>
-          <span class="survey-slider-tick">4</span>
-          <span class="survey-slider-tick">5</span>
-          <span class="survey-slider-tick">6</span>
-          <span class="survey-slider-tick">7</span>
-          <span class="survey-slider-tick">8</span>
-          <span class="survey-slider-tick">9</span>
-          <span class="survey-slider-tick">10</span>
+        <div class="survey-slider-ticks">
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 0">0</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 1">1</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 2">2</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 3">3</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 4">4</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 5">5</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 6">6</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 7">7</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 8">8</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 9">9</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 10">10</button>
         </div>
         <div class="survey-slider-anchors">
           <span>Not at all</span>
           <span>Completely</span>
         </div>
-        <p class="survey-slider-status">Tap or drag the slider to rate.</p>
+        <p class="survey-slider-status">Tap a number or drag the slider to rate.</p>
       </div>
     </li>
 
@@ -127,18 +127,18 @@ function buildHtml(): string {
           aria-valuetext="6"
           style="--pct: 60%"
         />
-        <div class="survey-slider-ticks" aria-hidden="true">
-          <span class="survey-slider-tick">0</span>
-          <span class="survey-slider-tick">1</span>
-          <span class="survey-slider-tick">2</span>
-          <span class="survey-slider-tick">3</span>
-          <span class="survey-slider-tick">4</span>
-          <span class="survey-slider-tick">5</span>
-          <span class="survey-slider-tick is-current">6</span>
-          <span class="survey-slider-tick">7</span>
-          <span class="survey-slider-tick">8</span>
-          <span class="survey-slider-tick">9</span>
-          <span class="survey-slider-tick">10</span>
+        <div class="survey-slider-ticks">
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 0">0</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 1">1</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 2">2</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 3">3</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 4">4</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 5">5</button>
+          <button type="button" class="survey-slider-tick is-current" tabindex="-1" aria-label="Set rating to 6">6</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 7">7</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 8">8</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 9">9</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 10">10</button>
         </div>
         <div class="survey-slider-anchors">
           <span>Not at all</span>
@@ -164,24 +164,24 @@ function buildHtml(): string {
           aria-valuetext="Not yet answered"
           aria-invalid="true"
         />
-        <div class="survey-slider-ticks" aria-hidden="true">
-          <span class="survey-slider-tick">0</span>
-          <span class="survey-slider-tick">1</span>
-          <span class="survey-slider-tick">2</span>
-          <span class="survey-slider-tick">3</span>
-          <span class="survey-slider-tick">4</span>
-          <span class="survey-slider-tick">5</span>
-          <span class="survey-slider-tick">6</span>
-          <span class="survey-slider-tick">7</span>
-          <span class="survey-slider-tick">8</span>
-          <span class="survey-slider-tick">9</span>
-          <span class="survey-slider-tick">10</span>
+        <div class="survey-slider-ticks">
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 0">0</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 1">1</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 2">2</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 3">3</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 4">4</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 5">5</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 6">6</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 7">7</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 8">8</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 9">9</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 10">10</button>
         </div>
         <div class="survey-slider-anchors">
           <span>Not at all</span>
           <span>Completely</span>
         </div>
-        <p class="survey-slider-status">Tap or drag the slider to rate.</p>
+        <p class="survey-slider-status">Tap a number or drag the slider to rate.</p>
       </div>
     </li>
 
@@ -200,16 +200,16 @@ function buildHtml(): string {
           aria-valuemin="0" aria-valuemax="10"
           aria-valuetext="Not yet answered"
         />
-        <div class="survey-slider-ticks" aria-hidden="true">
-          <span class="survey-slider-tick">0</span>
-          <span class="survey-slider-tick">5</span>
-          <span class="survey-slider-tick">10</span>
+        <div class="survey-slider-ticks">
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 0">0</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 5">5</button>
+          <button type="button" class="survey-slider-tick" tabindex="-1" aria-label="Set rating to 10">10</button>
         </div>
         <div class="survey-slider-anchors">
           <span>Not at all</span>
           <span>Completely</span>
         </div>
-        <p class="survey-slider-status">Tap or drag the slider to rate.</p>
+        <p class="survey-slider-status">Tap a number or drag the slider to rate.</p>
       </div>
     </li>
 

@@ -241,8 +241,8 @@ describe("QuestionInput", () => {
     expect(screen.getByText("1")).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
-    // Unanswered status prompt
-    expect(screen.getByText("Tap or drag the slider to rate.")).toBeInTheDocument();
+    // Unanswered status prompt (Wave R copy — teaches the tap-a-number affordance)
+    expect(screen.getByText("Tap a number or drag the slider to rate.")).toBeInTheDocument();
     // "—" must NOT be present
     expect(screen.queryByText("—")).not.toBeInTheDocument();
     unmount();

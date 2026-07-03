@@ -30,6 +30,7 @@ import {
   GroupReport,
   GroupReportEmpty,
 } from "@/components/assessments/GroupReport";
+import { PrintReportButton } from "@/components/assessments/PrintReportButton";
 
 // H15: never statically render or cache the report (bulk PII).
 export const dynamic = "force-dynamic";
@@ -149,6 +150,15 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
 
   return (
     <div className="su-report-page">
+      {/* Wave R (R-3, Jeff #9): screen-only print bar on the FULL render only —
+          identical placement to the per-respondent report page (top, no bottom
+          duplicate). The notApplicable / empty panels above return earlier and
+          never carry it. NOTE: `report.degraded` is a metrics flag on this same
+          full render (the complete <GroupReport/> still renders), not a distinct
+          outcome — so a degraded-but-full report keeps the button. */}
+      <div className="su-report-actions no-print">
+        <PrintReportButton />
+      </div>
       <GroupReport
         report={report}
         assessmentName={provenance.assessmentName}
