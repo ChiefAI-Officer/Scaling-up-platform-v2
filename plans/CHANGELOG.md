@@ -6,6 +6,10 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-03 — Progress report Jul-3 sent: Wave P + Wave Q with full visual evidence <!-- ENTRY_ISO:2026-07-03 ENTRY_SLUG:progress-report-jul3-sent -->
+
+**`Scaling-Up-Progress-Update-2026-07-03.html/.pdf` (repo root, self-contained) SENT to Jeff** with a 5-min Loom walkthrough (`loom.com/share/194cf78decbf43099323ca12c6c4eb6a`) + terse Slack. Narrative: "two roadmap phases went live overnight" — P2 quick fixes (Wave P) + P3 admin controls (Wave Q), every claim carrying a visual (user's non-negotiable): live prod captures (story-slot labels ×3, LVA wording ×2, templates list with qsp-v1's real DISABLED state, coach picker minus qsp-v1, Results Email default switch, Admin Users card), the invitation email **re-rendered via the production email engine** (chat-pasted screenshots can't reach disk — `wave-p-invite-email.png`), verbatim confirm-dialog replicas (native dialogs unscreenshotable, labeled as such), the differential-JWT-probe terminal panel, a before/after panel for the name fallback, the #18 three-question evidence trio, and the roadmap re-used with P2/P3 stamped DONE → sliders + printing NEXT UP. Build: Jul-2 style block verbatim, `{{IMG:}}` → base64 via node, PDF via headless Chrome. New screenshot pool: `report-p-*.png`, `report-q1..q4-*.png`. **Next wave chosen: Wave R = P4 slider (#8) + P5 reports/printing (#4 + #9, absorbs the Wave L N≠3 rounding tail).** Waiting on Jeff: #2.3 invite copy, Rockefeller+LVA exports, #15/#16/#19.
+
 ### 2026-07-03 — Wave Q LAUNCHED: admin & coach controls live on production <!-- ENTRY_ISO:2026-07-03 ENTRY_SLUG:wave-q-launched -->
 
 **Jeff July-1 items #1/#6/#7 (P3 tier) are LIVE** — PR #125 (squash `3b9b72a`) merged dark, `WAVE_Q_ADMIN_CONTROLS_ENABLED=1` set on Vercel Production + redeploy, launch walk same-session with every prod mutation individually authorized. Spec `docs/specs/v7.6/19q-wave-q-admin-controls-design.md` + **ADR-0018** (admin offboarding); CONTEXT.md gained three glossary terms (*Disabled template*, *Results-email default*, *Admin removal*).
