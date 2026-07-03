@@ -136,4 +136,14 @@ describe("QuestionInput SLIDER_LIKERT tap-a-number (Wave R R-1)", () => {
     expect(other).toHaveClass("survey-slider-tick");
     expect(other).not.toHaveClass("is-current");
   });
+
+  test("9. mousedown on a tick is default-prevented — tap never steals focus from the range input", () => {
+    render(
+      <QuestionInput question={sliderQuestion} value={5} onChange={jest.fn()} />
+    );
+    const btn = screen.getByRole("button", { name: "Set rating to 7" });
+    // fireEvent returns false when a handler called preventDefault()
+    const notPrevented = fireEvent.mouseDown(btn);
+    expect(notPrevented).toBe(false);
+  });
 });

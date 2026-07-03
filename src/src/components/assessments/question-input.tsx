@@ -101,6 +101,12 @@ export function QuestionInput({
               tabIndex={-1}
               aria-label={`Set rating to ${v}`}
               disabled={disabled}
+              // Prevent focus transfer on tap: clicking a tabIndex={-1} button
+              // still moves DOM focus to it, which strands keyboard users —
+              // arrows stop adjusting the slider and Tab lands on the NEXT
+              // question. Suppressing mousedown keeps focus where it was
+              // without affecting the click commit.
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => onChange(q.stableKey, v)}
             >
               {v}
