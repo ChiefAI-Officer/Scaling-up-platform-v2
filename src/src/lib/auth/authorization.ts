@@ -134,6 +134,14 @@ export async function canAccessWorkshop(workshopId: string): Promise<boolean> {
         where: { email: session.user.email },
     });
 
+    // Wave Q (#7): soft-removed users never pass — without this, a removed
+    // HYBRID admin (coach profile + live JWT) could still clone/request-edit
+    // ANY workshop through the ADMIN branch below. Row is already read;
+    // zero added queries. UNCONDITIONAL (ADR-0018).
+    if (user?.deletedAt) {
+        return false;
+    }
+
     if (user?.role === "ADMIN") {
         return true;
     }

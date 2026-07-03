@@ -36,8 +36,9 @@ implements it. Three forces shape the design:
   invitable; `accept-invite` clears `deletedAt`, sets the fresh password hash and role on the
   SAME row, and never creates a second User. One identity per email, forever — FK history and
   audit trails stay attached to one user id.
-- Guards: ADMIN-only actor, no self-removal, canonical `ADMIN_EMAIL` protected, ADMIN/STAFF
-  non-coach targets only.
+- Guards: ADMIN-only actor, no self-removal, canonical `ADMIN_EMAIL` protected, targets must be
+  role ADMIN/STAFF. **Hybrid accounts (ADMIN/STAFF with a coach profile) ARE removable** — the
+  whole account locks; only COACH-role users are out of scope.
 
 ## Alternatives considered
 
@@ -51,7 +52,13 @@ implements it. Three forces shape the design:
 
 ## Consequences
 
-- A removed admin is cut off within one request/navigation, not at JWT expiry.
+- A removed admin loses every mutation and every API-backed read on their next request. One
+  accepted residual window: dashboard PAGE soft-navigations in an already-open tab (App Router
+  layouts don't re-render on client navigation, and the 16 direct-`getServerSession` pages check
+  only the JWT) — read-only exposure until a hard load, new segment mount, or JWT expiry. The
+  revive path (invite + accept) is likewise deliberately NOT flag-gated: reviving requires an
+  explicit ADMIN invite plus email acceptance, and a KILLed flag must not strand a legitimate
+  re-onboarding.
 - `deletedAt` on `User` is available for future reuse (e.g. coach offboarding hardening — coach
   JWTs also survive 30 days today; out of Wave Q's scope).
 - Anyone reading `accept-invite` must know it can MUTATE an existing row, not only create.

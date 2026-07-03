@@ -1073,6 +1073,7 @@ function TemplateStep({
 }) {
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadedOk, setLoadedOk] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -1081,6 +1082,7 @@ function TemplateStep({
         const body = await res.json();
         if (res.ok && body.success) {
           setTemplates(body.data as TemplateSummary[]);
+          setLoadedOk(true);
         }
       } finally {
         setLoading(false);
@@ -1092,9 +1094,10 @@ function TemplateStep({
   // disabled (or deleted): the picker payload no longer contains it, so the
   // saved templateId would otherwise ride along silently (no radio appears
   // selected, yet Next stays enabled) until the campaign-create 409 backstop.
-  // Surface it and force a re-pick instead.
+  // Surface it and force a re-pick instead. Gated on loadedOk so a transient
+  // fetch FAILURE (empty list) doesn't masquerade as "no longer available".
   const unknownSelection =
-    !loading && value !== "" && !templates.some((t) => t.id === value);
+    !loading && loadedOk && value !== "" && !templates.some((t) => t.id === value);
 
   return (
     <div className="space-y-6">

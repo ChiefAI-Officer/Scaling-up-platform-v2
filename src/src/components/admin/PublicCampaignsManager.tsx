@@ -16,6 +16,7 @@ interface TemplateSummary {
   id: string;
   name: string;
   alias: string;
+  disabledAt?: string | null;
 }
 
 interface OrgSummary {
@@ -75,7 +76,10 @@ export function PublicCampaignsManager() {
 
       if (tmplRes.ok) {
         const body = (await tmplRes.json()) as { data: TemplateSummary[] };
-        setTemplates(body.data ?? []);
+        // Wave Q (#6): the admin list keeps disabled templates (for the
+        // badge/enable UI) — but they must not be offered for NEW public
+        // campaigns. The POST 409s regardless; this hides them up front.
+        setTemplates((body.data ?? []).filter((t) => !t.disabledAt));
       }
 
       if (orgsRes.ok) {

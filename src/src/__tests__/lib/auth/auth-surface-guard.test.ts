@@ -40,9 +40,13 @@ const SRC_ROOT = path.join(process.cwd(), "src");
  *                  do NOT add new files in this category.
  */
 const ALLOWLIST: string[] = [
-  // [CHECKPOINT] getUserForApiRoute/getApiActor liveness lives here; the other
-  // getServerSession calls in this file (requireAuth/getCoachForSession/
-  // canAccessWorkshop/isAdmin) are session plumbing used by pages/layouts.
+  // [CHECKPOINT] getUserForApiRoute/getApiActor liveness lives here.
+  // canAccessWorkshop (used by the clone/request-edit MUTATION routes, not
+  // just pages) carries its own deletedAt check — review finding, Wave Q.
+  // requireAuth/getCoachForSession/isAdmin are page plumbing: page-level
+  // soft-navigation reads in an already-open tab are an ACCEPTED residual
+  // window (read-only; every mutation + API read liveness-checks) — see
+  // ADR-0018 Consequences.
   "lib/auth/authorization.ts",
   // [CHECKPOINT] dashboard-wide page liveness (redirects deletedAt users).
   "app/(dashboard)/layout.tsx",
