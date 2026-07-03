@@ -265,12 +265,29 @@ export async function POST(request: NextRequest) {
 
     const template = await db.assessmentTemplate.findUnique({
       where: { id: data.templateId },
-      select: { id: true, alias: true },
+      select: { id: true, alias: true, disabledAt: true },
     });
     if (!template) {
       return NextResponse.json(
         { success: false, error: "Template not found" },
         { status: 404 }
+      );
+    }
+
+    // Wave Q (#6) — a disabled template can never start a NEW campaign.
+    // UNCONDITIONAL (not flag-gated): flags gate capabilities and writes,
+    // never the enforcement of persisted admin intent (spec 19q durable
+    // rule). Backstop for the picker filter (e.g. a resumed wizard draft
+    // pointing at a now-disabled template, or a mid-wizard disable race).
+    if (template.disabledAt) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "TEMPLATE_DISABLED",
+          message:
+            "This template has been disabled and cannot be used for new campaigns.",
+        },
+        { status: 409 }
       );
     }
 

@@ -409,9 +409,12 @@ describe("Files API", () => {
   // -----------------------------------------------------------------------
   describe("DELETE /api/files/[id]", () => {
     it("owner can delete their file", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(
-        authenticatedSession({ id: "user-1", role: "COACH" })
-      );
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-1",
+        email: "user-1@example.com",
+        role: "COACH",
+        coachId: null,
+      });
       (getFile as jest.Mock).mockResolvedValue({
         id: "file-1",
         uploadedBy: "user-1",
@@ -428,9 +431,12 @@ describe("Files API", () => {
     });
 
     it("admin can delete any file", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(
-        authenticatedSession({ id: "admin-1", role: "ADMIN" })
-      );
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin-1@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
       (getFile as jest.Mock).mockResolvedValue({
         id: "file-1",
         uploadedBy: "other-user",
@@ -447,9 +453,12 @@ describe("Files API", () => {
     });
 
     it("non-owner non-admin gets 403", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(
-        authenticatedSession({ id: "user-2", role: "COACH" })
-      );
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-2",
+        email: "user-2@example.com",
+        role: "COACH",
+        coachId: null,
+      });
       (getFile as jest.Mock).mockResolvedValue({
         id: "file-1",
         uploadedBy: "user-1",
@@ -463,9 +472,12 @@ describe("Files API", () => {
     });
 
     it("returns 404 for non-existent file", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(
-        authenticatedSession({ id: "user-1", role: "ADMIN" })
-      );
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "user-1",
+        email: "user-1@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
       (getFile as jest.Mock).mockResolvedValue(null);
 
       const response = await DELETE(buildDeleteRequest(), routeParams("gone"));
@@ -475,7 +487,7 @@ describe("Files API", () => {
     });
 
     it("returns 401 when not authenticated", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(null);
+      (getApiActor as jest.Mock).mockResolvedValue(null);
 
       const response = await DELETE(buildDeleteRequest(), routeParams("file-1"));
 
@@ -559,7 +571,7 @@ describe("Files API", () => {
     });
 
     it("returns 401 when not authenticated", async () => {
-      (getServerSession as jest.Mock).mockResolvedValue(null);
+      (getApiActor as jest.Mock).mockResolvedValue(null);
 
       const response = await PATCH(
         buildPatchRequest({ workflowStepId: "step-1" }),

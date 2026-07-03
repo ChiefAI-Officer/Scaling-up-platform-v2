@@ -4,8 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
+import { getApiActor } from "@/lib/auth/authorization";
 import { requireAdminApiActor } from "@/lib/auth/api-actor-gate";
 import { createWorkflow, listWorkflows, duplicateWorkflow } from "@/lib/workflows/workflow-service";
 import { z } from "zod";
@@ -22,8 +21,11 @@ const createWorkflowSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  // Wave Q (#7): auth resolves through getApiActor() — the liveness checkpoint
+  // (soft-removed users 401 immediately, not at 30-day JWT expiry). GET stays
+  // coach-accessible (lists templates); only the auth resolution changed.
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
 
   const workflows = await listWorkflows({
     templatesOnly,
-    createdBy: session.user.role === "ADMIN" ? undefined : session.user.id,
+    createdBy: actor.role === "ADMIN" ? undefined : actor.userId,
   });
 
   return NextResponse.json({ success: true, data: workflows });

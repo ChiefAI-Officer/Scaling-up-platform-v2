@@ -12,9 +12,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
-import { isPrivilegedRole } from "@/lib/auth/authorization";
+// Wave Q (#7): auth resolves through getApiActor() — the liveness checkpoint
+// (soft-removed users 401 immediately, not at 30-day JWT expiry).
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { getSurveyResults } from "@/lib/surveys/survey-service";
 import { z } from "zod";
 
@@ -48,12 +48,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   // Round 2 M7: tighten gate from session-only to admin/staff.
-  if (!isPrivilegedRole(session.user.role)) {
+  if (!isPrivilegedRole(actor.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

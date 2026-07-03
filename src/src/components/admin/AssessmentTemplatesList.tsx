@@ -24,13 +24,30 @@ interface TemplateRow {
   versionCount?: number;
   activeVersionPublishedAt?: string | null;
   status?: "ACTIVE" | "PENDING" | "DRAFT";
+  /**
+   * Wave Q item #6 — soft-DISABLE marker (distinct from soft-delete). Set ⇒
+   * hidden from the new-campaign picker; existing campaigns/reports keep
+   * working. Optional defensively for payloads predating the Wave Q API.
+   */
+  disabledAt?: string | null;
 }
 
-export function AssessmentTemplatesList() {
+export function AssessmentTemplatesList({
+  waveQEnabled = false,
+}: {
+  /**
+   * Wave Q — gates the Enable/Disable row action (the WRITE capability).
+   * Server-computed (`isWaveQAdminControlsEnabled()`) and passed down from
+   * the page. The `Disabled` badge is NOT gated — persisted admin intent
+   * stays visible even when the flag is off (spec 19q durable rule).
+   */
+  waveQEnabled?: boolean;
+} = {}) {
   const [rows, setRows] = useState<TemplateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const { toast } = useToast();
 
   async function reload() {
@@ -84,6 +101,61 @@ export function AssessmentTemplatesList() {
       });
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  // Wave Q item #6 — flag-gated Enable/Disable row action. Disable hides the
+  // template from new-campaign setup only (running campaigns/reports keep
+  // working — no active-campaign guard by design); Enable reverses it.
+  async function handleToggleDisabled(row: TemplateRow) {
+    const disabling = !row.disabledAt;
+    if (disabling) {
+      const confirmed = window.confirm(
+        `Disable template "${row.name}"? Hidden from new-campaign setup. Existing campaigns and reports are not affected.`,
+      );
+      if (!confirmed) return;
+    }
+    setTogglingId(row.id);
+    try {
+      const res = await fetch(`/api/admin/assessment-templates/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disabled: disabling }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // 403 = the Wave Q server flag is off (or was killed) — the write
+        // capability is gated even if this UI rendered from a stale page.
+        if (res.status === 403) {
+          toast({
+            title: disabling
+              ? "Cannot disable template"
+              : "Cannot enable template",
+            description:
+              "Admin template controls are not enabled on the server.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+      toast({
+        title: disabling ? "Template disabled" : "Template enabled",
+        description: disabling
+          ? "It no longer appears when setting up a new campaign."
+          : "It appears again when setting up a new campaign.",
+      });
+      await reload();
+    } catch (e) {
+      toast({
+        title: disabling
+          ? "Could not disable template"
+          : "Could not enable template",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -226,6 +298,16 @@ export function AssessmentTemplatesList() {
                       ) : (
                         <span className="wf-pill-status-active">● Active</span>
                       )}
+                      {/* Wave Q (#6) — always shown when the row carries the
+                          persisted disable marker (not flag-gated). */}
+                      {row.disabledAt && (
+                        <span
+                          className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[0.625rem] font-semibold uppercase tracking-wider bg-muted text-muted-foreground"
+                          data-testid={`disabled-badge-${row.id}`}
+                        >
+                          Disabled
+                        </span>
+                      )}
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <span className="wf-actions">
@@ -249,6 +331,27 @@ export function AssessmentTemplatesList() {
                         >
                           Edit
                         </Link>
+                        {/* Wave Q (#6) — Enable/Disable is the flag-gated
+                            write capability; existing actions stay as-is. */}
+                        {waveQEnabled && (
+                          <>
+                            <span className="wf-action-sep">·</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleDisabled(row)}
+                              disabled={togglingId !== null || deletingId !== null}
+                              className="wf-action-link"
+                              data-testid={`toggle-disabled-${row.id}`}
+                              aria-label={
+                                row.disabledAt
+                                  ? `Enable ${row.name}`
+                                  : `Disable ${row.name}`
+                              }
+                            >
+                              {row.disabledAt ? "Enable" : "Disable"}
+                            </button>
+                          </>
+                        )}
                         <span className="wf-action-sep">·</span>
                         <button
                           type="button"

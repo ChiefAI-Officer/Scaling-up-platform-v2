@@ -332,6 +332,156 @@ describe("PATCH /api/admin/assessment-templates/[id]", () => {
       expect(updateArgs.data.resultsEmailContentApprovedBy).toBeNull();
     });
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Wave Q (#1 + #6) — sendResultsDefault write + disable/enable, flag-gated.
+  // The FLAG gates these WRITES only; enforcement (picker filter + campaign
+  // create 409) is unconditional and tested in the respective route tests.
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("Wave Q — sendResultsDefault + disabled (flag-gated writes)", () => {
+    const savedEnabled = process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED;
+    const savedKill = process.env.WAVE_Q_ADMIN_CONTROLS_KILL;
+
+    function existingWaveQ(over: Record<string, unknown> = {}) {
+      return {
+        id: "tpl-1",
+        resultsEmailSubject: "Your results",
+        resultsEmailBodyMarkdown: "Here is your report.",
+        sendResultsDefault: false,
+        disabledAt: null,
+        ...over,
+      };
+    }
+
+    beforeEach(() => {
+      delete process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED;
+      delete process.env.WAVE_Q_ADMIN_CONTROLS_KILL;
+      (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(existingWaveQ());
+      (db.assessmentTemplate.update as jest.Mock).mockResolvedValue({});
+    });
+
+    afterEach(() => {
+      if (savedEnabled === undefined) delete process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED;
+      else process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED = savedEnabled;
+      if (savedKill === undefined) delete process.env.WAVE_Q_ADMIN_CONTROLS_KILL;
+      else process.env.WAVE_Q_ADMIN_CONTROLS_KILL = savedKill;
+    });
+
+    function auditCallsByAction(action: string) {
+      return (db.auditLog.create as jest.Mock).mock.calls.filter(
+        (c) => c[0].data.action === action,
+      );
+    }
+
+    it("flag OFF + sendResultsDefault present → 403 and NO write", async () => {
+      const res = await detailPATCH(
+        patchReq({ sendResultsDefault: true }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(403);
+      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+      expect(db.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it("flag OFF + disabled present → 403 and NO write", async () => {
+      const res = await detailPATCH(
+        patchReq({ disabled: true }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(403);
+      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+    });
+
+    it("flag ON: writes sendResultsDefault + audits TEMPLATE_RESULTS_DEFAULT_CHANGED (old→new), approval fields untouched", async () => {
+      process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED = "1";
+      const res = await detailPATCH(
+        patchReq({ sendResultsDefault: true }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data.sendResultsDefault).toBe(true);
+      // Independent of the results-email approval hash: a default flip must
+      // NOT invalidate or touch any approval field.
+      expect(updateArgs.data.resultsEmailContentApproved).toBeUndefined();
+      expect(updateArgs.data.resultsEmailContentApprovedHash).toBeUndefined();
+      expect(updateArgs.data.resultsEmailContentApprovedAt).toBeUndefined();
+      expect(updateArgs.data.resultsEmailContentApprovedBy).toBeUndefined();
+      const audits = auditCallsByAction("TEMPLATE_RESULTS_DEFAULT_CHANGED");
+      expect(audits).toHaveLength(1);
+      const changes = JSON.parse(audits[0][0].data.changes);
+      expect(changes.sendResultsDefault).toEqual({ old: false, new: true });
+    });
+
+    it("flag ON: disabled:true sets disabledAt + audits TEMPLATE_DISABLED, with NO active-campaign guard", async () => {
+      process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED = "1";
+      // An ACTIVE campaign exists — the DELETE handler 409s on this, but
+      // disable must NOT (existing campaigns keep running by design).
+      (db.assessmentCampaign.findFirst as jest.Mock).mockResolvedValue({ id: "c1" });
+      const res = await detailPATCH(
+        patchReq({ disabled: true }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      // No campaign lookup at all on the disable path.
+      expect(db.assessmentCampaign.findFirst).not.toHaveBeenCalled();
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data.disabledAt).toBeInstanceOf(Date);
+      expect(auditCallsByAction("TEMPLATE_DISABLED")).toHaveLength(1);
+    });
+
+    it("flag ON: disabled:true on an already-disabled template is a no-op (timestamp preserved, no audit)", async () => {
+      process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED = "1";
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(
+        existingWaveQ({ disabledAt: new Date("2026-07-01T00:00:00Z") }),
+      );
+      const res = await detailPATCH(
+        patchReq({ disabled: true }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data.disabledAt).toBeUndefined();
+      expect(auditCallsByAction("TEMPLATE_DISABLED")).toHaveLength(0);
+    });
+
+    it("flag ON: disabled:false clears disabledAt + audits TEMPLATE_ENABLED", async () => {
+      process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED = "1";
+      (db.assessmentTemplate.findFirst as jest.Mock).mockResolvedValue(
+        existingWaveQ({ disabledAt: new Date("2026-07-01T00:00:00Z") }),
+      );
+      const res = await detailPATCH(
+        patchReq({ disabled: false }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data.disabledAt).toBeNull();
+      expect(auditCallsByAction("TEMPLATE_ENABLED")).toHaveLength(1);
+    });
+
+    it("flag ON via kill switch → still 403 (KILL beats ENABLED)", async () => {
+      process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED = "1";
+      process.env.WAVE_Q_ADMIN_CONTROLS_KILL = "1";
+      const res = await detailPATCH(
+        patchReq({ sendResultsDefault: true }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(403);
+      expect(db.assessmentTemplate.update).not.toHaveBeenCalled();
+    });
+
+    it("flag OFF: a PATCH WITHOUT Wave-Q fields still works (regression)", async () => {
+      const res = await detailPATCH(
+        patchReq({ name: "Renamed" }) as never,
+        detailParams,
+      );
+      expect(res.status).toBe(200);
+      const updateArgs = (db.assessmentTemplate.update as jest.Mock).mock.calls[0][0];
+      expect(updateArgs.data.name).toBe("Renamed");
+    });
+  });
 });
 
 describe("DELETE /api/admin/assessment-templates/[id]", () => {

@@ -19,6 +19,11 @@ interface AdminTemplateSummary {
   name: string;
   alias: string;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
+  /** Wave Q (#6) — non-null when the template is disabled for NEW campaigns.
+   *  Disabled templates MUST still be listed here (only deletedAt hides). */
+  disabledAt: Date | null;
+  /** Wave Q (#1) — template-level default for "send results to respondent". */
+  sendResultsDefault: boolean;
 }
 
 export async function GET(request: NextRequest) {
@@ -39,12 +44,16 @@ export async function GET(request: NextRequest) {
     }
 
     const templates = await db.assessmentTemplate.findMany({
+      // Wave Q (#6): keep `deletedAt: null` ONLY — disabled templates stay
+      // listed so the admin UI can badge them and re-enable.
       where: { deletedAt: null },
       select: {
         id: true,
         name: true,
         alias: true,
         aggregationMode: true,
+        disabledAt: true,
+        sendResultsDefault: true,
       },
       orderBy: { name: "asc" },
     });

@@ -13,6 +13,7 @@ import {
   waveDCoachNotifyEnabled,
 } from "@/lib/assessments/wave-d-feature-flags";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
+import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 
 export default async function NewCampaignPage() {
   await requireCoach();
@@ -23,6 +24,10 @@ export default async function NewCampaignPage() {
   // Wave M (#19) — no campaign exists yet at create-time, so the gate is the
   // GLOBAL one (no id), matching the POST route's create-path gate exactly.
   const customSlidesEnabled = isCustomSlidesEnabled();
+  // Wave Q (#1) — server-only env read; the wizard receives the flag as a
+  // prop (mirroring resultsEmailEnabled) and derives the #15 checkbox default
+  // from the picked template's sendResultsDefault when on.
+  const waveQDefaultsEnabled = isWaveQAdminControlsEnabled();
   return (
     <div className="wf-scope max-w-3xl mx-auto">
       <CampaignWizard
@@ -31,6 +36,7 @@ export default async function NewCampaignPage() {
         resultsEmailEnabled={resultsEmailEnabled}
         coachNotifyEnabled={coachNotifyEnabled}
         customSlidesEnabled={customSlidesEnabled}
+        waveQDefaultsEnabled={waveQDefaultsEnabled}
       />
     </div>
   );

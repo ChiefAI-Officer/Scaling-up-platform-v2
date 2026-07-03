@@ -283,6 +283,14 @@ export async function getUserForApiRoute() {
         include: { coachProfile: true },
     });
 
+    // Wave Q (#7, ADR-0018): per-request API liveness — a soft-removed user is
+    // treated as unauthenticated on every API route that resolves an actor.
+    // UNCONDITIONAL (never flag-gated); zero added queries — one field check
+    // on the existing per-request read.
+    if (user?.deletedAt) {
+        return null;
+    }
+
     return user;
 }
 

@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { AssessmentTemplatesList } from "@/components/admin/AssessmentTemplatesList";
+import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 
 export default async function AdminAssessmentTemplatesPage() {
   const session = await getServerSession(authOptions);
@@ -33,7 +34,9 @@ export default async function AdminAssessmentTemplatesPage() {
         <span className="wf-breadcrumb-current">Templates</span>
       </div>
 
-      <AssessmentTemplatesList />
+      {/* Wave Q — server-only env read; the client list receives the flag as
+          a prop and gates the Enable/Disable write capability on it. */}
+      <AssessmentTemplatesList waveQEnabled={isWaveQAdminControlsEnabled()} />
     </div>
   );
 }

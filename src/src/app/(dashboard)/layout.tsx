@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { SignOutButton } from "@/components/layout/sign-out-button";
 import { getAdminNavBadgeCounts } from "@/lib/nav/admin-nav-badges";
+import { db } from "@/lib/db";
 
 export default async function DashboardLayout({
   children,
@@ -22,6 +23,19 @@ export default async function DashboardLayout({
 
   if (!session.user?.role || session.user.role === "COACH") {
     redirect("/unauthorized");
+  }
+
+  // Wave Q (#7, ADR-0018): page liveness — JWTs live 30 days, so a soft-removed
+  // admin would otherwise keep browsing dashboard pages until token expiry.
+  // One deletedAt select per navigation; UNCONDITIONAL (never flag-gated).
+  const liveUser = session.user.email
+    ? await db.user.findUnique({
+        where: { email: session.user.email },
+        select: { deletedAt: true },
+      })
+    : null;
+  if (!liveUser || liveUser.deletedAt) {
+    redirect("/login");
   }
 
   const counts = await getAdminNavBadgeCounts();

@@ -68,11 +68,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check no existing user with this email
+    // Check existing user with this email. Wave Q (#7, ADR-0018): a
+    // soft-removed ADMIN/STAFF tombstone is REVIVED IN PLACE (update, never a
+    // second row — one identity per email forever, FK history and audit trail
+    // stay attached to the same user id). A LIVE user, or a soft-deleted
+    // COACH-role tombstone (never silently convert a coach to ADMIN), keeps
+    // the existing rejection.
     const existingUser = await db.user.findUnique({
       where: { email: normalizedEmail },
     });
-    if (existingUser) {
+    const revivableTombstone =
+      existingUser &&
+      existingUser.deletedAt !== null &&
+      (existingUser.role === "ADMIN" || existingUser.role === "STAFF")
+        ? existingUser
+        : null;
+    if (existingUser && !revivableTombstone) {
       return NextResponse.json(
         { success: false, error: "An account with this email already exists" },
         { status: 400 }
@@ -82,14 +93,29 @@ export async function POST(request: NextRequest) {
     const passwordHash = await bcrypt.hash(password, 12);
 
     await db.$transaction(async (tx) => {
-      await tx.user.create({
-        data: {
-          email: normalizedEmail,
-          name,
-          role: "ADMIN",
-          passwordHash,
-        },
-      });
+      if (revivableTombstone) {
+        await tx.user.update({
+          where: { id: revivableTombstone.id },
+          data: {
+            deletedAt: null,
+            passwordHash,
+            // Role on revival = the invite's role (always ADMIN today) — the
+            // inviting admin's explicit decision; the audit below records the
+            // transition so a former-STAFF promotion is visible, not drift.
+            role: "ADMIN",
+            name,
+          },
+        });
+      } else {
+        await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            name,
+            role: "ADMIN",
+            passwordHash,
+          },
+        });
+      }
 
       await tx.adminInvite.update({
         where: { id: invite.id },
@@ -106,6 +132,13 @@ export async function POST(request: NextRequest) {
             email: normalizedEmail,
             name,
             invitedBy: invite.invitedBy,
+            ...(revivableTombstone
+              ? {
+                  revived: true,
+                  previousRole: revivableTombstone.role,
+                  newRole: "ADMIN",
+                }
+              : {}),
           }),
         },
       });

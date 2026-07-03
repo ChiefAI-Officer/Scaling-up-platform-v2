@@ -107,6 +107,13 @@ interface TemplateSummary {
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
   /** Computed server-side via isResultsEmailApproved. Controls #15 toggle gate. */
   resultsEmailApproved: boolean;
+  /**
+   * Wave Q item #1 — admin-set template default for the #15 checkbox.
+   * Optional defensively (payloads predating the Wave Q API change omit it);
+   * absent reads as false. Only consulted when `waveQDefaultsEnabled` is on
+   * AND the template's results email is approved — approval always wins.
+   */
+  sendResultsDefault?: boolean;
 }
 
 interface Respondent {
@@ -250,6 +257,7 @@ export function CampaignWizard({
   resultsEmailEnabled = false,
   coachNotifyEnabled = false,
   customSlidesEnabled = false,
+  waveQDefaultsEnabled = false,
 }: {
   /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -284,6 +292,18 @@ export function CampaignWizard({
    * the field when its flag is off, so a stale client can't persist slides.
    */
   customSlidesEnabled?: boolean;
+  /**
+   * Wave Q item #1 — gate the template-default derivation of the #15 checkbox
+   * behind WAVE_Q_ADMIN_CONTROLS (mirrors the server flag; passed from the
+   * server page like `resultsEmailEnabled`). When true, picking/switching a
+   * template initializes `sendResultsToRespondent` to
+   * `resultsEmailApproved ? template.sendResultsDefault : false`. When false
+   * (the default merge state) the legacy behavior is byte-identical: the
+   * checkbox starts false and only force-falses on an unapproved template.
+   * A resumed draft ALWAYS keeps its explicitly saved value either way —
+   * only a template-switch after resume re-derives.
+   */
+  waveQDefaultsEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -842,15 +862,24 @@ export function CampaignWizard({
         {state.step === 1 && (
           <TemplateStep
             value={state.templateId}
-            onChange={(id, name, resultsEmailApproved) =>
+            onChange={(id, name, resultsEmailApproved, sendResultsDefault) =>
               setState((s) => ({
                 ...s,
                 templateId: id,
                 templateName: name,
                 templateResultsEmailApproved: resultsEmailApproved,
-                // If the template changes and is no longer approved, clear #15.
-                sendResultsToRespondent:
-                  resultsEmailApproved ? s.sendResultsToRespondent : false,
+                // Wave Q (#1): with the flag on, template selection/switch
+                // re-derives #15 from the picked template's admin default —
+                // approval always wins (unapproved ⇒ false). Flag off keeps
+                // the legacy behavior byte-identical: preserve the current
+                // choice, clearing it only when the template is unapproved.
+                // (Draft resume never runs through here, so a resumed saved
+                // value is untouched until the coach switches templates.)
+                sendResultsToRespondent: waveQDefaultsEnabled
+                  ? resultsEmailApproved && sendResultsDefault
+                  : resultsEmailApproved
+                    ? s.sendResultsToRespondent
+                    : false,
               }))
             }
             onBack={back}
@@ -1033,7 +1062,12 @@ function TemplateStep({
   onNext,
 }: {
   value: string;
-  onChange: (id: string, name: string, resultsEmailApproved: boolean) => void;
+  onChange: (
+    id: string,
+    name: string,
+    resultsEmailApproved: boolean,
+    sendResultsDefault: boolean,
+  ) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -1053,6 +1087,14 @@ function TemplateStep({
       }
     })();
   }, []);
+
+  // Wave Q (#6) — a resumed draft can point at a template that has since been
+  // disabled (or deleted): the picker payload no longer contains it, so the
+  // saved templateId would otherwise ride along silently (no radio appears
+  // selected, yet Next stays enabled) until the campaign-create 409 backstop.
+  // Surface it and force a re-pick instead.
+  const unknownSelection =
+    !loading && value !== "" && !templates.some((t) => t.id === value);
 
   return (
     <div className="space-y-6">
@@ -1090,7 +1132,14 @@ function TemplateStep({
                 name="template"
                 value={t.id}
                 checked={value === t.id}
-                onChange={() => onChange(t.id, t.name, t.resultsEmailApproved)}
+                onChange={() =>
+                  onChange(
+                    t.id,
+                    t.name,
+                    t.resultsEmailApproved,
+                    t.sendResultsDefault === true,
+                  )
+                }
                 className="accent-primary mt-1"
               />
               <div className="flex-1">
@@ -1113,11 +1162,21 @@ function TemplateStep({
         </div>
       )}
 
+      {unknownSelection && (
+        <div
+          role="alert"
+          className="text-sm text-destructive"
+          data-testid="template-unavailable"
+        >
+          This template is no longer available — choose another.
+        </div>
+      )}
+
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="w-4 h-4 mr-2" /> Back
         </Button>
-        <Button onClick={onNext} disabled={!value}>
+        <Button onClick={onNext} disabled={!value || unknownSelection}>
           Next <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>

@@ -58,13 +58,20 @@ export async function POST(request: NextRequest) {
     const existingUser = await db.user.findUnique({
       where: { email: normalizedEmail },
     });
-    if (existingUser?.role === "ADMIN") {
-      return NextResponse.json(
-        { success: false, error: "A user with this email already has admin access" },
-        { status: 400 }
-      );
-    }
-    if (existingUser) {
+    // Wave Q (#7, ADR-0018): a soft-removed ADMIN/STAFF tombstone IS invitable —
+    // accept-invite revives that row in place. A soft-deleted COACH-role
+    // tombstone stays rejected (never silently convert a coach to ADMIN), and
+    // LIVE users keep the exact existing rejections.
+    const isRevivableTombstone =
+      existingUser?.deletedAt != null &&
+      (existingUser.role === "ADMIN" || existingUser.role === "STAFF");
+    if (existingUser && !isRevivableTombstone) {
+      if (existingUser.role === "ADMIN") {
+        return NextResponse.json(
+          { success: false, error: "A user with this email already has admin access" },
+          { status: 400 }
+        );
+      }
       return NextResponse.json(
         { success: false, error: "A user with this email already exists. Remove their existing account first." },
         { status: 400 }
