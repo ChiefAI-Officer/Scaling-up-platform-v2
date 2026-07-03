@@ -4,8 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
+// Wave Q (#7): auth resolves through getApiActor() — the liveness checkpoint
+// (soft-removed users 401 immediately, not at 30-day JWT expiry).
+import { getApiActor } from "@/lib/auth/authorization";
 import {
   createSurveyTemplate,
   listSurveyTemplates,
@@ -24,11 +25,11 @@ const createSurveyTemplateSchema = z.object({
 });
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.user.role !== "ADMIN") {
+  if (actor.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -37,11 +38,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.user.role !== "ADMIN") {
+  if (actor.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
     description,
     surveyType,
     categoryId,
-    createdBy: session.user.id,
+    createdBy: actor.userId,
   });
 
   return NextResponse.json({ success: true, data: template }, { status: 201 });

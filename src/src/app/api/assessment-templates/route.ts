@@ -14,6 +14,12 @@
  * `isResultsEmailApproved` and returned to the wizard so the #15 toggle can
  * self-disable when the template's approval hash does not match. The raw
  * hash is NEVER exposed to the client.
+ *
+ * Wave Q (#6): disabled templates (`disabledAt` set) are hidden from BOTH
+ * branches UNCONDITIONALLY — spec 19q durable rule: flags gate capabilities
+ * and writes, never the enforcement of persisted admin intent.
+ * Wave Q (#1): the raw stored `sendResultsDefault` is returned alongside
+ * `resultsEmailApproved` so the wizard can derive the checkbox default.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -29,6 +35,8 @@ interface TemplateSummary {
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
   /** True only when the results-email content is approved AND the hash matches. */
   resultsEmailApproved: boolean;
+  /** Wave Q (#1) — raw stored template-level default for "send results to respondent". */
+  sendResultsDefault: boolean;
 }
 
 export async function GET(request: NextRequest) {
@@ -46,13 +54,15 @@ export async function GET(request: NextRequest) {
 
     if (isPrivilegedRole(actor.role)) {
       const templates = await db.assessmentTemplate.findMany({
-        where: { deletedAt: null },
+        // Wave Q (#6): `disabledAt: null` is UNCONDITIONAL (never flag-gated).
+        where: { deletedAt: null, disabledAt: null },
         select: {
           id: true,
           name: true,
           alias: true,
           description: true,
           aggregationMode: true,
+          sendResultsDefault: true,
           resultsEmailContentApproved: true,
           resultsEmailContentApprovedHash: true,
           resultsEmailSubject: true,
@@ -69,6 +79,7 @@ export async function GET(request: NextRequest) {
           description: t.description,
           aggregationMode: t.aggregationMode,
           resultsEmailApproved: isResultsEmailApproved(t),
+          sendResultsDefault: t.sendResultsDefault,
         })) satisfies TemplateSummary[],
       });
     }
@@ -119,13 +130,15 @@ export async function GET(request: NextRequest) {
     }
 
     const templates = await db.assessmentTemplate.findMany({
-      where: { id: { in: accessibleTemplateIds }, deletedAt: null },
+      // Wave Q (#6): `disabledAt: null` is UNCONDITIONAL (never flag-gated).
+      where: { id: { in: accessibleTemplateIds }, deletedAt: null, disabledAt: null },
       select: {
         id: true,
         name: true,
         alias: true,
         description: true,
         aggregationMode: true,
+        sendResultsDefault: true,
         resultsEmailContentApproved: true,
         resultsEmailContentApprovedHash: true,
         resultsEmailSubject: true,
@@ -143,6 +156,7 @@ export async function GET(request: NextRequest) {
         description: t.description,
         aggregationMode: t.aggregationMode,
         resultsEmailApproved: isResultsEmailApproved(t),
+        sendResultsDefault: t.sendResultsDefault,
       })) satisfies TemplateSummary[],
     });
   } catch (error) {

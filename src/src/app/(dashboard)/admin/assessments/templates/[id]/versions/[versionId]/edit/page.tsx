@@ -14,6 +14,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { TemplateEditorTabbed } from "@/components/admin/TemplateEditorTabbed";
+import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 
 export default async function AdminAssessmentVersionEditPage({
   params,
@@ -44,6 +45,8 @@ export default async function AdminAssessmentVersionEditPage({
         resultsEmailSubject: true,
         resultsEmailBodyMarkdown: true,
         resultsEmailContentApproved: true,
+        // Wave Q (#1) — template-row results-email default toggle.
+        sendResultsDefault: true,
         aggregationMode: true,
       },
     }),
@@ -94,6 +97,7 @@ export default async function AdminAssessmentVersionEditPage({
           resultsEmailSubject: template.resultsEmailSubject,
           resultsEmailBodyMarkdown: template.resultsEmailBodyMarkdown,
           resultsEmailContentApproved: template.resultsEmailContentApproved,
+          sendResultsDefault: template.sendResultsDefault,
           aggregationMode: template.aggregationMode,
           // accessMode is a campaign-level concept; templates default to INVITED
           // (v1 PUBLIC mode is hardcoded for Website Assessment per WF16 spec).
@@ -123,6 +127,9 @@ export default async function AdminAssessmentVersionEditPage({
               : v.publishedAt,
           contentHash: v.contentHash,
         }))}
+        // Wave Q — server-only env read; the client editor receives the flag
+        // as a prop and gates the sendResultsDefault toggle on it.
+        waveQEnabled={isWaveQAdminControlsEnabled()}
       />
     </div>
   );

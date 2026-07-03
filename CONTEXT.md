@@ -18,6 +18,13 @@ _Avoid_: revision, draft (a draft is just a version with `publishedAt = null`).
 Among a template's published versions, the **latest** one — the version a *new* **Campaign** automatically pins. Older published versions stay published only to keep serving the campaigns already sent with them. There is exactly one Active version per template+language, and correction is **forward-only**: publish a newer version to supersede — never resurrect an older one (that would break longitudinal comparability, see ADR-0016).
 _Avoid_: treating every "Published" version as interchangeable — only the Active (latest published) version goes out on new sends.
 
+**Disabled template** (Wave Q, Jeff July-1 #6):
+A template an admin has retired from *new* use (e.g. QSP V1 after V2 shipped): it no longer appears when anyone — coach or admin — sets up a new **Campaign**, but it stays fully alive everywhere else (existing campaigns, reports, trends, re-seeds, the admin templates list, where it carries a Disabled badge and can be re-enabled). A **third lifecycle state**, distinct from soft-delete (`deletedAt`), which hides the template everywhere and is blocked while active campaigns exist.
+_Avoid_: "deleted", "archived" (delete already means something stronger here); assuming disable affects running campaigns — it never does.
+
+**Results-email default** (Wave Q, Jeff July-1 #1):
+A template-level default for the per-campaign "send results to respondents" toggle. The campaign wizard checkbox *starts* at the chosen template's default; the coach's per-campaign flip **is** the override (no coach-level standing preference exists). The default is storable at any time but **inert until the template's results-email content is approved** — the approval hash-gate always wins, at wizard time and at send time.
+
 **Domain** (Scaling Up Full only):
 One of the five top-level categories a Scaling Up Full question rolls up into: **People, Strategy, Execution, Cash, You**.
 _Avoid_: section (a section is a finer grouping within a domain), category, pillar.
@@ -110,6 +117,12 @@ _Avoid_: conflating it with the **Cohort trend** (aggregate, everyone at once) o
 **Report access gate**:
 The single server-side envelope every report-viewing route passes through before a report renders. It owns the *cross-cutting* protocol — actor resolution, the rate-limit guard (fail-closed to an enumeration-safe 404 when exceeded, but tolerant of a rate-limiter *outage*), the fail-closed audit write (with IP/UA + report provenance), no-store, and structured view metrics — and it wraps a report *loader*. The **loader** owns the domain authorization (`canManageCampaign` / `canViewGroupReport`) and returns the discriminated outcome (forbidden / notApplicable / empty / ok); the gate writes the audit + emits metrics on `ok` and hands the outcome back to the page, which renders each case. Two adapters today: the per-respondent **Results report** and the cohort **Aggregate report**.
 _Avoid_: "middleware" (the real `no-store` response header is set in Next middleware — a separate layer), "auth guard" (authorization lives in the loader, not the gate — the gate never decides who may see what).
+
+### Platform access
+
+**Admin removal** (Wave Q, Jeff July-1 #7):
+Offboarding an ADMIN/STAFF user who left the company. Always a **soft** removal (`User.deletedAt`) — historical `createdBy` references keep pointing at the tombstone — plus deletion of their `AdminInvite` row. Removal is enforced at login *and* by a per-request liveness check on privileged sessions (a removed admin is cut off in minutes, not at JWT expiry), and that enforcement is **deliberately not kill-switchable** — a killed Wave Q flag stops further removals but never re-admits the removed. A removed email is re-invitable: accepting a fresh invite **revives the same User row in place** (one identity per email, forever), never a second row.
+_Avoid_: "delete admin" implying a hard row delete (FKs forbid it); assuming a kill switch restores access.
 
 ## Relationships
 

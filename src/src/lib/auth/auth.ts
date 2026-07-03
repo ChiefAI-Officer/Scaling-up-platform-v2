@@ -9,7 +9,7 @@ export type UserRole = "ADMIN" | "STAFF" | "COACH";
 // Guardrail: DEMO_MODE can only be effective in local development.
 enforceProductionSafeAuthPosture("startup");
 
-function isCanonicalAdminEmail(email: string): boolean {
+export function isCanonicalAdminEmail(email: string): boolean {
   const configuredAdminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   if (!configuredAdminEmail) return false; // Fail closed — no canonical admin when env var unset
   return email.toLowerCase() === configuredAdminEmail;
@@ -68,6 +68,16 @@ export const authOptions: NextAuthOptions = {
         });
 
         if (!user) {
+          throw new Error(INVALID_CREDENTIALS);
+        }
+
+        // Wave Q (#7, ADR-0018): soft-removed users cannot log in — ANY role.
+        // UNCONDITIONAL (never flag-gated): a kill switch must not un-fire an
+        // offboarding. The canonical admin bypasses the INVITE guard below but
+        // deliberately NOT this check (removal guards forbid removing the
+        // canonical row, but fail closed anyway).
+        if (user.deletedAt) {
+          console.error(`Blocked login for soft-removed user ${user.email}`);
           throw new Error(INVALID_CREDENTIALS);
         }
 

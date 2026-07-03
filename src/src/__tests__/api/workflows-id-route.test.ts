@@ -16,6 +16,24 @@ jest.mock("@/lib/auth/auth", () => ({
   authOptions: {},
 }));
 
+jest.mock("@/lib/auth/authorization", () => ({
+  // Wave Q: these routes now resolve auth via getApiActor (liveness checkpoint).
+  // Derive the actor from the suite's mocked getServerSession so every
+  // existing per-test session setup keeps working unchanged.
+  getApiActor: jest.fn(async () => {
+    const session = await jest.requireMock("next-auth").getServerSession();
+    if (!session?.user) return null;
+    return {
+      userId: session.user.id,
+      email: session.user.email ?? "user@example.com",
+      role: session.user.role,
+      coachId: session.user.coachId ?? null,
+    };
+  }),
+  isPrivilegedRole: (role) => role === "ADMIN" || role === "STAFF",
+}));
+
+
 jest.mock("@/lib/workflows/workflow-service", () => ({
   getWorkflow: jest.fn(),
   updateWorkflow: jest.fn(),

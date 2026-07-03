@@ -4,6 +4,9 @@
  * GET — full template + version list (includes drafts).
  * PATCH — edit metadata only (name, description, invitation email, aggregationMode).
  *         alias is intentionally immutable; content is version-locked.
+ *         Wave Q adds two flag-gated fields: `sendResultsDefault` (#1) and
+ *         `disabled` (#6 → disabledAt). NO active-campaign guard on disable —
+ *         existing campaigns keep running by design (contrast with DELETE).
  * DELETE — soft-delete (sets deletedAt). 409 if any non-DRAFT campaign references this template.
  */
 
@@ -14,6 +17,7 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { resultsEmailContentHash } from "@/lib/assessments/results-email-approval";
+import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 
 export async function GET(
   _request: NextRequest,
@@ -90,6 +94,11 @@ const PatchTemplateBodySchema = z.object({
   resultsEmailSubject: z.string().max(200).trim().nullable().optional(),
   resultsEmailBodyMarkdown: z.string().max(5000).nullable().optional(),
   resultsEmailContentApproved: z.boolean().optional(),
+  // Wave Q (#1 + #6) — both OPTIONAL and flag-gated (403 when present with
+  // the WAVE_Q_ADMIN_CONTROLS flag off). `sendResultsDefault` is independent
+  // of the results-email approval hash; `disabled` maps to `disabledAt`.
+  sendResultsDefault: z.boolean().optional(),
+  disabled: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -129,12 +138,34 @@ export async function PATCH(
       );
     }
 
+    const data = parsed.data;
+
+    // Wave Q — the flag gates these WRITES (never the enforcement of already
+    // persisted intent). Reject BEFORE any read/write when either field is
+    // present with the flag off.
+    if (
+      (data.sendResultsDefault !== undefined || data.disabled !== undefined) &&
+      !isWaveQAdminControlsEnabled()
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "ADMIN_CONTROLS_DISABLED",
+          message:
+            "Template admin controls (sendResultsDefault/disabled) are not enabled.",
+        },
+        { status: 403 },
+      );
+    }
+
     const existing = await db.assessmentTemplate.findFirst({
       where: { id, deletedAt: null },
       select: {
         id: true,
         resultsEmailSubject: true,
         resultsEmailBodyMarkdown: true,
+        sendResultsDefault: true,
+        disabledAt: true,
       },
     });
     if (!existing) {
@@ -143,8 +174,6 @@ export async function PATCH(
         { status: 404 },
       );
     }
-
-    const data = parsed.data;
     const updateData: {
       name?: string;
       description?: string | null;
@@ -157,6 +186,8 @@ export async function PATCH(
       resultsEmailContentApprovedHash?: string | null;
       resultsEmailContentApprovedAt?: Date | null;
       resultsEmailContentApprovedBy?: string | null;
+      sendResultsDefault?: boolean;
+      disabledAt?: Date | null;
     } = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
@@ -208,6 +239,32 @@ export async function PATCH(
       updateData.resultsEmailContentApprovedBy = null;
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Wave Q (#1) — sendResultsDefault: writes the column only. Deliberately
+    // INDEPENDENT of the results-email approval hash — a default flip never
+    // touches or invalidates any resultsEmailContentApproved* field.
+    // ─────────────────────────────────────────────────────────────────────
+    const resultsDefaultChanged =
+      data.sendResultsDefault !== undefined &&
+      data.sendResultsDefault !== existing.sendResultsDefault;
+    if (data.sendResultsDefault !== undefined) {
+      updateData.sendResultsDefault = data.sendResultsDefault;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Wave Q (#6) — disable/enable. NO active-campaign guard, by design
+    // (existing campaigns keep running — contrast with DELETE's 409).
+    // disable is a no-op when already disabled (original timestamp kept).
+    // ─────────────────────────────────────────────────────────────────────
+    let disableAudit: "TEMPLATE_DISABLED" | "TEMPLATE_ENABLED" | null = null;
+    if (data.disabled === true && existing.disabledAt === null) {
+      updateData.disabledAt = new Date();
+      disableAudit = "TEMPLATE_DISABLED";
+    } else if (data.disabled === false && existing.disabledAt !== null) {
+      updateData.disabledAt = null;
+      disableAudit = "TEMPLATE_ENABLED";
+    }
+
     await db.assessmentTemplate.update({ where: { id }, data: updateData });
 
     await logAudit({
@@ -217,6 +274,36 @@ export async function PATCH(
       performedBy: actor.email ?? actor.userId,
       changes: updateData,
     });
+
+    if (data.sendResultsDefault !== undefined && resultsDefaultChanged) {
+      await logAudit({
+        entityType: "AssessmentTemplate",
+        entityId: id,
+        action: "TEMPLATE_RESULTS_DEFAULT_CHANGED",
+        performedBy: actor.email ?? actor.userId,
+        changes: {
+          sendResultsDefault: {
+            old: existing.sendResultsDefault,
+            new: data.sendResultsDefault,
+          },
+        },
+      });
+    }
+
+    if (disableAudit) {
+      await logAudit({
+        entityType: "AssessmentTemplate",
+        entityId: id,
+        action: disableAudit,
+        performedBy: actor.email ?? actor.userId,
+        changes: {
+          disabledAt: {
+            old: existing.disabledAt,
+            new: updateData.disabledAt ?? null,
+          },
+        },
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

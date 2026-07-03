@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth/auth";
 import ChangePasswordForm from "@/components/auth/change-password-form";
 import { InviteAdminSection } from "@/components/admin/invite-admin-section";
+import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 import { FadeUp } from "@/components/ui/animated";
 
 export default async function AdminSettingsPage() {
@@ -33,7 +34,9 @@ export default async function AdminSettingsPage() {
           <ChangePasswordForm />
         </div>
 
-        <InviteAdminSection />
+        {/* Wave Q (#7): the flag gates only the remove CAPABILITY — server
+            enforcement of an already-removed user stays unconditional. */}
+        <InviteAdminSection waveQEnabled={isWaveQAdminControlsEnabled()} />
       </div>
     </FadeUp>
   );

@@ -124,6 +124,13 @@ export interface TemplateEditorTabbedTemplate {
   resultsEmailSubject?: string | null;
   resultsEmailBodyMarkdown?: string | null;
   resultsEmailContentApproved?: boolean;
+  /**
+   * Wave Q item #1 — admin default for the wizard's #15 "email each
+   * respondent their results" checkbox. TEMPLATE-ROW field (like
+   * invitationSubject), never version content — stored while unapproved,
+   * inert until the results email content is approved.
+   */
+  sendResultsDefault?: boolean;
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
   accessMode?: "INVITED" | "PUBLIC";
 }
@@ -168,6 +175,12 @@ export interface TemplateEditorTabbedProps {
   onSaveDraft?: () => void | Promise<void>;
   /** Test-only injection for the dirty state slice. */
   initialDirtyFlags?: DirtyFlags;
+  /**
+   * Wave Q — gates the "Send results to respondents by default" toggle (a
+   * flag-gated write capability). Server-computed
+   * (`isWaveQAdminControlsEnabled()`) and passed down from the edit page.
+   */
+  waveQEnabled?: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -189,6 +202,7 @@ export function TemplateEditorTabbed({
   allVersions,
   onSaveDraft,
   initialDirtyFlags,
+  waveQEnabled = false,
 }: TemplateEditorTabbedProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -355,6 +369,76 @@ export function TemplateEditorTabbed({
       setVersionDirty();
     },
     [setVersionDirty],
+  );
+
+  // ─── Wave Q (#1) — sendResultsDefault toggle ──────────────────────────
+  // TEMPLATE-ROW field (like invitationSubject) — deliberately OUTSIDE the
+  // Save Draft / dirty-flags flow: Save Draft is unavailable on published
+  // versions, but this default must stay editable regardless of version
+  // publish state, so the switch PATCHes the template row immediately.
+  // The flip is independent of the results-email approval hash (a default
+  // flip never invalidates approval) and inert until approval.
+  const [sendResultsDefault, setSendResultsDefault] = useState(
+    template.sendResultsDefault ?? false,
+  );
+  const [savingSendResultsDefault, setSavingSendResultsDefault] =
+    useState(false);
+  const handleSendResultsDefaultChange = useCallback(
+    async (next: boolean) => {
+      if (savingSendResultsDefault) return;
+      setSavingSendResultsDefault(true);
+      try {
+        const res = await fetch(
+          `/api/admin/assessment-templates/${template.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sendResultsDefault: next }),
+          },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          // 403 = the Wave Q server flag is off (or was killed) — the write
+          // capability is gated even if this UI rendered from a stale page.
+          if (res.status === 403) {
+            toast({
+              title: "Could not update the results-email default",
+              description:
+                "Admin template controls are not enabled on the server.",
+              variant: "destructive",
+            });
+            return;
+          }
+          toast({
+            title: "Could not update the results-email default",
+            description:
+              typeof body?.error === "string"
+                ? body.error
+                : "Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        setSendResultsDefault(next);
+        toast({
+          title: next
+            ? "Results email on by default"
+            : "Results email off by default",
+          description: next
+            ? "New campaigns on this template start with the results email checked (once the content is approved)."
+            : "New campaigns on this template start with the results email unchecked.",
+        });
+      } catch (e) {
+        toast({
+          title: "Could not update the results-email default",
+          description: e instanceof Error ? e.message : "Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setSavingSendResultsDefault(false);
+      }
+    },
+    [savingSendResultsDefault, template.id, toast],
   );
 
   // Section operations — F2 / F2b.
@@ -1028,6 +1112,10 @@ export function TemplateEditorTabbed({
               allVersions={allVersions}
               currentVersionId={version.id}
               isReadOnly={isPublished}
+              waveQEnabled={waveQEnabled}
+              sendResultsDefault={sendResultsDefault}
+              sendResultsDefaultSaving={savingSendResultsDefault}
+              onSendResultsDefaultChange={handleSendResultsDefaultChange}
             />
           </div>
         </TabsContent>

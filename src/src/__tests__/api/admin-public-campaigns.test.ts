@@ -253,6 +253,22 @@ describe("POST /api/admin/public-campaigns — CREATE", () => {
       const res = await createPost(makeCreateRequest(validBody) as never);
       expect(res.status).toBe(404);
     });
+
+    // Wave Q (#6) — disabled templates are refused for NEW public campaigns
+    // UNCONDITIONALLY (adversarial-review catch: this was the missed third
+    // new-campaign path). Flag env is untouched here: enforcement must hold
+    // with the flag OFF.
+    it("returns 409 TEMPLATE_DISABLED for a disabled template (flag off)", async () => {
+      (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+        ...mockTemplate,
+        disabledAt: new Date("2026-07-02T00:00:00Z"),
+      });
+      const res = await createPost(makeCreateRequest(validBody) as never);
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error).toBe("TEMPLATE_DISABLED");
+      expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+    });
   });
 
   describe("happy path — no closeAt (OPEN_END)", () => {

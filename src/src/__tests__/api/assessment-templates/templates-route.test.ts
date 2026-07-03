@@ -63,9 +63,37 @@ describe("GET /api/assessment-templates", () => {
       new Request("http://localhost/api/assessment-templates") as never,
     );
     expect(res.status).toBe(200);
+    // Wave Q (#6): the picker hides disabled templates UNCONDITIONALLY (not
+    // flag-gated) while keeping the deletedAt filter (regression).
     expect(db.assessmentTemplate.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { deletedAt: null } }),
+      expect.objectContaining({ where: { deletedAt: null, disabledAt: null } }),
     );
+  });
+
+  it("admin payload carries the raw stored sendResultsDefault (Wave Q #1)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    (db.assessmentTemplate.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "t1",
+        name: "Rockefeller",
+        alias: "rkf",
+        description: null,
+        aggregationMode: "FULL_VISIBILITY",
+        sendResultsDefault: true,
+        resultsEmailContentApproved: false,
+        resultsEmailContentApprovedHash: null,
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+      },
+    ]);
+    const res = await GET(
+      new Request("http://localhost/api/assessment-templates") as never,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data[0].sendResultsDefault).toBe(true);
+    // Existing approval boolean still present alongside it.
+    expect(body.data[0].resultsEmailApproved).toBe(false);
   });
 
   it("coach with no active groups gets empty list", async () => {
@@ -102,9 +130,39 @@ describe("GET /api/assessment-templates", () => {
     expect(res.status).toBe(200);
     expect(db.assessmentTemplate.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: { in: ["tpl-1"] }, deletedAt: null },
+        where: { id: { in: ["tpl-1"] }, deletedAt: null, disabledAt: null },
       }),
     );
+  });
+
+  it("coach payload carries sendResultsDefault (Wave Q #1)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
+      { accessGroupId: "g1", coachId: "coach-1", accessGroup: { id: "g1", deletedAt: null } },
+    ]);
+    (db.accessGroupTemplate.findMany as jest.Mock).mockResolvedValue([
+      { accessGroupId: "g1", templateId: "tpl-1" },
+    ]);
+    (db.assessmentTemplate.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "tpl-1",
+        name: "R",
+        alias: "r",
+        description: null,
+        aggregationMode: "FULL_VISIBILITY",
+        sendResultsDefault: false,
+        resultsEmailContentApproved: false,
+        resultsEmailContentApprovedHash: null,
+        resultsEmailSubject: null,
+        resultsEmailBodyMarkdown: null,
+      },
+    ]);
+    const res = await GET(
+      new Request("http://localhost/api/assessment-templates") as never,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data[0].sendResultsDefault).toBe(false);
   });
 
   it("coach: soft-deleted groups excluded from INTERSECTION denominator", async () => {
@@ -126,7 +184,7 @@ describe("GET /api/assessment-templates", () => {
     expect(res.status).toBe(200);
     expect(db.assessmentTemplate.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: { in: ["tpl-1"] }, deletedAt: null },
+        where: { id: { in: ["tpl-1"] }, deletedAt: null, disabledAt: null },
       }),
     );
   });

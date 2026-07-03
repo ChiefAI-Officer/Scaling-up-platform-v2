@@ -4,9 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
-import { isPrivilegedRole } from "@/lib/auth/authorization";
+// Wave Q (#7): auth resolves through getApiActor() — the liveness checkpoint
+// (soft-removed users 401 immediately, not at 30-day JWT expiry).
+import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import {
   assignWorkflowToWorkshop,
   unassignWorkflow,
@@ -30,11 +30,11 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!isPrivilegedRole(session.user.role)) {
+  if (!isPrivilegedRole(actor.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -61,7 +61,7 @@ export async function POST(
     const assignment = await assignWorkflowToWorkshop({
       workflowId,
       workshopId,
-      assignedBy: session.user.id,
+      assignedBy: actor.userId,
     });
 
     // Fire Inngest event to schedule workflow execution
@@ -107,11 +107,11 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!isPrivilegedRole(session.user.role)) {
+  if (!isPrivilegedRole(actor.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

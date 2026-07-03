@@ -5,8 +5,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth/auth";
 import { canManageCoachData, getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { db } from "@/lib/db";
 import {
@@ -67,8 +65,10 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  // Wave Q (#7): auth resolves through getApiActor() — the liveness checkpoint
+  // (soft-removed users 401 immediately, not at JWT expiry).
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -90,11 +90,6 @@ export async function PATCH(
 
   const { id } = paramsValidation.data;
   const { workflowStepId, category, workshopId } = bodyValidation.data;
-  const actor = await getApiActor();
-
-  if (!actor) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   const file = await getFile(id);
   if (!file) {
@@ -172,8 +167,10 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
+  // Wave Q (#7): was the last raw-session handler in this file — now flows
+  // through the getApiActor() liveness checkpoint like GET/PATCH.
+  const actor = await getApiActor();
+  if (!actor) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -192,8 +189,7 @@ export async function DELETE(
   if (!file) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
-  const userRole = (session.user as { role?: string }).role || "";
-  if (file.uploadedBy !== session.user.id && !isPrivilegedRole(userRole as "ADMIN" | "STAFF" | "COACH")) {
+  if (file.uploadedBy !== actor.userId && !isPrivilegedRole(actor.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

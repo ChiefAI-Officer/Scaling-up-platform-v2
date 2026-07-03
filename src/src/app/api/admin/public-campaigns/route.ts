@@ -163,12 +163,26 @@ export async function POST(request: NextRequest) {
     // 5. Fetch template row (alias for slug generation)
     const template = await db.assessmentTemplate.findUnique({
       where: { id: templateId },
-      select: { id: true, alias: true },
+      select: { id: true, alias: true, disabledAt: true },
     });
     if (!template) {
       return NextResponse.json(
         { success: false, error: "Template not found" },
         { status: 404 }
+      );
+    }
+    // Wave Q (#6): a disabled template cannot be used for NEW campaigns —
+    // public campaigns included. UNCONDITIONAL (not flag-gated), mirroring
+    // the org campaign-create gate (spec 19q durable rule).
+    if (template.disabledAt) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "TEMPLATE_DISABLED",
+          message:
+            "This template has been disabled and cannot be used for new campaigns.",
+        },
+        { status: 409 }
       );
     }
 

@@ -82,4 +82,41 @@ describe("GET /api/admin/assessment-templates", () => {
     expect(body.success).toBe(true);
     expect(body.data).toHaveLength(1);
   });
+
+  // Wave Q (#6): DISABLED templates must STILL be listed (only deletedAt
+  // filters the admin list), carrying disabledAt + sendResultsDefault so the
+  // list UI can badge and toggle.
+  it("200 admin → disabled template still listed with disabledAt + sendResultsDefault", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(adminActor);
+    const disabledAt = new Date("2026-07-02T00:00:00Z");
+    (db.assessmentTemplate.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: "t1",
+        name: "QSP v1",
+        alias: "qsp-v1",
+        aggregationMode: "FULL_VISIBILITY",
+        disabledAt,
+        sendResultsDefault: true,
+      },
+    ]);
+    const res = await GET(
+      new Request("http://localhost/api/admin/assessment-templates") as never,
+    );
+    expect(res.status).toBe(200);
+    // The where clause must NOT filter on disabledAt…
+    expect(db.assessmentTemplate.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { deletedAt: null },
+        select: expect.objectContaining({
+          disabledAt: true,
+          sendResultsDefault: true,
+        }),
+      }),
+    );
+    // …and the payload must expose both fields.
+    const body = await res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].disabledAt).toBe(disabledAt.toISOString());
+    expect(body.data[0].sendResultsDefault).toBe(true);
+  });
 });

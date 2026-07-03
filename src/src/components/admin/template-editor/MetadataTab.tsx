@@ -79,6 +79,17 @@ export interface MetadataTabProps {
   allVersions: MetadataTabVersionMeta[];
   currentVersionId: string;
   isReadOnly: boolean;
+  /**
+   * Wave Q (#1) — gates the "Send results to respondents by default" toggle
+   * in the Results Email card (a flag-gated write capability; default off).
+   */
+  waveQEnabled?: boolean;
+  /** Wave Q (#1) — current template-row default (admin-set, coach-overridable). */
+  sendResultsDefault?: boolean;
+  /** Wave Q (#1) — in-flight guard while the immediate PATCH resolves. */
+  sendResultsDefaultSaving?: boolean;
+  /** Wave Q (#1) — flips the default via an immediate template-row PATCH. */
+  onSendResultsDefaultChange?: (next: boolean) => void;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -99,6 +110,10 @@ export function MetadataTab({
   allVersions,
   currentVersionId,
   isReadOnly,
+  waveQEnabled = false,
+  sendResultsDefault = false,
+  sendResultsDefaultSaving = false,
+  onSendResultsDefaultChange,
 }: MetadataTabProps) {
   return (
     <div className="space-y-8">
@@ -140,6 +155,10 @@ export function MetadataTab({
               onTemplateFieldChange({ resultsEmailContentApproved: v })
             }
             isReadOnly={isReadOnly}
+            waveQEnabled={waveQEnabled}
+            sendResultsDefault={sendResultsDefault}
+            sendResultsDefaultSaving={sendResultsDefaultSaving}
+            onSendResultsDefaultChange={onSendResultsDefaultChange}
           />
         </div>
 
@@ -514,6 +533,10 @@ function ResultsEmailCard({
   onBodyChange,
   onContentApprovedChange,
   isReadOnly,
+  waveQEnabled = false,
+  sendResultsDefault = false,
+  sendResultsDefaultSaving = false,
+  onSendResultsDefaultChange,
 }: {
   subject: string;
   body: string;
@@ -522,6 +545,10 @@ function ResultsEmailCard({
   onBodyChange: (v: string) => void;
   onContentApprovedChange: (v: boolean) => void;
   isReadOnly: boolean;
+  waveQEnabled?: boolean;
+  sendResultsDefault?: boolean;
+  sendResultsDefaultSaving?: boolean;
+  onSendResultsDefaultChange?: (next: boolean) => void;
 }) {
   return (
     <section className="wf-card" style={{ padding: "1.5rem" }}>
@@ -623,6 +650,51 @@ function ResultsEmailCard({
           </button>
         </div>
       </div>
+
+      {/* Wave Q (#1) — flag-gated results-email DEFAULT toggle. This is a
+          TEMPLATE-ROW field (like invitationSubject), NOT version content:
+          it PATCHes immediately (outside Save Draft) and deliberately does
+          NOT respect isReadOnly, so it stays editable even while a published
+          version is being viewed. Stored while unapproved; inert until the
+          results email content is approved. */}
+      {waveQEnabled && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2 p-3 rounded border border-border bg-muted/30">
+            <span className="text-xs text-foreground">
+              Send results to respondents by default
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
+                {sendResultsDefault ? "On" : "Off"}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={sendResultsDefault}
+                aria-label="Send results to respondents by default"
+                disabled={sendResultsDefaultSaving}
+                onClick={() =>
+                  onSendResultsDefaultChange?.(!sendResultsDefault)
+                }
+                className={`relative inline-flex h-5 w-9 items-center rounded-full border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  sendResultsDefault
+                    ? "bg-primary border-primary"
+                    : "bg-muted border-border"
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 rounded-full bg-background shadow transition-transform ${
+                    sendResultsDefault ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+          <p className="text-[0.6875rem] text-muted-foreground">
+            Takes effect once the results email content is approved.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

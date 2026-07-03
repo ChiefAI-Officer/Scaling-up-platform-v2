@@ -134,6 +134,14 @@ export async function canAccessWorkshop(workshopId: string): Promise<boolean> {
         where: { email: session.user.email },
     });
 
+    // Wave Q (#7): soft-removed users never pass — without this, a removed
+    // HYBRID admin (coach profile + live JWT) could still clone/request-edit
+    // ANY workshop through the ADMIN branch below. Row is already read;
+    // zero added queries. UNCONDITIONAL (ADR-0018).
+    if (user?.deletedAt) {
+        return false;
+    }
+
     if (user?.role === "ADMIN") {
         return true;
     }
@@ -282,6 +290,14 @@ export async function getUserForApiRoute() {
         where: { email: session.user.email },
         include: { coachProfile: true },
     });
+
+    // Wave Q (#7, ADR-0018): per-request API liveness — a soft-removed user is
+    // treated as unauthenticated on every API route that resolves an actor.
+    // UNCONDITIONAL (never flag-gated); zero added queries — one field check
+    // on the existing per-request read.
+    if (user?.deletedAt) {
+        return null;
+    }
 
     return user;
 }

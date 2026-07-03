@@ -89,6 +89,7 @@ beforeEach(() => {
   (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
     id: "tpl-1",
     alias: "rockefeller",
+    disabledAt: null,
   });
   (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue({
     id: "ver-1",
@@ -219,6 +220,58 @@ describe("POST /api/assessment-campaigns", () => {
     expect(res.status).toBe(422);
     const body = await res.json();
     expect(body.error).toBe("TEMPLATE_VERSION_NOT_PUBLISHED");
+  });
+
+  // ───────────────────────────────────────────────────────────────────────
+  // Wave Q (#6) — disabled templates are rejected UNCONDITIONALLY (durable
+  // rule: enforcement of persisted admin intent is never flag-gated).
+  // ───────────────────────────────────────────────────────────────────────
+  describe("Wave Q — disabled template rejection", () => {
+    const savedEnabled = process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED;
+
+    beforeEach(() => {
+      // Flag explicitly OFF — the 409 must fire anyway.
+      delete process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED;
+    });
+
+    afterEach(() => {
+      if (savedEnabled === undefined) delete process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED;
+      else process.env.WAVE_Q_ADMIN_CONTROLS_ENABLED = savedEnabled;
+    });
+
+    it("409 TEMPLATE_DISABLED even with the flag OFF; no campaign created", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+      (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
+        id: "tpl-1",
+        alias: "rockefeller",
+        disabledAt: new Date("2026-07-02T00:00:00Z"),
+      });
+      const res = await POST(jsonReq(validBody) as never);
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body).toEqual({
+        success: false,
+        error: "TEMPLATE_DISABLED",
+        message:
+          "This template has been disabled and cannot be used for new campaigns.",
+      });
+      expect(db.assessmentCampaign.create).not.toHaveBeenCalled();
+    });
+
+    it("template query selects disabledAt", async () => {
+      (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+      (db.assessmentCampaign.create as jest.Mock).mockResolvedValue({
+        id: "c1",
+        alias: "acme_rockefeller_260601100000",
+      });
+      const res = await POST(jsonReq(validBody) as never);
+      expect(res.status).toBe(201);
+      expect(db.assessmentTemplate.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({ disabledAt: true }),
+        }),
+      );
+    });
   });
 
   it("happy path creates DRAFT campaign with coach ownership", async () => {
