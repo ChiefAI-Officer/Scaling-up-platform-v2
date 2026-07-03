@@ -85,7 +85,7 @@ If the hand-check fails, that is a Wave L defect: it gets fixed + tested in this
 - **Tap on current value:** re-commits the same value — harmless no-op (matches drag-to-same behavior).
 - **Long question labels in R-2:** stacked layout removes the truncation pressure; `white-space: pre-wrap; word-break: break-word` on answers already handles long unbroken strings.
 - **Print with zero additional responses:** section already renders conditionally (`hasAdditional`) — unchanged.
-- **Group report print on empty/degraded outcomes:** no button rendered — nothing to print.
+- **Group report print on empty/not-applicable outcomes:** no button rendered — nothing to print. (Degraded is NOT one of these — it's a metrics flag on a full render and keeps the button; see R-3 build finding.)
 
 ## Test plan (TDD, subagent-driven)
 - **Jest — slider:** tapping a number commits the value **through the same `onChange` path as the drag** (buttons call `onChange(q.stableKey, v)` directly — they cannot reuse the literal `commit` handler, which reads `e.currentTarget.value` off the range input); tap answers an unanswered question (clears `is-unanswered`); buttons carry `tabIndex={-1}` + `aria-label`; row no longer `aria-hidden`; disabled propagates; status copy updated; range input keyboard path untouched; class names/hooks preserved.
@@ -93,7 +93,7 @@ If the hand-check fails, that is a Wave L defect: it gets fixed + tested in this
 - ~~CSS-contract string tests~~ — **dropped (co-validate):** brittle, low-value. The stacked layout + print break rule are verified by the print QA pass and preview-deployment check instead.
 - **Jest — ceil1:** fractional cases (7.5, 3.4→3.4, 3.41→3.5) — augment only if existing Wave L tests lack them.
 - **Build gate:** `CI=true npx next build --turbopack`.
-- **Preview-deployment pass (pre-merge, co-validate addition):** on the PR's Vercel preview URL — slider tap-to-set on desktop + mobile viewport with the thick track; stacked additional responses on a report; group-report print button + print preview. Flagless means merge = live, so this is the last gate before production.
+- **Preview-deployment pass (pre-merge, co-validate addition):** on the PR's Vercel preview URL — slider tap-to-set on desktop + mobile viewport with the thick track; stacked additional responses on a report; group-report print button + print preview. Flagless means merge = live, so this is the last gate before production. **Explicit checks from adversarial review:** (a) endpoint tick alignment on a WIDE desktop viewport — equal-slice glyph centers sit ~12–15px inboard of the thumb's 0/10 resting centers at ~600px card width (near-perfect on mobile); judge whether it reads as misaligned; (b) during the LVA print pass, watch the section-level `.su-report-additional { break-inside: avoid }` — stacked rows make the section taller, so a many-answer report may page-push the whole section (pre-existing rule; drop it in favor of the per-row rule if it bites).
 - **Live smoke (post-merge):** repeat the same checks on production (read-only — no mutations needed; R-4 already ran pre-merge).
 
 **Implementation cautions (recorded so TDD subagents don't rediscover them):**
