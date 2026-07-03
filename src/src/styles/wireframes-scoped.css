@@ -1291,8 +1291,11 @@
   line-height: 1;
   transition: color 0.1s, transform 0.1s;
 }
-.su-assessment-brand .survey-slider-tick:hover:not(:disabled) {
-  color: #522583;
+/* hover-capable devices only — prevents sticky "phantom selected" tick after a tap on touch */
+@media (hover: hover) {
+  .su-assessment-brand .survey-slider-tick:hover:not(:disabled) {
+    color: #522583;
+  }
 }
 .su-assessment-brand .survey-slider-tick:disabled {
   cursor: default;

@@ -99,7 +99,7 @@ If the hand-check fails, that is a Wave L defect: it gets fixed + tested in this
 
 ## Test plan (TDD, subagent-driven)
 - **Jest — slider:** tapping a number commits the value **through the same `onChange` path as the drag** (buttons call `onChange(q.stableKey, v)` directly — they cannot reuse the literal `commit` handler, which reads `e.currentTarget.value` off the range input); tap answers an unanswered question (clears `is-unanswered`); buttons carry `tabIndex={-1}` + `aria-label`; row no longer `aria-hidden`; disabled propagates; status copy updated; range input keyboard path untouched; class names/hooks preserved.
-- **Jest — report page:** group-report page renders `PrintReportButton` inside `no-print` on full render; NOT on empty/not-applicable/degraded outcomes; per-respondent page unchanged.
+- **Jest — report page:** group-report page renders `PrintReportButton` inside `no-print` on full render; NOT on empty/not-applicable outcomes (degraded = full render with a metrics flag, KEEPS the button — see Edge cases above); per-respondent page unchanged.
 - ~~CSS-contract string tests~~ — **dropped (co-validate):** brittle, low-value. The stacked layout + print break rule are verified by the print QA pass and preview-deployment check instead.
 - **Jest — ceil1:** fractional cases (7.5, 3.4→3.4, 3.41→3.5) — augment only if existing Wave L tests lack them.
 - **Build gate:** `CI=true npx next build --turbopack`.

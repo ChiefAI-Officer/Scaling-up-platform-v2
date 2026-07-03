@@ -146,4 +146,22 @@ describe("QuestionInput SLIDER_LIKERT tap-a-number (Wave R R-1)", () => {
     const notPrevented = fireEvent.mouseDown(btn);
     expect(notPrevented).toBe(false);
   });
+
+  test("10. non-default scale (1–5): buttons generate from min/max/step — count, labels, tap commit", () => {
+    const onChange = jest.fn();
+    const q: QuestionForInput = {
+      ...sliderQuestion,
+      stableKey: "S2_Q1",
+      scale: { min: 1, max: 5, step: 1, anchorMin: "Low", anchorMax: "High" },
+    };
+    render(<QuestionInput question={q} value={undefined} onChange={onChange} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(5);
+    buttons.forEach((btn, i) => {
+      expect(btn).toHaveAttribute("aria-label", `Set rating to ${i + 1}`);
+      expect(btn).toHaveTextContent(String(i + 1));
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Set rating to 5" }));
+    expect(onChange).toHaveBeenCalledWith("S2_Q1", 5);
+  });
 });
