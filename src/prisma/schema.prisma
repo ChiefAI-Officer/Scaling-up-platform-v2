@@ -20,6 +20,12 @@ model User {
   image         String?
   passwordHash  String?   // Sprint 1: Password hashing for credentials auth
   emailVerified DateTime?
+  // Wave Q (Jeff July-1 #7) — soft removal (admin offboarding, ADR-0018).
+  // Hard delete is impossible (non-nullable createdBy FKs). Enforced at login
+  // + per-request liveness UNCONDITIONALLY (never flag-gated: a kill switch
+  // must not un-fire an offboarding). Re-invite revives this same row in
+  // place — one identity per email, forever.
+  deletedAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -1182,6 +1188,17 @@ model AssessmentTemplate {
   resultsEmailContentApprovedHash String?
   resultsEmailContentApprovedAt   DateTime?
   resultsEmailContentApprovedBy   String?
+  // Wave Q (Jeff July-1 #1) — template-level default for the per-campaign
+  // sendResultsToRespondent toggle. Seeds the wizard checkbox ONLY while the
+  // results-email content is approved (approval always wins); the coach's
+  // per-campaign flip is the override. Inert data otherwise.
+  sendResultsDefault            Boolean                             @default(false)
+  // Wave Q (Jeff July-1 #6) — "disabled" third lifecycle state, distinct from
+  // soft-delete: hidden from NEW-campaign template pickers + rejected at
+  // campaign create, but existing campaigns/reports/trends/re-seeds are
+  // untouched and the admin list keeps showing it (re-enablable). Enforcement
+  // is deliberately NOT flag-gated (spec 19q durable rule).
+  disabledAt                    DateTime?
   aggregationMode               AssessmentTemplateAggregationMode   @default(FULL_VISIBILITY)
   createdBy                     String
   createdAt                     DateTime                            @default(now())
