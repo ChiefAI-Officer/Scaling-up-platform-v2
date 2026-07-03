@@ -1224,6 +1224,27 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Wave R (R-2b, Jeff #4): free-form TEXT answers inside a statement table get
+   a full-width row — question on its own line, answer below — instead of
+   being squeezed into the 96px rating column. */
+.su-public-brand .su-stmt-text {
+  vertical-align: top;
+}
+.su-public-brand .su-stmt-text-q {
+  color: #1a1322;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 6px;
+}
+.su-public-brand .su-stmt-text-a {
+  font-size: 14px;
+  color: #3a3346;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ── Responsive (screen) ─────────────────────────────────────────────────── */
 @media (max-width: 720px) {
   .su-public-brand .su-section {

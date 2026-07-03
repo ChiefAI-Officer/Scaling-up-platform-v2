@@ -46,6 +46,14 @@
 
 **Files:** `styles/su-report.css` only (CSS-only change; `BrandedReport.tsx` markup already uses `<dt>`/`<dd>` per row).
 
+### R-2b · The REAL live squeeze — TEXT answers in qualitative rating sections (preview-pass discovery)
+
+The pre-merge preview pass on a live QSP report exposed a scope gap: **QSP reports are qualitative reports** (`QualitativeReport`, not `BrandedReport`), and their free-form TEXT answers (e.g. "Please explain your rating.") render inside the statement table with the answer squeezed into the **96px rating column** (`su-stmt-rate` — built for numbers). The BrandedReport dl block R-2 changed barely renders on live data. This was the actual surface behind Jeff's #4 complaint. `RatingBlock`'s own doc comment claimed "TEXT reflections still render as Q&A within the same block" — never implemented.
+
+**Fix (TDD, 4 new tests):** in `RatingBlock`'s statement table, `type === "TEXT"` items render as a full-width `<td colSpan={2} class="su-stmt-text">` row — question (`su-stmt-text-q`, bold) on its own line, answer (`su-stmt-text-a`, pre-wrap) below — preserving item order exactly. Slider/number statements keep the two-column shape. New CSS beside the stmt-table block; the existing `@media print` `.su-stmt-table tr { break-inside: avoid }` rule already covers the new rows.
+
+**Files:** `QualitativeReport.tsx` (RatingBlock tbody), `styles/su-report.css` (su-stmt-text* rules), `__tests__/components/assessments/qualitative-report.test.tsx`.
+
 ## R-3 · Group-report print (Jeff #9)
 
 **Surface:** the group-report page `src/src/app/(report)/assessments/[id]/report/page.tsx`. The `(report)` route-group layout is deliberately chrome-free ("printable report stays clean" — its own doc comment), and `@media print` break rules for all `su-group-*` sections already exist (`su-report.css:1788`). The gap is purely the missing button.
