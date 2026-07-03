@@ -87,14 +87,24 @@ export function QuestionInput({
           onKeyUp={(e) => { if (MOVE_KEYS.includes(e.key)) commit(e); }}
           disabled={disabled}
         />
-        <div className="survey-slider-ticks" aria-hidden="true">
+        <div className="survey-slider-ticks">
           {values.map((v) => (
-            <span
+            // Pointer-only tap targets: tabIndex={-1} keeps the range input as
+            // the single keyboard control (arrows/Home/End already work) —
+            // ~11 focusable numbers per question would be a tab-stop regression.
+            // Buttons can't reuse `commit` (it reads e.currentTarget.value off
+            // the range input), so they call onChange directly — same path.
+            <button
               key={v}
+              type="button"
               className={`survey-slider-tick${answered && value === v ? " is-current" : ""}`}
+              tabIndex={-1}
+              aria-label={`Set rating to ${v}`}
+              disabled={disabled}
+              onClick={() => onChange(q.stableKey, v)}
             >
               {v}
-            </span>
+            </button>
           ))}
         </div>
         <div className="survey-slider-anchors">
@@ -102,7 +112,7 @@ export function QuestionInput({
           <span>{anchorMax}</span>
         </div>
         <p className="survey-slider-status">
-          {answered ? `Your rating: ${value}` : "Tap or drag the slider to rate."}
+          {answered ? `Your rating: ${value}` : "Tap a number or drag the slider to rate."}
         </p>
       </div>
     );

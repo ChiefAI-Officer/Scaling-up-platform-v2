@@ -92,6 +92,16 @@ jest.mock("@/lib/db", () => ({
   },
 }));
 
+// Wave R (R-3): thin stand-in for the client-only print button, mirroring the
+// per-respondent page test's mock shape exactly.
+jest.mock("@/components/assessments/PrintReportButton", () => ({
+  PrintReportButton: () => (
+    <button data-testid="print-report-button" type="button">
+      Print
+    </button>
+  ),
+}));
+
 // Thin stand-in for the real GroupReport renderer so this page test stays
 // focused on the page's own behavior (flag, rate-limit, gating, audit).
 jest.mock("@/components/assessments/GroupReport", () => ({
@@ -367,6 +377,100 @@ describe("(report) campaign group report page", () => {
     // the member. Runtime: a usage assertion so the test is observable.
     const action: AuditAction = "GROUP_REPORT_VIEW";
     expect(action).toBe("GROUP_REPORT_VIEW");
+  });
+});
+
+describe("(report) group report page — Wave R (R-3) print button", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRateLimit.mockResolvedValue({
+      success: true,
+      remaining: 99,
+      resetAt: Date.now() + 60000,
+    });
+    mockAuditCreate.mockResolvedValue({ id: "audit-1" });
+  });
+
+  it("full render (ok) carries PrintReportButton inside a su-report-actions no-print bar ABOVE the report — exactly once (no bottom duplicate)", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetGroupReport.mockResolvedValue(okResult());
+
+    const node = await Page(makeProps());
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    // Button present, wrapped in the same actions bar the per-respondent page uses.
+    expect(markup).toContain('class="su-report-actions no-print"');
+    expect(markup).toContain('data-testid="print-report-button"');
+
+    // Top of the report ONLY: the actions bar precedes the report body and
+    // the button appears exactly once.
+    const barIdx = markup.indexOf('class="su-report-actions no-print"');
+    const reportIdx = markup.indexOf('data-testid="group-report"');
+    expect(barIdx).toBeGreaterThan(-1);
+    expect(reportIdx).toBeGreaterThan(-1);
+    expect(barIdx).toBeLessThan(reportIdx);
+    expect(markup.match(/data-testid="print-report-button"/g)).toHaveLength(1);
+  });
+
+  it("notApplicable outcome (public campaign) renders WITHOUT the print button", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetGroupReport.mockResolvedValue({ kind: "notApplicable", reason: "public" });
+
+    const node = await Page(makeProps());
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain('data-testid="group-report-not-applicable"');
+    expect(markup).not.toContain('data-testid="print-report-button"');
+    expect(markup).not.toContain("su-report-actions");
+  });
+
+  it("notApplicable outcome (unpublished draft) renders WITHOUT the print button", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetGroupReport.mockResolvedValue({
+      kind: "notApplicable",
+      reason: "unpublished",
+      templateAlias: "scaling-up-full",
+    });
+
+    const node = await Page(makeProps());
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain('data-testid="group-report-not-applicable"');
+    expect(markup).not.toContain('data-testid="print-report-button"');
+    expect(markup).not.toContain("su-report-actions");
+  });
+
+  it("empty outcome (zero completions) renders WITHOUT the print button", async () => {
+    mockGetApiActor.mockResolvedValue(adminActor());
+    mockGetGroupReport.mockResolvedValue({
+      kind: "empty",
+      provenance: { ...provenance(), completedCount: 0 },
+    });
+
+    const node = await Page(makeProps());
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain('data-testid="group-report-empty"');
+    expect(markup).not.toContain('data-testid="print-report-button"');
+    expect(markup).not.toContain("su-report-actions");
+  });
+
+  it("degraded model on the ok path still renders the FULL report — the button stays (degraded is a metrics flag on the same full render, not a distinct outcome)", async () => {
+    // Recorded deviation note: the spec lists "degraded" alongside the
+    // empty/not-applicable panels, but in this page `report.degraded` never
+    // produces a distinct non-report body — it is the ok outcome rendering
+    // the complete <GroupReport/> (there IS something to print). The spec's
+    // rationale ("nothing to print") therefore does not apply here.
+    mockGetApiActor.mockResolvedValue(adminActor());
+    const res = okResult();
+    res.report.degraded = true;
+    mockGetGroupReport.mockResolvedValue(res);
+
+    const node = await Page(makeProps());
+    const markup = renderToStaticMarkup(node as React.ReactElement);
+
+    expect(markup).toContain('data-testid="group-report"');
+    expect(markup).toContain('data-testid="print-report-button"');
   });
 });
 
