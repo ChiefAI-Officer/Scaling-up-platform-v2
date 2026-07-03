@@ -79,6 +79,8 @@ Prod state (read-only query, user-authorized 2026-07-03): LVA = `leadership-visi
 
 If the hand-check fails, that is a Wave L defect: it gets fixed + tested in this PR before merge.
 
+**✅ RESULT (executed 2026-07-03, pre-merge, all mutations individually authorized):** respondent = existing safe test member "TestDelete MeSmoke" (example.com address) added via the coach UI; token minted directly (NO email sent); survey filled on the branch UI **entirely via the new tap-to-set number buttons** (all 16 values landed exactly as tapped — this doubled as the live slider check, screenshot `wave-r-live-slider-desktop.png`); submitted → "LVA test new" N=1→N=2. Group report hand-check: **16/16 exact** — Strong+Weak factors → 5.0, Average+Weak → 2.5, Weak+Weak → 0.0, every row n=2 (a divide-by-3 bug would have shown 3.4/1.7). Wave L tail CLOSED. Bonus: the N=3 "LVA Spectrum" PDF print pass independently re-confirmed true ceiling behavior (8.4/6.7/3.4/1.7). Note: local run needed `ASSESSMENT_SESSION_SECRET` set (any local-only value) for the invitation-cookie exchange — Vercel-only env var, recorded for future local pilots.
+
 ---
 
 ## Explicitly out of scope
