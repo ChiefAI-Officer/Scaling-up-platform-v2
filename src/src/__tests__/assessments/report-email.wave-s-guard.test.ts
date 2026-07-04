@@ -74,18 +74,21 @@ function lvaReport(): RespondentReport {
 }
 
 describe("Wave S — email twin carries no peers (behavior guard)", () => {
-  it("LVA email output has no peer-comparison copy even when the flag is on", () => {
-    process.env.WAVE_S_PEER_BENCHMARKS_ENABLED = "1";
-    try {
-      const { bodyHtml } = buildReportEmailHtml({
-        report: lvaReport(),
-        recipientRole: "respondent",
-      });
-      expect(bodyHtml).not.toContain("compared to peers");
-      expect(bodyHtml).not.toContain("Peers");
-      expect(bodyHtml).not.toContain("peer-comparison");
-    } finally {
-      delete process.env.WAVE_S_PEER_BENCHMARKS_ENABLED;
-    }
-  });
+  it.each(["TAKER_COPY", "REFERRING_COACH"] as const)(
+    "LVA %s email output has no peer-comparison copy even when the flag is on",
+    (recipientRole) => {
+      process.env.WAVE_S_PEER_BENCHMARKS_ENABLED = "1";
+      try {
+        const { bodyHtml } = buildReportEmailHtml({
+          report: lvaReport(),
+          recipientRole,
+        });
+        expect(bodyHtml).not.toContain("compared to peers");
+        expect(bodyHtml).not.toContain("Peers");
+        expect(bodyHtml).not.toContain("peer-comparison");
+      } finally {
+        delete process.env.WAVE_S_PEER_BENCHMARKS_ENABLED;
+      }
+    },
+  );
 });

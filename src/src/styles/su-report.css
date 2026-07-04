@@ -1816,6 +1816,10 @@
   }
   .su-public-brand .su-group-rat-row.has-peers .su-group-rat-peers {
     grid-column: 1 / -1;
+    /* Placed AFTER the n= badge (order) so label/bar/val/n keep row 1 and the
+       full-width peers line reads as row 2 — without this, auto-placement
+       strands n= alone on a third row. */
+    order: 5;
     text-align: right;
     margin-top: -2px;
   }
@@ -1852,6 +1856,9 @@
   border-collapse: collapse;
   font-size: 13px;
   margin-top: 6px;
+}
+.su-public-brand .su-peer-table .su-peer-th-factor {
+  width: 40%;
 }
 .su-public-brand .su-peer-table .su-peer-th {
   text-align: left;
