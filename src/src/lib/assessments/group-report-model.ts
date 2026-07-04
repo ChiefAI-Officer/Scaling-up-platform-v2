@@ -102,6 +102,14 @@ export interface GroupReportInput {
   version: { questions: unknown; sections?: unknown; scoringConfig?: unknown };
   participants: GroupReportParticipantInput[];
   submissions: GroupReportSubmissionInput[];
+  /**
+   * Wave S (Jeff #12/#13) — admin-set peer averages, stableKey → value (0–10,
+   * 1dp), fetched by the DB loader ONLY when the wave flag is on and the alias
+   * is peer-render-enabled. The model stays pure (no DB, no flag reads): an
+   * absent/empty map simply joins nothing. Applied ONLY on the LVA S3 rating
+   * path, and only to factors with a non-null `scaledValue`.
+   */
+  peerBenchmarks?: Map<string, number>;
 }
 
 // ─── Output contract (what renderers + T4/T5 consume) ────────────────────────
@@ -187,6 +195,16 @@ export interface GroupRatingFactor {
    */
   scaledValue: number | null;
   n: number;
+  /**
+   * Wave S (Jeff #12/#13) — the admin-set peer average for this factor
+   * (0–10, 1dp), joined by stableKey from the caller's `peerBenchmarks` map.
+   * OMIT-EMPTY per factor (D8): absent when no benchmark exists for the key,
+   * when the factor is scale-degraded (`scaledValue === null` — a raw-mean vs
+   * 0–10 comparison would be a scale mismatch), or on any non-LVA-S3 factor.
+   */
+  peers?: number;
+  /** Signed deviation `scaledValue − peers`, plain 1dp rounding. With `peers`. */
+  devPeers?: number;
 }
 
 export interface GroupRatingSection {
@@ -662,6 +680,9 @@ function groupQuestionsBySection(
 
 const round = (n: number): number => Math.round(n);
 
+/** Round to 1 decimal, plain signed rounding (Wave S devPeers — spec 19s S-4). */
+const round1 = (n: number): number => Math.round(n * 10) / 10;
+
 /** Mean of a non-empty number array (caller guarantees length > 0). */
 function meanOf(values: number[]): number {
   return values.reduce((a, b) => a + b, 0) / values.length;
@@ -722,6 +743,8 @@ function buildRatingSection(
   answersByRespondent: AnswersByRespondent,
   /** Wave L — flipped true when an LVA S3 factor has an out-of-domain value. */
   signal: { scaleDegraded: boolean },
+  /** Wave S — admin-set peer averages (stableKey → value); LVA S3 join only. */
+  peerBenchmarks?: Map<string, number>,
 ): GroupRatingSection | null {
   // Wave L (L3): the Esperto 0–10 scaled value is LVA-S3-specific. The 0/5/10
   // mapping must NOT leak into the generic rating contract — gate it on the LVA
@@ -759,6 +782,20 @@ function buildRatingSection(
       }
     }
 
+    // Wave S (Jeff #12/#13): join the admin-set peer average by stableKey —
+    // LVA S3 ONLY, and only when the factor has a valid 0–10 scaledValue (a
+    // scale-degraded factor gets NO peer comparison rather than a raw-mean vs
+    // 0–10 mismatch). Omit-empty per factor (D8).
+    let peers: number | undefined;
+    let devPeers: number | undefined;
+    if (isLvaStrengths && scaledValue !== null && peerBenchmarks) {
+      const benchmark = peerBenchmarks.get(key);
+      if (typeof benchmark === "number" && Number.isFinite(benchmark)) {
+        peers = benchmark;
+        devPeers = round1(scaledValue - benchmark);
+      }
+    }
+
     factors.push({
       stableKey: key,
       label: isLvaStrengths
@@ -770,6 +807,7 @@ function buildRatingSection(
       mean: meanOf(values),
       scaledValue,
       n: values.length,
+      ...(peers !== undefined && devPeers !== undefined ? { peers, devPeers } : {}),
     });
   }
   if (factors.length === 0) return null;
@@ -932,6 +970,8 @@ function buildQualitativeSections(
   answersByRespondent: AnswersByRespondent,
   /** Wave L — flipped by buildRatingSection when an LVA S3 value is out-of-domain. */
   signal: { scaleDegraded: boolean },
+  /** Wave S — admin-set peer averages; threaded to the rating builder only. */
+  peerBenchmarks?: Map<string, number>,
 ): GroupQualitativeSection[] {
   const sectionList = parseGroupSections(sectionsRaw);
   const questionsBySection = groupQuestionsBySection(questionsByKey, sectionList);
@@ -968,6 +1008,7 @@ function buildQualitativeSections(
           respondents,
           answersByRespondent,
           signal,
+          peerBenchmarks,
         );
         break;
       case "choices": {
@@ -1601,6 +1642,7 @@ export function buildGroupReportModel(input: GroupReportInput): CampaignGroupRep
         respondents,
         answersByRespondent,
         scaleSignal,
+        input?.peerBenchmarks,
       ),
     };
   } else {

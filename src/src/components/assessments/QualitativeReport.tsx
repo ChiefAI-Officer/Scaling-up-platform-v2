@@ -33,9 +33,78 @@ import {
   type QualItem,
   type QualSection,
 } from "@/lib/assessments/qualitative-report-model";
+import type { PeerComparisonSection } from "@/lib/assessments/peer-benchmarks";
+import { peerDevGlyph, peerDevText } from "@/lib/assessments/lva-report-display";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
+import { Fragment } from "react";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
+
+/**
+ * Wave S (D13) — where the peer-comparison section splices in: the index of
+ * the S4_obstacles section (peers render immediately BEFORE it, i.e. in the
+ * suppressed S3 section's natural slot), or -1 when no S4 section exists in
+ * this pinned version (callers then append the block after the last section).
+ */
+function peerSliceIndex(sections: readonly QualSection[]): number {
+  return sections.findIndex((s) => s.stableKey === "S4_obstacles");
+}
+
+/**
+ * Wave S (Jeff #12/#13) — the individual "compared to peers" section: the
+ * respondent's own S3 rating per factor (0/5/10 on the shared 0–10 axis) next
+ * to the admin-set peer average, with the shared ▲/▼/● deviation treatment
+ * (peerDevGlyph/peerDevText — same helpers as the group rating rows, so the
+ * two surfaces can never drift). Renders ONLY via the optional prop below;
+ * classes styled in su-report.css (`.su-peer-*`, print break-inside: avoid).
+ */
+function PeerComparisonBlock({ section }: { section: PeerComparisonSection }) {
+  return (
+    <section
+      className="su-section su-peer-section"
+      data-testid="qual-section-peer-comparison"
+    >
+      <h2 className="su-section-title su-h2">{section.title}</h2>
+      <p className="su-section-intro">{section.intro}</p>
+      <table className="su-peer-table">
+        <thead>
+          <tr>
+            <th className="su-peer-th su-peer-th-factor">Factor</th>
+            <th className="su-peer-th">Your rating</th>
+            <th className="su-peer-th">Peers</th>
+            <th className="su-peer-th">Difference</th>
+          </tr>
+        </thead>
+        <tbody>
+          {section.items.map((item) => (
+            <tr
+              key={item.stableKey}
+              data-testid={`peer-comparison-row-${item.stableKey}`}
+            >
+              <td className="su-peer-factor">{item.label}</td>
+              <td className="su-peer-own">
+                {item.ownRating}{" "}
+                <span className="su-peer-own-val">
+                  ({item.ownValue.toFixed(1)})
+                </span>
+              </td>
+              <td className="su-peer-peers">{item.peers.toFixed(1)}</td>
+              {/* `neg` styled in su-report.css — the report route loads no
+                  Tailwind, so utility classes would silently no-op here. */}
+              <td
+                className={item.dev < 0 ? "su-peer-dev neg" : "su-peer-dev"}
+                data-testid={`peer-comparison-dev-${item.stableKey}`}
+              >
+                <span aria-hidden="true">{peerDevGlyph(item.dev)}</span>{" "}
+                {peerDevText(item.dev)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -295,7 +364,22 @@ function SectionBody({ section, who }: { section: QualSection; who: string }) {
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function QualitativeReport({ report }: { report: RespondentReport }) {
+export function QualitativeReport({
+  report,
+  peerComparison,
+}: {
+  report: RespondentReport;
+  /**
+   * Wave S (Jeff #12/#13) — the OPTIONAL "compared to peers" section, built
+   * server-side by `buildPeerComparisonSection` (flag + render-enabled-alias
+   * gated at the page). Absent/null ⇒ this component's output is byte-identical
+   * to pre-Wave-S (the Esperto-faithful S3 suppression stays untouched). The
+   * section is deliberately NOT part of `buildQualitativeModel` — that model is
+   * shared with the respondent results email, which must never carry peers
+   * (spec 19s D9).
+   */
+  peerComparison?: PeerComparisonSection | null;
+}) {
   const model = buildQualitativeModel({
     templateAlias: report.templateAlias,
     sections: report.sections,
@@ -359,19 +443,29 @@ export function QualitativeReport({ report }: { report: RespondentReport }) {
       </section>
 
       {/* ── 3. Per-section blocks ──────────────────────────────────────────── */}
-      {model.sections.map((section) => (
-        <section
-          className="su-section"
-          key={section.stableKey}
-          data-testid={`qual-section-${section.stableKey}`}
-        >
-          <h2 className="su-section-title su-h2">{section.name}</h2>
-          {section.description && (
-            <p className="su-section-intro">{section.description}</p>
+      {/* Wave S (D13): the peer-comparison section renders in S3's natural
+          slot — immediately before S4_obstacles when that section is present
+          in the model, else appended after the last section (spec 19s S-5). */}
+      {model.sections.map((section, i) => (
+        <Fragment key={section.stableKey}>
+          {peerComparison && i === peerSliceIndex(model.sections) && (
+            <PeerComparisonBlock section={peerComparison} />
           )}
-          <SectionBody section={section} who={who} />
-        </section>
+          <section
+            className="su-section"
+            data-testid={`qual-section-${section.stableKey}`}
+          >
+            <h2 className="su-section-title su-h2">{section.name}</h2>
+            {section.description && (
+              <p className="su-section-intro">{section.description}</p>
+            )}
+            <SectionBody section={section} who={who} />
+          </section>
+        </Fragment>
       ))}
+      {peerComparison && peerSliceIndex(model.sections) === -1 && (
+        <PeerComparisonBlock section={peerComparison} />
+      )}
 
       {/* ── 4. Footer (matches the cleaned BrandedReport footer) ───────────── */}
       <footer className="su-report-footer" data-testid="report-footer">

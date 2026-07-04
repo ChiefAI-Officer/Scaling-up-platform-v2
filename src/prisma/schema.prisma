@@ -1209,8 +1209,35 @@ model AssessmentTemplate {
   versions      AssessmentTemplateVersion[]
   campaigns     AssessmentCampaign[]
   accessGroups  AccessGroupTemplate[]
+  benchmarks    AssessmentBenchmark[]
 
   @@map("assessment_templates")
+}
+
+// Wave S (Jeff July-1 #12/#13, spec 19s) — admin-set peer benchmarks.
+// Template-level (NOT version-level): stableKeys carry cross-version semantic
+// continuity (ADR-0001) and peers are a reference dataset, not version content
+// (spec 19s S-1 records the version-scoping trade-off). QUESTION is the only
+// kind this wave; the SU-Full consolidation follow-on adds DOMAIN/SECTION/
+// SCALEUP as additive enum migrations. Rows exist only when an admin enters
+// values — reports omit-empty per key (ADR-0019).
+enum BenchmarkMetricKind {
+  QUESTION
+}
+
+model AssessmentBenchmark {
+  id         String              @id @default(cuid())
+  templateId String
+  template   AssessmentTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  metricKind BenchmarkMetricKind
+  metricKey  String // question stableKey (QUESTION kind)
+  value      Float // 0–10; bounds-checked then rounded to 1dp at the API boundary
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@unique([templateId, metricKind, metricKey])
+  @@index([templateId])
+  @@map("assessment_benchmarks")
 }
 
 model AssessmentTemplateVersion {

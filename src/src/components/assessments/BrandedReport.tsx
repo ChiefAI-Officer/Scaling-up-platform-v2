@@ -41,6 +41,7 @@ import {
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import { greetingName } from "@/lib/assessments/respondent-display-name";
 import { QualitativeReport } from "@/components/assessments/QualitativeReport";
+import type { PeerComparisonSection } from "@/lib/assessments/peer-benchmarks";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
@@ -150,14 +151,25 @@ export interface BrandedReportProps {
   assessmentName?: string;
   /** Optional override; falls back to report.campaignLabel. */
   campaignLabel?: string | null;
+  /**
+   * Wave S (Jeff #12/#13) — optional "compared to peers" section, forwarded to
+   * the qualitative renderer only (scored templates ignore it; their Peers
+   * story is the SU-Full static benchmark, untouched by Wave S).
+   */
+  peerComparison?: PeerComparisonSection | null;
 }
 
-export function BrandedReport({ report, assessmentName, campaignLabel }: BrandedReportProps) {
+export function BrandedReport({
+  report,
+  assessmentName,
+  campaignLabel,
+  peerComparison,
+}: BrandedReportProps) {
   // Qualitative templates (LVA / QSP) get a wholly different per-respondent
   // renderer — their answers are mostly free-text/metrics, not scored items.
   // The scored anatomy below is unchanged for default/scored templates.
   if (reportConfigFor(report.templateAlias).reportType === "qualitative") {
-    return <QualitativeReport report={report} />;
+    return <QualitativeReport report={report} peerComparison={peerComparison} />;
   }
 
   const result: ScoreResult = report.result ?? ({} as ScoreResult);

@@ -33,6 +33,13 @@ import {
   hasComparableLongitudinal,
   asLongitudinalEligibilityDb,
 } from "@/lib/assessments/longitudinal-eligibility";
+import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
+import {
+  buildPeerComparisonSection,
+  isPeerRenderEnabledAlias,
+  type PeerComparisonSection,
+} from "@/lib/assessments/peer-benchmarks";
+import type { RespondentReport } from "@/lib/assessments/respondent-report";
 
 // H15: never statically render or cache the report (PII).
 export const dynamic = "force-dynamic";
@@ -74,6 +81,12 @@ export default async function RespondentReportPage({ params }: PageProps) {
   // any error / no actor / not-eligible ⇒ no link.
   const longitudinal = await resolveLongitudinalEntry(id, respondentId);
 
+  // Wave S (Jeff #12/#13) — the optional "compared to peers" section. Gated on
+  // the wave flag + render-enabled alias BEFORE any DB read (flag OFF ⇒ zero
+  // benchmark queries, byte-identical page — spec 19s S-2). Fail-soft like the
+  // longitudinal entry: any error ⇒ no section, never a broken report.
+  const peerComparison = await resolvePeerComparison(id, report);
+
   return (
     <div className="su-report-page">
       <div className="su-report-actions no-print">
@@ -91,7 +104,11 @@ export default async function RespondentReportPage({ params }: PageProps) {
           </a>
         )}
       </div>
-      <BrandedReport report={report} campaignLabel={report.campaignLabel} />
+      <BrandedReport
+        report={report}
+        campaignLabel={report.campaignLabel}
+        peerComparison={peerComparison}
+      />
     </div>
   );
 }
@@ -141,6 +158,47 @@ async function resolveLongitudinalEntry(
     return { href };
   } catch {
     // Never let the entry-link computation break the report render.
+    return null;
+  }
+}
+
+/**
+ * Wave S — resolve the "compared to peers" section for this report, or null.
+ * Flag + render-enabled-alias gates run FIRST (no DB touch when off); then the
+ * campaign's templateId keys the AssessmentBenchmark rows and the PURE builder
+ * derives the section from the frozen report payload (questionsByKey +
+ * rawAnswers — the same inputs the qualitative renderer consumes). Fail-soft:
+ * a missing campaign, zero rows, no qualifying factors, or a throw all resolve
+ * to null (the report renders exactly as pre-Wave-S).
+ */
+async function resolvePeerComparison(
+  campaignId: string,
+  report: RespondentReport,
+): Promise<PeerComparisonSection | null> {
+  try {
+    if (!isPeerBenchmarksEnabled()) return null;
+    if (!isPeerRenderEnabledAlias(report.templateAlias ?? null)) return null;
+
+    const campaign = await db.assessmentCampaign.findFirst({
+      where: { id: campaignId, deletedAt: null },
+      select: { templateId: true },
+    });
+    if (!campaign) return null;
+
+    const rows = await db.assessmentBenchmark.findMany({
+      where: { templateId: campaign.templateId, metricKind: "QUESTION" },
+      select: { metricKey: true, value: true },
+    });
+    if (rows.length === 0) return null;
+
+    return buildPeerComparisonSection({
+      questionsByKey: report.questionsByKey,
+      rawAnswers: report.rawAnswers,
+      benchmarks: new Map(rows.map((r) => [r.metricKey, r.value])),
+      templateAlias: report.templateAlias ?? null,
+    });
+  } catch {
+    // Never let peer-comparison resolution break the report render.
     return null;
   }
 }

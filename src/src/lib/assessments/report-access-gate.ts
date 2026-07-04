@@ -131,6 +131,19 @@ export async function viewGroupReport(
           // S3 scale-degraded signal to keep a viewed report attributable.
           groupRenderVersion: o.report.provenance.groupRenderVersion,
           scaleDegraded: o.report.provenance.scaleDegraded,
+          // Wave S (Jeff #12/#13): LVA peer-benchmark application — recorded
+          // ONLY when ≥1 factor actually joined (the loader sets provenance
+          // .peerBenchmarks under that exact condition; mirrors how the
+          // SU-Full benchmarkVersion string is recorded above).
+          ...(o.provenance.peerBenchmarks
+            ? {
+                peerBenchmarks: {
+                  applied: o.provenance.peerBenchmarks.applied,
+                  updatedAt:
+                    o.provenance.peerBenchmarks.updatedAt.toISOString(),
+                },
+              }
+            : {}),
         },
       };
     },
