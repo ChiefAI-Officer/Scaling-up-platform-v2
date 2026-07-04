@@ -15,6 +15,16 @@ import { authOptions } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
 import { TemplateEditorTabbed } from "@/components/admin/TemplateEditorTabbed";
 import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
+import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
+import {
+  isPeerRenderEnabledAlias,
+  listRatingQuestionKeys,
+  getQuestionBenchmarks,
+} from "@/lib/assessments/peer-benchmarks";
+import {
+  PeerBenchmarksPanel,
+  type PeerBenchmarkRow,
+} from "@/components/assessments/PeerBenchmarksPanel";
 
 export default async function AdminAssessmentVersionEditPage({
   params,
@@ -84,6 +94,34 @@ export default async function AdminAssessmentVersionEditPage({
     notFound();
   }
 
+  // Wave S (spec 19s S-3) — peer-averages editor rows. Rendered ONLY when the
+  // flag is ON and the alias is render-enabled (D10 — same list as the report
+  // joins, so no dead switches); otherwise nothing is fetched or rendered.
+  // Rows come from the currently-PUBLISHED version (not the URL's version),
+  // matching the API's validKeys resolution.
+  let peerBenchmarkRows: PeerBenchmarkRow[] | null = null;
+  if (isPeerBenchmarksEnabled() && isPeerRenderEnabledAlias(template.alias)) {
+    const published = await db.assessmentTemplateVersion.findFirst({
+      where: { templateId: id, publishedAt: { not: null } },
+      orderBy: { versionNumber: "desc" },
+      select: { questions: true },
+    });
+    if (published) {
+      const ratingKeys = listRatingQuestionKeys(
+        published.questions,
+        template.alias,
+      );
+      if (ratingKeys.length > 0) {
+        const benchmarks = await getQuestionBenchmarks(db, id);
+        peerBenchmarkRows = ratingKeys.map((q) => ({
+          stableKey: q.stableKey,
+          label: q.label,
+          value: benchmarks.get(q.stableKey) ?? null,
+        }));
+      }
+    }
+  }
+
   return (
     <div className="space-y-6">
       <TemplateEditorTabbed
@@ -131,6 +169,9 @@ export default async function AdminAssessmentVersionEditPage({
         // as a prop and gates the sendResultsDefault toggle on it.
         waveQEnabled={isWaveQAdminControlsEnabled()}
       />
+      {peerBenchmarkRows && (
+        <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />
+      )}
     </div>
   );
 }

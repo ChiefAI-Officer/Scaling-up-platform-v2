@@ -92,7 +92,7 @@ _Avoid_: confusing this with a scoring tier.
 Scaling Up Full's overall weighted 0–100 score (can exceed 100 via bonus). Its exact weighting formula is owned by Esperto and not in our source export.
 
 **Peers (benchmark)**:
-The industry-average reference values shown alongside a Scaling Up Full score — "companies with a comparable size who have preceded you in taking the assessment." A respondent's standing is expressed as **deviation from Peers** (▲/▼), *not* a tier band (Esperto has no bands, and we lack the peer distribution to compute its "X% score higher" percentile — see ADR-0015). Our Peers values are seeded PROVISIONAL from a single Esperto sample cohort, on the platform's 0–10 scale.
+The industry-average reference values shown alongside an assessment score — "companies with a comparable size who have preceded you in taking the assessment." A respondent's standing is expressed as **deviation from Peers** (▲/▼), *not* a tier band (Esperto has no bands, and we lack the peer distribution to compute its "X% score higher" percentile — see ADR-0015). Two sources exist: **SU-Full** Peers are seeded PROVISIONAL from a single Esperto sample cohort (static file, 0–10 scale); **LVA** Peers (Wave S) are **admin-set per rating question** in DB rows — there is no Esperto LVA peer dataset, so values exist only once an admin enters them (reports omit-empty until then; ADR-0019).
 _Avoid_: "percentile" (we show direction vs the peer mean, not a percentile); conflating Peers (external benchmark) with **Team avg** (this campaign's other leaders).
 
 **Pass** (Rockefeller):

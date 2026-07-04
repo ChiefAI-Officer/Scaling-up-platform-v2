@@ -37,6 +37,8 @@ import {
   isGroupReportAlias,
   isGroupReportEnabled,
 } from "@/lib/assessments/wave-f-flags";
+import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
+import { isPeerRenderEnabledAlias } from "@/lib/assessments/peer-benchmarks";
 import {
   buildGroupReportModel,
   type CampaignGroupReport,
@@ -72,11 +74,31 @@ interface InvitationCount {
   count: (args: { where: Record<string, unknown> }) => Promise<number>;
 }
 
+/** Wave S — the benchmark row shape the loader reads (peers join + provenance). */
+interface RawBenchmarkRow {
+  metricKey: string;
+  value: number;
+  updatedAt: Date;
+}
+
+interface BenchmarkFindMany {
+  findMany: (args: {
+    where: { templateId: string; metricKind: "QUESTION" };
+    select: { metricKey: true; value: true; updatedAt: true };
+  }) => Promise<RawBenchmarkRow[]>;
+}
+
 interface GroupReportTx {
   assessmentCampaign: CampaignFindFirst;
   assessmentCampaignParticipant: ParticipantFindMany;
   assessmentSubmission: SubmissionFindMany;
   assessmentInvitation: InvitationCount;
+  /**
+   * Wave S — queried ONLY when `isPeerBenchmarksEnabled()` AND the campaign's
+   * alias is peer-render-enabled (flag OFF ⇒ this delegate is never touched, so
+   * pre-Wave-S mocks/fakes without it keep working).
+   */
+  assessmentBenchmark: BenchmarkFindMany;
 }
 
 export interface GroupReportDb {
@@ -191,6 +213,15 @@ export interface GroupReportProvenance {
    */
   benchmarkVersion?: string;
   benchmarkKeyMismatch?: boolean;
+  /**
+   * Wave S (Jeff #12/#13) — LVA peer-benchmark application metadata, present
+   * ONLY when ≥1 S3 factor actually joined a peer average on this view
+   * (mirrors the SU-Full `benchmarkVersion` posture: reflects ACTUAL
+   * application, not a fresh fetch). `applied` counts the joined factors;
+   * `updatedAt` is the max `updatedAt` over the fetched benchmark rows — the
+   * audit link to the peer set in force (spec 19s S-1/C1 mitigation).
+   */
+  peerBenchmarks?: { applied: number; updatedAt: Date };
 }
 
 export type GroupReportResult =
@@ -240,6 +271,24 @@ function computeContentHash(
     })),
   });
   return createHash("sha256").update(canonical).digest("hex");
+}
+
+// ─── Wave S — applied-peer count (from the BUILT model) ───────────────────────
+
+/**
+ * Counts the rating factors that ACTUALLY joined a peer average — the audit
+ * `applied` figure comes from the built model, never from the fetched row
+ * count (a benchmark keyed to an unanswered/degraded factor joins nothing).
+ */
+function countAppliedPeerBenchmarks(report: CampaignGroupReport): number {
+  let applied = 0;
+  for (const section of report.qualitative?.sections ?? []) {
+    if (section.presentation !== "rating") continue;
+    for (const factor of section.factors) {
+      if (typeof factor.peers === "number") applied += 1;
+    }
+  }
+  return applied;
 }
 
 // ─── Main loader ──────────────────────────────────────────────────────────────
@@ -451,6 +500,18 @@ export async function getCampaignGroupReport(
         return { kind: "empty", provenance } as const;
       }
 
+      // Wave S (Jeff #12/#13) — admin-set peer averages. Fetched ONLY when the
+      // wave flag is on AND the alias is peer-render-enabled (flag OFF ⇒ zero
+      // benchmark DB reads, byte-identical report — S-2). Read on the SAME tx
+      // snapshot as the cohort. The empty branch above never reaches this.
+      let benchmarkRows: RawBenchmarkRow[] = [];
+      if (isPeerBenchmarksEnabled() && isPeerRenderEnabledAlias(templateAlias)) {
+        benchmarkRows = await tx.assessmentBenchmark.findMany({
+          where: { templateId: campaign.templateId, metricKind: "QUESTION" },
+          select: { metricKey: true, value: true, updatedAt: true },
+        });
+      }
+
       // Denormalize into the pure model's input shape.
       const participants: GroupReportParticipantInput[] = participantRows.map(
         (p) => ({
@@ -477,9 +538,31 @@ export async function getCampaignGroupReport(
         },
         participants,
         submissions,
+        ...(benchmarkRows.length > 0
+          ? {
+              peerBenchmarks: new Map(
+                benchmarkRows.map((r) => [r.metricKey, r.value]),
+              ),
+            }
+          : {}),
       };
 
       const report = buildGroupReportModel(input);
+
+      // Wave S — provenance reflects ACTUAL application (taken from the BUILT
+      // model, like the SU-Full benchmarkVersion below): recorded ONLY when
+      // ≥1 rating factor joined a peer average.
+      if (benchmarkRows.length > 0) {
+        const applied = countAppliedPeerBenchmarks(report);
+        if (applied >= 1) {
+          provenance.peerBenchmarks = {
+            applied,
+            updatedAt: new Date(
+              Math.max(...benchmarkRows.map((r) => r.updatedAt.getTime())),
+            ),
+          };
+        }
+      }
 
       // Wave J / J-2 — copy the Peers benchmark application metadata from the
       // BUILT model (NOT a fresh benchmarksFor call) so provenance reflects what

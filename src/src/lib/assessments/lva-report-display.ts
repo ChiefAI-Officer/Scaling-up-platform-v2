@@ -31,8 +31,16 @@ export const LVA_TEMPLATE_ALIAS = "leadership-vision-alignment";
  * ruleset in force. BUMP whenever the scale formula, label map, or intro
  * constants change. Recorded in the model provenance AND the GROUP_REPORT_VIEW
  * audit `changes` payload.
+ *
+ * v2 (Wave S, Jeff #12/#13): the ruleset now includes the CONDITIONAL peer
+ * benchmarks join on the S3 rating factors (`peers`/`devPeers` from admin-set
+ * `AssessmentBenchmark` rows). The version string describes the ruleset in
+ * force, so it ships unconditionally at merge — flag OFF just means the
+ * conditional rule joined nothing. Whether peers actually APPLIED on a given
+ * view is carried separately by the audit payload's `peerBenchmarks`
+ * `{ applied, updatedAt }` field (spec 19s S-4).
  */
-export const GROUP_RENDER_VERSION = "lva-fidelity-v1";
+export const GROUP_RENDER_VERSION = "lva-fidelity-v2";
 
 // ─── L3 — 0–10 rating scale (S3 only) ────────────────────────────────────────
 
@@ -73,6 +81,25 @@ export function scaledRatingValue(
  */
 export function s3ValuesInDomain(values: number[]): boolean {
   return values.every((v) => v === 1 || v === 2 || v === 3);
+}
+
+// ─── Wave S (Jeff #12/#13) — peer deviation formatting ───────────────────────
+//
+// Shared by BOTH peer-comparison renders (the group rating rows AND the
+// individual "compared to peers" section) so the ▲/▼/● + signed-1dp deviation
+// can never drift between the two surfaces. Pure — no React, no flag reads.
+
+/** Deviation glyph: ▲ above peers, ▼ below, ● equal (SU-Full DevCell family). */
+export function peerDevGlyph(dev: number): "▲" | "▼" | "●" {
+  if (dev > 0) return "▲";
+  if (dev < 0) return "▼";
+  return "●";
+}
+
+/** Deviation text — 1dp, signed for nonzero: "+1.2" / "−0.8" / "0.0". */
+export function peerDevText(dev: number): string {
+  const sign = dev > 0 ? "+" : dev < 0 ? "−" : "";
+  return `${sign}${Math.abs(dev).toFixed(1)}`;
 }
 
 // ─── L4a — report factor-label overrides ─────────────────────────────────────

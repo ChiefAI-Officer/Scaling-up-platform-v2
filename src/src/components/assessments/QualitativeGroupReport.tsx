@@ -49,6 +49,8 @@ import {
 import {
   LVA_TEMPLATE_ALIAS,
   lvaSectionIntro,
+  peerDevGlyph,
+  peerDevText,
 } from "@/lib/assessments/lva-report-display";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -164,9 +166,18 @@ function RatingSectionBlock({ section }: { section: GroupRatingSection }) {
           f.scaledValue != null
             ? f.scaledValue.toFixed(1)
             : formatGroupNumber(f.mean);
+        // Wave S (Jeff #12/#13): a factor with an admin-set peer average gets a
+        // "Peers N.N" cell + ▲/▼/● deviation next to its value — INSIDE the
+        // existing row (no new page-break surface; the row's print break-inside
+        // rule covers it). Omit-empty: a factor without a benchmark renders
+        // exactly as before (the model guarantees devPeers alongside peers).
+        const hasPeers =
+          typeof f.peers === "number" && typeof f.devPeers === "number";
         return (
           <div
-            className="su-group-rat-row"
+            className={
+              hasPeers ? "su-group-rat-row has-peers" : "su-group-rat-row"
+            }
             key={f.stableKey}
             data-testid={`group-rating-factor-${f.stableKey}`}
             data-factor={f.stableKey}
@@ -184,6 +195,30 @@ function RatingSectionBlock({ section }: { section: GroupRatingSection }) {
               {f.weak > 0 && <span className="w" style={{ width: `${wPct}%` }} />}
             </span>
             <span className="su-group-rat-val">{value}</span>
+            {hasPeers && (
+              <span
+                className="su-group-rat-peers"
+                data-testid={`group-rating-peers-${f.stableKey}`}
+              >
+                Peers{" "}
+                <span className="su-group-rat-peers-val">
+                  {f.peers!.toFixed(1)}
+                </span>{" "}
+                {/* `neg` is styled in su-report.css — the report route loads NO
+                    Tailwind, so a utility class here would silently no-op. */}
+                <span
+                  className={
+                    f.devPeers! < 0
+                      ? "su-group-rat-peers-dev neg"
+                      : "su-group-rat-peers-dev"
+                  }
+                  data-testid={`group-rating-devpeers-${f.stableKey}`}
+                >
+                  <span aria-hidden="true">{peerDevGlyph(f.devPeers!)}</span>{" "}
+                  {peerDevText(f.devPeers!)}
+                </span>
+              </span>
+            )}
             {/* L3 (R1-L1): per-factor n — denominators can differ (partial S3). */}
             <span className="su-group-rat-n">n={f.n}</span>
           </div>
