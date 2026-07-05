@@ -16,6 +16,8 @@ import { db } from "@/lib/db";
 import { TemplateEditorTabbed } from "@/components/admin/TemplateEditorTabbed";
 import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
+import { isQuestionEditorUnlockEnabled } from "@/lib/assessments/wave-t-flags";
+import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import {
   isPeerRenderEnabledAlias,
   listRatingQuestionKeys,
@@ -41,7 +43,7 @@ export default async function AdminAssessmentVersionEditPage({
   }
   const { id, versionId } = await params;
 
-  const [template, version, allVersions] = await Promise.all([
+  const [template, version, allVersions, publishedVersions] = await Promise.all([
     db.assessmentTemplate.findUnique({
       where: { id },
       select: {
@@ -88,11 +90,25 @@ export default async function AdminAssessmentVersionEditPage({
         contentHash: true,
       },
     }),
+    // Wave T (spec 19t §T-4) — every PUBLISHED version's questions JSON,
+    // for the inherited-lock unions. Fetched UNCONDITIONALLY (not flag-
+    // gated): the unions also drive the save path's inherited re-checks.
+    db.assessmentTemplateVersion.findMany({
+      where: { templateId: id, publishedAt: { not: null } },
+      select: { questions: true },
+    }),
   ]);
 
   if (!template || !version || version.templateId !== id) {
     notFound();
   }
+
+  // Wave T — union of published question stableKeys + per-question option
+  // keys across all published versions (drives isInherited, D8 slug
+  // uniqueness, and the D4/D9 impact warnings in the editor).
+  const { publishedKeys, publishedOptionKeys } = computePublishedQuestionUnions(
+    publishedVersions.map((v) => v.questions),
+  );
 
   // Wave S (spec 19s S-3) — peer-averages editor rows. Rendered ONLY when the
   // flag is ON and the alias is render-enabled (D10 — same list as the report
@@ -168,6 +184,12 @@ export default async function AdminAssessmentVersionEditPage({
         // Wave Q — server-only env read; the client editor receives the flag
         // as a prop and gates the sendResultsDefault toggle on it.
         waveQEnabled={isWaveQAdminControlsEnabled()}
+        // Wave T — the type-unlock flag gates the UI only; the published
+        // unions are ALWAYS passed (they power the save path's inherited
+        // locks regardless of the flag).
+        questionEditorUnlocked={isQuestionEditorUnlockEnabled()}
+        publishedQuestionKeys={publishedKeys}
+        publishedOptionKeys={publishedOptionKeys}
       />
       {peerBenchmarkRows && (
         <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />
