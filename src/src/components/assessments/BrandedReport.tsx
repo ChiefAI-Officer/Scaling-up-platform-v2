@@ -130,6 +130,20 @@ function stringifyAnswer(value: unknown): string {
   return String(value);
 }
 
+/**
+ * Wave T launch-found fix — MULTI_CHOICE answers store option KEYS; resolve
+ * them to labels via the question's options before display (same
+ * keys-never-leak rule the qualitative model applies, C-H1). Fallback to the
+ * raw key when no option matches (degraded/legacy shapes).
+ */
+function displayAnswer(value: unknown, meta?: QuestionMeta): string {
+  if (Array.isArray(value) && meta?.options && meta.options.length > 0) {
+    const byKey = new Map(meta.options.map((o) => [o.key, o.label]));
+    return value.map((v) => byKey.get(String(v)) ?? String(v)).join(", ");
+  }
+  return stringifyAnswer(value);
+}
+
 /** Normalize raw answers (JSON) to a [stableKey → value] list, total-tolerant. */
 function parseRawAnswers(raw: unknown): Array<{ stableKey: string; value: unknown }> {
   if (!Array.isArray(raw)) return [];
@@ -680,7 +694,7 @@ export function BrandedReport({
                 <dt className="su-report-dl-q">
                   {a.meta?.label ?? a.stableKey}
                 </dt>
-                <dd className="su-report-dl-a">{stringifyAnswer(a.value)}</dd>
+                <dd className="su-report-dl-a">{displayAnswer(a.value, a.meta)}</dd>
               </div>
             ))}
           </dl>
