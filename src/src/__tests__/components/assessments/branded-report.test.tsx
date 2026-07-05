@@ -624,6 +624,63 @@ describe("BrandedReport — additional responses (H9)", () => {
     render(<BrandedReport report={rockefellerReport()} />);
     expect(screen.queryByTestId("report-additional")).not.toBeInTheDocument();
   });
+
+  it("resolves MULTI_CHOICE option KEYS to labels (Wave T launch-found fix, C-H1 parity)", () => {
+    const report = baseReport({
+      result: {
+        perQuestion: [{ stableKey: "q1", value: 3, achieved: true }],
+        perSection: [
+          {
+            stableKey: "s1",
+            name: "Vision",
+            totalPoints: 3,
+            averagePoints: 3,
+            achievedCount: 1,
+            totalCount: 1,
+          },
+        ],
+        overallTotal: 3,
+        overallAverage: 3,
+        countAchieved: 1,
+        tier: { label: "Submitted", message: "" },
+        tierMetricValue: 3,
+        unansweredKeys: [],
+      },
+      sections: [
+        { stableKey: "s1", name: "Vision", questions: [{ stableKey: "q1" }] },
+      ],
+      questionByKey: { q1: "Slider question", m1: "Pick your top two obstacles" },
+      questionsByKey: {
+        q1: { type: "SLIDER_LIKERT", label: "Slider question" },
+        m1: {
+          type: "MULTI_CHOICE",
+          label: "Pick your top two obstacles",
+          options: [
+            { key: "cash", label: "Cash" },
+            { key: "strategy", label: "Strategy" },
+            { key: "sales", label: "Sales" },
+          ],
+        },
+      },
+      rawAnswers: [
+        { stableKey: "q1", value: 3 },
+        { stableKey: "m1", value: ["cash", "strategy", "unknown_key"] },
+      ],
+      scoringConfig: {
+        tierMetric: "overallAvg",
+        passThreshold: 0,
+        tiers: [{ minMetric: 0, label: "Submitted", message: "" }],
+      },
+    });
+    render(<BrandedReport report={report} />);
+    const extra = screen.getByTestId("report-additional");
+    // Stored keys resolved to labels…
+    expect(extra.textContent).toContain("Cash, Strategy");
+    // …raw keys never leak…
+    expect(extra.textContent).not.toContain("cash,");
+    // …and an unmatched key falls back to itself (degraded shapes).
+    expect(extra.textContent).toContain("unknown_key");
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
