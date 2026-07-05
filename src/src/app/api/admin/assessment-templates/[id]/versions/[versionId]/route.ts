@@ -7,6 +7,13 @@
  * PATCH — edit content on a DRAFT version. 409 ALREADY_PUBLISHED on a
  *         published version (content is immutable post-publish). Recomputes
  *         contentHash so the audit trail stays valid across edits.
+ *
+ * Wave T (spec 19t §T-5, D5) — the PATCH validates every question row
+ * (engine QuestionSchema + structural + identity checks) UNCONDITIONALLY
+ * (no feature flag: correctness, not capability — kill is revert-commit,
+ * co-validate C2). Validation GATES; it never rewrites — the ORIGINAL
+ * payload is persisted (Zod output would strip recommendations[] and
+ * unknown future fields; validate-don't-strip).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -17,6 +24,7 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { computeTemplateContentHash } from "@/lib/assessments/template-content-hash";
+import { QuestionSchema } from "@/lib/assessments/scoring";
 
 export async function GET(
   _request: NextRequest,
@@ -95,6 +103,162 @@ const PatchVersionBodySchema = z.object({
   language: z.string().min(2).max(20).optional(),
 });
 
+// ─── Wave T (§T-5) — unconditional question-payload validation ────────────
+//
+// Each check returns the FIRST failure found; the route maps a failure to
+// `{ success: false, error, code }` with status 400. Rows that pass are
+// persisted EXACTLY as sent (raw payload, never Zod output).
+
+const STABLE_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,39}$/;
+
+type QuestionValidationFailure = { code: string; message: string };
+
+function readRowStableKey(row: unknown): string | null {
+  if (row && typeof row === "object") {
+    const key = (row as Record<string, unknown>).stableKey;
+    if (typeof key === "string" && key.length > 0) return key;
+  }
+  return null;
+}
+
+/**
+ * Defensive stableKey → type map from a version's `questions` JSON.
+ * Skips non-array payloads, non-object rows, and rows without a string
+ * stableKey (old/hand-seeded versions may carry anything).
+ */
+function buildKeyTypeMap(questions: unknown): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!Array.isArray(questions)) return map;
+  for (const row of questions) {
+    const key = readRowStableKey(row);
+    if (key === null) continue;
+    const type = (row as Record<string, unknown>).type;
+    if (!map.has(key)) map.set(key, typeof type === "string" ? type : "");
+  }
+  return map;
+}
+
+/** Stages 1–4: per-row schema, key format, duplicate keys, MULTI_CHOICE structure. */
+function validateQuestionRowsStructural(
+  rows: unknown[],
+): QuestionValidationFailure | null {
+  // Stage 1 — every row must pass the engine QuestionSchema (non-strict:
+  // legacy stale `scale` on qualitative rows + unknown future fields pass).
+  for (const row of rows) {
+    const parsed = QuestionSchema.safeParse(row);
+    if (parsed.success) continue;
+    const key = readRowStableKey(row);
+    const issue = parsed.error.issues[0];
+    const detail = issue
+      ? `${issue.path.join(".") || "(root)"}: ${issue.message}`
+      : "failed schema validation";
+    return {
+      code: "INVALID_QUESTION",
+      message: `Invalid question${key ? ` "${key}"` : ""} — ${detail}`,
+    };
+  }
+
+  // Stage 2 — stableKey format (permanent join identifiers; ADR-0020).
+  for (const row of rows) {
+    const key = readRowStableKey(row) ?? "";
+    if (!STABLE_KEY_PATTERN.test(key)) {
+      return {
+        code: "INVALID_STABLE_KEY",
+        message: `Invalid stableKey "${key}" — must start with a letter and contain only letters, digits, and underscores (max 40 chars)`,
+      };
+    }
+  }
+
+  // Stage 3 — duplicate stableKeys within the payload.
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const key = readRowStableKey(row) as string;
+    if (seen.has(key)) {
+      return {
+        code: "DUPLICATE_STABLE_KEY",
+        message: `Duplicate stableKey "${key}" — stableKeys must be unique within a version`,
+      };
+    }
+    seen.add(key);
+  }
+
+  // Stage 4 — MULTI_CHOICE structural checks (mirrors publish +
+  // validateAnswerValues semantics).
+  for (const row of rows) {
+    const record = row as Record<string, unknown>;
+    if (record.type !== "MULTI_CHOICE") continue;
+    const key = readRowStableKey(row) as string;
+    const options = Array.isArray(record.options)
+      ? (record.options as Array<Record<string, unknown>>)
+      : [];
+    if (options.length === 0) {
+      return {
+        code: "MULTI_CHOICE_NO_OPTIONS",
+        message: `MULTI_CHOICE question "${key}" has no options — at least one option is required`,
+      };
+    }
+    const optionKeys = new Set<string>();
+    for (const option of options) {
+      const optionKey = typeof option.key === "string" ? option.key : "";
+      if (optionKeys.has(optionKey)) {
+        return {
+          code: "DUPLICATE_OPTION_KEY",
+          message: `MULTI_CHOICE question "${key}" has duplicate option key "${optionKey}" — option keys must be unique within a question`,
+        };
+      }
+      optionKeys.add(optionKey);
+    }
+    const maxChoices = record.maxChoices;
+    if (
+      typeof maxChoices === "number" &&
+      (maxChoices < 1 || maxChoices > options.length)
+    ) {
+      return {
+        code: "MAX_CHOICES_INVALID",
+        message: `MULTI_CHOICE question "${key}" has maxChoices ${maxChoices} — must be between 1 and the option count (${options.length})`,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Stage 5 — server-side identity enforcement (spec C1). Option keys are
+ * deliberately NOT enforced here: an option-key rename is indistinguishable
+ * from remove+add, and D9 permits removal (with a UI warning) — a server
+ * rename-lock would block a permitted edit (spec §T-5).
+ */
+function validateQuestionIdentity(
+  rows: unknown[],
+  storedDraftTypes: Map<string, string>,
+  publishedTypes: Map<string, string>,
+): QuestionValidationFailure | null {
+  for (const row of rows) {
+    const key = readRowStableKey(row) as string;
+    const type = (row as Record<string, unknown>).type;
+    const payloadType = typeof type === "string" ? type : "";
+    const inPublished = publishedTypes.has(key);
+    if (!storedDraftTypes.has(key)) {
+      if (inPublished) {
+        return {
+          code: "KEY_COLLIDES_WITH_PUBLISHED",
+          message: `stableKey "${key}" exists in a published version of this template — a new question must use a new key`,
+        };
+      }
+      continue;
+    }
+    if (storedDraftTypes.get(key) !== payloadType && inPublished) {
+      // Retyping a key that exists ONLY in the draft stays legal.
+      return {
+        code: "TYPE_LOCKED",
+        message: `Question "${key}" exists in a published version — its type is locked to "${storedDraftTypes.get(key)}"; a different type must be a new question`,
+      };
+    }
+  }
+  return null;
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; versionId: string }> },
@@ -135,7 +299,8 @@ export async function PATCH(
     const [version, template] = await Promise.all([
       db.assessmentTemplateVersion.findUnique({
         where: { id: versionId },
-        select: { templateId: true, publishedAt: true },
+        // `questions` feeds the Wave T stored-draft key→type map (§T-5).
+        select: { templateId: true, publishedAt: true, questions: true },
       }),
       db.assessmentTemplate.findUnique({
         where: { id: templateId },
@@ -159,6 +324,49 @@ export async function PATCH(
     }
 
     const data = parsed.data;
+
+    // ── Wave T §T-5 — unconditional validation (gates, never rewrites) ──
+    const structuralFailure = validateQuestionRowsStructural(data.questions);
+    if (structuralFailure) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: structuralFailure.message,
+          code: structuralFailure.code,
+        },
+        { status: 400 },
+      );
+    }
+
+    // Server-side identity enforcement (co-validate C1): ONE extra query —
+    // all published versions of this template (~few versions × ≤65 rows).
+    const publishedVersions = await db.assessmentTemplateVersion.findMany({
+      where: { templateId, publishedAt: { not: null } },
+      select: { questions: true },
+    });
+    const publishedTypes = new Map<string, string>();
+    for (const published of publishedVersions) {
+      for (const [key, type] of buildKeyTypeMap(published.questions)) {
+        if (!publishedTypes.has(key)) publishedTypes.set(key, type);
+      }
+    }
+    const identityFailure = validateQuestionIdentity(
+      data.questions,
+      buildKeyTypeMap(version.questions),
+      publishedTypes,
+    );
+    if (identityFailure) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: identityFailure.message,
+          code: identityFailure.code,
+        },
+        { status: 400 },
+      );
+    }
+    // ── end Wave T validation — from here the ORIGINAL payload persists ──
+
     const contentHash = computeTemplateContentHash({
       questions: data.questions,
       sections: data.sections,

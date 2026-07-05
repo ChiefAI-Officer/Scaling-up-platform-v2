@@ -25,6 +25,10 @@ _Avoid_: "deleted", "archived" (delete already means something stronger here); a
 **Results-email default** (Wave Q, Jeff July-1 #1):
 A template-level default for the per-campaign "send results to respondents" toggle. The campaign wizard checkbox *starts* at the chosen template's default; the coach's per-campaign flip **is** the override (no coach-level standing preference exists). The default is storable at any time but **inert until the template's results-email content is approved** — the approval hash-gate always wins, at wizard time and at send time.
 
+**Inherited question** (Wave T, Jeff July-1 #10):
+Within a DRAFT **Template Version**, a question whose `stableKey` appears in **any published version** of the same template. Inherited questions have their `stableKey` and type locked in the editor (and, for MULTI_CHOICE, their option *keys* — option labels stay editable); changing what an inherited question *means* is a new question with a new key (ADR-0001). Deleting one is allowed but warns about downstream impact (trends, locked crosswalks, peer benchmarks). The opposite is a **new-to-draft question**: added in the current draft, never published — its type is freely switchable and its key is derived from its label at first save, then immutable.
+_Avoid_: "existing question" (ambiguous — existing in the draft vs existing in a published version).
+
 **Domain** (Scaling Up Full only):
 One of the five top-level categories a Scaling Up Full question rolls up into: **People, Strategy, Execution, Cash, You**.
 _Avoid_: section (a section is a finer grouping within a domain), category, pillar.

@@ -69,6 +69,10 @@ import {
   type QuestionDraft,
 } from "@/components/admin/template-editor/QuestionsTab";
 import {
+  buildQuestionsPayload,
+  QuestionSerializationError,
+} from "@/components/admin/template-editor/question-serialization";
+import {
   ScoringTiersTab,
   type ScoringConfigShape,
 } from "@/components/admin/template-editor/ScoringTiersTab";
@@ -181,7 +185,28 @@ export interface TemplateEditorTabbedProps {
    * (`isWaveQAdminControlsEnabled()`) and passed down from the edit page.
    */
   waveQEnabled?: boolean;
+  /**
+   * Wave T (spec 19t D2) — the question-editor type unlock. Server-computed
+   * (`isQuestionEditorUnlockEnabled()`) and passed down from the edit page.
+   * Default false ⇒ the legacy slider-only Questions tab renders unchanged.
+   */
+  questionEditorUnlocked?: boolean;
+  /**
+   * Wave T (spec 19t §T-4) — union of question stableKeys across ALL
+   * published versions of the template. Drives inherited hydration + the
+   * D8 union-scoped slug uniqueness in the save path (NOT flag-gated).
+   */
+  publishedQuestionKeys?: string[];
+  /**
+   * Wave T (spec 19t §T-4) — per-question union of published MULTI_CHOICE
+   * option keys (inherited option-key locks + the D9 remove warning).
+   */
+  publishedOptionKeys?: Record<string, string[]>;
 }
+
+// Stable empty defaults so the memoized handlers don't churn.
+const EMPTY_PUBLISHED_QUESTION_KEYS: string[] = [];
+const EMPTY_PUBLISHED_OPTION_KEYS: Record<string, string[]> = {};
 
 // ────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -203,6 +228,9 @@ export function TemplateEditorTabbed({
   onSaveDraft,
   initialDirtyFlags,
   waveQEnabled = false,
+  questionEditorUnlocked = false,
+  publishedQuestionKeys = EMPTY_PUBLISHED_QUESTION_KEYS,
+  publishedOptionKeys = EMPTY_PUBLISHED_OPTION_KEYS,
 }: TemplateEditorTabbedProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -280,7 +308,7 @@ export function TemplateEditorTabbed({
   // into the version PATCH's questions[] (raw rows are preserved via
   // rawQuestionByStableKey lookup so unknown fields survive).
   const [questions, setQuestions] = useState<QuestionDraft[]>(() =>
-    hydrateQuestionsFromJson(version.questions),
+    hydrateQuestionsFromJson(version.questions, new Set(publishedQuestionKeys)),
   );
 
   // Stable references for scoringConfig / reportConfig so version PATCH
@@ -537,7 +565,12 @@ export function TemplateEditorTabbed({
           ...prev,
           {
             uid: genUid(),
-            stableKey: genNewQuestionStableKey(),
+            // Wave T D8 — unlocked, the slug key is derived from the label
+            // AT SAVE (buildQuestionsPayload); until then the row shows
+            // "(assigned on save)". Locked keeps the legacy Q_NEW_ key.
+            stableKey: questionEditorUnlocked
+              ? ""
+              : genNewQuestionStableKey(),
             sectionStableKey,
             label: "",
             helpText: "",
@@ -549,12 +582,16 @@ export function TemplateEditorTabbed({
             scaleStep: 1,
             anchorMin: "Not true",
             anchorMax: "Completely true",
+            options: [],
+            maxChoices: null,
+            isInherited: false,
+            isNewToDraft: true,
           },
         ];
       });
       setQuestionsDirty();
     },
-    [setQuestionsDirty],
+    [questionEditorUnlocked, setQuestionsDirty],
   );
 
   const handleUpdateQuestion = useCallback(
@@ -590,14 +627,24 @@ export function TemplateEditorTabbed({
           {
             ...src,
             uid: genUid(),
-            stableKey: genNewQuestionStableKey(),
+            // Wave T — a copy is a NEW question: unlocked it gets a slug
+            // key at save; locked it keeps the legacy Q_NEW_ key. Either
+            // way it is never inherited, and every copied option must be
+            // isNew:true (the serializer's inherited-option re-check has
+            // no raw row for a copy — spec 19t §T-3 Duplicate rule).
+            stableKey: questionEditorUnlocked
+              ? ""
+              : genNewQuestionStableKey(),
             sortOrder: nextSort,
+            isInherited: false,
+            isNewToDraft: true,
+            options: src.options.map((o) => ({ ...o, isNew: true })),
           },
         ];
       });
       setQuestionsDirty();
     },
-    [setQuestionsDirty],
+    [questionEditorUnlocked, setQuestionsDirty],
   );
 
   const handleReorderQuestions = useCallback(
@@ -642,6 +689,58 @@ export function TemplateEditorTabbed({
       // F2: per-surface PATCH dispatch.
       // Template-level dirty (metadata) → PATCH /api/admin/assessment-templates/{id}
       // Version-level dirty (version + sections) → PATCH /api/admin/.../versions/{versionId}
+      const needsVersionPatch =
+        Boolean(dirtyFlags.version) ||
+        Boolean(dirtyFlags.sections) ||
+        Boolean(dirtyFlags.questions) ||
+        Boolean(dirtyFlags.scoringConfig);
+
+      // Serialize the version payloads BEFORE dispatching any fetch so a
+      // serializer guard violation (Wave T) aborts the whole save without
+      // a partial write.
+      let sectionsPayload: unknown = null;
+      let questionsPayload: unknown = null;
+      // Wave T §T-3 — slug keys assigned at THIS save (uid → stableKey),
+      // applied back to state after a successful PATCH.
+      let assignedKeys: Map<string, string> = new Map();
+      if (needsVersionPatch) {
+        // Serialize sections. When not dirty, pass rawSectionsRef through
+        // byte-for-byte (content-hash stable). When dirty, each row is
+        // rebuilt by spreading the matching raw row FIRST so description /
+        // partLabel / domain + any unknown fields survive (preserves SU
+        // Full's per-domain scoring even on a questions-only save).
+        sectionsPayload = buildSectionsPayload(sections, {
+          sectionsDirty: Boolean(dirtyFlags.sections),
+          rawSections: rawSectionsRef.current,
+        });
+
+        // Wave T (spec 19t §T-3) — per-type question serialization via the
+        // pure helper: raw rows spread first (unknown fields survive),
+        // scale only on sliders / options only on MULTI_CHOICE, D8 slug
+        // keys derived for new-to-draft rows against the published union,
+        // inherited key/type/option-key locks re-checked client-side.
+        try {
+          const r = buildQuestionsPayload(questions, {
+            questionsDirty: Boolean(dirtyFlags.questions),
+            rawQuestions: rawQuestionsRef.current,
+            publishedKeys: new Set(publishedQuestionKeys),
+            publishedOptionKeys,
+          });
+          questionsPayload = r.payload;
+          assignedKeys = r.assignedKeys;
+        } catch (e) {
+          if (e instanceof QuestionSerializationError) {
+            toast({
+              title: "Could not save draft",
+              description: e.message,
+              variant: "destructive",
+            });
+            return;
+          }
+          throw e;
+        }
+      }
+
       const ops: Array<Promise<{ ok: boolean; status: number; surface: string }>> = [];
 
       if (dirtyFlags.metadata) {
@@ -678,67 +777,7 @@ export function TemplateEditorTabbed({
         );
       }
 
-      const needsVersionPatch =
-        Boolean(dirtyFlags.version) ||
-        Boolean(dirtyFlags.sections) ||
-        Boolean(dirtyFlags.questions) ||
-        Boolean(dirtyFlags.scoringConfig);
-
       if (needsVersionPatch) {
-        // Serialize sections. When not dirty, pass rawSectionsRef through
-        // byte-for-byte (content-hash stable). When dirty, each row is
-        // rebuilt by spreading the matching raw row FIRST so description /
-        // partLabel / domain + any unknown fields survive (preserves SU
-        // Full's per-domain scoring even on a questions-only save).
-        const sectionsPayload = buildSectionsPayload(sections, {
-          sectionsDirty: Boolean(dirtyFlags.sections),
-          rawSections: rawSectionsRef.current,
-        });
-
-        // F3 — Serialize questions. When questions are dirty, rebuild
-        // each row from the draft, looking up the raw row by stableKey
-        // (preserves recommendations[], unknown future fields, etc.).
-        // When not dirty, pass through rawQuestionsRef byte-for-byte.
-        let questionsPayload: unknown;
-        if (dirtyFlags.questions) {
-          const rawByStableKey = new Map<string, Record<string, unknown>>();
-          for (const r of rawQuestionsRef.current) {
-            if (r && typeof r === "object") {
-              const row = r as Record<string, unknown>;
-              if (typeof row.stableKey === "string") {
-                rawByStableKey.set(row.stableKey, row);
-              }
-            }
-          }
-          questionsPayload = questions.map((q) => {
-            const raw = rawByStableKey.get(q.stableKey) ?? {};
-            const rawScale =
-              raw.scale && typeof raw.scale === "object"
-                ? (raw.scale as Record<string, unknown>)
-                : {};
-            return {
-              ...raw,
-              stableKey: q.stableKey,
-              sectionStableKey: q.sectionStableKey,
-              sortOrder: q.sortOrder,
-              type: q.type,
-              label: q.label,
-              ...(q.helpText.trim() ? { helpText: q.helpText } : {}),
-              isRequired: q.isRequired,
-              scale: {
-                ...rawScale,
-                min: q.scaleMin,
-                max: q.scaleMax,
-                step: q.scaleStep,
-                anchorMin: q.anchorMin,
-                anchorMax: q.anchorMax,
-              },
-            };
-          });
-        } else {
-          questionsPayload = rawQuestionsRef.current;
-        }
-
         const body: Record<string, unknown> = {
           questions: questionsPayload,
           sections: sectionsPayload,
@@ -778,6 +817,53 @@ export function TemplateEditorTabbed({
       // Optional test/observability hook.
       await onSaveDraft?.();
 
+      // Wave T (adversarial-review fix) — the version PATCH just persisted
+      // these payloads, so they ARE the stored truth now. Without this, the
+      // refs keep the page-load rows and the NEXT save with that surface
+      // not-dirty (e.g. a sections-only save after adding questions) would
+      // pass the STALE rows through and silently delete the just-saved
+      // content.
+      if (needsVersionPatch) {
+        rawQuestionsRef.current = Array.isArray(questionsPayload)
+          ? (questionsPayload as unknown[])
+          : rawQuestionsRef.current;
+        rawSectionsRef.current = Array.isArray(sectionsPayload)
+          ? (sectionsPayload as unknown[])
+          : rawSectionsRef.current;
+      }
+
+      // Wave T — the slug keys assigned at this save become the rows'
+      // permanent stableKeys (immutable from here on, ADR-0020). Options on
+      // MULTI_CHOICE rows are synced from the persisted payload in the same
+      // pass (isNew:false + their derived keys) so an option-label rename on
+      // a later save can never re-derive (change) an already-persisted
+      // option key.
+      if (needsVersionPatch && Array.isArray(questionsPayload)) {
+        const applied = assignedKeys;
+        const persistedByKey = new Map<string, Record<string, unknown>>();
+        for (const row of questionsPayload as unknown[]) {
+          if (row && typeof row === "object") {
+            const r = row as Record<string, unknown>;
+            if (typeof r.stableKey === "string") persistedByKey.set(r.stableKey, r);
+          }
+        }
+        setQuestions((prev) =>
+          prev.map((q) => {
+            const finalKey = applied.get(q.uid) ?? q.stableKey;
+            const persisted = persistedByKey.get(finalKey);
+            const persistedOptions = Array.isArray(persisted?.options)
+              ? (persisted!.options as Array<{ key: string; label: string }>).map(
+                  (o) => ({ key: o.key, label: o.label, isNew: false }),
+                )
+              : q.options;
+            if (finalKey === q.stableKey && persistedOptions === q.options) {
+              return q;
+            }
+            return { ...q, stableKey: finalKey, options: persistedOptions };
+          }),
+        );
+      }
+
       // Clear dirty flags on success.
       setDirtyFlags({});
       toast({ title: "Draft saved" });
@@ -796,6 +882,8 @@ export function TemplateEditorTabbed({
     isAnyDirty,
     isPublished,
     onSaveDraft,
+    publishedOptionKeys,
+    publishedQuestionKeys,
     questions,
     router,
     savingDraft,
@@ -1146,6 +1234,8 @@ export function TemplateEditorTabbed({
               onDuplicateQuestion={handleDuplicateQuestion}
               onReorderQuestions={handleReorderQuestions}
               isReadOnly={isPublished}
+              isUnlocked={questionEditorUnlocked}
+              publishedOptionKeys={publishedOptionKeys}
             />
           </div>
         </TabsContent>

@@ -27,6 +27,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -49,25 +50,18 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 
 import type { SectionDraft } from "./SectionsCard";
+import type { QuestionDraftRow } from "./question-serialization";
 
 // ────────────────────────────────────────────────────────────────────────
 // Types
 // ────────────────────────────────────────────────────────────────────────
-export interface QuestionDraft {
-  uid: string;
-  stableKey: string;
-  sectionStableKey: string;
-  label: string;
-  helpText: string;
-  isRequired: boolean;
-  type: string;
-  sortOrder: number;
-  scaleMin: number;
-  scaleMax: number;
-  scaleStep: number;
-  anchorMin: string;
-  anchorMax: string;
-}
+/**
+ * Wave T — the editor draft row is now structurally identical to the pure
+ * serializer's QuestionDraftRow (question-serialization.ts): the F3 fields
+ * plus `options` / `maxChoices` / `isInherited` / `isNewToDraft`. Re-exported
+ * under the original name so existing imports keep working.
+ */
+export type QuestionDraft = QuestionDraftRow;
 
 export interface QuestionsTabProps {
   sections: SectionDraft[];
@@ -78,6 +72,17 @@ export interface QuestionsTabProps {
   onDuplicateQuestion: (uid: string) => void;
   onReorderQuestions: (sectionStableKey: string, newOrder: string[]) => void;
   isReadOnly: boolean;
+  /**
+   * Wave T (spec 19t D2) — the question-editor type unlock. False ⇒ the
+   * legacy slider-only editor renders byte-identically (v1.5 placeholders
+   * included); true ⇒ TEXT/NUMBER/MULTI_CHOICE editing is enabled.
+   */
+  isUnlocked: boolean;
+  /**
+   * Wave T (spec 19t §T-4) — union of option keys per published question
+   * stableKey. Drives the D9 inherited-option remove warning.
+   */
+  publishedOptionKeys: Record<string, readonly string[]>;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -91,7 +96,12 @@ export function genNewQuestionStableKey(): string {
   return `Q_NEW_${genUid()}`;
 }
 
-export function hydrateQuestionsFromJson(raw: unknown): QuestionDraft[] {
+const EMPTY_PUBLISHED_KEYS: ReadonlySet<string> = new Set();
+
+export function hydrateQuestionsFromJson(
+  raw: unknown,
+  publishedKeys: ReadonlySet<string> = EMPTY_PUBLISHED_KEYS,
+): QuestionDraft[] {
   const arr = Array.isArray(raw) ? raw : [];
   return arr.map((q, idx) => {
     const r = q as {
@@ -103,6 +113,8 @@ export function hydrateQuestionsFromJson(raw: unknown): QuestionDraft[] {
       isRequired?: unknown;
       sortOrder?: unknown;
       scale?: unknown;
+      options?: unknown;
+      maxChoices?: unknown;
     };
     const scale = (r.scale && typeof r.scale === "object"
       ? r.scale
@@ -119,6 +131,22 @@ export function hydrateQuestionsFromJson(raw: unknown): QuestionDraft[] {
       typeof r.stableKey === "string" && r.stableKey.length > 0
         ? r.stableKey
         : `${sectionStableKey || "S?"}_Q${idx + 1}`;
+    // Wave T — persisted MULTI_CHOICE options hydrate as isNew:false
+    // (their keys are locked by the serializer's inherited re-check).
+    const options: Array<{ key: string; label: string; isNew: boolean }> = [];
+    if (Array.isArray(r.options)) {
+      for (const o of r.options) {
+        if (o && typeof o === "object") {
+          const opt = o as { key?: unknown; label?: unknown };
+          options.push({
+            key: typeof opt.key === "string" ? opt.key : "",
+            label: typeof opt.label === "string" ? opt.label : "",
+            isNew: false,
+          });
+        }
+      }
+    }
+    const isInherited = publishedKeys.has(stableKey);
     return {
       uid: genUid(),
       stableKey,
@@ -140,6 +168,13 @@ export function hydrateQuestionsFromJson(raw: unknown): QuestionDraft[] {
         typeof scale.anchorMax === "string"
           ? scale.anchorMax
           : "Completely true",
+      options,
+      maxChoices:
+        typeof r.maxChoices === "number" && Number.isFinite(r.maxChoices)
+          ? r.maxChoices
+          : null,
+      isInherited,
+      isNewToDraft: !isInherited,
     };
   });
 }
@@ -151,15 +186,36 @@ interface SortableQuestionCardProps {
   question: QuestionDraft;
   isFocused: boolean;
   isReadOnly: boolean;
+  isUnlocked: boolean;
   onFocus: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+}
+
+/**
+ * Wave T D4 — deleting an INHERITED question (its stableKey exists in a
+ * published version) is a history-affecting act; the confirm names the key
+ * and the three consequence classes. New-to-draft rows keep the legacy
+ * simple confirm.
+ */
+function buildDeleteConfirmText(question: QuestionDraft): string {
+  return [
+    `Delete inherited question ${question.stableKey}?`,
+    "",
+    "This question exists in a published version of this template. Deleting it means:",
+    `• cross-version trend history for ${question.stableKey} ends with the last published version;`,
+    "• a locked Esperto import crosswalk that maps this key will refuse imports against the next published version;",
+    "• any peer benchmark set on this question will be pruned.",
+    "",
+    "Continue?",
+  ].join("\n");
 }
 
 function SortableQuestionCard({
   question,
   isFocused,
   isReadOnly,
+  isUnlocked,
   onFocus,
   onDuplicate,
   onDelete,
@@ -187,7 +243,7 @@ function SortableQuestionCard({
     <li
       ref={setNodeRef}
       style={style}
-      data-testid={`question-card-${question.stableKey}`}
+      data-testid={`question-card-${question.stableKey || question.uid}`}
       aria-current={isFocused ? "true" : undefined}
       className={`flex items-start gap-2 px-3 py-3 rounded-md border bg-card ${focusedClass}`}
     >
@@ -209,7 +265,9 @@ function SortableQuestionCard({
             className="inline-flex items-center px-1.5 py-0.5 text-[0.625rem] font-mono font-semibold uppercase tracking-wide rounded bg-muted text-muted-foreground"
             aria-label={`Question stable key ${question.stableKey}`}
           >
-            {question.stableKey}
+            {question.stableKey || (
+              <span className="italic normal-case">(assigned on save)</span>
+            )}
           </span>
           <span className="inline-flex items-center px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide rounded bg-success/10 text-success">
             {question.type}
@@ -249,7 +307,9 @@ function SortableQuestionCard({
           onClick={() => {
             if (isReadOnly) return;
             const ok = window.confirm(
-              `Delete question ${question.stableKey}?`,
+              isUnlocked && question.isInherited
+                ? buildDeleteConfirmText(question)
+                : `Delete question ${question.stableKey}?`,
             );
             if (ok) onDelete();
           }}
@@ -269,16 +329,91 @@ function SortableQuestionCard({
 interface QuestionConfigFormProps {
   question: QuestionDraft | null;
   isReadOnly: boolean;
+  isUnlocked: boolean;
+  publishedOptionKeys: Record<string, readonly string[]>;
   onUpdate: (patch: Partial<QuestionDraft>) => void;
+}
+
+/**
+ * Wave T D9 — removing an option whose key exists in a published version
+ * orphans its `S5_why_<optionKey>` conditional followup pairing and breaks
+ * the option's historical vote-share continuity.
+ */
+function buildOptionRemoveConfirmText(
+  optionKey: string,
+  questionStableKey: string,
+): string {
+  return [
+    `Remove option "${optionKey}" from ${questionStableKey}?`,
+    "",
+    "This option key exists in a published version. Removing it:",
+    `• breaks its "S5_why_${optionKey}"-style conditional followup pairing;`,
+    "• ends the option's historical vote-share continuity across versions.",
+    "",
+    "Continue?",
+  ].join("\n");
+}
+
+/**
+ * Wave T D9 (co-validate C4) — changing an inherited slider's scale
+ * (min/max/step) drifts its measurement semantics across versions.
+ */
+function buildScaleChangeConfirmText(questionStableKey: string): string {
+  return [
+    `Change the scale of inherited question ${questionStableKey}?`,
+    "",
+    "This question exists in a published version. Changing scale min/max/step drifts its measurement semantics across versions — answers before and after will be on different scales.",
+    "",
+    "Continue?",
+  ].join("\n");
 }
 
 function QuestionConfigForm({
   question,
   isReadOnly,
+  isUnlocked,
+  publishedOptionKeys,
   onUpdate,
 }: QuestionConfigFormProps) {
   const [numberOpen, setNumberOpen] = useState(false);
   const [multiOpen, setMultiOpen] = useState(false);
+  // D9 scale-change warning — acknowledged once per question per session.
+  const scaleAckUidsRef = useRef<Set<string>>(new Set());
+
+  // Wave T — scale edits on an INHERITED slider warn once (measurement-
+  // semantics drift), then apply silently for that question. Cancel
+  // discards the field change. Locked mode keeps today's silent behavior.
+  const handleScaleUpdate = (
+    patch: Pick<Partial<QuestionDraft>, "scaleMin" | "scaleMax" | "scaleStep">,
+  ) => {
+    if (!question) return;
+    if (
+      isUnlocked &&
+      question.isInherited &&
+      !scaleAckUidsRef.current.has(question.uid)
+    ) {
+      const ok = window.confirm(
+        buildScaleChangeConfirmText(question.stableKey),
+      );
+      if (!ok) return;
+      scaleAckUidsRef.current.add(question.uid);
+    }
+    onUpdate(patch);
+  };
+
+  const handleRemoveOption = (idx: number) => {
+    if (!question) return;
+    const opt = question.options[idx];
+    if (!opt) return;
+    const published = publishedOptionKeys[question.stableKey] ?? [];
+    if (opt.key !== "" && published.includes(opt.key)) {
+      const ok = window.confirm(
+        buildOptionRemoveConfirmText(opt.key, question.stableKey),
+      );
+      if (!ok) return;
+    }
+    onUpdate({ options: question.options.filter((_, i) => i !== idx) });
+  };
 
   if (!question) {
     return (
@@ -317,9 +452,17 @@ function QuestionConfigForm({
         <input
           id={`q-stablekey-${question.uid}`}
           type="text"
-          value={question.stableKey}
+          value={
+            question.stableKey === ""
+              ? "(assigned on save)"
+              : question.stableKey
+          }
           readOnly
-          className="wf-input"
+          className={
+            question.stableKey === ""
+              ? "wf-input italic text-muted-foreground"
+              : "wf-input"
+          }
           style={{ background: "hsl(var(--muted) / 0.4)" }}
         />
         <span className="block text-[0.6875rem] italic text-muted-foreground">
@@ -335,39 +478,66 @@ function QuestionConfigForm({
         >
           Question Type
         </label>
-        <select
-          id={`q-type-${question.uid}`}
-          value={question.type}
-          onChange={(e) => onUpdate({ type: e.target.value })}
-          disabled={isReadOnly}
-          className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <optgroup label="Active in v1">
+        {isUnlocked ? (
+          /* Wave T D1/D3 — all 4 engine types enabled while new-to-draft;
+             type is LOCKED (delete + add) once the key is published. The
+             fake TEXTAREA/COMPOUND placeholders are removed flag-on. */
+          <select
+            id={`q-type-${question.uid}`}
+            value={question.type}
+            onChange={(e) => onUpdate({ type: e.target.value })}
+            disabled={isReadOnly || question.isInherited}
+            className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
+          >
             <option value="SLIDER_LIKERT">SLIDER_LIKERT</option>
-            {/* Gap E + grill Q9 — NUMBER + MULTI_CHOICE deferred to v1.5 */}
-            <option value="NUMBER" disabled>
-              NUMBER — v1.5
-            </option>
-            <option value="MULTI_CHOICE" disabled>
-              MULTI_CHOICE — v1.5
-            </option>
-          </optgroup>
-          <optgroup label="v1.5 (deferred)">
-            <option value="TEXT" disabled>
-              TEXT — v1.5
-            </option>
-            <option value="TEXTAREA" disabled>
-              TEXTAREA — v1.5
-            </option>
-            <option value="COMPOUND" disabled>
-              COMPOUND — v1.5
-            </option>
-          </optgroup>
-        </select>
-        <span className="block text-[0.6875rem] italic text-muted-foreground">
-          v1 active types cover all 4 default INVITED templates. v1.5 types
-          stay disabled until QSP v2 compound questions ship.
-        </span>
+            <option value="TEXT">TEXT</option>
+            <option value="NUMBER">NUMBER</option>
+            <option value="MULTI_CHOICE">MULTI_CHOICE</option>
+          </select>
+        ) : (
+          <select
+            id={`q-type-${question.uid}`}
+            value={question.type}
+            onChange={(e) => onUpdate({ type: e.target.value })}
+            disabled={isReadOnly}
+            className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <optgroup label="Active in v1">
+              <option value="SLIDER_LIKERT">SLIDER_LIKERT</option>
+              {/* Gap E + grill Q9 — NUMBER + MULTI_CHOICE deferred to v1.5 */}
+              <option value="NUMBER" disabled>
+                NUMBER — v1.5
+              </option>
+              <option value="MULTI_CHOICE" disabled>
+                MULTI_CHOICE — v1.5
+              </option>
+            </optgroup>
+            <optgroup label="v1.5 (deferred)">
+              <option value="TEXT" disabled>
+                TEXT — v1.5
+              </option>
+              <option value="TEXTAREA" disabled>
+                TEXTAREA — v1.5
+              </option>
+              <option value="COMPOUND" disabled>
+                COMPOUND — v1.5
+              </option>
+            </optgroup>
+          </select>
+        )}
+        {isUnlocked ? (
+          question.isInherited ? (
+            <span className="block text-[0.6875rem] italic text-muted-foreground">
+              Type is locked once published — a different type is a new
+              question (delete + add).
+            </span>
+          ) : null
+        ) : (
+          <span className="block text-[0.6875rem] italic text-muted-foreground">
+            v1 active types cover all 4 default INVITED templates. v1.5 types
+            stay disabled until QSP v2 compound questions ship.
+          </span>
+        )}
       </div>
 
       {/* Label */}
@@ -452,8 +622,9 @@ function QuestionConfigForm({
         />
       </div>
 
-      {/* Read-only fallback for non-SLIDER_LIKERT question types */}
-      {question.type !== "SLIDER_LIKERT" && (
+      {/* Read-only fallback for non-SLIDER_LIKERT question types (legacy,
+          flag-off only — Wave T unlocks per-type editing) */}
+      {!isUnlocked && question.type !== "SLIDER_LIKERT" && (
         <div className="wf-helper-card" style={{ opacity: 0.7 }}>
           <span className="wf-pill wf-pill--status">
             {question.type}
@@ -484,7 +655,7 @@ function QuestionConfigForm({
               type="number"
               value={question.scaleMin}
               onChange={(e) =>
-                onUpdate({ scaleMin: Number(e.target.value) })
+                handleScaleUpdate({ scaleMin: Number(e.target.value) })
               }
               disabled={isReadOnly}
               className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
@@ -502,7 +673,7 @@ function QuestionConfigForm({
               type="number"
               value={question.scaleMax}
               onChange={(e) =>
-                onUpdate({ scaleMax: Number(e.target.value) })
+                handleScaleUpdate({ scaleMax: Number(e.target.value) })
               }
               disabled={isReadOnly}
               className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
@@ -520,7 +691,7 @@ function QuestionConfigForm({
               type="number"
               value={question.scaleStep}
               onChange={(e) =>
-                onUpdate({ scaleStep: Number(e.target.value) })
+                handleScaleUpdate({ scaleStep: Number(e.target.value) })
               }
               disabled={isReadOnly}
               className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
@@ -573,6 +744,136 @@ function QuestionConfigForm({
       </div>
       )}
 
+      {/* ── Wave T (flag ON) — per-type config blocks ── */}
+      {isUnlocked && question.type === "TEXT" && (
+        <div
+          className="rounded-md border border-border bg-muted/20 p-3 space-y-1"
+          data-testid="text-config-note"
+        >
+          <h4 className="text-xs font-semibold text-foreground">
+            TEXT — free text
+          </h4>
+          <p className="text-[0.6875rem] italic text-muted-foreground">
+            Renders as a multi-line answer box on the respondent form.
+            Answers are capped at 10,000 characters.
+          </p>
+        </div>
+      )}
+
+      {isUnlocked && question.type === "NUMBER" && (
+        <div
+          className="rounded-md border border-border bg-muted/20 p-3 space-y-1"
+          data-testid="number-config-note"
+        >
+          <h4 className="text-xs font-semibold text-foreground">
+            NUMBER — numeric entry
+          </h4>
+          <p className="text-[0.6875rem] italic text-muted-foreground">
+            Free numeric entry with finite-number validation at submit.
+            Put units or bounds guidance in the Help text.
+          </p>
+        </div>
+      )}
+
+      {isUnlocked && question.type === "MULTI_CHOICE" && (
+        <div
+          className="rounded-md border border-border bg-muted/20 p-3 space-y-2"
+          data-testid="multichoice-config"
+        >
+          <h4 className="text-xs font-semibold text-foreground">
+            MULTI_CHOICE — options
+          </h4>
+          {question.options.length === 0 && (
+            <p className="text-[0.6875rem] italic text-warning">
+              At least one option is required to save.
+            </p>
+          )}
+          <ul className="space-y-1">
+            {question.options.map((opt, idx) => (
+              <li key={idx} className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center px-1.5 py-0.5 text-[0.625rem] font-mono rounded bg-muted text-muted-foreground whitespace-nowrap ${
+                    opt.isNew && opt.key === "" ? "italic" : "font-semibold"
+                  }`}
+                >
+                  {opt.isNew && opt.key === "" ? "auto from label" : opt.key}
+                </span>
+                <input
+                  type="text"
+                  data-testid={`q-option-label-${idx}`}
+                  aria-label={`Option ${idx + 1} label`}
+                  value={opt.label}
+                  onChange={(e) =>
+                    onUpdate({
+                      options: question.options.map((o, i) =>
+                        i === idx ? { ...o, label: e.target.value } : o,
+                      ),
+                    })
+                  }
+                  disabled={isReadOnly}
+                  className="wf-input flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                />
+                <button
+                  type="button"
+                  data-testid={`q-option-remove-${idx}`}
+                  onClick={() => handleRemoveOption(idx)}
+                  disabled={isReadOnly}
+                  className="text-xs font-medium px-2 py-1 rounded text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            data-testid="q-option-add"
+            onClick={() =>
+              onUpdate({
+                options: [
+                  ...question.options,
+                  { key: "", label: "", isNew: true },
+                ],
+              })
+            }
+            disabled={isReadOnly}
+            className="text-[0.6875rem] font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            + Add option
+          </button>
+          <div className="space-y-1">
+            <label
+              className="block text-[0.6875rem] font-medium text-foreground"
+              htmlFor={`q-maxchoices-${question.uid}`}
+            >
+              Max choices
+            </label>
+            <input
+              id={`q-maxchoices-${question.uid}`}
+              data-testid="q-maxchoices"
+              type="number"
+              min={1}
+              value={question.maxChoices ?? ""}
+              onChange={(e) =>
+                onUpdate({
+                  maxChoices:
+                    e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+              disabled={isReadOnly}
+              style={{ width: "5rem" }}
+              className="px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+            />
+            <span className="block text-[0.6875rem] italic text-muted-foreground">
+              Blank = unlimited. Enforced live on the respondent form.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Legacy v1.5 accordions (flag OFF only) ── */}
+      {!isUnlocked && (
+        <>
       {/* NUMBER accordion (v1.5 deferred, all inputs disabled per Gap E) */}
       <div
         className="rounded-md border border-border bg-muted/10 p-3 space-y-2"
@@ -767,6 +1068,8 @@ function QuestionConfigForm({
           </div>
         )}
       </div>
+        </>
+      )}
     </section>
   );
 }
@@ -783,6 +1086,8 @@ export function QuestionsTab({
   onDuplicateQuestion,
   onReorderQuestions,
   isReadOnly,
+  isUnlocked,
+  publishedOptionKeys,
 }: QuestionsTabProps) {
   const [selectedSectionStableKey, setSelectedSectionStableKey] = useState<
     string | null
@@ -825,9 +1130,13 @@ export function QuestionsTab({
 
   const selectedSection =
     sections.find((s) => s.stableKey === selectedSectionStableKey) ?? null;
-  const sectionQuestions = selectedSectionStableKey
-    ? questionsBySection[selectedSectionStableKey] ?? []
-    : [];
+  const sectionQuestions = useMemo(
+    () =>
+      selectedSectionStableKey
+        ? questionsBySection[selectedSectionStableKey] ?? []
+        : [],
+    [questionsBySection, selectedSectionStableKey],
+  );
   const focusedQuestion =
     sectionQuestions.find((q) => q.uid === focusedQuestionUid) ?? null;
 
@@ -981,6 +1290,7 @@ export function QuestionsTab({
                       question={q}
                       isFocused={focusedQuestionUid === q.uid}
                       isReadOnly={isReadOnly}
+                      isUnlocked={isUnlocked}
                       onFocus={() => setFocusedQuestionUid(q.uid)}
                       onDuplicate={() => onDuplicateQuestion(q.uid)}
                       onDelete={() => onDeleteQuestion(q.uid)}
@@ -1009,6 +1319,8 @@ export function QuestionsTab({
           <QuestionConfigForm
             question={focusedQuestion}
             isReadOnly={isReadOnly}
+            isUnlocked={isUnlocked}
+            publishedOptionKeys={publishedOptionKeys}
             onUpdate={(patch) => {
               if (focusedQuestion) onUpdateQuestion(focusedQuestion.uid, patch);
             }}
@@ -1016,7 +1328,9 @@ export function QuestionsTab({
         </aside>
       </div>
 
-      {/* v1.5 informational cards */}
+      {/* v1.5 informational cards (legacy, flag OFF only — Wave T ships
+          TEXT for real and TEXTAREA/COMPOUND were never engine types) */}
+      {!isUnlocked && (
       <section
         className="wf-card space-y-3"
         style={{ padding: "1.25rem", background: "hsl(var(--muted) / 0.1)" }}
@@ -1078,6 +1392,7 @@ export function QuestionsTab({
           </div>
         </div>
       </section>
+      )}
     </div>
   );
 }

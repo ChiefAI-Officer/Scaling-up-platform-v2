@@ -24,6 +24,7 @@ jest.mock("@/lib/db", () => ({
     assessmentTemplateVersion: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
     },
@@ -114,8 +115,19 @@ describe("GET /api/admin/assessment-templates/[id]/versions/[versionId]", () => 
 });
 
 describe("PATCH /api/admin/assessment-templates/[id]/versions/[versionId]", () => {
+  // Wave T (§T-5): the PATCH now validates question rows against the real
+  // QuestionSchema — the payload must be a valid question row (the old
+  // `{ id: "q" }` stub is rejected with 400 INVALID_QUESTION by design).
   const validBody = {
-    questions: [{ id: "q" }],
+    questions: [
+      {
+        stableKey: "S1_demo",
+        sortOrder: 0,
+        type: "TEXT",
+        label: "Demo question",
+        isRequired: false,
+      },
+    ],
     sections: [{ id: "s" }],
     scoringConfig: { tiers: [] },
   };
@@ -144,7 +156,10 @@ describe("PATCH /api/admin/assessment-templates/[id]/versions/[versionId]", () =
     (db.assessmentTemplateVersion.findUnique as jest.Mock).mockResolvedValue({
       templateId: "tpl-1",
       publishedAt: null,
+      questions: [],
     });
+    // Wave T identity check queries published versions — none here.
+    (db.assessmentTemplateVersion.findMany as jest.Mock).mockResolvedValue([]);
     (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
       invitationSubject: "s",
       invitationBodyMarkdown: "b",
