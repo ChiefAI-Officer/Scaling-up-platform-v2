@@ -30,6 +30,8 @@ import {
   type Answer,
 } from "@/lib/assessments/scoring";
 import { logAudit } from "@/lib/audit";
+import { pruneHiddenAnswers } from "@/lib/assessments/form-visibility";
+import type { PagerQuestion } from "@/lib/assessments/section-pages";
 import {
   waveDResultsEmailEnabled,
   waveDCoachNotifyEnabled,
@@ -403,10 +405,15 @@ export async function POST(
           { status: 500, headers: NO_STORE_HEADERS }
         );
       }
-      const rawAnswers: Answer[] = answers.map((a) => ({
-        stableKey: a.stableKey,
-        value: a.value,
-      }));
+      // Wave W (C3/D4): drop answers whose question is hidden by its authored
+      // showIf BEFORE every side effect (scoring, outbox rows, persistence) —
+      // a crafted submit must not smuggle hidden-question answers into
+      // reports. Unknown stableKeys are kept for scoreSubmission's
+      // UNKNOWN_STABLE_KEY rejection; no-op when the version has no showIf.
+      const rawAnswers: Answer[] = pruneHiddenAnswers(
+        answers.map((a) => ({ stableKey: a.stableKey, value: a.value })),
+        allQuestions as unknown as PagerQuestion[],
+      );
       // scoreSubmission may throw ScoringValidationError → caught by outer catch.
       const scoreResult = scoreSubmission(versionParsed.data, rawAnswers);
 

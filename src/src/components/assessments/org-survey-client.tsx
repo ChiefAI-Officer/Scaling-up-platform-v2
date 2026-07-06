@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { SectionPager } from "./section-pager";
 import {
   buildSectionPages,
+  filterConditionallyEmptiedPages,
   isAnswered,
   type PagerSection,
   type PagerQuestion,
@@ -472,10 +473,17 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
   // Wave M (#19): weave any server-sanitized custom slides into the page array
   // (pure; no-op when data.customSlides is empty/undefined). The client never
   // sanitizes — slides arrive as already-safe SafeSlide[] from /me.
+  // Wave W (D7): a section whose authored questions are ALL hidden by showIf
+  // is suppressed (no contentless step); authored-empty intro pages render as
+  // before. Runs BEFORE the slide merge so `before-section` anchors reflect
+  // the visible page list (unknown anchor ⇒ existing fail-safe drop).
   const { pages } = mergeCustomSlides(
-    buildSectionPages(
-      sortedSections as PagerSection[],
-      visibleQuestions as PagerQuestion[]
+    filterConditionallyEmptiedPages(
+      buildSectionPages(
+        sortedSections as PagerSection[],
+        visibleQuestions as PagerQuestion[]
+      ),
+      sortedQuestions as PagerQuestion[]
     ),
     data.customSlides ?? []
   );

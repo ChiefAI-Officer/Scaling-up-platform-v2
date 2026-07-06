@@ -52,6 +52,8 @@ import {
   buildRespondentReportFromSubmission,
 } from "@/lib/assessments/report-email";
 import { logAudit } from "@/lib/audit";
+import { pruneHiddenAnswers } from "@/lib/assessments/form-visibility";
+import type { PagerQuestion } from "@/lib/assessments/section-pages";
 import { inngest } from "@/inngest/client";
 
 // ---------------------------------------------------------------------------
@@ -177,6 +179,15 @@ export async function POST(
     }
 
     const allQuestions = version.questions as Array<Record<string, unknown>>;
+    // Wave W (C3/D4): drop answers whose question is hidden by its authored
+    // showIf BEFORE every side effect (scoring, email rows, persistence) — a
+    // crafted submit must not smuggle hidden-question answers into reports.
+    // Unknown stableKeys are kept for scoreSubmission's UNKNOWN_STABLE_KEY
+    // rejection; no-op (same ref) when the version has no showIf.
+    const submittedAnswers = pruneHiddenAnswers(
+      data.answers,
+      allQuestions as unknown as PagerQuestion[],
+    );
     const versionParsed = TemplateVersionForScoringSchema.safeParse({
       questions: allQuestions,
       sections: version.sections,
@@ -194,7 +205,7 @@ export async function POST(
     // -----------------------------------------------------------------------
     let result;
     try {
-      result = scoreSubmission(versionParsed.data, data.answers);
+      result = scoreSubmission(versionParsed.data, submittedAnswers);
     } catch (err) {
       if (err instanceof ScoringValidationError) {
         return NextResponse.json(
@@ -250,7 +261,7 @@ export async function POST(
       sections: version.sections,
       questions: allQuestions,
       scoringConfig: version.scoringConfig,
-      rawAnswers: data.answers, // the same answers persisted to submission.answers
+      rawAnswers: submittedAnswers, // the same answers persisted to submission.answers
       submittedAt: now,
       // submissionId is only known after the submission is persisted (below).
       // The email body does not render provenance for the scored public quiz,
@@ -328,7 +339,7 @@ export async function POST(
             campaignId: campaign.id,
             respondentId: null,
             invitationId: null,
-            answers: data.answers as Prisma.InputJsonValue,
+            answers: submittedAnswers as Prisma.InputJsonValue,
             result: result as unknown as Prisma.InputJsonValue,
             publicTaker: {
               firstName: data.publicTaker.firstName,

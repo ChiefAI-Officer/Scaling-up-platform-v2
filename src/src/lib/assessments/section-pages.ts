@@ -6,6 +6,8 @@ export interface PagerQuestion {
   scale?: { min: number; max: number; step: number; anchorMin: string; anchorMax: string };
   options?: { key: string; label: string }[];
   maxChoices?: number;
+  /** Wave W — authored show-if: visible only while `optionKey` is selected on the (earlier, MULTI_CHOICE) gate question. */
+  showIf?: { questionKey: string; optionKey: string };
 }
 export interface SectionPage {
   stableKey: string; name: string; description?: string; partLabel?: string; domain?: string;
@@ -40,6 +42,53 @@ export function buildSectionPages(sections: PagerSection[], questions: PagerQues
     pages.push({ stableKey: OTHER_PAGE_KEY, name: "Other", isOther: true, questions: orphans });
   }
   return pages;
+}
+
+/**
+ * Wave W (C1) — THE canonical survey render order: sections by sortOrder, then
+ * questions by sortOrder within each section, orphans last (exactly
+ * buildSectionPages' order — derived FROM it so the two can never drift).
+ * Shared by the editor's gate dropdown, the publish-time strictly-earlier
+ * check, and the tests. Raw question sortOrder alone is NOT globally unique
+ * across sections and must never be used for cross-section comparisons.
+ */
+export function canonicalQuestionOrderIndex(
+  sections: Array<Pick<PagerSection, "stableKey" | "sortOrder">>,
+  questions: Array<Pick<PagerQuestion, "stableKey" | "sortOrder" | "sectionStableKey">>,
+): Map<string, number> {
+  const pages = buildSectionPages(
+    sections.map((s) => ({ ...s, name: "" })),
+    questions.map((q) => ({ ...q, type: "TEXT", label: "", isRequired: false })),
+  );
+  const index = new Map<string, number>();
+  let i = 0;
+  for (const page of pages) {
+    for (const q of page.questions) index.set(q.stableKey, i++);
+  }
+  return index;
+}
+
+/**
+ * Wave W (D7) — suppress conditionally-emptied pages: a section page is
+ * dropped when the VERSION has ≥1 question in that section but the filtered
+ * (visible) list has 0. Authored-empty sections (zero questions in the
+ * version — true intro pages like LVA "Welcome") always render. The Other
+ * page never needs this: buildSectionPages only appends it when visible
+ * orphans exist.
+ */
+export function filterConditionallyEmptiedPages(
+  pages: SectionPage[],
+  allQuestions: Array<Pick<PagerQuestion, "sectionStableKey">>,
+): SectionPage[] {
+  const authoredSections = new Set<string>();
+  for (const q of allQuestions) {
+    const k = typeof q.sectionStableKey === "string" ? q.sectionStableKey.trim() : "";
+    if (k.length > 0) authoredSections.add(k);
+  }
+  const next = pages.filter(
+    (p) => p.isOther || p.questions.length > 0 || !authoredSections.has(p.stableKey),
+  );
+  return next.length === pages.length ? pages : next;
 }
 
 export function isAnswered(value: number | string | string[] | null | undefined): boolean {
