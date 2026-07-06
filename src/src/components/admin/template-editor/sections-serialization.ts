@@ -82,6 +82,10 @@ export function buildSectionsPayload(
     return {
       ...raw, // spread raw FIRST → preserve key order + unknown fields (content-hash stable)
       stableKey: s.stableKey && s.stableKey.length > 0 ? s.stableKey : `S${idx + 1}`,
+      // Positional stamp: editor-added rows have no raw sortOrder (publish
+      // schema requires one), and moves/drag-reorders change only array
+      // order — the persisted sortOrder must follow what the editor shows.
+      sortOrder: idx + 1,
       name: s.name,
       ...(s.description !== undefined ? { description: s.description } : {}),
       ...(s.partLabel !== undefined ? { partLabel: s.partLabel } : {}),

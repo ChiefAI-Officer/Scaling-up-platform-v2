@@ -42,6 +42,34 @@ describe("sections serialization round-trip", () => {
     expect(ye.customField).toBe("keepme");
   });
 
+  it("stamps sortOrder on editor-added sections so the version stays publishable (Wave W walk-found gap)", () => {
+    const drafts = [
+      ...hydrateSectionsFromJson(stored),
+      { uid: "u_new", stableKey: "S3", name: "New section" },
+    ];
+    const payload = buildSectionsPayload(drafts, {
+      sectionsDirty: true,
+      rawSections: stored,
+    }) as Array<Record<string, unknown>>;
+    for (const row of payload) {
+      expect(typeof row.sortOrder).toBe("number");
+    }
+    expect(payload.map((s) => s.sortOrder)).toEqual([1, 2, 3]);
+  });
+
+  it("persists a reorder: sortOrder follows the draft array order, raw fields survive", () => {
+    const drafts = hydrateSectionsFromJson(stored).reverse();
+    const payload = buildSectionsPayload(drafts, {
+      sectionsDirty: true,
+      rawSections: stored,
+    }) as Array<Record<string, unknown>>;
+    expect(payload.map((s) => s.stableKey)).toEqual(["S1_welcome", "S_PEOPLE_YE"]);
+    expect(payload.map((s) => s.sortOrder)).toEqual([1, 2]);
+    const ye = payload.find((s) => s.stableKey === "S_PEOPLE_YE")!;
+    expect(ye.customField).toBe("keepme");
+    expect(ye.domain).toBe("people");
+  });
+
   it("SU Full sections survive a questions-only save and still pass publish (domain intact)", () => {
     const c = buildScalingUpFullContent();
     const drafts = hydrateSectionsFromJson(c.sections);
