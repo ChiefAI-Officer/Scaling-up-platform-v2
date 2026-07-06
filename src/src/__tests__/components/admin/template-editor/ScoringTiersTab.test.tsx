@@ -266,28 +266,10 @@ describe("ScoringTiersTab — F4 (Checkpoint 3)", () => {
   });
 
   describe("Deferred logic placeholders (per WF18 lines 990-1109)", () => {
-    it("Conditional Sections ghost card renders with v1.5 badge + disabled inputs", () => {
+    it("Conditional Sections ghost card is REMOVED (Wave W, spec 19w D5 — superseded by Wave U findings; show-if authoring lives in the Questions tab)", () => {
       render(<ScoringTiersTab {...makeProps()} />);
-      const card = screen.getByTestId("deferred-conditional-sections");
-      expect(card).toBeInTheDocument();
-      expect(within(card).getByText(/Conditional Sections/i)).toBeInTheDocument();
-      // v1.5 badge present
-      expect(within(card).getByText(/v1\.5/i)).toBeInTheDocument();
-      // All inputs disabled
-      const inputs = within(card).queryAllByRole("textbox");
-      inputs.forEach((el) => expect(el).toBeDisabled());
-      const selects = within(card).queryAllByRole("combobox");
-      selects.forEach((el) => expect(el).toBeDisabled());
-    });
-
-    it("Conditional Sections shows JSON example block", () => {
-      render(<ScoringTiersTab {...makeProps()} />);
-      const card = screen.getByTestId("deferred-conditional-sections");
-      // pre/code block with JSON shape
-      const pre = card.querySelector("pre");
-      expect(pre).not.toBeNull();
-      expect(pre?.textContent ?? "").toMatch(/conditionalSections/i);
-      expect(pre?.textContent ?? "").toMatch(/markdownContent/i);
+      expect(screen.queryByTestId("deferred-conditional-sections")).toBeNull();
+      expect(screen.queryByText(/conditionalSections/)).toBeNull();
     });
 
     it("Peer Benchmarks ghost card renders with v1.5 badge + disabled mini-table", () => {

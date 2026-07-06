@@ -61,6 +61,7 @@ function makeQuestion(overrides: Partial<QuestionDraft>): QuestionDraft {
     isNewToDraft: true,
     findingBands: [],
     findingOptionTexts: {},
+    showIf: null,
     ...overrides,
   };
 }

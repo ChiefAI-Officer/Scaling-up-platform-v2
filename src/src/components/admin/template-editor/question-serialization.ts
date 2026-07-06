@@ -75,6 +75,14 @@ export interface QuestionDraftRow {
    */
   findingBands: FindingBandDraft[];
   findingOptionTexts: Record<string, string>;
+  /**
+   * Wave W — authored show-if ({ gate stableKey, gate optionKey }). null =
+   * unconditional. `optionKey: ""` is a half-picked rule (gate chosen,
+   * option pending) — the panel may hold it without breaking saves; only a
+   * COMPLETE rule is emitted. Emission is explicit with anti-resurrection,
+   * exactly the `recommendations` contract.
+   */
+  showIf: { questionKey: string; optionKey: string } | null;
 }
 
 export type QuestionSerializationErrorCode =
@@ -527,6 +535,20 @@ export function buildQuestionsPayload(
       // TEXT can never carry rules (publish rejects them; the serializer
       // never emits them).
       delete row.recommendations;
+    }
+
+    // ── Wave W (spec 19w §2.6) — showIf, explicit emission with
+    // anti-resurrection. On a dirty save the draft is authoritative:
+    // a COMPLETE rule overwrites the stored value; a cleared or
+    // half-picked rule DELETES the key (a rule cleared in the panel
+    // stays cleared — never resurrected by the raw spread).
+    if (d.showIf && d.showIf.questionKey !== "" && d.showIf.optionKey !== "") {
+      row.showIf = {
+        questionKey: d.showIf.questionKey,
+        optionKey: d.showIf.optionKey,
+      };
+    } else {
+      delete row.showIf;
     }
 
     return row;

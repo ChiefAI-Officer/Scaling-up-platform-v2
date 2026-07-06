@@ -15,7 +15,7 @@
 
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo } from "react";
 
 import { scoreSubmission } from "@/lib/assessments/scoring";
 
@@ -327,7 +327,7 @@ export function ScoringTiersTab({
   const tierMetric = scoringConfig.tierMetric;
   const passThreshold = scoringConfig.passThreshold;
   const tiers = scoringConfig.tiers ?? [];
-  const domains = scoringConfig.domains ?? [];
+  const domains = useMemo(() => scoringConfig.domains ?? [], [scoringConfig.domains]);
   const rollupOverall = scoringConfig.rollup?.overall;
 
   const updateConfig = useCallback(
@@ -568,82 +568,12 @@ export function ScoringTiersTab({
       )}
 
       {/* ──────────────────────────────────────────────────────────────
-          Section 3 — Deferred logic placeholders (per WF18)
+          Section 3 — Deferred logic placeholder (per WF18; Wave W
+          removed the Conditional Sections ghost — spec 19w D5: its
+          report-sections concept was superseded by Wave U findings and
+          survey show-if authoring lives in the Questions tab)
           ────────────────────────────────────────────────────────────── */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Conditional Sections — ghost */}
-        <div
-          data-testid="deferred-conditional-sections"
-          aria-hidden="true"
-          className="rounded-xl border border-border bg-muted/20 p-6 space-y-3 opacity-70"
-        >
-          <header className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-foreground">
-              Conditional Sections
-            </h4>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[0.625rem] font-bold bg-warning/20 text-warning">
-              v1.5
-            </span>
-          </header>
-          <p className="text-xs text-muted-foreground">
-            Dynamic report copy. Each section evaluates a{" "}
-            <code>when</code> clause against the respondent&apos;s answers +
-            computed result; if true, the section&apos;s markdown content
-            renders in their report.
-          </p>
-          <div className="grid grid-cols-3 gap-2">
-            <select
-              disabled
-              className="px-2 py-1 text-xs border border-border rounded bg-background opacity-50"
-            >
-              <option>(question stableKey)</option>
-            </select>
-            <select
-              disabled
-              className="px-2 py-1 text-xs border border-border rounded bg-background opacity-50"
-            >
-              <option>between</option>
-            </select>
-            <input
-              type="text"
-              disabled
-              placeholder="(value)"
-              className="px-2 py-1 text-xs border border-border rounded bg-background opacity-50"
-            />
-          </div>
-          <textarea
-            disabled
-            placeholder="Markdown content"
-            rows={3}
-            className="w-full px-2 py-1 text-xs border border-border rounded bg-background opacity-50"
-          />
-          <button
-            type="button"
-            disabled
-            className="wf-btn wf-btn-secondary"
-            style={{ opacity: 0.5 }}
-          >
-            + Add Section
-          </button>
-          <p className="text-xs text-muted-foreground italic">
-            For v1, admins seed conditionalSections JSON via Prisma Studio.
-            Renderer-side evaluation ships in v1 — only the admin authoring UI
-            is deferred.
-          </p>
-          <pre className="text-[0.625rem] bg-muted/50 p-2 rounded overflow-x-auto">
-            {`{
-  "conditionalSections": [
-    {
-      "stableKey": "RECOMMENDATION_LOW",
-      "sortOrder": 1,
-      "when": { "stableKey": "Q01", "op": "lte", "value": 3 },
-      "markdownContent": "..."
-    }
-  ]
-}`}
-          </pre>
-        </div>
-
         {/* Peer Benchmarks — ghost */}
         <div
           data-testid="deferred-peer-benchmarks"
@@ -724,13 +654,14 @@ export function ScoringTiersTab({
           Why is this section deferred? (Codex co-validate, May 12 2026)
         </h4>
         <p className="text-sm text-muted-foreground">
-          The when-clause builder was flagged by Codex peer review as the
-          highest-complexity Wave 2 screen. Jeff&apos;s content matrix
-          isn&apos;t ready (tier messages for scores 7 &amp; 10 still being
-          authored). Deferring the authoring UI to v1.5 saves 1–2 days off the
-          critical path while preserving runtime support for{" "}
-          <code>conditionalSections</code> and <code>peerBenchmarks</code>{" "}
-          (seeded via Prisma Studio).
+          Peer-benchmark authoring was deferred at the original v1 cut
+          (May 2026); Wave S (spec 19s) since shipped the REAL admin panel on
+          the LVA template editor (<code>AssessmentBenchmark</code> rows), so
+          this ghost is retained only as the WF18 record for templates the
+          panel hasn&apos;t reached. The former Conditional Sections ghost was
+          removed in Wave W (spec 19w): its report-sections concept was
+          superseded by Wave U findings (ADR-0021), and survey show-if
+          authoring now lives on each question in the Questions tab.
         </p>
       </section>
     </div>

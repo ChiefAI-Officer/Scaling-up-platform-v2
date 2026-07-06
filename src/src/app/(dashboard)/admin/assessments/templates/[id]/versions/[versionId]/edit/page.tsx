@@ -18,6 +18,7 @@ import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
 import { isQuestionEditorUnlockEnabled } from "@/lib/assessments/wave-t-flags";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
+import { isConditionalAuthoringEnabled } from "@/lib/assessments/wave-w-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import {
   isPeerRenderEnabledAlias,
@@ -194,6 +195,9 @@ export default async function AdminAssessmentVersionEditPage({
         // Wave U — findings-logic authoring (panel-only gate; the save
         // path's per-type rule emission is NOT flag-gated).
         findingsEnabled={isFindingsLogicEnabled()}
+        // Wave W — conditional (show-if) authoring (panel-only gate; the
+        // runtime evaluation, publish gate, and submit prune are flagless).
+        conditionalAuthoringEnabled={isConditionalAuthoringEnabled()}
       />
       {peerBenchmarkRows && (
         <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />
