@@ -83,6 +83,10 @@ import {
   emitEspertoImportMetric,
   type RestrictedCommitPrismaLike,
 } from "@/lib/assessments/esperto-import/restricted-route-helpers";
+import {
+  recordCommitResultSignal,
+  recordCommitConflictSignal,
+} from "@/lib/assessments/esperto-import/alert-signals";
 import { isEspertoSuFullImportEnabled } from "@/lib/assessments/wave-o-flags";
 import {
   canAccessOrganization,
@@ -837,30 +841,48 @@ async function handleRestrictedResultsImport(
   try {
     const commitDb = buildRealRestrictedCommitDb(db as unknown as RestrictedCommitPrismaLike);
     const result = await commitRestrictedImport(commitDb, plan, commitCtx, actor);
-    emitEspertoImportMetric("commit_result", {
+    const commitResultFields = {
       organizationId: targetOrgId,
       templateAlias: crosswalk.templateAlias,
       outcome: result.kind,
       submissionsCreated: "submissionsCreated" in result ? result.submissionsCreated : 0,
       latencyMs: Date.now() - commitStartedAt,
-    });
+    };
+    emitEspertoImportMetric("commit_result", commitResultFields);
+    // Wave V (V-2): persist the same signal durably for the alert cron —
+    // UNCONDITIONAL (flags gate the cron, never this write) and fail-soft.
+    await recordCommitResultSignal(db, commitResultFields);
     return NextResponse.json({
       success: true,
       data: { outcome: result, skippedArtifacts: aggregateFiles?.length ?? 0 },
     });
   } catch (error) {
     if (error instanceof RestrictedCommitError) {
-      emitEspertoImportMetric("commit_conflict", {
+      const conflictFields = {
         errorCode: error.code,
         organizationId: targetOrgId,
         templateAlias: crosswalk.templateAlias,
-      });
+      };
+      emitEspertoImportMetric("commit_conflict", conflictFields);
+      // Wave V (V-2): durable signal for the alert cron (fail-soft; written
+      // HERE — route level, after the commit transaction already rolled back).
+      await recordCommitConflictSignal(db, conflictFields);
       const status = RESTRICTED_COMMIT_ERROR_STATUS[error.code];
       return NextResponse.json(
         { success: false, error: error.code, message: error.message, details: error.details },
         { status },
       );
     }
+    // Wave V (V-2, D4): an UNEXPECTED (non-domain) commit failure is the most
+    // alertable class — record it as an `unexpected-error` conflict signal
+    // (fail-soft) before rethrowing to the platform 500 handler.
+    const unexpectedFields = {
+      errorCode: "unexpected-error",
+      organizationId: targetOrgId,
+      templateAlias: crosswalk.templateAlias,
+    };
+    emitEspertoImportMetric("commit_conflict", unexpectedFields);
+    await recordCommitConflictSignal(db, unexpectedFields);
     throw error;
   }
 }

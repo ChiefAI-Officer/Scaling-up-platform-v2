@@ -1934,3 +1934,20 @@
     display: table-header-group;
   }
 }
+
+/* Wave V (V-3) — "Imported from Esperto (historical)" provenance pill.
+   All three report surfaces render it inside the dark .su-report-cover
+   (respondent scored + qualitative + group), so one light-ink treatment
+   suffices — the kind-pill look, print-safe (the border carries the shape
+   when backgrounds are stripped in print). */
+.su-public-brand .su-imported-badge {
+  display: inline-block;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  padding: 3px 12px;
+  border-radius: 14px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  margin-top: 6px;
+}

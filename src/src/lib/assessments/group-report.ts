@@ -104,7 +104,11 @@ interface GroupReportTx {
 export interface GroupReportDb {
   $transaction: <T>(
     cb: (tx: GroupReportTx) => Promise<T>,
-    options?: { isolationLevel?: Prisma.TransactionIsolationLevel },
+    options?: {
+      isolationLevel?: Prisma.TransactionIsolationLevel;
+      maxWait?: number;
+      timeout?: number;
+    },
   ) => Promise<T>;
 }
 
@@ -126,6 +130,9 @@ interface RawCampaign {
   createdByCoachId: string | null;
   templateId: string;
   versionId: string;
+  // Wave V (V-3): Wave O import-round manifest; non-null ⇒ historical import.
+  // Presence-only read — derived to a boolean, never put on the model.
+  importManifest?: unknown;
   // Display names threaded through provenance for the T8 renderer — read in
   // the SAME snapshot (no second un-snapshotted round-trip).
   organization: { name: string };
@@ -200,6 +207,13 @@ export interface GroupReportProvenance {
   coachLogoUrl: string | null;
   /** Wave K — the coach's display name, used as the logo `<img alt>`. */
   coachName: string | null;
+  /**
+   * Wave V (V-3) — true when the campaign is a Wave O historical Esperto
+   * import (`campaign.importManifest != null`). Boolean ONLY — the manifest
+   * payload never reaches the model. Optional so model-builder callers that
+   * predate the field stay valid; absent ⇒ no badge (fail-closed).
+   */
+  isImported?: boolean;
   /**
    * Wave J / J-2 — Peers benchmark application metadata, copied from the BUILT
    * model (NOT a fresh `benchmarksFor` call) so it reflects ACTUAL application:
@@ -326,6 +340,9 @@ export async function getCampaignGroupReport(
           createdByCoachId: true,
           templateId: true,
           versionId: true,
+          // Wave V (V-3): presence-only — derived to a boolean below; the
+          // manifest payload never reaches the report model.
+          importManifest: true,
           organization: { select: { name: true } },
           template: { select: { alias: true, name: true } },
           // Wave K: coach logo (no migration — reuses Coach.profileImage).
@@ -493,6 +510,8 @@ export async function getCampaignGroupReport(
         versionLabel: `${templateAlias}-v${campaign.version.versionNumber}`,
         coachLogoUrl,
         coachName,
+        // Wave V (V-3): boolean only — the manifest payload stays server-side.
+        isImported: campaign.importManifest != null,
       };
 
       // 0 completed → empty (provenance still carries the invitation counts).
@@ -574,6 +593,13 @@ export async function getCampaignGroupReport(
 
       return { kind: "ok", report, provenance } as const;
     },
-    { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+      // V-4 (Wave V): explicit budget over Prisma's 5s default — read-path
+      // analog of the #117 commit-path fix (Neon cold start / high-latency
+      // clients tripped P2028 on report views).
+      maxWait: 10_000,
+      timeout: 15_000,
+    },
   );
 }

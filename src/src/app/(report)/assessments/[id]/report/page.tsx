@@ -171,6 +171,7 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
         templateAlias={provenance.templateAlias}
         coachLogoUrl={provenance.coachLogoUrl}
         coachName={provenance.coachName}
+        isImported={provenance.isImported}
       />
     </div>
   );

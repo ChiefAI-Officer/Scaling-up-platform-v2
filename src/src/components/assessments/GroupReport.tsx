@@ -29,6 +29,7 @@ import type { CampaignGroupReport } from "@/lib/assessments/group-report-model";
 import { QualitativeGroupReport } from "@/components/assessments/QualitativeGroupReport";
 import { ScoredGroupReport } from "@/components/assessments/ScoredGroupReport";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
+import { ImportedBadge } from "@/components/assessments/ImportedBadge";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
 
@@ -62,6 +63,12 @@ export interface GroupReportProvenance {
   coachLogoUrl?: string | null;
   /** Wave K — the coach's display name, used as the logo `<img alt>`. */
   coachName?: string | null;
+  /**
+   * Wave V (V-3) — true when the campaign is a Wave O historical Esperto
+   * import; renders the "Imported from Esperto (historical)" pill on the
+   * cover. Absent/false → no badge (fail-closed).
+   */
+  isImported?: boolean;
 }
 
 export interface GroupReportProps extends GroupReportProvenance {
@@ -116,9 +123,15 @@ export function GroupReportCover({
   generatedAt,
   coachLogoUrl,
   coachName,
+  isImported,
 }: Pick<
   GroupReportProvenance,
-  "assessmentName" | "companyName" | "generatedAt" | "coachLogoUrl" | "coachName"
+  | "assessmentName"
+  | "companyName"
+  | "generatedAt"
+  | "coachLogoUrl"
+  | "coachName"
+  | "isImported"
 >) {
   return (
     <section className="su-report-cover" data-testid="group-report-cover">
@@ -143,6 +156,8 @@ export function GroupReportCover({
             For {companyName} · Leadership Team
           </div>
           <div className="su-report-sub">{formatGroupDate(generatedAt)}</div>
+          {/* Wave V (V-3): provenance pill for Wave O historical imports. */}
+          {isImported ? <ImportedBadge /> : null}
         </div>
       </div>
     </section>

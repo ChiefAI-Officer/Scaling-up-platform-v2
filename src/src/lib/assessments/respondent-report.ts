@@ -41,6 +41,7 @@ interface SubmissionFindFirst {
 interface ReportDb {
   $transaction: <T>(
     cb: (tx: { assessmentSubmission: SubmissionFindFirst }) => Promise<T>,
+    options?: { maxWait?: number; timeout?: number },
   ) => Promise<T>;
 }
 
@@ -69,6 +70,8 @@ interface RawSubmission {
   };
   campaign: {
     name: string | null;
+    /** Wave V (V-3): Wave O import-round manifest; non-null ⇒ historical import. */
+    importManifest?: unknown;
     template: {
       id: string;
       name: string;
@@ -151,6 +154,14 @@ export interface RespondentReport {
   coachLogoUrl?: string | null;
   /** Wave K — the coach's display name, used as the logo `<img alt>`. */
   coachName?: string | null;
+  /**
+   * Wave V (V-3) — true when the campaign is a Wave O historical Esperto
+   * import (`campaign.importManifest != null`). Boolean ONLY: the manifest
+   * payload never reaches this model. Optional because the public-quiz path
+   * constructs this shape without a campaign in hand (never imported) —
+   * absent ⇒ no badge (fail-closed).
+   */
+  isImported?: boolean;
 }
 
 export type RespondentReportOutcome =
@@ -218,6 +229,9 @@ export async function getRespondentReport(
         campaign: {
           select: {
             name: true,
+            // Wave V (V-3): presence-only — the loader derives a boolean and
+            // the manifest payload never reaches the report model.
+            importManifest: true,
             template: {
               select: {
                 id: true,
@@ -316,8 +330,15 @@ export async function getRespondentReport(
       degraded,
       coachLogoUrl,
       coachName,
+      // Wave V (V-3): boolean only — the manifest payload stays server-side.
+      isImported: submission.campaign.importManifest != null,
     };
 
     return { status: "ok", report } as const;
-  });
+  },
+  // V-4 (Wave V): explicit budget over Prisma's 5s interactive-transaction
+  // default — a Neon cold start / high-latency client can P2028 a report
+  // view (read-path analog of the #117 commit-path fix). Tactical: the
+  // transaction itself is load-bearing (auth + fetch in one snapshot, H14).
+  { maxWait: 10_000, timeout: 15_000 });
 }

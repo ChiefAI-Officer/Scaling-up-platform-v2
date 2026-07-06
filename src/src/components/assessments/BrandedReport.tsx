@@ -43,6 +43,7 @@ import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { parseResolvedFindings } from "@/lib/assessments/findings-section-model";
 import { greetingName } from "@/lib/assessments/respondent-display-name";
 import { QualitativeReport } from "@/components/assessments/QualitativeReport";
+import { ImportedBadge } from "@/components/assessments/ImportedBadge";
 import type { PeerComparisonSection } from "@/lib/assessments/peer-benchmarks";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 
@@ -422,6 +423,8 @@ export function BrandedReport({
             <div className="su-report-sub">
               {report.companyName} · {formatSubmittedAt(report.submittedAt)}
             </div>
+            {/* Wave V (V-3): provenance pill for Wave O historical imports. */}
+            {report.isImported ? <ImportedBadge /> : null}
           </div>
         </div>
       </section>
