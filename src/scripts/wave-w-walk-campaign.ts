@@ -1,5 +1,5 @@
 /**
- * Wave V launch walk — create the throwaway walk campaign (INVITED, ACTIVE,
+ * Wave W launch walk — create the throwaway walk campaign (INVITED, ACTIVE,
  * OPEN_END) on the walk template, add the safe test member as participant,
  * and mint an invitation token. NO email is sent (rows only).
  *
