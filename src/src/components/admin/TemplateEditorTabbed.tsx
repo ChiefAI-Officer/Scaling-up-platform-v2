@@ -202,6 +202,13 @@ export interface TemplateEditorTabbedProps {
    * option keys (inherited option-key locks + the D9 remove warning).
    */
   publishedOptionKeys?: Record<string, string[]>;
+  /**
+   * Wave U (spec 19u U-4) — findings-logic authoring. Server-computed
+   * (`isFindingsLogicEnabled()`) and passed down from the edit page.
+   * Default false ⇒ the Questions tab renders byte-identically to
+   * pre-Wave-U (no Findings panel).
+   */
+  findingsEnabled?: boolean;
 }
 
 // Stable empty defaults so the memoized handlers don't churn.
@@ -231,6 +238,7 @@ export function TemplateEditorTabbed({
   questionEditorUnlocked = false,
   publishedQuestionKeys = EMPTY_PUBLISHED_QUESTION_KEYS,
   publishedOptionKeys = EMPTY_PUBLISHED_OPTION_KEYS,
+  findingsEnabled = false,
 }: TemplateEditorTabbedProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -586,6 +594,9 @@ export function TemplateEditorTabbed({
             maxChoices: null,
             isInherited: false,
             isNewToDraft: true,
+            // Wave U — new questions start with no findings rules.
+            findingBands: [],
+            findingOptionTexts: {},
           },
         ];
       });
@@ -1236,6 +1247,7 @@ export function TemplateEditorTabbed({
               isReadOnly={isPublished}
               isUnlocked={questionEditorUnlocked}
               publishedOptionKeys={publishedOptionKeys}
+              findingsEnabled={findingsEnabled}
             />
           </div>
         </TabsContent>

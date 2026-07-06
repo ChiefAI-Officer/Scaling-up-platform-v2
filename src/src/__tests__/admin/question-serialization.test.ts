@@ -37,6 +37,10 @@ function makeDraft(overrides: Partial<QuestionDraftRow> = {}): QuestionDraftRow 
     maxChoices: null,
     isInherited: true,
     isNewToDraft: false,
+    // Wave U — findings rules default empty (rule-free rows emit no
+    // `recommendations` key; the raw spread's stored value is dropped).
+    findingBands: [],
+    findingOptionTexts: {},
     ...overrides,
   };
 }
@@ -569,6 +573,16 @@ describe("buildQuestionsPayload", () => {
   });
 
   describe("raw-spread preservation (content-hash contract, dirty path)", () => {
+    // Wave U note: `recommendations` is no longer an UNKNOWN field — it is
+    // owned (typed per question type, hydrated into the draft, explicitly
+    // re-emitted). It survives a dirty save via hydration → draft →
+    // emission, NOT via the blind spread (anti-resurrection, spec 19u U-4).
+    // Truly-unknown future fields (`futureField`) still survive via the
+    // spread — that remains the validate-don't-strip core.
+    const RAW_BANDS = [
+      { minScore: 0, maxScore: 4, text: "Do X" },
+      { minScore: 5, maxScore: 10, text: "Do Y" },
+    ];
     const raw = [
       {
         stableKey: "S1_focus",
@@ -578,32 +592,49 @@ describe("buildQuestionsPayload", () => {
         label: "Focus",
         isRequired: true,
         scale: { min: 0, max: 10, step: 1, anchorMin: "Low", anchorMax: "High" },
-        recommendations: ["Do X", "Do Y"],
+        recommendations: RAW_BANDS,
         futureField: { keep: true },
       },
     ];
+    /** The hydrated draft carries the raw bands (hydrateQuestionsFromJson). */
+    const hydratedDraft = () =>
+      makeDraft({
+        stableKey: "S1_focus",
+        label: "Focus (edited)",
+        findingBands: RAW_BANDS.map((b) => ({ ...b })),
+      });
 
-    it("preserves recommendations[] and unknown future fields on a slider row", () => {
-      const draft = makeDraft({ stableKey: "S1_focus", label: "Focus (edited)" });
+    it("preserves recommendations[] (via hydrated draft) and unknown future fields (via spread) on a slider row", () => {
       const { payload } = buildQuestionsPayload(
-        [draft],
+        [hydratedDraft()],
         baseOpts({ rawQuestions: raw }),
       );
       const row = (payload as Array<Record<string, unknown>>)[0];
-      expect(row.recommendations).toEqual(["Do X", "Do Y"]);
+      expect(row.recommendations).toEqual(RAW_BANDS);
       expect(row.futureField).toEqual({ keep: true });
       expect(row.label).toBe("Focus (edited)");
     });
 
     it("preserves the raw row's key ORDER (spread raw first)", () => {
-      const draft = makeDraft({ stableKey: "S1_focus", label: "Focus (edited)" });
       const { payload } = buildQuestionsPayload(
-        [draft],
+        [hydratedDraft()],
         baseOpts({ rawQuestions: raw }),
       );
       const row = (payload as Array<Record<string, unknown>>)[0];
       const rawKeys = Object.keys(raw[0]);
       expect(Object.keys(row).slice(0, rawKeys.length)).toEqual(rawKeys);
+    });
+
+    it("Wave U anti-resurrection: a rule deleted in the panel stays deleted on a dirty save", () => {
+      // Same raw row, but the draft's bands were emptied in the panel.
+      const { payload } = buildQuestionsPayload(
+        [makeDraft({ stableKey: "S1_focus", findingBands: [] })],
+        baseOpts({ rawQuestions: raw }),
+      );
+      const row = (payload as Array<Record<string, unknown>>)[0];
+      expect("recommendations" in row).toBe(false);
+      // The truly-unknown field still survives.
+      expect(row.futureField).toEqual({ keep: true });
     });
   });
 

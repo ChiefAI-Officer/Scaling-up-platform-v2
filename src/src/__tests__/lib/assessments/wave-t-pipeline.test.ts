@@ -85,6 +85,24 @@ function draftFromRaw(
     maxChoices: null,
     isInherited: inherited,
     isNewToDraft: !inherited,
+    // Wave U — mirror hydrateQuestionsFromJson: persisted band rules ride
+    // into the draft (that is how they survive a dirty save now — explicit
+    // re-emission, not blind spread).
+    findingBands: Array.isArray(raw.recommendations)
+      ? (raw.recommendations as Array<Record<string, unknown>>)
+          .filter(
+            (b) =>
+              typeof b.minScore === "number" &&
+              typeof b.maxScore === "number" &&
+              typeof b.text === "string",
+          )
+          .map((b) => ({
+            minScore: b.minScore as number,
+            maxScore: b.maxScore as number,
+            text: b.text as string,
+          }))
+      : [],
+    findingOptionTexts: {},
   };
 }
 
@@ -105,6 +123,8 @@ function newDraft(
     maxChoices: null,
     isInherited: false,
     isNewToDraft: true,
+    findingBands: [],
+    findingOptionTexts: {},
     ...partial,
   };
 }

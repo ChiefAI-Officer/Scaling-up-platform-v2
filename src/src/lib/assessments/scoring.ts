@@ -24,6 +24,7 @@
 
 import { z } from "zod";
 import { MAX_TEXT_ANSWER_LENGTH } from "./answer-limits";
+import { resolveFindings, type ResolvedFinding } from "./findings";
 
 // ─── Zod schemas (input validation) ──────────────────────────────────────
 
@@ -58,11 +59,22 @@ export const SliderLikertQuestion = z.object({
 });
 export type SliderLikertQuestion = z.infer<typeof SliderLikertQuestion>;
 
+// Wave U (spec 19u U-2, ADR-0021) — MULTI_CHOICE findings rule: one optional
+// text per option, keyed by the option's key. The question's TYPE
+// discriminates the `recommendations` item shape (bands vs option rules).
+export const FindingOptionRuleSchema = z.object({
+  optionKey: z.string(),
+  text: z.string(),
+});
+
 // Qualitative question types: TEXT, NUMBER, MULTI_CHOICE. No scale required.
-const QualitativeQuestion = z.object({
+// Wave U split the former single enum-typed QualitativeQuestion into three
+// literal-discriminated arms so `recommendations` can be typed per question
+// type (spec D3). Every shared field keeps its original optionality — the
+// acceptance behavior for rule-free payloads is byte-identical to before.
+const qualitativeShape = {
   stableKey: z.string(),
   sortOrder: z.number().int(),
-  type: z.enum(["TEXT", "NUMBER", "MULTI_CHOICE"]),
   label: z.string(),
   helpText: z.string().optional(),
   sectionStableKey: z.string().optional(),
@@ -71,12 +83,37 @@ const QualitativeQuestion = z.object({
     .array(z.object({ key: z.string(), label: z.string() }))
     .optional(),
   maxChoices: z.number().int().optional(),
+} as const;
+
+// TEXT declares `recommendations` as unknown ONLY so a stray value SURVIVES
+// the (stripping) parse and the PUBLISH check can reject it explicitly —
+// TEXT questions can never carry findings rules, but that rejection is a
+// publish-tier concern, not a save-shape concern (spec D10 layering).
+const TextQuestion = z.object({
+  ...qualitativeShape,
+  type: z.literal("TEXT"),
+  recommendations: z.unknown().optional(),
+});
+
+const NumberQuestion = z.object({
+  ...qualitativeShape,
+  type: z.literal("NUMBER"),
+  // NUMBER findings rules are bands over the (unbounded) answer value.
+  recommendations: z.array(RecommendationBandSchema).optional(),
+});
+
+const MultiChoiceQuestion = z.object({
+  ...qualitativeShape,
+  type: z.literal("MULTI_CHOICE"),
+  recommendations: z.array(FindingOptionRuleSchema).optional(),
 });
 
 // Discriminated union — accepts all 4 question types.
 const QuestionBase = z.discriminatedUnion("type", [
   SliderLikertQuestion,
-  QualitativeQuestion,
+  TextQuestion,
+  NumberQuestion,
+  MultiChoiceQuestion,
 ]);
 
 export const QuestionSchema = QuestionBase;
@@ -182,6 +219,38 @@ function checkRecommendationsRuntime(
       }
     }
   }
+
+  // Wave U (spec 19u U-2/D4) — NUMBER findings bands: max>=min + non-overlap.
+  // NO scale-bounds or coverage check — the NUMBER domain is unbounded and
+  // gaps are legal (a value in no band simply produces no finding).
+  for (let qi = 0; qi < questions.length; qi++) {
+    const q = questions[qi];
+    if (q.type !== "NUMBER") continue;
+    const bands = q.recommendations;
+    if (!bands || bands.length === 0) continue;
+
+    for (let bi = 0; bi < bands.length; bi++) {
+      if (bands[bi].maxScore < bands[bi].minScore) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", qi, "recommendations", bi],
+          message: `Finding band ${bi}: maxScore < minScore`,
+        });
+      }
+    }
+    const sorted = [...bands].sort((a, b) => a.minScore - b.minScore);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i];
+      const b = sorted[i + 1];
+      if (b.minScore <= a.maxScore) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", qi, "recommendations"],
+          message: `Finding bands overlap: [${a.minScore}, ${a.maxScore}] and [${b.minScore}, ${b.maxScore}]`,
+        });
+      }
+    }
+  }
 }
 
 function checkRecommendationsPublish(
@@ -246,7 +315,108 @@ function checkRecommendationsPublish(
           break;
         }
       }
+      // Wave U (D21) — length cap applies to ALL rule kinds at publish.
+      checkFindingTextCap(txt, ["questions", origIdx, "recommendations", bi, "text"], ctx);
     }
+  }
+
+  // ── Wave U (spec 19u U-2) — publish-tier checks for the new rule kinds ──
+  for (let qi = 0; qi < questions.length; qi++) {
+    const q = questions[qi];
+
+    // TEXT questions can never carry findings rules. The value survives the
+    // parse only because TextQuestion declares `recommendations: unknown` —
+    // rejection deliberately lives HERE, not at save (spec D10 layering).
+    if (q.type === "TEXT") {
+      if (q.recommendations !== undefined && q.recommendations !== null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["questions", qi, "recommendations"],
+          message: `TEXT question "${q.stableKey}" cannot carry findings rules`,
+        });
+      }
+      continue;
+    }
+
+    // NUMBER — sentinels + length cap (max>=min + non-overlap already run in
+    // the runtime tier, which publish includes; gaps are legal per D4).
+    if (q.type === "NUMBER") {
+      const bands = q.recommendations;
+      if (!bands || bands.length === 0) continue;
+      for (let bi = 0; bi < bands.length; bi++) {
+        const txt = bands[bi].text ?? "";
+        for (const sentinel of PLACEHOLDER_SENTINELS) {
+          if (txt.includes(sentinel)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["questions", qi, "recommendations", bi, "text"],
+              message: `Finding text contains placeholder sentinel "${sentinel}"`,
+            });
+            break;
+          }
+        }
+        checkFindingTextCap(txt, ["questions", qi, "recommendations", bi, "text"], ctx);
+      }
+      continue;
+    }
+
+    // MULTI_CHOICE — every rule's optionKey must exist on THIS question,
+    // duplicate rule optionKeys are rejected, sentinels + cap on text.
+    if (q.type === "MULTI_CHOICE") {
+      const rules = q.recommendations;
+      if (!rules || rules.length === 0) continue;
+      const optionKeys = new Set((q.options ?? []).map((o) => o.key));
+      const seen = new Set<string>();
+      for (let ri = 0; ri < rules.length; ri++) {
+        const rule = rules[ri];
+        if (!optionKeys.has(rule.optionKey)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["questions", qi, "recommendations", ri, "optionKey"],
+            message: `Finding rule optionKey "${rule.optionKey}" is not among the question's options`,
+          });
+        }
+        if (seen.has(rule.optionKey)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["questions", qi, "recommendations", ri, "optionKey"],
+            message: `Duplicate finding rule for optionKey "${rule.optionKey}"`,
+          });
+        }
+        seen.add(rule.optionKey);
+        const txt = rule.text ?? "";
+        for (const sentinel of PLACEHOLDER_SENTINELS) {
+          if (txt.includes(sentinel)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["questions", qi, "recommendations", ri, "text"],
+              message: `Finding text contains placeholder sentinel "${sentinel}"`,
+            });
+            break;
+          }
+        }
+        checkFindingTextCap(txt, ["questions", qi, "recommendations", ri, "text"], ctx);
+      }
+    }
+  }
+}
+
+// Wave U (D21) — publish-tier cap on rule text. 2,000 chars comfortably
+// clears the longest live SU-Full band (482 chars, measured 2026-07-05)
+// while guarding report/print blowup from a runaway paste.
+const MAX_FINDING_TEXT_LENGTH = 2000;
+
+function checkFindingTextCap(
+  text: string,
+  path: (string | number)[],
+  ctx: z.RefinementCtx
+): void {
+  if (text.length > MAX_FINDING_TEXT_LENGTH) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path,
+      message: `Finding text is ${text.length} chars — max ${MAX_FINDING_TEXT_LENGTH}`,
+    });
   }
 }
 
@@ -648,6 +818,16 @@ export interface ScoreResult {
   /** D2 — 0-100 score. Emitted only when scoringConfig.scaleUpScore === true. */
   scaleUpScore?: number;
   unansweredKeys: string[];
+  /**
+   * Wave U (spec 19u D18, ADR-0021) — the frozen findings snapshot: every
+   * findings rule that FIRED for this respondent, resolved once at scoring
+   * time. ALWAYS written by current code (empty array when nothing fires);
+   * typed optional only because pre-Wave-U frozen results lack it — readers
+   * must tolerate absence. Reports render this snapshot; they never
+   * re-resolve. Sliders ALSO keep their legacy per-row `recommendation`
+   * (scored reports render sliders from the rows — no double display).
+   */
+  findings?: ResolvedFinding[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -1443,6 +1623,13 @@ export function scoreSubmission(
     scaleUpScore = Math.round(tierMetricValue * 10);
   }
 
+  // Wave U (D18) — resolve + freeze the findings snapshot UNCONDITIONALLY
+  // (the flag gates authoring + rendering, never this write). Empty array
+  // when no rules fire. Total-tolerant: resolveFindings never throws.
+  const findingsAnswerMap = new Map<string, unknown>();
+  for (const a of answers) findingsAnswerMap.set(a.stableKey, a.value);
+  const findings = resolveFindings(v.questions, findingsAnswerMap);
+
   const result: ScoreResult = {
     perQuestion,
     perSection,
@@ -1452,6 +1639,7 @@ export function scoreSubmission(
     tier,
     tierMetricValue,
     unansweredKeys,
+    findings,
   };
   if (perDomain !== undefined) result.perDomain = perDomain;
   if (scaleUpScore !== undefined) result.scaleUpScore = scaleUpScore;

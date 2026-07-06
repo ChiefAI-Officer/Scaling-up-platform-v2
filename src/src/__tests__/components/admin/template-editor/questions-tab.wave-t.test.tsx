@@ -75,6 +75,8 @@ function makeQuestion(overrides: Partial<QuestionDraft>): QuestionDraft {
     maxChoices: null,
     isInherited: false,
     isNewToDraft: true,
+    findingBands: [],
+    findingOptionTexts: {},
     ...overrides,
   };
 }

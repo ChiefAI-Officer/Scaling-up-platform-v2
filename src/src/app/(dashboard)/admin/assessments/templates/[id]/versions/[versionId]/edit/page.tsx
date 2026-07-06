@@ -17,6 +17,7 @@ import { TemplateEditorTabbed } from "@/components/admin/TemplateEditorTabbed";
 import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
 import { isQuestionEditorUnlockEnabled } from "@/lib/assessments/wave-t-flags";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import {
   isPeerRenderEnabledAlias,
@@ -190,6 +191,9 @@ export default async function AdminAssessmentVersionEditPage({
         questionEditorUnlocked={isQuestionEditorUnlockEnabled()}
         publishedQuestionKeys={publishedKeys}
         publishedOptionKeys={publishedOptionKeys}
+        // Wave U — findings-logic authoring (panel-only gate; the save
+        // path's per-type rule emission is NOT flag-gated).
+        findingsEnabled={isFindingsLogicEnabled()}
       />
       {peerBenchmarkRows && (
         <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />

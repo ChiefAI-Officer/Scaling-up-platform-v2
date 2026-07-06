@@ -84,9 +84,9 @@ _Avoid_: assuming Esperto's codes equal our stableKeys — they never do; the cr
 The overall result band of a *scored* assessment (Rockefeller: Low / OK / Great; Scaling Up Full: Not-ready / On-the-way / Exemplary). Every published version needs ≥1 tier. **Note:** Scaling Up Full's tier is computed and stored in `ScoreResult` but **render-suppressed** — its reports show peer-deviation instead of a band (ADR-0015); the tier is hidden, not removed.
 _Avoid_: calling per-question advice or invitation progress a "tier".
 
-**Per-question recommendation**:
-Advice text attached to an individual Scaling Up Full question, selected by that question's score against fixed stops {0, 3, 5, 7, 10}. Not an overall result.
-_Avoid_: recommendation = tier.
+**Per-question recommendation** (a.k.a. **findings rule** — Jeff July-1 #11, Wave U):
+Advice text attached to an individual question, selected by that respondent's own answer. The rule shape is discriminated by the question's type (ADR-0021): SLIDER/NUMBER carry **bands** (`minScore`–`maxScore` → text; sliders must tile their scale at publish, NUMBER bands may leave gaps), MULTI_CHOICE carries **per-option** texts (each selected option with a rule contributes its finding), TEXT carries none. Findings are resolved and **frozen at submission-scoring time** (`result.findings`, ADR-0021) — a report's findings never change after the fact. Originated as Scaling Up Full's Esperto-verbatim bands at fixed stops {0, 3, 5, 7, 10}; Wave U makes rules authorable in the template editor on any template and renders them in the individual report only (scored: the existing "What to work on next" block; qualitative: a new findings section) — never in group reports or the results email. Rule *text* is reword-class (editable on inherited questions); rules reach reports only via a newly published version.
+_Avoid_: recommendation = tier; "findings" = survey branching (that is conditional/show-if logic, an input-side concept — findings are output-side).
 
 **Invitation status band**:
 A campaign-progress label for a respondent — new / invited / started / completed (revoked excluded). Purely workflow state; carries no scoring meaning.

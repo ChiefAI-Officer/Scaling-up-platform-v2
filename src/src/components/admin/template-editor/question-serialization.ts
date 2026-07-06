@@ -36,6 +36,17 @@
 // Types
 // ────────────────────────────────────────────────────────────────────────
 
+/**
+ * Wave U (spec 19u U-4) — one findings band row in the editor. min/max are
+ * null while the input is empty; rows with null bounds or blank text are
+ * NOT emitted (the panel may hold half-typed rows without breaking saves).
+ */
+export interface FindingBandDraft {
+  minScore: number | null;
+  maxScore: number | null;
+  text: string;
+}
+
 export interface QuestionDraftRow {
   uid: string;
   stableKey: string;
@@ -54,6 +65,16 @@ export interface QuestionDraftRow {
   maxChoices: number | null;
   isInherited: boolean;
   isNewToDraft: boolean;
+  /**
+   * Wave U — findings rules (per-type; the question TYPE discriminates which
+   * field is live): `findingBands` on SLIDER_LIKERT / NUMBER,
+   * `findingOptionTexts` (optionKey → rule text; blank/absent = no rule) on
+   * MULTI_CHOICE. Both are ignored for TEXT. Emission is EXPLICIT per type
+   * with anti-resurrection: on a dirty save the raw row's `recommendations`
+   * is always overwritten or deleted — never resurrected by the raw spread.
+   */
+  findingBands: FindingBandDraft[];
+  findingOptionTexts: Record<string, string>;
 }
 
 export type QuestionSerializationErrorCode =
@@ -79,6 +100,77 @@ export class QuestionSerializationError extends Error {
     this.code = code;
     this.stableKey = stableKey;
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Wave U — slider band coverage (advisory UI helper; publish enforces)
+// ────────────────────────────────────────────────────────────────────────
+
+export type SliderBandCoverage =
+  | { complete: true }
+  | { complete: false; message: string };
+
+/**
+ * Advisory coverage state for a SLIDER question's findings bands, shown
+ * inline in the panel so the publish-time full-tiling rule never surprises
+ * (spec D11). Mirrors `checkRecommendationsPublish`'s slider semantics:
+ * bands (the EMITTABLE ones — numeric bounds + non-blank text) must start at
+ * scale.min, end at scale.max, and be contiguous (integer scales: next.min
+ * === prev.max + 1; fractional: next.min === prev.max). No bands at all is
+ * complete (rules are opt-in per question).
+ */
+export function sliderBandCoverage(
+  scaleMin: number,
+  scaleMax: number,
+  step: number,
+  bands: FindingBandDraft[],
+): SliderBandCoverage {
+  const usable = bands
+    .filter(
+      (b) =>
+        typeof b.minScore === "number" &&
+        Number.isFinite(b.minScore) &&
+        typeof b.maxScore === "number" &&
+        Number.isFinite(b.maxScore) &&
+        b.text.trim() !== "",
+    )
+    .map((b) => ({ min: b.minScore as number, max: b.maxScore as number }));
+  if (usable.length === 0) return { complete: true };
+
+  const sorted = [...usable].sort((a, b) => a.min - b.min);
+  for (const b of sorted) {
+    if (b.max < b.min) {
+      return { complete: false, message: `A band has max < min (${b.max} < ${b.min})` };
+    }
+  }
+  const isInteger = step === 1;
+  const problems: string[] = [];
+  if (sorted[0].min !== scaleMin) {
+    problems.push(`missing ${scaleMin}–${isInteger ? sorted[0].min - 1 : sorted[0].min}`);
+  }
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
+    const expected = isInteger ? a.max + 1 : a.max;
+    if (b.min < expected) {
+      return { complete: false, message: `Bands overlap at ${b.min}` };
+    }
+    if (b.min > expected) {
+      problems.push(`missing ${expected}–${isInteger ? b.min - 1 : b.min}`);
+    }
+  }
+  if (sorted[sorted.length - 1].max !== scaleMax) {
+    problems.push(
+      `missing ${isInteger ? sorted[sorted.length - 1].max + 1 : sorted[sorted.length - 1].max}–${scaleMax}`,
+    );
+  }
+  if (problems.length > 0) {
+    return {
+      complete: false,
+      message: `Covers part of ${scaleMin}–${scaleMax}; ${problems.join(", ")}`,
+    };
+  }
+  return { complete: true };
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -388,6 +480,42 @@ export function buildQuestionsPayload(
       delete row.scale;
       delete row.options;
       delete row.maxChoices;
+    }
+
+    // ── Wave U (spec 19u U-4) — findings rules, explicit per-type emission.
+    // The raw spread above may have carried the STORED `recommendations`;
+    // on a dirty save the draft is authoritative: overwrite with the
+    // draft-derived rules, or DELETE the key when the draft has none
+    // (anti-resurrection — a rule deleted in the panel stays deleted).
+    if (d.type === "SLIDER_LIKERT" || d.type === "NUMBER") {
+      const bands = d.findingBands
+        .filter(
+          (b) =>
+            typeof b.minScore === "number" &&
+            Number.isFinite(b.minScore) &&
+            typeof b.maxScore === "number" &&
+            Number.isFinite(b.maxScore) &&
+            b.text.trim() !== "",
+        )
+        .map((b) => ({
+          minScore: b.minScore as number,
+          maxScore: b.maxScore as number,
+          text: b.text,
+        }));
+      if (bands.length > 0) row.recommendations = bands;
+      else delete row.recommendations;
+    } else if (d.type === "MULTI_CHOICE") {
+      // Emit in the question's OPTION order (drives fired-rule order in the
+      // resolver); blank text = no rule for that option.
+      const rules = d.options
+        .filter((o) => o.key !== "" && (d.findingOptionTexts[o.key] ?? "").trim() !== "")
+        .map((o) => ({ optionKey: o.key, text: d.findingOptionTexts[o.key] }));
+      if (rules.length > 0) row.recommendations = rules;
+      else delete row.recommendations;
+    } else {
+      // TEXT can never carry rules (publish rejects them; the serializer
+      // never emits them).
+      delete row.recommendations;
     }
 
     return row;
