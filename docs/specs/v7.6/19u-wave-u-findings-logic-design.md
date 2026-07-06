@@ -1,6 +1,6 @@
 # Spec 19u — Wave U: Findings Logic (Jeff July-1 #11)
 
-**Status: CO-VALIDATED (2026-07-05) — awaiting user greenlight.** See §6 for the co-validate changelog (Codex C1/C2/C4 accepted — the resolution model changed to snapshot-at-scoring; C3 partial; C5 overridden with rider).
+**Status: LAUNCHED 2026-07-06** — PR #139 (`d50b576`) merged dark, launch walk complete per §5 (both walks all-green; launch-found fix #140 `8fd7975`), `WAVE_U_FINDINGS_ENABLED=1` live on Vercel Production, prod smokes all-pass. CHANGELOG slug `wave-u-launched`. See §6 for the co-validate changelog (Codex C1/C2/C4 accepted — the resolution model changed to snapshot-at-scoring; C3 partial; C5 overridden with rider).
 Pipeline: brainstorm → grill-with-docs → grill-me (this doc) → /co-validate (Codex) → user greenlight → TDD build → adversarial review → PR dark → same-session launch walk.
 
 ## §0 Ground truth

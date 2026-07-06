@@ -1,6 +1,6 @@
 # ADR-0021 — Findings rules: type-discriminated shape on `recommendations[]`, snapshot-at-scoring resolution
 
-**Status:** Proposed (Wave U, spec 19u) — becomes Accepted when Wave U merges.
+**Status:** Accepted (Wave U merged `d50b576` + launched 2026-07-06).
 **Date:** 2026-07-05
 **Context owner:** assessment module (Esperto replacement)
 
