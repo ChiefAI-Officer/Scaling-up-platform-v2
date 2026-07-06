@@ -70,24 +70,34 @@ export function canonicalQuestionOrderIndex(
 
 /**
  * Wave W (D7) — suppress conditionally-emptied pages: a section page is
- * dropped when the VERSION has ≥1 question in that section but the filtered
- * (visible) list has 0. Authored-empty sections (zero questions in the
- * version — true intro pages like LVA "Welcome") always render. The Other
- * page never needs this: buildSectionPages only appends it when visible
- * orphans exist.
+ * dropped when the VERSION has ≥1 question in that section, EVERY one of
+ * them carries an authored `showIf`, and the filtered (visible) list has 0.
+ * The all-showIf requirement attributes the emptying to authored rules by
+ * construction: a section emptied by a hardcoded filter (the LVA alias
+ * branch, or any future one) keeps its pre-Wave-W rendering, so D3's
+ * "LVA byte-identical" holds structurally, not by luck. Authored-empty
+ * sections (zero questions in the version — true intro pages like LVA
+ * "Welcome") always render. The Other page never needs this:
+ * buildSectionPages only appends it when visible orphans exist.
  */
 export function filterConditionallyEmptiedPages(
   pages: SectionPage[],
-  allQuestions: Array<Pick<PagerQuestion, "sectionStableKey">>,
+  allQuestions: Array<Pick<PagerQuestion, "sectionStableKey" | "showIf">>,
 ): SectionPage[] {
-  const authoredSections = new Set<string>();
+  const authored = new Map<string, { any: boolean; allShowIf: boolean }>();
   for (const q of allQuestions) {
     const k = typeof q.sectionStableKey === "string" ? q.sectionStableKey.trim() : "";
-    if (k.length > 0) authoredSections.add(k);
+    if (k.length === 0) continue;
+    const entry = authored.get(k) ?? { any: false, allShowIf: true };
+    entry.any = true;
+    if (!q.showIf) entry.allShowIf = false;
+    authored.set(k, entry);
   }
-  const next = pages.filter(
-    (p) => p.isOther || p.questions.length > 0 || !authoredSections.has(p.stableKey),
-  );
+  const next = pages.filter((p) => {
+    if (p.isOther || p.questions.length > 0) return true;
+    const entry = authored.get(p.stableKey);
+    return !(entry?.any && entry.allShowIf);
+  });
   return next.length === pages.length ? pages : next;
 }
 

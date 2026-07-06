@@ -134,10 +134,17 @@ conditional display at collection time. Recorded here so nobody "fixes" it.
 ### §2.5 Pager — suppress conditionally-emptied pages (D7)
 
 Where the clients build pages from the filtered question list, skip a section page iff the **version** has
-≥1 question assigned to that section but the **filtered** list has 0. Implemented as a small pure helper next
-to `buildSectionPages` (fed both the unfiltered and filtered sets), test-locked. Authored-empty sections
-(true intro pages like LVA "Welcome") always render. LVA behavior cannot change: its S4 gate is required
-(≥1 selection ⇒ ≥1 visible follow-up), and its other sections are unconditional — regression-asserted anyway.
+≥1 question assigned to that section, **every one of them carries an authored `showIf`**, and the
+**filtered** list has 0. Implemented as a small pure helper next to `buildSectionPages` (fed both the
+unfiltered and filtered sets), test-locked. Authored-empty sections (true intro pages like LVA "Welcome")
+always render.
+
+**Build-hardened (adversarial review):** the all-showIf requirement attributes the emptying to authored
+rules BY CONSTRUCTION — a section emptied by a hardcoded filter (the LVA alias branch, or any future one)
+keeps its pre-Wave-W rendering. Without it, D3 held only by luck: the LVA S5 section happens to carry 2
+always-visible required TEXT questions alongside the 16 branch-hidden follow-ups, so it can never empty —
+but a mid-survey suppression of a branch-emptied page would have shifted LVA's "Section N of M" denominator.
+Regression-asserted with an LVA-shaped fixture.
 
 ### §2.6 Editor — per-question "Show only when…" panel (flag-gated)
 
@@ -263,3 +270,20 @@ revert-commit. Ships EMPTY (honest-data): no live template gains `showIf` in thi
 - **Independent (main-loop) review, pre-Codex:** caught that the server prune as first drafted would have run
   the LVA alias branch server-side (a D3 violation) — fixed to generic-rules-only before the Codex call; Codex
   C2 independently converged on the same seam.
+
+### Adversarial review (post-build, 2026-07-06)
+
+- **Subagent died on its session usage limit** (the recurring 4th-wave pattern; Wave T/U precedent) — review
+  completed INLINE per the established fallback. Its last-breath lead was real and pursued:
+- **D7 hardening (the one build-found fix):** the page-suppression rule originally keyed on "section has
+  authored questions + 0 visible", which would suppress a section emptied by the LVA alias branch too. LVA is
+  safe today only because its S5 section carries 2 always-visible required TEXT questions — safety by luck.
+  Rule tightened to require every authored question in the section to carry `showIf` (attribution by
+  construction, §2.5); LVA-shaped + mixed-section regressions added.
+- Verified clean inline: prune-vs-required interplay (publish forbids required+showIf; unknown keys still
+  reach UNKNOWN_STABLE_KEY); pager index safety (a gate's answer can only change on the gate's own page,
+  strictly earlier than any suppressible page ⇒ the current index never dangles; `!page` fallback benign);
+  editor handler races (functional setState updates — delete-then-clear-dependents is order-safe);
+  serializer resurrection paths (sections-only saves passthrough same-ref; publish route persists only
+  `publishedAt`/`publishedBy`, never rewritten questions); both payload routes emit questions raw (`showIf`
+  reaches the clients); duplicate-from-published carries `showIf` via wholesale JSON copy.

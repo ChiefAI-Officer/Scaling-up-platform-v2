@@ -444,6 +444,58 @@ describe("filterConditionallyEmptiedPages (D7)", () => {
     expect(pages.map((p) => p.stableKey)).toContain("S_INTRO");
   });
 
+  it("does NOT suppress a section emptied by a HARDCODED filter (LVA branch) — attribution is to authored showIf only", () => {
+    // Adversarial-review hardening: an LVA-shaped section whose questions
+    // carry NO showIf (hidden by the alias branch, not authored rules) keeps
+    // its pre-Wave-W rendering even when fully emptied.
+    const lvaSections: PagerSection[] = [
+      { stableKey: "S4_obstacles", sortOrder: 1, name: "Obstacles" },
+      { stableKey: "S5_explained", sortOrder: 2, name: "Explained" },
+    ];
+    const lvaQuestions: PagerQuestion[] = [
+      q("S4_biggest_obstacles", {
+        sectionStableKey: "S4_obstacles",
+        type: "MULTI_CHOICE",
+        options: [{ key: "sales", label: "Sales" }],
+      }),
+      q("S5_why_sales", { sectionStableKey: "S5_explained" }),
+    ];
+    const visible = filterVisibleSurveyQuestions({
+      templateAlias: LVA_ALIAS,
+      questions: lvaQuestions,
+      answers: { S4_biggest_obstacles: [] }, // nothing ticked → S5 emptied
+    });
+    const pages = filterConditionallyEmptiedPages(
+      buildSectionPages(lvaSections, visible),
+      lvaQuestions,
+    );
+    expect(pages.map((p) => p.stableKey)).toEqual([
+      "S4_obstacles",
+      "S5_explained", // kept — emptied by the LVA branch, not by showIf
+    ]);
+  });
+
+  it("keeps a mixed section (showIf + plain questions) even when the conditional ones hide", () => {
+    const mixedQuestions: PagerQuestion[] = [
+      gateQ("Q_GATE", { sectionStableKey: "S_MAIN" }),
+      q("Q_DEP", {
+        sectionStableKey: "S_COND",
+        showIf: { questionKey: "Q_GATE", optionKey: "sales" },
+      }),
+      q("Q_PLAIN", { sectionStableKey: "S_COND" }),
+    ];
+    const visible = filterVisibleSurveyQuestions({
+      templateAlias: "t",
+      questions: mixedQuestions,
+      answers: {},
+    });
+    const pages = filterConditionallyEmptiedPages(
+      buildSectionPages(sections, visible),
+      mixedQuestions,
+    );
+    expect(pages.map((p) => p.stableKey)).toContain("S_COND");
+  });
+
   it("no-ops when nothing is conditional (same page list)", () => {
     const plainQuestions = [gateQ("Q_GATE", { sectionStableKey: "S_MAIN" })];
     const pages = filterConditionallyEmptiedPages(
