@@ -1,7 +1,18 @@
 # 19w — Wave W: Conditional (show-if) Question Authoring — Design
 
-> **Status: DRAFT — brainstormed + grilled 2026-07-06; pending /co-validate (Codex) + user greenlight. NO code yet.**
-> Pipeline: brainstorm → grill (this doc) → /co-validate → greenlight → TDD (inline) → adversarial review → PR dark → same-session launch walk on "go".
+> **Status: LAUNCHED 2026-07-06.** PR #148 (squash `207686a`) merged + same-session launch walk;
+> `WAVE_W_CONDITIONAL_AUTHORING_ENABLED=1` live on Vercel Production (NEWEST-deployment redeploy, re-aliased
+> `platformtest.scalingup.com`). Pipeline ran in full: brainstorm → grill → /co-validate (Codex, §6) →
+> greenlight → TDD inline (95 tests, jest-verified) → adversarial review (subagent died on session limit →
+> inline; 1 finding fixed, §6) → PR dark → "go merge" → launch walk → quarantine → authorized flag flip →
+> prod smokes. **Launch evidence:** publish BLOCKED on a dependent-before-gate with the routed modal
+> (`wave-w-publish-blocked.png`) → fixed → published; survey opened "Section 1 of 1" (D7 suppression) →
+> live hide/show + page reinstatement + client answer-prune; frozen submission = exactly the visible answers;
+> report answered-only (`wave-w-report-answered-only.png`); tamper POST pruned server-side on the live route;
+> Duplicate carried rules byte-exact; artifacts quarantined §5.5 (smoke 0/0, `scripts/wave-w-walk-quarantine.ts`);
+> prod: real LVA report unchanged, panel live on a real draft (`wave-w-prod-showif-panel.png`), ghost tab gone.
+> **Walk-found pre-existing gap (ledgered, NOT Wave W):** editor-added sections persist without `sortOrder` →
+> unpublishable until reordered/patched (create-form stamps it; the editor Sections serializer doesn't).
 > Anchor: `project_wave_w_next.md`. Prior wave: 19v (Wave V, LAUNCHED). Tracker: Wave U spec §3 follow-on ("row 38", the editor's disabled tab).
 
 ## §0 Ground truth (verified in code 2026-07-06)
