@@ -3,8 +3,9 @@
  * soft-delete; published version rows are never hard-deleted).
  *
  * Targets (all throwaway walk artifacts, 2026-07-06):
- *  - campaign walk-w-campaign  cmr96ro310000phu07kuijj42 (+ its invitation/submission rows stay attached, campaign soft-deleted)
+ *  - campaign walk-w-campaign  cmr96ro310000phu07kuijj42
  *  - campaign walk-w-tamper    cmr96zger0000jebgkw6txyem
+ *    (both campaigns: invitation/submission rows stay attached; campaign soft-deleted, invitations revoked)
  *  - template walk-qual-w      cmr961srn0002gpfzhhmw44bm (v1 published + v2 dup draft)
  *
  * Usage: npx tsx scripts/wave-w-walk-quarantine.ts

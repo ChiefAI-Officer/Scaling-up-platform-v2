@@ -62,12 +62,16 @@ async function main() {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ token: rawToken }),
   });
-  const cookie = ex.headers.get("set-cookie")?.split(";")[0];
+  const cookie = ex.headers.getSetCookie()[0]?.split(";")[0];
   console.log("exchange:", ex.status, cookie ? "cookie ok" : "NO COOKIE");
+  if (!ex.ok || !cookie) {
+    console.error("exchange failed — proof invalid");
+    process.exit(1);
+  }
 
   const submit = await fetch(`${base}/org-survey/walk-w-tamper/submit`, {
     method: "POST",
-    headers: { "content-type": "application/json", cookie: cookie ?? "" },
+    headers: { "content-type": "application/json", cookie },
     body: JSON.stringify({
       answers: [
         { stableKey: "S1_what_is_your_biggest_obstacle", value: ["cash"] },
@@ -76,13 +80,21 @@ async function main() {
       ],
     }),
   });
-  console.log("submit:", submit.status, JSON.stringify(await submit.json()).slice(0, 120));
+  console.log("submit:", submit.status, (await submit.text()).slice(0, 120));
+  if (!submit.ok) {
+    console.error("submit failed — proof invalid");
+    process.exit(1);
+  }
 
   const sub = await db.assessmentSubmission.findFirst({
     where: { campaignId: campaign.id },
     select: { id: true, answers: true },
   });
-  console.log("stored answers:", JSON.stringify(sub?.answers));
+  if (!sub) {
+    console.error("NO SUBMISSION STORED — proof invalid");
+    process.exit(1);
+  }
+  console.log("stored answers:", JSON.stringify(sub.answers));
   await db.$disconnect();
 }
 main().catch(async (e) => { console.error(e); await db.$disconnect(); process.exit(1); });
