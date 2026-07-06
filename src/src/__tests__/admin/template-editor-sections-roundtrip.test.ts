@@ -3,7 +3,7 @@ import {
   buildSectionsPayload,
 } from "@/components/admin/template-editor/sections-serialization";
 import { buildScalingUpFullContent } from "../../../prisma/seed-scaling-up-full-assessment";
-import { TemplateVersionForPublishSchema } from "@/lib/assessments/scoring";
+import { SectionSchema, TemplateVersionForPublishSchema } from "@/lib/assessments/scoring";
 
 describe("sections serialization round-trip", () => {
   const stored = [
@@ -52,7 +52,10 @@ describe("sections serialization round-trip", () => {
       rawSections: stored,
     }) as Array<Record<string, unknown>>;
     for (const row of payload) {
-      expect(typeof row.sortOrder).toBe("number");
+      // Prove the property in the test's name: every row parses under the
+      // publish schema's section arm (which requires an integer sortOrder).
+      const parsed = SectionSchema.safeParse(row);
+      expect(parsed.success ? [] : parsed.error.issues).toEqual([]);
     }
     expect(payload.map((s) => s.sortOrder)).toEqual([1, 2, 3]);
   });
