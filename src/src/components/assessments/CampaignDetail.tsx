@@ -32,6 +32,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { ImportedBadge } from "@/components/assessments/ImportedBadge";
 import {
   Dialog,
   DialogContent,
@@ -1050,6 +1051,12 @@ export function CampaignDetail({
             <p className="text-sm text-muted-foreground font-mono">
               {campaign.alias}
             </p>
+            {/* Wave V (V-3): provenance badge for Wave O historical imports. */}
+            {campaign.isImported ? (
+              <div className="mt-1.5">
+                <ImportedBadge variant="admin" />
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <StatusPill
@@ -1594,7 +1601,6 @@ export function CampaignDetail({
                 const expanded = expandedRespondentId === row.respondent.id;
                 const loading = loadingRespondentId === row.respondent.id;
                 const cached = resultsCache[row.respondent.id];
-                const invStatus = row.invitation?.status ?? "PENDING";
                 const canResend =
                   row.invitation !== null &&
                   row.invitation.revokedAt === null &&

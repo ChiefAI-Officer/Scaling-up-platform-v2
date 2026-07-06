@@ -77,6 +77,13 @@ export interface CampaignOverview {
     invitationSubject: string | null;
     invitationBodyMarkdown: string | null;
     invitationBodyHtml: string | null;
+    /**
+     * Wave V (V-3) — true when this campaign is a Wave O historical Esperto
+     * import (`importManifest != null`). Boolean ONLY (the manifest payload
+     * never leaves the server); optional so older fixtures stay valid —
+     * absent ⇒ no badge (fail-closed).
+     */
+    isImported?: boolean;
   };
   stats: {
     totalParticipants: number;
@@ -130,6 +137,8 @@ interface CampaignWithRels {
   invitationSubject: string | null;
   invitationBodyMarkdown: string | null;
   invitationBodyHtml: string | null;
+  /** Wave V (V-3): Wave O import-round manifest; non-null ⇒ historical import. */
+  importManifest?: unknown;
   template: { id: string; name: string };
   organization: { id: string; name: string };
 }
@@ -273,6 +282,8 @@ export async function getCampaignOverview(
       invitationSubject: campaign.invitationSubject,
       invitationBodyMarkdown: campaign.invitationBodyMarkdown,
       invitationBodyHtml: campaign.invitationBodyHtml,
+      // Wave V (V-3): boolean only — the manifest payload stays server-side.
+      isImported: campaign.importManifest != null,
     },
     stats,
   };

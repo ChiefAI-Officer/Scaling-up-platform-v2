@@ -547,6 +547,7 @@ export const TemplateVersionForPublishSchema =
     checkRecommendationsPublish(data.questions, ctx);
     checkDomainAssignment(data.sections, data.scoringConfig, ctx);
     checkPerDomainTierTiling(data.sections, data.questions, data.scoringConfig, ctx);
+    checkGlobalTierTiling(data.questions, data.scoringConfig, ctx);
     checkSectionRefsResolve(data.sections, data.questions, ctx);
   });
 
@@ -613,6 +614,57 @@ function checkPerDomainTierTiling(
         message: issue.message,
       });
     }
+  }
+}
+
+/**
+ * V-1 (Wave V) — publish-time GLOBAL tier-tiling gate.
+ *
+ * `scoreSubmission` step 2 asserts `scoringConfig.tiers` tile the version's
+ * metric domain; a version failing it 400s (INVALID_SCORING_CONFIG) on EVERY
+ * submit, so it must never publish — walk-found during the Wave U launch,
+ * where a non-tiling draft published fine and then failed every submission.
+ * Ambiguous-domain configs (mixed scales under overallAvg/rollup, zero
+ * sliders under rollup) reject here too: the domain computation throws the
+ * same INVALID_SCORING_CONFIG at runtime.
+ *
+ * Parity is the contract: the domain comes from `computeGlobalTierDomain`,
+ * the SAME helper step 2 calls (SLIDER_LIKERT-only filter, rollup vs legacy
+ * branches), so publish-pass ⇒ step-2-pass and qualitative templates that
+ * score today can never be newly blocked.
+ */
+function checkGlobalTierTiling(
+  questions: Array<z.infer<typeof QuestionBase>>,
+  cfg: z.infer<typeof ScoringConfigBase>,
+  ctx: z.RefinementCtx,
+): void {
+  const sliderQuestions = questions.filter(
+    (q): q is SliderLikertQuestion => q.type === "SLIDER_LIKERT"
+  );
+  let domain: TierDomain;
+  try {
+    domain = computeGlobalTierDomain(sliderQuestions, cfg);
+  } catch (err) {
+    if (err instanceof ScoringValidationError) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scoringConfig", "tiers"],
+        message: err.message,
+      });
+      return;
+    }
+    throw err;
+  }
+  const issues = validateTierTiling(cfg.tiers, domain, [
+    "scoringConfig",
+    "tiers",
+  ]);
+  for (const issue of issues) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: issue.path,
+      message: issue.message,
+    });
   }
 }
 
@@ -934,6 +986,24 @@ function computeRollupTierDomain(questions: SliderLikertQuestion[]): TierDomain 
 }
 
 /**
+ * V-1 (Wave V) — the GLOBAL tier metric domain, shared VERBATIM by
+ * `scoreSubmission` step 2 and the publish-time `checkGlobalTierTiling` so
+ * the two paths can never diverge. Rollup set → rollup metric scale; unset →
+ * the legacy tierMetric-implied domain (byte-for-byte preserved
+ * Rockefeller/QSP behavior). Throws ScoringValidationError on ambiguous
+ * configs (mixed scales, zero questions), matching runtime behavior.
+ */
+function computeGlobalTierDomain(
+  scorableQuestions: SliderLikertQuestion[],
+  scoringConfig: Pick<ScoringConfig, "rollup" | "tierMetric">
+): TierDomain {
+  if (scoringConfig.rollup) {
+    return computeRollupTierDomain(scorableQuestions);
+  }
+  return computeTierDomain(scorableQuestions, scoringConfig.tierMetric);
+}
+
+/**
  * Verify the tiers exactly tile the metric domain with no gaps and no overlaps.
  *   - sorted by minMetric ascending
  *   - first.minMetric === domain.min
@@ -1194,16 +1264,10 @@ export function scoreSubmission(
   //    legacy tierMetric path is skipped entirely so D2 templates can ship
   //    with tier shapes that match the rollup metric (e.g., 0-10) without
   //    being constrained by the legacy domain math.
-  if (v.scoringConfig.rollup) {
-    const rollupDomain = computeRollupTierDomain(scorableQuestions);
-    assertTierTiling(v.scoringConfig.tiers, rollupDomain);
-  } else {
-    const domain = computeTierDomain(
-      scorableQuestions,
-      v.scoringConfig.tierMetric
-    );
-    assertTierTiling(v.scoringConfig.tiers, domain);
-  }
+  assertTierTiling(
+    v.scoringConfig.tiers,
+    computeGlobalTierDomain(scorableQuestions, v.scoringConfig)
+  );
 
   // D2 (E1.1) — belt-and-suspenders runtime validation for per-domain
   // tiers. Pre-E1.1 prod data may have malformed domain tiers (manually

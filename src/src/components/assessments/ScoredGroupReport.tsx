@@ -368,6 +368,7 @@ export function ScoredGroupReport(props: GroupReportProps) {
         generatedAt={props.generatedAt}
         coachLogoUrl={props.coachLogoUrl}
         coachName={props.coachName}
+        isImported={props.isImported}
       />
 
       <div className="su-group-body">

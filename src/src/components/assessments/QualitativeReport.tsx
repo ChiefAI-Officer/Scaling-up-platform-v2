@@ -42,6 +42,7 @@ import {
 } from "@/lib/assessments/findings-section-model";
 import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
+import { ImportedBadge } from "@/components/assessments/ImportedBadge";
 import { Fragment } from "react";
 
 const LOGO_SRC = "/brand/su-logo-white.svg";
@@ -480,6 +481,8 @@ export function QualitativeReport({
             <div className="su-report-sub">
               {report.companyName} · {submitted}
             </div>
+            {/* Wave V (V-3): provenance pill for Wave O historical imports. */}
+            {report.isImported ? <ImportedBadge /> : null}
           </div>
         </div>
       </section>

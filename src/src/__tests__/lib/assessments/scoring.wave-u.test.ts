@@ -148,9 +148,11 @@ describe("per-type recommendations shapes (runtime schema)", () => {
 
 describe("publish tier (Wave U)", () => {
   it("NUMBER gaps are accepted at publish (no coverage requirement — D4)", () => {
+    // Wave V: the slider keeps the fixture globally scoreable (overallAvg
+    // needs ≥1 slider) so the new global tier-tiling gate stays out of the way.
     expect(
       TemplateVersionForPublishSchema.safeParse(
-        version([{ ...numberQ, recommendations: NUMBER_BANDS }])
+        version([slider, { ...numberQ, recommendations: NUMBER_BANDS }])
       ).success
     ).toBe(true);
   });
@@ -219,10 +221,14 @@ describe("publish tier (Wave U)", () => {
       expect(r.success).toBe(false);
       if (!r.success) expect(JSON.stringify(r.error.issues)).toContain("max 2000");
     }
-    // Exactly at the cap is fine.
+    // Exactly at the cap is fine. (Wave V: slider keeps the fixture
+    // globally scoreable — see the NUMBER-gaps test above.)
     expect(
       TemplateVersionForPublishSchema.safeParse(
-        version([{ ...numberQ, recommendations: [{ minScore: 0, maxScore: 9, text: atCap }] }])
+        version([
+          slider,
+          { ...numberQ, recommendations: [{ minScore: 0, maxScore: 9, text: atCap }] },
+        ])
       ).success
     ).toBe(true);
   });
