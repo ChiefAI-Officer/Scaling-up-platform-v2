@@ -35,6 +35,7 @@ function makeDraft(overrides: Partial<QuestionDraftRow> = {}): QuestionDraftRow 
     isNewToDraft: false,
     findingBands: [],
     findingOptionTexts: {},
+    showIf: null,
     ...overrides,
   };
 }

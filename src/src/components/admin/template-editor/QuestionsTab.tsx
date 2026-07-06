@@ -52,6 +52,7 @@ import { GripVertical } from "lucide-react";
 import type { SectionDraft } from "./SectionsCard";
 import type { QuestionDraftRow, FindingBandDraft } from "./question-serialization";
 import { sliderBandCoverage } from "./question-serialization";
+import { canonicalQuestionOrderIndex } from "@/lib/assessments/section-pages";
 
 // ────────────────────────────────────────────────────────────────────────
 // Types
@@ -93,6 +94,14 @@ export interface QuestionsTabProps {
    * unchanged.
    */
   findingsEnabled?: boolean;
+  /**
+   * Wave W (spec 19w §2.6) — conditional (show-if) authoring. False ⇒ no
+   * showIf DOM exists and this tab renders byte-identically to pre-Wave-W;
+   * true ⇒ every question card gains a collapsible "Show only when…"
+   * panel + the Required interlock + dependent confirm-drop hygiene.
+   * Optional (default false) so pre-Wave-W call sites render unchanged.
+   */
+  conditionalEnabled?: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -126,6 +135,7 @@ export function hydrateQuestionsFromJson(
       options?: unknown;
       maxChoices?: unknown;
       recommendations?: unknown;
+      showIf?: unknown;
     };
     const scale = (r.scale && typeof r.scale === "object"
       ? r.scale
@@ -223,6 +233,23 @@ export function hydrateQuestionsFromJson(
       isNewToDraft: !isInherited,
       findingBands,
       findingOptionTexts,
+      // Wave W — tolerant hydration: only a well-shaped {questionKey,
+      // optionKey} (both non-empty strings) becomes a draft rule; anything
+      // else hydrates to null (unconditional).
+      showIf: (() => {
+        const s = r.showIf as
+          | { questionKey?: unknown; optionKey?: unknown }
+          | null
+          | undefined;
+        return s &&
+          typeof s === "object" &&
+          typeof s.questionKey === "string" &&
+          s.questionKey !== "" &&
+          typeof s.optionKey === "string" &&
+          s.optionKey !== ""
+          ? { questionKey: s.questionKey, optionKey: s.optionKey }
+          : null;
+      })(),
     };
   });
 }
@@ -238,6 +265,12 @@ interface SortableQuestionCardProps {
   onFocus: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  /**
+   * Wave W — stableKeys of questions whose showIf references THIS question.
+   * Deleting the gate makes them unconditional; the confirm names them and
+   * the parent clears their rules after the delete.
+   */
+  showIfDependentKeys?: readonly string[];
 }
 
 /**
@@ -259,6 +292,18 @@ function buildDeleteConfirmText(question: QuestionDraft): string {
   ].join("\n");
 }
 
+/**
+ * Wave W — appended to the delete confirm when other questions are shown
+ * conditionally on the one being deleted.
+ */
+function buildShowIfDependentsWarning(keys: readonly string[]): string {
+  if (keys.length === 0) return "";
+  return [
+    "",
+    `${keys.length} question${keys.length === 1 ? "" : "s"} shown conditionally on this one will become always-visible: ${keys.join(", ")}.`,
+  ].join("\n");
+}
+
 function SortableQuestionCard({
   question,
   isFocused,
@@ -267,6 +312,7 @@ function SortableQuestionCard({
   onFocus,
   onDuplicate,
   onDelete,
+  showIfDependentKeys = [],
 }: SortableQuestionCardProps) {
   const {
     attributes,
@@ -355,9 +401,10 @@ function SortableQuestionCard({
           onClick={() => {
             if (isReadOnly) return;
             const ok = window.confirm(
-              isUnlocked && question.isInherited
+              (isUnlocked && question.isInherited
                 ? buildDeleteConfirmText(question)
-                : `Delete question ${question.stableKey}?`,
+                : `Delete question ${question.stableKey}?`) +
+                buildShowIfDependentsWarning(showIfDependentKeys),
             );
             if (ok) onDelete();
           }}
@@ -374,11 +421,26 @@ function SortableQuestionCard({
 // ────────────────────────────────────────────────────────────────────────
 // Per-question config form (right column)
 // ────────────────────────────────────────────────────────────────────────
+/** Wave W — a gate the focused question may condition on (preceding MULTI_CHOICE). */
+export interface ShowIfGateOption {
+  stableKey: string;
+  label: string;
+  options: ReadonlyArray<{ key: string; label: string }>;
+}
+
 interface QuestionConfigFormProps {
   question: QuestionDraft | null;
   isReadOnly: boolean;
   isUnlocked: boolean;
   findingsEnabled: boolean;
+  /** Wave W — whether the "Show only when…" panel renders (flag-gated). */
+  conditionalEnabled: boolean;
+  /** Wave W — eligible gates for the FOCUSED question (canonical order). */
+  showIfGates: ReadonlyArray<ShowIfGateOption>;
+  /** Wave W — questions whose showIf references the FOCUSED question. */
+  showIfDependents: ReadonlyArray<QuestionDraft>;
+  /** Wave W — clear the showIf of the given question uids (dependent hygiene). */
+  onClearDependents: (uids: string[]) => void;
   publishedOptionKeys: Record<string, readonly string[]>;
   onUpdate: (patch: Partial<QuestionDraft>) => void;
 }
@@ -658,11 +720,198 @@ function FindingsPanel({
   );
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// Wave W (spec 19w §2.6) — "Show only when…" panel
+// ────────────────────────────────────────────────────────────────────────
+/**
+ * Collapsible per-question show-if authoring (the Findings-panel idiom).
+ * One rule per question: pick a PRECEDING MULTI_CHOICE gate, then one of
+ * its options — the question renders only while that option is selected.
+ * Interlocks with Required (D4/C6): required questions can't be conditional
+ * and vice versa; publish stays the backstop. A dangling rule (its gate no
+ * longer eligible — deleted/retyped/reordered in the draft) is surfaced
+ * with a warning + Clear; runtime fails open, publish rejects the residue.
+ */
+function ShowIfPanel({
+  question,
+  gates,
+  isReadOnly,
+  onUpdate,
+}: {
+  question: QuestionDraft;
+  gates: ReadonlyArray<ShowIfGateOption>;
+  isReadOnly: boolean;
+  onUpdate: (patch: Partial<QuestionDraft>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rule = question.showIf;
+  const hasCompleteRule = !!rule && rule.questionKey !== "" && rule.optionKey !== "";
+  const selectedGate = rule
+    ? gates.find((g) => g.stableKey === rule.questionKey) ?? null
+    : null;
+  const isDangling = !!rule && rule.questionKey !== "" && !selectedGate;
+
+  return (
+    <div
+      className="rounded-md border border-border bg-muted/10 p-3 space-y-2"
+      data-testid="q-showif-panel"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-foreground">
+            Show only when…
+          </span>
+          {hasCompleteRule && (
+            <span className="inline-flex items-center px-1.5 py-0.5 text-[0.625rem] font-semibold rounded bg-primary/10 text-primary">
+              conditional
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          data-testid="q-showif-toggle"
+          onClick={() => setOpen((v) => !v)}
+          className="text-xs font-medium px-2 py-1 rounded text-foreground hover:bg-muted"
+          aria-expanded={open}
+        >
+          {open ? "Hide" : "Configure"}
+        </button>
+      </div>
+
+      {open && question.isRequired && (
+        <p
+          className="text-xs italic text-muted-foreground"
+          data-testid="q-showif-required-note"
+        >
+          Required questions can&apos;t be conditional — a hidden required
+          question would block every submission. Untick Required first.
+        </p>
+      )}
+
+      {open && !question.isRequired && (
+        <div className="space-y-2">
+          {isDangling && (
+            <p
+              className="text-xs text-destructive"
+              data-testid="q-showif-dangling"
+            >
+              This rule references &ldquo;{rule?.questionKey}&rdquo;, which is
+              no longer an earlier multiple-choice question. Publishing will be
+              blocked until the rule is cleared or the gate restored.
+            </p>
+          )}
+
+          {gates.length === 0 && !rule && (
+            <p
+              className="text-xs italic text-muted-foreground"
+              data-testid="q-showif-no-gates"
+            >
+              No eligible gate yet — add a MULTI_CHOICE question EARLIER in the
+              survey (brand-new questions become selectable after the first
+              save assigns their key).
+            </p>
+          )}
+
+          {(gates.length > 0 || rule) && (
+            <>
+              <div className="space-y-1">
+                <label
+                  className="wf-label"
+                  htmlFor={`q-showif-gate-${question.uid}`}
+                >
+                  Question
+                </label>
+                <select
+                  id={`q-showif-gate-${question.uid}`}
+                  data-testid="q-showif-gate"
+                  value={selectedGate ? selectedGate.stableKey : ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      showIf:
+                        e.target.value === ""
+                          ? null
+                          : { questionKey: e.target.value, optionKey: "" },
+                    })
+                  }
+                  disabled={isReadOnly}
+                  className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <option value="">(always shown)</option>
+                  {gates.map((g) => (
+                    <option key={g.stableKey} value={g.stableKey}>
+                      {g.label || g.stableKey}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedGate && (
+                <div className="space-y-1">
+                  <label
+                    className="wf-label"
+                    htmlFor={`q-showif-option-${question.uid}`}
+                  >
+                    Option
+                  </label>
+                  <select
+                    id={`q-showif-option-${question.uid}`}
+                    data-testid="q-showif-option"
+                    value={rule?.optionKey ?? ""}
+                    onChange={(e) =>
+                      onUpdate({
+                        showIf: {
+                          questionKey: selectedGate.stableKey,
+                          optionKey: e.target.value,
+                        },
+                      })
+                    }
+                    disabled={isReadOnly}
+                    className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    <option value="">(pick an option)</option>
+                    {selectedGate.options
+                      .filter((o) => o.key !== "")
+                      .map((o) => (
+                        <option key={o.key} value={o.key}>
+                          {o.label || o.key}
+                        </option>
+                      ))}
+                  </select>
+                  <span className="block text-[0.6875rem] italic text-muted-foreground">
+                    Shown only while this option is selected. Half-picked rules
+                    are not saved.
+                  </span>
+                </div>
+              )}
+
+              {rule && (
+                <button
+                  type="button"
+                  data-testid="q-showif-clear"
+                  onClick={() => onUpdate({ showIf: null })}
+                  disabled={isReadOnly}
+                  className="text-xs font-medium px-2 py-1 rounded text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Clear rule
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuestionConfigForm({
   question,
   isReadOnly,
   isUnlocked,
   findingsEnabled,
+  conditionalEnabled,
+  showIfGates,
+  showIfDependents,
+  onClearDependents,
   publishedOptionKeys,
   onUpdate,
 }: QuestionConfigFormProps) {
@@ -701,11 +950,20 @@ function QuestionConfigForm({
       findingsEnabled &&
       opt.key !== "" &&
       (question.findingOptionTexts[opt.key] ?? "").trim() !== "";
-    if (opt.key !== "" && published.includes(opt.key)) {
+    // Wave W — other questions shown conditionally on THIS option lose
+    // their rule with it (confirm-drop, never silent).
+    const optionDependents =
+      conditionalEnabled && opt.key !== ""
+        ? showIfDependents.filter((d) => d.showIf?.optionKey === opt.key)
+        : [];
+    if (opt.key !== "" && (published.includes(opt.key) || optionDependents.length > 0)) {
       const ok = window.confirm(
         buildOptionRemoveConfirmText(opt.key, question.stableKey) +
           (hasRule
             ? `\n\nIt also carries a finding rule, which will be removed with it.`
+            : "") +
+          (optionDependents.length > 0
+            ? `\n\n${optionDependents.length} question${optionDependents.length === 1 ? "" : "s"} shown conditionally on this option will become always-visible: ${optionDependents.map((d) => d.stableKey).join(", ")}.`
             : ""),
       );
       if (!ok) return;
@@ -721,6 +979,9 @@ function QuestionConfigForm({
       patch.findingOptionTexts = texts;
     }
     onUpdate(patch);
+    if (optionDependents.length > 0) {
+      onClearDependents(optionDependents.map((d) => d.uid));
+    }
   };
 
   // Wave U D21 — ANY retype drops the question's findings rules, behind a
@@ -728,13 +989,33 @@ function QuestionConfigForm({
   // questions — the dropdown is disabled for inherited ones.)
   const handleTypeChange = (nextType: string) => {
     if (!question || nextType === question.type) return;
+    // Wave W — retyping a gate away from MULTI_CHOICE strands its
+    // dependents' rules; confirm names them, then their rules are cleared.
+    const typeDependents =
+      conditionalEnabled &&
+      question.type === "MULTI_CHOICE" &&
+      nextType !== "MULTI_CHOICE"
+        ? showIfDependents
+        : [];
     const ruleCount = findingsEnabled ? countFindingRules(question) : 0;
-    if (ruleCount > 0) {
+    if (ruleCount > 0 || typeDependents.length > 0) {
       const ok = window.confirm(
-        buildTypeChangeFindingsConfirmText(ruleCount, question.type, nextType),
+        (ruleCount > 0
+          ? buildTypeChangeFindingsConfirmText(ruleCount, question.type, nextType)
+          : `Change question type ${question.type} → ${nextType}?`) +
+          (typeDependents.length > 0
+            ? `\n\n${typeDependents.length} question${typeDependents.length === 1 ? "" : "s"} shown conditionally on this one will become always-visible: ${typeDependents.map((d) => d.stableKey).join(", ")}.`
+            : ""),
       );
       if (!ok) return;
-      onUpdate({ type: nextType, findingBands: [], findingOptionTexts: {} });
+      if (ruleCount > 0) {
+        onUpdate({ type: nextType, findingBands: [], findingOptionTexts: {} });
+      } else {
+        onUpdate({ type: nextType });
+      }
+      if (typeDependents.length > 0) {
+        onClearDependents(typeDependents.map((d) => d.uid));
+      }
       return;
     }
     onUpdate({ type: nextType });
@@ -919,10 +1200,21 @@ function QuestionConfigForm({
             aria-label="Required"
             checked={question.isRequired}
             onChange={(e) => onUpdate({ isRequired: e.target.checked })}
-            disabled={isReadOnly}
+            disabled={
+              isReadOnly || (conditionalEnabled && question.showIf !== null)
+            }
             className="w-4 h-4 disabled:opacity-60"
           />
         </label>
+        {conditionalEnabled && question.showIf !== null && (
+          <span
+            className="block text-[0.6875rem] italic text-muted-foreground"
+            data-testid="q-required-showif-note"
+          >
+            Conditional questions are always optional — clear the
+            &ldquo;Show only when&hellip;&rdquo; rule to make this required.
+          </span>
+        )}
       </div>
 
       {/* Sort order */}
@@ -1207,6 +1499,18 @@ function QuestionConfigForm({
         />
       )}
 
+      {/* ── Wave W (spec 19w §2.6) — "Show only when…" panel (flag-gated;
+          any type may be conditional; editable on inherited questions —
+          showIf is reword-class, it changes form flow, never identity). ── */}
+      {conditionalEnabled && (
+        <ShowIfPanel
+          question={question}
+          gates={showIfGates}
+          isReadOnly={isReadOnly}
+          onUpdate={onUpdate}
+        />
+      )}
+
       {/* ── Legacy v1.5 accordions (flag OFF only) ── */}
       {!isUnlocked && (
         <>
@@ -1425,6 +1729,7 @@ export function QuestionsTab({
   isUnlocked,
   publishedOptionKeys,
   findingsEnabled = false,
+  conditionalEnabled = false,
 }: QuestionsTabProps) {
   const [selectedSectionStableKey, setSelectedSectionStableKey] = useState<
     string | null
@@ -1476,6 +1781,67 @@ export function QuestionsTab({
   );
   const focusedQuestion =
     sectionQuestions.find((q) => q.uid === focusedQuestionUid) ?? null;
+
+  // ── Wave W — canonical order + gate/dependent maps (C1) ──
+  // Order comes from THE shared helper (buildSectionPages' order: sections
+  // by editor array position, questions by sortOrder within) keyed by uid so
+  // unsaved rows (blank stableKey) can't collide.
+  const showIfOrderByUid = useMemo(() => {
+    if (!conditionalEnabled) return new Map<string, number>();
+    return canonicalQuestionOrderIndex(
+      sections.map((s, i) => ({ stableKey: s.stableKey, sortOrder: i })),
+      questions.map((q) => ({
+        stableKey: q.uid,
+        sortOrder: q.sortOrder,
+        sectionStableKey: q.sectionStableKey,
+      })),
+    );
+  }, [conditionalEnabled, sections, questions]);
+
+  // Eligible gates for the FOCUSED question: strictly-earlier MULTI_CHOICE
+  // with a persisted stableKey (unsaved rows can't be referenced yet) and no
+  // showIf of their own (chains are publish-rejected — don't author them).
+  const focusedShowIfGates = useMemo<ShowIfGateOption[]>(() => {
+    if (!conditionalEnabled || !focusedQuestion) return [];
+    const ownOrder = showIfOrderByUid.get(focusedQuestion.uid);
+    if (ownOrder === undefined) return [];
+    return questions
+      .filter(
+        (q) =>
+          q.type === "MULTI_CHOICE" &&
+          q.stableKey !== "" &&
+          q.uid !== focusedQuestion.uid &&
+          q.showIf === null &&
+          (showIfOrderByUid.get(q.uid) ?? Infinity) < ownOrder,
+      )
+      .sort(
+        (a, b) =>
+          (showIfOrderByUid.get(a.uid) ?? 0) - (showIfOrderByUid.get(b.uid) ?? 0),
+      )
+      .map((q) => ({
+        stableKey: q.stableKey,
+        label: q.label,
+        options: q.options.map((o) => ({ key: o.key, label: o.label })),
+      }));
+  }, [conditionalEnabled, focusedQuestion, questions, showIfOrderByUid]);
+
+  // Questions whose showIf references a given question's stableKey.
+  const showIfDependentsOf = useCallback(
+    (gate: QuestionDraft): QuestionDraft[] => {
+      if (!conditionalEnabled || gate.stableKey === "") return [];
+      return questions.filter(
+        (q) => q.uid !== gate.uid && q.showIf?.questionKey === gate.stableKey,
+      );
+    },
+    [conditionalEnabled, questions],
+  );
+
+  const clearShowIfFor = useCallback(
+    (uids: string[]) => {
+      for (const uid of uids) onUpdateQuestion(uid, { showIf: null });
+    },
+    [onUpdateQuestion],
+  );
 
   // ─── Drag-and-drop sensors ──────────────────────────────────────────────
   const sensors = useSensors(
@@ -1621,18 +1987,29 @@ export function QuestionsTab({
                 strategy={verticalListSortingStrategy}
               >
                 <ul className="space-y-2">
-                  {sectionQuestions.map((q) => (
-                    <SortableQuestionCard
-                      key={q.uid}
-                      question={q}
-                      isFocused={focusedQuestionUid === q.uid}
-                      isReadOnly={isReadOnly}
-                      isUnlocked={isUnlocked}
-                      onFocus={() => setFocusedQuestionUid(q.uid)}
-                      onDuplicate={() => onDuplicateQuestion(q.uid)}
-                      onDelete={() => onDeleteQuestion(q.uid)}
-                    />
-                  ))}
+                  {sectionQuestions.map((q) => {
+                    const deps = showIfDependentsOf(q);
+                    return (
+                      <SortableQuestionCard
+                        key={q.uid}
+                        question={q}
+                        isFocused={focusedQuestionUid === q.uid}
+                        isReadOnly={isReadOnly}
+                        isUnlocked={isUnlocked}
+                        onFocus={() => setFocusedQuestionUid(q.uid)}
+                        onDuplicate={() => onDuplicateQuestion(q.uid)}
+                        onDelete={() => {
+                          onDeleteQuestion(q.uid);
+                          // Wave W — the deleted gate's dependents become
+                          // unconditional (named in the confirm above).
+                          if (deps.length > 0) {
+                            clearShowIfFor(deps.map((d) => d.uid));
+                          }
+                        }}
+                        showIfDependentKeys={deps.map((d) => d.stableKey)}
+                      />
+                    );
+                  })}
                 </ul>
               </SortableContext>
             </DndContext>
@@ -1658,6 +2035,12 @@ export function QuestionsTab({
             isReadOnly={isReadOnly}
             isUnlocked={isUnlocked}
             findingsEnabled={findingsEnabled}
+            conditionalEnabled={conditionalEnabled}
+            showIfGates={focusedShowIfGates}
+            showIfDependents={
+              focusedQuestion ? showIfDependentsOf(focusedQuestion) : []
+            }
+            onClearDependents={clearShowIfFor}
             publishedOptionKeys={publishedOptionKeys}
             onUpdate={(patch) => {
               if (focusedQuestion) onUpdateQuestion(focusedQuestion.uid, patch);

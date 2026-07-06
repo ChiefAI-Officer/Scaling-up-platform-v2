@@ -25,6 +25,7 @@
 import { z } from "zod";
 import { MAX_TEXT_ANSWER_LENGTH } from "./answer-limits";
 import { resolveFindings, type ResolvedFinding } from "./findings";
+import { canonicalQuestionOrderIndex } from "./section-pages";
 
 // ─── Zod schemas (input validation) ──────────────────────────────────────
 
@@ -45,6 +46,18 @@ export const RecommendationBandSchema = z.object({
   text: z.string(),
 });
 
+// Wave W (spec 19w) — authored show-if: the question renders only while
+// `optionKey` is selected on the (earlier, MULTI_CHOICE) gate question.
+// Save tier validates SHAPE only; drafts may be referentially dangling —
+// referential integrity (gate exists / MULTI_CHOICE / strictly earlier /
+// real option / no chain / carrier optional) is the publish-tier
+// checkShowIfIntegrity below.
+export const ShowIfSchema = z.object({
+  questionKey: z.string().min(1),
+  optionKey: z.string().min(1),
+});
+export type ShowIf = z.infer<typeof ShowIfSchema>;
+
 // Named export so downstream code can use as a Zod schema + TypeScript type guard.
 export const SliderLikertQuestion = z.object({
   stableKey: z.string(),
@@ -56,6 +69,7 @@ export const SliderLikertQuestion = z.object({
   isRequired: z.boolean(),
   scale: SliderLikertScaleSchema,
   recommendations: z.array(RecommendationBandSchema).optional(),
+  showIf: ShowIfSchema.optional(),
 });
 export type SliderLikertQuestion = z.infer<typeof SliderLikertQuestion>;
 
@@ -83,6 +97,7 @@ const qualitativeShape = {
     .array(z.object({ key: z.string(), label: z.string() }))
     .optional(),
   maxChoices: z.number().int().optional(),
+  showIf: ShowIfSchema.optional(),
 } as const;
 
 // TEXT declares `recommendations` as unknown ONLY so a stray value SURVIVES
@@ -549,6 +564,7 @@ export const TemplateVersionForPublishSchema =
     checkPerDomainTierTiling(data.sections, data.questions, data.scoringConfig, ctx);
     checkGlobalTierTiling(data.questions, data.scoringConfig, ctx);
     checkSectionRefsResolve(data.sections, data.questions, ctx);
+    checkShowIfIntegrity(data.sections, data.questions, ctx);
   });
 
 /**
@@ -666,6 +682,78 @@ function checkGlobalTierTiling(
       message: issue.message,
     });
   }
+}
+
+/**
+ * Wave W (spec 19w §2.3) — publish-time showIf referential integrity. For
+ * every question carrying a showIf: the gate must exist, be MULTI_CHOICE,
+ * appear STRICTLY EARLIER in canonical survey render order (C1 — the shared
+ * buildSectionPages order, never raw sortOrder), carry the referenced
+ * optionKey, and not itself be conditional (no chains); the carrier must be
+ * optional (D4 — a hidden required question would block every submit).
+ * Collects ALL issues in one pass, routed under ["questions", i, "showIf"].
+ *
+ * Runtime evaluation fails open on every state rejected here, so
+ * publish-pass ⇒ the renderer never sees an invalid rule.
+ */
+function checkShowIfIntegrity(
+  sections: Array<z.infer<typeof SectionBase>>,
+  questions: Array<z.infer<typeof QuestionBase>>,
+  ctx: z.RefinementCtx,
+): void {
+  if (!questions.some((q) => q.showIf)) return;
+  const byKey = new Map(questions.map((q) => [q.stableKey, q]));
+  const order = canonicalQuestionOrderIndex(sections, questions);
+
+  questions.forEach((q, i) => {
+    const rule = q.showIf;
+    if (!rule) return;
+    const path = ["questions", i, "showIf"];
+    const issue = (message: string, tail: string[] = []) =>
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [...path, ...tail], message });
+
+    const gate = byKey.get(rule.questionKey);
+    if (!gate) {
+      issue(
+        `question "${q.stableKey}": showIf references "${rule.questionKey}", which is not a question in this version`,
+        ["questionKey"],
+      );
+      return;
+    }
+    if (gate.type !== "MULTI_CHOICE") {
+      issue(
+        `question "${q.stableKey}": showIf gate "${gate.stableKey}" must be a MULTI_CHOICE question (got ${gate.type})`,
+        ["questionKey"],
+      );
+      return;
+    }
+    const gateOrder = order.get(gate.stableKey);
+    const ownOrder = order.get(q.stableKey);
+    if (gateOrder === undefined || ownOrder === undefined || gateOrder >= ownOrder) {
+      issue(
+        `question "${q.stableKey}": showIf gate "${gate.stableKey}" must appear strictly earlier in the survey`,
+        ["questionKey"],
+      );
+    }
+    const optionKeys = new Set((gate.options ?? []).map((o) => o.key));
+    if (!optionKeys.has(rule.optionKey)) {
+      issue(
+        `question "${q.stableKey}": showIf option "${rule.optionKey}" is not an option of gate "${gate.stableKey}"`,
+        ["optionKey"],
+      );
+    }
+    if (gate.showIf) {
+      issue(
+        `question "${q.stableKey}": showIf gate "${gate.stableKey}" is itself conditional — chained conditions are not supported`,
+        ["questionKey"],
+      );
+    }
+    if (q.isRequired) {
+      issue(
+        `question "${q.stableKey}": a conditional question cannot be required — a hidden required question would block every submission`,
+      );
+    }
+  });
 }
 
 export const AnswerSchema = z.object({

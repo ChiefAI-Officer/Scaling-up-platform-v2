@@ -137,9 +137,11 @@ describe("TemplateEditorTabbed — F1 chrome", () => {
       expect(
         screen.getByRole("tab", { name: /Scoring & Tiers/ }),
       ).toBeInTheDocument();
+      // Wave W (spec 19w D5): the disabled Conditional Logic ghost tab is
+      // REMOVED — show-if authoring lives in the Questions tab now.
       expect(
-        screen.getByRole("tab", { name: /Conditional Logic/ }),
-      ).toBeInTheDocument();
+        screen.queryByRole("tab", { name: /Conditional Logic/ }),
+      ).toBeNull();
       expect(screen.getByRole("tab", { name: /^Access$/ })).toBeInTheDocument();
       expect(screen.getByRole("tab", { name: /^Versions$/ })).toBeInTheDocument();
     });
@@ -172,7 +174,7 @@ describe("TemplateEditorTabbed — F1 chrome", () => {
       expect(questionsTab).toHaveAttribute("aria-selected", "true");
     });
 
-    it("ignores ?tab=conditional — Conditional Logic stays inactive (disabled)", () => {
+    it("ignores ?tab=conditional — the removed ghost tab's URL falls back to Metadata (Wave W)", () => {
       mockSearchParams = new URLSearchParams("tab=conditional");
       render(
         <TemplateEditorTabbed
@@ -182,32 +184,10 @@ describe("TemplateEditorTabbed — F1 chrome", () => {
         />,
       );
 
-      const condTab = screen.getByRole("tab", { name: /Conditional Logic/ });
-      expect(condTab).toHaveAttribute("aria-disabled", "true");
-      expect(condTab).not.toHaveAttribute("aria-selected", "true");
-      // Falls back to Metadata.
+      expect(screen.queryByRole("tab", { name: /Conditional Logic/ })).toBeNull();
+      // Falls back to Metadata, exactly as when the ghost tab existed.
       const metaTab = screen.getByRole("tab", { name: /^Metadata$/ });
       expect(metaTab).toHaveAttribute("aria-selected", "true");
-    });
-
-    it("Conditional Logic tab shows v1.5 badge + tooltip from WF16", () => {
-      render(
-        <TemplateEditorTabbed
-          template={baseTemplate}
-          version={draftVersion}
-          allVersions={allVersions}
-        />,
-      );
-
-      const condTab = screen.getByRole("tab", { name: /Conditional Logic/ });
-      expect(condTab).toHaveAttribute("aria-disabled", "true");
-      // Badge text.
-      expect(condTab.textContent).toMatch(/v1\.5/i);
-      // WF16 tooltip text verbatim.
-      expect(condTab).toHaveAttribute(
-        "title",
-        "Available in v1.5 — for v1, admins seed conditionalSections JSON via Prisma Studio",
-      );
     });
 
     it("Access tab navigates to /admin/assessments/access-groups (renders <a>)", () => {

@@ -86,7 +86,6 @@ type TabId =
   | "sections"
   | "questions"
   | "scoring"
-  | "conditional"
   | "versions";
 
 const VALID_TAB_IDS: TabId[] = [
@@ -96,20 +95,21 @@ const VALID_TAB_IDS: TabId[] = [
   "scoring",
   "versions",
 ];
-// NOTE: "conditional" is NOT in VALID_TAB_IDS — it's disabled and any
-// URL pointing at it falls back to "metadata".
+// NOTE (Wave W, spec 19w D5): the disabled "Conditional Logic" ghost tab is
+// GONE. Its WF18 copy ("renderer-side conditionalSections evaluation ships
+// in v1") was never true in this codebase, and its conditional-REPORT-
+// sections concept was superseded by Wave U findings (ADR-0021). Survey
+// show-if authoring lives in the Questions tab's per-question
+// "Show only when…" panel instead. A URL pointing at ?tab=conditional
+// falls back to "metadata" exactly as before.
 
 const TAB_LABELS: Record<TabId, string> = {
   metadata: "Metadata",
   sections: "Sections",
   questions: "Questions",
   scoring: "Scoring & Tiers",
-  conditional: "Conditional Logic",
   versions: "Versions",
 };
-
-const CONDITIONAL_LOGIC_TOOLTIP =
-  "Available in v1.5 — for v1, admins seed conditionalSections JSON via Prisma Studio";
 
 // ────────────────────────────────────────────────────────────────────────
 // Props
@@ -209,6 +209,13 @@ export interface TemplateEditorTabbedProps {
    * pre-Wave-U (no Findings panel).
    */
   findingsEnabled?: boolean;
+  /**
+   * Wave W (spec 19w §2.6) — conditional (show-if) authoring. Server-
+   * computed (`isConditionalAuthoringEnabled()`) and passed down from the
+   * edit page. Default false ⇒ the Questions tab renders byte-identically
+   * to pre-Wave-W (no "Show only when…" panel).
+   */
+  conditionalAuthoringEnabled?: boolean;
 }
 
 // Stable empty defaults so the memoized handlers don't churn.
@@ -239,6 +246,7 @@ export function TemplateEditorTabbed({
   publishedQuestionKeys = EMPTY_PUBLISHED_QUESTION_KEYS,
   publishedOptionKeys = EMPTY_PUBLISHED_OPTION_KEYS,
   findingsEnabled = false,
+  conditionalAuthoringEnabled = false,
 }: TemplateEditorTabbedProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -597,6 +605,8 @@ export function TemplateEditorTabbed({
             // Wave U — new questions start with no findings rules.
             findingBands: [],
             findingOptionTexts: {},
+            // Wave W — new questions start unconditional.
+            showIf: null,
           },
         ];
       });
@@ -1146,20 +1156,6 @@ export function TemplateEditorTabbed({
           <TabsTrigger value="scoring">
             {TAB_LABELS.scoring}
           </TabsTrigger>
-          <TabsTrigger
-            value="conditional"
-            disabled
-            aria-disabled="true"
-            title={CONDITIONAL_LOGIC_TOOLTIP}
-            // Defensive: ignore clicks even if the disabled state is
-            // bypassed by a screen reader.
-            onClick={(e) => e.preventDefault()}
-          >
-            {TAB_LABELS.conditional}
-            <span className="ml-1 inline-flex items-center px-1 py-px rounded text-[0.625rem] font-bold uppercase tracking-wider bg-warning/20 text-warning">
-              v1.5
-            </span>
-          </TabsTrigger>
           {/* Access — link, not a tab panel. Per WF16 spec it navigates
               to /admin/assessments/access-groups. We render it inside the
               tab nav so it sits in the same visual row, but as a Radix
@@ -1248,6 +1244,7 @@ export function TemplateEditorTabbed({
               isUnlocked={questionEditorUnlocked}
               publishedOptionKeys={publishedOptionKeys}
               findingsEnabled={findingsEnabled}
+              conditionalEnabled={conditionalAuthoringEnabled}
             />
           </div>
         </TabsContent>

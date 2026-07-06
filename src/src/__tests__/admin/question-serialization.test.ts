@@ -41,6 +41,7 @@ function makeDraft(overrides: Partial<QuestionDraftRow> = {}): QuestionDraftRow 
     // `recommendations` key; the raw spread's stored value is dropped).
     findingBands: [],
     findingOptionTexts: {},
+    showIf: null,
     ...overrides,
   };
 }
