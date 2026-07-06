@@ -266,5 +266,16 @@ describe("sliderBandCoverage (advisory hint — D11)", () => {
       complete: false,
       message: "Band -2–3 extends outside the 0–3 scale",
     });
+    // A band ENTIRELY above the scale — pre-fix this produced both a real
+    // gap ("missing 0–4") and the inverted range ("missing 6–3").
+    expect(sliderBandCoverage(0, 3, 1, [band(5, 6)])).toEqual({
+      complete: false,
+      message: "Band 5–6 extends outside the 0–3 scale",
+    });
+    // Fractional step: the check is scale-bound, not integer-only.
+    expect(sliderBandCoverage(0, 3, 0.5, [band(0, 3.5)])).toEqual({
+      complete: false,
+      message: "Band 0–3.5 extends outside the 0–3 scale",
+    });
   });
 });
