@@ -143,6 +143,17 @@ export function sliderBandCoverage(
       return { complete: false, message: `A band has max < min (${b.max} < ${b.min})` };
     }
   }
+  // Wave U launch-found fix: a band extending OUTSIDE the scale must be
+  // named directly — feeding it into the gap math below produced inverted
+  // garbage ranges like "missing 7–3" on a 0–3 scale.
+  for (const b of sorted) {
+    if (b.min < scaleMin || b.max > scaleMax) {
+      return {
+        complete: false,
+        message: `Band ${b.min}–${b.max} extends outside the ${scaleMin}–${scaleMax} scale`,
+      };
+    }
+  }
   const isInteger = step === 1;
   const problems: string[] = [];
   if (sorted[0].min !== scaleMin) {

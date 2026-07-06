@@ -254,4 +254,17 @@ describe("sliderBandCoverage (advisory hint — D11)", () => {
       message: expect.stringContaining("max < min"),
     });
   });
+
+  it("launch-found regression: a band OUTSIDE the scale is named directly (never an inverted gap range)", () => {
+    // The Wave U launch walk authored 0–6 on a 0–3 scale and got
+    // "missing 7–3" — inverted garbage. The overshoot must be named.
+    expect(sliderBandCoverage(0, 3, 1, [band(0, 6)])).toEqual({
+      complete: false,
+      message: "Band 0–6 extends outside the 0–3 scale",
+    });
+    expect(sliderBandCoverage(0, 3, 1, [band(-2, 3)])).toEqual({
+      complete: false,
+      message: "Band -2–3 extends outside the 0–3 scale",
+    });
+  });
 });
