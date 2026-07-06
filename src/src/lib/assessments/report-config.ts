@@ -46,7 +46,24 @@ const REPORT_CONFIG: Readonly<Record<string, ReportConfig>> = {
   "scaling-up-full": { reportType: "scored", showScoreTable: true, showTier: false },
 };
 
+/**
+ * Wave U (spec 19u D14/U-6) — reserved test-walk namespace. Any alias with
+ * the EXACT prefix `walk-qual-` resolves to a qualitative report config so
+ * launch walks can exercise the qualitative render path E2E with a THROWAWAY
+ * test template (real qualitative aliases are exact-mapped above; walking on
+ * them would leak test content into latest-published). Each wave's walk
+ * needs a FRESH alias (walk-qual-u, walk-qual-v, …) because soft-deleted
+ * walk templates keep their alias claimed. Never use for real templates.
+ */
+const WALK_QUALITATIVE_PREFIX = "walk-qual-";
+const WALK_QUALITATIVE_CONFIG: ReportConfig = {
+  reportType: "qualitative",
+  showScoreTable: false,
+  showTier: false,
+};
+
 export function reportConfigFor(alias: string | null | undefined): ReportConfig {
   if (!alias) return DEFAULT_REPORT_CONFIG;
+  if (alias.startsWith(WALK_QUALITATIVE_PREFIX)) return WALK_QUALITATIVE_CONFIG;
   return REPORT_CONFIG[alias] ?? DEFAULT_REPORT_CONFIG;
 }

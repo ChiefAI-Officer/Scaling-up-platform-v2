@@ -50,7 +50,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 
 import type { SectionDraft } from "./SectionsCard";
-import type { QuestionDraftRow } from "./question-serialization";
+import type { QuestionDraftRow, FindingBandDraft } from "./question-serialization";
+import { sliderBandCoverage } from "./question-serialization";
 
 // ────────────────────────────────────────────────────────────────────────
 // Types
@@ -83,6 +84,15 @@ export interface QuestionsTabProps {
    * stableKey. Drives the D9 inherited-option remove warning.
    */
   publishedOptionKeys: Record<string, readonly string[]>;
+  /**
+   * Wave U (spec 19u U-4) — findings-logic authoring. False ⇒ the Findings
+   * panel does not exist and this tab renders byte-identically to
+   * pre-Wave-U; true ⇒ each SLIDER/NUMBER/MULTI_CHOICE question card gains
+   * a collapsible Findings panel (editable on inherited questions — D9
+   * reword-class). Optional (default false) so pre-Wave-U call sites render
+   * unchanged.
+   */
+  findingsEnabled?: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -115,6 +125,7 @@ export function hydrateQuestionsFromJson(
       scale?: unknown;
       options?: unknown;
       maxChoices?: unknown;
+      recommendations?: unknown;
     };
     const scale = (r.scale && typeof r.scale === "object"
       ? r.scale
@@ -147,6 +158,41 @@ export function hydrateQuestionsFromJson(
       }
     }
     const isInherited = publishedKeys.has(stableKey);
+
+    // Wave U (spec 19u U-4) — hydrate persisted findings rules per type.
+    const qType = typeof r.type === "string" ? r.type : "SLIDER_LIKERT";
+    const findingBands: FindingBandDraft[] = [];
+    const findingOptionTexts: Record<string, string> = {};
+    if (Array.isArray(r.recommendations)) {
+      for (const rec of r.recommendations) {
+        if (!rec || typeof rec !== "object") continue;
+        const rr = rec as {
+          minScore?: unknown;
+          maxScore?: unknown;
+          optionKey?: unknown;
+          text?: unknown;
+        };
+        if (
+          (qType === "SLIDER_LIKERT" || qType === "NUMBER") &&
+          typeof rr.minScore === "number" &&
+          typeof rr.maxScore === "number" &&
+          typeof rr.text === "string"
+        ) {
+          findingBands.push({
+            minScore: rr.minScore,
+            maxScore: rr.maxScore,
+            text: rr.text,
+          });
+        } else if (
+          qType === "MULTI_CHOICE" &&
+          typeof rr.optionKey === "string" &&
+          typeof rr.text === "string"
+        ) {
+          findingOptionTexts[rr.optionKey] = rr.text;
+        }
+      }
+    }
+
     return {
       uid: genUid(),
       stableKey,
@@ -175,6 +221,8 @@ export function hydrateQuestionsFromJson(
           : null,
       isInherited,
       isNewToDraft: !isInherited,
+      findingBands,
+      findingOptionTexts,
     };
   });
 }
@@ -330,8 +378,41 @@ interface QuestionConfigFormProps {
   question: QuestionDraft | null;
   isReadOnly: boolean;
   isUnlocked: boolean;
+  findingsEnabled: boolean;
   publishedOptionKeys: Record<string, readonly string[]>;
   onUpdate: (patch: Partial<QuestionDraft>) => void;
+}
+
+/** Wave U — how many findings rules a draft question currently carries. */
+function countFindingRules(q: QuestionDraft): number {
+  if (q.type === "SLIDER_LIKERT" || q.type === "NUMBER") {
+    return q.findingBands.filter((b) => b.text.trim() !== "").length;
+  }
+  if (q.type === "MULTI_CHOICE") {
+    return Object.values(q.findingOptionTexts).filter((t) => t.trim() !== "")
+      .length;
+  }
+  return 0;
+}
+
+/**
+ * Wave U D21 — ANY retype drops that question's findings rules (even the
+ * band-compatible SLIDER→NUMBER — re-author deliberately).
+ */
+function buildTypeChangeFindingsConfirmText(
+  ruleCount: number,
+  fromType: string,
+  toType: string,
+): string {
+  return [
+    `Change this question's type from ${fromType} to ${toType}?`,
+    "",
+    `It carries ${ruleCount} finding rule${ruleCount === 1 ? "" : "s"} — changing the type removes ${
+      ruleCount === 1 ? "it" : "them all"
+    }. Re-author findings for the new type deliberately.`,
+    "",
+    "Continue?",
+  ].join("\n");
 }
 
 /**
@@ -368,10 +449,220 @@ function buildScaleChangeConfirmText(questionStableKey: string): string {
   ].join("\n");
 }
 
+/**
+ * Wave U (spec 19u U-4/D8) — the collapsible per-question Findings panel.
+ * SLIDER/NUMBER: band rows (min | max | text) with add/remove; sliders show
+ * an advisory coverage hint (publish enforces full tiling — D11). NUMBER
+ * bands may leave gaps (D4). MULTI_CHOICE: one optional text per option.
+ * Collapsed by default; the header badge shows the current rule count.
+ */
+function FindingsPanel({
+  question,
+  isReadOnly,
+  onUpdate,
+}: {
+  question: QuestionDraft;
+  isReadOnly: boolean;
+  onUpdate: (patch: Partial<QuestionDraft>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ruleCount = countFindingRules(question);
+  const isBandType =
+    question.type === "SLIDER_LIKERT" || question.type === "NUMBER";
+
+  const updateBand = (idx: number, patch: Partial<FindingBandDraft>) => {
+    onUpdate({
+      findingBands: question.findingBands.map((b, i) =>
+        i === idx ? { ...b, ...patch } : b,
+      ),
+    });
+  };
+
+  const coverage =
+    question.type === "SLIDER_LIKERT"
+      ? sliderBandCoverage(
+          question.scaleMin,
+          question.scaleMax,
+          question.scaleStep,
+          question.findingBands,
+        )
+      : null;
+
+  return (
+    <div
+      className="rounded-md border border-border bg-muted/20 p-3 space-y-2"
+      data-testid="q-findings-panel"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-xs font-semibold text-foreground">
+          Findings{ruleCount > 0 ? ` (${ruleCount})` : ""}
+        </h4>
+        <button
+          type="button"
+          data-testid="q-findings-toggle"
+          onClick={() => setOpen((v) => !v)}
+          className="text-[0.6875rem] text-muted-foreground hover:text-foreground"
+        >
+          {open ? "Hide" : ruleCount > 0 ? "Edit" : "Add"}
+        </button>
+      </div>
+      {!open && (
+        <p className="text-[0.6875rem] italic text-muted-foreground">
+          {isBandType
+            ? "Report text shown when the answer falls in a score range."
+            : "Report text shown when an option is selected."}
+        </p>
+      )}
+      {open && isBandType && (
+        <div className="space-y-2">
+          <ul className="space-y-2">
+            {question.findingBands.map((band, idx) => (
+              <li key={idx} className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    data-testid={`q-finding-band-min-${idx}`}
+                    aria-label={`Band ${idx + 1} min`}
+                    value={band.minScore ?? ""}
+                    onChange={(e) =>
+                      updateBand(idx, {
+                        minScore:
+                          e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                    disabled={isReadOnly}
+                    style={{ width: "4.5rem" }}
+                    className="px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+                  />
+                  <span className="text-[0.6875rem] text-muted-foreground">to</span>
+                  <input
+                    type="number"
+                    data-testid={`q-finding-band-max-${idx}`}
+                    aria-label={`Band ${idx + 1} max`}
+                    value={band.maxScore ?? ""}
+                    onChange={(e) =>
+                      updateBand(idx, {
+                        maxScore:
+                          e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                    disabled={isReadOnly}
+                    style={{ width: "4.5rem" }}
+                    className="px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+                  />
+                  <button
+                    type="button"
+                    data-testid={`q-finding-band-remove-${idx}`}
+                    onClick={() =>
+                      onUpdate({
+                        findingBands: question.findingBands.filter(
+                          (_, i) => i !== idx,
+                        ),
+                      })
+                    }
+                    disabled={isReadOnly}
+                    className="ml-auto text-xs font-medium px-2 py-1 rounded text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <textarea
+                  data-testid={`q-finding-band-text-${idx}`}
+                  aria-label={`Band ${idx + 1} report text`}
+                  rows={2}
+                  maxLength={2000}
+                  placeholder="Report text for answers in this range…"
+                  value={band.text}
+                  onChange={(e) => updateBand(idx, { text: e.target.value })}
+                  disabled={isReadOnly}
+                  className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
+                />
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            data-testid="q-finding-band-add"
+            onClick={() =>
+              onUpdate({
+                findingBands: [
+                  ...question.findingBands,
+                  { minScore: null, maxScore: null, text: "" },
+                ],
+              })
+            }
+            disabled={isReadOnly}
+            className="text-[0.6875rem] font-medium px-2 py-1 rounded border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            + Add band
+          </button>
+          {coverage && !coverage.complete && (
+            <p
+              data-testid="q-finding-coverage"
+              className="text-[0.6875rem] font-medium text-warning"
+            >
+              {coverage.message} — sliders must cover the whole scale to
+              publish.
+            </p>
+          )}
+          {question.type === "NUMBER" && (
+            <p className="text-[0.6875rem] italic text-muted-foreground">
+              Gaps are fine — an answer outside every range simply shows no
+              finding.
+            </p>
+          )}
+        </div>
+      )}
+      {open && question.type === "MULTI_CHOICE" && (
+        <div className="space-y-2">
+          {question.options.length === 0 && (
+            <p className="text-[0.6875rem] italic text-muted-foreground">
+              Add options first — each option can carry its own finding text.
+            </p>
+          )}
+          {question.options.map((opt, idx) => (
+            <div key={opt.key !== "" ? opt.key : `new-${idx}`} className="space-y-1">
+              <label className="block text-[0.6875rem] font-medium text-foreground">
+                {opt.label || (opt.key !== "" ? opt.key : `Option ${idx + 1}`)}
+              </label>
+              {opt.key === "" ? (
+                <p className="text-[0.6875rem] italic text-muted-foreground">
+                  Save the draft first to give this option a key, then add its
+                  finding text.
+                </p>
+              ) : (
+                <textarea
+                  data-testid={`q-finding-option-${opt.key}`}
+                  aria-label={`Finding text for option ${opt.label || opt.key}`}
+                  rows={2}
+                  maxLength={2000}
+                  placeholder="Report text when this option is selected (optional)…"
+                  value={question.findingOptionTexts[opt.key] ?? ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      findingOptionTexts: {
+                        ...question.findingOptionTexts,
+                        [opt.key]: e.target.value,
+                      },
+                    })
+                  }
+                  disabled={isReadOnly}
+                  className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuestionConfigForm({
   question,
   isReadOnly,
   isUnlocked,
+  findingsEnabled,
   publishedOptionKeys,
   onUpdate,
 }: QuestionConfigFormProps) {
@@ -406,13 +697,47 @@ function QuestionConfigForm({
     const opt = question.options[idx];
     if (!opt) return;
     const published = publishedOptionKeys[question.stableKey] ?? [];
+    const hasRule =
+      findingsEnabled &&
+      opt.key !== "" &&
+      (question.findingOptionTexts[opt.key] ?? "").trim() !== "";
     if (opt.key !== "" && published.includes(opt.key)) {
       const ok = window.confirm(
-        buildOptionRemoveConfirmText(opt.key, question.stableKey),
+        buildOptionRemoveConfirmText(opt.key, question.stableKey) +
+          (hasRule
+            ? `\n\nIt also carries a finding rule, which will be removed with it.`
+            : ""),
       );
       if (!ok) return;
     }
-    onUpdate({ options: question.options.filter((_, i) => i !== idx) });
+    // Wave U — removing an option drops its finding rule with it (silently
+    // for new-to-draft options; named in the confirm above for published).
+    const patch: Partial<QuestionDraft> = {
+      options: question.options.filter((_, i) => i !== idx),
+    };
+    if (opt.key !== "" && question.findingOptionTexts[opt.key] !== undefined) {
+      const texts = { ...question.findingOptionTexts };
+      delete texts[opt.key];
+      patch.findingOptionTexts = texts;
+    }
+    onUpdate(patch);
+  };
+
+  // Wave U D21 — ANY retype drops the question's findings rules, behind a
+  // confirm naming the loss. (Retype is only possible on new-to-draft
+  // questions — the dropdown is disabled for inherited ones.)
+  const handleTypeChange = (nextType: string) => {
+    if (!question || nextType === question.type) return;
+    const ruleCount = findingsEnabled ? countFindingRules(question) : 0;
+    if (ruleCount > 0) {
+      const ok = window.confirm(
+        buildTypeChangeFindingsConfirmText(ruleCount, question.type, nextType),
+      );
+      if (!ok) return;
+      onUpdate({ type: nextType, findingBands: [], findingOptionTexts: {} });
+      return;
+    }
+    onUpdate({ type: nextType });
   };
 
   if (!question) {
@@ -485,7 +810,7 @@ function QuestionConfigForm({
           <select
             id={`q-type-${question.uid}`}
             value={question.type}
-            onChange={(e) => onUpdate({ type: e.target.value })}
+            onChange={(e) => handleTypeChange(e.target.value)}
             disabled={isReadOnly || question.isInherited}
             className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
           >
@@ -498,7 +823,7 @@ function QuestionConfigForm({
           <select
             id={`q-type-${question.uid}`}
             value={question.type}
-            onChange={(e) => onUpdate({ type: e.target.value })}
+            onChange={(e) => handleTypeChange(e.target.value)}
             disabled={isReadOnly}
             className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
           >
@@ -871,6 +1196,17 @@ function QuestionConfigForm({
         </div>
       )}
 
+      {/* ── Wave U (spec 19u U-4) — Findings panel (flag-gated; never on TEXT).
+          Editable on inherited questions (D9 reword-class — the whole point
+          is adding findings to existing LVA/QSP questions). ── */}
+      {findingsEnabled && question.type !== "TEXT" && (
+        <FindingsPanel
+          question={question}
+          isReadOnly={isReadOnly}
+          onUpdate={onUpdate}
+        />
+      )}
+
       {/* ── Legacy v1.5 accordions (flag OFF only) ── */}
       {!isUnlocked && (
         <>
@@ -1088,6 +1424,7 @@ export function QuestionsTab({
   isReadOnly,
   isUnlocked,
   publishedOptionKeys,
+  findingsEnabled = false,
 }: QuestionsTabProps) {
   const [selectedSectionStableKey, setSelectedSectionStableKey] = useState<
     string | null
@@ -1320,6 +1657,7 @@ export function QuestionsTab({
             question={focusedQuestion}
             isReadOnly={isReadOnly}
             isUnlocked={isUnlocked}
+            findingsEnabled={findingsEnabled}
             publishedOptionKeys={publishedOptionKeys}
             onUpdate={(patch) => {
               if (focusedQuestion) onUpdateQuestion(focusedQuestion.uid, patch);

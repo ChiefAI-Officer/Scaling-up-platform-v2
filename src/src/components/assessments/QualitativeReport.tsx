@@ -35,6 +35,12 @@ import {
 } from "@/lib/assessments/qualitative-report-model";
 import type { PeerComparisonSection } from "@/lib/assessments/peer-benchmarks";
 import { peerDevGlyph, peerDevText } from "@/lib/assessments/lva-report-display";
+import {
+  parseResolvedFindings,
+  buildFindingsSection,
+  type FindingsSection,
+} from "@/lib/assessments/findings-section-model";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { CoachLogo } from "@/components/assessments/CoachLogo";
 import { Fragment } from "react";
 
@@ -102,6 +108,45 @@ function PeerComparisonBlock({ section }: { section: PeerComparisonSection }) {
           ))}
         </tbody>
       </table>
+    </section>
+  );
+}
+
+/**
+ * Wave U (spec 19u U-5) — the consolidated findings section: the frozen
+ * `result.findings` snapshot grouped by survey section, with the scored
+ * report's parity copy ("What to work on next" / "Your recommendations")
+ * and its `.su-report-rec*` classes (styled + print-safe in su-report.css,
+ * shared with BrandedReport's recommendations block — the two surfaces
+ * cannot drift). Renders ONLY when the flag is on AND rules fired.
+ */
+function FindingsBlock({ section }: { section: FindingsSection }) {
+  return (
+    <section
+      className="su-section su-report-recs"
+      data-testid="qual-section-findings"
+    >
+      <p className="su-section-eyebrow">{section.eyebrow}</p>
+      <h2 className="su-section-title su-h2">{section.title}</h2>
+      {section.groups.map((group, gi) => (
+        <div
+          className="su-report-rec-group"
+          key={group.sectionName ?? `unnamed-${gi}`}
+        >
+          {group.sectionName && (
+            <h3 className="su-report-rec-section">{group.sectionName}</h3>
+          )}
+          {group.items.map((item, ii) => (
+            <div
+              className="su-report-rec"
+              key={`${item.stableKey}#${ii}`}
+              data-testid={`qual-finding-${item.stableKey}`}
+            >
+              <p>{item.text}</p>
+            </div>
+          ))}
+        </div>
+      ))}
     </section>
   );
 }
@@ -391,6 +436,17 @@ export function QualitativeReport({
   const firstName = greetingName(report.respondentName);
   const submitted = formatSubmittedAt(report.submittedAt);
 
+  // Wave U — build the findings section from the frozen snapshot (total-
+  // tolerant: absent/malformed → null → no section). Flag-gated at render.
+  const findingsSection = isFindingsLogicEnabled()
+    ? buildFindingsSection(
+        parseResolvedFindings(
+          (report.result as { findings?: unknown } | null | undefined)?.findings,
+        ),
+        report.sections,
+      )
+    : null;
+
   return (
     <div className="su-public-brand su-report" data-testid="qualitative-report">
       {/* ── 1. Cover ─────────────────────────────────────────────────────── */}
@@ -466,6 +522,15 @@ export function QualitativeReport({
       {peerComparison && peerSliceIndex(model.sections) === -1 && (
         <PeerComparisonBlock section={peerComparison} />
       )}
+
+      {/* Wave U (spec 19u U-5): the consolidated findings section — renders
+          the frozen result.findings snapshot (ALL rule kinds on qualitative
+          templates), appended after the last section. Flag OFF or empty
+          snapshot → absent entirely (output byte-identical to pre-Wave-U).
+          Deliberately NOT part of buildQualitativeModel — that model is
+          shared with the respondent results email, which must never carry
+          findings (D7; same isolation as Wave S peers). */}
+      {findingsSection && <FindingsBlock section={findingsSection} />}
 
       {/* ── 4. Footer (matches the cleaned BrandedReport footer) ───────────── */}
       <footer className="su-report-footer" data-testid="report-footer">

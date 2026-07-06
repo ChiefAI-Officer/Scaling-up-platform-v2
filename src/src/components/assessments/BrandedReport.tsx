@@ -39,6 +39,8 @@ import {
   headlineForTierMetric,
 } from "@/lib/assessments/report-presentation";
 import { reportConfigFor } from "@/lib/assessments/report-config";
+import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
+import { parseResolvedFindings } from "@/lib/assessments/findings-section-model";
 import { greetingName } from "@/lib/assessments/respondent-display-name";
 import { QualitativeReport } from "@/components/assessments/QualitativeReport";
 import type { PeerComparisonSection } from "@/lib/assessments/peer-benchmarks";
@@ -307,18 +309,54 @@ export function BrandedReport({
   const hasDomainCards = domainCards.length > 0;
 
   // ── Recommendations grouped by section (only non-empty) ──────────────────
+  // Wave U (spec 19u U-5/D6) — NON-SLIDER findings from the frozen
+  // `result.findings` snapshot merge into this block when the flag is on.
+  // Slider entries in the snapshot are IGNORED here: sliders keep rendering
+  // from the legacy per-row `recommendation` (old submissions have no
+  // snapshot and must render unchanged; no double display). Flag OFF or no
+  // snapshot → this block is byte-identical to pre-Wave-U output.
+  const snapshotFindings = isFindingsLogicEnabled()
+    ? parseResolvedFindings(
+        (result as ScoreResult & { findings?: unknown }).findings,
+      ).filter((f) => f.questionType !== "SLIDER_LIKERT")
+    : [];
+  const knownSectionKeys = new Set(perSection.map((ps) => ps.stableKey));
+  const findingsBySection = new Map<
+    string,
+    Array<{ key: string; text: string }>
+  >();
+  const orphanFindings: Array<{ key: string; text: string }> = [];
+  snapshotFindings.forEach((f, i) => {
+    // `#uN` suffix keeps React keys unique when one MULTI_CHOICE question
+    // fires several findings (same stableKey).
+    const entry = { key: `${f.stableKey}#u${i}`, text: f.text };
+    if (f.sectionStableKey && knownSectionKeys.has(f.sectionStableKey)) {
+      const list = findingsBySection.get(f.sectionStableKey) ?? [];
+      list.push(entry);
+      findingsBySection.set(f.sectionStableKey, list);
+    } else {
+      orphanFindings.push(entry);
+    }
+  });
+
   const recSections = sectionCards
     .map(({ ps, rows }) => ({
       name: ps.name,
-      recs: rows
-        .filter((r) => r.recommendation && r.recommendation.trim() !== "")
-        .map((r) => ({ key: r.stableKey, text: r.recommendation as string })),
+      recs: [
+        ...rows
+          .filter((r) => r.recommendation && r.recommendation.trim() !== "")
+          .map((r) => ({ key: r.stableKey, text: r.recommendation as string })),
+        ...(findingsBySection.get(ps.stableKey) ?? []),
+      ],
     }))
     .filter((g) => g.recs.length > 0);
   // include orphan recommendations under a generic group
-  const orphanRecs = orphanRows
-    .filter((r) => r.recommendation && r.recommendation.trim() !== "")
-    .map((r) => ({ key: r.stableKey, text: r.recommendation as string }));
+  const orphanRecs = [
+    ...orphanRows
+      .filter((r) => r.recommendation && r.recommendation.trim() !== "")
+      .map((r) => ({ key: r.stableKey, text: r.recommendation as string })),
+    ...orphanFindings,
+  ];
   if (orphanRecs.length > 0) {
     recSections.push({ name: "Recommendations", recs: orphanRecs });
   }

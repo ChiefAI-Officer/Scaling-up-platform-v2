@@ -75,19 +75,18 @@ describe("scoring BC snapshot — Rockefeller", () => {
     const serialized = stableStringify(result);
     const sha = createHash("sha256").update(serialized).digest("hex");
 
-    // ROCKEFELLER_BC_SNAPSHOT_SHA — re-locked 2026-06-02 for the content
-    // re-seed (Task 2): the Rockefeller seed content changed (invented slider
-    // anchors "Not true"/"Completely true" → "" to match the source which has
-    // none; Q1_1 trailing period dropped; section-7 straight quotes), which
-    // flows into the per-question ScoreResult. The scoring ENGINE is unchanged
-    // — this drift is from the intentional verbatim content fix, not an engine
-    // regression. Prior SHA (pre-reseed): b5997e68…fc50.
+    // ROCKEFELLER_BC_SNAPSHOT_SHA — re-locked 2026-07-05 for Wave U (spec
+    // 19u D18): scoreSubmission now UNCONDITIONALLY freezes the findings
+    // snapshot as `result.findings` (empty array here — Rockefeller carries
+    // no findings rules). The ONLY delta vs the prior snapshot is the added
+    // `"findings":[]` key; every pre-existing field is byte-identical (the
+    // per-row `recommendation` path is untouched). Prior SHA (pre-Wave-U):
+    // 3831c547…7200; before that (pre-reseed 2026-06-02): b5997e68…fc50.
     // To intentionally update again: run the test, copy "Received", explain it.
     const EXPECTED_SHA =
-      "3831c5470e6ec77968e6d7ff1ab0b30e1542f2f7cbd1879bcdfd54bd62907200";
+      "dbe653ad601c80aa9752953e76d8f3d38b1910da4cf8e0886cfc6d80229b6547";
 
     if (sha !== EXPECTED_SHA) {
-      // eslint-disable-next-line no-console
       console.error(
         `[scoring-bc-snapshot] DRIFT DETECTED\n  expected = ${EXPECTED_SHA}\n  computed = ${sha}\n  serialized = ${serialized}`
       );
