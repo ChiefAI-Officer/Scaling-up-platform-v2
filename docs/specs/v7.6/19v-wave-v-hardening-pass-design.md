@@ -1,11 +1,16 @@
 # Spec 19v — Wave V: P8 Hardening Pass
 
-**Status:** BUILT 2026-07-06 — co-validated (§6), user-greenlit, TDD build complete (63 new tests,
-built INLINE — the co-validate subagent died on a session usage limit, 4th wave running), PR dark.
-Launch walk pending user "go". Direction (P8 hardening over conditional authoring) chosen by user
-2026-07-06; conditional/show-if authoring slots as Wave W. **D3 preflight ALREADY RUN on prod
-(read-only): 19 versions scanned, only the quarantined Wave U walk template's v1 fails (the very
-version that found the gap) — all 18 real versions CLEAN.**
+**Status:** LAUNCHED 2026-07-06 — PR #146 (`e8ccd0d`) merged + same-session launch walk complete;
+`WAVE_V_IMPORT_ALERTING_ENABLED=1` live on Vercel Production (individually authorized) + newest
+deployment redeployed. Launch walk proved: V-1 publish BLOCKED on non-tiling tiers → fix →
+publish → submit succeeded; V-3 badge live on all three surfaces (walk LVA campaign used for the
+alias-allowlisted group report); V-2 sweep twice against prod DB (condition A fired,
+checkpoint-before-send, walk-recipient email) and the FIRST PROD CRON CHECKPOINT verified
+(resumed exactly from the walk cursor, 105-min catch-up span, 0 evaluated, no email). Artifacts
+quarantined §5.5 order (smoke 0/0); prod smokes green. D3 preflight (ALL 19 versions): only the
+quarantined Wave U walk v1 fails — 18 real versions CLEAN. Build was INLINE (co-validate
+subagent died on a session usage limit — Codex called directly from the main loop, §6).
+Direction: P8 hardening chosen over conditional authoring — conditionals slot as Wave W.
 
 ## §0 Ground truth
 

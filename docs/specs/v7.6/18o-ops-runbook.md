@@ -245,6 +245,30 @@ filter action IN ("assessment.esperto_import.preview","assessment.esperto_import
 route should 404 before emitting this marker); a hit means the gate check has a bug. Owner:
 engineering lead, launch-blocking if it fires.
 
+### Wave V addendum (2026-07-06) — conditions A/B/C are now IN-APP
+
+Wave V (spec 19v, V-2) implemented alerts **A** (divergent-reimport), **B** (denial burst >3) and
+**C** (commit latency p95 >10s) in-app — no log drain required for them anymore:
+
+- Both import routes persist each `commit_result` / `commit_conflict` marker as a durable
+  **AuditLog signal row** (`entityType assessment_import`, actions `import_commit_result` /
+  `import_commit_conflict`; console markers unchanged, byte-identical). A NEW `unexpected-error`
+  conflict code covers non-domain commit failures (previously invisible 500s). Writes are
+  UNCONDITIONAL (flags gate the cron, never the data) and fail-soft.
+- The Inngest cron `esperto-import-alert-cron` (`*/10`) evaluates the span since its last
+  checkpoint row (`entityType assessment_import_alert_cron`, action `run` — a persisted cursor,
+  checkpoint written BEFORE send so late ticks/deploy pauses can't drop a span and retries can't
+  double-email) and emails ONE consolidated alert to `ADMIN_EMAIL` per firing span.
+  `ADMIN_EMAIL` is REQUIRED: missing env + a firing → the loud
+  `assessment.esperto_import.alert_email_unconfigured` marker, no silent fallback address.
+- Flags: `WAVE_V_IMPORT_ALERTING_ENABLED` (live since 2026-07-06), `WAVE_V_IMPORT_ALERTING_KILL`
+  wins. Kill = zero the flag; signal rows persist inert.
+- **Condition D (flag-drift) remains LOG-DRAIN-ONLY** — the route 404s before any row exists, so
+  no DB signal can represent it. The §7 query above still applies once a drain is wired.
+- Ops queries: latest checkpoint = newest `assessment_import_alert_cron`/`run` AuditLog row (its
+  `changes` JSON records `processedThrough`, `evaluated`, `fired`). Signal history = AuditLog
+  `entityType assessment_import` ordered by `timestamp`.
+
 ---
 
 ## 8. Pre-deploy Checks (Dark-merge Safety)
