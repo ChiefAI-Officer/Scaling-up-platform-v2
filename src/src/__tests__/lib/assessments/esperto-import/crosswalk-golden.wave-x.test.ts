@@ -24,7 +24,7 @@ import {
 } from "@/lib/assessments/esperto-import/crosswalks";
 import { decodeMultiChoiceIndices } from "@/lib/assessments/esperto-import/restricted-plan";
 import { buildRockefellerContent } from "../../../../../prisma/seed-rockefeller-assessment";
-import { scoreSubmission } from "@/lib/assessments/scoring";
+import { scoreSubmission, type TemplateVersionForScoring } from "@/lib/assessments/scoring";
 
 type Raw = Record<string, unknown>;
 const rockRaw = rockGolden.raw as Raw;
@@ -57,9 +57,26 @@ describe("Wave X lock gate — every locked crosswalk has a golden fixture (Code
     expect(lvaCrosswalk.locked).toBe(true);
   });
 
-  it("each golden fixture is exhaustive against its crosswalk (no unknown keys)", () => {
-    expect(validateCrosswalkExhaustive(rockefellerCrosswalk, Object.keys(rockRaw)).ok).toBe(true);
-    expect(validateCrosswalkExhaustive(lvaCrosswalk, Object.keys(lvaRaw)).ok).toBe(true);
+  // Generalized over ALL non-exempt locked crosswalks so a future lock flip
+  // cannot register a hollow fixture (e.g. raw: {}) and pass: the fixture must
+  // (a) contain no keys the crosswalk doesn't know (exhaustiveness) and
+  // (b) contain EVERY mapped espertoKey (coverage — empty-string answers count;
+  //     keys the vendor omits from JSON when empty belong in droppedKeys, not map).
+  it("each golden fixture is exhaustive AND fully covers its crosswalk's mapped keys", () => {
+    for (const cw of ALL_CROSSWALKS) {
+      if (!cw.locked || PRE_WAVE_X_LOCKED.has(cw.templateAlias)) continue;
+      const raw = GOLDEN_BY_ALIAS[cw.templateAlias];
+      expect(raw).toBeDefined();
+      // (a) no unknown keys in the fixture
+      expect(validateCrosswalkExhaustive(cw, Object.keys(raw))).toEqual({
+        ok: true,
+        unknownKeys: [],
+      });
+      // (b) every mapped espertoKey appears in the fixture raw
+      const rawKeys = new Set(Object.keys(raw));
+      const missing = cw.map.map((e) => e.espertoKey).filter((k) => !rawKeys.has(k));
+      expect(missing).toEqual([]);
+    }
   });
 });
 
@@ -72,24 +89,26 @@ describe("Rockefeller golden fixture — every binding + known-answer parity", (
     }
   });
 
-  it("recompute reproduces the designed totals (0-valued answers included)", () => {
+  it("recompute matches the VENDOR-computed totals in the export (parity, incl. 0-valued answers)", () => {
     const content = buildRockefellerContent();
     const answers = Object.entries(rockRaw).map(([stableKey, value]) => ({
       stableKey,
       value: value as number,
     }));
-    const expectedTotal = answers.reduce((a, r) => a + (r.value as number), 0);
-    const expectedAchieved = answers.filter((r) => (r.value as number) >= 2).length;
     const result = scoreSubmission(
       {
         questions: content.questions,
         sections: content.sections,
         scoringConfig: content.scoringConfig,
-      } as never,
+      } as TemplateVersionForScoring,
       answers,
     );
-    expect(result.overallTotal).toBe(expectedTotal);
-    expect(result.countAchieved).toBe(expectedAchieved);
+    // Parity target = Esperto's own `processed` block from the captured export,
+    // NOT values re-derived from the same raw we feed the scorer.
+    expect(result.overallTotal).toBe(rockGolden.processed.overall_total);
+    expect(result.countAchieved).toBe(rockGolden.processed.count_achieved);
+    // Sanity: the designed pattern's arithmetic total (Σ (s+j)%4 over 10×4) is 60.
+    expect(rockGolden.processed.overall_total).toBe(60);
   });
 });
 
@@ -144,13 +163,44 @@ describe("LVA golden fixture — V1/V2/V3 bindings proven by self-identifying an
     expect(lvaCrosswalk.map.find((e) => e.espertoKey === "Q33")).toBeUndefined();
   });
 
-  it("every mapped LVA text answer carries its self-identifying marker (spot-check the S6 block)", () => {
-    const checks: Array<[string, string]> = [
-      ["Q21", "XV: What is the long"],
-      ["Q22", "XV: What is the core"],
-      ["Q29", "XV: What is in your"],
-      ["Q20", "42"], // rehire % NUMBER
+  // Every positional TEXT binding, pinned two ways: the fixture's captured
+  // self-identifying marker (proves what the vendor stored under that Q-code)
+  // AND the crosswalk's espertoKey→stableKey mapping (so a positional swap in
+  // buildMap() — e.g. Q23↔Q24 — fails here even though set-equality tests pass).
+  // Note: some adjacent fragments repeat verbatim (Q9/Q10 "Who are the main",
+  // Q29/Q29a/Q30 "What is in your") — for those the stableKey pin, not the
+  // marker, is what freezes the binding; their order was verified live in D4.
+  it("every positional TEXT binding is pinned: fixture marker + mapped stableKey (anti-swap)", () => {
+    const table: Array<[string, string, string]> = [
+      // espertoKey, fixture marker fragment, mapped stableKey
+      ["Q8", "XV: What are the main", "S2_main_products"],
+      ["Q9", "XV: Who are the main", "S2_main_partners"],
+      ["Q10", "XV: Who are the main", "S2_main_competitors"],
+      ["Q11", "XV: What do the media", "S2_media"],
+      ["Q12", "XV: What is the main", "S2_reason_success"],
+      ["Q13", "XV: What do employees say", "S2_employees_say"],
+      ["Q14", "XV: What are the major", "S2_major_initiatives"],
+      ["Q15", "XV: What could be the", "S2_reason_not_reach"],
+      ["Q18", "XV: Is another factor hindering", "S5_other_factor"],
+      ["Q19", "XV: If you could change", "S5_change_one_thing"],
+      ["Q21", "XV: What is the longterm", "S6_bhag"],
+      ["Q22", "XV: What is the core", "S6_core_purpose"],
+      ["Q23", "XV: What do you think", "S6_core_values"],
+      ["Q24", "XV: Is there a clear", "S6_market_focus"],
+      ["Q25", "XV: What is the defined", "S6_core_customer"],
+      ["Q26", "XV: Describe the companys strategy", "S6_strategy_one_sentence"],
+      ["Q27", "XV: Does the company manage", "S6_strategy_implementation"],
+      ["Q28", "XV: Are the goals for", "S6_goals_clear"],
+      ["Q29", "XV: What is in your", "S6_priority_org"],
+      ["Q29a", "XV: What is in your", "S6_priority_year"],
+      ["Q30", "XV: What is in your", "S6_priority_quarter"],
     ];
-    for (const [q, frag] of checks) expect(String(lvaRaw[q])).toContain(frag);
+    for (const [q, frag, stableKey] of table) {
+      expect(String(lvaRaw[q])).toContain(frag);
+      expect(lvaCrosswalk.map.find((x) => x.espertoKey === q)?.stableKey).toBe(stableKey);
+    }
+    // Q20 is the lone S6 NUMBER — designed value 42.
+    expect(lvaRaw["Q20"]).toBe(42);
+    expect(lvaCrosswalk.map.find((x) => x.espertoKey === "Q20")?.stableKey).toBe("S6_rehire_pct");
   });
 });

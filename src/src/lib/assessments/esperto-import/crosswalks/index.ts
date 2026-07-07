@@ -28,7 +28,7 @@ export { scalingUpFullCrosswalk } from "./scaling-up-full";
 // Registry
 // ────────────────────────────────────────────────────────────────────────
 
-/** All known crosswalks. Stubs (Rockefeller/LVA/SU-Full) are present but `locked:false`. */
+/** All known crosswalks. All four are `locked:true` as of Wave X (2026-07-07); RESTRICTED-only instruments (Rockefeller/LVA/SU-Full) carry `espertoVariant: null`. */
 export const ALL_CROSSWALKS: readonly Crosswalk[] = [
   qspV2Crosswalk,
   rockefellerCrosswalk,
