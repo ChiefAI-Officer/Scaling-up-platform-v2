@@ -37,6 +37,20 @@
  *                                                        (NEVER create, NEVER fail).
  *   - a scorable key missing/blank                     → incomplete-respondent
  *                                                        (NO partial-scored row).
+ *   - a malformed MULTI_CHOICE index list (Wave X D7)  → invalid-multi-choice.
+ *   - a present value that violates the pinned         → invalid-answer-value
+ *     version's type/scale constraints (non-numeric      (mirrors scoring's
+ *     slider/number, out-of-range or non-integer          INVALID_TYPE /
+ *     slider, over-long text)                             NON_INTEGER /
+ *                                                         OUT_OF_RANGE /
+ *                                                         ANSWER_TOO_LONG so one
+ *                                                         bad historical value
+ *                                                         skips THAT respondent
+ *                                                         instead of throwing
+ *                                                         inside the commit
+ *                                                         transaction and
+ *                                                         rolling back the
+ *                                                         whole batch).
  *
  * PROVENANCE (manifest): carries NO raw mid / reportid / email / name /
  * demographics — only salted hashes + counts. Salt is supplied by the caller
@@ -45,6 +59,7 @@
 
 import { createHash } from "crypto";
 
+import { MAX_TEXT_ANSWER_LENGTH } from "../answer-limits";
 import type { Crosswalk, VersionQuestion } from "./crosswalks";
 import {
   validateCrosswalkExhaustive,
@@ -100,10 +115,14 @@ export interface RestrictedCampaign {
 export interface RestrictedSkip {
   mid: string;
   reportid: string;
-  reason: "unresolved-respondent" | "incomplete-respondent" | "invalid-multi-choice";
+  reason:
+    | "unresolved-respondent"
+    | "incomplete-respondent"
+    | "invalid-multi-choice"
+    | "invalid-answer-value";
   /** Present for incomplete-respondent — the scorable keys that were absent/blank. */
   missingKeys?: string[];
-  /** Present for invalid-multi-choice — what was malformed (Wave X D7). */
+  /** Present for invalid-multi-choice / invalid-answer-value — what was malformed. */
   detail?: string;
 }
 
@@ -335,6 +354,44 @@ function coerceValue(
 
   // TEXT / MULTI_CHOICE → string.
   return typeof raw === "string" ? raw : String(raw);
+}
+
+/**
+ * Validate one coerced non-MULTI_CHOICE value against the pinned version's
+ * type/scale constraints — the SAME rules `scoreSubmission` enforces at commit
+ * time (INVALID_TYPE / NON_INTEGER / OUT_OF_RANGE / ANSWER_TOO_LONG), applied
+ * at PLAN time so one bad historical value skips THAT respondent (mirroring
+ * the invalid-multi-choice skip) instead of throwing inside the commit
+ * transaction and rolling back the whole batch as an opaque 500.
+ *
+ * Returns a human-readable problem string, or `null` when acceptable. NEVER
+ * echoes TEXT content (redaction discipline); numeric values are named.
+ * Step alignment is not checked here — every current instrument uses step=1,
+ * for which any in-range integer is aligned; scoring stays the final wall.
+ */
+function validateCoercedValue(
+  ourType: string,
+  value: number | string,
+  vq: VersionQuestion | undefined,
+): string | null {
+  if (ourType === "SLIDER_LIKERT" || ourType === "NUMBER") {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      return "present but not numeric";
+    }
+    if (ourType === "SLIDER_LIKERT") {
+      if (!Number.isInteger(value)) return `non-integer slider value ${value}`;
+      const scale = vq?.scale;
+      if (scale && (value < scale.min || value > scale.max)) {
+        return `value ${value} outside slider range ${scale.min}..${scale.max}`;
+      }
+    }
+    return null;
+  }
+  // TEXT — mirrors scoring's ANSWER_TOO_LONG cap (content never echoed).
+  if (typeof value === "string" && value.length > MAX_TEXT_ANSWER_LENGTH) {
+    return `text answer length ${value.length} exceeds ${MAX_TEXT_ANSWER_LENGTH}`;
+  }
+  return null;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -585,6 +642,7 @@ export function buildRestrictedImportPlan(
     //    only mapped keys become answers). Blank values are omitted.
     const answers: ResultsAnswer[] = [];
     let invalidMultiChoice: string | null = null;
+    let invalidAnswerValue: string | null = null;
     for (const entry of crosswalk.map) {
       const raw = file.raw[entry.espertoKey];
       if (entry.ourType === "MULTI_CHOICE") {
@@ -608,6 +666,19 @@ export function buildRestrictedImportPlan(
       }
       const value = coerceValue(entry.ourType, raw);
       if (value === undefined) continue;
+      // Plan-time value validation: a present-but-malformed value (out-of-range
+      // slider, non-numeric slider/number, over-long text) skips THIS respondent
+      // here rather than throwing inside scoreSubmission during the commit
+      // transaction and rolling the whole batch back as an opaque 500.
+      const problem = validateCoercedValue(
+        entry.ourType,
+        value,
+        vqByStableKey.get(entry.stableKey),
+      );
+      if (problem !== null) {
+        invalidAnswerValue = `${entry.espertoKey} → ${entry.stableKey}: ${problem}`;
+        break;
+      }
       answers.push({ stableKey: entry.stableKey, value });
     }
     if (invalidMultiChoice !== null) {
@@ -616,6 +687,15 @@ export function buildRestrictedImportPlan(
         reportid: file.reportid,
         reason: "invalid-multi-choice",
         detail: invalidMultiChoice,
+      });
+      continue;
+    }
+    if (invalidAnswerValue !== null) {
+      plan.skips.push({
+        mid: file.mid,
+        reportid: file.reportid,
+        reason: "invalid-answer-value",
+        detail: invalidAnswerValue,
       });
       continue;
     }
