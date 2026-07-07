@@ -100,9 +100,11 @@ export interface RestrictedCampaign {
 export interface RestrictedSkip {
   mid: string;
   reportid: string;
-  reason: "unresolved-respondent" | "incomplete-respondent";
+  reason: "unresolved-respondent" | "incomplete-respondent" | "invalid-multi-choice";
   /** Present for incomplete-respondent — the scorable keys that were absent/blank. */
   missingKeys?: string[];
+  /** Present for invalid-multi-choice — what was malformed (Wave X D7). */
+  detail?: string;
 }
 
 /** A batch-level fatal error. A non-empty `blocks` makes the plan null-campaign. */
@@ -164,6 +166,12 @@ export interface BuildRestrictedImportPlanInput {
   versionQuestions: VersionQuestion[];
   /** stableKeys that MUST be present + in-range for a COMPLETE respondent. */
   scorableStableKeys: string[];
+  /**
+   * Wave X (D2) — the selected instrument's externalId namespace. Optional so
+   * every pre-Wave-X caller stays byte-identical: omitted → the SU-Full
+   * prefix, exactly the literal Wave O shipped.
+   */
+  instrument?: { externalIdPrefix: string };
   /** Salt for provenance hashes (caller passes from env; tests pass a fixed value). */
   hashSalt: string;
   /**
@@ -329,6 +337,48 @@ function coerceValue(
 }
 
 // ────────────────────────────────────────────────────────────────────────
+// Wave X (D7) — MULTI_CHOICE index decode
+// ────────────────────────────────────────────────────────────────────────
+
+/**
+ * Decode Esperto's MULTI_CHOICE encoding — a comma-separated list of 1-BASED
+ * indices into the pinned version's option ORDER (LVA Q16a: "15,10,9") — into
+ * the platform's `string[]` of option keys, preserving the file's pick order.
+ *
+ * Malformed input NEVER guesses or truncates: non-integer tokens, indices out
+ * of the option range, duplicates, or more picks than `maxChoices` all return
+ * an error the caller turns into an `invalid-multi-choice` respondent skip.
+ * A bare number decodes as a single pick (Esperto may emit one unquoted).
+ */
+export function decodeMultiChoiceIndices(
+  raw: string | number,
+  options: { key: string }[],
+  maxChoices: number | undefined,
+): { ok: true; value: string[] } | { ok: false; error: string } {
+  const tokens = String(raw)
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+  if (tokens.length === 0) return { ok: false, error: "no indices present" };
+  if (typeof maxChoices === "number" && tokens.length > maxChoices) {
+    return { ok: false, error: `${tokens.length} picks exceed maxChoices ${maxChoices}` };
+  }
+  const seen = new Set<number>();
+  const value: string[] = [];
+  for (const token of tokens) {
+    if (!/^\d+$/.test(token)) return { ok: false, error: `non-integer index "${token}"` };
+    const index = Number(token);
+    if (index < 1 || index > options.length) {
+      return { ok: false, error: `index ${index} outside option range 1..${options.length}` };
+    }
+    if (seen.has(index)) return { ok: false, error: `duplicate index ${index}` };
+    seen.add(index);
+    value.push(options[index - 1].key);
+  }
+  return { ok: true, value };
+}
+
+// ────────────────────────────────────────────────────────────────────────
 // buildRestrictedImportPlan
 // ────────────────────────────────────────────────────────────────────────
 
@@ -342,9 +392,11 @@ export function buildRestrictedImportPlan(
     respondents,
     versionQuestions,
     scorableStableKeys,
+    instrument,
     hashSalt,
     nowIso = new Date().toISOString(),
   } = input;
+  const externalIdPrefix = instrument?.externalIdPrefix ?? "esperto:sufull";
 
   // ── 1. Round-label validation. An unusable label blocks upfront (before we
   //    trust anything else in the batch). ───────────────────────────────────
@@ -487,6 +539,9 @@ export function buildRestrictedImportPlan(
     if (r.externalId) respByExternalId.set(r.externalId, r.id);
   }
 
+  // Pinned-version question lookup (Wave X D7 — MULTI_CHOICE decode targets).
+  const vqByStableKey = new Map(versionQuestions.map((q) => [q.stableKey, q]));
+
   // The scorable-key set the completeness gate enforces.
   const scorableSet = scorableStableKeys;
 
@@ -509,11 +564,37 @@ export function buildRestrictedImportPlan(
     // 7b/flatten. Map raw Q-codes via crosswalk.map (skip droppedKeys implicitly:
     //    only mapped keys become answers). Blank values are omitted.
     const answers: ResultsAnswer[] = [];
+    let invalidMultiChoice: string | null = null;
     for (const entry of crosswalk.map) {
       const raw = file.raw[entry.espertoKey];
+      if (entry.ourType === "MULTI_CHOICE") {
+        // Wave X (D7) — index decode against the pinned version's options.
+        if (isBlank(raw)) continue; // unanswered
+        const vq = vqByStableKey.get(entry.stableKey);
+        const decoded = decodeMultiChoiceIndices(
+          raw as string | number,
+          vq?.options ?? [],
+          vq?.maxChoices,
+        );
+        if (!decoded.ok) {
+          invalidMultiChoice = `${entry.espertoKey} → ${entry.stableKey}: ${decoded.error}`;
+          break;
+        }
+        answers.push({ stableKey: entry.stableKey, value: decoded.value });
+        continue;
+      }
       const value = coerceValue(entry.ourType, raw);
       if (value === undefined) continue;
       answers.push({ stableKey: entry.stableKey, value });
+    }
+    if (invalidMultiChoice !== null) {
+      plan.skips.push({
+        mid: file.mid,
+        reportid: file.reportid,
+        reason: "invalid-multi-choice",
+        detail: invalidMultiChoice,
+      });
+      continue;
     }
 
     // 9. Completeness gate. Every scorable key must be present + non-blank in the
@@ -563,7 +644,7 @@ export function buildRestrictedImportPlan(
 
   const campaign: RestrictedCampaign = {
     cid,
-    externalId: `esperto:sufull:${cid}:${roundLabelSlug}`,
+    externalId: `${externalIdPrefix}:${cid}:${roundLabelSlug}`,
     name: `${crosswalk.templateAlias} — imported — ${roundLabel.trim()}`,
     roundLabelSlug,
     openAt,

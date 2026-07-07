@@ -35,6 +35,11 @@
 
 import { liveCampaignWhere } from "../campaign-live";
 import {
+  completenessKeysFor,
+  getInstrumentByBatchKind,
+  type RestrictedInstrument,
+} from "./restricted-instruments";
+import {
   getCrosswalkByTemplateAlias,
   validateCrosswalkAgainstVersion,
   type Crosswalk,
@@ -136,6 +141,7 @@ export type RestrictedImportContextResult =
 interface RequiredFlagQuestion {
   stableKey: string;
   isRequired: boolean;
+  type: string;
 }
 
 /**
@@ -146,17 +152,23 @@ interface RequiredFlagQuestion {
  */
 export async function resolveRestrictedImportContext(
   db: RestrictedContextDb,
+  instrument?: RestrictedInstrument,
 ): Promise<RestrictedImportContextResult> {
-  // ── Crosswalk lookup. A null here means the registry is missing the
-  //    SU-Full stub entirely — that can never legitimately happen (the stub
-  //    always exists, `locked:false` or not), so it's a code bug → 500. ─────
-  const crosswalk = getCrosswalkByTemplateAlias(SU_FULL_TEMPLATE_ALIAS);
+  // Wave X (D2): omitted instrument → the SU-Full entry, so every pre-Wave-X
+  // caller resolves byte-identically.
+  const resolvedInstrument =
+    instrument ?? getInstrumentByBatchKind("esperto-sufull-restricted-v1")!;
+
+  // ── Crosswalk lookup. A null here means the crosswalk registry is missing
+  //    the instrument's entry entirely — that can never legitimately happen
+  //    (stubs always exist, `locked:false` or not), so it's a code bug → 500. ─
+  const crosswalk = getCrosswalkByTemplateAlias(resolvedInstrument.templateAlias);
   if (!crosswalk) {
     return {
       ok: false,
       code: "CROSSWALK_NOT_FOUND",
       status: 500,
-      error: `No crosswalk registered for template alias "${SU_FULL_TEMPLATE_ALIAS}"`,
+      error: `No crosswalk registered for template alias "${resolvedInstrument.templateAlias}"`,
     };
   }
 
@@ -210,15 +222,14 @@ export async function resolveRestrictedImportContext(
     };
   }
 
-  // ── scorableStableKeys — derived from the FULL question list's `isRequired`
-  //    flag (the authoritative gate scoring.ts itself uses), NOT hardcoded to
-  //    "all SLIDER_LIKERT". Both SLIDER_LIKERT and qualitative question types
-  //    carry `isRequired` in scoring.ts's schemas. ───────────────────────────
+  // ── scorableStableKeys — derived from the FULL question list under the
+  //    instrument's completeness policy (Wave X D9). SU-Full/Rockefeller:
+  //    the `isRequired` filter (scoring.ts's own gate — Wave O byte-identical).
+  //    LVA: the SLIDER_LIKERT core set (the 16-factor matrix IS the
+  //    instrument; blank texts import as unanswered). ────────────────────────
   const fullQuestions =
     (publishedVersion.questions as unknown as RequiredFlagQuestion[]) ?? [];
-  const scorableStableKeys = fullQuestions
-    .filter((q) => q.isRequired === true)
-    .map((q) => q.stableKey);
+  const scorableStableKeys = completenessKeysFor(resolvedInstrument, fullQuestions);
 
   return {
     ok: true,

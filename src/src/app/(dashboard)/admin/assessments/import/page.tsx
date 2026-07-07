@@ -25,12 +25,14 @@ export const dynamic = "force-dynamic";
 
 import { EspertoImportClient } from "@/components/admin/esperto-import/EspertoImportClient";
 import { isEspertoSuFullImportEnabled } from "@/lib/assessments/wave-o-flags";
+import { isEspertoLvaRockImportEnabled } from "@/lib/assessments/wave-x-flags";
 
 export default function AdminEspertoImportPage() {
   // Global-only check (no per-org opts) — a deliberate Phase-1 simplification.
   // Per-org canary visibility for the Phase 2+ pilot rollout is a deferred
   // follow-on; see docs/specs/v7.6/18o-ops-runbook.md §3.
   const suFullImportEnabled = isEspertoSuFullImportEnabled();
+  const lvaRockImportEnabled = isEspertoLvaRockImportEnabled();
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -49,21 +51,39 @@ export default function AdminEspertoImportPage() {
         <p className="text-sm text-muted-foreground">
           Supported today:{" "}
           <span className="font-medium text-foreground">Members rosters</span>
-          {suFullImportEnabled ? ", " : " and "}
+          {", "}
           <span className="font-medium text-foreground">QSP-v2 results</span>
           {suFullImportEnabled ? (
             <>
-              , and{" "}
+              {", "}
               <span className="font-medium text-foreground">
-                Scaling Up Full (historical results)
+                Scaling Up Full (historical rounds)
               </span>
             </>
           ) : null}
-          . Other Esperto assessment types aren&apos;t available for import yet.
+          {lvaRockImportEnabled ? (
+            <>
+              {", "}
+              <span className="font-medium text-foreground">
+                Leadership Vision Alignment
+              </span>{" "}
+              and{" "}
+              <span className="font-medium text-foreground">
+                Rockefeller Habits Checklist
+              </span>{" "}
+              (historical rounds)
+            </>
+          ) : null}
+          . Other Esperto assessment types aren&apos;t available for import
+          yet. Historical rounds need the company&apos;s Members roster
+          imported first.
         </p>
       </header>
 
-      <EspertoImportClient suFullImportEnabled={suFullImportEnabled} />
+      <EspertoImportClient
+        suFullImportEnabled={suFullImportEnabled}
+        lvaRockImportEnabled={lvaRockImportEnabled}
+      />
     </div>
   );
 }

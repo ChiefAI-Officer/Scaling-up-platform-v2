@@ -83,6 +83,10 @@ export interface VersionQuestion {
   stableKey: string;
   type: string;
   scale?: { min: number; max: number };
+  /** MULTI_CHOICE only (Wave X D7) — the pinned version's option order is the index-decode target. */
+  options?: { key: string }[];
+  /** MULTI_CHOICE only — decode enforces this cap (never truncates silently). */
+  maxChoices?: number;
 }
 
 /**
@@ -117,6 +121,13 @@ export function validateCrosswalkAgainstVersion(
     if (entry.ourType === "SLIDER_LIKERT" && !vq.scale) {
       problems.push(
         `crosswalk stableKey "${entry.stableKey}" is SLIDER_LIKERT but the pinned version question has no scale`,
+      );
+    }
+    // Wave X (D7): a MULTI_CHOICE binding is only usable when the pinned
+    // version carries the option list the index decode targets.
+    if (entry.ourType === "MULTI_CHOICE" && !(vq.options && vq.options.length > 0)) {
+      problems.push(
+        `crosswalk stableKey "${entry.stableKey}" is MULTI_CHOICE but the pinned version question has no options`,
       );
     }
   }
