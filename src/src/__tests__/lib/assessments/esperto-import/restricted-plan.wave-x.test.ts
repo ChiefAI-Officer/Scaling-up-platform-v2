@@ -27,7 +27,12 @@ const mcCrosswalk: Crosswalk = {
   map: [
     { espertoKey: "Q16_1", stableKey: "S3_alpha", ourType: "SLIDER_LIKERT" },
     { espertoKey: "Q16_2", stableKey: "S3_beta", ourType: "SLIDER_LIKERT" },
-    { espertoKey: "Q16a", stableKey: "S4_picks", ourType: "MULTI_CHOICE" },
+    {
+      espertoKey: "Q16a",
+      stableKey: "S4_picks",
+      ourType: "MULTI_CHOICE",
+      optionOrder: ["alpha", "beta", "gamma"],
+    },
     { espertoKey: "Q17_1", stableKey: "S5_why_alpha", ourType: "TEXT" },
     { espertoKey: "Q17_2", stableKey: "S5_why_beta", ourType: "TEXT" },
   ],

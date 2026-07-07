@@ -41,7 +41,8 @@ decisions about how instruments differ:
   defeat the gate. `null` = no gate. Predeclared fallback: if the controlled verification export's
   `mat` differs from the historical sample's, `mat` is per-campaign/batch-scoped (unenumerable) and
   cannot key schema identity — the gate stays off for that instrument and schema drift falls to the
-  remaining tripwires (shape detector, exhaustiveness hard-fail, per-type value domains). SU-Full
+  remaining tripwires (shape detector, exhaustiveness hard-fail; answer VALUES are range-checked
+  only at commit-time scoring, not at plan time). SU-Full
   keeps `knownMats: null` (Wave O byte-identity; retrofit is a ledgered follow-on).
 - **`completeness` policy.** `"required-set"` (SU-Full, Rockefeller — scored; the `isRequired`
   filter, exactly Wave O's behavior) vs `"slider-core-set"` (LVA — qualitative; the SLIDER_LIKERT
@@ -54,14 +55,24 @@ decisions about how instruments differ:
   locks.
 - **`externalIdPrefix`.** Campaign idempotency namespace: `esperto:sufull:` / `esperto:lva:` /
   `esperto:rockhabits:` `<cid>:<roundLabelSlug>`. The by-externalId quarantine script is
-  prefix-agnostic by construction.
+  prefix-agnostic; its `--org` convenience mode targets SU-Full only (it resolves through the pin).
+- **`participatesInOrgCidPin`.** TRUE only for SU-Full. Esperto's `cid` proved per-assessment-
+  campaign, not per-company (the same company's LVA and Rockefeller exports carry different cids —
+  verified 2026-07-07), so the org-level `espertoSuFullCid` pin cannot extend to the new
+  instruments: sharing it false-refuses cross-instrument imports, and a first LVA/Rock import would
+  mispin the field and 409 every future SU-Full import. Their wrong-org protection is the explicit
+  target-org selection + the mid-resolution low-resolution block (`mid` IS person-stable across
+  instruments). The imported-campaign alias is likewise instrument-segmented
+  (`imported-<instrumentKey>-<cid>-<roundLabelSlug>`).
 - **Optional per-instrument consistency probe** (warn-only, never blocks): LVA's Q16a↔Q17
   correlation check.
 
 **Deliberately NOT per-instrument** (Codex C5, partial): version pinning (latest-published, one rule
 for all) and value coercion (type-driven; the Wave X MULTI_CHOICE index decode is a TYPE capability
-— comma-separated 1-based indices into the pinned version's option order — reusable by any future
-MC-bearing instrument, not an LVA special case).
+— comma-separated 1-based indices decoded against the CROSSWALK's pinned `optionOrder`, which the
+against-version validator holds set-equal to the version's option keys, so a later template-edit
+REORDER can never remap historical picks — reusable by any future MC-bearing instrument, not an LVA
+special case).
 
 ## Consequences
 

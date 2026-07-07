@@ -30,7 +30,16 @@ crosswalks, verification + lock, honest-framing UI, launch walk.
 Both files: `{reportid, date, name, tags, mat, cid, mid, raw, processed}` — classify.ts already detects
 `restricted-individual` (`mid`+`raw`+`processed`, no `group*` key). Same `mid` (member) on both files;
 `mat` differs per file (`AbOTKKmwk2` LVA / `bbEWkOQMMS` Rock) — evidently the assessment/instrument id.
-Verify that reading during build; `mat` is top-level metadata, not an answer key (never crosswalked).
+`mat` is top-level metadata, not an answer key (never crosswalked). **`cid` ALSO differs per file for
+the SAME company** (verified 2026-07-07 during the adversarial-review triage): Esperto's `cid` is
+per-assessment-campaign, NOT per-company. Consequences: the Wave O org-level cid pin
+(`Organization.espertoSuFullCid`) is UNSOUND for the new instruments (per-instrument pinning would
+still false-refuse a company's second round) — LVA/Rockefeller do not participate in the pin
+(registry `participatesInOrgCidPin:false`; wrong-org protection = explicit org selection +
+mid-resolution low-resolution block, and `mid` IS person-stable across instruments — same `mid` on
+both samples). **Ledgered Wave O question (§8): if two SU-Full rounds of one company also carry
+different cids, Wave O's own pin would 409 the second round — verify on the next real multi-round
+SU-Full import; NOT changed in this wave (byte-identity).**
 - **LVA raw = 71 keys**: `Q1_1` + `Q1a_2..9` (9 financials) · `Q8–Q15` (8 vision TEXTs) · `Q15A/Q15B`
   (empty in sample — identity unknown, likely conditional follow-ups) · `Q16_1..16` (16-factor matrix,
   values 1–3) · `Q16a` (pick-3 obstacles as comma 1-based indices, e.g. `"15,10,9"`) · `Q17_1..16`
@@ -320,6 +329,11 @@ data — confirming the folder-name caveat). Two findings the JSON alone could n
   `skippedArtifacts`, never written (Wave O rule, unchanged).
 - Group-report enablement questions for imported LVA rounds (alias allowlist + N-thresholds) — reports
   render by existing rules; no new report code in this wave.
+- **Wave O cid-pin multi-round question** — Esperto `cid` proved per-campaign (§2.1); if a company's
+  SU-Full rounds carry different cids, `espertoSuFullCid` 409s the second round. Verify against the
+  first real multi-round SU-Full import; the fix (if needed) is a Wave-O-side change, not Wave X.
+- **Per-instrument org provenance pin for LVA/Rockefeller** — needs a schema addition (JSON map or
+  per-instrument columns); deferred. Current protection: explicit org + mid-resolution block.
 - **Rockefeller group/team report** — Jeff's 2026-06-18 decision excluded it deliberately
   (wave-f-flags.ts); Esperto had a "Full Team" PDF, so if Jeff asks post-import, it's a NEW feature
   wave with that decision to revisit, not a Wave X omission.
@@ -371,3 +385,47 @@ data — confirming the folder-name caveat). Two findings the JSON alone could n
   spec error (the 0–3 scale IS Esperto-faithful; the "1–3 fidelity gap" ledger note was wrong and is
   removed) and decoded `count_achieved`; the LVA source workbook's question strings resolved the S6
   display order (its full fidelity audit lives in spec 18).
+
+## 10. Adversarial review record (2026-07-07, subagent survived — full report in the build session)
+
+12 findings; all dispositioned, fixes committed in-wave with regression tests:
+
+- **CRIT-1 (cid pin instrument-blind) — FIXED.** Triage first verified the ground truth: same
+  company's LVA/Rock cids DIFFER → Esperto `cid` is per-campaign. `RestrictedCommitCtx.pinOrgCid`
+  (registry `participatesInOrgCidPin`) scopes the mismatch refusal AND the pin write to SU-Full
+  only; an LVA/Rock import can neither be refused by nor corrupt `espertoSuFullCid`. Tests: pinned
+  org + pinOrgCid:false → created, zero org writes. Surfaced the LATENT WAVE O multi-round
+  question — ledgered (§8), not changed (byte-identity).
+- **HIGH-2 (alias hardcoded imported-sufull-) — FIXED.** Alias = `imported-<instrumentKey>-…`;
+  default "sufull" keeps Wave O byte-identical. Test asserts both.
+- **MED-3 (sparse anchorless file blocks the batch) — FIXED.** `detectBatchShape`: subset rule per
+  file, distinctive-anchor rule over the batch UNION — a sparse legitimate file rides along with
+  anchored siblings; an all-anchorless batch still rejects. Route 5b uses it. Tests cover both +
+  per-file foreign attribution.
+- **MED-4 (MC decode order pinned to latest-published options) — FIXED.** `CrosswalkEntry.optionOrder`
+  pins Esperto's index order in the crosswalk itself; the decode targets IT, and
+  `validateCrosswalkAgainstVersion` enforces set-equality with the version's option keys — a
+  version-edit reorder can never remap history; add/remove/rename fails loudly. Tests: order match
+  vs seed + set-inequality failure.
+- **MED-5 (quarantine script instrument-blind) — FIXED.** Redaction recognizes all `esperto:*`
+  prefixes; `--org` mode prints that it targets the SU-Full round ONLY (it resolves through the
+  SU-Full pin) and directs LVA/Rock quarantines to explicit `--externalId`.
+- **MED-6 (completeness vs future version drift — the PR #116 class) — FIXED.** Completeness keys
+  are intersected with crosswalk-mapped stableKeys in the resolver: a future version question
+  Esperto never asked cannot make history unimportable. Applies to ALL instruments (for SU-Full
+  this can only FIX latent breakage, never cause it — imports supply only mapped keys). The old
+  helper test asserting the un-intersected behavior was updated to assert the new rule.
+- **LOW-7 (locked message says SU-Full) — FIXED** (instrument-neutral message).
+- **LOW-8 (decode leniency edges) — FIXED.** Only string|number raw accepted (arrays/objects/bools
+  → malformed skip); interior empty tokens malformed; ONE trailing comma tolerated; echoed token
+  capped at 20 chars (also LOW-9).
+- **LOW-9 (skip detail echoes raw fragment) — MITIGATED** (20-char cap; response-only, never
+  persisted — reviewer verified manifest/audit/signals carry no raw values).
+- **LOW-10 (zod loosened for roster/results) — FIXED** (`batchKind` only valid for
+  kind:restrictedResults).
+- **LOW-11 (empty completeness set vacuously passes) — FIXED** (explicit `empty-completeness-set`
+  block; defense-in-depth).
+- **LOW-12 (UI copy visible while dark) — ACCEPTED AS INTENDED** (X-6 honest framing; the SU-Full
+  ENGINE path is delta-free — reviewer verified each byte-identity mechanism in code).
+- Reviewer also flagged the ADR's "per-type value domains" tripwire as overstated for the D8 case-b
+  world (values are range-checked only at commit-time scoring) — ADR corrected.

@@ -45,9 +45,11 @@ function argValue(flag: string): string | null {
 
 /** Redact the cid segment of an `esperto:sufull:<cid>:<slug>` externalId for display. */
 function redactExternalId(externalId: string): string {
-  const m = /^esperto:sufull:([^:]+):(.+)$/.exec(externalId);
+  // Wave X: recognizes every restricted-import instrument prefix
+  // (esperto:sufull / esperto:lva / esperto:rockhabits).
+  const m = /^(esperto:[a-z]+):([^:]+):(.+)$/.exec(externalId);
   if (!m) return "[unrecognized externalId shape]";
-  return `esperto:sufull:[redacted]:${m[2]}`;
+  return `${m[1]}:[redacted]:${m[3]}`;
 }
 
 async function resolveExternalId(): Promise<string> {
@@ -82,6 +84,14 @@ async function resolveExternalId(): Promise<string> {
     console.error(`Round label "${roundLabel}" is not a valid round label.`);
     process.exit(1);
   }
+  // Wave X: --org mode resolves through the org's pinned SU-Full cid, so it
+  // can ONLY ever target SU-Full rounds. LVA/Rockefeller rounds do not
+  // participate in the org cid pin (their Esperto cids are per-campaign) —
+  // quarantine those by explicit id: --externalId esperto:lva:<cid>:<slug>
+  // or --externalId esperto:rockhabits:<cid>:<slug>.
+  console.log(
+    "--org mode targets the SU-FULL round only; use --externalId for LVA/Rockefeller rounds.",
+  );
   return `esperto:sufull:${org.espertoSuFullCid}:${slug}`;
 }
 

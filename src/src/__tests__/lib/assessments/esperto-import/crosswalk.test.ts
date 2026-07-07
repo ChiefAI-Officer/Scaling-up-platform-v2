@@ -312,14 +312,38 @@ describe("lvaCrosswalk (Wave X)", () => {
     }
   });
 
-  it("Q16a is the single MULTI_CHOICE entry (index-decode target, D7)", () => {
+  it("Q16a is the single MULTI_CHOICE entry, with the pinned Esperto index order (D7/MED-4)", () => {
     const mc = lvaCrosswalk.map.filter((e) => e.ourType === "MULTI_CHOICE");
     expect(mc).toHaveLength(1);
-    expect(mc[0]).toEqual({
+    expect(mc[0]).toMatchObject({
       espertoKey: "Q16a",
       stableKey: "S4_biggest_obstacles",
       ourType: "MULTI_CHOICE",
     });
+    // The decode targets the CROSSWALK's order — a later version-edit that
+    // reorders options can never remap historical picks.
+    const content = buildLvaContent();
+    const s4 = content.questions.find((q) => q.stableKey === "S4_biggest_obstacles") as {
+      options: { key: string }[];
+    };
+    expect([...mc[0].optionOrder!]).toEqual(s4.options.map((o) => o.key));
+  });
+
+  it("version-compat FAILS when the version's option keys are not set-equal to the pinned optionOrder (MED-4)", () => {
+    const content = buildLvaContent();
+    const versionQuestions = content.questions.map((q) => ({
+      stableKey: q.stableKey,
+      type: q.type,
+      scale: (q as { scale?: { min: number; max: number } }).scale,
+      options:
+        q.stableKey === "S4_biggest_obstacles"
+          ? [{ key: "some_new_factor" }, ...(q as { options: { key: string }[] }).options.slice(1)]
+          : (q as { options?: { key: string }[] }).options,
+      maxChoices: (q as { maxChoices?: number }).maxChoices,
+    }));
+    const compat = validateCrosswalkAgainstVersion(lvaCrosswalk, versionQuestions);
+    expect(compat.ok).toBe(false);
+    expect(compat.problems.some((p) => p.includes("not set-equal"))).toBe(true);
   });
 
   it("drops exactly the 6 no-home keys with reasons (currency, Q15A/B, Q33, Q35/Q36)", () => {

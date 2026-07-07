@@ -30,12 +30,7 @@
 
 import { isEspertoSuFullImportEnabled } from "../wave-o-flags";
 import { isEspertoLvaRockImportEnabled } from "../wave-x-flags";
-import {
-  lvaCrosswalk,
-  rockefellerCrosswalk,
-  scalingUpFullCrosswalk,
-  type Crosswalk,
-} from "./crosswalks";
+import { getCrosswalkByTemplateAlias } from "./crosswalks";
 
 export interface RestrictedInstrument {
   instrumentKey: "sufull" | "lva" | "rockefeller";
@@ -53,6 +48,14 @@ export interface RestrictedInstrument {
   knownMats: readonly string[] | null;
   /** D9 — completeness-gate key derivation policy. */
   completeness: "required-set" | "slider-core-set";
+  /**
+   * Whether this instrument participates in the org-level Esperto cid pin
+   * (`Organization.espertoSuFullCid`). TRUE only for SU-Full — Esperto's cid
+   * is per-assessment-campaign, not per-company (same company's LVA + Rock
+   * samples carry different cids, verified 2026-07-07), so the shared pin
+   * would false-refuse or mispin for the new instruments.
+   */
+  participatesInOrgCidPin: boolean;
   /**
    * D3 — whether the route layer runs the shape-agreement check
    * (`detectShapeMatches`) on every file. FALSE for SU-Full: Wave O shipped
@@ -114,6 +117,7 @@ export const RESTRICTED_INSTRUMENTS: readonly RestrictedInstrument[] = [
     isEnabled: isEspertoSuFullImportEnabled,
     knownMats: null, // Wave O launched without a mat gate — byte-identical behavior.
     completeness: "required-set",
+    participatesInOrgCidPin: true, // Wave O behavior
     shapeChecked: false, // Wave O byte-identity — see field doc.
   },
   {
@@ -127,6 +131,7 @@ export const RESTRICTED_INSTRUMENTS: readonly RestrictedInstrument[] = [
     // against (predeclared decision rule — spec 19x D8).
     knownMats: null,
     completeness: "slider-core-set",
+    participatesInOrgCidPin: false, // cid is per-Esperto-campaign — see field doc
     shapeChecked: true,
     fileConsistencyWarning: lvaQ16aQ17ConsistencyWarning,
   },
@@ -139,6 +144,7 @@ export const RESTRICTED_INSTRUMENTS: readonly RestrictedInstrument[] = [
     isEnabled: isEspertoLvaRockImportEnabled,
     knownMats: null, // populated at lock time (D8)
     completeness: "required-set",
+    participatesInOrgCidPin: false, // cid is per-Esperto-campaign — see field doc
     shapeChecked: true,
   },
 ];
@@ -151,14 +157,11 @@ export function getInstrumentByBatchKind(batchKind: string): RestrictedInstrumen
 // D3 — shape detection, data-derived from the crosswalk registry
 // ────────────────────────────────────────────────────────────────────────
 
-const CROSSWALK_BY_ALIAS: Record<string, Crosswalk> = {
-  "scaling-up-full": scalingUpFullCrosswalk,
-  "leadership-vision-alignment": lvaCrosswalk,
-  RockHabits: rockefellerCrosswalk,
-};
-
 function universeOf(alias: string): Set<string> {
-  const cw = CROSSWALK_BY_ALIAS[alias];
+  // Resolved through the crosswalk registry itself — the universes can never
+  // drift from the mappings, and a future instrument only needs its
+  // crosswalk + registry entry (no second lookup table).
+  const cw = getCrosswalkByTemplateAlias(alias);
   const keys = new Set<string>();
   if (!cw) return keys;
   for (const e of cw.map) keys.add(e.espertoKey);
@@ -204,6 +207,56 @@ export function detectShapeMatches(
     return {
       ok: false,
       reason: `the file carries no key distinctive to ${instrument.uiLabel} — ambiguous shape (possibly a different instrument's export)`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Batch-level shape agreement (MED-3, adversarial review): the SUBSET rule is
+ * per-file (any foreign key names its file), but the DISTINCTIVE-ANCHOR rule
+ * runs over the UNION of the batch's keys — the batch as a whole proves the
+ * instrument identity, so a legitimately sparse file (Esperto omits empty
+ * keys per-key) rides along with its anchored siblings instead of blocking
+ * the round. A batch with NO anchor anywhere is still rejected (wrong-file
+ * signal).
+ */
+export function detectBatchShape(
+  instrument: Pick<RestrictedInstrument, "templateAlias" | "uiLabel">,
+  perFileKeys: string[][],
+): { ok: true } | { ok: false; errors: { index: number; reason: string }[] } {
+  const universe = universeOf(instrument.templateAlias);
+  const errors: { index: number; reason: string }[] = [];
+  const union = new Set<string>();
+  for (let i = 0; i < perFileKeys.length; i++) {
+    const keys = perFileKeys[i];
+    if (keys.length === 0) {
+      errors.push({ index: i, reason: "the file contains no answer keys" });
+      continue;
+    }
+    const foreign = keys.filter((k) => !universe.has(k));
+    if (foreign.length > 0) {
+      errors.push({
+        index: i,
+        reason: `${foreign.length} answer key(s) do not belong to ${instrument.uiLabel} (e.g. ${foreign
+          .slice(0, 3)
+          .join(", ")})`,
+      });
+      continue;
+    }
+    for (const k of keys) union.add(k);
+  }
+  if (errors.length > 0) return { ok: false, errors };
+  const distinctive = distinctiveOf(instrument.templateAlias);
+  if (![...union].some((k) => distinctive.has(k))) {
+    return {
+      ok: false,
+      errors: [
+        {
+          index: 0,
+          reason: `no file in the batch carries a key distinctive to ${instrument.uiLabel} — ambiguous shape (possibly a different instrument's export)`,
+        },
+      ],
     };
   }
   return { ok: true };

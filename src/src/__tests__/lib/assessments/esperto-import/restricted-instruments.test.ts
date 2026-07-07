@@ -10,6 +10,7 @@ import {
   RESTRICTED_INSTRUMENTS,
   getInstrumentByBatchKind,
   detectShapeMatches,
+  detectBatchShape,
   completenessKeysFor,
   checkMatAllowed,
 } from "@/lib/assessments/esperto-import/restricted-instruments";
@@ -148,6 +149,41 @@ describe("detectShapeMatches (D3 — data-derived universes + distinctive anchor
     const wrong = detectShapeMatches(lva(), keysOf("rock40"));
     expect(wrong.ok).toBe(false);
     if (!wrong.ok) expect(wrong.reason).toBeTruthy();
+  });
+});
+
+describe("detectBatchShape (MED-3 — anchor over the batch UNION)", () => {
+  const rock = () => getInstrumentByBatchKind("esperto-rockhabits-restricted-v1")!;
+
+  it("an anchorless sparse file rides along with an anchored sibling", () => {
+    const anchorless = keysOf("rock40").filter((k) => !/^Q[12]_/.test(k)); // 32 keys, no anchor
+    const anchored = keysOf("rock40");
+    expect(detectBatchShape(rock(), [anchorless, anchored]).ok).toBe(true);
+  });
+
+  it("a batch of ONLY anchorless files still rejects (wrong-file signal)", () => {
+    const anchorless = keysOf("rock40").filter((k) => !/^Q[12]_/.test(k));
+    const r = detectBatchShape(rock(), [anchorless, anchorless]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors[0].reason).toContain("distinctive");
+  });
+
+  it("a foreign key names its file index; sibling files do not mask it", () => {
+    const good = keysOf("rock40");
+    const foreign = [...keysOf("rock40").slice(0, 10), "Q16a"]; // LVA key
+    const r = detectBatchShape(rock(), [good, foreign]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.errors).toHaveLength(1);
+      expect(r.errors[0].index).toBe(1);
+      expect(r.errors[0].reason).toContain("do not belong");
+    }
+  });
+
+  it("registry pin participation: SU-Full true, LVA/Rock false (Esperto cid is per-campaign)", () => {
+    expect(getInstrumentByBatchKind("esperto-sufull-restricted-v1")!.participatesInOrgCidPin).toBe(true);
+    expect(getInstrumentByBatchKind("esperto-lva-restricted-v1")!.participatesInOrgCidPin).toBe(false);
+    expect(getInstrumentByBatchKind("esperto-rockhabits-restricted-v1")!.participatesInOrgCidPin).toBe(false);
   });
 });
 

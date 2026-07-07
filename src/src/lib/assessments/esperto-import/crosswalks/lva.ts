@@ -111,7 +111,14 @@ function buildMap(): CrosswalkEntry[] {
       ourType: "SLIDER_LIKERT",
     });
   }
-  map.push({ espertoKey: "Q16a", stableKey: "S4_biggest_obstacles", ourType: "MULTI_CHOICE" });
+  map.push({
+    espertoKey: "Q16a",
+    stableKey: "S4_biggest_obstacles",
+    ourType: "MULTI_CHOICE",
+    // Esperto's 1-based pick indices decode against THIS order (D7/MED-4) —
+    // pinned here so a future version-edit reorder can never remap history.
+    optionOrder: LVA_FACTOR_ORDER,
+  });
   for (let n = 1; n <= 16; n++) {
     map.push({
       espertoKey: `Q17_${n}`,

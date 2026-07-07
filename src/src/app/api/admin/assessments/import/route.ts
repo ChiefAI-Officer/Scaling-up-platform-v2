@@ -89,7 +89,7 @@ import {
 } from "@/lib/assessments/esperto-import/alert-signals";
 import {
   checkMatAllowed,
-  detectShapeMatches,
+  detectBatchShape,
   getInstrumentByBatchKind,
   type RestrictedInstrument,
 } from "@/lib/assessments/esperto-import/restricted-instruments";
@@ -167,6 +167,10 @@ const importBodySchema = z
       path: ["batchKind"],
     },
   )
+  .refine((b) => b.batchKind === undefined || b.kind === "restrictedResults", {
+    message: "batchKind is only valid for kind:restrictedResults",
+    path: ["batchKind"],
+  })
   .refine((b) => b.kind !== "restrictedResults" || !!b.roundLabel, {
     message: "roundLabel is required for kind:restrictedResults",
     path: ["roundLabel"],
@@ -749,16 +753,17 @@ async function handleRestrictedResultsImport(
   //    exhaustiveness guard already hard-fails foreign keys) and the D8 `mat`
   //    schema-identity gate (no-op while knownMats is null). ─────────────────
   const instrumentGuardErrors: { index: number; reason: string }[] = [];
+  if (instrument.shapeChecked) {
+    // Subset rule per file; distinctive-anchor rule over the batch UNION —
+    // a legitimately sparse file rides along with its anchored siblings.
+    const shape = detectBatchShape(
+      instrument,
+      parsedFiles.map((f) => Object.keys(f.raw)),
+    );
+    if (!shape.ok) instrumentGuardErrors.push(...shape.errors);
+  }
   for (let i = 0; i < parsedFiles.length; i++) {
-    const f = parsedFiles[i];
-    if (instrument.shapeChecked) {
-      const shape = detectShapeMatches(instrument, Object.keys(f.raw));
-      if (!shape.ok) {
-        instrumentGuardErrors.push({ index: i, reason: shape.reason });
-        continue;
-      }
-    }
-    const mat = checkMatAllowed(instrument, f.mat);
+    const mat = checkMatAllowed(instrument, parsedFiles[i].mat);
     if (!mat.ok) instrumentGuardErrors.push({ index: i, reason: mat.reason });
   }
   if (instrumentGuardErrors.length > 0) {
@@ -889,6 +894,8 @@ async function handleRestrictedResultsImport(
     createdByUserId: actor.userId,
     previewResolvedVersionId: expectedVersionId,
     commitResolvedVersionId: freshCtxResult.publishedVersion.id,
+    instrumentKey: instrument.instrumentKey,
+    pinOrgCid: instrument.participatesInOrgCidPin,
     versionForScoringForNewCampaign: {
       questions: publishedVersion.questions,
       sections: publishedVersion.sections,

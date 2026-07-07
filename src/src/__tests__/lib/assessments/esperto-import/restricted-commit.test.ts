@@ -548,6 +548,50 @@ describe("commitRestrictedImport — in-transaction refusals", () => {
     // Already pinned — should NOT re-write it.
     expect(db.orgUpdates).toHaveLength(0);
   });
+
+  // ── Wave X (adversarial CRIT-1/HIGH-2): non-pin instruments ──────────────
+  it("pinOrgCid:false — a DIFFERENT pinned cid does NOT refuse, and the pin is NEVER written (LVA/Rock: Esperto cids are per-campaign)", async () => {
+    const db = makeFakeDbWithAccess();
+    db.seedOrg("org-1", "cidSUFULL_ALREADY_PINNED");
+    const result = await commitRestrictedImport(
+      db,
+      basePlan(),
+      baseCtx({ instrumentKey: "lva", pinOrgCid: false }),
+      actor,
+    );
+    expect(result.kind).toBe("created");
+    // The SU-Full pin must be untouched — an LVA import mispinning
+    // espertoSuFullCid would 409 every future SU-Full import.
+    expect(db.orgUpdates).toHaveLength(0);
+  });
+
+  it("pinOrgCid:false on a fresh org — still no pin write", async () => {
+    const db = makeFakeDbWithAccess();
+    db.seedOrg("org-1", null);
+    const result = await commitRestrictedImport(
+      db,
+      basePlan(),
+      baseCtx({ instrumentKey: "rockefeller", pinOrgCid: false }),
+      actor,
+    );
+    expect(result.kind).toBe("created");
+    expect(db.orgUpdates).toHaveLength(0);
+  });
+
+  it("the imported-campaign alias carries the instrument key (default sufull — Wave O byte-identity)", async () => {
+    const dbDefault = makeFakeDbWithAccess();
+    await commitRestrictedImport(dbDefault, basePlan(), baseCtx(), actor);
+    expect(dbDefault.campaignCreates[0].data.alias).toMatch(/^imported-sufull-/);
+
+    const dbLva = makeFakeDbWithAccess();
+    await commitRestrictedImport(
+      dbLva,
+      basePlan(),
+      baseCtx({ instrumentKey: "lva", pinOrgCid: false }),
+      actor,
+    );
+    expect(dbLva.campaignCreates[0].data.alias).toMatch(/^imported-lva-/);
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────

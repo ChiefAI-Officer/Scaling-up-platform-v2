@@ -229,7 +229,15 @@ export async function resolveRestrictedImportContext(
   //    instrument; blank texts import as unanswered). ────────────────────────
   const fullQuestions =
     (publishedVersion.questions as unknown as RequiredFlagQuestion[]) ?? [];
-  const scorableStableKeys = completenessKeysFor(resolvedInstrument, fullQuestions);
+  // INTERSECTED with the crosswalk-mapped stableKeys (adversarial MED-6 — the
+  // Wave O PR #116 failure class): a future published version that adds a
+  // required/slider question Esperto never asked must not make every
+  // historical respondent "incomplete" — an import can only ever supply
+  // mapped keys, so only mapped keys may gate completeness.
+  const mappedStableKeys = new Set(crosswalk.map.map((e) => e.stableKey));
+  const scorableStableKeys = completenessKeysFor(resolvedInstrument, fullQuestions).filter(
+    (k) => mappedStableKeys.has(k),
+  );
 
   return {
     ok: true,
