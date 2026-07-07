@@ -27,11 +27,12 @@
  *  - S6: Q20 (NUMBER, sample value 100) → S6_rehire_pct; Q21..Q30 + Q29a →
  *    positional through S6_priority_quarter (sample semantics all corroborate;
  *    note Q29a = priority_year sits BETWEEN Q29 and Q30).
- *  - S6 PROVISIONAL TAIL (verification family V3 — Esperto's tail numbering
- *    does NOT follow the form's display order): Q31 → constructive_discussions
- *    ("yes, things." = yes+explain), Q32 → add_leadership_position ("sales"),
- *    Q34 → dept_kpis ("calls, conversions, mrr" = three KPIs). Q33 has no
- *    seed home. The D4 controlled submission settles V3 before lock.
+ *  - S6 TAIL (verification family V3 — CONFIRMED live 2026-07-07 via the D4
+ *    controlled submission's self-identifying markers): Q31 →
+ *    constructive_discussions, Q32 → add_leadership_position, Q34 → dept_kpis.
+ *    Q33 is empty in the current form version → droppedKeys, never mapped.
+ *    (Q35/Q36 do not exist in the current LeadVision form; kept in droppedKeys
+ *    for the xlsx-union sample shape — see §2.1.)
  *
  * droppedKeys: currency (S1 context; no platform question), Q15A/Q15B
  * (empty in the sample; likely conditional follow-ups — identities recorded
@@ -42,8 +43,12 @@
  * `espertoVariant` stays null DELIBERATELY (report-kind path must keep
  * refusing; restricted exports carry no variant).
  *
- * `locked: false` until the D4 controlled verification submission resolves
- * V1–V3 (19x run-sheet; golden-fixture CI gate per Codex C4).
+ * `locked: true` (2026-07-07): the D4 controlled verification submission
+ * resolved V1–V3 exactly — financials positional (11..99), Q16a "1,10,16"
+ * decoded to recruitment/sales/growth_financing matching the non-empty Q17
+ * why-texts, and every S6-tail marker named its mapped question. Golden
+ * fixture `fixtures/wavex-lva-golden.json`. `mat` is per-participant (D8
+ * case-b) → registry knownMats stays null.
  */
 
 import type { Crosswalk, CrosswalkEntry } from "./types";
@@ -160,7 +165,7 @@ function buildMap(): CrosswalkEntry[] {
 export const lvaCrosswalk: Crosswalk = {
   templateAlias: "leadership-vision-alignment",
   espertoVariant: null,
-  locked: false,
+  locked: true,
   map: buildMap(),
   droppedKeys: [
     { key: "currency", reason: "S1 financial-context currency selector — no platform question; amounts import as entered" },

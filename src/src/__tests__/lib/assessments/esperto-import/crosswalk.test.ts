@@ -133,13 +133,13 @@ describe("crosswalk registry", () => {
     expect(getCrosswalkByTemplateAlias("nope-not-an-alias")).toBeNull();
   });
 
-  it("registers Rockefeller + LVA as AUTHORED but locked:false (Wave X — lock gated on D4 verification)", () => {
-    expect(rockefellerCrosswalk.locked).toBe(false);
+  it("registers Rockefeller + LVA as authored + LOCKED (Wave X — D4 verification complete 2026-07-07)", () => {
+    expect(rockefellerCrosswalk.locked).toBe(true);
     expect(rockefellerCrosswalk.map).toHaveLength(40);
     expect(rockefellerCrosswalk.templateAlias).toBe("RockHabits");
 
-    expect(lvaCrosswalk.locked).toBe(false);
-    expect(lvaCrosswalk.map.length).toBeGreaterThan(0);
+    expect(lvaCrosswalk.locked).toBe(true);
+    expect(lvaCrosswalk.map).toHaveLength(67);
     expect(lvaCrosswalk.templateAlias).toBe("leadership-vision-alignment");
   });
 

@@ -70,42 +70,18 @@ describe("buildResultsImportPlan — locked gate (§7)", () => {
     expect(plan.skips).toEqual([]);
   });
 
-  // Gap-test only (no new implementation code) — locks in TODAY's behavior that
-  // Rockefeller ("RockHabits") and LVA ("leadership-vision-alignment") are stub
-  // crosswalks shipped with `locked: false`, so any results-import attempt using
-  // either of them is refused by the SAME locked-gate the QSP path exercises
-  // above. This is a real behavior gap (no Rockefeller/LVA results-import is
-  // possible today), not a design choice made in this test.
-  it("refuses the Rockefeller stub crosswalk (locked:false): crosswalk-not-locked, no campaigns", () => {
-    expect(rockefellerCrosswalk.locked).toBe(false);
-    const plan = buildResultsImportPlan({
-      parsedReport: loadReport(),
-      crosswalk: rockefellerCrosswalk,
-      targetOrgId: TARGET_ORG,
-      respondents: fullRoster(),
-    });
-
-    expect(plan.campaigns).toHaveLength(0);
-    expect(plan.blocks).toEqual([
-      { reason: "crosswalk-not-locked", detail: rockefellerCrosswalk.templateAlias },
-    ]);
-    expect(plan.skips).toEqual([]);
-  });
-
-  it("refuses the LVA stub crosswalk (locked:false): crosswalk-not-locked, no campaigns", () => {
-    expect(lvaCrosswalk.locked).toBe(false);
-    const plan = buildResultsImportPlan({
-      parsedReport: loadReport(),
-      crosswalk: lvaCrosswalk,
-      targetOrgId: TARGET_ORG,
-      respondents: fullRoster(),
-    });
-
-    expect(plan.campaigns).toHaveLength(0);
-    expect(plan.blocks).toEqual([
-      { reason: "crosswalk-not-locked", detail: lvaCrosswalk.templateAlias },
-    ]);
-    expect(plan.skips).toEqual([]);
+  // Wave X: Rockefeller + LVA are now LOCKED (D4 verification complete), but
+  // they are RESTRICTED-only crosswalks (espertoVariant: null). The report-kind
+  // path selects a crosswalk by the report's self-identifying `variant`, so it
+  // can NEVER reach these — the durable guarantee that a Rockefeller/LVA report
+  // import is impossible is their null variant, not their lock state. (The
+  // restricted-import path selects them by template alias instead.)
+  it("Rockefeller + LVA are restricted-only: null espertoVariant keeps them off the report-kind path", () => {
+    expect(rockefellerCrosswalk.espertoVariant).toBeNull();
+    expect(lvaCrosswalk.espertoVariant).toBeNull();
+    // Both are locked now — the report path's exclusion is structural, not lock-based.
+    expect(rockefellerCrosswalk.locked).toBe(true);
+    expect(lvaCrosswalk.locked).toBe(true);
   });
 });
 
