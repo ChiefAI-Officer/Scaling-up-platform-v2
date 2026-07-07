@@ -832,6 +832,10 @@ describe("POST /api/admin/assessments/import — restrictedResults (Wave X instr
     const body = await res.json();
     const reasons = body.data.summary.blocks.map((b: { reason: string }) => b.reason);
     expect(reasons).not.toContain("crosswalk-locked");
+    // The empty mock version trips the empty-completeness-set guard instead —
+    // the correct downstream block for a version with no scorables; no creates.
+    expect(reasons).toContain("empty-completeness-set");
+    expect(body.data.summary.creates).toBe(0);
   });
 
   it("D3 shape guard: Rockefeller-shaped file under the LVA batchKind → 400", async () => {

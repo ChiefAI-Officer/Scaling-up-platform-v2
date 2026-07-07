@@ -136,7 +136,7 @@ function buildMap(): CrosswalkEntry[] {
   map.push({ espertoKey: "Q18", stableKey: "S5_other_factor", ourType: "TEXT" });
   map.push({ espertoKey: "Q19", stableKey: "S5_change_one_thing", ourType: "TEXT" });
 
-  // S6 focus block — Q20..Q30 + Q29a positional; V3 provisional tail.
+  // S6 focus block — Q20..Q30 + Q29a positional; V3 confirmed tail.
   map.push({ espertoKey: "Q20", stableKey: "S6_rehire_pct", ourType: "NUMBER" });
   const s6Text: Array<[string, string]> = [
     ["Q21", "S6_bhag"],
@@ -150,7 +150,8 @@ function buildMap(): CrosswalkEntry[] {
     ["Q29", "S6_priority_org"],
     ["Q29a", "S6_priority_year"],
     ["Q30", "S6_priority_quarter"],
-    // V3 PROVISIONAL — settled by the D4 controlled submission before lock:
+    // V3 tail — CONFIRMED by the D4 controlled submission 2026-07-07 (see
+    // header + fixtures/wavex-lva-golden.json):
     ["Q31", "S6_constructive_discussions"],
     ["Q32", "S6_add_leadership_position"],
     ["Q34", "S6_dept_kpis"],

@@ -850,10 +850,12 @@ describe("POST /api/assessments/import — restrictedResults (Wave X instruments
     const body = await res.json();
     // The crosswalk is now locked:true, so the lock gate no longer blocks —
     // this proves the D4 lock flip took effect end-to-end through the route.
-    // (The empty mock version then trips the empty-completeness-set guard,
-    // which is the correct downstream behavior for a version with no scorables.)
+    // The empty mock version then trips the empty-completeness-set guard,
+    // which is the correct downstream behavior for a version with no scorables.
     const reasons = body.data.summary.blocks.map((b: { reason: string }) => b.reason);
     expect(reasons).not.toContain("crosswalk-locked");
+    expect(reasons).toContain("empty-completeness-set");
+    expect(body.data.summary.creates).toBe(0);
   });
 
   it("D3 shape guard: a Rockefeller-shaped file under the LVA batchKind → 400 wrong-instrument, nothing written", async () => {
