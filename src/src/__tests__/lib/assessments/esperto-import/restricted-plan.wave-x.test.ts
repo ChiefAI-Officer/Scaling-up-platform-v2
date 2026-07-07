@@ -150,3 +150,35 @@ describe("PII: the export `name` field never reaches the plan output", () => {
     expect(JSON.stringify(plan)).not.toContain("SENSITIVE-PERSON-NAME");
   });
 });
+
+describe("plan-time value validation (invalid-answer-value skip)", () => {
+  // Reuse the MC crosswalk's slider entries (S3_alpha/beta, scale 1..3).
+  it("an out-of-range slider value skips THAT respondent, others import", () => {
+    const bad = file("BAD", "1");
+    bad.raw.Q16_1 = 9; // S3_alpha slider, scale max 3
+    const plan = buildRestrictedImportPlan(input([bad, file("OK", "2")]));
+    expect(plan.blocks).toEqual([]);
+    expect(plan.skips).toHaveLength(1);
+    expect(plan.skips[0]).toMatchObject({ mid: "BAD", reason: "invalid-answer-value" });
+    expect(plan.skips[0].detail).toContain("S3_alpha");
+    expect(plan.campaign!.rows).toHaveLength(1);
+    expect(plan.campaign!.rows[0].mid).toBe("OK");
+  });
+
+  it("a non-numeric slider value skips with invalid-answer-value", () => {
+    const bad = file("BAD", "1");
+    bad.raw.Q16_2 = "not-a-number"; // S3_beta slider
+    const plan = buildRestrictedImportPlan(input([bad]));
+    expect(plan.skips).toHaveLength(1);
+    expect(plan.skips[0].reason).toBe("invalid-answer-value");
+    // TEXT content is never echoed, but the marker/reason is safe.
+    expect(plan.skips[0].detail).toContain("S3_beta");
+  });
+
+  it("a valid in-range slider set imports cleanly (no false positives)", () => {
+    const plan = buildRestrictedImportPlan(input([file("OK", "2")]));
+    expect(plan.skips).toEqual([]);
+    expect(plan.blocks).toEqual([]);
+    expect(plan.campaign!.rows).toHaveLength(1);
+  });
+});
