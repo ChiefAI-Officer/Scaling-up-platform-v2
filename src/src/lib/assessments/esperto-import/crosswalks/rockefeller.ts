@@ -21,9 +21,14 @@
  * `variant`, and the report-kind import path (which matches by variant) has
  * never been verified for Rockefeller — it must keep refusing.
  *
- * `locked: false` until the D4 controlled verification submission proves
- * within-section row order live (19x run-sheet; golden-fixture CI gate per
- * Codex C4). Flip to true ONLY with that fixture in the same commit.
+ * `locked: true` (2026-07-07): the D4 controlled verification submission
+ * proved within-section row order live — all 40 raw values equalled the
+ * designed (s+j)%4 pattern and recompute reproduced the totals. Golden
+ * fixture `fixtures/wavex-rock-golden.json` (crosswalk-golden.wave-x.test.ts).
+ * NOTE the export's `mat` is a per-participant token, NOT a per-instrument
+ * schema id (verified: LVA + Rock submissions carry different mats), so the
+ * registry's `knownMats` stays null — schema-drift protection falls to the
+ * shape detector + exhaustiveness guard (spec 19x D8 case-b).
  */
 
 import type { Crosswalk, CrosswalkEntry } from "./types";
@@ -42,7 +47,7 @@ function buildIdentityMap(): CrosswalkEntry[] {
 export const rockefellerCrosswalk: Crosswalk = {
   templateAlias: "RockHabits",
   espertoVariant: null,
-  locked: false,
+  locked: true,
   map: buildIdentityMap(),
   droppedKeys: [],
 };

@@ -843,15 +843,17 @@ describe("POST /api/assessments/import — restrictedResults (Wave X instruments
     expect(res.status).toBe(404);
   });
 
-  it("with Wave X ON, an LVA batch reaches the plan and is refused by crosswalk-locked (import refused until D4 lock)", async () => {
+  it("with Wave X ON, an LVA batch reaches the plan (crosswalk LOCKED post-D4 — no crosswalk-locked block)", async () => {
     (isEspertoLvaRockImportEnabled as jest.Mock).mockReturnValue(true);
     const res = await POST(req(lvaBody()));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.data.summary.creates).toBe(0);
-    expect(body.data.summary.blocks.map((b: { reason: string }) => b.reason)).toContain(
-      "crosswalk-locked",
-    );
+    // The crosswalk is now locked:true, so the lock gate no longer blocks —
+    // this proves the D4 lock flip took effect end-to-end through the route.
+    // (The empty mock version then trips the empty-completeness-set guard,
+    // which is the correct downstream behavior for a version with no scorables.)
+    const reasons = body.data.summary.blocks.map((b: { reason: string }) => b.reason);
+    expect(reasons).not.toContain("crosswalk-locked");
   });
 
   it("D3 shape guard: a Rockefeller-shaped file under the LVA batchKind → 400 wrong-instrument, nothing written", async () => {

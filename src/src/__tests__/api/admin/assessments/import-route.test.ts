@@ -825,14 +825,13 @@ describe("POST /api/admin/assessments/import — restrictedResults (Wave X instr
     expect(res.status).toBe(404);
   });
 
-  it("with Wave X ON, the LVA batch is refused by crosswalk-locked (until D4 lock)", async () => {
+  it("with Wave X ON, the LVA batch reaches the plan (crosswalk LOCKED post-D4 — no crosswalk-locked block)", async () => {
     (isEspertoLvaRockImportEnabled as jest.Mock).mockReturnValue(true);
     const res = await POST(req(lvaBody()));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.data.summary.blocks.map((b: { reason: string }) => b.reason)).toContain(
-      "crosswalk-locked",
-    );
+    const reasons = body.data.summary.blocks.map((b: { reason: string }) => b.reason);
+    expect(reasons).not.toContain("crosswalk-locked");
   });
 
   it("D3 shape guard: Rockefeller-shaped file under the LVA batchKind → 400", async () => {
