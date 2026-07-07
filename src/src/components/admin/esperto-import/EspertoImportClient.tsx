@@ -190,9 +190,12 @@ function restrictedCommitErrorMessage(json: {
 export function EspertoImportClient({
   variant = "admin",
   suFullImportEnabled = false,
+  lvaRockImportEnabled = false,
 }: {
   variant?: EspertoImportVariant;
   suFullImportEnabled?: boolean;
+  /** Wave X — unlocks the LVA + Rockefeller instrument options. */
+  lvaRockImportEnabled?: boolean;
 } = {}) {
   const isCoach = variant === "coach";
   const apiPath = isCoach
@@ -213,7 +216,35 @@ export function EspertoImportClient({
   const [ownerCoachId, setOwnerCoachId] = useState<string>("");
   const [companyName, setCompanyName] = useState<string>("");
 
-  // ── restrictedResults-only fields (Wave O SU-Full) ─────────────────────
+  // ── restrictedResults-only fields (Wave O SU-Full + Wave X LVA/Rock) ───
+  // Instrument selection (Wave X D3): the option list is exactly the
+  // flag-enabled instruments; the choice drives the request's batchKind.
+  const instrumentOptions: { batchKind: string; label: string; note: string }[] = [
+    ...(suFullImportEnabled
+      ? [{
+          batchKind: "esperto-sufull-restricted-v1",
+          label: "Scaling Up Full",
+          note: "Scored — renders full scored reports and feeds longitudinal.",
+        }]
+      : []),
+    ...(lvaRockImportEnabled
+      ? [
+          {
+            batchKind: "esperto-lva-restricted-v1",
+            label: "Leadership Vision Alignment",
+            note: "Qualitative — renders the LVA report (no scores).",
+          },
+          {
+            batchKind: "esperto-rockhabits-restricted-v1",
+            label: "Rockefeller Habits Checklist",
+            note: "Scored — renders per-respondent scored reports.",
+          },
+        ]
+      : []),
+  ];
+  const [instrumentBatchKind, setInstrumentBatchKind] = useState<string>("");
+  const selectedInstrumentBatchKind =
+    instrumentBatchKind || instrumentOptions[0]?.batchKind || "";
   const [roundLabel, setRoundLabel] = useState<string>("");
   const [targetOrgId, setTargetOrgId] = useState<string>("");
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -451,7 +482,7 @@ export function EspertoImportClient({
       const body: Record<string, unknown> = {
         mode,
         kind,
-        batchKind: "esperto-sufull-restricted-v1",
+        batchKind: selectedInstrumentBatchKind,
         roundLabel: roundLabel.trim(),
         targetOrgId,
         files: restrictedFiles.map((f) => f.payload),
@@ -620,12 +651,12 @@ export function EspertoImportClient({
             >
               Results (past answers)
             </ModeButton>
-            {suFullImportEnabled ? (
+            {suFullImportEnabled || lvaRockImportEnabled ? (
               <ModeButton
                 active={kind === "restrictedResults"}
                 onClick={() => switchKind("restrictedResults")}
               >
-                SU-Full (historical)
+                Historical rounds
               </ModeButton>
             ) : null}
           </div>
@@ -654,6 +685,44 @@ export function EspertoImportClient({
         <CardContent className="space-y-5">
           {kind === "restrictedResults" ? (
             <>
+              <div className="space-y-2">
+                <Label>Assessment</Label>
+                <div
+                  role="radiogroup"
+                  aria-label="Historical assessment instrument"
+                  className="space-y-1"
+                >
+                  {instrumentOptions.map((opt) => (
+                    <label
+                      key={opt.batchKind}
+                      className="flex cursor-pointer items-start gap-2 rounded-md border border-border p-2 text-sm has-[:checked]:border-primary"
+                    >
+                      <input
+                        type="radio"
+                        name="import-instrument"
+                        value={opt.batchKind}
+                        checked={selectedInstrumentBatchKind === opt.batchKind}
+                        onChange={() => {
+                          setInstrumentBatchKind(opt.batchKind);
+                          resetResults();
+                        }}
+                        className="mt-0.5"
+                      />
+                      <span>
+                        <span className="font-medium">{opt.label}</span>
+                        <span className="block text-xs text-muted-foreground">{opt.note}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  One instrument per batch — the files must all be restricted
+                  individual exports of this assessment. Import the
+                  company&apos;s Members roster first; results only attach to
+                  people already on the roster.
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="round-label">Round label</Label>
                 <Input

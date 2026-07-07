@@ -41,8 +41,8 @@ import type { EspertoReport, EspertoReportRow } from "./types";
 /** One reconstructed answer — mirrors the live submit route's `{stableKey, value}`. */
 export interface ResultsAnswer {
   stableKey: string;
-  /** number for SLIDER_LIKERT/NUMBER, string for TEXT. */
-  value: number | string;
+  /** number for SLIDER_LIKERT/NUMBER, string for TEXT, string[] of option keys for MULTI_CHOICE (Wave X D7). */
+  value: number | string | string[];
 }
 
 /** One reconstructed submission row (one resolved respondent within a campaign). */

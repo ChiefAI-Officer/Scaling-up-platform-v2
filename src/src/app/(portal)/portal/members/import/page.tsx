@@ -25,6 +25,7 @@ import { requireCoach } from "@/lib/auth/authorization";
 import { FadeUp } from "@/components/ui/animated";
 import { EspertoImportClient } from "@/components/admin/esperto-import/EspertoImportClient";
 import { isEspertoSuFullImportEnabled } from "@/lib/assessments/wave-o-flags";
+import { isEspertoLvaRockImportEnabled } from "@/lib/assessments/wave-x-flags";
 
 export default async function CoachEspertoImportPage() {
   await requireCoach();
@@ -33,6 +34,7 @@ export default async function CoachEspertoImportPage() {
   // Per-org canary visibility for the Phase 2+ pilot rollout is a deferred
   // follow-on; see docs/specs/v7.6/18o-ops-runbook.md §3.
   const suFullImportEnabled = isEspertoSuFullImportEnabled();
+  const lvaRockImportEnabled = isEspertoLvaRockImportEnabled();
 
   return (
     <div className="space-y-6">
@@ -56,18 +58,24 @@ export default async function CoachEspertoImportPage() {
             Teams.
           </p>
           <p className="text-muted-foreground">
-            Supported today: Members rosters
-            {suFullImportEnabled
-              ? ", QSP-v2 results, and Scaling Up Full (historical results)"
-              : " and QSP-v2 results"}
+            Supported today: Members rosters, QSP-v2 results
+            {suFullImportEnabled ? ", Scaling Up Full (historical rounds)" : ""}
+            {lvaRockImportEnabled
+              ? ", Leadership Vision Alignment and Rockefeller Habits Checklist (historical rounds)"
+              : ""}
             . Other Esperto assessment types aren&apos;t available for import
-            yet.
+            yet. Historical rounds need the company&apos;s Members roster
+            imported first.
           </p>
         </div>
       </FadeUp>
 
       <FadeUp delay={0.1}>
-        <EspertoImportClient variant="coach" suFullImportEnabled={suFullImportEnabled} />
+        <EspertoImportClient
+          variant="coach"
+          suFullImportEnabled={suFullImportEnabled}
+          lvaRockImportEnabled={lvaRockImportEnabled}
+        />
       </FadeUp>
     </div>
   );

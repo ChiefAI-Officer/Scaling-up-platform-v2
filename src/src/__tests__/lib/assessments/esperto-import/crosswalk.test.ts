@@ -21,6 +21,9 @@ import { qspV2Crosswalk } from "../../../../lib/assessments/esperto-import/cross
 import { rockefellerCrosswalk } from "../../../../lib/assessments/esperto-import/crosswalks/rockefeller";
 import { lvaCrosswalk } from "../../../../lib/assessments/esperto-import/crosswalks/lva";
 import { scalingUpFullCrosswalk } from "../../../../lib/assessments/esperto-import/crosswalks/scaling-up-full";
+import { buildRockefellerContent } from "../../../../../prisma/seed-rockefeller-assessment";
+import { scoreSubmission } from "../../../../lib/assessments/scoring";
+import { buildLvaContent } from "../../../../../prisma/seed-lva-assessment";
 import {
   getCrosswalkByVariant,
   getCrosswalkByTemplateAlias,
@@ -130,21 +133,224 @@ describe("crosswalk registry", () => {
     expect(getCrosswalkByTemplateAlias("nope-not-an-alias")).toBeNull();
   });
 
-  it("registers Rockefeller + LVA as locked:false stubs with empty maps", () => {
+  it("registers Rockefeller + LVA as AUTHORED but locked:false (Wave X — lock gated on D4 verification)", () => {
     expect(rockefellerCrosswalk.locked).toBe(false);
-    expect(rockefellerCrosswalk.map).toEqual([]);
-    expect(rockefellerCrosswalk.droppedKeys).toEqual([]);
+    expect(rockefellerCrosswalk.map).toHaveLength(40);
     expect(rockefellerCrosswalk.templateAlias).toBe("RockHabits");
 
     expect(lvaCrosswalk.locked).toBe(false);
-    expect(lvaCrosswalk.map).toEqual([]);
-    expect(lvaCrosswalk.droppedKeys).toEqual([]);
+    expect(lvaCrosswalk.map.length).toBeGreaterThan(0);
     expect(lvaCrosswalk.templateAlias).toBe("leadership-vision-alignment");
   });
 
-  it("resolves the Rockefeller + LVA stubs by alias", () => {
+  it("resolves the Rockefeller + LVA crosswalks by alias", () => {
     expect(getCrosswalkByTemplateAlias("RockHabits")).toBe(rockefellerCrosswalk);
     expect(getCrosswalkByTemplateAlias("leadership-vision-alignment")).toBe(lvaCrosswalk);
+  });
+
+  it("keeps Rockefeller + LVA OUT of the report-kind variant path (espertoVariant null)", () => {
+    // Restricted exports carry no `variant`; the report-kind path must never
+    // accidentally resolve these unverified-for-report-kind crosswalks.
+    expect(rockefellerCrosswalk.espertoVariant).toBeNull();
+    expect(lvaCrosswalk.espertoVariant).toBeNull();
+    expect(getCrosswalkByVariant("RockHabits")).toBeNull();
+    expect(getCrosswalkByVariant("LeadVision")).toBeNull();
+  });
+});
+
+// ── Wave X (19x X-5) — Rockefeller crosswalk ───────────────────────────────
+
+describe("rockefellerCrosswalk (Wave X)", () => {
+  it("is the identity map: Q{s}_{q} → Q{s}_{q} × 40, all SLIDER_LIKERT", () => {
+    const expected: string[] = [];
+    for (let s = 1; s <= 10; s++) {
+      for (let q = 1; q <= 4; q++) expected.push(`Q${s}_${q}`);
+    }
+    expect(rockefellerCrosswalk.map.map((e) => e.espertoKey)).toEqual(expected);
+    for (const e of rockefellerCrosswalk.map) {
+      expect(e.stableKey).toBe(e.espertoKey);
+      expect(e.ourType).toBe("SLIDER_LIKERT");
+    }
+  });
+
+  it("has an empty droppedKeys (raw universe = exactly the 40 sliders — xlsx-header verified)", () => {
+    expect(rockefellerCrosswalk.droppedKeys).toEqual([]);
+  });
+
+  it("is exhaustive over the full 40-key export shape AND over a sparser shape (JSON omits empties)", () => {
+    const fullKeys = rockefellerCrosswalk.map.map((e) => e.espertoKey);
+    expect(validateCrosswalkExhaustive(rockefellerCrosswalk, fullKeys).ok).toBe(true);
+    // A respondent who skipped some sliders → fewer keys, still exhaustive.
+    expect(validateCrosswalkExhaustive(rockefellerCrosswalk, fullKeys.slice(0, 25)).ok).toBe(true);
+    // An unknown key is a hard error (schema tripwire, D8 fallback).
+    const injected = validateCrosswalkExhaustive(rockefellerCrosswalk, [...fullKeys, "Q11_1"]);
+    expect(injected.ok).toBe(false);
+    expect(injected.unknownKeys).toEqual(["Q11_1"]);
+  });
+
+  it("is compatible with the seed's version content (types + scales)", () => {
+    const content = buildRockefellerContent();
+    const versionQuestions = content.questions.map((q) => ({
+      stableKey: q.stableKey,
+      type: q.type,
+      scale: q.scale,
+    }));
+    const compat = validateCrosswalkAgainstVersion(rockefellerCrosswalk, versionQuestions);
+    expect(compat.problems).toEqual([]);
+    expect(compat.ok).toBe(true);
+  });
+
+  it("known-answer: recomputed score matches hand-computed totals/avg/countAchieved incl. 0-valued answers", () => {
+    // Synthetic designed round (NOT Jeff's file — never commit derived copies):
+    // section s, row j → value (s + j) mod 4 — the same pattern as the D4
+    // verification run-sheet; includes 0s (valid on the 4-pt scale).
+    const content = buildRockefellerContent();
+    const answers: { stableKey: string; value: number }[] = [];
+    let expectedTotal = 0;
+    let expectedAchieved = 0;
+    for (let s = 1; s <= 10; s++) {
+      for (let q = 1; q <= 4; q++) {
+        const value = (s + q) % 4;
+        answers.push({ stableKey: `Q${s}_${q}`, value });
+        expectedTotal += value;
+        if (value >= 2) expectedAchieved += 1; // passThreshold: 2 (countAchieved semantics)
+      }
+    }
+    const result = scoreSubmission(
+      {
+        questions: content.questions,
+        sections: content.sections,
+        scoringConfig: content.scoringConfig,
+      } as never,
+      answers,
+    );
+    expect(result.overallTotal).toBe(expectedTotal);
+    expect(result.countAchieved).toBe(expectedAchieved);
+    expect(result.overallAverage).toBeCloseTo(expectedTotal / 40, 10);
+    expect(result.tierMetricValue).toBe(expectedAchieved);
+  });
+});
+
+// ── Wave X (19x X-4) — LVA crosswalk ───────────────────────────────────────
+
+describe("lvaCrosswalk (Wave X)", () => {
+  /** The sample JSON export's 71 raw keys (structural shape, no data). */
+  function sampleJsonKeys(): string[] {
+    const keys: string[] = ["Q1_1"];
+    for (let i = 2; i <= 9; i++) keys.push(`Q1a_${i}`);
+    for (let i = 8; i <= 15; i++) keys.push(`Q${i}`);
+    keys.push("Q15A", "Q15B");
+    for (let n = 1; n <= 16; n++) keys.push(`Q16_${n}`);
+    keys.push("Q16a");
+    for (let n = 1; n <= 16; n++) keys.push(`Q17_${n}`);
+    for (let i = 18; i <= 34; i++) keys.push(`Q${i}`);
+    keys.push("Q29a", "currency");
+    return keys; // 71
+  }
+
+  it("maps all 67 seed questions — set-equal with buildLvaContent, no duplicates", () => {
+    const content = buildLvaContent();
+    const contentKeys = content.questions.map((q) => q.stableKey).sort();
+    const mappedKeys = lvaCrosswalk.map.map((e) => e.stableKey).sort();
+    expect(mappedKeys).toEqual(contentKeys);
+    expect(new Set(mappedKeys).size).toBe(mappedKeys.length);
+    expect(lvaCrosswalk.map).toHaveLength(67);
+  });
+
+  it("is exhaustive over the sample's 71-key JSON shape AND the 73-key xlsx-union shape", () => {
+    const json71 = sampleJsonKeys();
+    expect(json71).toHaveLength(71);
+    expect(validateCrosswalkExhaustive(lvaCrosswalk, json71).ok).toBe(true);
+    // Q35/Q36 exist only in the xlsx header (JSON omits empty keys per-key) —
+    // a historical respondent who answered them must not hard-fail.
+    const union73 = [...json71, "Q35", "Q36"];
+    expect(validateCrosswalkExhaustive(lvaCrosswalk, union73).ok).toBe(true);
+    // Unknown keys stay a hard error (schema tripwire).
+    const injected = validateCrosswalkExhaustive(lvaCrosswalk, [...json71, "Q99"]);
+    expect(injected.ok).toBe(false);
+    expect(injected.unknownKeys).toEqual(["Q99"]);
+  });
+
+  it("is compatible with the seed's version content (types + scales + MC options)", () => {
+    const content = buildLvaContent();
+    const versionQuestions = content.questions.map((q) => ({
+      stableKey: q.stableKey,
+      type: q.type,
+      scale: (q as { scale?: { min: number; max: number } }).scale,
+      options: (q as { options?: { key: string }[] }).options,
+      maxChoices: (q as { maxChoices?: number }).maxChoices,
+    }));
+    const compat = validateCrosswalkAgainstVersion(lvaCrosswalk, versionQuestions);
+    expect(compat.problems).toEqual([]);
+    expect(compat.ok).toBe(true);
+  });
+
+  it("version-compat FAILS when the MC question lacks options (Wave X D7 rule)", () => {
+    const content = buildLvaContent();
+    const versionQuestions = content.questions.map((q) => ({
+      stableKey: q.stableKey,
+      type: q.type,
+      scale: (q as { scale?: { min: number; max: number } }).scale,
+      // options deliberately omitted
+    }));
+    const compat = validateCrosswalkAgainstVersion(lvaCrosswalk, versionQuestions);
+    expect(compat.ok).toBe(false);
+    expect(compat.problems.some((p) => p.includes("S4_biggest_obstacles") && p.includes("no options"))).toBe(true);
+  });
+
+  it("binds the 16-factor matrix and why-texts in the SAME factor order as the seed's S4 options", () => {
+    const content = buildLvaContent();
+    const s4 = content.questions.find((q) => q.stableKey === "S4_biggest_obstacles") as {
+      options: { key: string }[];
+    };
+    const optionOrder = s4.options.map((o) => o.key);
+    for (let n = 1; n <= 16; n++) {
+      const matrix = lvaCrosswalk.map.find((e) => e.espertoKey === `Q16_${n}`)!;
+      const why = lvaCrosswalk.map.find((e) => e.espertoKey === `Q17_${n}`)!;
+      expect(matrix.stableKey).toBe(`S3_${optionOrder[n - 1]}`);
+      expect(why.stableKey).toBe(`S5_why_${optionOrder[n - 1]}`);
+    }
+  });
+
+  it("Q16a is the single MULTI_CHOICE entry, with the pinned Esperto index order (D7/MED-4)", () => {
+    const mc = lvaCrosswalk.map.filter((e) => e.ourType === "MULTI_CHOICE");
+    expect(mc).toHaveLength(1);
+    expect(mc[0]).toMatchObject({
+      espertoKey: "Q16a",
+      stableKey: "S4_biggest_obstacles",
+      ourType: "MULTI_CHOICE",
+    });
+    // The decode targets the CROSSWALK's order — a later version-edit that
+    // reorders options can never remap historical picks.
+    const content = buildLvaContent();
+    const s4 = content.questions.find((q) => q.stableKey === "S4_biggest_obstacles") as {
+      options: { key: string }[];
+    };
+    expect([...mc[0].optionOrder!]).toEqual(s4.options.map((o) => o.key));
+  });
+
+  it("version-compat FAILS when the version's option keys are not set-equal to the pinned optionOrder (MED-4)", () => {
+    const content = buildLvaContent();
+    const versionQuestions = content.questions.map((q) => ({
+      stableKey: q.stableKey,
+      type: q.type,
+      scale: (q as { scale?: { min: number; max: number } }).scale,
+      options:
+        q.stableKey === "S4_biggest_obstacles"
+          ? [{ key: "some_new_factor" }, ...(q as { options: { key: string }[] }).options.slice(1)]
+          : (q as { options?: { key: string }[] }).options,
+      maxChoices: (q as { maxChoices?: number }).maxChoices,
+    }));
+    const compat = validateCrosswalkAgainstVersion(lvaCrosswalk, versionQuestions);
+    expect(compat.ok).toBe(false);
+    expect(compat.problems.some((p) => p.includes("not set-equal"))).toBe(true);
+  });
+
+  it("drops exactly the 6 no-home keys with reasons (currency, Q15A/B, Q33, Q35/Q36)", () => {
+    expect(lvaCrosswalk.droppedKeys.map((d) => d.key).sort()).toEqual(
+      ["Q15A", "Q15B", "Q33", "Q35", "Q36", "currency"],
+    );
+    for (const d of lvaCrosswalk.droppedKeys) expect(d.reason.length).toBeGreaterThan(10);
   });
 });
 

@@ -61,6 +61,11 @@ jest.mock("@/lib/assessments/wave-o-flags", () => ({
   isEspertoSuFullImportEnabled: jest.fn().mockReturnValue(false),
 }));
 
+// Wave X flag gate (LVA + Rockefeller) — default OFF (dark).
+jest.mock("@/lib/assessments/wave-x-flags", () => ({
+  isEspertoLvaRockImportEnabled: jest.fn().mockReturnValue(false),
+}));
+
 // Access-control predicates — mocked so tests control allow/deny without
 // standing up the full AccessControlDb surface (coach/accessGroup* rows etc).
 jest.mock("@/lib/assessments/access-control", () => ({
@@ -84,6 +89,8 @@ import {
 } from "@/lib/assessments/esperto-import/crosswalks";
 import type { Crosswalk } from "@/lib/assessments/esperto-import/crosswalks";
 import { isEspertoSuFullImportEnabled } from "@/lib/assessments/wave-o-flags";
+import { isEspertoLvaRockImportEnabled } from "@/lib/assessments/wave-x-flags";
+import { lvaCrosswalk } from "@/lib/assessments/esperto-import/crosswalks/lva";
 import {
   canAccessOrganization,
   canCreateCampaign,
@@ -770,5 +777,107 @@ describe("POST /api/assessments/import — restrictedResults (Wave O, coach-scop
       const body = await res.json();
       expect(body.error).toBe("version-changed-since-preview");
     });
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// Wave X (spec 19x) — new-instrument selection via batchKind, flag
+// separation, and the D3 shape guard, on the SAME coach route.
+// ────────────────────────────────────────────────────────────────────────
+
+describe("POST /api/assessments/import — restrictedResults (Wave X instruments)", () => {
+  function lvaFile(mid: string): EspertoRestricted {
+    // Minimal LVA-shaped raw: subset of the LVA universe incl. distinctive keys.
+    const raw: Record<string, unknown> = { Q16a: "1", Q18: "note" };
+    for (let n = 1; n <= 16; n++) raw[`Q16_${n}`] = 2;
+    return {
+      reportid: `rep-${mid}`,
+      date: "2025-05-01T10:00:00-04:00",
+      name: "Some Co",
+      tags: [],
+      mat: "AbOTKKmwk2",
+      cid: "cidLVA01",
+      mid,
+      raw,
+      processed: {},
+    };
+  }
+
+  function lvaBody(over: Record<string, unknown> = {}) {
+    return {
+      mode: "preview",
+      kind: "restrictedResults",
+      batchKind: "esperto-lva-restricted-v1",
+      roundLabel: "2025 LVA Round",
+      targetOrgId: "org-r",
+      files: [lvaFile("MID_A")],
+      ...over,
+    };
+  }
+
+  beforeEach(() => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (getCrosswalkByTemplateAlias as jest.Mock).mockImplementation((alias: string) =>
+      alias === "leadership-vision-alignment" ? lvaCrosswalk : null,
+    );
+    // Pin compat explicitly — this describe's mock version rows are empty.
+    (validateCrosswalkAgainstVersion as jest.Mock).mockReturnValue({ ok: true, problems: [] });
+    (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue({
+      id: "ver-lva-3",
+      language: "en",
+      questions: [],
+      sections: [],
+      scoringConfig: {},
+    });
+    (db.orgRespondent.findMany as jest.Mock).mockResolvedValue([]);
+  });
+
+  it("400 (zod) for an unknown batchKind", async () => {
+    const res = await POST(req(lvaBody({ batchKind: "esperto-unknown-v1" })));
+    expect(res.status).toBe(400);
+  });
+
+  it("stays DARK (404) for LVA when the Wave X flag is off — even with Wave O ON (flag separation)", async () => {
+    (isEspertoSuFullImportEnabled as jest.Mock).mockReturnValue(true);
+    const res = await POST(req(lvaBody()));
+    expect(res.status).toBe(404);
+  });
+
+  it("with Wave X ON, an LVA batch reaches the plan and is refused by crosswalk-locked (import refused until D4 lock)", async () => {
+    (isEspertoLvaRockImportEnabled as jest.Mock).mockReturnValue(true);
+    const res = await POST(req(lvaBody()));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.summary.creates).toBe(0);
+    expect(body.data.summary.blocks.map((b: { reason: string }) => b.reason)).toContain(
+      "crosswalk-locked",
+    );
+  });
+
+  it("D3 shape guard: a Rockefeller-shaped file under the LVA batchKind → 400 wrong-instrument, nothing written", async () => {
+    (isEspertoLvaRockImportEnabled as jest.Mock).mockReturnValue(true);
+    const rockShaped = lvaFile("MID_A");
+    rockShaped.raw = { Q1_1: 2, Q2_1: 3, Q3_1: 1 }; // Rockefeller codes, foreign to LVA
+    const res = await POST(req(lvaBody({ files: [rockShaped] })));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("Leadership Vision Alignment");
+    expect(body.fileErrors[0].reason).toContain("do not belong");
+  });
+
+  it("SU-Full batches are untouched by the Wave X flag (still gated by Wave O only)", async () => {
+    (isEspertoLvaRockImportEnabled as jest.Mock).mockReturnValue(true);
+    (isEspertoSuFullImportEnabled as jest.Mock).mockReturnValue(false);
+    const res = await POST(
+      req({
+        mode: "preview",
+        kind: "restrictedResults",
+        batchKind: "esperto-sufull-restricted-v1",
+        roundLabel: "2025 Annual",
+        targetOrgId: "org-r",
+        files: [lvaFile("MID_A")],
+      }),
+    );
+    expect(res.status).toBe(404); // dark — Wave O off, Wave X irrelevant
   });
 });

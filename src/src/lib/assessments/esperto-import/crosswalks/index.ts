@@ -83,6 +83,10 @@ export interface VersionQuestion {
   stableKey: string;
   type: string;
   scale?: { min: number; max: number };
+  /** MULTI_CHOICE only (Wave X D7) — the pinned version's option order is the index-decode target. */
+  options?: { key: string }[];
+  /** MULTI_CHOICE only — decode enforces this cap (never truncates silently). */
+  maxChoices?: number;
 }
 
 /**
@@ -118,6 +122,36 @@ export function validateCrosswalkAgainstVersion(
       problems.push(
         `crosswalk stableKey "${entry.stableKey}" is SLIDER_LIKERT but the pinned version question has no scale`,
       );
+    }
+    // Wave X (D7): a MULTI_CHOICE binding is only usable when (a) the
+    // crosswalk pins Esperto's index order (`optionOrder`) and (b) that list
+    // is set-equal to the pinned version's option keys. The decode targets
+    // the CROSSWALK's order, so a later template edit that merely reorders
+    // options can never silently remap historical picks; a version that
+    // adds/removes/renames option keys fails here loudly.
+    if (entry.ourType === "MULTI_CHOICE") {
+      if (!(vq.options && vq.options.length > 0)) {
+        problems.push(
+          `crosswalk stableKey "${entry.stableKey}" is MULTI_CHOICE but the pinned version question has no options`,
+        );
+        continue;
+      }
+      if (!entry.optionOrder || entry.optionOrder.length === 0) {
+        problems.push(
+          `crosswalk stableKey "${entry.stableKey}" is MULTI_CHOICE but the crosswalk entry has no optionOrder (the index-decode target)`,
+        );
+        continue;
+      }
+      const versionKeys = new Set(vq.options.map((o) => o.key));
+      const orderKeys = new Set(entry.optionOrder);
+      const same =
+        versionKeys.size === orderKeys.size &&
+        [...orderKeys].every((k) => versionKeys.has(k));
+      if (!same) {
+        problems.push(
+          `crosswalk stableKey "${entry.stableKey}" optionOrder is not set-equal to the pinned version's option keys`,
+        );
+      }
     }
   }
 

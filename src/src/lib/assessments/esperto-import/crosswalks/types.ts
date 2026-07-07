@@ -36,6 +36,14 @@ export interface CrosswalkEntry {
   stableKey: string;
   /** The question type we expect that stableKey to be in the pinned version. */
   ourType: CrosswalkQuestionType;
+  /**
+   * MULTI_CHOICE only (Wave X D7): Esperto's 1-based index order → option
+   * keys. The decode targets THIS order — never the pinned version's option
+   * array order, which template edits may legally reorder after the lock.
+   * The against-version validator enforces set-equality between this list
+   * and the version's option keys.
+   */
+  optionOrder?: readonly string[];
 }
 
 /** A per-template crosswalk. */

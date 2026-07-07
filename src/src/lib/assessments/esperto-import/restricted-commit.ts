@@ -143,6 +143,22 @@ export interface RestrictedCommitCtx {
   commitResolvedVersionId: string;
   /** Scoring shape for previewResolvedVersionId — used ONLY when creating a new campaign. */
   versionForScoringForNewCampaign: TemplateVersionForScoring;
+  /**
+   * Wave X (D2) — instrument identity for the imported-campaign alias
+   * (`imported-<instrumentKey>-…`). Omitted = "sufull" (Wave O byte-identity).
+   */
+  instrumentKey?: string;
+  /**
+   * Wave X — whether this instrument participates in the org-level Esperto
+   * cid pin (`Organization.espertoSuFullCid`): the mismatch refusal AND the
+   * first-import pin write. TRUE only for SU-Full. Esperto's `cid` is
+   * per-assessment-campaign, NOT per-company (verified 2026-07-07: the same
+   * company's LVA and Rockefeller sample exports carry different cids), so a
+   * shared pin would false-refuse cross-instrument imports and an LVA/Rock
+   * first-import would mispin the SU-Full field. Omitted = true (Wave O
+   * byte-identity).
+   */
+  pinOrgCid?: boolean;
   /** Coach has explicitly acknowledged a low-resolution batch shown at preview. Default false. */
   ackLowResolution?: boolean;
   /** Fraction of unresolved files above which the batch is "low resolution" and blocked absent ack. Default 0.5. */
@@ -398,7 +414,9 @@ export async function commitRestrictedImport(
         "Target organization does not exist.",
       );
     }
+    const pinParticipates = ctx.pinOrgCid ?? true; // SU-Full only (Wave X)
     if (
+      pinParticipates &&
       org.espertoSuFullCid !== null &&
       org.espertoSuFullCid !== campaign.cid
     ) {
@@ -407,7 +425,7 @@ export async function commitRestrictedImport(
         "This batch's cid does not match the cid already pinned on the target organization.",
       );
     }
-    const shouldPinCid = org.espertoSuFullCid === null;
+    const shouldPinCid = pinParticipates && org.espertoSuFullCid === null;
 
     // 3. Reuse-or-create decision.
     const existing = await tx.assessmentCampaign.findUnique({
@@ -489,7 +507,7 @@ async function commitCreatePath(
   actor: ApiActor,
   shouldPinCid: boolean,
 ): Promise<RestrictedCommitOutcome> {
-  const alias = `imported-sufull-${slugifyForAlias(campaign.cid)}-${campaign.roundLabelSlug}`;
+  const alias = `imported-${ctx.instrumentKey ?? "sufull"}-${slugifyForAlias(campaign.cid)}-${campaign.roundLabelSlug}`;
 
   const created = await tx.assessmentCampaign.create({
     data: {

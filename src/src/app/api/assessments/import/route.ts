@@ -86,7 +86,12 @@ import {
   recordCommitResultSignal,
   recordCommitConflictSignal,
 } from "@/lib/assessments/esperto-import/alert-signals";
-import { isEspertoSuFullImportEnabled } from "@/lib/assessments/wave-o-flags";
+import {
+  checkMatAllowed,
+  detectBatchShape,
+  getInstrumentByBatchKind,
+  type RestrictedInstrument,
+} from "@/lib/assessments/esperto-import/restricted-instruments";
 import {
   canAccessOrganization,
   canCreateCampaign,
@@ -135,7 +140,9 @@ const importBodySchema = z
     // Raw Esperto export JSON — validated by parseEspertoExport, not here.
     payload: z.unknown().optional(),
     // ── kind:"restrictedResults" fields (Wave O) ──────────────────────────
-    batchKind: z.literal("esperto-sufull-restricted-v1").optional(),
+    // Wave X (D3): the batchKind IS the instrument selector — the registry
+    // owns the accepted values (stale clients can only send the SU-Full one).
+    batchKind: z.string().min(1).optional(),
     roundLabel: z.string().min(1).optional(),
     targetOrgId: z.string().min(1).optional(),
     files: z.array(z.unknown()).min(1).optional(),
@@ -147,8 +154,18 @@ const importBodySchema = z
     message: "companyName is required for kind:roster",
     path: ["companyName"],
   })
-  .refine((b) => b.kind !== "restrictedResults" || b.batchKind === "esperto-sufull-restricted-v1", {
-    message: 'batchKind must be "esperto-sufull-restricted-v1" for kind:restrictedResults',
+  .refine(
+    (b) =>
+      b.kind !== "restrictedResults" ||
+      getInstrumentByBatchKind(b.batchKind ?? "") !== null,
+    {
+      message:
+        "batchKind must be a supported restricted-import instrument for kind:restrictedResults",
+      path: ["batchKind"],
+    },
+  )
+  .refine((b) => b.batchKind === undefined || b.kind === "restrictedResults", {
+    message: "batchKind is only valid for kind:restrictedResults",
     path: ["batchKind"],
   })
   .refine((b) => b.kind !== "restrictedResults" || !!b.roundLabel, {
@@ -233,6 +250,7 @@ export async function POST(request: NextRequest) {
       kind,
       companyName,
       payload,
+      batchKind,
       roundLabel,
       targetOrgId,
       files,
@@ -253,7 +271,10 @@ export async function POST(request: NextRequest) {
     // ── Restricted results import (Wave O) — its own pipeline. The schema's
     //    refine()s guarantee roundLabel/targetOrgId/files are present here. ──
     if (kind === "restrictedResults") {
+      // The refine guarantees registry membership.
+      const instrument = getInstrumentByBatchKind(batchKind ?? "")!;
       return handleRestrictedResultsImport(
+        instrument,
         files as unknown[],
         (aggregateFiles ?? undefined) as unknown[] | undefined,
         roundLabel as string,
@@ -657,6 +678,7 @@ async function handleResultsImport(
 // ────────────────────────────────────────────────────────────────────────
 
 async function handleRestrictedResultsImport(
+  instrument: RestrictedInstrument,
   files: unknown[],
   aggregateFiles: unknown[] | undefined,
   roundLabel: string,
@@ -666,8 +688,9 @@ async function handleRestrictedResultsImport(
   expectedVersionId: string | undefined,
   actor: ApiActor,
 ): Promise<NextResponse> {
-  // ── 1. Flag gate FIRST — dark 404, no DB touched. ─────────────────────────
-  if (!isEspertoSuFullImportEnabled({ organizationId: targetOrgId })) {
+  // ── 1. Flag gate FIRST — dark 404, no DB touched. Per-instrument (Wave X):
+  //    SU-Full stays on the Wave O flag; LVA + Rockefeller on the Wave X flag. ─
+  if (!instrument.isEnabled({ organizationId: targetOrgId })) {
     return NextResponse.json(
       { success: false, error: "Organization not found" },
       { status: 404 },
@@ -684,7 +707,7 @@ async function handleRestrictedResultsImport(
   }
 
   // ── 3. Resolve template/version/crosswalk/scorableStableKeys. ─────────────
-  const ctxResult = await resolveRestrictedImportContext(db);
+  const ctxResult = await resolveRestrictedImportContext(db, instrument);
   if (!ctxResult.ok) {
     const body: { success: false; error: string; details?: unknown; problems?: string[] } = {
       success: false,
@@ -738,6 +761,49 @@ async function handleRestrictedResultsImport(
     );
   }
 
+  // ── 5b. Wave X — selection-vs-file guards, whole-batch 400 (nothing written).
+  //    D3 shape agreement (skipped for SU-Full — Wave O byte-identity; its
+  //    exhaustiveness guard already hard-fails foreign keys) and the D8 `mat`
+  //    schema-identity gate (no-op while knownMats is null). ─────────────────
+  const instrumentGuardErrors: { index: number; reason: string }[] = [];
+  if (instrument.shapeChecked) {
+    // Subset rule per file; distinctive-anchor rule over the batch UNION —
+    // a legitimately sparse file rides along with its anchored siblings.
+    const shape = detectBatchShape(
+      instrument,
+      parsedFiles.map((f) => Object.keys(f.raw)),
+    );
+    if (!shape.ok) instrumentGuardErrors.push(...shape.errors);
+  }
+  for (let i = 0; i < parsedFiles.length; i++) {
+    const mat = checkMatAllowed(instrument, parsedFiles[i].mat);
+    if (!mat.ok) instrumentGuardErrors.push({ index: i, reason: mat.reason });
+  }
+  if (instrumentGuardErrors.length > 0) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: `One or more files do not match the selected instrument (${instrument.uiLabel})`,
+        fileErrors: instrumentGuardErrors,
+      },
+      { status: 400 },
+    );
+  }
+
+  // Per-instrument cross-field consistency probes (warn-only, never block).
+  const consistencyWarnings: { reason: string; detail: string }[] = [];
+  if (instrument.fileConsistencyWarning) {
+    for (let i = 0; i < parsedFiles.length; i++) {
+      const warning = instrument.fileConsistencyWarning(parsedFiles[i].raw);
+      if (warning) {
+        consistencyWarnings.push({
+          reason: "answer-consistency",
+          detail: `files[${i}]: ${warning}`,
+        });
+      }
+    }
+  }
+
   // ── 6. Parse aggregateFiles (optional) — cid-mismatch → warning only. ─────
   const aggregateCidMismatchWarnings: { reason: string; detail: string }[] = [];
   const batchCid = parsedFiles[0]?.cid;
@@ -773,6 +839,7 @@ async function handleRestrictedResultsImport(
     respondents,
     versionQuestions: ctxResult.versionQuestions,
     scorableStableKeys,
+    instrument: { externalIdPrefix: instrument.externalIdPrefix },
     hashSalt: resolveEspertoImportHashSalt(),
   });
 
@@ -784,7 +851,11 @@ async function handleRestrictedResultsImport(
       fileCount: files.length,
       blockReasons: plan.blocks.map((b) => b.reason),
       skipReasonCounts: countBy(plan.skips.map((s) => s.reason)),
-      warningReasons: [...plan.warnings.map((w) => w.reason), ...aggregateCidMismatchWarnings.map((w) => w.reason)],
+      warningReasons: [
+        ...plan.warnings.map((w) => w.reason),
+        ...aggregateCidMismatchWarnings.map((w) => w.reason),
+        ...consistencyWarnings.map((w) => w.reason),
+      ],
       flagState: "on",
     });
     return NextResponse.json({
@@ -794,7 +865,7 @@ async function handleRestrictedResultsImport(
           creates: plan.campaign?.rows.length ?? 0,
           skips: plan.skips.length,
           blocks: plan.blocks,
-          warnings: [...plan.warnings, ...aggregateCidMismatchWarnings],
+          warnings: [...plan.warnings, ...aggregateCidMismatchWarnings, ...consistencyWarnings],
           ignoredArtifacts: aggregateFiles?.length ?? 0,
         },
         resolvedVersionId: publishedVersion.id,
@@ -813,7 +884,7 @@ async function handleRestrictedResultsImport(
   // Fresh, independent re-resolution — NOT a reuse of the value computed
   // above at step 3 (this IS the point of the check: catch a version publish
   // race between this route's own preview and commit calls).
-  const freshCtxResult = await resolveRestrictedImportContext(db);
+  const freshCtxResult = await resolveRestrictedImportContext(db, instrument);
   if (!freshCtxResult.ok) {
     const body: { success: false; error: string; details?: unknown; problems?: string[] } = {
       success: false,
@@ -832,6 +903,8 @@ async function handleRestrictedResultsImport(
     createdByUserId: actor.userId,
     previewResolvedVersionId: expectedVersionId,
     commitResolvedVersionId: freshCtxResult.publishedVersion.id,
+    instrumentKey: instrument.instrumentKey,
+    pinOrgCid: instrument.participatesInOrgCidPin,
     versionForScoringForNewCampaign: {
       questions: publishedVersion.questions,
       sections: publishedVersion.sections,

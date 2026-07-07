@@ -123,7 +123,7 @@ async function uploadFiles(input: HTMLInputElement, files: File[]) {
 
 function selectSuFullKind() {
   fireEvent.click(
-    screen.getByRole("radio", { name: /SU-Full \(historical\)/i }),
+    screen.getByRole("radio", { name: /Historical rounds/i }),
   );
 }
 
@@ -138,26 +138,26 @@ afterEach(() => {
 });
 
 describe("EspertoImportClient — restrictedResults (Wave O SU-Full)", () => {
-  it("does NOT render the SU-Full kind button when suFullImportEnabled is false/omitted", async () => {
+  it("does NOT render the Historical rounds kind button when both flags are false/omitted", async () => {
     render(<EspertoImportClient />);
     expect(
-      screen.queryByRole("radio", { name: /SU-Full \(historical\)/i }),
+      screen.queryByRole("radio", { name: /Historical rounds/i }),
     ).not.toBeInTheDocument();
   });
 
-  it("does NOT render the SU-Full kind button when suFullImportEnabled is explicitly false", async () => {
+  it("does NOT render the Historical rounds kind button when suFullImportEnabled is explicitly false", async () => {
     render(<EspertoImportClient suFullImportEnabled={false} />);
     expect(
-      screen.queryByRole("radio", { name: /SU-Full \(historical\)/i }),
+      screen.queryByRole("radio", { name: /Historical rounds/i }),
     ).not.toBeInTheDocument();
   });
 
-  it("renders the SU-Full kind button when suFullImportEnabled is true, and selecting it swaps in the round-label/org/multi-file UI", async () => {
+  it("renders the Historical rounds kind button when suFullImportEnabled is true, and selecting it swaps in the round-label/org/multi-file UI", async () => {
     mockOrgsOk();
     render(<EspertoImportClient suFullImportEnabled />);
 
     const kindButton = screen.getByRole("radio", {
-      name: /SU-Full \(historical\)/i,
+      name: /Historical rounds/i,
     });
     expect(kindButton).toBeInTheDocument();
 
@@ -693,5 +693,94 @@ describe("EspertoImportClient — restrictedResults (Wave O SU-Full)", () => {
     ).toBe("");
     expect(screen.queryByText(/file loaded/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Preview$/i })).toBeDisabled();
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// Wave X (spec 19x, X-6) — instrument selection drives the batchKind.
+// ────────────────────────────────────────────────────────────────────────
+
+describe("EspertoImportClient — instrument selection (Wave X)", () => {
+  it("with only Wave X enabled, the kind button renders and lists exactly LVA + Rockefeller", async () => {
+    mockOrgsOk();
+    render(<EspertoImportClient lvaRockImportEnabled />);
+    fireEvent.click(screen.getByRole("radio", { name: /Historical rounds/i }));
+    expect(
+      screen.getByRole("radio", { name: /Leadership Vision Alignment/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: /Rockefeller Habits Checklist/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("radio", { name: /Scaling Up Full/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("with both flags on, all three instruments list and selecting Rockefeller sends its batchKind", async () => {
+    mockOrgsOk();
+    render(<EspertoImportClient suFullImportEnabled lvaRockImportEnabled />);
+    fireEvent.click(screen.getByRole("radio", { name: /Historical rounds/i }));
+    await waitFor(() => screen.getByRole("option", { name: /Acme Corp/i }));
+
+    expect(screen.getByRole("radio", { name: /Scaling Up Full/i })).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("radio", { name: /Rockefeller Habits Checklist/i }),
+    );
+    fireEvent.change(screen.getByLabelText(/Round label/i), {
+      target: { value: "2025 Q3" },
+    });
+    fireEvent.change(screen.getByLabelText(/Target organization/i), {
+      target: { value: "org-1" },
+    });
+    await uploadFiles(
+      screen.getByLabelText(/Individual files/i) as HTMLInputElement,
+      [jsonFile(INDIVIDUAL_PAYLOAD_1, "person1.json")],
+    );
+
+    mockJsonResponse(true, 200, {
+      success: true,
+      data: {
+        summary: { creates: 1, skips: 0, blocks: [], warnings: [], ignoredArtifacts: 0 },
+        resolvedVersionId: "ver-rock-2",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Preview$/i }));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    const call = (global.fetch as jest.Mock).mock.calls.at(-1)!;
+    const sentBody = JSON.parse(call[1].body as string);
+    expect(sentBody.batchKind).toBe("esperto-rockhabits-restricted-v1");
+    expect(sentBody.kind).toBe("restrictedResults");
+  });
+
+  it("SU-Full-only (no Wave X): the sole instrument is preselected and the SU-Full batchKind is sent (Wave O parity)", async () => {
+    mockOrgsOk();
+    render(<EspertoImportClient suFullImportEnabled />);
+    selectSuFullKind();
+    await waitFor(() => screen.getByRole("option", { name: /Acme Corp/i }));
+    expect(
+      screen.queryByRole("radio", { name: /Leadership Vision Alignment/i }),
+    ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Round label/i), {
+      target: { value: "2025 Annual" },
+    });
+    fireEvent.change(screen.getByLabelText(/Target organization/i), {
+      target: { value: "org-1" },
+    });
+    await uploadFiles(
+      screen.getByLabelText(/Individual files/i) as HTMLInputElement,
+      [jsonFile(INDIVIDUAL_PAYLOAD_1, "person1.json")],
+    );
+    mockJsonResponse(true, 200, {
+      success: true,
+      data: {
+        summary: { creates: 1, skips: 0, blocks: [], warnings: [], ignoredArtifacts: 0 },
+        resolvedVersionId: "ver-1",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Preview$/i }));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    const call = (global.fetch as jest.Mock).mock.calls.at(-1)!;
+    const sentBody = JSON.parse(call[1].body as string);
+    expect(sentBody.batchKind).toBe("esperto-sufull-restricted-v1");
   });
 });

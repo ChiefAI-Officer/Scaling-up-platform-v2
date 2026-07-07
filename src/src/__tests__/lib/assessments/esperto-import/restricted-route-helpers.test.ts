@@ -169,7 +169,7 @@ describe("resolveRestrictedImportContext — happy path", () => {
     }
   });
 
-  it("excludes a required-but-not-mapped stableKey only if isRequired is false; includes every isRequired:true key regardless of type", async () => {
+  it("intersects completeness keys with the crosswalk map (Wave X MED-6): a required-but-UNMAPPED key never gates — imports can only supply mapped keys", async () => {
     const db = makeDb({
       assessmentTemplateVersion: {
         findFirst: jest.fn().mockResolvedValue({
@@ -188,9 +188,10 @@ describe("resolveRestrictedImportContext — happy path", () => {
     const result = await resolveRestrictedImportContext(db);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.scorableStableKeys.sort()).toEqual(
-        ["SUF_multi", "SUF_rate_a"].sort(),
-      );
+      // SUF_multi is isRequired:true but NOT crosswalk-mapped — a future
+      // version adding a question Esperto never asked must not make every
+      // historical respondent "incomplete" (the Wave O PR #116 class).
+      expect(result.scorableStableKeys.sort()).toEqual(["SUF_rate_a"]);
     }
   });
 });
