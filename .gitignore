@@ -50,3 +50,16 @@ Thumbs.db
 # is required and tracked separately (see spec 12 §14); this ignore does NOT resolve it.
 From Jeff/*
 !From Jeff/style-guide/
+
+# Local agent/tooling session state — never commit (the tracked .claude/claudex/log
+# files stay tracked; gitignore only hides NEW untracked state).
+.agents/
+.codex/
+.claude/skills/
+.claude/claudex/*.state
+.claude/claudex/*/
+.claude/claudex/PLAN.*.md
+**/.claude/claudex/
+
+# Playwright test artifacts (regenerated on every run)
+src/test-results/

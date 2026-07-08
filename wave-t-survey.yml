@@ -1,0 +1,16 @@
+- generic [active] [ref=f3e1]:
+  - generic [ref=f3e3]:
+    - banner [ref=f3e4]:
+      - generic [ref=f3e5]: Scaling Up
+      - generic [ref=f3e6]: Survey link error
+    - main [ref=f3e7]:
+      - generic [ref=f3e8]:
+        - generic [ref=f3e9]: Notice
+        - heading "We can't open this survey" [level=1] [ref=f3e23]
+        - paragraph [ref=f3e11]: Failed to exchange token
+    - contentinfo [ref=f3e12]: Powered by Scaling Up
+  - region "Notifications (F8)":
+    - list
+  - button "Open Next.js Dev Tools" [ref=f3e18] [cursor=pointer]:
+    - img [ref=f3e19]
+  - alert [ref=f3e22]

@@ -1,0 +1,191 @@
+- generic [active] [ref=f16e1]:
+  - generic [ref=f16e2]:
+    - complementary [ref=f16e3]:
+      - generic [ref=f16e5]: Scaling Up Coach
+      - navigation [ref=f16e6]:
+        - link "Dashboard" [ref=f16e7] [cursor=pointer]:
+          - /url: /portal/home
+          - img [ref=f16e9]
+          - generic [ref=f16e14]: Dashboard
+        - link "My Workshops" [ref=f16e15] [cursor=pointer]:
+          - /url: /portal/workshops
+          - img [ref=f16e17]
+          - generic [ref=f16e19]: My Workshops
+        - link "Members" [ref=f16e20] [cursor=pointer]:
+          - /url: /portal/members
+          - img [ref=f16e22]
+          - generic [ref=f16e26]: Members
+        - link "Assessments" [ref=f16e27] [cursor=pointer]:
+          - /url: /portal/assessments
+          - img [ref=f16e29]
+          - generic [ref=f16e32]: Assessments
+        - link "Registrations" [ref=f16e33] [cursor=pointer]:
+          - /url: /portal/registrations
+          - img [ref=f16e35]
+          - generic [ref=f16e40]: Registrations
+        - link "Request Workshop" [ref=f16e41] [cursor=pointer]:
+          - /url: /portal/request
+          - img [ref=f16e43]
+          - generic [ref=f16e45]: Request Workshop
+        - link "Settings" [ref=f16e48] [cursor=pointer]:
+          - /url: /portal/settings
+          - img [ref=f16e50]
+          - generic [ref=f16e53]: Settings
+      - link "G Gabriel Coach" [ref=f16e54] [cursor=pointer]:
+        - /url: /portal/settings
+        - generic [ref=f16e55]:
+          - generic [ref=f16e56]: G
+          - generic [ref=f16e57]:
+            - paragraph [ref=f16e58]: Gabriel
+            - paragraph [ref=f16e59]: Coach
+    - generic [ref=f16e60]:
+      - banner [ref=f16e61]:
+        - generic [ref=f16e62]:
+          - button "Switch to dark mode" [ref=f16e63] [cursor=pointer]:
+            - img [ref=f16e64]
+          - link "Settings" [ref=f16e67] [cursor=pointer]:
+            - /url: /portal/settings
+          - button "Sign Out" [ref=f16e68]
+      - main [ref=f16e69]:
+        - generic [ref=f16e70]:
+          - generic [ref=f16e71]:
+            - link "Back to Assessments" [ref=f16e72] [cursor=pointer]:
+              - /url: /portal/assessments
+              - img [ref=f16e73]
+              - text: Back to Assessments
+            - link "View Trends" [ref=f16e76] [cursor=pointer]:
+              - /url: /portal/assessments/trends?templateId=cmpapsaoz0003100os4vgaa38&organizationId=cmpb9nqj30001a07xey1bwwmy
+              - img [ref=f16e77]
+              - text: View Trends
+          - generic [ref=f16e80]:
+            - generic [ref=f16e81]:
+              - generic [ref=f16e82]:
+                - heading "rockefeller test nmew" [level=1] [ref=f16e83]
+                - paragraph [ref=f16e84]: test_rockhabits_260615101051
+              - generic [ref=f16e85]:
+                - generic [ref=f16e86]: ACTIVE
+                - button "Close Campaign" [ref=f16e87]:
+                  - img [ref=f16e88]
+                  - text: Close Campaign
+                - button "Delete campaign" [ref=f16e92]:
+                  - img [ref=f16e93]
+                  - text: Delete campaign
+            - generic [ref=f16e96]:
+              - generic [ref=f16e97]:
+                - generic [ref=f16e98]: Template
+                - generic [ref=f16e99]: Rockefeller Habits Checklist
+              - generic [ref=f16e100]:
+                - generic [ref=f16e101]: Organization
+                - generic [ref=f16e102]: Test
+              - generic [ref=f16e103]:
+                - generic [ref=f16e104]: Opened
+                - generic [ref=f16e105]:
+                  - generic [ref=f16e106]: Jun 14, 2026, 6:10 AM
+                  - button "Edit" [ref=f16e107]
+              - generic [ref=f16e108]:
+                - generic [ref=f16e109]: Closes
+                - generic [ref=f16e110]: Open-ended
+            - generic [ref=f16e111]:
+              - generic [ref=f16e112]:
+                - generic [ref=f16e113]: Participants
+                - generic [ref=f16e114]: "1"
+              - generic [ref=f16e115]:
+                - generic [ref=f16e116]: Invited
+                - generic [ref=f16e117]: "1"
+              - generic [ref=f16e118]:
+                - generic [ref=f16e119]: Viewed
+                - generic [ref=f16e120]: "1"
+              - generic [ref=f16e121]:
+                - generic [ref=f16e122]: Submitted
+                - generic [ref=f16e123]: "1"
+              - generic [ref=f16e124]:
+                - generic [ref=f16e125]: Completion
+                - generic [ref=f16e126]: 100%
+          - button "Invitation email Using template default — click to customize Edit" [ref=f16e128]:
+            - generic [ref=f16e129]:
+              - heading "Invitation email" [level=2] [ref=f16e130]
+              - paragraph [ref=f16e131]: Using template default — click to customize
+            - generic [ref=f16e132]: Edit
+          - button "Custom slides Add branded interstitial pages inside the assessment Edit" [ref=f16e134]:
+            - generic [ref=f16e135]:
+              - heading "Custom slides" [level=2] [ref=f16e136]
+              - paragraph [ref=f16e137]: Add branded interstitial pages inside the assessment
+            - generic [ref=f16e138]: Edit
+          - generic [ref=f16e139]:
+            - generic [ref=f16e140]:
+              - img [ref=f16e141]
+              - generic [ref=f16e146]: "Total:"
+              - generic [ref=f16e147]: "1"
+            - generic [ref=f16e148]:
+              - img [ref=f16e149]
+              - generic [ref=f16e152]: "New:"
+              - generic [ref=f16e153]: "0"
+            - generic [ref=f16e154]:
+              - img [ref=f16e155]
+              - generic [ref=f16e158]: "Invited:"
+              - generic [ref=f16e159]: "0"
+            - generic [ref=f16e160]:
+              - img [ref=f16e161]
+              - generic [ref=f16e164]: "Started:"
+              - generic [ref=f16e165]: "0"
+            - generic [ref=f16e166]:
+              - img [ref=f16e167]
+              - generic [ref=f16e170]: "Completed:"
+              - generic [ref=f16e171]: "1"
+          - generic [ref=f16e172]:
+            - generic [ref=f16e173]:
+              - generic [ref=f16e174]:
+                - heading "Respondents" [level=2] [ref=f16e175]
+                - paragraph [ref=f16e176]: Track invitation delivery and view individual results.
+              - generic [ref=f16e177]:
+                - button "Add Respondent" [ref=f16e178]:
+                  - img [ref=f16e179]
+                  - text: Add Respondent
+                - button "Send Invitations" [ref=f16e180]:
+                  - img [ref=f16e181]
+                  - text: Send Invitations
+                - button "Send Reminders" [ref=f16e184]:
+                  - img [ref=f16e185]
+                  - text: Send Reminders
+                - link "Export respondents (CSV)" [ref=f16e188] [cursor=pointer]:
+                  - /url: /api/assessment-campaigns/cmqf1yw4z000f4f4ixsp28q6y/respondents/export.csv
+                  - img [ref=f16e189]
+                  - text: Export respondents (CSV)
+            - table [ref=f16e192]:
+              - rowgroup [ref=f16e193]:
+                - row "Name Email Team Status Sent Submitted Actions" [ref=f16e194]:
+                  - columnheader "Name" [ref=f16e195]
+                  - columnheader "Email" [ref=f16e196]
+                  - columnheader "Team" [ref=f16e197]
+                  - columnheader "Status" [ref=f16e198]
+                  - columnheader "Sent" [ref=f16e199]
+                  - columnheader "Submitted" [ref=f16e200]
+                  - columnheader "Actions" [ref=f16e201]
+              - rowgroup [ref=f16e202]:
+                - row "TEST ADD TEST ADD Mark as CEO TEST ADD test-account@redacted.local Test Completed Jun 15, 2026, 6:11 AM Jun 15, 2026, 6:12 AM View report Raw data Download result (CSV)" [ref=f16e203]:
+                  - cell "TEST ADD TEST ADD Mark as CEO TEST ADD" [ref=f16e204]:
+                    - generic [ref=f16e205]: TEST ADD TEST ADD
+                    - button "Mark as CEO" [ref=f16e206]
+                    - generic [ref=f16e207]: TEST ADD
+                  - cell "test-account@redacted.local" [ref=f16e208]
+                  - cell "Test" [ref=f16e209]
+                  - cell "Completed" [ref=f16e210]:
+                    - generic [ref=f16e211]: Completed
+                  - cell "Jun 15, 2026, 6:11 AM" [ref=f16e212]
+                  - cell "Jun 15, 2026, 6:12 AM" [ref=f16e213]
+                  - cell "View report Raw data Download result (CSV)" [ref=f16e214]:
+                    - generic [ref=f16e215]:
+                      - link "View report" [ref=f16e216] [cursor=pointer]:
+                        - /url: /assessments/cmqf1yw4z000f4f4ixsp28q6y/respondents/cmppgmfbe000c3lkt3k87hegc/report
+                        - img [ref=f16e217]
+                        - text: View report
+                      - button "Raw data" [ref=f16e220]:
+                        - img [ref=f16e221]
+                        - text: Raw data
+                      - link "Download result (CSV)" [ref=f16e224] [cursor=pointer]:
+                        - /url: /api/assessment-campaigns/cmqf1yw4z000f4f4ixsp28q6y/respondents/cmppgmfbe000c3lkt3k87hegc/result/export.csv
+                        - img [ref=f16e225]
+                        - text: Download result (CSV)
+  - region "Notifications (F8)":
+    - list
+  - alert [ref=f16e228]

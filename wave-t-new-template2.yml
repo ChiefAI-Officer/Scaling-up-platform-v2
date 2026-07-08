@@ -1,0 +1,284 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - link "Skip to main content" [ref=f1e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=f1e4]:
+      - generic [ref=f1e6]:
+        - generic [ref=f1e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=f1e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - generic [ref=f1e11]:
+            - link "Dashboard" [ref=f1e12] [cursor=pointer]:
+              - /url: /admin/dashboard
+            - button "Workshops" [ref=f1e14] [cursor=pointer]:
+              - text: Workshops
+              - img [ref=f1e15]
+            - link "Approvals" [ref=f1e17] [cursor=pointer]:
+              - /url: /admin/approvals
+            - link "Assessments" [ref=f1e18] [cursor=pointer]:
+              - /url: /admin/assessments
+            - button "Automation" [ref=f1e20] [cursor=pointer]:
+              - text: Automation
+              - img [ref=f1e21]
+            - button "People" [ref=f1e24] [cursor=pointer]:
+              - text: People
+              - img [ref=f1e25]
+            - button "Financials" [ref=f1e28] [cursor=pointer]:
+              - text: Financials
+              - img [ref=f1e29]
+        - generic [ref=f1e31]:
+          - button "Switch to dark mode" [ref=f1e180] [cursor=pointer]:
+            - img [ref=f1e181]
+          - generic [ref=f1e39]:
+            - link "Settings" [ref=f1e40] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=f1e41]
+          - generic [ref=f1e42]: A
+    - main "Page content" [ref=f1e43]:
+      - generic [ref=f1e44]:
+        - complementary "Assessments navigation" [ref=f1e45]:
+          - navigation [ref=f1e46]:
+            - generic [ref=f1e47]:
+              - paragraph [ref=f1e48]: Assessments
+              - link "Dashboard" [ref=f1e49] [cursor=pointer]:
+                - /url: /admin/assessments
+              - link "Organizations(coming soon)" [disabled] [ref=f1e50] [cursor=pointer]:
+                - /url: /admin/assessments/organizations
+              - link "Access Groups" [ref=f1e51] [cursor=pointer]:
+                - /url: /admin/assessments/access-groups
+              - link "Templates" [active] [ref=f1e52] [cursor=pointer]:
+                - /url: /admin/assessments/templates
+              - link "Campaigns(coming soon)" [disabled] [ref=f1e53] [cursor=pointer]:
+                - /url: /admin/assessments/campaigns
+              - link "Public Quizzes(coming soon)" [disabled] [ref=f1e54] [cursor=pointer]:
+                - /url: /admin/assessments/public-quizzes
+              - link "Import" [ref=f1e55] [cursor=pointer]:
+                - /url: /admin/assessments/import
+              - link "Aggregate Report" [ref=f1e56] [cursor=pointer]:
+                - /url: /admin/assessments/aggregate
+        - generic [ref=f1e184]:
+          - generic [ref=f1e185]:
+            - link "Admin" [ref=f1e186] [cursor=pointer]:
+              - /url: /admin/dashboard
+            - generic [ref=f1e187]: /
+            - link "Assessments" [ref=f1e188] [cursor=pointer]:
+              - /url: /admin/assessments
+            - generic [ref=f1e189]: /
+            - generic [ref=f1e190]: Templates
+          - generic [ref=f1e191]:
+            - generic [ref=f1e192]:
+              - heading "Assessment Templates" [level=2] [ref=f1e193]
+              - paragraph [ref=f1e194]:
+                - text: Catalogue of templates available for campaign creation. Per-coach access managed at
+                - emphasis [ref=f1e195]: Admin › Assessments › Access Groups
+                - text: .
+            - link "+ Create Template" [ref=f1e197] [cursor=pointer]:
+              - /url: /admin/assessments/templates/new
+          - generic [ref=f1e198]:
+            - generic [ref=f1e199]:
+              - generic [ref=f1e200]: Total Templates
+              - generic [ref=f1e201]: "7"
+            - generic [ref=f1e202]:
+              - generic [ref=f1e203]: INVITED (active)
+              - generic [ref=f1e204]: "7"
+            - generic [ref=f1e205]:
+              - generic [ref=f1e206]: PUBLIC (active)
+              - generic [ref=f1e207]: "0"
+            - generic [ref=f1e208]:
+              - generic [ref=f1e209]: Drafts
+              - generic [ref=f1e210]: "0"
+          - table [ref=f1e212]:
+            - rowgroup [ref=f1e213]:
+              - row "Template Name Access Mode Aggregation Versions Active Version Published Status Actions" [ref=f1e214]:
+                - columnheader "Template Name" [ref=f1e215]
+                - columnheader "Access Mode" [ref=f1e216]
+                - columnheader "Aggregation" [ref=f1e217]
+                - columnheader "Versions" [ref=f1e218]
+                - columnheader "Active Version Published" [ref=f1e219]
+                - columnheader "Status" [ref=f1e220]
+                - columnheader "Actions" [ref=f1e221]
+            - rowgroup [ref=f1e222]:
+              - row "Leadership Vision Alignment INVITED FULL_VISIBILITY v1 (1 total) — ● Active View · Access ↗ · Edit · Soft-delete Leadership Vision Alignment" [ref=f1e223]:
+                - cell "Leadership Vision Alignment" [ref=f1e224]:
+                  - link "Leadership Vision Alignment" [ref=f1e225] [cursor=pointer]:
+                    - /url: /admin/assessments/templates/cmpl64cb30003mjdszd2e5fql
+                - cell "INVITED" [ref=f1e226]:
+                  - generic [ref=f1e227]: INVITED
+                - cell "FULL_VISIBILITY" [ref=f1e228]:
+                  - generic [ref=f1e229]: FULL_VISIBILITY
+                - cell "v1 (1 total)" [ref=f1e230]:
+                  - generic [ref=f1e231]: v1 (1 total)
+                - cell "—" [ref=f1e232]
+                - cell "● Active" [ref=f1e233]:
+                  - generic [ref=f1e234]: ● Active
+                - cell "View · Access ↗ · Edit · Soft-delete Leadership Vision Alignment" [ref=f1e235]:
+                  - generic [ref=f1e236]:
+                    - link "View" [ref=f1e237] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmpl64cb30003mjdszd2e5fql
+                    - generic [ref=f1e238]: ·
+                    - link "Access ↗" [ref=f1e239] [cursor=pointer]:
+                      - /url: /admin/assessments/access-groups
+                    - generic [ref=f1e240]: ·
+                    - link "Edit" [ref=f1e241] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmpl64cb30003mjdszd2e5fql
+                    - generic [ref=f1e242]: ·
+                    - button "Soft-delete Leadership Vision Alignment" [ref=f1e243] [cursor=pointer]: Delete
+              - row "Quarterly Session Prep v1 INVITED FULL_VISIBILITY v1 (1 total) — ● Active Disabled View · Access ↗ · Edit · Soft-delete Quarterly Session Prep v1" [ref=f1e244]:
+                - cell "Quarterly Session Prep v1" [ref=f1e245]:
+                  - link "Quarterly Session Prep v1" [ref=f1e246] [cursor=pointer]:
+                    - /url: /admin/assessments/templates/cmpd191uz00052qkuni0d6ff4
+                - cell "INVITED" [ref=f1e247]:
+                  - generic [ref=f1e248]: INVITED
+                - cell "FULL_VISIBILITY" [ref=f1e249]:
+                  - generic [ref=f1e250]: FULL_VISIBILITY
+                - cell "v1 (1 total)" [ref=f1e251]:
+                  - generic [ref=f1e252]: v1 (1 total)
+                - cell "—" [ref=f1e253]
+                - cell "● Active Disabled" [ref=f1e254]:
+                  - generic [ref=f1e255]: ● Active
+                  - generic [ref=f1e256]: Disabled
+                - cell "View · Access ↗ · Edit · Soft-delete Quarterly Session Prep v1" [ref=f1e257]:
+                  - generic [ref=f1e258]:
+                    - link "View" [ref=f1e259] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmpd191uz00052qkuni0d6ff4
+                    - generic [ref=f1e260]: ·
+                    - link "Access ↗" [ref=f1e261] [cursor=pointer]:
+                      - /url: /admin/assessments/access-groups
+                    - generic [ref=f1e262]: ·
+                    - link "Edit" [ref=f1e263] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmpd191uz00052qkuni0d6ff4
+                    - generic [ref=f1e264]: ·
+                    - button "Soft-delete Quarterly Session Prep v1" [ref=f1e265] [cursor=pointer]: Delete
+              - row "Quarterly Session Prep v2 INVITED FULL_VISIBILITY v1 (1 total) — ● Active View · Access ↗ · Edit · Soft-delete Quarterly Session Prep v2" [ref=f1e266]:
+                - cell "Quarterly Session Prep v2" [ref=f1e267]:
+                  - link "Quarterly Session Prep v2" [ref=f1e268] [cursor=pointer]:
+                    - /url: /admin/assessments/templates/cmpd19fz1000511gwz6tzx2pw
+                - cell "INVITED" [ref=f1e269]:
+                  - generic [ref=f1e270]: INVITED
+                - cell "FULL_VISIBILITY" [ref=f1e271]:
+                  - generic [ref=f1e272]: FULL_VISIBILITY
+                - cell "v1 (1 total)" [ref=f1e273]:
+                  - generic [ref=f1e274]: v1 (1 total)
+                - cell "—" [ref=f1e275]
+                - cell "● Active" [ref=f1e276]:
+                  - generic [ref=f1e277]: ● Active
+                - cell "View · Access ↗ · Edit · Soft-delete Quarterly Session Prep v2" [ref=f1e278]:
+                  - generic [ref=f1e279]:
+                    - link "View" [ref=f1e280] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmpd19fz1000511gwz6tzx2pw
+                    - generic [ref=f1e281]: ·
+                    - link "Access ↗" [ref=f1e282] [cursor=pointer]:
+                      - /url: /admin/assessments/access-groups
+                    - generic [ref=f1e283]: ·
+                    - link "Edit" [ref=f1e284] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmpd19fz1000511gwz6tzx2pw
+                    - generic [ref=f1e285]: ·
+                    - button "Soft-delete Quarterly Session Prep v2" [ref=f1e286] [cursor=pointer]: Delete
+              - row "Rockefeller Habits Checklist INVITED FULL_VISIBILITY v1 (1 total) — ● Active View · Access ↗ · Edit · Soft-delete Rockefeller Habits Checklist" [ref=f1e287]:
+                - cell "Rockefeller Habits Checklist" [ref=f1e288]:
+                  - link "Rockefeller Habits Checklist" [ref=f1e289] [cursor=pointer]:
+                    - /url: /admin/assessments/templates/cmpapsaoz0003100os4vgaa38
+                - cell "INVITED" [ref=f1e290]:
+                  - generic [ref=f1e291]: INVITED
+                - cell "FULL_VISIBILITY" [ref=f1e292]:
+                  - generic [ref=f1e293]: FULL_VISIBILITY
+                - cell "v1 (1 total)" [ref=f1e294]:
+                  - generic [ref=f1e295]: v1 (1 total)
+                - cell "—" [ref=f1e296]
+                - cell "● Active" [ref=f1e297]:
+                  - generic [ref=f1e298]: ● Active
+                - cell "View · Access ↗ · Edit · Soft-delete Rockefeller Habits Checklist" [ref=f1e299]:
+                  - generic [ref=f1e300]:
+                    - link "View" [ref=f1e301] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmpapsaoz0003100os4vgaa38
+                    - generic [ref=f1e302]: ·
+                    - link "Access ↗" [ref=f1e303] [cursor=pointer]:
+                      - /url: /admin/assessments/access-groups
+                    - generic [ref=f1e304]: ·
+                    - link "Edit" [ref=f1e305] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmpapsaoz0003100os4vgaa38
+                    - generic [ref=f1e306]: ·
+                    - button "Soft-delete Rockefeller Habits Checklist" [ref=f1e307] [cursor=pointer]: Delete
+              - row "Scaling Up 4 Decisions Assessment INVITED FULL_VISIBILITY v1 (1 total) — ● Active View · Access ↗ · Edit · Soft-delete Scaling Up 4 Decisions Assessment" [ref=f1e308]:
+                - cell "Scaling Up 4 Decisions Assessment" [ref=f1e309]:
+                  - link "Scaling Up 4 Decisions Assessment" [ref=f1e310] [cursor=pointer]:
+                    - /url: /admin/assessments/templates/cmq7k2ew50003dgfyo031gacw
+                - cell "INVITED" [ref=f1e311]:
+                  - generic [ref=f1e312]: INVITED
+                - cell "FULL_VISIBILITY" [ref=f1e313]:
+                  - generic [ref=f1e314]: FULL_VISIBILITY
+                - cell "v1 (1 total)" [ref=f1e315]:
+                  - generic [ref=f1e316]: v1 (1 total)
+                - cell "—" [ref=f1e317]
+                - cell "● Active" [ref=f1e318]:
+                  - generic [ref=f1e319]: ● Active
+                - cell "View · Access ↗ · Edit · Soft-delete Scaling Up 4 Decisions Assessment" [ref=f1e320]:
+                  - generic [ref=f1e321]:
+                    - link "View" [ref=f1e322] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmq7k2ew50003dgfyo031gacw
+                    - generic [ref=f1e323]: ·
+                    - link "Access ↗" [ref=f1e324] [cursor=pointer]:
+                      - /url: /admin/assessments/access-groups
+                    - generic [ref=f1e325]: ·
+                    - link "Edit" [ref=f1e326] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmq7k2ew50003dgfyo031gacw
+                    - generic [ref=f1e327]: ·
+                    - button "Soft-delete Scaling Up 4 Decisions Assessment" [ref=f1e328] [cursor=pointer]: Delete
+              - row "Scaling Up Full Assessment INVITED FULL_VISIBILITY v1 (1 total) — ● Active View · Access ↗ · Edit · Soft-delete Scaling Up Full Assessment" [ref=f1e329]:
+                - cell "Scaling Up Full Assessment" [ref=f1e330]:
+                  - link "Scaling Up Full Assessment" [ref=f1e331] [cursor=pointer]:
+                    - /url: /admin/assessments/templates/cmpkrg60q0003sbwzo491w1up
+                - cell "INVITED" [ref=f1e332]:
+                  - generic [ref=f1e333]: INVITED
+                - cell "FULL_VISIBILITY" [ref=f1e334]:
+                  - generic [ref=f1e335]: FULL_VISIBILITY
+                - cell "v1 (1 total)" [ref=f1e336]:
+                  - generic [ref=f1e337]: v1 (1 total)
+                - cell "—" [ref=f1e338]
+                - cell "● Active" [ref=f1e339]:
+                  - generic [ref=f1e340]: ● Active
+                - cell "View · Access ↗ · Edit · Soft-delete Scaling Up Full Assessment" [ref=f1e341]:
+                  - generic [ref=f1e342]:
+                    - link "View" [ref=f1e343] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmpkrg60q0003sbwzo491w1up
+                    - generic [ref=f1e344]: ·
+                    - link "Access ↗" [ref=f1e345] [cursor=pointer]:
+                      - /url: /admin/assessments/access-groups
+                    - generic [ref=f1e346]: ·
+                    - link "Edit" [ref=f1e347] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmpkrg60q0003sbwzo491w1up
+                    - generic [ref=f1e348]: ·
+                    - button "Soft-delete Scaling Up Full Assessment" [ref=f1e349] [cursor=pointer]: Delete
+              - row "The Five Dysfunctions of a Team — Team Assessment INVITED FULL_VISIBILITY v1 (1 total) — ● Active View · Access ↗ · Edit · Soft-delete The Five Dysfunctions of a Team — Team Assessment" [ref=f1e350]:
+                - cell "The Five Dysfunctions of a Team — Team Assessment" [ref=f1e351]:
+                  - link "The Five Dysfunctions of a Team — Team Assessment" [ref=f1e352] [cursor=pointer]:
+                    - /url: /admin/assessments/templates/cmq7ld0c70003q73il108ngp1
+                - cell "INVITED" [ref=f1e353]:
+                  - generic [ref=f1e354]: INVITED
+                - cell "FULL_VISIBILITY" [ref=f1e355]:
+                  - generic [ref=f1e356]: FULL_VISIBILITY
+                - cell "v1 (1 total)" [ref=f1e357]:
+                  - generic [ref=f1e358]: v1 (1 total)
+                - cell "—" [ref=f1e359]
+                - cell "● Active" [ref=f1e360]:
+                  - generic [ref=f1e361]: ● Active
+                - cell "View · Access ↗ · Edit · Soft-delete The Five Dysfunctions of a Team — Team Assessment" [ref=f1e362]:
+                  - generic [ref=f1e363]:
+                    - link "View" [ref=f1e364] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmq7ld0c70003q73il108ngp1
+                    - generic [ref=f1e365]: ·
+                    - link "Access ↗" [ref=f1e366] [cursor=pointer]:
+                      - /url: /admin/assessments/access-groups
+                    - generic [ref=f1e367]: ·
+                    - link "Edit" [ref=f1e368] [cursor=pointer]:
+                      - /url: /admin/assessments/templates/cmq7ld0c70003q73il108ngp1
+                    - generic [ref=f1e369]: ·
+                    - button "Soft-delete The Five Dysfunctions of a Team — Team Assessment" [ref=f1e370] [cursor=pointer]: Delete
+    - contentinfo [ref=f1e168]:
+      - paragraph [ref=f1e170]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - button "Open Next.js Dev Tools" [ref=f1e176] [cursor=pointer]:
+    - img [ref=f1e177]
+  - alert [ref=f1e183]
