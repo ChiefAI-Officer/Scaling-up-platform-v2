@@ -311,13 +311,10 @@ export function AssessmentTemplatesList({
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <span className="wf-actions">
-                        <Link
-                          href={`/admin/assessments/templates/${row.id}`}
-                          className="wf-action-link"
-                        >
-                          View
-                        </Link>
-                        <span className="wf-action-sep">·</span>
+                        {/* Jul-8 roadmap #2 — "View" removed: it linked to the
+                            same editor URL as the row name + "Edit" (3 controls,
+                            1 destination). The template NAME is now the open
+                            affordance; "Edit" stays as the explicit verb. */}
                         <Link
                           href={`/admin/assessments/access-groups`}
                           className="wf-action-link"
