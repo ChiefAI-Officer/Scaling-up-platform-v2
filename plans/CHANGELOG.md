@@ -6,6 +6,22 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-08 — Wave U3 LAUNCHED: findings/recommendations in the results email LIVE on production <!-- ENTRY_ISO:2026-07-08 ENTRY_SLUG:wave-u3-launched -->
+
+**`WAVE_U3_EMAIL_FINDINGS_ENABLED=1` set on Vercel Production + redeploy** (deploy `j7f6gd7hv`, aliased `platformtest.scalingup.com`) — flips the Wave U3 email surface (built dark in PR #162 `76b5cb18`, spec 19aa) LIVE. This is **roadmap target #1 of 3** from the Jul-8 progress report (`progress-report-jul8-sent`).
+
+**What went live.** The FROZEN `result.findings` snapshot now renders into the results email for BOTH recipients (taker + referring coach, D4) and BOTH report kinds:
+- **scored anatomy** — ALL rule kinds render, **including SLIDER bands** (D5, a deliberate divergence from the on-screen scored report's non-slider filter — the email has no legacy per-row slider path, so excluding sliders would gut recommendations for slider-heavy instruments like SU-Full); merged into "What to work on next";
+- **qualitative twin** (LVA/QSP) — a consolidated "Your recommendations" section rendered **BEFORE** the answers, so recs survive the ~90 KB email byte budget.
+
+Reads the snapshot via `parseResolvedFindings` — **never re-resolves** (the D3 read-path rule; reader-audit guard green). Kill = zero the flag (published snapshots persist inert). The `WAVE_U_FINDINGS_ENABLED` report flag next to it (live 2 days) is a **separate** flag and was unaffected — U3 shipped its own flag precisely so the flip wouldn't push findings into real emails on deploy.
+
+**Launch verification (no prod-DB test data, render-equivalence).** (1) The 4 U3 suites — `wave-u3-flags`, `question-serialization.wave-u3`, `report-email.wave-u3-findings`, `questions-tab.wave-u3` — **37 tests, all green on the deployed commit**. (2) A shipped-code render (`buildReportEmailHtml` at HEAD with the prod flag value) confirmed: scored flag-ON → "Your recommendations" block present with all three rule kinds (slider/number/multi-choice); qualitative flag-ON → block present, rendered before the answers; **flag-OFF byte-identical** (frozen snapshot vs no-snapshot) for BOTH kinds → real templates with no authored findings send an UNCHANGED email (honest-data). (3) Prod alias `platformtest.scalingup.com` HTTP 200. Because the deployed code == the rendered code and the prod flag == the rendered flag value, the render is what production emits; a real prod-DB campaign + ACS send was **not** minted (I can't self-read a delivered inbox, and it would leave artifacts to quarantine) — a live-inbox send remains available on request as belt-and-suspenders.
+
+**Editor test-a-value preview** already shipped LIVE with #162 (gated by the live Wave U flag, not this flag) — no separate launch. **Group-report/cohort findings** remain DEFERRED (D1 — undefined aggregation semantic; its own wave, likely a Jeff call).
+
+**Next (Jul-8 roadmap, targets #2–#3):** the templates-list **View == Edit** fix and the three "coming soon" admin pages (Organizations / Campaigns / Public Quizzes) that 404 today.
+
 ### 2026-07-08 — Codebase handoff package for Jeff + full working-tree sweep (docs/assets only) <!-- ENTRY_ISO:2026-07-08 ENTRY_SLUG:handoff-jeff-jul8 -->
 
 **[HANDOFF-Jeff-2026-07-08.md](../HANDOFF-Jeff-2026-07-08.md) written at the repo root** — the sync-with-the-codebase guide for Jeff: clone/run instructions (Node 20, env values via Vercel — never committed, push-to-`main` = prod deploy), the reading order (CLAUDE.md → this CHANGELOG → the 22 ADRs → the v7.6 spec library), a J→Y wave ledger with launch dates, the production feature-flag table (all wave flags ON except `WAVE_U3_EMAIL_FINDINGS_ENABLED` — dark pending Jeff's sample review), the **corrected** waiting-on-Jeff list (SU-Full industry benchmarking decision · #2.3 invite copy · #15/#16/#19 wording · U3 sample review — LVA peer numbers dropped per `progress-report-jul8-sent`), and practical notes (immutable published versions/stableKeys, import observability + rehearsed quarantine, the deployment verification protocol).

@@ -1,6 +1,6 @@
 # Spec 19aa — Wave U §3 leftovers (part 1): findings in the results email + editor test-a-value preview
 
-> **Status:** BUILT — editor findings preview LIVE on merge (reuses the live Wave U flag); results-email findings MERGED DARK behind `WAVE_U3_EMAIL_FINDINGS_ENABLED` (default OFF). Launch = flag flip after a walk (pending, separate authorization).
+> **Status:** LAUNCHED 2026-07-08 — `WAVE_U3_EMAIL_FINDINGS_ENABLED=1` set on Vercel Production + redeploy (deploy `j7f6gd7hv`); results-email findings now render LIVE for both recipients and both report kinds. Launch-verified via shipped-code render (scored + qualitative, flag ON/OFF byte-identity) + the 4 U3 suites (37 tests) green on the deployed commit; prod alias HTTP 200. Editor findings preview shipped LIVE on merge (reuses the live Wave U flag). Kill = zero the flag. See `plans/CHANGELOG.md` (`wave-u3-launched`).
 > **Wave:** Wave U §3 leftovers, part 1. (Single-letter 19a–19z is exhausted; continuing as `19aa`.)
 > **Flags:** editor preview reuses the LIVE `isFindingsLogicEnabled()` (Wave U). Email findings get a
 > NEW default-OFF flag `WAVE_U3_EMAIL_FINDINGS_ENABLED` (ships dark; kill = zero the flag).
