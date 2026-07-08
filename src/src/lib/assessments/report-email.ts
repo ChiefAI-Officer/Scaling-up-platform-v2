@@ -56,6 +56,11 @@ import {
 } from "@/lib/assessments/qualitative-report-model";
 import { buildQuestionMetaByKey } from "@/lib/assessments/question-meta";
 import { emitReportMetric } from "@/lib/assessments/report-metrics";
+import {
+  parseResolvedFindings,
+  buildFindingsSection,
+} from "@/lib/assessments/findings-section-model";
+import { isEmailFindingsEnabled } from "@/lib/assessments/wave-u3-flags";
 
 export type ReportEmailRecipientRole = "TAKER_COPY" | "REFERRING_COACH";
 
@@ -483,6 +488,70 @@ function buildQualitativeBodySections(report: RespondentReport): {
   return { html: parts.join(""), truncated };
 }
 
+// ── Wave U3 (spec 19aa) — results-email findings block ─────────────────────
+//
+// Renders the FROZEN `result.findings` snapshot (ADR-0021) into an email-safe
+// <table>, shared by BOTH the scored anatomy and the qualitative twin. It NEVER
+// re-resolves — it reads the snapshot via parseResolvedFindings (the D3
+// read-path rule) — and groups by the version's sections via the shared
+// buildFindingsSection (scored ↔ qualitative parity), which by design includes
+// ALL kinds incl. SLIDER_LIKERT bands (D5: the email has no legacy per-row
+// slider-rec path to double-display, and dropping sliders would gut
+// recommendations for slider-heavy scored instruments like SU-Full).
+//
+// Flag-gated (default-OFF WAVE_U3_EMAIL_FINDINGS_ENABLED): returns "" when the
+// flag is off OR nothing fired, so both email bodies are BYTE-IDENTICAL when
+// dark (injected via adjacent concatenation at the call sites). Every finding
+// TEXT is escaped (defence-in-depth — campaign-authored content) and no raw
+// value is ever interpolated into a style/attribute. Imports nothing from the
+// peers module, so the Wave S email byte-identity source guard stays green.
+function buildEmailFindingsBlock(report: RespondentReport): string {
+  if (!isEmailFindingsEnabled()) return "";
+  const findings = parseResolvedFindings(report.result?.findings);
+  const section = buildFindingsSection(findings, report.sections);
+  if (!section) return "";
+
+  const escEyebrow = escapeHtml(section.eyebrow);
+  const escTitle = escapeHtml(section.title);
+
+  const groupsHtml = section.groups
+    .map((g) => {
+      const heading =
+        g.sectionName !== null
+          ? `<div style="font-size:12px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:${MUTED};margin:12px 0 6px;">${escapeHtml(
+              g.sectionName,
+            )}</div>`
+          : "";
+      const items = g.items
+        .map(
+          (it) =>
+            `<div style="font-size:13px;color:${INK};line-height:1.55;margin:0 0 8px;">${escapeHtml(
+              it.text,
+            )}</div>`,
+        )
+        .join("");
+      return `${heading}${items}`;
+    })
+    .join("");
+
+  return `
+  <tr>
+    <td style="padding:24px 32px 6px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:${MUTED};font-weight:800;">${escEyebrow}</td>
+  </tr>
+  <tr>
+    <td style="padding:0 32px 6px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${SOFT};border:1px solid ${LINE};border-radius:13px;">
+        <tr>
+          <td style="padding:16px 18px;">
+            <div style="font-size:16px;font-weight:800;color:${INK};margin-bottom:6px;">${escTitle}</div>
+            ${groupsHtml}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>`;
+}
+
 /**
  * Assembles the full qualitative report email (shell + body). Reuses the scored
  * email's branded cover/footer; only the BODY differs. Never throws — on a body
@@ -553,11 +622,19 @@ function buildQualitativeReportEmail({
         )}</td></tr>`
       : "";
 
+    // Wave U3 (spec 19aa D5): findings render BEFORE the answers block so
+    // recommendations survive the ~90 KB qualitative byte budget / answer
+    // truncation. "" when the flag is off or nothing fired ⇒ byte-identical.
+    const findingsBlock = buildEmailFindingsBlock(report);
+
     // No present sections at all → a graceful "received" body (not an error).
+    // Findings still lead even here (D5: recommendations survive the EXTREME of
+    // answer truncation — an all-suppressed/empty answer body). "" when the flag
+    // is off ⇒ byte-identical to the prior "received" fallback.
     const body =
       sectionsHtml === ""
-        ? `<tr><td style="padding:22px 32px;font-size:14px;color:${INK};line-height:1.55;">Your assessment has been received.</td></tr>`
-        : `${preface}${sectionsHtml}${truncationNote}`;
+        ? `${findingsBlock}<tr><td style="padding:22px 32px;font-size:14px;color:${INK};line-height:1.55;">Your assessment has been received.</td></tr>`
+        : `${preface}${findingsBlock}${sectionsHtml}${truncationNote}`;
 
     return { subject, bodyHtml: shell(body) };
   } catch (err) {
@@ -888,6 +965,11 @@ export function buildReportEmailHtml({
     }
   }
 
+  // ── Wave U3 (spec 19aa) — findings block, after the breakdown, before the
+  // conclusion CTA. "" when the flag is off or nothing fired ⇒ the scored email
+  // is byte-identical to today (injected via adjacent concatenation below).
+  const findingsBlock = buildEmailFindingsBlock(report);
+
   // ── Conclusion + footer ────────────────────────────────────────────────────
   const leadIn =
     recipientRole === "REFERRING_COACH"
@@ -949,7 +1031,7 @@ export function buildReportEmailHtml({
           ${overall}
           ${cardsBlock}
           ${scoresTable}
-          ${breakdownBlock}
+          ${breakdownBlock}${findingsBlock}
           ${conclusion}
         </table>
       </td>
