@@ -25,6 +25,7 @@ jest.mock("@/lib/db", () => ({
     orgRespondent: { findMany: jest.fn() },
     assessmentTemplate: { findFirst: jest.fn() },
     assessmentTemplateVersion: { findFirst: jest.fn() },
+    auditLog: { create: jest.fn() }, // Wave Y — activity signal writes
     $transaction: jest.fn(),
   },
 }));
@@ -760,6 +761,36 @@ describe("POST /api/admin/assessments/import — restrictedResults (Wave O, admi
           data: expect.objectContaining({ createdByCoachId: null }),
         }),
       );
+    });
+  });
+
+  // ── Wave Y — durable activity signals (admin mirror of the coach wiring) ──
+  describe("Wave Y activity signals", () => {
+    beforeEach(() => {
+      (isEspertoSuFullImportEnabled as jest.Mock).mockReturnValue(true);
+    });
+    function activityRows() {
+      return (db.auditLog.create as jest.Mock).mock.calls
+        .map((c) => c[0].data as { entityType: string; entityId: string; action: string; changes: string })
+        .filter((d) => d.entityType === "assessment_import_activity");
+    }
+    it("org-access refusal writes ONE refused row with entityId 'unknown'", async () => {
+      (canAccessOrganization as jest.Mock).mockResolvedValue(false);
+      const res = await POST(req(baseBody()));
+      expect(res.status).toBe(404);
+      const rows = activityRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].action).toBe("refused");
+      expect(rows[0].entityId).toBe("unknown");
+      expect(JSON.parse(rows[0].changes).code).toBe("org-access");
+    });
+    it("entitlement refusal writes a refused row (entitlement-denied)", async () => {
+      (canCreateCampaign as jest.Mock).mockResolvedValue(false);
+      const res = await POST(req(baseBody()));
+      expect(res.status).toBe(403);
+      const rows = activityRows();
+      expect(rows).toHaveLength(1);
+      expect(JSON.parse(rows[0].changes).code).toBe("entitlement-denied");
     });
   });
 });

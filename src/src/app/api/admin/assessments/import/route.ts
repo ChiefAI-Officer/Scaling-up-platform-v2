@@ -81,12 +81,14 @@ import {
   buildRealRestrictedCommitDb,
   resolveEspertoImportHashSalt,
   emitEspertoImportMetric,
+  refuse,
   type RestrictedCommitPrismaLike,
 } from "@/lib/assessments/esperto-import/restricted-route-helpers";
 import {
   recordCommitResultSignal,
   recordCommitConflictSignal,
 } from "@/lib/assessments/esperto-import/alert-signals";
+import { recordPreviewSignal } from "@/lib/assessments/esperto-import/import-activity-signals";
 import {
   checkMatAllowed,
   detectBatchShape,
@@ -687,10 +689,15 @@ async function handleRestrictedResultsImport(
   //    must still exist and be live — canAccessOrganization enforces both). ──
   const orgAllowed = await canAccessOrganization(asAccessDb(db), actor, targetOrgId);
   if (!orgAllowed) {
-    return NextResponse.json(
-      { success: false, error: "Organization not found" },
-      { status: 404 },
-    );
+    // Wave Y: refused signal. Org id OMITTED — the requested id is untrusted on
+    // a denied-access path (Codex C4) → the row records entityId:"unknown".
+    return refuse(db, {
+      code: "org-access",
+      mode,
+      status: 404,
+      body: { success: false, error: "Organization not found" },
+      templateAlias: instrument.templateAlias,
+    });
   }
 
   // ── 3. Resolve template/version/crosswalk/scorableStableKeys. ─────────────
@@ -702,6 +709,24 @@ async function handleRestrictedResultsImport(
     };
     if (ctxResult.code === "TEMPLATE_VERSION_NOT_PUBLISHED") body.details = ctxResult.details;
     if (ctxResult.code === "CROSSWALK_INCOMPATIBLE_WITH_VERSION") body.problems = ctxResult.problems;
+    // Wave Y: a depublished template / broken crosswalk fails EVERY import — a
+    // loud operator signal (D12). Genuine system errors stay uninstrumented.
+    const ctxRefusalCode =
+      ctxResult.code === "TEMPLATE_VERSION_NOT_PUBLISHED"
+        ? "template-not-published"
+        : ctxResult.code === "CROSSWALK_INCOMPATIBLE_WITH_VERSION"
+          ? "crosswalk-incompatible"
+          : null;
+    if (ctxRefusalCode) {
+      return refuse(db, {
+        code: ctxRefusalCode,
+        mode,
+        status: ctxResult.status,
+        body,
+        organizationId: targetOrgId,
+        templateAlias: instrument.templateAlias,
+      });
+    }
     return NextResponse.json(body, { status: ctxResult.status });
   }
   const { template, publishedVersion, crosswalk, scorableStableKeys } = ctxResult;
@@ -709,18 +734,26 @@ async function handleRestrictedResultsImport(
   // ── 4. Entitlement — run for BOTH preview and commit (admin bypasses). ────
   const entitled = await canCreateCampaign(asAccessDb(db), actor, template.id);
   if (!entitled) {
-    return NextResponse.json(
-      { success: false, error: "Not authorized to create campaign for this template" },
-      { status: 403 },
-    );
+    return refuse(db, {
+      code: "entitlement-denied",
+      mode,
+      status: 403,
+      body: { success: false, error: "Not authorized to create campaign for this template" },
+      organizationId: targetOrgId,
+      templateAlias: crosswalk.templateAlias,
+    });
   }
 
   // ── 5. Parse + classify every file — whole-batch 400 on ANY failure. ──────
   if (files.length > MAX_RESTRICTED_FILES) {
-    return NextResponse.json(
-      { success: false, error: `Too many files (max ${MAX_RESTRICTED_FILES})` },
-      { status: 413 },
-    );
+    return refuse(db, {
+      code: "too-many-files",
+      mode,
+      status: 413,
+      body: { success: false, error: `Too many files (max ${MAX_RESTRICTED_FILES})` },
+      organizationId: targetOrgId,
+      templateAlias: crosswalk.templateAlias,
+    });
   }
 
   const parsedFiles: EspertoRestricted[] = [];
@@ -742,10 +775,14 @@ async function handleRestrictedResultsImport(
     }
   }
   if (fileErrors.length > 0) {
-    return NextResponse.json(
-      { success: false, error: "One or more files failed to parse", fileErrors },
-      { status: 400 },
-    );
+    return refuse(db, {
+      code: "file-parse",
+      mode,
+      status: 400,
+      body: { success: false, error: "One or more files failed to parse", fileErrors },
+      organizationId: targetOrgId,
+      templateAlias: crosswalk.templateAlias,
+    });
   }
 
   // ── 5b. Wave X — selection-vs-file guards, whole-batch 400 (nothing written).
@@ -767,14 +804,18 @@ async function handleRestrictedResultsImport(
     if (!mat.ok) instrumentGuardErrors.push({ index: i, reason: mat.reason });
   }
   if (instrumentGuardErrors.length > 0) {
-    return NextResponse.json(
-      {
+    return refuse(db, {
+      code: "instrument-mismatch",
+      mode,
+      status: 400,
+      body: {
         success: false,
         error: `One or more files do not match the selected instrument (${instrument.uiLabel})`,
         fileErrors: instrumentGuardErrors,
       },
-      { status: 400 },
-    );
+      organizationId: targetOrgId,
+      templateAlias: crosswalk.templateAlias,
+    });
   }
 
   // Per-instrument cross-field consistency probes (warn-only, never block).
@@ -845,6 +886,18 @@ async function handleRestrictedResultsImport(
       ],
       flagState: "on",
     });
+    // Wave Y: durable preview signal ONLY when the preview degraded (block or
+    // ≥1 skip) — clean previews write nothing (D3). Fail-soft; UNCONDITIONAL.
+    if (plan.blocks.length > 0 || plan.skips.length > 0) {
+      await recordPreviewSignal(db, {
+        organizationId: targetOrgId,
+        templateAlias: crosswalk.templateAlias,
+        blockReasons: plan.blocks.map((b) => b.reason),
+        skipReasonCounts: countBy(plan.skips.map((s) => s.reason)),
+        filesInBatch: files.length,
+        respondentsSkipped: plan.skips.length,
+      });
+    }
     return NextResponse.json({
       success: true,
       data: {
@@ -879,6 +932,23 @@ async function handleRestrictedResultsImport(
     };
     if (freshCtxResult.code === "TEMPLATE_VERSION_NOT_PUBLISHED") body.details = freshCtxResult.details;
     if (freshCtxResult.code === "CROSSWALK_INCOMPATIBLE_WITH_VERSION") body.problems = freshCtxResult.problems;
+    // Wave Y: same operator-meaningful context refusals on the commit re-resolve.
+    const ctxRefusalCode =
+      freshCtxResult.code === "TEMPLATE_VERSION_NOT_PUBLISHED"
+        ? "template-not-published"
+        : freshCtxResult.code === "CROSSWALK_INCOMPATIBLE_WITH_VERSION"
+          ? "crosswalk-incompatible"
+          : null;
+    if (ctxRefusalCode) {
+      return refuse(db, {
+        code: ctxRefusalCode,
+        mode,
+        status: freshCtxResult.status,
+        body,
+        organizationId: targetOrgId,
+        templateAlias: crosswalk.templateAlias,
+      });
+    }
     return NextResponse.json(body, { status: freshCtxResult.status });
   }
 
