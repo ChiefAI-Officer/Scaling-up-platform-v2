@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { ObservabilityDashboard } from "@/components/admin/ObservabilityDashboard";
+import { ImportHealthPanel } from "@/components/admin/ImportHealthPanel";
 
 export default async function AdminObservabilityPage() {
   const session = await getServerSession(authOptions);
@@ -29,12 +30,15 @@ export default async function AdminObservabilityPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold text-foreground">Observability</h1>
         <p className="text-sm text-muted-foreground">
-          v1 — DB-derived counters. The full spec calls for 7 Vercel/Inngest
-          metrics + 6 alert gates (see{" "}
-          <code>docs/specs/v7.6/06-observability.md</code>); those wire in v1.5.
+          v1 — DB-derived counters. Esperto historical-import observability
+          (durable signals + the alert cron&apos;s own decisions) is now live
+          in the panel below; the other 7 Vercel/Inngest metrics + 6 alert gates
+          (see <code>docs/specs/v7.6/06-observability.md</code>) still wire in
+          v1.5.
         </p>
       </header>
       <ObservabilityDashboard />
+      <ImportHealthPanel />
     </div>
   );
 }

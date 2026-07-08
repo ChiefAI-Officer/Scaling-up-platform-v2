@@ -28,6 +28,7 @@ jest.mock("@/lib/db", () => ({
     orgRespondent: { findMany: jest.fn() },
     assessmentTemplate: { findFirst: jest.fn() },
     assessmentTemplateVersion: { findFirst: jest.fn() },
+    auditLog: { create: jest.fn() }, // Wave Y — activity signal writes
     $transaction: jest.fn(),
   },
 }));
@@ -767,6 +768,12 @@ describe("POST /api/assessments/import — restrictedResults (Wave O, coach-scop
       expect(body.success).toBe(true);
       expect(body.data.outcome.kind).toBe("created");
       expect(db.$transaction).toHaveBeenCalledTimes(1);
+      // Wave Y (D14): a SUCCESSFUL commit writes NO activity row (refused /
+      // preview_result are refusal/preview-only — no double-emission).
+      const activity = (db.auditLog.create as jest.Mock).mock.calls
+        .map((c) => c[0].data as { entityType: string })
+        .filter((d) => d.entityType === "assessment_import_activity");
+      expect(activity).toHaveLength(0);
     });
 
     it("409 version-changed-since-preview when expectedVersionId doesn't match the fresh resolution", async () => {
@@ -776,6 +783,136 @@ describe("POST /api/assessments/import — restrictedResults (Wave O, coach-scop
       expect(res.status).toBe(409);
       const body = await res.json();
       expect(body.error).toBe("version-changed-since-preview");
+    });
+  });
+
+  // ── Wave Y — durable activity signals (refusals + preview degradation) ────
+  describe("Wave Y activity signals", () => {
+    beforeEach(() => {
+      (isEspertoSuFullImportEnabled as jest.Mock).mockReturnValue(true);
+    });
+
+    function activityRows() {
+      return (db.auditLog.create as jest.Mock).mock.calls
+        .map(
+          (c) =>
+            c[0].data as {
+              entityType: string;
+              entityId: string;
+              action: string;
+              changes: string;
+            },
+        )
+        .filter((d) => d.entityType === "assessment_import_activity");
+    }
+
+    it("org-access refusal writes ONE refused row with entityId 'unknown' (org never persisted)", async () => {
+      (canAccessOrganization as jest.Mock).mockResolvedValue(false);
+      const res = await POST(req(baseBody()));
+      expect(res.status).toBe(404);
+      const rows = activityRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].action).toBe("refused");
+      expect(rows[0].entityId).toBe("unknown");
+      const changes = JSON.parse(rows[0].changes);
+      expect(changes.code).toBe("org-access");
+      expect(changes.organizationId).toBeUndefined();
+    });
+
+    it("too-many-files refusal writes a refused row (code too-many-files)", async () => {
+      const files = Array.from({ length: 301 }, (_, i) =>
+        restrictedFile(`MID_${i}`, `rep-${i}`, "2025-03-01T10:00:00-04:00"),
+      );
+      const res = await POST(req(baseBody({ files })));
+      expect(res.status).toBe(413);
+      const rows = activityRows();
+      expect(rows).toHaveLength(1);
+      expect(JSON.parse(rows[0].changes).code).toBe("too-many-files");
+    });
+
+    it("entitlement refusal writes a refused row (entitlement-denied) with the validated org", async () => {
+      (canCreateCampaign as jest.Mock).mockResolvedValue(false);
+      const res = await POST(req(baseBody()));
+      expect(res.status).toBe(403);
+      const rows = activityRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].action).toBe("refused");
+      expect(rows[0].entityId).toBe("org-r");
+      expect(JSON.parse(rows[0].changes).code).toBe("entitlement-denied");
+    });
+
+    it("a DEGRADED preview (≥1 skip) writes ONE preview_result row", async () => {
+      // A second file whose mid is NOT on the roster → unresolved-respondent skip.
+      const res = await POST(
+        req(
+          baseBody({
+            files: [
+              restrictedFile("MID_A", "rep-A", "2025-03-01T10:00:00-04:00"),
+              restrictedFile("MID_ORPHAN", "rep-B", "2025-03-01T10:00:00-04:00"),
+            ],
+          }),
+        ),
+      );
+      expect(res.status).toBe(200);
+      const rows = activityRows().filter((d) => d.action === "preview_result");
+      expect(rows).toHaveLength(1);
+      const changes = JSON.parse(rows[0].changes);
+      expect(changes.skipReasonCounts["unresolved-respondent"]).toBe(1);
+      expect(changes.respondentsSkipped).toBe(1);
+    });
+
+    it("a CLEAN preview (no blocks/skips) writes NO preview_result row (D3)", async () => {
+      const res = await POST(req(baseBody()));
+      expect(res.status).toBe(200);
+      expect(
+        activityRows().filter((d) => d.action === "preview_result"),
+      ).toHaveLength(0);
+    });
+
+    it("preview context refusal (template-not-published) writes a refused row (D12)", async () => {
+      (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValueOnce(null);
+      const res = await POST(req(baseBody()));
+      expect(res.status).toBe(422);
+      const rows = activityRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0].action).toBe("refused");
+      const changes = JSON.parse(rows[0].changes);
+      expect(changes.code).toBe("template-not-published");
+      expect(changes.mode).toBe("preview");
+    });
+
+    it("commit-mode fresh-ctx refusal (template depublished between preview & commit) writes a refused row", async () => {
+      // step-3 resolve OK, step-10 FRESH resolve fails → the hand-duplicated
+      // commit refusal branch (route.ts ~949) that no other test exercises.
+      (db.assessmentTemplateVersion.findFirst as jest.Mock).mockReset();
+      (db.assessmentTemplateVersion.findFirst as jest.Mock)
+        .mockResolvedValueOnce({
+          id: "ver-1",
+          language: "enUS",
+          questions: [
+            { stableKey: "SUF_rate_a", type: "SLIDER_LIKERT", isRequired: true, scale: { min: 0, max: 10 } },
+            { stableKey: "SUF_headcount", type: "NUMBER", isRequired: true },
+          ],
+          sections: [],
+          scoringConfig: {},
+        })
+        .mockResolvedValueOnce(null);
+      const res = await POST(req(baseBody({ mode: "commit", expectedVersionId: "ver-1" })));
+      expect(res.status).toBe(422);
+      const rows = activityRows();
+      expect(rows).toHaveLength(1);
+      const changes = JSON.parse(rows[0].changes);
+      expect(changes.code).toBe("template-not-published");
+      expect(changes.mode).toBe("commit");
+      expect(db.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("file-parse refusal writes a refused row (code file-parse)", async () => {
+      const res = await POST(req(baseBody({ files: [{ nope: true }] })));
+      expect(res.status).toBe(400);
+      const rows = activityRows();
+      expect(rows).toHaveLength(1);
+      expect(JSON.parse(rows[0].changes).code).toBe("file-parse");
     });
   });
 });

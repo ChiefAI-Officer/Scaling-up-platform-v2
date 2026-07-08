@@ -46,6 +46,11 @@ import {
   type VersionQuestion,
 } from "./crosswalks";
 import type { RestrictedCommitDb } from "./restricted-commit";
+import { NextResponse } from "next/server";
+import {
+  recordRefusalSignal,
+  type ActivitySignalDb,
+} from "./import-activity-signals";
 
 /** The SU-Full template's crosswalk alias — the only alias this helper resolves. */
 export const SU_FULL_TEMPLATE_ALIAS = "scaling-up-full";
@@ -458,7 +463,8 @@ export type EspertoImportMetricEvent =
   | "preview"
   | "commit_attempt"
   | "commit_result"
-  | "commit_conflict";
+  | "commit_conflict"
+  | "refused";
 
 /** Emit one `assessment.esperto_import.<event>` structured marker. Never throws. */
 export function emitEspertoImportMetric(
@@ -481,4 +487,41 @@ export function emitEspertoImportMetric(
   } catch {
     // Instrumentation is best-effort — never let a logging failure surface.
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// refuse — the single seam every pre-commit 4xx gate returns through
+// (spec 19y D7/D16). It writes a fail-soft `refused` activity signal (Wave Y)
+// + the console marker, then returns the caller's EXISTING response body +
+// status VERBATIM (no normalization → no caller-visible change). Centralizing
+// this makes "every refusal emits a signal" a structural invariant a future
+// gate cannot silently skip. `organizationId` is OMITTED for the pre-validation
+// `org-access` refusal (its requested org id is untrusted, Codex C4) → the row
+// records entityId:"unknown".
+// ────────────────────────────────────────────────────────────────────────
+export async function refuse(
+  db: ActivitySignalDb,
+  opts: {
+    code: string;
+    mode: "preview" | "commit";
+    status: number;
+    body: Record<string, unknown>;
+    organizationId?: string;
+    templateAlias?: string;
+  },
+): Promise<NextResponse> {
+  emitEspertoImportMetric("refused", {
+    code: opts.code,
+    mode: opts.mode,
+    organizationId: opts.organizationId,
+    templateAlias: opts.templateAlias,
+    status: opts.status,
+  });
+  await recordRefusalSignal(db, {
+    code: opts.code,
+    mode: opts.mode,
+    organizationId: opts.organizationId,
+    templateAlias: opts.templateAlias,
+  });
+  return NextResponse.json(opts.body, { status: opts.status });
 }
