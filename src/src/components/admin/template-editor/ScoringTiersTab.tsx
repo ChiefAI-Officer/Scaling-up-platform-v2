@@ -5,12 +5,13 @@
  *
  * Plan: ~/.claude/plans/yes-we-were-in-cosmic-jellyfish.md (F4 + Gap D)
  *
- * Matches WF18 section-for-section:
+ * Structure (the WF18 "deferred logic" placeholders — the Peer Benchmarks
+ * ghost card + its explanation card — were removed in Wave W leftovers,
+ * spec 19z: superseded by the live Wave S peer-averages panel; the earlier
+ * Conditional Sections ghost went in Wave W, spec 19w D5):
  *   1. Scoring Configuration card (Tier Metric + Pass Threshold)
  *   2. Tiers table (Order/minMetric/maxMetric/Label/Message/Action)
  *   3. Per-domain tiers (Gap D — not in WF, plan-driven D2 extension)
- *   4. Deferred Conditional Sections + Peer Benchmarks ghost cards
- *   5. Explanation card (verbatim WF18)
  */
 
 "use client";
@@ -566,104 +567,6 @@ export function ScoringTiersTab({
           ))}
         </section>
       )}
-
-      {/* ──────────────────────────────────────────────────────────────
-          Section 3 — Deferred logic placeholder (per WF18; Wave W
-          removed the Conditional Sections ghost — spec 19w D5: its
-          report-sections concept was superseded by Wave U findings and
-          survey show-if authoring lives in the Questions tab)
-          ────────────────────────────────────────────────────────────── */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Peer Benchmarks — ghost */}
-        <div
-          data-testid="deferred-peer-benchmarks"
-          aria-hidden="true"
-          className="rounded-xl border border-border bg-muted/20 p-6 space-y-3 opacity-70"
-        >
-          <header className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-foreground">
-              Peer Benchmarks
-            </h4>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[0.625rem] font-bold bg-warning/20 text-warning">
-              v1.5
-            </span>
-          </header>
-          <p className="text-xs text-muted-foreground">
-            Hardcoded benchmark values per question stableKey. Used by the
-            report renderer to draw a &ldquo;Your peers averaged X; you&apos;re
-            at Y&rdquo; panel.
-          </p>
-          <table className="w-full text-xs">
-            <thead className="bg-muted/40">
-              <tr>
-                <th className="px-2 py-1 text-left text-muted-foreground">
-                  stableKey
-                </th>
-                <th className="px-2 py-1 text-left text-muted-foreground">
-                  Benchmark
-                </th>
-                <th className="px-2 py-1 text-left text-muted-foreground">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { stableKey: "Q3_2", benchmark: 2.4 },
-                { stableKey: "Q5_1", benchmark: 1.8 },
-                { stableKey: "Q7_3", benchmark: 2.7 },
-              ].map((row) => (
-                <tr key={row.stableKey} className="border-t border-border">
-                  <td className="px-2 py-1 font-mono">{row.stableKey}</td>
-                  <td className="px-2 py-1">{row.benchmark}</td>
-                  <td className="px-2 py-1">
-                    <button
-                      type="button"
-                      disabled
-                      className="text-xs text-destructive opacity-50"
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button
-            type="button"
-            disabled
-            className="wf-btn wf-btn-secondary"
-            style={{ opacity: 0.5 }}
-          >
-            + Add Benchmark
-          </button>
-          <p className="text-xs text-muted-foreground italic">
-            v1 ships with hardcoded benchmark seeds via Prisma Studio. v2
-            replaces with real-data benchmarks once submissions accrue.
-            Missing benchmark → renderer omits that question&apos;s panel,
-            doesn&apos;t break.
-          </p>
-        </div>
-      </section>
-
-      {/* ──────────────────────────────────────────────────────────────
-          Section 4 — Explanation card (verbatim WF18)
-          ────────────────────────────────────────────────────────────── */}
-      <section className="wf-card space-y-2" style={{ padding: "1.5rem", background: "hsl(var(--muted) / 0.1)" }}>
-        <h4 className="text-sm font-semibold text-foreground">
-          Why is this section deferred? (Codex co-validate, May 12 2026)
-        </h4>
-        <p className="text-sm text-muted-foreground">
-          Peer-benchmark authoring was deferred at the original v1 cut
-          (May 2026); Wave S (spec 19s) since shipped the REAL admin panel on
-          the LVA template editor (<code>AssessmentBenchmark</code> rows), so
-          this ghost is retained only as the WF18 record for templates the
-          panel hasn&apos;t reached. The former Conditional Sections ghost was
-          removed in Wave W (spec 19w): its report-sections concept was
-          superseded by Wave U findings (ADR-0021), and survey show-if
-          authoring now lives on each question in the Questions tab.
-        </p>
-      </section>
     </div>
   );
 }

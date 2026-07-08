@@ -121,7 +121,7 @@ const allVersions = [
 // ────────────────────────────────────────────────────────────────────────
 describe("TemplateEditorTabbed — F1 chrome", () => {
   describe("tab nav", () => {
-    it("renders all 7 tabs with exact labels from WF16", () => {
+    it("renders all 6 tabs with exact labels from WF16 (Conditional Logic ghost removed in Wave W)", () => {
       render(
         <TemplateEditorTabbed
           template={baseTemplate}
@@ -263,7 +263,7 @@ describe("TemplateEditorTabbed — F1 chrome", () => {
       expect(pill.textContent).toMatch(/v1 \(published\)/i);
     });
 
-    it("Preview as Respondent button is disabled with v1.5 tooltip", () => {
+    it("Preview as Respondent button is REMOVED (Wave W leftovers, spec 19z — dead v1.5 no-op button dropped)", () => {
       render(
         <TemplateEditorTabbed
           template={baseTemplate}
@@ -272,11 +272,9 @@ describe("TemplateEditorTabbed — F1 chrome", () => {
         />,
       );
 
-      const btn = screen.getByRole("button", {
-        name: /Preview as Respondent/,
-      });
-      expect(btn).toBeDisabled();
-      expect(btn).toHaveAttribute("title", "Coming in v1.5");
+      expect(
+        screen.queryByRole("button", { name: /Preview as Respondent/ }),
+      ).toBeNull();
     });
 
     it("Save Draft button calls onSaveDraft callback (when a surface is dirty)", async () => {

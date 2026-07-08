@@ -12,7 +12,20 @@ interface VisibilityArgs {
   answers: AnswersMap;
 }
 
-/** The LVA hardcoded branch — Wave I, verbatim (Wave W D3: untouched). */
+/**
+ * The LVA hardcoded branch — Wave I, verbatim (Wave W D3: untouched).
+ *
+ * KEPT INTENTIONALLY (Wave W leftovers, spec 19z D2). Migrating this to the
+ * generic authored `showIf` engine below was evaluated and DESCOPED: it would
+ * require backfilling `showIf` onto already-published (immutable) LVA version
+ * rows — otherwise campaigns pinned to a pre-showIf version lose survey-side
+ * obstacle-followup hiding — AND it would flip LVA storage (today hidden S5
+ * answers are stored + report-suppressed via REPORT_FILTERS; authored showIf
+ * would make `pruneHiddenAnswers` drop them pre-persistence). For 18 tested
+ * lines Wave W already proved safe (intersection semantics — the generic pass
+ * can never resurrect an LVA-hidden question), that prod data op is not worth
+ * it. Ledgered as a deferred follow-on ("LVA-migrate-to-authored-showIf").
+ */
 function applyLvaFilter(
   templateAlias: string | null | undefined,
   questions: PagerQuestion[],
