@@ -51,8 +51,16 @@ import { GripVertical } from "lucide-react";
 
 import type { SectionDraft } from "./SectionsCard";
 import type { QuestionDraftRow, FindingBandDraft } from "./question-serialization";
-import { sliderBandCoverage } from "./question-serialization";
+import {
+  sliderBandCoverage,
+  buildFindingRecommendations,
+} from "./question-serialization";
 import { canonicalQuestionOrderIndex } from "@/lib/assessments/section-pages";
+import { resolveFindings } from "@/lib/assessments/findings";
+import {
+  QuestionInput,
+  type QuestionForInput,
+} from "@/components/assessments/question-input";
 
 // ────────────────────────────────────────────────────────────────────────
 // Types
@@ -512,6 +520,122 @@ function buildScaleChangeConfirmText(questionStableKey: string): string {
 }
 
 /**
+ * Wave U3 (spec 19aa D7) — the test-a-value preview inside the Findings panel.
+ *
+ * Lets an author answer THIS question with the real respondent widget
+ * (`QuestionInput` — same slider scale/step, same MULTI_CHOICE checkboxes) and
+ * see which finding text would fire. The fired list is computed by the pure
+ * `resolveFindings` over the EXACT rules a save would emit
+ * (`buildFindingRecommendations` — the shared helper), so the preview provably
+ * agrees with what a published version resolves (no drift, D7). Live +
+ * tolerant: recomputes as the author types, even on half-authored/coverage-gap
+ * rules. The no-answer ⇒ nothing-fires case is shown explicitly so authors
+ * understand the hidden⇒omitted rule. Never gated separately — it lives inside
+ * the already-flag-gated FindingsPanel (reuses the live Wave U flag; authoring
+ * only, no send / prod-data effect). MULTI_CHOICE fires in the question's
+ * authored option order regardless of tick order (matches the resolver).
+ */
+function FindingsPreview({ question }: { question: QuestionDraft }) {
+  const [sample, setSample] = useState<
+    number | string | string[] | undefined
+  >(undefined);
+
+  const previewKey = question.stableKey || "__preview__";
+
+  const forInput: QuestionForInput = {
+    stableKey: previewKey,
+    type: question.type,
+    label: question.label || "Sample answer",
+    isRequired: false,
+    ...(question.type === "SLIDER_LIKERT"
+      ? {
+          scale: {
+            min: question.scaleMin,
+            max: question.scaleMax,
+            step: question.scaleStep,
+            anchorMin: question.anchorMin,
+            anchorMax: question.anchorMax,
+          },
+        }
+      : {}),
+    ...(question.type === "MULTI_CHOICE"
+      ? {
+          options: question.options
+            .filter((o) => o.key !== "")
+            .map((o) => ({ key: o.key, label: o.label || o.key })),
+          ...(question.maxChoices !== null
+            ? { maxChoices: question.maxChoices }
+            : {}),
+        }
+      : {}),
+  };
+
+  const fired = useMemo(() => {
+    const recs = buildFindingRecommendations(question) ?? [];
+    const fakeQ = {
+      stableKey: previewKey,
+      type: question.type,
+      label: question.label || previewKey,
+      sortOrder: 0,
+      recommendations: recs,
+      options: question.options.map((o) => ({ key: o.key })),
+    };
+    const answers = new Map<string, unknown>();
+    if (sample !== undefined) answers.set(previewKey, sample);
+    return resolveFindings([fakeQ], answers);
+  }, [question, sample, previewKey]);
+
+  const answered =
+    sample !== undefined &&
+    !(typeof sample === "string" && sample === "") &&
+    !(Array.isArray(sample) && sample.length === 0);
+
+  return (
+    <div
+      className="mt-2 rounded border border-dashed border-border p-2 space-y-2"
+      data-testid="q-findings-preview"
+    >
+      <p className="text-[0.6875rem] font-semibold text-muted-foreground">
+        Test a value — preview which finding fires
+      </p>
+      <QuestionInput
+        question={forInput}
+        value={sample}
+        onChange={(_key, v) => setSample(v)}
+      />
+      <div
+        data-testid="q-findings-preview-result"
+        className="text-[0.6875rem]"
+      >
+        {!answered ? (
+          <span className="italic text-muted-foreground">
+            Enter a sample answer to preview which finding fires.
+          </span>
+        ) : fired.length === 0 ? (
+          <span className="italic text-muted-foreground">
+            No finding fires for this answer.
+          </span>
+        ) : (
+          <ul className="space-y-1">
+            {fired.map((f, i) => (
+              <li key={i} className="text-foreground">
+                <span className="font-semibold">Fires:</span> {f.text}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {question.type === "SLIDER_LIKERT" && (
+        <p className="text-[0.6875rem] italic text-muted-foreground">
+          Scored on-screen reports render slider recommendations via the per-row
+          path; this previews the resolved band text that freezes on submission.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
  * Wave U (spec 19u U-4/D8) — the collapsible per-question Findings panel.
  * SLIDER/NUMBER: band rows (min | max | text) with add/remove; sliders show
  * an advisory coverage hint (publish enforces full tiling — D11). NUMBER
@@ -716,6 +840,7 @@ function FindingsPanel({
           ))}
         </div>
       )}
+      {open && <FindingsPreview question={question} />}
     </div>
   );
 }

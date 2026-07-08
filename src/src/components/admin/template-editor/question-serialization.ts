@@ -336,6 +336,57 @@ function rawOptionKeys(raw: Record<string, unknown> | undefined): Set<string> {
 }
 
 /**
+ * Wave U3 (spec 19aa D7) — the SINGLE source of truth for turning a question
+ * draft's authored findings into the emitted `recommendations` array.
+ *
+ * Used by BOTH `buildQuestionsPayload` (the save path, §4 below) AND the
+ * editor's test-a-value preview (QuestionsTab `FindingsPreview`). Sharing this
+ * is the no-drift guarantee: "which finding the preview says fires" is derived
+ * from the EXACT rules a save would emit, so the preview can never disagree
+ * with what a published version resolves. Returns null when the draft has no
+ * emittable rule (the caller then DELETEs the key — anti-resurrection).
+ *
+ *   SLIDER_LIKERT / NUMBER → bands { minScore, maxScore, text } (finite bounds
+ *                            + non-blank text), in row order.
+ *   MULTI_CHOICE           → { optionKey, text } in the question's OPTION order
+ *                            (drives fired-rule order); blank text = no rule.
+ *   TEXT / anything else   → null (rules are never emitted; publish rejects them).
+ */
+export function buildFindingRecommendations(d: {
+  type: string;
+  findingBands: FindingBandDraft[];
+  findingOptionTexts: Record<string, string>;
+  options: ReadonlyArray<{ key: string }>;
+}): Array<Record<string, unknown>> | null {
+  if (d.type === "SLIDER_LIKERT" || d.type === "NUMBER") {
+    const bands = d.findingBands
+      .filter(
+        (b) =>
+          typeof b.minScore === "number" &&
+          Number.isFinite(b.minScore) &&
+          typeof b.maxScore === "number" &&
+          Number.isFinite(b.maxScore) &&
+          b.text.trim() !== "",
+      )
+      .map((b) => ({
+        minScore: b.minScore as number,
+        maxScore: b.maxScore as number,
+        text: b.text,
+      }));
+    return bands.length > 0 ? bands : null;
+  }
+  if (d.type === "MULTI_CHOICE") {
+    // Emit in the question's OPTION order (drives fired-rule order in the
+    // resolver); blank text = no rule for that option.
+    const rules = d.options
+      .filter((o) => o.key !== "" && (d.findingOptionTexts[o.key] ?? "").trim() !== "")
+      .map((o) => ({ optionKey: o.key, text: d.findingOptionTexts[o.key] }));
+    return rules.length > 0 ? rules : null;
+  }
+  return null;
+}
+
+/**
  * Serialize the QuestionDraftRow rows back into a version PATCH `questions`
  * body.
  *
@@ -506,36 +557,12 @@ export function buildQuestionsPayload(
     // on a dirty save the draft is authoritative: overwrite with the
     // draft-derived rules, or DELETE the key when the draft has none
     // (anti-resurrection — a rule deleted in the panel stays deleted).
-    if (d.type === "SLIDER_LIKERT" || d.type === "NUMBER") {
-      const bands = d.findingBands
-        .filter(
-          (b) =>
-            typeof b.minScore === "number" &&
-            Number.isFinite(b.minScore) &&
-            typeof b.maxScore === "number" &&
-            Number.isFinite(b.maxScore) &&
-            b.text.trim() !== "",
-        )
-        .map((b) => ({
-          minScore: b.minScore as number,
-          maxScore: b.maxScore as number,
-          text: b.text,
-        }));
-      if (bands.length > 0) row.recommendations = bands;
-      else delete row.recommendations;
-    } else if (d.type === "MULTI_CHOICE") {
-      // Emit in the question's OPTION order (drives fired-rule order in the
-      // resolver); blank text = no rule for that option.
-      const rules = d.options
-        .filter((o) => o.key !== "" && (d.findingOptionTexts[o.key] ?? "").trim() !== "")
-        .map((o) => ({ optionKey: o.key, text: d.findingOptionTexts[o.key] }));
-      if (rules.length > 0) row.recommendations = rules;
-      else delete row.recommendations;
-    } else {
-      // TEXT can never carry rules (publish rejects them; the serializer
-      // never emits them).
-      delete row.recommendations;
-    }
+    // Wave U3 (spec 19aa D7): the derivation lives in the SHARED
+    // buildFindingRecommendations so the editor preview resolves the identical
+    // rules a save emits (no drift).
+    const recommendations = buildFindingRecommendations(d);
+    if (recommendations) row.recommendations = recommendations;
+    else delete row.recommendations;
 
     // ── Wave W (spec 19w §2.6) — showIf, explicit emission with
     // anti-resurrection. On a dirty save the draft is authoritative:
