@@ -1,0 +1,643 @@
+<meta charset="utf-8">
+<title>Scaling Up Platform v2 — Data Model</title>
+<style>
+  :root{
+    --ground:#E8ECF3; --surface:#FCFDFF; --surface-2:#F4F6FB;
+    --ink:#161A23; --muted:#5C6675; --faint:#8A93A3;
+    --line:#D6DCE6; --line-soft:#E7EBF2;
+    --a:#3C4FB0; --a-soft:#EBEDF8; --a-line:#C7CDEE;
+    --b:#0E8F82; --b-soft:#E1F1EF; --b-line:#B7DED8;
+    --pk:#B07206; --uq:#7A5AF8; --fk:#465064;
+    --json:#9A6B1F; --arr:#0E7C90;
+    --radius:11px;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --shadow:0 1px 2px rgba(22,26,35,.04),0 4px 14px rgba(22,26,35,.05);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+    line-height:1.5;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(circle at 1px 1px,rgba(60,79,176,.055) 1px,transparent 0);
+    background-size:22px 22px;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:rgba(252,253,255,.86);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .head-inner{max-width:1440px;margin:0 auto;padding:16px 24px 12px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--a);font-weight:600}
+  h1{font-size:23px;font-weight:800;letter-spacing:-.02em;margin:3px 0 2px;text-wrap:balance}
+  .sub{color:var(--muted);font-size:13.5px;margin:0}
+  .sub code{font-family:var(--mono);font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px;color:var(--ink)}
+  .stats{display:flex;flex-wrap:wrap;gap:6px 20px;margin-top:11px}
+  .stat{display:flex;align-items:baseline;gap:6px;font-size:12.5px;color:var(--muted)}
+  .stat b{font-family:var(--mono);font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+
+  /* ---------- Toolbar ---------- */
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:13px}
+  .search{position:relative;flex:1 1 230px;min-width:180px;max-width:340px}
+  .search input{
+    width:100%;font-family:var(--mono);font-size:13px;color:var(--ink);
+    padding:8px 30px 8px 30px;border:1px solid var(--line);border-radius:8px;background:var(--surface);
+  }
+  .search input:focus{outline:2px solid var(--a);outline-offset:1px;border-color:transparent}
+  .search .mag{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:13px}
+  .search .clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--faint);cursor:pointer;font-size:15px;padding:2px 4px;display:none}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{
+    font-family:var(--sans);font-size:12px;font-weight:600;color:var(--muted);
+    padding:5px 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface);cursor:pointer;
+    white-space:nowrap;transition:background .12s,color .12s,border-color .12s;
+  }
+  .chip:hover{border-color:var(--a-line);color:var(--ink)}
+  .chip[aria-pressed="true"]{background:var(--a);border-color:var(--a);color:#fff}
+  .chip.b[aria-pressed="true"]{background:var(--b);border-color:var(--b)}
+  .btn{font-family:var(--sans);font-size:12px;font-weight:600;color:var(--muted);padding:5px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface);cursor:pointer}
+  .btn:hover{color:var(--ink);border-color:var(--a-line)}
+
+  /* ---------- Legend ---------- */
+  .legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;padding-top:11px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--muted)}
+  .lg{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .lg em{font-style:normal;color:var(--muted)}
+  .marker{font-family:var(--mono);font-weight:700;font-size:11px;display:inline-flex;align-items:center;justify-content:center;min-width:15px;height:15px;border-radius:4px;padding:0 3px}
+  .m-pk{color:var(--pk);background:#FBF1DD}
+  .m-uq{color:var(--uq);background:#EEE9FE}
+  .m-fk{color:#fff;background:var(--fk);border-radius:999px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .dot.a{background:var(--a)} .dot.b{background:var(--b)}
+
+  /* ---------- Layout ---------- */
+  main{max-width:1440px;margin:0 auto;padding:26px 24px 60px}
+  .cluster-head{display:flex;align-items:center;gap:12px;margin:34px 0 4px}
+  .cluster-head .bar{width:4px;align-self:stretch;border-radius:3px;min-height:38px}
+  .cluster-a .bar{background:var(--a)} .cluster-b .bar{background:var(--b)}
+  .cluster-head h2{font-size:18px;font-weight:800;letter-spacing:-.01em;margin:0}
+  .cluster-head .k{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
+  .cluster-a h2 .tag{color:var(--a)} .cluster-b h2 .tag{color:var(--b)}
+
+  .group{margin-top:22px}
+  .group-title{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+  .group-title::after{content:"";flex:1;height:1px;background:var(--line-soft)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start}
+
+  /* ---------- Card ---------- */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;scroll-margin-top:150px;transition:box-shadow .15s,opacity .15s,border-color .15s,filter .15s}
+  .card .ch{display:flex;align-items:center;gap:8px;padding:11px 13px;cursor:pointer;border-bottom:1px solid var(--line-soft);background:linear-gradient(0deg,transparent,rgba(60,79,176,.02))}
+  .card.b .ch{background:linear-gradient(0deg,transparent,rgba(14,143,130,.03))}
+  .card .cdot{width:8px;height:8px;border-radius:50%;flex:none}
+  .card.a .cdot{background:var(--a)} .card.b .cdot{background:var(--b)}
+  .card .nm{font-family:var(--mono);font-weight:700;font-size:14px;letter-spacing:-.01em}
+  .card .tb{font-family:var(--mono);font-size:10.5px;color:var(--faint);background:var(--surface-2);border:1px solid var(--line-soft);padding:1px 6px;border-radius:5px;margin-left:auto;white-space:nowrap}
+  .card .chev{border:0;background:none;color:var(--faint);cursor:pointer;font-size:11px;padding:2px;transition:transform .15s;flex:none}
+  .card.collapsed .chev{transform:rotate(-90deg)}
+  .card .badge{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 5px;border-radius:4px;color:var(--b);background:var(--b-soft);border:1px solid var(--b-line)}
+
+  .cols{list-style:none;margin:0;padding:4px 0;font-family:var(--mono);font-size:12px}
+  .card.collapsed .cols,.card.collapsed .rels{display:none}
+  .col{display:flex;align-items:center;gap:7px;padding:3px 13px;white-space:nowrap}
+  .col:hover{background:var(--surface-2)}
+  .col .cn{color:var(--ink)}
+  .col.nl .cn{color:var(--muted)}
+  .col .ty{margin-left:auto;color:var(--faint);font-size:11px}
+  .col .ty.json{color:var(--json);font-style:italic}
+  .col .ty.enum{color:var(--uq)}
+  .col .ty.arr{color:var(--arr)}
+  .col .def{color:var(--faint);font-size:10.5px;opacity:.8}
+  .col .mk{font-weight:700;font-size:10px;display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;border-radius:4px;padding:0 2px;flex:none}
+  .mk.pk{color:var(--pk);background:#FBF1DD}
+  .mk.uq{color:var(--uq);background:#EEE9FE}
+  .fkchip{font-family:var(--sans);font-size:10.5px;font-weight:600;padding:1px 6px 1px 5px;border-radius:999px;cursor:pointer;border:1px solid transparent;white-space:nowrap}
+  .fkchip.toa{color:var(--a);background:var(--a-soft);border-color:var(--a-line)}
+  .fkchip.tob{color:var(--b);background:var(--b-soft);border-color:var(--b-line)}
+  .fkchip.bridge{border-style:dashed;border-width:1.5px}
+  .fkchip:hover{filter:brightness(.96)}
+  .col .fkchip{margin-left:2px}
+
+  .rels{padding:9px 13px 12px;border-top:1px dashed var(--line-soft);display:flex;flex-direction:column;gap:7px}
+  .relrow{display:flex;gap:7px;align-items:baseline;flex-wrap:wrap}
+  .rellab{font-family:var(--mono);font-size:10px;letter-spacing:.03em;text-transform:uppercase;color:var(--faint);flex:none;min-width:78px}
+  .reltags{display:flex;flex-wrap:wrap;gap:5px}
+  .relnote{font-family:var(--sans);font-size:11.5px;color:var(--muted)}
+  .eval{font-family:var(--mono);font-size:10.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line-soft);padding:2px 6px;border-radius:5px}
+
+  /* selection states */
+  body.sel .card:not(.on):not(.nb){opacity:.32;filter:saturate(.5)}
+  .card.on{border-color:var(--a);box-shadow:0 0 0 2px var(--a),var(--shadow)}
+  .card.b.on{border-color:var(--b);box-shadow:0 0 0 2px var(--b),var(--shadow)}
+  .card.nb{border-color:var(--a-line)}
+  .card.b.nb{border-color:var(--b-line)}
+  .card.hide,.group.hide,.cluster-head.hide{display:none}
+
+  /* ---------- Enums ---------- */
+  .enums-head{margin-top:44px}
+  .egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:16px}
+  .enum{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 13px;box-shadow:var(--shadow)}
+  .enum h4{font-family:var(--mono);font-size:12.5px;font-weight:700;margin:0 0 8px;display:flex;align-items:center;gap:7px}
+  .enum h4 .cdot{width:7px;height:7px;border-radius:50%}
+  .enum.a h4 .cdot{background:var(--a)} .enum.b h4 .cdot{background:var(--b)}
+  .evals{display:flex;flex-wrap:wrap;gap:4px}
+
+  /* ---------- Footer ---------- */
+  footer{max-width:1440px;margin:0 auto;padding:0 24px 60px}
+  .note{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--b);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--muted);line-height:1.55}
+  .note b{color:var(--ink)}
+  .note code{font-family:var(--mono);font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:4px;color:var(--ink)}
+  .note .bridge-word{color:var(--b);font-weight:600}
+  .src{margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center}
+
+  @media (max-width:560px){
+    .head-inner{padding:14px 15px 10px} main{padding:20px 15px 50px} footer{padding:0 15px 50px}
+    .grid{grid-template-columns:1fr} h1{font-size:19px}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header>
+  <div class="head-inner">
+    <div class="eyebrow">PostgreSQL · Prisma ORM · Neon</div>
+    <h1>Scaling Up Platform v2 — Data Model</h1>
+    <p class="sub">Every table the app persists, grouped by domain, with columns, types, and foreign-key relationships. Generated from <code>prisma/schema.prisma</code>.</p>
+    <div class="stats">
+      <span class="stat"><b>49</b> tables</span>
+      <span class="stat"><b>14</b> enums</span>
+      <span class="stat"><b>36</b> migrations</span>
+      <span class="stat"><b>2</b> clusters</span>
+      <span class="stat"><span class="dot a"></span> Workshop Management &nbsp; <span class="dot b"></span> Assessment v7.6</span>
+    </div>
+
+    <div class="toolbar">
+      <div class="search">
+        <span class="mag">⌕</span>
+        <input id="q" type="search" placeholder="filter tables &amp; columns…" aria-label="Filter tables and columns" autocomplete="off">
+        <button class="clr" id="clr" aria-label="Clear search">×</button>
+      </div>
+      <div class="chips" id="chips"></div>
+      <button class="btn" id="toggleAll">Collapse all</button>
+      <button class="btn" id="reset">Reset</button>
+    </div>
+
+    <div class="legend">
+      <span class="lg"><span class="marker m-pk">PK</span> primary key</span>
+      <span class="lg"><span class="marker m-fk">↗</span> foreign key → target</span>
+      <span class="lg"><span class="marker m-uq">◆</span> unique</span>
+      <span class="lg"><em>grey column</em> = nullable</span>
+      <span class="lg"><span class="fkchip bridge toa" style="cursor:default">dashed</span> cross-cluster bridge</span>
+      <span class="lg">click a table to spotlight its relationships</span>
+    </div>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<footer>
+  <div class="note">
+    <b>Why two clusters?</b> The <b>Assessment v7.6</b> subsystem (15 tables) is greenfield-additive:
+    it reaches back into the core <b>Workshop Management</b> app (34 tables) <b>only</b> through
+    <code>User</code> (audit authorship) and <code>Coach</code> (org ownership, campaign authorship,
+    access-group membership) — the dashed <span class="bridge-word">bridge</span> chips.
+    No assessment table foreign-keys into <code>Workshop</code>, <code>Registration</code>, or the workflow engine, so the two halves evolve independently.
+  </div>
+  <div class="src">source of truth · src/prisma/schema.prisma (1,503 lines) · schema ↔ migrations verified 1:1, no drift</div>
+</footer>
+
+<script>
+// ---- enum registry (name -> {cluster, values}) ----
+const ENUMS = {
+  ApprovalType:{c:'a',v:['WORKSHOP_REQUEST','CUSTOM_PRICING','CANCELLATION','DATE_CHANGE','REFUND','CERTIFICATION_EDGE_CASE']},
+  ApprovalStatus:{c:'a',v:['PENDING','APPROVED','DENIED','EXPIRED','INFO_REQUESTED','COUNTER_OFFERED']},
+  EmailType:{c:'a',v:['REGISTRATION_CONFIRMATION','PRE_EVENT_5_DAYS','PRE_EVENT_1_DAY','PRE_EVENT_2_HOURS','PRE_EVENT_1_HOUR','POST_EVENT_SURVEY','COACH_FEEDBACK_REQUEST','CANCELLATION_NOTICE','DATE_CHANGE_NOTICE','FOLLOWUP_REMINDER']},
+  PageStatus:{c:'a',v:['DRAFT','PUBLISHED','CANCELLED']},
+  ReportStatus:{c:'a',v:['PENDING','SUBMITTED','OVERDUE']},
+  WorkshopCategory:{c:'a',v:['AI','EXIT_AND_VALUATION']},
+  LandingPageTemplate:{c:'a',v:['BIO_PAGE','SOLO_LANDING','DUO_LANDING','REGISTRATION','THANK_YOU']},
+  AssessmentCampaignStatus:{c:'b',v:['DRAFT','ACTIVE','CLOSED']},
+  AssessmentInviteTiming:{c:'b',v:['IMMEDIATELY','ON_OPEN']},
+  AssessmentCampaignEndMode:{c:'b',v:['OPEN_END','ENDS_AFTER']},
+  AssessmentInvitationStatus:{c:'b',v:['PENDING','SENT','VIEWED','SUBMITTED']},
+  AssessmentQuestionType:{c:'b',v:['SLIDER_LIKERT','NUMBER','MULTI_CHOICE']},
+  AssessmentCampaignAccessMode:{c:'b',v:['INVITED','PUBLIC']},
+  AssessmentTemplateAggregationMode:{c:'b',v:['FULL_VISIBILITY','CEO_ONLY']},
+};
+
+// ---- column shorthand: [name, type, flags] ----
+// flags: k=PK, u=unique, f=fkTarget, nl=nullable, d=default
+const K={k:1}, NL={nl:1}, U={u:1}, UN={u:1,nl:1};
+function fk(t,opt){return Object.assign({f:t}, opt||{});}
+
+// ---- table registry ----
+const T = [
+// ===== CLUSTER A — Workshop Management =====
+{n:'User',t:'users',g:'Identity & Access',c:'a',cols:[
+  ['id','String',K],['email','String',U],['name','String',NL],['role','String',{d:'STAFF'}],
+  ['image','String',NL],['passwordHash','String',NL],['emailVerified','DateTime',NL],
+  ['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'Account',t:'accounts',g:'Identity & Access',c:'a',uq:['provider + providerAccountId'],cols:[
+  ['id','String',K],['userId','String',fk('User')],['type','String'],['provider','String'],
+  ['providerAccountId','String'],['refresh_token','String',NL],['access_token','String',NL],
+  ['expires_at','Int',NL],['token_type','String',NL],['scope','String',NL],['id_token','String',NL],['session_state','String',NL]]},
+{n:'Session',t:'sessions',g:'Identity & Access',c:'a',cols:[
+  ['id','String',K],['sessionToken','String',U],['userId','String',fk('User')],['expires','DateTime']]},
+{n:'AdminInvite',t:'admin_invites',g:'Identity & Access',c:'a',cols:[
+  ['id','String',K],['email','String',U],['name','String',NL],['invitedBy','String'],
+  ['token','String',U],['expiresAt','DateTime'],['acceptedAt','DateTime',NL],['createdAt','DateTime']]},
+
+{n:'Coach',t:'coaches',g:'Coaches',c:'a',cols:[
+  ['id','String',K],['userId','String',fk('User',{u:1,nl:1})],['hubspotId','String',UN],['circleId','String',UN],
+  ['email','String',U],['firstName','String'],['lastName','String'],['phone','String',NL],['company','String',NL],
+  ['title','String',NL],['bio','String',NL],['profileImage','String',NL],['linkedinUrl','String',NL],
+  ['showBookCallCta','Boolean',{d:'true'}],['bookCallUrl','String',NL],['certificationStatus','String',{d:'PENDING'}],
+  ['certificationExpiry','DateTime',NL],['paymentStatus','String',{d:'PENDING'}],['territory','String',NL],
+  ['performanceMetrics','String',NL],['createdAt','DateTime'],['updatedAt','DateTime'],['syncedAt','DateTime',NL]]},
+{n:'CoachCertification',t:'coach_certifications',g:'Coaches',c:'a',uq:['coachId + workshopTypeId'],cols:[
+  ['id','String',K],['coachId','String',fk('Coach')],['workshopTypeId','String',fk('WorkshopType')],
+  ['certifiedAt','DateTime'],['expiresAt','DateTime',NL],['status','String',{d:'ACTIVE'}]]},
+
+{n:'WorkshopType',t:'workshop_types',g:'Catalog & Config',c:'a',cols:[
+  ['id','String',K],['name','String'],['slug','String',U],['description','String',NL],['shortDescription','String',NL],
+  ['durationOptions','String'],['materials','String',NL],['marketingTemplates','String',NL],['pricingTiers','String',NL],
+  ['preWorkshopInstructions','String',NL],['isActive','Boolean',{d:'true'}],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'Category',t:'categories',g:'Catalog & Config',c:'a',cols:[
+  ['id','String',K],['name','String',U],['slug','String',U],['description','String',NL],['defaultTitle','String',NL],
+  ['defaultDescription','String',NL],['isActive','Boolean',{d:'true'}],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'PricingTier',t:'pricing_tiers',g:'Catalog & Config',c:'a',cols:[
+  ['id','String',K],['categoryId','String',fk('Category')],['name','String'],['amountCents','Int'],
+  ['description','String',NL],['isActive','Boolean',{d:'true'}],['createdAt','DateTime'],['updatedAt','DateTime']]},
+
+{n:'Workshop',t:'workshops',g:'Workshops',c:'a',cols:[
+  ['id','String',K],['workshopCode','String',U],['coachId','String',fk('Coach')],
+  ['workshopTypeId','String',fk('WorkshopType',{nl:1})],['categoryId','String',fk('Category',{nl:1})],
+  ['category','WorkshopCategory',{d:'AI'}],['title','String'],['description','String',NL],['format','String'],
+  ['duration','String'],['eventDate','DateTime'],['eventEndDate','DateTime',NL],['eventTime','String',NL],
+  ['timezone','String',{d:'America/New_York'}],['venueName','String',NL],['venueAddress','String',NL],
+  ['venueInstructions','String',NL],['virtualPlatform','String',NL],['virtualLink','String',NL],
+  ['isFree','Boolean',{d:'false'}],['priceCents','Int',NL],['earlyBirdPriceCents','Int',NL],['earlyBirdDeadline','DateTime',NL],
+  ['pricingTierId','String',fk('PricingTier',{nl:1})],['geoTargetAreas','String',NL],['excludedClients','String',NL],
+  ['coupons','String',{d:'[]'}],['status','String',{d:'INFO_REQUESTED'}],['landingPageSlug','String',UN],
+  ['hubspotCampaignId','String',NL],['stripeProductId','String',NL],['stripePriceId','String',NL],
+  ['maxAttendees','Int',{d:'50'}],['isLocked','Boolean',{d:'false'}],['lockedAt','DateTime',NL],['lockedBy','String',NL],
+  ['termsAcceptedAt','DateTime',NL],['workshopBuiltEmailSentAt','DateTime',NL],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'WorkshopAdminNote',t:'workshop_admin_notes',g:'Workshops',c:'a',note:'side table — never on coach payloads',cols:[
+  ['id','String',K],['workshopId','String',fk('Workshop',{u:1})],['body','String'],['updatedBy','String'],
+  ['updatedAt','DateTime'],['createdAt','DateTime']]},
+{n:'WorkshopPage',t:'workshop_pages',g:'Workshops',c:'a',uq:['workshopId + pageType'],cols:[
+  ['id','String',K],['workshopId','String',fk('Workshop')],['workshopCode','String'],['pageType','String'],
+  ['templateId','String',NL],['content','String',NL],['slug','String',UN],['published','Boolean',{d:'false'}],
+  ['publishedAt','DateTime',NL],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'WorkshopDraft',t:'workshop_drafts',g:'Workshops',c:'a',note:'soft link only (no FK)',cols:[
+  ['id','String',K],['userId','String'],['workshopId','String',UN],['currentStep','Int',{d:'1'}],
+  ['stepsData','String'],['lastSavedAt','DateTime'],['createdAt','DateTime'],['updatedAt','DateTime']]},
+
+{n:'Registration',t:'registrations',g:'Registrations',c:'a',cols:[
+  ['id','String',K],['workshopId','String',fk('Workshop')],['email','String'],['firstName','String'],['lastName','String'],
+  ['company','String',NL],['jobTitle','String',NL],['phone','String',NL],['paymentStatus','String',{d:'PENDING'}],
+  ['stripePaymentId','String',NL],['stripeSessionId','String',NL],['amountPaidCents','Int',NL],['hubspotContactId','String',NL],
+  ['status','String',{d:'REGISTERED'}],['checkedInAt','DateTime',NL],['attended','Boolean',{d:'false'}],['attendedAt','DateTime',NL],
+  ['marketingOptIn','Boolean',{d:'false'}],['paymentProcessedAt','DateTime',NL],['notificationSentAt','DateTime',NL],
+  ['refundedAt','DateTime',NL],['refundedBy','String',NL],['stripeRefundId','String',NL],['createdAt','DateTime'],['updatedAt','DateTime']]},
+
+{n:'MarketingCampaign',t:'marketing_campaigns',g:'Marketing & Automation',c:'a',cols:[
+  ['id','String',K],['workshopId','String',fk('Workshop')],['campaignType','String'],['content','String',NL],
+  ['assets','String',NL],['scheduledSends','String',NL],['hubspotCampaignId','String',NL],['metrics','String',NL],
+  ['status','String',{d:'DRAFT'}],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'AutomationTask',t:'automation_tasks',g:'Marketing & Automation',c:'a',cols:[
+  ['id','String',K],['workshopId','String',fk('Workshop')],['taskType','String'],['status','String',{d:'PENDING'}],
+  ['inputData','String',NL],['outputData','String',NL],['errorMessage','String',NL],['attempts','Int',{d:'0'}],
+  ['maxAttempts','Int',{d:'3'}],['startedAt','DateTime',NL],['completedAt','DateTime',NL],['createdAt','DateTime']]},
+
+{n:'SurveyTemplate',t:'survey_templates',g:'Surveys',c:'a',cols:[
+  ['id','String',K],['name','String'],['description','String',NL],['surveyType','String'],
+  ['categoryId','String',fk('Category',{nl:1})],['isActive','Boolean',{d:'true'}],['createdBy','String'],
+  ['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'SurveyQuestion',t:'survey_questions',g:'Surveys',c:'a',cols:[
+  ['id','String',K],['templateId','String',fk('SurveyTemplate')],['sortOrder','Int'],['questionType','String'],
+  ['label','String'],['description','String',NL],['isRequired','Boolean',{d:'true'}],['options','String',NL],
+  ['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'Survey',t:'surveys',g:'Surveys',c:'a',cols:[
+  ['id','String',K],['templateId','String',fk('SurveyTemplate',{nl:1})],['registrationId','String',fk('Registration',{nl:1})],
+  ['workshopId','String',fk('Workshop')],['workshopCode','String',NL],['surveyType','String'],['responses','String',NL],
+  ['npsScore','Int',NL],['sentAt','DateTime',NL],['completedAt','DateTime',NL],['createdAt','DateTime']]},
+{n:'SurveyAnswer',t:'survey_answers',g:'Surveys',c:'a',uq:['surveyId + questionId'],cols:[
+  ['id','String',K],['surveyId','String',fk('Survey')],['questionId','String',fk('SurveyQuestion')],
+  ['value','String',NL],['numValue','Int',NL],['createdAt','DateTime']]},
+
+{n:'Workflow',t:'workflows',g:'Workflows & Email',c:'a',cols:[
+  ['id','String',K],['name','String'],['description','String',NL],['isActive','Boolean',{d:'true'}],
+  ['isTemplate','Boolean',{d:'false'}],['categoryId','String',fk('Category',{nl:1})],['workshopFormat','String',NL],
+  ['workflowPhase','String',NL],['createdBy','String'],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'WorkflowStep',t:'workflow_steps',g:'Workflows & Email',c:'a',cols:[
+  ['id','String',K],['workflowId','String',fk('Workflow')],['sortOrder','Int'],['stepType','String'],
+  ['emailTemplateId','String',fk('EmailTemplate',{nl:1})],['subject','String',NL],['body','String',NL],
+  ['customRecipients','String',NL],['triggerType','String'],['offsetDays','Int',NL],['offsetHours','Int',NL],
+  ['sendTimeOfDay','String',NL],['attachments','String',NL],['surveyTemplateId','String',fk('SurveyTemplate',{nl:1})],
+  ['isActive','Boolean',{d:'true'}],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'WorkflowAssignment',t:'workflow_assignments',g:'Workflows & Email',c:'a',uq:['workflowId + workshopId'],cols:[
+  ['id','String',K],['workflowId','String',fk('Workflow')],['workshopId','String',fk('Workshop')],
+  ['workshopCode','String'],['isActive','Boolean',{d:'true'}],['assignedBy','String'],['assignedAt','DateTime']]},
+{n:'WorkflowStepExecution',t:'workflow_step_executions',g:'Workflows & Email',c:'a',note:'self-ref parent/child fan-out',uq:['parentId + registrationId','deliveryBatchKey'],cols:[
+  ['id','String',K],['stepId','String',fk('WorkflowStep')],['workshopId','String',fk('Workshop')],
+  ['registrationId','String',NL],['parentId','String',fk('WorkflowStepExecution',{nl:1})],['recipientEmail','String',NL],
+  ['status','String',{d:'PENDING'}],['scheduledFor','DateTime',NL],['executedAt','DateTime',NL],['errorMessage','String',NL],
+  ['attempts','Int',{d:'0'}],['inngestEventId','String',NL],['deliveryBatchKey','String',UN],['createdAt','DateTime']]},
+{n:'EmailTemplate',t:'email_templates',g:'Workflows & Email',c:'a',cols:[
+  ['id','String',K],['name','String',U],['subject','String'],['body','String'],['variables','String'],
+  ['type','EmailType'],['timingDays','Int',NL],['isActive','Boolean',{d:'true'}],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'TransactionalEmailTemplate',t:'transactional_email_templates',g:'Workflows & Email',c:'a',note:'global single row per type',cols:[
+  ['id','String',K],['emailType','String',U],['subject','String'],['body','String'],['version','Int',{d:'1'}],
+  ['updatedBy','String',NL],['updatedAt','DateTime'],['createdAt','DateTime'],['previousSubject','String',NL],['previousBody','String',NL]]},
+
+{n:'FileAttachment',t:'file_attachments',g:'Files',c:'a',cols:[
+  ['id','String',K],['filename','String'],['blobUrl','String'],['contentType','String'],['sizeBytes','Int'],
+  ['workshopId','String',fk('Workshop',{nl:1})],['workshopCode','String',NL],['workflowStepId','String',fk('WorkflowStep',{nl:1})],
+  ['uploadedBy','String'],['category','String',NL],['createdAt','DateTime']]},
+
+{n:'ApprovalQueue',t:'approval_queue',g:'Approvals (HITL)',c:'a',cols:[
+  ['id','String',K],['type','ApprovalType'],['workshopId','String',fk('Workshop',{nl:1})],['coachId','String',fk('Coach')],
+  ['requestData','String'],['status','ApprovalStatus',{d:'PENDING'}],['requestedAt','DateTime'],['requestedBy','String',NL],
+  ['respondedAt','DateTime',NL],['respondedBy','String',NL],['decision','String',NL],['notes','String',NL],
+  ['responseReason','String',NL],['escalatedAt','DateTime',NL],['coachResponse','String',NL],
+  ['counterOfferCents','Int',NL],['counterOfferNote','String',NL]]},
+{n:'ApprovalMessage',t:'approval_messages',g:'Approvals (HITL)',c:'a',cols:[
+  ['id','String',K],['approvalId','String',fk('ApprovalQueue')],['from','String'],['text','String'],
+  ['synthetic','Boolean',{d:'false'}],['createdAt','DateTime']]},
+
+{n:'LandingPage',t:'landing_pages',g:'Landing Pages',c:'a',uq:['workshopId + template'],cols:[
+  ['id','String',K],['workshopId','String',fk('Workshop')],['template','LandingPageTemplate'],['slug','String',U],
+  ['content','String'],['status','PageStatus',{d:'DRAFT'}],['isActiveTemplate','Boolean',{d:'false'}],
+  ['categoryId','String',fk('Category',{nl:1})],['sourceTemplateId','String',NL],['customCode','String',NL],
+  ['customHtml','String',NL],['publishedAt','DateTime',NL],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'PageTemplate',t:'page_templates',g:'Landing Pages',c:'a',cols:[
+  ['id','String',K],['name','String'],['templateType','LandingPageTemplate'],['categoryId','String',fk('Category',{nl:1})],
+  ['content','String'],['customCode','String',NL],['customHtml','String',NL],['isActive','Boolean',{d:'false'}],
+  ['createdAt','DateTime'],['updatedAt','DateTime']]},
+
+{n:'FollowUpReport',t:'follow_up_reports',g:'Follow-Up',c:'a',cols:[
+  ['id','String',K],['workshopId','String',fk('Workshop')],['coachId','String',fk('Coach')],['dueDate','DateTime'],
+  ['submittedAt','DateTime',NL],['reportData','String',NL],['status','ReportStatus',{d:'PENDING'}],
+  ['remindersSent','Int',{d:'0'}],['createdAt','DateTime']]},
+
+{n:'Contact',t:'contacts',g:'CRM & Audit',c:'a',note:'CRM import (Kajabi)',cols:[
+  ['id','String',K],['kajabiId','String',UN],['name','String'],['firstName','String',NL],['lastName','String',NL],
+  ['email','String',U],['emailMarketing','String',{d:'Never subscribed'}],['lifetimeValue','Float',{d:'0.0'}],
+  ['addedAt','DateTime'],['lastActivityAt','DateTime',NL],['tags','String',NL],['products','String',NL],
+  ['avatar','String',NL],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'AuditLog',t:'audit_logs',g:'CRM & Audit',c:'a',note:'polymorphic (entityType/entityId, no FK)',cols:[
+  ['id','String',K],['entityType','String'],['entityId','String'],['action','String'],['performedBy','String',NL],
+  ['changes','String'],['ipAddress','String',NL],['userAgent','String',NL],['timestamp','DateTime']]},
+
+// ===== CLUSTER B — Assessment v7.6 =====
+{n:'Organization',t:'organizations',g:'Org & People',c:'b',cols:[
+  ['id','String',K],['name','String'],['externalId','String',UN],['ownerCoachId','String',fk('Coach')],
+  ['createdAt','DateTime'],['updatedAt','DateTime'],['deletedAt','DateTime',NL]]},
+{n:'OrgTeam',t:'org_teams',g:'Org & People',c:'b',note:'self-referential team hierarchy',cols:[
+  ['id','String',K],['organizationId','String',fk('Organization')],['parentTeamId','String',fk('OrgTeam',{nl:1})],
+  ['name','String'],['type','String',NL],['description','String',NL],['createdAt','DateTime'],['updatedAt','DateTime'],['deletedAt','DateTime',NL]]},
+{n:'OrgRespondent',t:'org_respondents',g:'Org & People',c:'b',uq:['organizationId + dedupeSource + dedupeValue'],cols:[
+  ['id','String',K],['organizationId','String',fk('Organization')],['teamId','String',fk('OrgTeam',{nl:1})],
+  ['email','String'],['normalizedEmail','String',NL],['firstName','String'],['lastName','String'],['jobTitle','String',NL],
+  ['externalId','String',NL],['dedupeSource','String'],['dedupeValue','String'],['roleType','String',NL],
+  ['createdAt','DateTime'],['updatedAt','DateTime'],['deletedAt','DateTime',NL]]},
+{n:'OrganizationOwnershipEvent',t:'organization_ownership_events',g:'Org & People',c:'b',note:'ownership audit-of-record',cols:[
+  ['id','String',K],['organizationId','String',fk('Organization')],['kind','String'],
+  ['oldOwnerCoachId','String',fk('Coach',{nl:1})],['newOwnerCoachId','String',fk('Coach',{nl:1})],
+  ['campaignId','String',fk('AssessmentCampaign',{nl:1})],['performedBy','String',fk('User')],['notes','String',NL],['createdAt','DateTime']]},
+
+{n:'AssessmentTemplate',t:'assessment_templates',g:'Templates',c:'b',cols:[
+  ['id','String',K],['name','String'],['alias','String',U],['description','String',NL],['invitationSubject','String'],
+  ['invitationBodyMarkdown','String'],['resultsEmailSubject','String',NL],['resultsEmailBodyMarkdown','String',NL],
+  ['resultsEmailContentApproved','Boolean',{d:'false'}],['resultsEmailContentApprovedHash','String',NL],
+  ['resultsEmailContentApprovedAt','DateTime',NL],['resultsEmailContentApprovedBy','String',NL],
+  ['aggregationMode','AssessmentTemplateAggregationMode',{d:'FULL_VISIBILITY'}],['createdBy','String',fk('User')],
+  ['createdAt','DateTime'],['updatedAt','DateTime'],['deletedAt','DateTime',NL]]},
+{n:'AssessmentTemplateVersion',t:'assessment_template_versions',g:'Templates',c:'b',badge:'immutable',uq:['templateId + versionNumber + language'],note:'frozen once publishedAt set (DB trigger)',cols:[
+  ['id','String',K],['templateId','String',fk('AssessmentTemplate')],['versionNumber','Int'],['language','String'],
+  ['questions','Json'],['sections','Json'],['scoringConfig','Json'],['reportConfig','Json',NL],['contentHash','String'],
+  ['publishedAt','DateTime',NL],['publishedBy','String',NL],['createdAt','DateTime']]},
+
+{n:'AssessmentCampaign',t:'assessment_campaigns',g:'Campaigns & Responses',c:'b',cols:[
+  ['id','String',K],['templateId','String',fk('AssessmentTemplate')],['versionId','String',fk('AssessmentTemplateVersion')],
+  ['organizationId','String',fk('Organization')],['language','String'],['alias','String',U],['externalId','String',UN],
+  ['name','String'],['description','String',NL],['status','AssessmentCampaignStatus',{d:'DRAFT'}],
+  ['accessMode','AssessmentCampaignAccessMode',{d:'INVITED'}],['publicConfig','Json',NL],['openAt','DateTime'],
+  ['endMode','AssessmentCampaignEndMode'],['closeAt','DateTime',NL],['notifyAdminOnSubmit','Boolean',{d:'true'}],
+  ['invitationSubject','String',NL],['invitationBodyMarkdown','String',NL],['deletedAt','DateTime',NL],
+  ['inviteTiming','AssessmentInviteTiming',{d:'IMMEDIATELY'}],['inviteSendStartedAt','DateTime',NL],
+  ['inviteSendHeartbeatAt','DateTime',NL],['invitesSentAt','DateTime',NL],['sendResultsToRespondent','Boolean',{d:'false'}],
+  ['notifyCoachOnCompletion','Boolean',{d:'false'}],['invitationBodyHtml','String',NL],['customSlides','Json',NL],
+  ['createdBy','String',fk('User')],['createdByCoachId','String',fk('Coach',{nl:1})],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'AssessmentCampaignParticipant',t:'assessment_campaign_participants',g:'Campaigns & Responses',c:'b',uq:['campaignId + respondentId','campaignId WHERE isCEO (partial)'],cols:[
+  ['id','String',K],['campaignId','String',fk('AssessmentCampaign')],['respondentId','String',fk('OrgRespondent')],
+  ['isCEO','Boolean',{d:'false'}],['teamPathAtAdd','String[]'],['teamLabelsAtAdd','String[]'],['addedAt','DateTime']]},
+{n:'AssessmentInvitation',t:'assessment_invitations',g:'Campaigns & Responses',c:'b',uq:['campaignId + respondentId'],cols:[
+  ['id','String',K],['campaignId','String',fk('AssessmentCampaign')],['respondentId','String',fk('OrgRespondent')],
+  ['tokenHash','String',U],['status','AssessmentInvitationStatus',{d:'PENDING'}],['expiresAt','DateTime'],
+  ['sentAt','DateTime',NL],['submittedAt','DateTime',NL],['revokedAt','DateTime',NL],['resentCount','Int',{d:'0'}],
+  ['lastResentAt','DateTime',NL],['createdAt','DateTime']]},
+{n:'AssessmentSubmission',t:'assessment_submissions',g:'Campaigns & Responses',c:'b',uq:['invitationId','(campaignId,respondentId) partial','resultsTokenHash partial','idempotencyKey partial'],cols:[
+  ['id','String',K],['campaignId','String',fk('AssessmentCampaign')],['respondentId','String',fk('OrgRespondent',{nl:1})],
+  ['invitationId','String',fk('AssessmentInvitation',{u:1,nl:1})],['submittedAt','DateTime'],['answers','Json'],['result','Json'],
+  ['publicTaker','Json',NL],['referringCoachEmail','String',NL],['idempotencyKey','String',NL],['resultsTokenHash','String',NL],
+  ['resultsTokenIssuedAt','DateTime',NL],['resultsTokenExpiresAt','DateTime',NL],['resultsTokenRevokedAt','DateTime',NL],
+  ['resultsTokenViewedAt','DateTime',NL]]},
+{n:'AssessmentEmailOutbox',t:'assessment_email_outbox',g:'Campaigns & Responses',c:'b',note:'durable retry outbox',uq:['submissionId + recipientRole'],cols:[
+  ['id','String',K],['submissionId','String',fk('AssessmentSubmission')],['recipientEmail','String'],['recipientRole','String'],
+  ['emailType','String'],['subject','String'],['bodyHtml','String'],['status','String',{d:'PENDING'}],['attempts','Int',{d:'0'}],
+  ['lastError','String',NL],['sentAt','DateTime',NL],['nextAttemptAt','DateTime'],['createdAt','DateTime'],['updatedAt','DateTime']]},
+{n:'CampaignWizardDraft',t:'assessment_campaign_wizard_drafts',g:'Campaigns & Responses',c:'b',note:'one row per coach',cols:[
+  ['id','String',K],['coachId','String',fk('Coach',{u:1})],['currentStep','Int',{d:'1'}],['stepsData','String'],
+  ['lastSavedAt','DateTime'],['createdAt','DateTime'],['updatedAt','DateTime']]},
+
+{n:'AccessGroup',t:'access_groups',g:'Access Control (RBAC)',c:'b',note:'name unique WHERE not deleted',cols:[
+  ['id','String',K],['name','String'],['description','String',NL],['accessPolicyVersion','String',{d:'v1.intersection'}],
+  ['createdBy','String',fk('User')],['createdAt','DateTime'],['updatedAt','DateTime'],['deletedAt','DateTime',NL]]},
+{n:'AccessGroupCoach',t:'access_group_coaches',g:'Access Control (RBAC)',c:'b',uq:['accessGroupId + coachId'],cols:[
+  ['id','String',K],['accessGroupId','String',fk('AccessGroup')],['coachId','String',fk('Coach')],
+  ['addedAt','DateTime'],['addedBy','String',fk('User')]]},
+{n:'AccessGroupTemplate',t:'access_group_templates',g:'Access Control (RBAC)',c:'b',uq:['accessGroupId + templateId'],cols:[
+  ['id','String',K],['accessGroupId','String',fk('AccessGroup')],['templateId','String',fk('AssessmentTemplate')],
+  ['addedAt','DateTime'],['addedBy','String',fk('User')]]},
+];
+
+// ---- derive adjacency ----
+const byName = {}; T.forEach(t=>byName[t.n]=t);
+const inEdges = {}; T.forEach(t=>inEdges[t.n]=new Set());
+T.forEach(t=>t.cols.forEach(col=>{const f=col[2]&&col[2].f; if(f&&byName[f]&&f!==t.n) inEdges[f].add(t.n);}));
+function outTargets(t){const s=new Set(); t.cols.forEach(c=>{const f=c[2]&&c[2].f; if(f&&f!==t.n)s.add(f);}); return [...s];}
+function neighbors(name){const t=byName[name];const s=new Set(outTargets(t));inEdges[name].forEach(x=>s.add(x));return s;}
+
+// ---- group ordering ----
+const GROUPS = {a:['Identity & Access','Coaches','Catalog & Config','Workshops','Registrations','Marketing & Automation','Surveys','Workflows & Email','Files','Approvals (HITL)','Landing Pages','Follow-Up','CRM & Audit'],
+                b:['Org & People','Templates','Campaigns & Responses','Access Control (RBAC)']};
+const CLUSTER_META = {a:{title:'Workshop Management',n:34},b:{title:'Assessment v7.6',n:15}};
+
+// ---- DOM helpers (textContent only) ----
+function el(tag,cls,text){const e=document.createElement(tag); if(cls)e.className=cls; if(text!=null)e.textContent=text; return e;}
+function tyClass(ty){if(ty==='Json')return 'json'; if(ty.endsWith('[]'))return 'arr'; if(ENUMS[ty])return 'enum'; return '';}
+
+function fkChip(target,srcCluster,arrowLeft){
+  const tgt=byName[target]; const tc=tgt?tgt.c:'a';
+  const bridge = tgt && tgt.c!==srcCluster;
+  const b=el('button','fkchip to'+tc+(bridge?' bridge':''));
+  b.textContent=(arrowLeft?'← ':'→ ')+target;
+  b.title='foreign key '+(arrowLeft?'from ':'to ')+target+(bridge?'  (cross-cluster bridge)':'');
+  b.dataset.jump=target;
+  return b;
+}
+
+function renderCard(t){
+  const card=el('div','card '+t.c); card.id='tbl-'+t.n; card.dataset.name=t.n; card.dataset.group=t.g;
+  card.dataset.blob=(t.n+' '+t.t+' '+t.cols.map(c=>c[0]).join(' ')).toLowerCase();
+
+  const ch=el('div','ch');
+  ch.appendChild(el('span','cdot'));
+  ch.appendChild(el('span','nm',t.n));
+  if(t.badge) ch.appendChild(el('span','badge',t.badge));
+  ch.appendChild(el('span','tb',t.t));
+  const chev=el('button','chev','▾'); chev.setAttribute('aria-label','Toggle columns for '+t.n);
+  ch.appendChild(chev);
+  card.appendChild(ch);
+
+  const ul=el('ul','cols');
+  t.cols.forEach(([n,ty,fl])=>{
+    fl=fl||{};
+    const li=el('li','col'+(fl.nl?' nl':''));
+    if(fl.k) li.appendChild(el('span','mk pk','PK'));
+    else if(fl.f){const s=el('span','mk','↗'); s.style.color='var(--fk)'; s.title='foreign key'; li.appendChild(s);}
+    else li.appendChild(el('span','mk',''));
+    li.appendChild(el('span','cn',n));
+    if(fl.u) li.appendChild(el('span','mk uq','◆'));
+    if(fl.f) li.appendChild(fkChip(fl.f,t.c,false));
+    li.appendChild(el('span','ty '+tyClass(ty), ty+(fl.nl?'?':'')));
+    if(fl.d!=null) li.appendChild(el('span','def','='+fl.d));
+    ul.appendChild(li);
+  });
+  card.appendChild(ul);
+
+  const outs=outTargets(t); const ins=[...inEdges[t.n]];
+  if(outs.length||ins.length||t.note||(t.uq&&t.uq.length)){
+    const rels=el('div','rels');
+    if(outs.length){
+      const row=el('div','relrow'); row.appendChild(el('span','rellab','references'));
+      const tags=el('div','reltags'); outs.forEach(o=>tags.appendChild(fkChip(o,t.c,false))); row.appendChild(tags); rels.appendChild(row);
+    }
+    if(ins.length){
+      const row=el('div','relrow'); row.appendChild(el('span','rellab','referenced by'));
+      const tags=el('div','reltags'); ins.forEach(o=>tags.appendChild(fkChip(o,t.c,true))); row.appendChild(tags); rels.appendChild(row);
+    }
+    if(t.uq&&t.uq.length){
+      const row=el('div','relrow'); row.appendChild(el('span','rellab','unique'));
+      const tags=el('div','reltags'); t.uq.forEach(u=>tags.appendChild(el('span','eval',u))); row.appendChild(tags); rels.appendChild(row);
+    }
+    if(t.note){
+      const row=el('div','relrow'); row.appendChild(el('span','rellab','note'));
+      row.appendChild(el('span','relnote',t.note)); rels.appendChild(row);
+    }
+    card.appendChild(rels);
+  }
+  return card;
+}
+
+// ---- build DOM ----
+const main=document.getElementById('main');
+['a','b'].forEach(cl=>{
+  const meta=CLUSTER_META[cl];
+  const head=el('div','cluster-head cluster-'+cl); head.dataset.cluster=cl;
+  head.appendChild(el('div','bar'));
+  const wrap=el('div');
+  const h2=el('h2'); h2.appendChild(el('span','tag',meta.title)); wrap.appendChild(h2);
+  wrap.appendChild(el('div','k',meta.n+' tables · cluster '+cl.toUpperCase()));
+  head.appendChild(wrap);
+  main.appendChild(head);
+
+  GROUPS[cl].forEach(g=>{
+    const gEl=el('section','group'); gEl.dataset.group=g; gEl.dataset.cluster=cl;
+    gEl.appendChild(el('h3','group-title',g));
+    const grid=el('div','grid');
+    T.filter(t=>t.c===cl&&t.g===g).forEach(t=>grid.appendChild(renderCard(t)));
+    gEl.appendChild(grid); main.appendChild(gEl);
+  });
+});
+
+// ---- enums panel ----
+const eHead=el('div','cluster-head enums-head');
+const eBar=el('div','bar'); eBar.style.background='var(--uq)'; eHead.appendChild(eBar);
+const eWrap=el('div'); const eh2=el('h2',null,'Enums'); eh2.style.color='var(--uq)';
+eWrap.appendChild(eh2); eWrap.appendChild(el('div','k','14 enumerated types')); eHead.appendChild(eWrap);
+main.appendChild(eHead);
+const eg=el('div','egrid');
+Object.keys(ENUMS).forEach(name=>{
+  const def=ENUMS[name];
+  const e=el('div','enum '+def.c);
+  const h=el('h4'); h.appendChild(el('span','cdot')); h.appendChild(document.createTextNode(name)); e.appendChild(h);
+  const vals=el('div','evals'); def.v.forEach(v=>vals.appendChild(el('span','eval',v))); e.appendChild(vals);
+  eg.appendChild(e);
+});
+main.appendChild(eg);
+
+// ---- interactivity ----
+const body=document.body;
+let selected=null;
+function clearSel(){selected=null;body.classList.remove('sel');document.querySelectorAll('.card.on,.card.nb').forEach(c=>c.classList.remove('on','nb'));}
+function selectTable(name,scroll){
+  const card=document.getElementById('tbl-'+name); if(!card)return;
+  if(selected===name){clearSel();return;}
+  clearSel(); selected=name; body.classList.add('sel');
+  card.classList.add('on'); card.classList.remove('collapsed');
+  neighbors(name).forEach(nb=>{const c=document.getElementById('tbl-'+nb); if(c)c.classList.add('nb');});
+  if(scroll)card.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'center'});
+}
+main.addEventListener('click',e=>{
+  const jump=e.target.closest('[data-jump]');
+  if(jump){e.stopPropagation();selectTable(jump.dataset.jump,true);return;}
+  const chev=e.target.closest('.chev');
+  if(chev){e.stopPropagation();chev.closest('.card').classList.toggle('collapsed');return;}
+  const ch=e.target.closest('.ch');
+  if(ch){selectTable(ch.closest('.card').dataset.name,false);return;}
+});
+
+// ---- filters ----
+const chipsWrap=document.getElementById('chips');
+let activeCluster=null;
+const allChip=el('button','chip','All domains'); allChip.setAttribute('aria-pressed','true'); chipsWrap.appendChild(allChip);
+[['a','Workshop Mgmt'],['b','Assessment']].forEach(([cl,lab])=>{
+  const c=el('button','chip '+(cl==='b'?'b':''),lab); c.dataset.cluster=cl; c.setAttribute('aria-pressed','false'); chipsWrap.appendChild(c);
+});
+function pressOnly(chip){document.querySelectorAll('#chips .chip').forEach(ch=>ch.setAttribute('aria-pressed','false')); chip.setAttribute('aria-pressed','true');}
+allChip.addEventListener('click',()=>{activeCluster=null;pressOnly(allChip);applyFilters();});
+chipsWrap.addEventListener('click',e=>{const c=e.target.closest('.chip[data-cluster]'); if(!c)return;
+  pressOnly(c); activeCluster=c.dataset.cluster; applyFilters();});
+
+const q=document.getElementById('q'), clr=document.getElementById('clr');
+function applyFilters(){
+  const query=(q.value||'').trim().toLowerCase();
+  clr.style.display=query?'block':'none';
+  document.querySelectorAll('.card').forEach(card=>{
+    const okQ=!query||card.dataset.blob.includes(query);
+    const okG=!activeCluster||card.classList.contains(activeCluster);
+    card.classList.toggle('hide',!(okQ&&okG));
+  });
+  document.querySelectorAll('.group').forEach(g=>{
+    g.classList.toggle('hide', g.querySelectorAll('.card:not(.hide)').length===0);});
+  document.querySelectorAll('.cluster-head[data-cluster]').forEach(h=>{
+    const cl=h.dataset.cluster;
+    h.classList.toggle('hide', document.querySelectorAll('.group[data-cluster="'+cl+'"]:not(.hide)').length===0);});
+}
+q.addEventListener('input',applyFilters);
+clr.addEventListener('click',()=>{q.value='';applyFilters();q.focus();});
+
+// ---- collapse-all / reset ----
+let collapsed=false;
+document.getElementById('toggleAll').addEventListener('click',e=>{
+  collapsed=!collapsed;
+  document.querySelectorAll('.card').forEach(c=>c.classList.toggle('collapsed',collapsed));
+  e.target.textContent=collapsed?'Expand all':'Collapse all';});
+document.getElementById('reset').addEventListener('click',()=>{
+  q.value='';activeCluster=null;collapsed=false;
+  document.querySelectorAll('.card').forEach(c=>c.classList.remove('collapsed','hide'));
+  pressOnly(allChip);
+  document.getElementById('toggleAll').textContent='Collapse all';
+  clearSel();applyFilters();});
+</script>

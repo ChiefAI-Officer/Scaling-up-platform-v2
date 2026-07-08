@@ -1,0 +1,193 @@
+- generic [active] [ref=f14e1]:
+  - generic [ref=f14e2]:
+    - complementary [ref=f14e3]:
+      - generic [ref=f14e5]: Scaling Up Coach
+      - navigation [ref=f14e6]:
+        - link "Dashboard" [ref=f14e7] [cursor=pointer]:
+          - /url: /portal/home
+          - img [ref=f14e9]
+          - generic [ref=f14e14]: Dashboard
+        - link "My Workshops" [ref=f14e15] [cursor=pointer]:
+          - /url: /portal/workshops
+          - img [ref=f14e17]
+          - generic [ref=f14e19]: My Workshops
+        - link "Members" [ref=f14e20] [cursor=pointer]:
+          - /url: /portal/members
+          - img [ref=f14e22]
+          - generic [ref=f14e26]: Members
+        - link "Assessments" [ref=f14e27] [cursor=pointer]:
+          - /url: /portal/assessments
+          - img [ref=f14e29]
+          - generic [ref=f14e32]: Assessments
+        - link "Registrations" [ref=f14e33] [cursor=pointer]:
+          - /url: /portal/registrations
+          - img [ref=f14e35]
+          - generic [ref=f14e40]: Registrations
+        - link "Request Workshop" [ref=f14e41] [cursor=pointer]:
+          - /url: /portal/request
+          - img [ref=f14e43]
+          - generic [ref=f14e45]: Request Workshop
+        - link "Settings" [ref=f14e48] [cursor=pointer]:
+          - /url: /portal/settings
+          - img [ref=f14e50]
+          - generic [ref=f14e53]: Settings
+      - link "G Gabriel Coach" [ref=f14e54] [cursor=pointer]:
+        - /url: /portal/settings
+        - generic [ref=f14e55]:
+          - generic [ref=f14e56]: G
+          - generic [ref=f14e57]:
+            - paragraph [ref=f14e58]: Gabriel
+            - paragraph [ref=f14e59]: Coach
+    - generic [ref=f14e60]:
+      - banner [ref=f14e61]:
+        - generic [ref=f14e62]:
+          - button "Switch to dark mode" [ref=f14e239] [cursor=pointer]:
+            - img [ref=f14e240]
+          - link "Settings" [ref=f14e71] [cursor=pointer]:
+            - /url: /portal/settings
+          - button "Sign Out" [ref=f14e72]
+      - main [ref=f14e73]:
+        - generic [ref=f14e74]:
+          - generic [ref=f14e75]:
+            - link "Back to Assessments" [ref=f14e76] [cursor=pointer]:
+              - /url: /portal/assessments
+              - img [ref=f14e77]
+              - text: Back to Assessments
+            - generic [ref=f14e79]:
+              - link "View group report" [ref=f14e80] [cursor=pointer]:
+                - /url: /assessments/cmqf0lzbz000l4p5uk6ixe03x/report
+                - img [ref=f14e81]
+                - text: View group report
+              - link "View Trends" [ref=f14e84] [cursor=pointer]:
+                - /url: /portal/assessments/trends?templateId=cmpl64cb30003mjdszd2e5fql&organizationId=cmpb9nqj30001a07xey1bwwmy
+                - img [ref=f14e85]
+                - text: View Trends
+          - generic [ref=f14e88]:
+            - generic [ref=f14e89]:
+              - generic [ref=f14e90]:
+                - heading "LVA test new" [level=1] [ref=f14e91]
+                - paragraph [ref=f14e92]: test_leadership_vision_alignment_260615093249
+              - generic [ref=f14e93]:
+                - generic [ref=f14e94]: ACTIVE
+                - button "Close Campaign" [ref=f14e95]:
+                  - img [ref=f14e96]
+                  - text: Close Campaign
+                - button "Delete campaign" [ref=f14e100]:
+                  - img [ref=f14e101]
+                  - text: Delete campaign
+            - generic [ref=f14e104]:
+              - generic [ref=f14e105]:
+                - generic [ref=f14e106]: Template
+                - generic [ref=f14e107]: Leadership Vision Alignment
+              - generic [ref=f14e108]:
+                - generic [ref=f14e109]: Organization
+                - generic [ref=f14e110]: Test
+              - generic [ref=f14e111]:
+                - generic [ref=f14e112]: Opened
+                - generic [ref=f14e113]:
+                  - generic [ref=f14e114]: Jun 14, 2026, 5:29 AM
+                  - button "Edit" [ref=f14e115]
+              - generic [ref=f14e116]:
+                - generic [ref=f14e117]: Closes
+                - generic [ref=f14e118]: Open-ended
+            - generic [ref=f14e119]:
+              - generic [ref=f14e120]:
+                - generic [ref=f14e121]: Participants
+                - generic [ref=f14e122]: "1"
+              - generic [ref=f14e123]:
+                - generic [ref=f14e124]: Invited
+                - generic [ref=f14e125]: "1"
+              - generic [ref=f14e126]:
+                - generic [ref=f14e127]: Viewed
+                - generic [ref=f14e128]: "1"
+              - generic [ref=f14e129]:
+                - generic [ref=f14e130]: Submitted
+                - generic [ref=f14e131]: "1"
+              - generic [ref=f14e132]:
+                - generic [ref=f14e133]: Completion
+                - generic [ref=f14e134]: 100%
+          - button "Invitation email Using template default — click to customize Edit" [ref=f14e136]:
+            - generic [ref=f14e137]:
+              - heading "Invitation email" [level=2] [ref=f14e138]
+              - paragraph [ref=f14e139]: Using template default — click to customize
+            - generic [ref=f14e140]: Edit
+          - generic [ref=f14e141]:
+            - generic [ref=f14e142]:
+              - img [ref=f14e143]
+              - generic [ref=f14e148]: "Total:"
+              - generic [ref=f14e149]: "1"
+            - generic [ref=f14e150]:
+              - img [ref=f14e151]
+              - generic [ref=f14e154]: "New:"
+              - generic [ref=f14e155]: "0"
+            - generic [ref=f14e156]:
+              - img [ref=f14e157]
+              - generic [ref=f14e160]: "Invited:"
+              - generic [ref=f14e161]: "0"
+            - generic [ref=f14e162]:
+              - img [ref=f14e163]
+              - generic [ref=f14e166]: "Started:"
+              - generic [ref=f14e167]: "0"
+            - generic [ref=f14e168]:
+              - img [ref=f14e169]
+              - generic [ref=f14e172]: "Completed:"
+              - generic [ref=f14e173]: "1"
+          - generic [ref=f14e174]:
+            - generic [ref=f14e175]:
+              - generic [ref=f14e176]:
+                - heading "Respondents" [level=2] [ref=f14e177]
+                - paragraph [ref=f14e178]: Track invitation delivery and view individual results.
+              - generic [ref=f14e179]:
+                - button "Add Respondent" [ref=f14e180]:
+                  - img [ref=f14e181]
+                  - text: Add Respondent
+                - button "Send Invitations" [ref=f14e182]:
+                  - img [ref=f14e183]
+                  - text: Send Invitations
+                - button "Send Reminders" [ref=f14e186]:
+                  - img [ref=f14e187]
+                  - text: Send Reminders
+                - link "Export respondents (CSV)" [ref=f14e190] [cursor=pointer]:
+                  - /url: /api/assessment-campaigns/cmqf0lzbz000l4p5uk6ixe03x/respondents/export.csv
+                  - img [ref=f14e191]
+                  - text: Export respondents (CSV)
+            - table [ref=f14e194]:
+              - rowgroup [ref=f14e195]:
+                - row "Name Email Team Status Sent Submitted Actions" [ref=f14e196]:
+                  - columnheader "Name" [ref=f14e197]
+                  - columnheader "Email" [ref=f14e198]
+                  - columnheader "Team" [ref=f14e199]
+                  - columnheader "Status" [ref=f14e200]
+                  - columnheader "Sent" [ref=f14e201]
+                  - columnheader "Submitted" [ref=f14e202]
+                  - columnheader "Actions" [ref=f14e203]
+              - rowgroup [ref=f14e204]:
+                - row "TEST ADD TEST ADD Mark as CEO TEST ADD test-account@redacted.local Test Completed Jun 15, 2026, 5:32 AM Jun 15, 2026, 5:56 AM View report Raw data Download result (CSV)" [ref=f14e205]:
+                  - cell "TEST ADD TEST ADD Mark as CEO TEST ADD" [ref=f14e206]:
+                    - generic [ref=f14e207]: TEST ADD TEST ADD
+                    - button "Mark as CEO" [ref=f14e208]
+                    - generic [ref=f14e209]: TEST ADD
+                  - cell "test-account@redacted.local" [ref=f14e210]
+                  - cell "Test" [ref=f14e211]
+                  - cell "Completed" [ref=f14e212]:
+                    - generic [ref=f14e213]: Completed
+                  - cell "Jun 15, 2026, 5:32 AM" [ref=f14e214]
+                  - cell "Jun 15, 2026, 5:56 AM" [ref=f14e215]
+                  - cell "View report Raw data Download result (CSV)" [ref=f14e216]:
+                    - generic [ref=f14e217]:
+                      - link "View report" [ref=f14e218] [cursor=pointer]:
+                        - /url: /assessments/cmqf0lzbz000l4p5uk6ixe03x/respondents/cmppgmfbe000c3lkt3k87hegc/report
+                        - img [ref=f14e219]
+                        - text: View report
+                      - button "Raw data" [ref=f14e222]:
+                        - img [ref=f14e223]
+                        - text: Raw data
+                      - link "Download result (CSV)" [ref=f14e226] [cursor=pointer]:
+                        - /url: /api/assessment-campaigns/cmqf0lzbz000l4p5uk6ixe03x/respondents/cmppgmfbe000c3lkt3k87hegc/result/export.csv
+                        - img [ref=f14e227]
+                        - text: Download result (CSV)
+  - region "Notifications (F8)":
+    - list
+  - button "Open Next.js Dev Tools" [ref=f14e235] [cursor=pointer]:
+    - img [ref=f14e236]
+  - alert [ref=f14e242]

@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wave F #22 — Group Report mockup</title>
+<style>
+  :root{
+    --pp:#522583; --pp-deep:#3f1c66; --pp-tint:#f4f0fa; --pp-tint2:#f0e9fa;
+    --or:#f7a600; --bl:#008bd2; --br:#946b36; --gr:#95c11f; --rd:#c8202f;
+    --ink:#1a1322; --muted:#6b6480; --line:#e4dcf0;
+    --head:"Helvetica Neue",Helvetica,Arial,sans-serif;
+    --body:"Roboto","Helvetica Neue",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#ddd5e9;font-family:var(--body);color:var(--ink);padding:34px 0}
+  .sheet{width:1080px;margin:0 auto 40px;background:#fff;box-shadow:0 10px 40px rgba(40,20,70,.22);border-radius:6px;overflow:hidden}
+  .stripe{display:flex;height:10px}
+  .stripe i{flex:1}.stripe .a{background:var(--or)}.stripe .b{background:var(--bl)}.stripe .c{background:var(--br)}.stripe .d{background:var(--gr)}
+  /* cover */
+  .cover{background:var(--pp);color:#fff;padding:54px 60px 64px;position:relative;overflow:hidden}
+  .cover .wave{position:absolute;right:-60px;top:-30px;width:520px;height:420px;background:#fff;opacity:.06;border-radius:50%}
+  .logo{display:flex;align-items:center;gap:14px;margin-bottom:40px}
+  .logo .mark{width:54px;height:54px;border:3px solid #fff;border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .logo .mark svg{display:block}
+  .logo .txt{font-family:var(--head);font-weight:800;letter-spacing:.5px;line-height:1}
+  .logo .txt b{font-size:26px;display:block}
+  .logo .txt span{font-size:10px;letter-spacing:3px;opacity:.85;font-weight:600}
+  .cover h1{font-family:var(--head);font-size:40px;line-height:1.08;margin:0 0 14px;font-weight:800;max-width:680px}
+  .cover .kind{display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.4);padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600;letter-spacing:.4px}
+  .cover .for{margin-top:38px;font-size:15px;opacity:.92}
+  .cover .for b{font-weight:700}
+  /* body */
+  .body{padding:34px 60px 14px}
+  .asof{background:var(--pp-tint);border:1px solid var(--line);border-radius:6px;padding:9px 14px;font-size:12.5px;color:var(--muted);margin-bottom:26px;display:flex;gap:18px;flex-wrap:wrap}
+  .asof b{color:var(--pp)}
+  .sec{margin:0 0 34px}
+  .sec>h2{font-family:var(--head);color:var(--pp);font-size:21px;margin:0 0 4px;font-weight:800;border-left:5px solid var(--pp);padding-left:12px}
+  .sec>p.intro{color:var(--muted);font-size:13.5px;margin:0 0 16px;padding-left:17px}
+  /* matrix table */
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  .mtx th,.mtx td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:right}
+  .mtx th:first-child,.mtx td:first-child{text-align:left}
+  .mtx thead th{background:var(--pp-tint2);color:var(--pp);font-family:var(--head);font-weight:700;font-size:12px;border-bottom:2px solid var(--pp)}
+  .mtx .ceo{color:var(--pp);font-weight:700}
+  .mtx td.mean{font-weight:700;background:var(--pp-tint)}
+  .mtx .n{color:var(--muted);font-size:11px;text-align:right;font-weight:400}
+  .mtx tr:last-child td{border-bottom:none}
+  .blank{color:#c3bcd2}
+  /* free text */
+  .qa{margin-bottom:18px}
+  .qa h3{font-family:var(--head);color:var(--bl);font-size:15px;margin:0 0 7px;font-weight:700;border-bottom:1px solid var(--line);padding-bottom:5px}
+  .qa .row{display:grid;grid-template-columns:200px 1fr;gap:14px;padding:5px 0;font-size:13.5px}
+  .qa .who{color:var(--muted);font-weight:600}
+  .qa .who.ceo{color:var(--pp)}
+  /* rating stacked bars */
+  .rat{display:grid;grid-template-columns:210px 1fr 52px;gap:12px;align-items:center;margin:7px 0;font-size:13px}
+  .rat .lab{text-align:right;color:var(--ink)}
+  .rat .bar{height:18px;border-radius:3px;display:flex;overflow:hidden;background:#eee}
+  .rat .bar .s{background:var(--gr)} .rat .bar .a{background:var(--or)} .rat .bar .w{background:var(--rd)}
+  .rat .val{font-weight:700;color:var(--pp);text-align:right}
+  .legend{display:flex;gap:20px;font-size:12px;color:var(--muted);margin:14px 0 4px;padding-left:222px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  /* obstacle / rehire bars */
+  .obs{display:grid;grid-template-columns:210px 1fr 46px;gap:12px;align-items:center;margin:5px 0;font-size:13px}
+  .obs .lab{text-align:right}
+  .obs .track{height:16px;background:#f1edf8;border-radius:3px;overflow:hidden}
+  .obs .fill{height:100%;background:var(--rd);border-radius:3px}
+  .obs.zero .lab{color:var(--muted)}
+  .obs .pct{font-weight:700;text-align:right;font-size:12.5px}
+  .reh .fill{background:var(--gr)}
+  .meanline{padding-left:222px;color:var(--pp);font-weight:700;font-size:12.5px;margin-top:6px}
+  /* callouts */
+  .note{background:#fff8e1;border-left:5px solid var(--or);color:#3a2400;padding:11px 15px;border-radius:0 6px 6px 0;font-size:13px;margin:6px 0 20px}
+  .note b{color:#7a4b00}
+  /* scored profile */
+  .prof th,.prof td{padding:9px 12px;border-bottom:1px solid var(--line)}
+  .prof thead th{background:var(--pp-tint2);color:var(--pp);font-family:var(--head);font-size:12px;border-bottom:2px solid var(--pp);text-align:right}
+  .prof thead th:first-child{text-align:left}
+  .prof td{text-align:right;font-size:13px}.prof td:first-child{text-align:left}
+  .prof .grp td:first-child{font-family:var(--head);color:var(--pp);font-weight:800}
+  .prof .grp td{background:var(--pp-tint);font-weight:700}
+  .prof .sub td:first-child{padding-left:26px;color:var(--ink)}
+  .prof .ceo{color:var(--pp);font-weight:700}
+  .dev .up::before{content:"▲ ";color:var(--bl);font-size:10px}
+  .dev .dn::before{content:"▼ ";color:var(--br);font-size:10px}
+  .dev .na{color:#bdb6cc}
+  .tier{display:inline-block;background:var(--pp);color:#fff;padding:3px 11px;border-radius:14px;font-size:11.5px;font-weight:700;margin-left:8px}
+  .tierband{display:flex;gap:8px;margin:4px 0 18px;flex-wrap:wrap}
+  .tierband .t{font-size:12px;padding:5px 12px;border-radius:6px;background:var(--pp-tint);color:var(--pp);font-weight:600}
+  .qbar{display:grid;grid-template-columns:230px 1fr;gap:14px;margin:9px 0;font-size:13px;align-items:center}
+  .qbar .lab{text-align:right;color:var(--ink)}
+  .qbar .pair{display:flex;flex-direction:column;gap:4px}
+  .qbar .b{height:14px;border-radius:3px;display:flex;align-items:center;color:#fff;font-size:10px;padding-left:6px;font-weight:700}
+  .qbar .b.c{background:var(--pp)} .qbar .b.t{background:#b9a9d6;color:#3f1c66}
+  .qbar .k{font-size:10px;color:var(--muted);width:34px;display:inline-block}
+  /* footer */
+  .foot{border-top:1px solid var(--line);margin:18px 60px 0;padding:18px 0 28px;display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px}
+  .foot .lg{display:flex;align-items:center;gap:9px;color:var(--pp);font-family:var(--head);font-weight:800;letter-spacing:.4px}
+  .foot .lg .m{width:26px;height:26px;border:2px solid var(--pp);border-radius:5px;display:flex;align-items:center;justify-content:center}
+  .tag{max-width:1080px;margin:0 auto 10px;color:#4a3d63;font-family:var(--head);font-weight:700;font-size:14px;letter-spacing:.3px}
+  .badge{display:inline-block;font-size:11px;font-weight:700;color:#fff;background:var(--bl);border-radius:4px;padding:2px 7px;margin-left:8px;vertical-align:2px;letter-spacing:.3px}
+  .badge.g{background:var(--gr)}
+  /* ---- print / PDF ---- */
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{size:10.6in 16.5in;margin:0.35in}
+  @media print{
+    body{background:#fff;padding:0}
+    .tag{padding:10px 0 6px;color:var(--pp)}
+    .sheet{box-shadow:none;border-radius:0;margin:0 auto 6px;width:980px}
+    .sheet + .tag{page-break-before:always}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= QUALITATIVE GROUP (LVA) ================= -->
+<div class="tag">▸ ARCHETYPE 1 — QUALITATIVE GROUP REPORT &nbsp;(Leadership Vision Alignment · QSP) <span class="badge">aggregates raw answers</span></div>
+<div class="sheet">
+  <div class="stripe"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>
+  <div class="cover">
+    <div class="wave"></div>
+    <div class="logo">
+      <span class="mark"><svg width="30" height="22" viewBox="0 0 30 22"><path d="M2 18 C8 18 9 4 15 4 C21 4 22 18 28 18" stroke="#f7a600" stroke-width="3" fill="none"/><path d="M2 18 C8 18 9 4 15 4" stroke="#008bd2" stroke-width="3" fill="none"/></svg></span>
+      <span class="txt"><b>SCALING UP</b><span>A GAZELLES COMPANY</span></span>
+    </div>
+    <span class="kind">Group Report</span>
+    <h1>Your Leadership Vision&nbsp;Alignment Report</h1>
+    <div class="for">For <b>Acme Corp</b> · Leadership Team &nbsp;•&nbsp; June 18, 2026</div>
+  </div>
+  <div class="body">
+    <div class="asof">
+      <span>As of <b>Jun 18, 2026, 6:58 AM</b></span>
+      <span><b>3 of 4</b> invited completed</span>
+      <span>Version <b>lva-v2</b></span>
+      <span>CEO: <b>John CEOExec</b></span>
+    </div>
+
+    <div class="sec">
+      <h2>The Vision on the Future</h2>
+      <p class="intro">What the leadership team aspires the company to be in three years.</p>
+      <table class="mtx">
+        <thead><tr><th>Metric</th><th>Mean</th><th class="ceo">John&nbsp;CEOExec (CEO)</th><th>Kathy&nbsp;HR</th><th>Jeff&nbsp;Services</th><th class="n">n</th></tr></thead>
+        <tbody>
+          <tr><td>Revenue in three years ($M)</td><td class="mean">10.0</td><td class="ceo">10</td><td>10</td><td>10</td><td class="n">3</td></tr>
+          <tr><td>Net profit (%)</td><td class="mean">12.7</td><td class="ceo">18</td><td>10</td><td>10</td><td class="n">3</td></tr>
+          <tr><td>Number of customers</td><td class="mean">287</td><td class="ceo">300</td><td>285</td><td>275</td><td class="n">3</td></tr>
+          <tr><td>Number of employees</td><td class="mean">20.0</td><td class="ceo">20</td><td>20</td><td class="blank">—</td><td class="n">2</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sec">
+      <h2>What the team says</h2>
+      <div class="qa">
+        <h3>Our main Products in three years</h3>
+        <div class="row"><span class="who ceo">John CEOExec (CEO)</span><span>Software and services</span></div>
+        <div class="row"><span class="who">Kathy HR</span><span>Expanded SaaS platform with onboarding tooling</span></div>
+        <div class="row"><span class="who">Jeff Services</span><span>Managed-services tier around the core product</span></div>
+      </div>
+      <div class="qa">
+        <h3>What are the key reasons for success in three years?</h3>
+        <div class="row"><span class="who ceo">John CEOExec (CEO)</span><span>Consistent results and disciplined execution</span></div>
+        <div class="row"><span class="who">Jeff Services</span><span>Customer retention and a repeatable delivery model</span></div>
+        <div class="row" style="color:var(--muted);font-size:12px;padding-top:2px"><span class="who"></span><span>Kathy HR left this blank — omitted (omit-empty).</span></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>Organizational Strengths &amp; Weaknesses</h2>
+      <p class="intro">16 factors, each rated Weak / Average / Strong — aggregated across the 3 respondents, sorted strongest first. (Showing 6 of 16.)</p>
+      <div class="rat"><span class="lab">Recruitment of new staff</span><span class="bar"><span class="s" style="width:67%"></span><span class="a" style="width:33%"></span></span><span class="val">2.7</span></div>
+      <div class="rat"><span class="lab">Keeping employees</span><span class="bar"><span class="s" style="width:67%"></span><span class="a" style="width:33%"></span></span><span class="val">2.7</span></div>
+      <div class="rat"><span class="lab">Execution &amp; operational processes</span><span class="bar"><span class="s" style="width:33%"></span><span class="a" style="width:67%"></span></span><span class="val">2.3</span></div>
+      <div class="rat"><span class="lab">Strategy</span><span class="bar"><span class="s" style="width:33%"></span><span class="a" style="width:34%"></span><span class="w" style="width:33%"></span></span><span class="val">2.0</span></div>
+      <div class="rat"><span class="lab">Culture</span><span class="bar"><span class="a" style="width:67%"></span><span class="w" style="width:33%"></span></span><span class="val">1.7</span></div>
+      <div class="rat"><span class="lab">Cash</span><span class="bar"><span class="a" style="width:33%"></span><span class="w" style="width:67%"></span></span><span class="val">1.3</span></div>
+      <div class="legend"><span><i style="background:var(--gr)"></i>Strong</span><span><i style="background:var(--or)"></i>Average</span><span><i style="background:var(--rd)"></i>Weak</span><span style="color:var(--pp)">value = mean on the 1–3 scale · n=3</span></div>
+    </div>
+
+    <div class="sec">
+      <h2>Biggest Obstacles to growth</h2>
+      <p class="intro">% of the respondents who flagged each factor (answerer denominator, n=3). All factors shown; labels, not codes.</p>
+      <div class="obs"><span class="lab">Culture</span><span class="track"><span class="fill" style="width:67%"></span></span><span class="pct">67%</span></div>
+      <div class="obs"><span class="lab">Strategy</span><span class="track"><span class="fill" style="width:67%"></span></span><span class="pct">67%</span></div>
+      <div class="obs"><span class="lab">Cash</span><span class="track"><span class="fill" style="width:33%"></span></span><span class="pct">33%</span></div>
+      <div class="obs zero"><span class="lab">Recruitment of new staff</span><span class="track"></span><span class="pct">0%</span></div>
+      <div class="obs zero"><span class="lab">Technology</span><span class="track"></span><span class="pct">0%</span></div>
+    </div>
+
+    <div class="sec">
+      <h2>Important Focus areas</h2>
+      <p class="intro">Which percentage of employees would you enthusiastically rehire?</p>
+      <div class="obs reh"><span class="lab ceo" style="color:var(--pp);font-weight:700">John CEOExec (CEO)</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="pct">100%</span></div>
+      <div class="obs reh"><span class="lab">Kathy HR</span><span class="track"><span class="fill" style="width:90%"></span></span><span class="pct">90%</span></div>
+      <div class="obs reh"><span class="lab">Jeff Services</span><span class="track"><span class="fill" style="width:99%"></span></span><span class="pct">99%</span></div>
+      <div class="meanline">Mean: 96.3%</div>
+    </div>
+
+    <div class="note"><b>Graceful degrade (G2):</b> if the designated CEO hasn't submitted, the report still renders the team aggregate and shows <i>“CEO (John CEOExec) — not yet submitted”</i> in place of the CEO column. If no CEO is designated, a nudge links to the CEO picker.</div>
+  </div>
+  <div class="foot">
+    <span>June 18, 2026</span>
+    <span class="lg"><span class="m"><svg width="16" height="12" viewBox="0 0 30 22"><path d="M2 18 C8 18 9 4 15 4 C21 4 22 18 28 18" stroke="#522583" stroke-width="3" fill="none"/></svg></span>Generated by Scaling Up Platform</span>
+  </div>
+</div>
+
+<!-- ================= SCORED GROUP (Rockefeller) ================= -->
+<div class="tag">▸ ARCHETYPE 2 — SCORED GROUP REPORT &nbsp;(Rockefeller Habits · Five Dysfunctions) <span class="badge g">reads frozen result · CEO excluded from Team avg</span></div>
+<div class="sheet">
+  <div class="stripe"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i></div>
+  <div class="cover">
+    <div class="wave"></div>
+    <div class="logo">
+      <span class="mark"><svg width="30" height="22" viewBox="0 0 30 22"><path d="M2 18 C8 18 9 4 15 4 C21 4 22 18 28 18" stroke="#f7a600" stroke-width="3" fill="none"/><path d="M2 18 C8 18 9 4 15 4" stroke="#008bd2" stroke-width="3" fill="none"/></svg></span>
+      <span class="txt"><b>SCALING UP</b><span>A GAZELLES COMPANY</span></span>
+    </div>
+    <span class="kind">Group Report</span>
+    <h1>Your Rockefeller&nbsp;Habits Report</h1>
+    <div class="for">For <b>Acme Corp</b> · Leadership Team &nbsp;•&nbsp; June 18, 2026</div>
+  </div>
+  <div class="body">
+    <div class="asof">
+      <span>As of <b>Jun 18, 2026, 7:02 AM</b></span>
+      <span><b>4 of 5</b> invited completed</span>
+      <span>Version <b>rock-v2</b></span>
+      <span>CEO: <b>John CEOExec</b></span>
+    </div>
+
+    <div class="sec">
+      <h2>Alignment profile <span class="tier">CEO tier: On Track</span></h2>
+      <p class="intro">Section scores — the CEO vs. the <b>team average of the other leaders</b> (CEO excluded), with the gap. Higher = stronger habit. ▲/▼ show direction, not good/bad.</p>
+      <table class="prof dev">
+        <thead><tr><th>Section</th><th class="ceo">CEO</th><th>Team avg<br><span style="font-weight:400;font-size:10px">(excl. CEO)</span></th><th>Dev</th></tr></thead>
+        <tbody>
+          <tr class="grp"><td>People</td><td class="ceo">3.1</td><td>5.3</td><td class="dn">−2.2</td></tr>
+          <tr class="sub"><td>Right people, right seats</td><td class="ceo">2.8</td><td>5.3</td><td class="dn">−2.5</td></tr>
+          <tr class="sub"><td>Core values lived</td><td class="ceo">3.4</td><td>5.3</td><td class="dn">−1.9</td></tr>
+          <tr class="grp"><td>Strategy</td><td class="ceo">2.0</td><td>7.1</td><td class="dn">−5.1</td></tr>
+          <tr class="grp"><td>Execution</td><td class="ceo">6.2</td><td>5.4</td><td class="up">+0.8</td></tr>
+          <tr class="grp"><td>Cash</td><td class="ceo">1.6</td><td class="na">—</td><td class="na">— (N&lt;2)</td></tr>
+        </tbody>
+      </table>
+      <div class="tierband">
+        <span class="t">Team tiers: On&nbsp;Track ×2</span><span class="t">Needs&nbsp;Focus ×1</span><span class="t">At&nbsp;Risk ×1</span>
+      </div>
+      <div class="note"><b>N&lt;2 fallback (R1-HIGH-1):</b> the “Cash” section has fewer than one <i>other</i> submission, so the deviation is suppressed (“—”) rather than comparing the CEO to himself.</div>
+    </div>
+
+    <div class="sec">
+      <h2>By question — CEO vs. team</h2>
+      <p class="intro">CEO value (purple) against the non-CEO team mean (grey).</p>
+      <div class="qbar"><span class="lab">We have a written core-values list</span><span class="pair"><span class="b c" style="width:40%"><span class="k">CEO 4</span></span><span class="b t" style="width:53%"><span class="k">Team 5.3</span></span></span></div>
+      <div class="qbar"><span class="lab">Quarterly priorities are clear</span><span class="pair"><span class="b c" style="width:20%"><span class="k">CEO 2</span></span><span class="b t" style="width:68%"><span class="k">Team 6.8</span></span></span></div>
+      <div class="qbar"><span class="lab">KPIs reviewed weekly</span><span class="pair"><span class="b c" style="width:62%"><span class="k">CEO 6.2</span></span><span class="b t" style="width:54%"><span class="k">Team 5.4</span></span></span></div>
+    </div>
+  </div>
+  <div class="foot">
+    <span>June 18, 2026</span>
+    <span class="lg"><span class="m"><svg width="16" height="12" viewBox="0 0 30 22"><path d="M2 18 C8 18 9 4 15 4 C21 4 22 18 28 18" stroke="#522583" stroke-width="3" fill="none"/></svg></span>Generated by Scaling Up Platform</span>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,179 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - link "Skip to main content" [ref=f1e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - navigation "Main navigation" [ref=f1e4]:
+      - generic [ref=f1e6]:
+        - generic [ref=f1e7]:
+          - link "Scaling Up - Go to Dashboard" [ref=f1e9] [cursor=pointer]:
+            - /url: /admin/dashboard
+            - text: Scaling Up
+          - generic [ref=f1e11]:
+            - link "Dashboard" [ref=f1e12] [cursor=pointer]:
+              - /url: /admin/dashboard
+            - button "Workshops" [ref=f1e14] [cursor=pointer]:
+              - text: Workshops
+              - img [ref=f1e15]
+            - link "Approvals" [ref=f1e17] [cursor=pointer]:
+              - /url: /admin/approvals
+            - link "Assessments" [ref=f1e18] [cursor=pointer]:
+              - /url: /admin/assessments
+            - button "Automation" [ref=f1e20] [cursor=pointer]:
+              - text: Automation
+              - img [ref=f1e21]
+            - button "People" [ref=f1e24] [cursor=pointer]:
+              - text: People
+              - img [ref=f1e25]
+            - button "Financials" [ref=f1e28] [cursor=pointer]:
+              - text: Financials
+              - img [ref=f1e29]
+        - generic [ref=f1e31]:
+          - button "Switch to dark mode" [ref=f1e180] [cursor=pointer]:
+            - img [ref=f1e181]
+          - generic [ref=f1e39]:
+            - link "Settings" [ref=f1e40] [cursor=pointer]:
+              - /url: /admin/settings
+            - button "Sign Out" [ref=f1e41]
+          - generic [ref=f1e42]: A
+    - main "Page content" [ref=f1e43]:
+      - generic [ref=f1e44]:
+        - complementary "Assessments navigation" [ref=f1e45]:
+          - navigation [ref=f1e46]:
+            - generic [ref=f1e47]:
+              - paragraph [ref=f1e48]: Assessments
+              - link "Dashboard" [ref=f1e49] [cursor=pointer]:
+                - /url: /admin/assessments
+              - link "Organizations(coming soon)" [disabled] [ref=f1e50] [cursor=pointer]:
+                - /url: /admin/assessments/organizations
+              - link "Access Groups" [ref=f1e51] [cursor=pointer]:
+                - /url: /admin/assessments/access-groups
+              - link "Templates" [ref=f1e52] [cursor=pointer]:
+                - /url: /admin/assessments/templates
+              - link "Campaigns(coming soon)" [disabled] [ref=f1e53] [cursor=pointer]:
+                - /url: /admin/assessments/campaigns
+              - link "Public Quizzes(coming soon)" [disabled] [ref=f1e54] [cursor=pointer]:
+                - /url: /admin/assessments/public-quizzes
+              - link "Import" [ref=f1e55] [cursor=pointer]:
+                - /url: /admin/assessments/import
+              - link "Aggregate Report" [ref=f1e56] [cursor=pointer]:
+                - /url: /admin/assessments/aggregate
+        - generic [ref=f1e58]:
+          - generic [ref=f1e59]:
+            - heading "New Assessment Template" [level=1] [ref=f1e60]
+            - paragraph [ref=f1e61]: Define metadata + paste the content JSON (questions, sections, scoringConfig). A first draft version is created automatically — you can publish it once you're ready.
+          - generic [ref=f1e62]:
+            - generic [ref=f1e63]:
+              - heading "Metadata" [level=2] [ref=f1e64]
+              - generic [ref=f1e65]:
+                - generic [ref=f1e66]:
+                  - generic [ref=f1e67]: Name
+                  - textbox [ref=f1e68]
+                - generic [ref=f1e69]:
+                  - generic [ref=f1e70]: Alias (URL slug, immutable)
+                  - textbox "my-template" [ref=f1e71]
+                  - paragraph [ref=f1e72]: Lowercase, digits, dashes only.
+              - generic [ref=f1e73]:
+                - generic [ref=f1e74]: Description
+                - textbox [ref=f1e75]
+              - generic [ref=f1e76]:
+                - generic [ref=f1e77]:
+                  - generic [ref=f1e78]: Aggregation mode
+                  - combobox [ref=f1e79]:
+                    - option "FULL_VISIBILITY" [selected]
+                    - option "CEO_ONLY"
+                - generic [ref=f1e80]:
+                  - generic [ref=f1e81]: Language
+                  - textbox [ref=f1e82]: en
+            - generic [ref=f1e83]:
+              - heading "Invitation email" [level=2] [ref=f1e84]
+              - generic [ref=f1e85]:
+                - generic [ref=f1e86]: Subject
+                - textbox [ref=f1e87]: You're invited to take an assessment
+              - generic [ref=f1e88]:
+                - generic [ref=f1e89]: Body (Markdown)
+                - textbox [ref=f1e90]: "Hi {{respondentFirstName}}, You've been invited to take the {{campaignName}} assessment. [Start the assessment]({{invitationUrl}}) The survey closes on {{closeAt}}."
+            - generic [ref=f1e91]:
+              - generic [ref=f1e92]:
+                - heading "Sections" [level=2] [ref=f1e93]
+                - button "Section" [ref=f1e94]:
+                  - img [ref=f1e95]
+                  - text: Section
+              - paragraph [ref=f1e96]: Sections group questions and drive per-section averages in reports. Identifiers (S1, S2…) are auto-generated from order.
+              - generic [ref=f1e97]:
+                - generic [ref=f1e98]:
+                  - generic [ref=f1e99]: S1
+                  - textbox "Section name" [ref=f1e100]
+                  - button "Move up" [disabled] [ref=f1e101]:
+                    - img [ref=f1e102]
+                  - button "Move down" [disabled] [ref=f1e104]:
+                    - img [ref=f1e105]
+                  - button "Remove section" [disabled] [ref=f1e107]:
+                    - img [ref=f1e108]
+                - 'textbox "Optional: part label (e.g. ''Part 1: Leadership'')" [ref=f1e111]'
+                - 'textbox "Optional: section description shown to respondents" [ref=f1e112]'
+            - generic [ref=f1e113]:
+              - generic [ref=f1e114]:
+                - heading "Questions" [level=2] [ref=f1e115]
+                - button "Question" [ref=f1e116]:
+                  - img [ref=f1e117]
+                  - text: Question
+              - paragraph [ref=f1e118]: All questions today are SLIDER_LIKERT type. Identifiers (S1_Q1…) are auto-generated from section + position.
+              - paragraph [ref=f1e119]:
+                - text: No questions yet. Click
+                - strong [ref=f1e120]: Question
+                - text: to add one.
+            - generic [ref=f1e121]:
+              - heading "Scoring" [level=2] [ref=f1e122]
+              - generic [ref=f1e123]:
+                - generic [ref=f1e124]:
+                  - generic [ref=f1e125]: Tier metric
+                  - combobox [ref=f1e126]:
+                    - option "countAchieved" [selected]
+                    - option "overallTotal"
+                    - option "overallAvg"
+                - generic [ref=f1e127]:
+                  - generic [ref=f1e128]: Pass threshold (a question is "achieved" when value ≥ this)
+                  - spinbutton [ref=f1e129]: "0"
+              - generic [ref=f1e130]:
+                - heading "Tiers" [level=3] [ref=f1e131]
+                - button "Tier" [ref=f1e132]:
+                  - img [ref=f1e133]
+                  - text: Tier
+              - paragraph [ref=f1e134]:
+                - text: A tier matches when
+                - code [ref=f1e135]: minMetric ≤ metric < maxMetric
+                - text: . Leave maxMetric blank to make the tier unbounded (top tier).
+              - generic [ref=f1e137]:
+                - generic [ref=f1e138]:
+                  - generic [ref=f1e139]: min
+                  - spinbutton [ref=f1e140]: "0"
+                - generic [ref=f1e141]:
+                  - generic [ref=f1e142]: max (blank = unbounded)
+                  - textbox [ref=f1e143]
+                - generic [ref=f1e144]:
+                  - generic [ref=f1e145]: label
+                  - textbox [ref=f1e146]
+                - generic [ref=f1e147]:
+                  - generic [ref=f1e148]: message
+                  - textbox [ref=f1e149]
+                - generic [ref=f1e150]:
+                  - button [disabled] [ref=f1e151]:
+                    - img [ref=f1e152]
+                  - button [disabled] [ref=f1e154]:
+                    - img [ref=f1e155]
+                  - button [disabled] [ref=f1e157]:
+                    - img [ref=f1e158]
+            - generic [ref=f1e161]:
+              - heading "Report config (advanced, optional)" [level=2] [ref=f1e162]
+              - paragraph [ref=f1e163]: Paste-JSON for now — used by future report templates. Leave blank for null.
+              - textbox "Leave blank for null" [ref=f1e164]
+            - generic [ref=f1e165]:
+              - button "Cancel" [ref=f1e166]
+              - button "Create template" [ref=f1e167]
+    - contentinfo [ref=f1e168]:
+      - paragraph [ref=f1e170]: Scaling Up Workshop Platform v2.0
+  - region "Notifications (F8)":
+    - list
+  - button "Open Next.js Dev Tools" [ref=f1e176] [cursor=pointer]:
+    - img [ref=f1e177]
+  - alert [ref=f1e183]
