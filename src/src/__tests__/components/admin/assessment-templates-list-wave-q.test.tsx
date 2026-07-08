@@ -127,8 +127,9 @@ describe("AssessmentTemplatesList — flag-gated Enable/Disable action", () => {
     expect(
       screen.queryByRole("button", { name: /enable qsp v1/i }),
     ).not.toBeInTheDocument();
-    // Existing actions untouched.
-    expect(screen.getAllByText("View")).toHaveLength(2);
+    // Existing actions untouched. ("View" was removed Jul-8 roadmap #2 —
+    // it duplicated the name + Edit editor link; see the dedup test.)
+    expect(screen.queryAllByText("View")).toHaveLength(0);
     expect(screen.getAllByText("Edit")).toHaveLength(2);
     expect(screen.getAllByText("Delete")).toHaveLength(2);
     expect(screen.getAllByText(/access/i).length).toBeGreaterThanOrEqual(2);

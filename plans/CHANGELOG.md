@@ -6,6 +6,14 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-08 — Templates-list "View" removed (View == Edit de-duplication) <!-- ENTRY_ISO:2026-07-08 ENTRY_SLUG:templates-list-view-edit-dedup -->
+
+**Jul-8 roadmap target #2 of 3.** The admin assessment-templates list row rendered the template **name**, a **"View"** link, and an **"Edit"** link — all three pointing at `/admin/assessments/templates/{id}`, which redirects into the tabbed editor. Three controls, one destination (user-flagged: "View and Edit go to the same place — bad UI"). There is **no read-only view page** in the app (`/templates/{id}` has only ever redirected to the editor; Wave W removed the old disabled respondent-preview button), so the honest fix is de-duplication, not a new page.
+
+**Removed the redundant "View" link** in `AssessmentTemplatesList.tsx`: the template NAME is now the open affordance (→ editor) and "Edit" stays as the explicit verb — the conventional list pattern (name-click vs. action verb). "Access", the flag-gated Enable/Disable, and "Delete" are untouched. Presentation-only; **no route/schema/flag change; kill = revert-commit.** 4 new dedup tests + the stale Wave Q `getAllByText("View")).toHaveLength(2)` assertion flipped to assert-absent; both suites green (11 tests), eslint clean, `CI=true next build --turbopack` green.
+
+_(Building a real read-only View page + the three "coming soon" admin pages — Organizations / Campaigns / Public Quizzes, which 404 today — remain roadmap target #3.)_
+
 ### 2026-07-08 — Wave U3 LAUNCHED: findings/recommendations in the results email LIVE on production <!-- ENTRY_ISO:2026-07-08 ENTRY_SLUG:wave-u3-launched -->
 
 **`WAVE_U3_EMAIL_FINDINGS_ENABLED=1` set on Vercel Production + redeploy** (deploy `j7f6gd7hv`, aliased `platformtest.scalingup.com`) — flips the Wave U3 email surface (built dark in PR #162 `76b5cb18`, spec 19aa) LIVE. This is **roadmap target #1 of 3** from the Jul-8 progress report (`progress-report-jul8-sent`).
