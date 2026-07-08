@@ -4,7 +4,7 @@
  * TemplateEditorTabbed — F1 (Checkpoint 1a).
  *
  * Wireframe rebuild Phase 1a. Smallest possible standalone surface for
- * the admin assessment template editor: persistent header + 7-tab nav
+ * the admin assessment template editor: persistent header + 5-tab nav
  * + URL-based tab persistence. Tab panels are empty placeholders for
  * F1; the real Metadata / Sections / Questions / Scoring & Tiers /
  * Versions panels land in subsequent checkpoints (F2-F6).
@@ -18,9 +18,10 @@
  *   2. Sections
  *   3. Questions
  *   4. Scoring & Tiers
- *   5. Conditional Logic — disabled, v1.5 badge + tooltip
- *   6. Access          — link to /admin/assessments/access-groups (NOT a panel)
- *   7. Versions
+ *   5. Versions
+ *   + Access           — link to /admin/assessments/access-groups (NOT a panel)
+ * (The "Conditional Logic" ghost tab was removed in Wave W, spec 19w D5; the
+ *  disabled "Preview as Respondent" header button in Wave W leftovers, spec 19z.)
  *
  * Cross-tab dirty state is lifted here. Future tab components call
  * setDirty(surface) to flip a flag; the beforeunload listener fires
@@ -1083,14 +1084,6 @@ export function TemplateEditorTabbed({
         </div>
 
         <div className="wf-page-action-row">
-          <button
-            type="button"
-            disabled
-            title="Coming in v1.5"
-            className="wf-btn wf-btn-ghost wf-btn-sm"
-          >
-            Preview as Respondent
-          </button>
           <button
             type="button"
             onClick={handleSaveDraft}

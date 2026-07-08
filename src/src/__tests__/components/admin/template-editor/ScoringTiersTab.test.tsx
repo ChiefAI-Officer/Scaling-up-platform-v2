@@ -272,25 +272,19 @@ describe("ScoringTiersTab — F4 (Checkpoint 3)", () => {
       expect(screen.queryByText(/conditionalSections/)).toBeNull();
     });
 
-    it("Peer Benchmarks ghost card renders with v1.5 badge + disabled mini-table", () => {
+    it("Peer Benchmarks ghost card is REMOVED (Wave W leftovers, spec 19z — superseded by the live Wave S peer-averages panel)", () => {
       render(<ScoringTiersTab {...makeProps()} />);
-      const card = screen.getByTestId("deferred-peer-benchmarks");
-      expect(card).toBeInTheDocument();
-      expect(within(card).getByText(/Peer Benchmarks/i)).toBeInTheDocument();
-      expect(within(card).getByText(/v1\.5/i)).toBeInTheDocument();
-      const buttons = within(card).queryAllByRole("button");
-      buttons.forEach((el) => expect(el).toBeDisabled());
+      expect(screen.queryByTestId("deferred-peer-benchmarks")).toBeNull();
+      expect(screen.queryByText(/Peer Benchmarks/i)).toBeNull();
     });
   });
 
   describe("Explanation card", () => {
-    it("renders the explanation card title verbatim from WF18", () => {
+    it("is REMOVED (Wave W leftovers, spec 19z — the deferred-logic explanation card went out with the ghost placeholders it explained)", () => {
       render(<ScoringTiersTab {...makeProps()} />);
       expect(
-        screen.getByText(
-          /Why is this section deferred\? \(Codex co-validate, May 12 2026\)/i,
-        ),
-      ).toBeInTheDocument();
+        screen.queryByText(/Why is this section deferred/i),
+      ).toBeNull();
     });
   });
 
