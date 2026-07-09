@@ -116,19 +116,26 @@ describe("AssessmentsSidebar", () => {
       return node as HTMLAnchorElement;
     }
 
-    it("marks Organizations / Campaigns as placeholders for ADMIN (Public Campaigns is now a real route — Wave Z Z-1)", () => {
+    it("marks NO admin entries as placeholders — all are real routes now (Wave Z PR-2)", () => {
       render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
+
+      // Organizations + Campaigns admin pages landed in Wave Z PR-2; Public
+      // Campaigns was wired in Z-1. No "(coming soon)" markers remain.
+      expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
 
       for (const label of ["Organizations", "Campaigns"]) {
         const anchor = anchorFor(label);
-        expect(anchor).toHaveAttribute("aria-disabled", "true");
-        expect(anchor.className).toMatch(/opacity-60/);
+        expect(anchor).not.toHaveAttribute("aria-disabled");
+        expect(anchor.className).not.toMatch(/opacity-60/);
       }
-
-      // Two "(coming soon)" markers now — Public Campaigns was wired to its
-      // real page (/admin/assessments/public-campaigns) in Wave Z Z-1.
-      const comingSoon = screen.getAllByText(/coming soon/i);
-      expect(comingSoon.length).toBe(2);
+      expect(anchorFor("Organizations")).toHaveAttribute(
+        "href",
+        "/admin/assessments/organizations",
+      );
+      expect(anchorFor("Campaigns")).toHaveAttribute(
+        "href",
+        "/admin/assessments/campaigns",
+      );
     });
 
     it("does NOT mark Dashboard / Access Groups / Templates / Public Campaigns / Aggregate Report as placeholders for ADMIN", () => {

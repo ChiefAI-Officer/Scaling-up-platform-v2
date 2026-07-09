@@ -1,6 +1,6 @@
 # Spec 19ab — Wave Z: wire the three "coming soon" Assessments admin pages
 
-> **Status:** SCOPED + /grill-with-docs (7 product decisions) + /grill-me (6 impl decisions) + /co-validate ×2 (round 2 caught a ship-broken dead-end + simplified the detail page — reversed the shared-helper call) — awaiting user greenlight (gated wave). No code yet.
+> **Status:** SHIPPED 2026-07-09 — PR-1 (Z-1 Public Campaigns rewire) merged #168; PR-2 (Z-2 Campaigns + Z-3 Organizations + Z-4 sidebar) built TDD (60 tests / 8 suites) + build green + adversarial review 0 defects; flagless → live on merge. **Jul-8 roadmap target #3 DONE (roadmap complete).** _(Prior: SCOPED + /grill-with-docs + /grill-me + /co-validate ×2 — 13 decisions resolved; round 2 caught a ship-broken longitudinal dead-end + reversed the shared-helper call.)_
 > **Roadmap:** Jul-8 progress-report target #3 of 3 (the last one). Targets #1 (Wave U3 email findings) and #2 (templates-list View==Edit) are LAUNCHED.
 > **Wave home:** Wave Z (next letter after Wave Y). Spec seq `19ab` (after `19aa`).
 

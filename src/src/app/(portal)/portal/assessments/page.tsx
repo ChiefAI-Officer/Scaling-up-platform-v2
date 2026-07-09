@@ -18,10 +18,7 @@ import {
   CampaignsListWithFilter,
   type CampaignListItem,
 } from "@/components/assessments/CampaignsListWithFilter";
-import {
-  computeCampaignStatusMetrics,
-  type CampaignStatusMetricsInput,
-} from "@/lib/assessments/campaign-status-metrics";
+import { toCampaignListItems } from "@/lib/assessments/campaign-list-items";
 
 const APP_URL =
   process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
@@ -80,44 +77,8 @@ export default async function CoachAssessmentsPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  const items: CampaignListItem[] = campaigns.map((c) => {
-    // Build a lookup from respondentId → invitation row (1-to-1 per campaign)
-    const invByRespondentId = new Map(
-      c.invitations.map((inv) => [inv.respondentId, inv])
-    );
-
-    // Build the metrics input: one row per participant.
-    // AssessmentInvitationStatus enum values are a superset of the helper's
-    // PENDING | SENT | VIEWED | SUBMITTED — cast is safe because those are
-    // the only values the DB can hold for active (non-revoked) invitations.
-    const metricsInput: CampaignStatusMetricsInput[] = c.participants.map((p) => {
-      const inv = invByRespondentId.get(p.respondentId) ?? null;
-      return {
-        participantId: p.id,
-        invitation: inv
-          ? {
-              status: inv.status as "PENDING" | "SENT" | "VIEWED" | "SUBMITTED",
-              sentAt: inv.sentAt,
-              revokedAt: inv.revokedAt,
-            }
-          : null,
-      };
-    });
-
-    const metrics = computeCampaignStatusMetrics(metricsInput);
-
-    return {
-      id: c.id,
-      name: c.name,
-      alias: c.alias,
-      status: c.status,
-      templateName: c.template.name,
-      organizationId: c.organization.id,
-      organizationName: c.organization.name,
-      openAt: c.openAt.toISOString(),
-      metrics,
-    };
-  });
+  // Wave Z (Z-2) — shared mapper (identical to the admin oversight page).
+  const items: CampaignListItem[] = toCampaignListItems(campaigns);
 
   return (
     <div className="space-y-6">
