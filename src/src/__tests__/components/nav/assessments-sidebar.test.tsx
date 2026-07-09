@@ -48,7 +48,7 @@ describe("AssessmentsSidebar", () => {
     expect(screen.getByText("Access Groups")).toBeInTheDocument();
     expect(screen.getByText("Templates")).toBeInTheDocument();
     expect(screen.getByText("Campaigns")).toBeInTheDocument();
-    expect(screen.getByText("Public Quizzes")).toBeInTheDocument();
+    expect(screen.getByText("Public Campaigns")).toBeInTheDocument();
     expect(screen.getByText("Aggregate Report")).toBeInTheDocument();
   });
 
@@ -64,13 +64,13 @@ describe("AssessmentsSidebar", () => {
   it("hides the admin section entirely when role is COACH", () => {
     render(<AssessmentsSidebar session={makeSession("COACH")} />);
     // Admin-only labels disappear (Organizations / Access Groups / Templates /
-    // Campaigns / Public Quizzes / Aggregate Report). The "Dashboard" label
+    // Campaigns / Public Campaigns / Aggregate Report). The "Dashboard" label
     // is admin-only as well — coaches see "My Campaigns" / "Members".
     expect(screen.queryByText("Organizations")).not.toBeInTheDocument();
     expect(screen.queryByText("Access Groups")).not.toBeInTheDocument();
     expect(screen.queryByText("Templates")).not.toBeInTheDocument();
     expect(screen.queryByText("Campaigns")).not.toBeInTheDocument();
-    expect(screen.queryByText("Public Quizzes")).not.toBeInTheDocument();
+    expect(screen.queryByText("Public Campaigns")).not.toBeInTheDocument();
     expect(screen.queryByText("Aggregate Report")).not.toBeInTheDocument();
   });
 
@@ -116,33 +116,40 @@ describe("AssessmentsSidebar", () => {
       return node as HTMLAnchorElement;
     }
 
-    it("marks Organizations / Campaigns / Public Quizzes as placeholders for ADMIN", () => {
+    it("marks Organizations / Campaigns as placeholders for ADMIN (Public Campaigns is now a real route — Wave Z Z-1)", () => {
       render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
 
-      for (const label of ["Organizations", "Campaigns", "Public Quizzes"]) {
+      for (const label of ["Organizations", "Campaigns"]) {
         const anchor = anchorFor(label);
         expect(anchor).toHaveAttribute("aria-disabled", "true");
         expect(anchor.className).toMatch(/opacity-60/);
       }
 
-      // Three "(coming soon)" markers on the admin side (one per placeholder row).
+      // Two "(coming soon)" markers now — Public Campaigns was wired to its
+      // real page (/admin/assessments/public-campaigns) in Wave Z Z-1.
       const comingSoon = screen.getAllByText(/coming soon/i);
-      expect(comingSoon.length).toBe(3);
+      expect(comingSoon.length).toBe(2);
     });
 
-    it("does NOT mark Dashboard / Access Groups / Templates / Aggregate Report as placeholders for ADMIN", () => {
+    it("does NOT mark Dashboard / Access Groups / Templates / Public Campaigns / Aggregate Report as placeholders for ADMIN", () => {
       render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
 
       for (const label of [
         "Dashboard",
         "Access Groups",
         "Templates",
+        "Public Campaigns",
         "Aggregate Report",
       ]) {
         const anchor = anchorFor(label);
         expect(anchor).not.toHaveAttribute("aria-disabled");
         expect(anchor.className).not.toMatch(/opacity-60/);
       }
+      // Public Campaigns points at its real page, not the old placeholder route.
+      expect(anchorFor("Public Campaigns")).toHaveAttribute(
+        "href",
+        "/admin/assessments/public-campaigns",
+      );
     });
 
     it("marks neither coach-lane entry as a placeholder (both are real routes)", () => {

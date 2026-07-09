@@ -6,6 +6,14 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-09 — Wave Z Z-1: Public Campaigns nav wired (orphaned page un-404'd) <!-- ENTRY_ISO:2026-07-09 ENTRY_SLUG:wave-z1-public-campaigns-wired -->
+
+**Jul-8 roadmap target #3, PR-1 of 2** (spec `docs/specs/v7.6/19ab-assessments-admin-pages-wiring.md`, Z-1). The Assessments sidebar's "Public Quizzes" entry was a `placeholder:true` that **404'd** — while a COMPLETE admin page (`/admin/assessments/public-campaigns` + `PublicCampaignsManager`: lists + creates PUBLIC-access campaigns) sat **orphaned** with no nav entry. Wired the entry to the real page and **relabeled "Public Quizzes" → "Public Campaigns"** (the domain glossary avoids "quiz" — the `/quiz/...` URL is not the canonical term; captured in `CONTEXT.md`).
+
+**Smoke-verified the orphaned page first** (grill-me commitment): its three in-mount fetch targets (`/api/assessment-campaigns`, `/api/admin/assessment-templates`, `/api/organizations`) all exist + admit admin; 27 existing API tests green; a new render smoke confirms the list + create form mount without crashing. **Presentation/wiring only — no route/schema/flag/API change; kill = revert-commit.** Sidebar test flipped (Public Campaigns now real, not placeholder; **2 "coming soon" markers remain** for Organizations + Campaigns, wired in PR-2). Sidebar + smoke suites green (11), eslint clean, `CI=true next build --turbopack` green.
+
+PR-2 = Z-2 (admin Campaigns oversight list + detail) + Z-3 (admin Organizations directory).
+
 ### 2026-07-08 — Templates-list "View" removed (View == Edit de-duplication) <!-- ENTRY_ISO:2026-07-08 ENTRY_SLUG:templates-list-view-edit-dedup -->
 
 **Jul-8 roadmap target #2 of 3.** The admin assessment-templates list row rendered the template **name**, a **"View"** link, and an **"Edit"** link — all three pointing at `/admin/assessments/templates/{id}`, which redirects into the tabbed editor. Three controls, one destination (user-flagged: "View and Edit go to the same place — bad UI"). There is **no read-only view page** in the app (`/templates/{id}` has only ever redirected to the editor; Wave W removed the old disabled respondent-preview button), so the honest fix is de-duplication, not a new page.
