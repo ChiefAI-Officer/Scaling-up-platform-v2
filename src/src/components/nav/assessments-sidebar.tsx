@@ -39,10 +39,12 @@ interface SidebarEntry {
 
 const ADMIN_ENTRIES: SidebarEntry[] = [
   { href: "/admin/assessments", label: "Dashboard", exact: true },
-  // Organizations / Campaigns / Public Quizzes are placeholders until the
-  // dedicated admin pages land — the routes don't have page files yet.
-  // The Link still navigates (lands on a 404 in dev, which is the desired
-  // visual signal alongside the dimmed "(coming soon)" treatment).
+  // Organizations / Campaigns are placeholders until their dedicated admin
+  // pages land (Wave Z PR-2) — the routes don't have page files yet, so the
+  // Link lands on a 404 in dev, the desired visual signal alongside the dimmed
+  // "(coming soon)" treatment. "Public Campaigns" is a REAL route (Wave Z Z-1):
+  // it wires to the existing /admin/assessments/public-campaigns page (formerly
+  // orphaned behind a "Public Quizzes" placeholder — the glossary avoids "quiz").
   {
     href: "/admin/assessments/organizations",
     label: "Organizations",
@@ -55,11 +57,7 @@ const ADMIN_ENTRIES: SidebarEntry[] = [
     label: "Campaigns",
     placeholder: true,
   },
-  {
-    href: "/admin/assessments/public-quizzes",
-    label: "Public Quizzes",
-    placeholder: true,
-  },
+  { href: "/admin/assessments/public-campaigns", label: "Public Campaigns" },
   { href: "/admin/assessments/import", label: "Import" },
   { href: "/admin/assessments/aggregate", label: "Aggregate Report" },
 ];

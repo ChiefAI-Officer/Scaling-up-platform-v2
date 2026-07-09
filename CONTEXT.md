@@ -42,6 +42,10 @@ The participant UI tints each section by its **Domain** using the Scaling Up bra
 One send of a template version to a chosen subset of a company's members.
 _Avoid_: assessment instance, test, run.
 
+**Public Campaign**:
+A **Campaign** with `accessMode = PUBLIC` — anyone with the link self-enrolls and answers via `/quiz/[alias]` (no invitation, no roster membership required). Admin/STAFF-only to create; it still belongs to a chosen **Organization** (`organizationId` is non-nullable). The admin nav entry and its management page are labelled **"Public Campaigns"** and live at `/admin/assessments/public-campaigns`.
+_Avoid_: "Public Quiz" / "Public Quizzes" as a label (the glossary avoids "quiz" — the `/quiz/...` URL is not the domain term); conflating it with the INVITED flow (roster + emailed invitations).
+
 **Respondent**:
 A person in a company's roster (`OrgRespondent`) who can be invited to answer. Distinct from a **Participant** — the record of a respondent's inclusion in a *specific* campaign (`AssessmentCampaignParticipant`).
 _Avoid_: using "participant" and "respondent" interchangeably — a respondent exists in the roster independent of any campaign.
