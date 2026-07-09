@@ -507,3 +507,39 @@ describe("MembersTeamsView", () => {
     expect(link).toHaveAttribute("href", "/portal/members/import");
   });
 });
+
+// Wave Z (Z-3a) — admin-host props hide the two coach-only affordances.
+describe("MembersTeamsView — admin host props", () => {
+  test("default (coach) shows Add Company/Team button + Esperto import link", () => {
+    render(<MembersTeamsView initialOrganizations={[ORG_1]} />);
+    expect(
+      screen.getByRole("button", { name: /add company or team/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /import from esperto/i }),
+    ).toBeInTheDocument();
+  });
+
+  test("allowOrgCreate=false hides the Add Company/Team button (org-create 403s for admin)", () => {
+    render(
+      <MembersTeamsView initialOrganizations={[ORG_1]} allowOrgCreate={false} />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /add company or team/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  test("hideEspertoImport hides the coach-only /portal/members/import link", () => {
+    render(
+      <MembersTeamsView initialOrganizations={[ORG_1]} hideEspertoImport />,
+    );
+    expect(
+      screen.queryByRole("link", { name: /import from esperto/i }),
+    ).not.toBeInTheDocument();
+    // No stray /portal/* link remains for the admin host.
+    const portalLinks = screen
+      .queryAllByRole("link")
+      .filter((a) => (a.getAttribute("href") ?? "").startsWith("/portal/"));
+    expect(portalLinks).toHaveLength(0);
+  });
+});

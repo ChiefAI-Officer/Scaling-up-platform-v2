@@ -78,6 +78,23 @@ export type TreeNode =
 
 export interface MembersTeamsViewProps {
   initialOrganizations: OrgSummary[];
+  /**
+   * Wave Z (Z-3) — gates the "Add Company or Team" (+) button. Default true
+   * (coach portal). The admin host passes false: its company-create path
+   * `POST /api/organizations` 403s for a non-coach actor ("Only coaches can
+   * create organizations"), and the button is the only entry point to that
+   * flow. Admin still manages EXISTING rosters/teams via node actions + CSV
+   * import; creating brand-new companies/teams from the admin oversight page
+   * is out of scope this wave.
+   */
+  allowOrgCreate?: boolean;
+  /**
+   * Wave Z (Z-3) — hides the "Import from Esperto" link, which points at the
+   * coach-only `/portal/members/import` route (a `requireCoach()` bounce for
+   * admin). Default false (coach portal). Admin has its own
+   * `/admin/assessments/import`.
+   */
+  hideEspertoImport?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +177,11 @@ function NodeButton({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps) {
+export function MembersTeamsView({
+  initialOrganizations,
+  allowOrgCreate = true,
+  hideEspertoImport = false,
+}: MembersTeamsViewProps) {
   // Companies list — may grow when a new Company is created via the modal
   const [organizations, setOrganizations] = useState<OrgSummary[]>(initialOrganizations);
 
@@ -400,15 +421,17 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
           <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
             Teams
           </h2>
-          <button
-            type="button"
-            onClick={() => setAddTeamOpen(true)}
-            title="Add Company or Team"
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            aria-label="Add Company or Team"
-          >
-            <FolderPlus className="w-4 h-4" />
-          </button>
+          {allowOrgCreate && (
+            <button
+              type="button"
+              onClick={() => setAddTeamOpen(true)}
+              title="Add Company or Team"
+              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Add Company or Team"
+            >
+              <FolderPlus className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {organizations.length === 0 && (
@@ -582,16 +605,19 @@ export function MembersTeamsView({ initialOrganizations }: MembersTeamsViewProps
             {panelTitle ? `Members — ${panelTitle}` : "Members"}
           </h2>
           <div className="flex items-center gap-1">
-            {/* Import historical data from Esperto (own lane / page) */}
-            <Link
-              href="/portal/members/import"
-              title="Import from Esperto"
-              aria-label="Import from Esperto"
-              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <FileDown className="w-4 h-4" />
-              Import from Esperto
-            </Link>
+            {/* Import historical data from Esperto (own lane / page). Hidden on
+                the admin host — the link targets the coach-only portal route. */}
+            {!hideEspertoImport && (
+              <Link
+                href="/portal/members/import"
+                title="Import from Esperto"
+                aria-label="Import from Esperto"
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <FileDown className="w-4 h-4" />
+                Import from Esperto
+              </Link>
+            )}
 
             {/* Import members (bulk CSV) */}
             <button

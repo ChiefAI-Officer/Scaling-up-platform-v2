@@ -106,6 +106,22 @@ export interface CampaignDetailProps {
    * recomputes auth. Fail-closed: absent/empty → no links.
    */
   longitudinalRespondentIds?: string[];
+  /**
+   * Wave Z (Z-2) — base path for the "Back to Assessments" link and the
+   * post-delete redirect. Default is the coach portal; the admin campaigns
+   * host passes "/admin/assessments/campaigns" so admin/STAFF don't bounce
+   * into a `requireCoach()` portal route.
+   */
+  basePath?: string;
+  /**
+   * Wave Z (Z-2) — when true, suppress the two portal-ONLY affordances that
+   * have no admin equivalent: "View Trends" (`/portal/assessments/trends`) and
+   * the empty-state "Add members in the Members lane" (`/portal/members`).
+   * Default false (coach portal shows them). The admin host sets this true.
+   * (The per-respondent "Over time" longitudinal link is suppressed separately
+   * by the admin page passing `longitudinalRespondentIds={[]}`.)
+   */
+  hidePortalOnlyLinks?: boolean;
 }
 
 interface OrgRespondentRow {
@@ -199,6 +215,8 @@ export function CampaignDetail({
   initialCustomSlides = [],
   customSlidesSections = [],
   longitudinalRespondentIds = [],
+  basePath = "/portal/assessments",
+  hidePortalOnlyLinks = false,
 }: CampaignDetailProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -392,7 +410,7 @@ export function CampaignDetail({
         description: "The campaign has been removed.",
       });
       setDeleteDialogOpen(false);
-      router.push("/portal/assessments");
+      router.push(basePath);
     } catch (err) {
       toast({
         title: "Could not delete campaign",
@@ -1006,7 +1024,7 @@ export function CampaignDetail({
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between gap-4">
         <Link
-          href="/portal/assessments"
+          href={basePath}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Assessments
@@ -1028,13 +1046,15 @@ export function CampaignDetail({
               <FileText className="w-4 h-4" /> View group report
             </a>
           )}
-          <Link
-            href={`/portal/assessments/trends?templateId=${encodeURIComponent(campaign.templateId)}&organizationId=${encodeURIComponent(campaign.organizationId)}`}
-            className="inline-flex items-center gap-2 bg-card border border-border hover:bg-muted/40 text-sm font-medium text-foreground px-3 py-1.5 rounded-lg transition-colors"
-            data-testid="campaign-detail-view-trends"
-          >
-            <LineChart className="w-4 h-4" /> View Trends
-          </Link>
+          {!hidePortalOnlyLinks && (
+            <Link
+              href={`/portal/assessments/trends?templateId=${encodeURIComponent(campaign.templateId)}&organizationId=${encodeURIComponent(campaign.organizationId)}`}
+              className="inline-flex items-center gap-2 bg-card border border-border hover:bg-muted/40 text-sm font-medium text-foreground px-3 py-1.5 rounded-lg transition-colors"
+              data-testid="campaign-detail-view-trends"
+            >
+              <LineChart className="w-4 h-4" /> View Trends
+            </Link>
+          )}
         </div>
       </div>
 
@@ -1876,12 +1896,14 @@ export function CampaignDetail({
                   ? "This company has no members yet."
                   : "All company members are already participants in this campaign."}
               </p>
-              <Link
-                href="/portal/members"
-                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors"
-              >
-                Add members in the Members lane
-              </Link>
+              {!hidePortalOnlyLinks && (
+                <Link
+                  href="/portal/members"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors"
+                >
+                  Add members in the Members lane
+                </Link>
+              )}
             </div>
           ) : (
             <div

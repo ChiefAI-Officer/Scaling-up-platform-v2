@@ -60,9 +60,15 @@ function formatDate(iso: string): string {
 interface CompanySectionProps {
   organizationName: string;
   campaigns: CampaignListItem[];
+  /** Base path for a campaign's detail link. Default: the coach portal. */
+  detailBasePath: string;
 }
 
-function CompanySection({ organizationName, campaigns }: CompanySectionProps) {
+function CompanySection({
+  organizationName,
+  campaigns,
+  detailBasePath,
+}: CompanySectionProps) {
   const count = campaigns.length;
   return (
     <section className="space-y-2">
@@ -89,7 +95,7 @@ function CompanySection({ organizationName, campaigns }: CompanySectionProps) {
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <div className="min-w-0 flex-1">
                     <Link
-                      href={`/portal/assessments/${c.id}`}
+                      href={`${detailBasePath}/${c.id}`}
                       className="font-medium text-foreground hover:text-primary text-sm"
                     >
                       {c.name}
@@ -110,7 +116,7 @@ function CompanySection({ organizationName, campaigns }: CompanySectionProps) {
                     Opens {formatDate(c.openAt)}
                   </span>
                   <Link
-                    href={`/portal/assessments/${c.id}`}
+                    href={`${detailBasePath}/${c.id}`}
                     className="text-xs text-primary hover:underline ml-auto"
                   >
                     View
@@ -139,8 +145,12 @@ function CompanySection({ organizationName, campaigns }: CompanySectionProps) {
 
 export function CampaignsListWithFilter({
   campaigns,
+  detailBasePath = "/portal/assessments",
 }: {
   campaigns: CampaignListItem[];
+  /** Base path for each campaign's detail link. Default: coach portal.
+   *  The admin oversight page passes "/admin/assessments/campaigns". */
+  detailBasePath?: string;
 }) {
   const [filter, setFilter] = useState<FilterValue>("ALL");
 
@@ -250,6 +260,7 @@ export function CampaignsListWithFilter({
               key={group.orgId}
               organizationName={group.name}
               campaigns={group.campaigns}
+              detailBasePath={detailBasePath}
             />
           ))}
         </div>

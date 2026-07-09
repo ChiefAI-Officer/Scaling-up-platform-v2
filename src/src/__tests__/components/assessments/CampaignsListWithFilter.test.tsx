@@ -193,3 +193,40 @@ describe("CampaignsListWithFilter — grouped by company", () => {
     expect(screen.getAllByText(/Beta Inc/).length).toBeGreaterThanOrEqual(1);
   });
 });
+
+// Wave Z Z-2a — detailBasePath prop (admin campaigns oversight reuse).
+describe("CampaignsListWithFilter — detailBasePath", () => {
+  const one: CampaignListItem[] = [
+    makeCampaign({ id: "c1", organizationId: "org-alpha", organizationName: "Alpha Corp" }),
+  ];
+
+  it("defaults campaign detail links to the coach portal (regression)", () => {
+    render(<CampaignsListWithFilter campaigns={one} />);
+    // Both the name link and the "View" link point at the portal by default.
+    expect(screen.getByRole("link", { name: "Campaign c1" })).toHaveAttribute(
+      "href",
+      "/portal/assessments/c1",
+    );
+    expect(screen.getByRole("link", { name: "View" })).toHaveAttribute(
+      "href",
+      "/portal/assessments/c1",
+    );
+  });
+
+  it("points detail links at the admin base path when provided", () => {
+    render(
+      <CampaignsListWithFilter
+        campaigns={one}
+        detailBasePath="/admin/assessments/campaigns"
+      />,
+    );
+    expect(screen.getByRole("link", { name: "Campaign c1" })).toHaveAttribute(
+      "href",
+      "/admin/assessments/campaigns/c1",
+    );
+    expect(screen.getByRole("link", { name: "View" })).toHaveAttribute(
+      "href",
+      "/admin/assessments/campaigns/c1",
+    );
+  });
+});

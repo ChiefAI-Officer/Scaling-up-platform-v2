@@ -39,24 +39,15 @@ interface SidebarEntry {
 
 const ADMIN_ENTRIES: SidebarEntry[] = [
   { href: "/admin/assessments", label: "Dashboard", exact: true },
-  // Organizations / Campaigns are placeholders until their dedicated admin
-  // pages land (Wave Z PR-2) — the routes don't have page files yet, so the
-  // Link lands on a 404 in dev, the desired visual signal alongside the dimmed
-  // "(coming soon)" treatment. "Public Campaigns" is a REAL route (Wave Z Z-1):
-  // it wires to the existing /admin/assessments/public-campaigns page (formerly
-  // orphaned behind a "Public Quizzes" placeholder — the glossary avoids "quiz").
-  {
-    href: "/admin/assessments/organizations",
-    label: "Organizations",
-    placeholder: true,
-  },
+  // Wave Z: all admin entries are now real routes. Organizations + Campaigns
+  // (their admin pages landed in PR-2) and Public Campaigns (wired in Z-1 to
+  // the existing /admin/assessments/public-campaigns page — the glossary avoids
+  // "quiz") are no longer "(coming soon)" placeholders. The `placeholder` prop
+  // remains supported for any future unbuilt entry.
+  { href: "/admin/assessments/organizations", label: "Organizations" },
   { href: "/admin/assessments/access-groups", label: "Access Groups" },
   { href: "/admin/assessments/templates", label: "Templates" },
-  {
-    href: "/admin/assessments/campaigns",
-    label: "Campaigns",
-    placeholder: true,
-  },
+  { href: "/admin/assessments/campaigns", label: "Campaigns" },
   { href: "/admin/assessments/public-campaigns", label: "Public Campaigns" },
   { href: "/admin/assessments/import", label: "Import" },
   { href: "/admin/assessments/aggregate", label: "Aggregate Report" },

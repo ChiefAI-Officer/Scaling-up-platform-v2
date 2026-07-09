@@ -6,6 +6,19 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-09 — Wave Z PR-2: admin Campaigns + Organizations pages live (Jul-8 roadmap target #3 DONE) <!-- ENTRY_ISO:2026-07-09 ENTRY_SLUG:wave-z-admin-pages -->
+
+**Completes Jul-8 roadmap target #3** — the last of the three. The two remaining "coming soon" admin sidebar entries (Campaigns, Organizations) are now real pages (spec `docs/specs/v7.6/19ab`, items Z-2/Z-3/Z-4). **Flagless presentation/wiring; kill = revert.** Reuse, not rebuild: both pages wrap the existing coach components with backward-compatible host-context props, and the underlying APIs already admit privileged actors (`isPrivilegedRole`/`canAccessOrganization`/`canManageCampaign` bypass), so **no route/schema change**.
+
+- **Admin Campaigns oversight** (`/admin/assessments/campaigns`) — lists ALL `accessMode=INVITED` campaigns across every company (PUBLIC excluded — own page; imported historical rounds included), grouped by company, via `CampaignsListWithFilter` + a new `detailBasePath` prop. Drill-down → a new admin **campaign-detail** page (`/campaigns/[id]`) reusing `CampaignDetail` as a reduced-nav host (new `basePath` + `hidePortalOnlyLinks` props): the FULL management surface (close/delete/remove/reminders/resend) + the group-report link, with the four portal-only dead-ends retargeted/suppressed and **longitudinal omitted** (`longitudinalRespondentIds={[]}` — the per-row "Over time" link had no admin route; the /co-validate ship-broken catch). The admin detail page calls the existing shared building blocks DIRECTLY — no portal refactor.
+- **Admin Organizations directory** (`/admin/assessments/organizations`) — lists ALL non-deleted orgs (light query; members/teams load lazily on select) via `MembersTeamsView` + new `allowOrgCreate`/`hideEspertoImport` props (admin manages any company's roster + teams; the org-create button is hidden — its `POST /api/organizations` 403s for a non-coach — and the coach-only `/portal/members/import` link is hidden; admin has its own import).
+- **Shared `toCampaignListItems` mapper** extracted VERBATIM from the coach portal list page (which now calls it) — zero metrics drift between the coach and admin lists.
+- **Sidebar** (`assessments-sidebar.tsx`): Organizations + Campaigns placeholders flipped to real routes (Public Campaigns was Z-1); **no "(coming soon)" markers remain**.
+
+Auth is fail-closed on all three pages (login/unauthorized for non-privileged; the admin detail redirects a denied/deleted campaign to the admin list, NEVER `/portal`) — asserted for **STAFF** explicitly. New/extended tests across 8 suites (60 tests green): 3 page auth+data suites, the mapper, the 3 component-prop suites (+ coach regressions). `CI=true next build --turbopack` green (all three admin routes compiled). Repo-grounded adversarial review = **0 shipping-breaking defects**. Known pre-existing (NOT this change): the metrics-less `portal-assessments-status-filter` suite + two eslint warnings outside the diff. PR-1 (Z-1, Public Campaigns rewire) shipped in #168.
+
+**Jul-8 roadmap COMPLETE — all 3 targets done** (#1 Wave U3 email findings launched · #2 templates-list View==Edit · #3 these admin pages).
+
 ### 2026-07-09 — Wave Z Z-1: Public Campaigns nav wired (orphaned page un-404'd) <!-- ENTRY_ISO:2026-07-09 ENTRY_SLUG:wave-z1-public-campaigns-wired -->
 
 **Jul-8 roadmap target #3, PR-1 of 2** (spec `docs/specs/v7.6/19ab-assessments-admin-pages-wiring.md`, Z-1). The Assessments sidebar's "Public Quizzes" entry was a `placeholder:true` that **404'd** — while a COMPLETE admin page (`/admin/assessments/public-campaigns` + `PublicCampaignsManager`: lists + creates PUBLIC-access campaigns) sat **orphaned** with no nav entry. Wired the entry to the real page and **relabeled "Public Quizzes" → "Public Campaigns"** (the domain glossary avoids "quiz" — the `/quiz/...` URL is not the canonical term; captured in `CONTEXT.md`).
