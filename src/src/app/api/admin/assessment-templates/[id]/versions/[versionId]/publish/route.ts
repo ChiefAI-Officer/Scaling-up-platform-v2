@@ -10,7 +10,7 @@ import { db } from "@/lib/db";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
-import { TemplateVersionForPublishSchema } from "@/lib/assessments/scoring";
+import { getPublishValidationIssues } from "@/lib/assessments/scoring";
 
 export async function POST(
   request: NextRequest,
@@ -70,17 +70,17 @@ export async function POST(
     // sentinel text rejected, domain assignment complete. Existing
     // Rockefeller/QSP templates pass because they don't opt into the new
     // fields; new D2 templates (SU Full) must pass before publishedAt flips.
-    const publishParse = TemplateVersionForPublishSchema.safeParse({
+    const publishIssues = getPublishValidationIssues({
       questions: version.questions,
       sections: version.sections,
       scoringConfig: version.scoringConfig,
     });
-    if (!publishParse.success) {
+    if (publishIssues.length > 0) {
       return NextResponse.json(
         {
           success: false,
           error: "PUBLISH_VALIDATION_FAILED",
-          issues: publishParse.error.issues,
+          issues: publishIssues,
         },
         { status: 422 },
       );
