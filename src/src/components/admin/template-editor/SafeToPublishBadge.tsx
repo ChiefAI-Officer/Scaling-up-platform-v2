@@ -36,11 +36,19 @@ export interface SafeToPublishBadgeProps {
 export function SafeToPublishBadge(props: SafeToPublishBadgeProps) {
   const [open, setOpen] = React.useState(false);
 
+  // Debounce the heavy recompute on large instruments (spec 19ad §3.5): defer
+  // the per-keystroke structural inputs so publish-readiness recomputes at idle
+  // priority, keeping question authoring responsive on big templates. (The
+  // parent passes stable publishedKeys/dirty identities so the memo caches on
+  // unrelated re-renders — adversarial-review fix.)
+  const deferredQuestions = React.useDeferredValue(props.questions);
+  const deferredSections = React.useDeferredValue(props.sections);
+
   const readiness: PublishReadiness = React.useMemo(() => {
     try {
       const built = buildVersionScoringPayload({
-        questions: props.questions,
-        sections: props.sections,
+        questions: deferredQuestions,
+        sections: deferredSections,
         rawQuestions: props.rawQuestions,
         rawSections: props.rawSections,
         scoringConfig: props.scoringConfig,
@@ -57,8 +65,8 @@ export function SafeToPublishBadge(props: SafeToPublishBadgeProps) {
       return { prevent: [{ path: [], message }], warn: [] };
     }
   }, [
-    props.questions,
-    props.sections,
+    deferredQuestions,
+    deferredSections,
     props.rawQuestions,
     props.rawSections,
     props.scoringConfig,

@@ -721,6 +721,21 @@ export function TemplateEditorTabbed({
   const [testModeOpen, setTestModeOpen] = useState(false);
   const testModeAvailable = !isPublished && testModeEnabled;
   const safeToPublishAvailable = !isPublished && safeToPublishEnabled;
+  // Stable identities for the Safe-to-Publish badge (Wave ED2) so its readiness
+  // useMemo actually caches — recompute only when the draft's structure/dirty
+  // state changes, not on every unrelated editor render (adversarial-review fix:
+  // a fresh `new Set(...)`/`{...}` per render defeated the child memo).
+  const badgePublishedKeys = useMemo(
+    () => new Set(publishedQuestionKeys),
+    [publishedQuestionKeys],
+  );
+  const badgeDirty = useMemo(
+    () => ({
+      questions: Boolean(dirtyFlags.questions),
+      sections: Boolean(dirtyFlags.sections),
+    }),
+    [dirtyFlags.questions, dirtyFlags.sections],
+  );
   const handleSaveDraft = useCallback(async () => {
     if (isPublished || savingDraft) return;
     if (!isAnyDirty) return;
@@ -1111,12 +1126,9 @@ export function TemplateEditorTabbed({
               rawQuestions={rawQuestionsRef.current}
               rawSections={rawSectionsRef.current}
               scoringConfig={scoringConfigRef.current}
-              publishedKeys={new Set(publishedQuestionKeys)}
+              publishedKeys={badgePublishedKeys}
               publishedOptionKeys={publishedOptionKeys}
-              dirty={{
-                questions: Boolean(dirtyFlags.questions),
-                sections: Boolean(dirtyFlags.sections),
-              }}
+              dirty={badgeDirty}
               isDirty={isAnyDirty}
             />
           )}
