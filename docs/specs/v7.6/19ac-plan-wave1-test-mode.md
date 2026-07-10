@@ -287,7 +287,7 @@ Replace the `pruneHiddenAnswers(...)` → `submittedAnswers` and `scoreSubmissio
 
 - [ ] **Step 4: Run the submit suites + typecheck**
 
-Run: `cd src && npx jest __tests__ -t "submit"` and `cd src && npx eslint "app/(public)/org-survey/[campaignAlias]/submit/route.ts" "app/api/quiz/[campaignAlias]/submit/route.ts"`
+Run: `cd src && npx jest __tests__ -t "submit"` and `cd src && npx eslint "src/app/(public)/org-survey/[campaignAlias]/submit/route.ts" "src/app/api/quiz/[campaignAlias]/submit/route.ts"`
 Expected: PASS, zero lint errors, same test count as Step 1.
 
 - [ ] **Step 5: Commit**
@@ -327,6 +327,9 @@ const questions: QuestionDraftRow[] = [
 ];
 
 describe("buildVersionScoringPayload", () => {
+  // NOTE: `toBe` (reference equality) assumes `buildSectionsPayload` returns the raw
+  // array when `sectionsDirty: false`. Verify against `sections-serialization.ts` —
+  // if it always rebuilds, switch to `toEqual`.
   it("NOT dirty → passes raw arrays through by reference (byte-for-byte)", () => {
     const rawQuestions = [{ stableKey: "S1_q1", type: "SLIDER_LIKERT" }];
     const rawSections = [{ stableKey: "S1", name: "Section 1", sortOrder: 1 }];
@@ -670,6 +673,10 @@ export interface TestModeDrawerProps {
   dirty: { questions: boolean; sections: boolean };
 }
 
+// TWO answer representations coexist intentionally:
+// - `answers: Record<string, ...>` (AnswersMap shape) for `filterVisibleSurveyQuestions`
+// - `answerList: Answer[]` (`{stableKey, value}[]`) for `computeScoreResult`
+// Do NOT unify — the APIs consume different shapes.
 type Answers = Record<string, number | string | string[]>;
 const MIN_TO_SCORE = 1;
 
@@ -896,13 +903,22 @@ import { buildVersionScoringPayload } from "@/components/admin/template-editor/b
 import { computeScoreResult } from "@/lib/assessments/compute-score-result";
 import { scoreSubmission, TemplateVersionForScoringSchema, type Answer } from "@/lib/assessments/scoring";
 import type { PagerQuestion } from "@/lib/assessments/section-pages";
-// Reuse a real seed to avoid a hand-built version: e.g. Rockefeller (slider-only, scored).
-import { buildTemplateContent } from "../../../../prisma/seed-rockefeller-assessment";
+// Inline fixture (NOT imported from prisma/seed-* — those are tsconfig-excluded).
+// Minimal 2-slider scored version matching the Task 2 fixture pattern.
+const fixtureContent = {
+  questions: [
+    { stableKey: "S1_q1", type: "SLIDER_LIKERT", label: "Q1", sectionStableKey: "S1",
+      sortOrder: 1, isRequired: true, scale: { min: 0, max: 10, step: 1 } },
+    { stableKey: "S1_q2", type: "SLIDER_LIKERT", label: "Q2", sectionStableKey: "S1",
+      sortOrder: 2, isRequired: true, scale: { min: 0, max: 10, step: 1 } },
+  ],
+  sections: [{ stableKey: "S1", name: "Section 1", sortOrder: 1 }],
+  scoringConfig: { tierMetric: "overallAvg", tiers: [{ label: "All", min: 0, max: 10 }] },
+};
 
 describe("Test Mode fidelity (regression guards)", () => {
   it("assembly parity: Test Mode payload parses + scores like the persisted version", () => {
-    const content = buildTemplateContent(); // { questions, sections, scoringConfig }
-    const parsed = TemplateVersionForScoringSchema.parse(content);
+    const parsed = TemplateVersionForScoringSchema.parse(fixtureContent);
     const questions = parsed.questions as unknown as PagerQuestion[];
     const answers: Answer[] = questions
       .filter((q) => (q as { type?: string }).type === "SLIDER_LIKERT")

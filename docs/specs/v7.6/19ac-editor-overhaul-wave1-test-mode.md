@@ -175,7 +175,8 @@ This is the co-validate-mandated core. All of these are pure / client-importable
   data-write risk.
 
 ### 3.4 Output surfaces (scope) — grill Q5+Q6
-- ✅ **Shown (ScoreResult-native, pure):** overall tier + message, the driving metric value (`tierMetricValue`
+- ✅ **Shown (ScoreResult-native, pure):** overall tier + message (suppressed when `reportConfigFor` returns
+  `showTier: false`, e.g. `scaling-up-full`), the driving metric value (`tierMetricValue`
   and `overallAverage`/`countAchieved` as applicable), ScaleUp Score + per-domain scores (when present),
   per-section averages, the fired `result.findings` list, and the **unanswered-required count** (Q1 honesty
   guard, from `unansweredKeys`).
@@ -262,8 +263,9 @@ scoring/findings/report code paths (reuse the pure functions). Publish gating un
 - ~~`computeScoreResult` belongs to Wave 3~~ — **REVERSED by /co-validate (C2/C5):** the `computeScoreResult`
   (prune→score) extraction + the shared build-version-payload helper are now **IN Wave 1** (extract-don't-fork,
   removes the second code path by construction). Wave 3's editor-*hook* extraction remains separate.
-- Define the Test Mode button state on a read-only PUBLISHED version (own review); debounce recompute on large
-  instruments.
+- ~~Define the Test Mode button state on a read-only PUBLISHED version~~ — **RESOLVED (plan Task 7):** button
+  hidden on published versions (`!isPublished` guard); no disabled-with-tooltip needed.
+- Debounce recompute on large instruments (implementer adapts based on instrument size).
 
 ## 6. References
 - Editor: `src/src/components/admin/TemplateEditorTabbed.tsx`, `.../template-editor/QuestionsTab.tsx`,
