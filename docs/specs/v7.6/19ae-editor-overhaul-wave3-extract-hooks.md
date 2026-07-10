@@ -1,6 +1,6 @@
 # Spec 19ae — Assessment Editor Overhaul · Wave 3: Extract shared editor state + inspector subcomponents into headless hooks
 
-> **Status:** DRAFT — brainstorm DONE 2026-07-10 (5 decisions locked below). `/grill-with-docs` + `/co-validate` (real Codex GPT-5.5 @ xhigh) **PENDING**; then final user approval before `writing-plans`. Nothing is built.
+> **Status:** DRAFT — brainstorm + `/grill-with-docs` DONE 2026-07-10 (5 brainstorm + 3 grill decisions locked below). `/co-validate` (real Codex GPT-5.5 @ xhigh) **PENDING**; then final user approval before `writing-plans`. Nothing is built.
 > **Date:** 2026-07-10 · **Author:** design track (Wave ED overhaul, re-sequenced 5-wave plan — spec 19ac §2).
 > **Gate:** GATED wave. Brainstorm DONE; grill + co-validate + this spec + an implementation plan + user approval complete the gate.
 
@@ -13,7 +13,11 @@
 >
 > **No flag (brainstorm decision, confirmed by the user).** Unlike ED1/ED2, ED3 adds **no capability** — it is a pure structural refactor. A dark flag would ship dead hook code nothing consumes → the very drift ED3 prevents. So: live on merge; the byte-equivalence guard is the safety; **kill = revert-the-commit**. (§3.6)
 
-> **Grill outcome (`/grill-with-docs`):** _PENDING — to be filled after the grill._
+> **Grill outcome (2026-07-10, `/grill-with-docs`) — 3 decisions locked; guard determinism code-verified:**
+> - **Guard determinism (code-verified, de-risks §3.5):** the emitted PATCH payload rows are built from explicit fields with **no `uid`** (`question-serialization.ts:514-553`); `uid` is client-only row identity added at hydrate, never stored, never emitted; a new question's emitted `stableKey` is the **slug-derived** deterministic key, not the temporary `Q_NEW_<random>`. So `genUid`'s `Math.random()` never reaches the payload → **byte-exact PATCH snapshots are deterministic** for a fixed edit script.
+> - **G1 — guard assertion surface (accepted as recommended).** The guard asserts (a) **byte-exact** outgoing metadata + version PATCH bodies, (b) derived behaviors (`isAnyDirty`, Save-disabled, `?tab=` routing), (c) the **post-save reconciliation *result*** — questions-state `stableKey`/`isNew` + the raw-ref overwrite, asserted **by stableKey, never by random uid**. It does NOT assert every panel prop (brittle/redundant — identical PATCH + identical rendered inspector ⇒ identical load-bearing props). Plus: an **explicit Wave-T data-loss regression fixture** (add question → save → non-dirty-questions follow-up save must NOT drop the first question — the exact bug Wave T fixed); the suite renders **flags-ON** (findings/showif/unlock/test-mode/safe-to-publish all mount + covered) with a smaller **flags-OFF** absence pass; and **`genUid` mocked to a deterministic counter** for belt-and-suspenders reproducibility. (§3.5)
+> - **G2 — `useSaveDraft` and `useVersionActions` are SEPARATE hooks (accepted).** Save is coupled to the dirty/serialize/reconciliation flow; publish/duplicate hit different routes, don't read the dirty models, and one hard-navigates — so they compose independently; mechanical-lift preserves current publish-while-dirty behavior with no new coupling. (§3.2)
+> - **G3 — delivery + confirmations (accepted).** **One PR, incremental guard-green commits** (the wave is one logical unit; matches ED1/ED2). Selection state stays **local to `QuestionsTab`** for ED3 (§3.3). Hooks live in `template-editor/hooks/`. **Build-time caution (not a design decision):** the `useSaveDraft` extraction is the highest implementation risk — its 15-entry `useCallback` dep array references state that will live in sibling hooks, so the composer must thread those inputs correctly or risk a stale closure the guard might not catch in every sequence → an explicit adversarial-review focus.
 
 > **/co-validate outcome (real Codex GPT-5.5 @ xhigh):** _PENDING — to be filled after co-validate._
 
@@ -77,10 +81,15 @@ Behavior is relocated, never changed. The three known warts are **preserved verb
 *(Cleanup is explicitly out of scope; two of these dissolve in W4's single-outline layout, and the dual-copy is a candidate for W5 polish.)*
 
 ### 3.5 Byte-equivalence guard (Q5)
-- **Golden characterization suite, written first (Task 1).** RTL renders the current `TemplateEditorTabbed`; a scripted edit sequence drives it; assertions are **byte-exact** on:
-  - the outgoing **metadata PATCH** body and **version PATCH** body (via mocked `fetch`), for the tricky paths — new-question D8 slug-key assignment, inherited-question key/type/option-key locks, findings bands, showIf, the multi-choice option editor, and a sections reorder;
-  - the derived behaviors — `isAnyDirty`, Save-Draft disabled state, tab routing (`?tab=`), and the post-save `assignedKeys`→`questions` reconciliation + `rawQuestionsRef`/`rawSectionsRef` overwrite.
-  - **Fixtures:** a slider-heavy instrument + one carrying the LVA multi-choice (`S4_biggest_obstacles`) + a text/number mix. (Exact fixtures finalized in the plan; see §5.)
+- **Determinism (code-verified, grill).** The emitted PATCH rows carry **no `uid`** (built from explicit fields, `question-serialization.ts:514-553`); `uid` is client-only, never stored/emitted; a new question's emitted `stableKey` is slug-derived (deterministic). So byte-exact PATCH snapshots reproduce for a fixed edit script — `genUid`'s `Math.random()` never reaches the payload. Belt-and-suspenders: **mock `genUid` to a deterministic counter** in the suite so any uid-touching intermediate is stable too.
+- **Golden characterization suite, written first (Task 1).** RTL renders the current `TemplateEditorTabbed` — **reusing the existing render harness** (`src/__tests__/components/admin/TemplateEditorTabbed.test.tsx` and `template-editor-tabbed.wave-t.test.tsx` already mock `next/navigation` + `useToast` + @dnd-kit and render the full editor). A scripted edit sequence drives it; assertions (G1):
+  - **byte-exact** outgoing **metadata PATCH** + **version PATCH** bodies (mocked `fetch`), across the tricky paths — new-question D8 slug-key assignment, inherited-question key/type/option-key locks, findings bands, showIf, the multi-choice option editor, a sections reorder;
+  - the derived behaviors — `isAnyDirty`, Save-Draft disabled, `?tab=` routing;
+  - the **post-save reconciliation *result*** — questions-state `stableKey`/`isNew` + the `rawQuestionsRef`/`rawSectionsRef` overwrite, asserted **by stableKey, never by random uid**.
+  - It does **not** assert every panel prop (brittle/redundant — identical PATCH + identical rendered inspector ⇒ identical load-bearing props).
+- **Wave-T data-loss regression fixture (G1).** Add question → save → *non-dirty-questions* follow-up save must NOT drop the first question (the exact bug Wave T fixed — the subtlest part of the reconciliation).
+- **Flag passes (G1).** Primary pass with **all editor flags ON** (findings/showif/unlock/test-mode/safe-to-publish mount + covered); a smaller **flags-OFF** pass confirms gated panels stay absent.
+- **Fixtures:** a slider-heavy instrument + one carrying the LVA multi-choice (`S4_biggest_obstacles`) + a text/number mix. (Exact fixtures finalized in the plan; see §5.)
 - **Held green through every slice.** Each extraction commit must keep the suite byte-green; a broken byte assertion means the slice changed output → not done.
 - **Inspector extraction check (light, structural):** the four extracted panels render for a focused question with the correct fields/handlers wired — not a brittle full DOM snapshot.
 - **Existing seam parity tests stay as-is** (they already lock the shared-helper anti-drift from ED1/ED2).
@@ -100,13 +109,15 @@ ED3 adds no capability, so there is no `WAVE_ED3_*` flag. It rewires the live ed
 ## 4. Non-goals
 No schema change. No data migration. **No weakening of immutable-key / published-version-freeze invariants** (editor stays read-only on published versions; authoring on DRAFT only; explicit Save Draft, not autosave). **No new scoring/findings/report code paths** — reuse the pure seams verbatim. **No three-pane / layout change** (that's W4). No question type-model change (the 4-type Zod union stands; no radio/single-select type). Scoring tiers/domains stay **instrument-level** (not moved into a per-question inspector — that scope is set for W4's inspector). `sendResultsDefault` stays its own independent immediate-PATCH path. **No behavioral cleanup of the three warts** (§3.4). No new flag.
 
-## 5. Open items (to harden in `/grill-with-docs` + `/co-validate`)
-- **Exact guard fixtures** — which real/synthetic instruments best exercise the tricky serialize paths without brittleness; how many edit-sequence steps.
-- **`useVersionActions` vs `useSaveDraft`** — genuinely separate hooks, or fold publish/duplicate into the save hook? (publish/duplicate are independent of the dirty/serialize flow, so likely separate — confirm.)
-- **Post-save reconciliation edge cases** — the `assignedKeys`→state + raw-ref overwrite is the subtlest logic in `handleSaveDraft`; the guard must pin its exact behavior (a follow-up save after a rename must not delete just-saved content — the pre-existing bug Wave T fixed).
-- **Guard coverage of flag-gated panels** — must the characterization suite also assert the props passed to the findings/showif/test-mode/safe-to-publish surfaces, or is byte-exact PATCH + light inspector-render check sufficient?
-- **Hook file placement** — `template-editor/hooks/` vs alongside the tabs; naming.
-- **Selection-state lift** — confirm it stays local to `QuestionsTab` in ED3 (deferred to W4), not lifted early.
+## 5. Resolved / open items
+- ~~**Guard coverage of flag-gated panels**~~ — **RESOLVED (grill G1):** byte-exact PATCH + derived behaviors + post-save reconciliation result (by stableKey) + light inspector-render check; NOT full panel-prop assertions. Flags-ON primary pass + flags-OFF absence pass. (§3.5)
+- ~~**Post-save reconciliation edge cases**~~ — **RESOLVED (grill G1):** an explicit Wave-T data-loss regression fixture (add→save→non-dirty follow-up save must not drop the added question) pins the subtlest logic. (§3.5)
+- ~~**`useVersionActions` vs `useSaveDraft`**~~ — **RESOLVED (grill G2):** separate hooks (publish/duplicate are independent of the dirty/serialize flow; one hard-navigates). (§3.2)
+- ~~**Guard determinism**~~ — **RESOLVED (grill, code-verified):** `uid` never reaches the emitted payload; new-question stableKey is slug-derived → byte-exact PATCH is deterministic; `genUid` additionally mocked to a counter. (§3.5)
+- ~~**Selection-state lift**~~ — **RESOLVED (grill G3):** stays local to `QuestionsTab` in ED3; W4 lifts. (§3.3)
+- ~~**Hook file placement**~~ — **RESOLVED (grill G3):** `template-editor/hooks/`; naming finalized at build.
+- **Exact guard fixtures** — the three fixture shapes are set (§3.5); the precise instrument content + number of edit-sequence steps is finalized in the implementation plan.
+- **Build-time caution (not a design open item):** the `useSaveDraft` extraction is the highest implementation risk (its 15-entry dep array references sibling-hook state → stale-closure risk); explicit adversarial-review focus.
 
 ## 6. References (grounded against current `main`, 2026-07-10)
 - **Editor shell (refactor target):** `src/src/components/admin/TemplateEditorTabbed.tsx` — state: `useState` ×14 (activeTab `:275`, dirtyFlags `:300`, templateValues `:312`, versionValues `:326`, sections `:333`, questions `:341`, scoringConfigState `:364`, sendResultsDefault `:440`, savingDraft `:719`, testModeOpen `:721`, publishingVersionId `:959`, publishIssues `:963`, duplicatingVersionId `:966`); `useRef` ×4 (`rawQuestionsRef` `:349`, `rawSectionsRef` `:355`, `scoringConfigRef` `:358`, `reportConfigRef` `:359`); `handleSaveDraft` `:739`; publish/duplicate `:970`/`:1038`; tab list `:1191-1352`; header action row `:1121-1169`.
