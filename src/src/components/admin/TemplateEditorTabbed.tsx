@@ -73,6 +73,7 @@ import {
 } from "@/components/admin/template-editor/question-serialization";
 import { buildVersionScoringPayload } from "@/components/admin/template-editor/build-version-payload";
 import { TestModeDrawer } from "@/components/admin/template-editor/TestModeDrawer";
+import { SafeToPublishBadge } from "@/components/admin/template-editor/SafeToPublishBadge";
 import {
   ScoringTiersTab,
   type ScoringConfigShape,
@@ -223,6 +224,11 @@ export interface TemplateEditorTabbedProps {
    * components can't read the raw env var, so the flag is resolved server-side.
    */
   testModeEnabled?: boolean;
+  /**
+   * Wave ED2 (spec 19ad) — Safe-to-Publish live readout. Server-computed
+   * (`isSafeToPublishEnabled()`) and passed down from the edit page.
+   */
+  safeToPublishEnabled?: boolean;
 }
 
 // Stable empty defaults so the memoized handlers don't churn.
@@ -255,6 +261,7 @@ export function TemplateEditorTabbed({
   findingsEnabled = false,
   conditionalAuthoringEnabled = false,
   testModeEnabled = false,
+  safeToPublishEnabled = false,
 }: TemplateEditorTabbedProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -713,6 +720,22 @@ export function TemplateEditorTabbed({
   // Wave ED1 (spec 19ac) — Test Mode drawer: drafts only, flag-gated.
   const [testModeOpen, setTestModeOpen] = useState(false);
   const testModeAvailable = !isPublished && testModeEnabled;
+  const safeToPublishAvailable = !isPublished && safeToPublishEnabled;
+  // Stable identities for the Safe-to-Publish badge (Wave ED2) so its readiness
+  // useMemo actually caches — recompute only when the draft's structure/dirty
+  // state changes, not on every unrelated editor render (adversarial-review fix:
+  // a fresh `new Set(...)`/`{...}` per render defeated the child memo).
+  const badgePublishedKeys = useMemo(
+    () => new Set(publishedQuestionKeys),
+    [publishedQuestionKeys],
+  );
+  const badgeDirty = useMemo(
+    () => ({
+      questions: Boolean(dirtyFlags.questions),
+      sections: Boolean(dirtyFlags.sections),
+    }),
+    [dirtyFlags.questions, dirtyFlags.sections],
+  );
   const handleSaveDraft = useCallback(async () => {
     if (isPublished || savingDraft) return;
     if (!isAnyDirty) return;
@@ -1096,6 +1119,19 @@ export function TemplateEditorTabbed({
         </div>
 
         <div className="wf-page-action-row">
+          {safeToPublishAvailable && (
+            <SafeToPublishBadge
+              questions={questions}
+              sections={sections}
+              rawQuestions={rawQuestionsRef.current}
+              rawSections={rawSectionsRef.current}
+              scoringConfig={scoringConfigRef.current}
+              publishedKeys={badgePublishedKeys}
+              publishedOptionKeys={publishedOptionKeys}
+              dirty={badgeDirty}
+              isDirty={isAnyDirty}
+            />
+          )}
           {testModeAvailable && (
             <button
               type="button"
