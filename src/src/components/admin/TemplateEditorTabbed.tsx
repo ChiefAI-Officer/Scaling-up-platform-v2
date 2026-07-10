@@ -1315,11 +1315,11 @@ export function TemplateEditorTabbed({
         </TabsContent>
       </Tabs>
 
-      {testModeAvailable && (
+      {testModeAvailable && testModeOpen && (
         <TestModeDrawer
-          open={testModeOpen}
+          open
           onClose={() => setTestModeOpen(false)}
-          templateAlias={templateValues.alias}
+          templateAlias={template.alias}
           questions={questions}
           sections={sections}
           rawQuestions={rawQuestionsRef.current}

@@ -76,7 +76,8 @@ export function TestModeDrawer(props: TestModeDrawerProps) {
       return { kind: "ok", version: res.data };
     } catch (e) {
       if (e instanceof QuestionSerializationError) return { kind: "config-error", messages: [e.message] };
-      throw e;
+      // Never let an assembly error escape and crash the editor (Review F1/F3).
+      return { kind: "config-error", messages: ["Couldn't assemble this draft for testing."] };
     }
   }, [
     props.questions,
@@ -89,7 +90,12 @@ export function TestModeDrawer(props: TestModeDrawerProps) {
     props.dirty,
   ]);
 
-  const answerList: Answer[] = Object.entries(answers).map(([stableKey, value]) => ({ stableKey, value }));
+  // A cleared field (empty string) or empty multi-select is "unanswered", not a
+  // value to score — dropping it matches the empty→unanswered intent AND avoids
+  // an INVALID_TYPE throw (a cleared NUMBER input sends ""). Review F1.
+  const answerList: Answer[] = Object.entries(answers)
+    .filter(([, v]) => v !== "" && !(Array.isArray(v) && v.length === 0))
+    .map(([stableKey, value]) => ({ stableKey, value }));
 
   const visible: PagerQuestion[] =
     parsed.kind === "ok"
@@ -146,6 +152,9 @@ export function TestModeDrawer(props: TestModeDrawerProps) {
             {scored.kind === "empty" && (
               <p className="text-sm text-muted-foreground">Answer some questions to see results.</p>
             )}
+            {scored.kind === "answer-issue" && (
+              <p className="text-sm text-muted-foreground">{scored.message}</p>
+            )}
             {scored.kind === "config-error" && <ConfigError messages={scored.messages} />}
             {scored.kind === "result" && <ResultPanel display={scored.display} />}
           </div>
@@ -157,6 +166,7 @@ export function TestModeDrawer(props: TestModeDrawerProps) {
 
 type Scored =
   | { kind: "empty" }
+  | { kind: "answer-issue"; message: string }
   | { kind: "config-error"; messages: string[] }
   | { kind: "result"; display: TestModeDisplay };
 
@@ -177,10 +187,12 @@ function scoreDraft(parsed: Parsed, answerList: Answer[], templateAlias: string 
     if (e instanceof ScoringValidationError) {
       if (e.code === "EMPTY_ANSWERS") return { kind: "empty" };
       if (e.code === "INVALID_SCORING_CONFIG") return { kind: "config-error", messages: [e.message] };
+      // Any other scorer code (OUT_OF_RANGE / NON_INTEGER / INVALID_TYPE /
+      // UNKNOWN_STABLE_KEY / duplicate) is an answer-VALUE issue — show a soft
+      // note, NEVER rethrow (an uncaught throw would crash the whole editor). Review F1.
+      return { kind: "answer-issue", message: "Can't compute a result for the current answers — adjust them and try again." };
     }
-    // Answer-shape codes (UNKNOWN_STABLE_KEY / OUT_OF_RANGE / duplicate) are
-    // unreachable via the constrained QuestionInput → a real bug; let it throw.
-    throw e;
+    return { kind: "answer-issue", message: "Something went wrong computing the result." };
   }
 }
 
