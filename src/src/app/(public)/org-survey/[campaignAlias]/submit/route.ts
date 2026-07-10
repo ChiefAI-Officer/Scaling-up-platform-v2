@@ -24,13 +24,11 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getInvitationSession } from "@/lib/assessments/invitation-cookie";
 import {
-  scoreSubmission,
   ScoringValidationError,
   TemplateVersionForScoringSchema,
-  type Answer,
 } from "@/lib/assessments/scoring";
 import { logAudit } from "@/lib/audit";
-import { pruneHiddenAnswers } from "@/lib/assessments/form-visibility";
+import { computeScoreResult } from "@/lib/assessments/compute-score-result";
 import type { PagerQuestion } from "@/lib/assessments/section-pages";
 import {
   waveDResultsEmailEnabled,
@@ -405,17 +403,14 @@ export async function POST(
           { status: 500, headers: NO_STORE_HEADERS }
         );
       }
-      // Wave W (C3/D4): drop answers whose question is hidden by its authored
-      // showIf BEFORE every side effect (scoring, outbox rows, persistence) —
-      // a crafted submit must not smuggle hidden-question answers into
-      // reports. Unknown stableKeys are kept for scoreSubmission's
-      // UNKNOWN_STABLE_KEY rejection; no-op when the version has no showIf.
-      const rawAnswers: Answer[] = pruneHiddenAnswers(
-        answers.map((a) => ({ stableKey: a.stableKey, value: a.value })),
+      // Prune-then-score via the ONE shared seam (spec 19ac). rawAnswers stays
+      // the PRUNED set (persisted + emitted downstream). May throw
+      // ScoringValidationError → caught by outer catch.
+      const { result: scoreResult, prunedAnswers: rawAnswers } = computeScoreResult(
+        versionParsed.data,
         allQuestions as unknown as PagerQuestion[],
+        answers.map((a) => ({ stableKey: a.stableKey, value: a.value })),
       );
-      // scoreSubmission may throw ScoringValidationError → caught by outer catch.
-      const scoreResult = scoreSubmission(versionParsed.data, rawAnswers);
 
       // Single instant shared by the report's submittedAt + the invitation's
       // SUBMITTED stamp, so the emailed report date matches the DB row.
