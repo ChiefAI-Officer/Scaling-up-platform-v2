@@ -77,6 +77,7 @@ export function TestModeDrawer(props: TestModeDrawerProps) {
     } catch (e) {
       if (e instanceof QuestionSerializationError) return { kind: "config-error", messages: [e.message] };
       // Never let an assembly error escape and crash the editor (Review F1/F3).
+      console.error("[TestMode] assembly error:", e);
       return { kind: "config-error", messages: ["Couldn't assemble this draft for testing."] };
     }
   }, [
@@ -192,6 +193,7 @@ function scoreDraft(parsed: Parsed, answerList: Answer[], templateAlias: string 
       // note, NEVER rethrow (an uncaught throw would crash the whole editor). Review F1.
       return { kind: "answer-issue", message: "Can't compute a result for the current answers — adjust them and try again." };
     }
+    console.error("[TestMode] unexpected scoring error:", e);
     return { kind: "answer-issue", message: "Something went wrong computing the result." };
   }
 }
