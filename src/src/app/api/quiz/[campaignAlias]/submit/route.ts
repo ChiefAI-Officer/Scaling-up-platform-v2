@@ -38,7 +38,6 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import {
-  scoreSubmission,
   ScoringValidationError,
   TemplateVersionForScoringSchema,
 } from "@/lib/assessments/scoring";
@@ -52,7 +51,7 @@ import {
   buildRespondentReportFromSubmission,
 } from "@/lib/assessments/report-email";
 import { logAudit } from "@/lib/audit";
-import { pruneHiddenAnswers } from "@/lib/assessments/form-visibility";
+import { computeScoreResult } from "@/lib/assessments/compute-score-result";
 import type { PagerQuestion } from "@/lib/assessments/section-pages";
 import { inngest } from "@/inngest/client";
 
@@ -179,15 +178,6 @@ export async function POST(
     }
 
     const allQuestions = version.questions as Array<Record<string, unknown>>;
-    // Wave W (C3/D4): drop answers whose question is hidden by its authored
-    // showIf BEFORE every side effect (scoring, email rows, persistence) — a
-    // crafted submit must not smuggle hidden-question answers into reports.
-    // Unknown stableKeys are kept for scoreSubmission's UNKNOWN_STABLE_KEY
-    // rejection; no-op (same ref) when the version has no showIf.
-    const submittedAnswers = pruneHiddenAnswers(
-      data.answers,
-      allQuestions as unknown as PagerQuestion[],
-    );
     const versionParsed = TemplateVersionForScoringSchema.safeParse({
       questions: allQuestions,
       sections: version.sections,
@@ -201,11 +191,21 @@ export async function POST(
     }
 
     // -----------------------------------------------------------------------
-    // Score the submission (pure, no I/O)
+    // Prune-then-score via the ONE shared seam (spec 19ac). Wave W (C3/D4):
+    // drop answers whose question is hidden by its authored showIf BEFORE
+    // every side effect (scoring, email rows, persistence) — a crafted
+    // submit must not smuggle hidden-question answers into reports. Unknown
+    // stableKeys are kept for scoreSubmission's UNKNOWN_STABLE_KEY rejection;
+    // no-op (same ref) when the version has no showIf.
     // -----------------------------------------------------------------------
     let result;
+    let submittedAnswers;
     try {
-      result = scoreSubmission(versionParsed.data, submittedAnswers);
+      ({ result, prunedAnswers: submittedAnswers } = computeScoreResult(
+        versionParsed.data,
+        allQuestions as unknown as PagerQuestion[],
+        data.answers,
+      ));
     } catch (err) {
       if (err instanceof ScoringValidationError) {
         return NextResponse.json(
