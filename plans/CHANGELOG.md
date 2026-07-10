@@ -6,7 +6,9 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
-### 2026-07-10 — Wave ED2 (assessment-editor Safe-to-Publish) BUILT + merged dark <!-- ENTRY_ISO:2026-07-10 ENTRY_SLUG:wave-ed2-built -->
+### 2026-07-10 — Wave ED2 (assessment-editor Safe-to-Publish) LAUNCHED — live on production <!-- ENTRY_ISO:2026-07-10 ENTRY_SLUG:wave-ed2-launched -->
+
+**LAUNCHED 2026-07-10** (after merge-dark PR #177): `WAVE_ED2_SAFE_TO_PUBLISH_ENABLED=1` set on Vercel Production + prod redeploy `ot8n18wb8` (Ready). **Walk-verified on the prod editor:** the Safe-to-Publish badge renders live on a real DRAFT (Rockefeller Habits Checklist v3) reading "Ready to publish"; the expanded panel shows Blocks-publish(0) / Advisory(0); ED1's Test Mode button is present alongside it. That the badge renders at all confirms the flag reached the server runtime (`isSafeToPublishEnabled()` → the `safeToPublishEnabled` prop → `safeToPublishAvailable`). No prod data mutated (read-only walk; the badge writes nothing). Kill = flag off / revert.
 
 **Wave 2 of the assessment-editor overhaul** (re-sequenced 5-wave plan; spec `docs/specs/v7.6/19ad-editor-overhaul-wave2-safe-to-publish.md` + plan `19ad-plan-wave2-safe-to-publish.md`). Merged **DARK** behind default-OFF `WAVE_ED2_SAFE_TO_PUBLISH_ENABLED` — prod byte-identical until the flag flips. **Launch (live prod walk + flag flip) is a separate, individually-authorized step.**
 
@@ -24,7 +26,10 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 **Kill** = flag off (or revert — additive). **Next**: launch (live walk + flag flip, separate auth), then Wave 3 (extract shared editor hooks) → Wave 4 (three-pane, kill-able) → Wave 5 (polish).
 
-### 2026-07-09 — Wave ED1 (assessment-editor Test Mode) BUILT + merged dark <!-- ENTRY_ISO:2026-07-09 ENTRY_SLUG:wave-ed1-built -->
+### 2026-07-09 — Wave ED1 (assessment-editor Test Mode) LAUNCHED — live on production <!-- ENTRY_ISO:2026-07-09 ENTRY_SLUG:wave-ed1-launched -->
+
+**LAUNCHED:** `WAVE_ED1_TEST_MODE_ENABLED` is live on Vercel Production (verified via `vercel env ls` — set 2026-07-10; the ED1 flag flip + redeploy `4obl6x01v` from the launch session). The Test Mode drawer is available on DRAFT versions in prod. _(This entry folds the previously-open ED1 launched-SoT PR #176, which predated Wave ED2 and was superseded/closed in favor of this reconciled changelog so the launched entries stay newest-first.)_ Build detail below.
+
 
 **Wave 1 of the assessment-editor overhaul — a submit-and-score sandbox on the template editor, merged DARK to `main`** (PR #172 code `7f60fa4b` + PR #171 spec/plan `507119a4`; behind default-OFF `WAVE_ED1_TEST_MODE_ENABLED` → prod behavior byte-identical until the flag flips). Spec `docs/specs/v7.6/19ac-editor-overhaul-wave1-test-mode.md`; plan `19ac-plan-wave1-test-mode.md`.
 
