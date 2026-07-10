@@ -29,6 +29,10 @@ A template-level default for the per-campaign "send results to respondents" togg
 Within a DRAFT **Template Version**, a question whose `stableKey` appears in **any published version** of the same template. Inherited questions have their `stableKey` and type locked in the editor (and, for MULTI_CHOICE, their option *keys* — option labels stay editable); changing what an inherited question *means* is a new question with a new key (ADR-0001). Deleting one is allowed but warns about downstream impact (trends, locked crosswalks, peer benchmarks). The opposite is a **new-to-draft question**: added in the current draft, never published — its type is freely switchable and its key is derived from its label at first save, then immutable.
 _Avoid_: "existing question" (ambiguous — existing in the draft vs existing in a published version).
 
+**Test Mode** (Wave ED1, assessment-editor overhaul):
+An authoring aid on the **Template Version** editor. While editing a *draft*, an admin enters sample answers and immediately sees the computed result — per-section/domain scores, the overall **Scoring tier** (when the instrument shows one), and which **findings rules** fire — to validate the instrument's *outputs* before publishing. It is a sandbox: it **records nothing** (no **Respondent**, no submission, no email), and its display of tier/score-table follows the same per-instrument config the real **Results report** uses, so the two can't diverge.
+_Avoid_: "preview" (there is no respondent-walkthrough preview here — Test Mode validates *outputs*, not the survey-taking experience); "submission" (a Test Mode run is never persisted).
+
 **Domain** (Scaling Up Full only):
 One of the five top-level categories a Scaling Up Full question rolls up into: **People, Strategy, Execution, Cash, You**.
 _Avoid_: section (a section is a finer grouping within a domain), category, pillar.
