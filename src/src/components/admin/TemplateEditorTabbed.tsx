@@ -59,7 +59,6 @@ import {
 import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 import {
-  buildSectionsPayload,
   genUid,
   hydrateSectionsFromJson,
 } from "@/components/admin/template-editor/sections-serialization";
@@ -70,9 +69,9 @@ import {
   type QuestionDraft,
 } from "@/components/admin/template-editor/QuestionsTab";
 import {
-  buildQuestionsPayload,
   QuestionSerializationError,
 } from "@/components/admin/template-editor/question-serialization";
+import { buildVersionScoringPayload } from "@/components/admin/template-editor/build-version-payload";
 import {
   ScoringTiersTab,
   type ScoringConfigShape,
@@ -726,30 +725,32 @@ export function TemplateEditorTabbed({
       // applied back to state after a successful PATCH.
       let assignedKeys: Map<string, string> = new Map();
       if (needsVersionPatch) {
-        // Serialize sections. When not dirty, pass rawSectionsRef through
-        // byte-for-byte (content-hash stable). When dirty, each row is
-        // rebuilt by spreading the matching raw row FIRST so description /
-        // partLabel / domain + any unknown fields survive (preserves SU
-        // Full's per-domain scoring even on a questions-only save).
-        sectionsPayload = buildSectionsPayload(sections, {
-          sectionsDirty: Boolean(dirtyFlags.sections),
-          rawSections: rawSectionsRef.current,
-        });
-
-        // Wave T (spec 19t §T-3) — per-type question serialization via the
-        // pure helper: raw rows spread first (unknown fields survive),
-        // scale only on sliders / options only on MULTI_CHOICE, D8 slug
-        // keys derived for new-to-draft rows against the published union,
+        // Assemble sections + questions via the SHARED helper (spec 19ac C2)
+        // so editor Test Mode scores byte-identically what Save persists —
+        // ONE seam, real dirty flags (not forced). Sections: not-dirty →
+        // rawSectionsRef passthrough; dirty → rebuilt (spread raw first,
+        // preserving description/partLabel/domain + unknown fields, so SU
+        // Full per-domain scoring survives a questions-only save). Questions
+        // (Wave T §T-3): per-type serialization, scale only on sliders /
+        // options only on MULTI_CHOICE, D8 slug keys for new-to-draft rows,
         // inherited key/type/option-key locks re-checked client-side.
         try {
-          const r = buildQuestionsPayload(questions, {
-            questionsDirty: Boolean(dirtyFlags.questions),
+          const built = buildVersionScoringPayload({
+            questions,
+            sections,
             rawQuestions: rawQuestionsRef.current,
+            rawSections: rawSectionsRef.current,
+            scoringConfig: scoringConfigRef.current,
             publishedKeys: new Set(publishedQuestionKeys),
             publishedOptionKeys,
+            dirty: {
+              questions: Boolean(dirtyFlags.questions),
+              sections: Boolean(dirtyFlags.sections),
+            },
           });
-          questionsPayload = r.payload;
-          assignedKeys = r.assignedKeys;
+          questionsPayload = built.questions;
+          sectionsPayload = built.sections;
+          assignedKeys = built.assignedKeys;
         } catch (e) {
           if (e instanceof QuestionSerializationError) {
             toast({
