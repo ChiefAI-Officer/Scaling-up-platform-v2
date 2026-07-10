@@ -568,6 +568,22 @@ export const TemplateVersionForPublishSchema =
   });
 
 /**
+ * Wave ED2 (spec 19ad C1) — the ONE publish-validation entry point. Both the
+ * publish route AND the editor's live Safe-to-Publish badge call this, so the
+ * live readout can never drift from the server gate (extract-don't-fork, the
+ * same move Wave 1 made for computeScoreResult). Returns [] when the version is
+ * publishable; otherwise the Zod issues the 422 carries. Pure, no db.
+ */
+export function getPublishValidationIssues(input: {
+  questions: unknown;
+  sections: unknown;
+  scoringConfig: unknown;
+}): z.ZodIssue[] {
+  const res = TemplateVersionForPublishSchema.safeParse(input);
+  return res.success ? [] : res.error.issues;
+}
+
+/**
  * D2 (E1.1) — publish-time per-domain tier-tiling check. Iterates
  * scoringConfig.domains[], computes each domain's metric range from the
  * questions in its sections, and runs `validateTierTiling` in fractional
