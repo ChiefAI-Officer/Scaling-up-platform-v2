@@ -72,6 +72,7 @@ import {
   QuestionSerializationError,
 } from "@/components/admin/template-editor/question-serialization";
 import { buildVersionScoringPayload } from "@/components/admin/template-editor/build-version-payload";
+import { TestModeDrawer } from "@/components/admin/template-editor/TestModeDrawer";
 import {
   ScoringTiersTab,
   type ScoringConfigShape,
@@ -216,6 +217,12 @@ export interface TemplateEditorTabbedProps {
    * to pre-Wave-W (no "Show only when…" panel).
    */
   conditionalAuthoringEnabled?: boolean;
+  /**
+   * Wave ED1 (spec 19ac) — Test Mode sandbox. Server-computed
+   * (`isTestModeEnabled()`) and passed down from the edit page. Client
+   * components can't read the raw env var, so the flag is resolved server-side.
+   */
+  testModeEnabled?: boolean;
 }
 
 // Stable empty defaults so the memoized handlers don't churn.
@@ -247,6 +254,7 @@ export function TemplateEditorTabbed({
   publishedOptionKeys = EMPTY_PUBLISHED_OPTION_KEYS,
   findingsEnabled = false,
   conditionalAuthoringEnabled = false,
+  testModeEnabled = false,
 }: TemplateEditorTabbedProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -702,6 +710,9 @@ export function TemplateEditorTabbed({
 
   // ─── Save Draft ───────────────────────────────────────────────────────
   const [savingDraft, setSavingDraft] = useState(false);
+  // Wave ED1 (spec 19ac) — Test Mode drawer: drafts only, flag-gated.
+  const [testModeOpen, setTestModeOpen] = useState(false);
+  const testModeAvailable = !isPublished && testModeEnabled;
   const handleSaveDraft = useCallback(async () => {
     if (isPublished || savingDraft) return;
     if (!isAnyDirty) return;
@@ -1085,6 +1096,16 @@ export function TemplateEditorTabbed({
         </div>
 
         <div className="wf-page-action-row">
+          {testModeAvailable && (
+            <button
+              type="button"
+              onClick={() => setTestModeOpen(true)}
+              className="wf-btn wf-btn-secondary wf-btn-sm"
+              data-testid="template-editor-test-mode-btn"
+            >
+              Test Mode
+            </button>
+          )}
           <button
             type="button"
             onClick={handleSaveDraft}
@@ -1293,6 +1314,25 @@ export function TemplateEditorTabbed({
           </div>
         </TabsContent>
       </Tabs>
+
+      {testModeAvailable && (
+        <TestModeDrawer
+          open={testModeOpen}
+          onClose={() => setTestModeOpen(false)}
+          templateAlias={templateValues.alias}
+          questions={questions}
+          sections={sections}
+          rawQuestions={rawQuestionsRef.current}
+          rawSections={rawSectionsRef.current}
+          scoringConfig={scoringConfigRef.current}
+          publishedKeys={new Set(publishedQuestionKeys)}
+          publishedOptionKeys={publishedOptionKeys}
+          dirty={{
+            questions: Boolean(dirtyFlags.questions),
+            sections: Boolean(dirtyFlags.sections),
+          }}
+        />
+      )}
 
       {/* Publish failure modal — mounted at the bottom; mirrors
           AssessmentTemplateDetail. */}
