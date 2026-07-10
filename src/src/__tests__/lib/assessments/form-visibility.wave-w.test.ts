@@ -33,6 +33,8 @@ import {
   type PagerQuestion,
   type PagerSection,
 } from "@/lib/assessments/section-pages";
+import * as fs from "fs";
+import * as path from "path";
 
 const LVA_ALIAS = "leadership-vision-alignment";
 
@@ -384,19 +386,29 @@ describe("pruneHiddenAnswers (shared submit-route prune)", () => {
 // ── Route wiring guard (Wave V pattern — source-grep freeze) ─────────────
 
 describe("submit-route prune wiring", () => {
-  const fs = require("fs") as typeof import("fs");
-  const path = require("path") as typeof import("path");
   const routes = [
     "src/app/(public)/org-survey/[campaignAlias]/submit/route.ts",
     "src/app/api/quiz/[campaignAlias]/submit/route.ts",
   ];
 
-  it.each(routes)("%s calls pruneHiddenAnswers before scoring", (rel) => {
+  it.each(routes)("%s scores via computeScoreResult", (rel) => {
+    // Both routes delegate prune+score to the ONE shared seam (spec 19ac) —
+    // they can no longer drift apart or bypass the prune.
     const source = fs.readFileSync(path.join(process.cwd(), rel), "utf8");
+    expect(source).toContain("computeScoreResult(");
+  });
+
+  it("computeScoreResult prunes BEFORE scoring (relocated ordering freeze)", () => {
+    // The prune-before-score security freeze now lives at the seam where the
+    // logic moved. pruneHiddenAnswers MUST run before scoreSubmission so a
+    // crafted submit can never smuggle hidden-question answers into scoring.
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/assessments/compute-score-result.ts"),
+      "utf8",
+    );
     expect(source).toContain("pruneHiddenAnswers(");
-    // The prune must run BEFORE scoreSubmission in the handler body.
     expect(source.indexOf("pruneHiddenAnswers(")).toBeLessThan(
-      source.indexOf("scoreSubmission(version"),
+      source.indexOf("scoreSubmission("),
     );
   });
 });
