@@ -6,6 +6,24 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-09 — Wave ED1 (assessment-editor Test Mode) BUILT + merged dark <!-- ENTRY_ISO:2026-07-09 ENTRY_SLUG:wave-ed1-built -->
+
+**Wave 1 of the assessment-editor overhaul — a submit-and-score sandbox on the template editor, merged DARK to `main`** (PR #172 code `7f60fa4b` + PR #171 spec/plan `507119a4`; behind default-OFF `WAVE_ED1_TEST_MODE_ENABLED` → prod behavior byte-identical until the flag flips). Spec `docs/specs/v7.6/19ac-editor-overhaul-wave1-test-mode.md`; plan `19ac-plan-wave1-test-mode.md`.
+
+**What it does:** while editing a DRAFT template version, an admin opens a **Test Mode drawer**, fills sample answers on the live draft (rendered with the real `QuestionInput` widget, visibility honored), and immediately sees the computed result — per-section/domain scores, the overall tier (when the instrument shows one), and which findings fire. Writes nothing (no submission, no email); closing discards everything. Drafts only; flag-gated (the server edit-page reads `isTestModeEnabled()` and passes it as a prop, since the editor is a client component that can't read the raw env var).
+
+**Architecture — extract-don't-fork, no second code path (the /co-validate mandate):**
+- **`computeScoreResult(version, questions, answers, {allowMissingRequired?})`** (`lib/assessments/compute-score-result.ts`) — the ONE prune→score seam (`pruneHiddenAnswers` → `scoreSubmission`), returning `{result, prunedAnswers}`. BOTH submit routes (`org-survey`, `quiz`) were refactored to route through it (behavior-preserving); Test Mode calls the same. The Wave-W prune-before-score source-grep guard was RELOCATED to this seam (strictly stronger — both routes now assert they delegate to `computeScoreResult`; the ordering freeze moved onto the helper).
+- **`buildVersionScoringPayload(editorState)`** (`components/admin/template-editor/build-version-payload.ts`) — the editor's save-time `{questions,sections,scoringConfig}` assembly, extracted so **Save Draft AND Test Mode** both call it with the editor's REAL dirty flags (NOT forced). Test Mode assembles byte-identically what Save persists (the write path persists the payload verbatim — `versions/[versionId]/route.ts`), so it scores what would be published.
+- **`buildTestModeDisplay(result, alias)`** (`.../test-mode-display.ts`) — pure `ScoreResult`→view-model; tier/score-table gated by `reportConfigFor(alias)` (the same dispatch the real reports use → can't diverge; findings always surfaced as an authoring output, NOT a faithful branded-report reproduction — that full render is a deferred follow-on).
+- **`TestModeDrawer.tsx`** — the drawer UI (question label + real widget per visible question; empty / config-error / result states; the empty/too-few-answers state short-circuits the scorer, which throws `EMPTY_ANSWERS` on zero answers).
+
+**Fidelity:** by construction (shared helpers), locked by a regression test — for COMPLETE answers, the Test Mode path (`computeScoreResult` + `allowMissingRequired`) deep-equals the real submit path (`scoreSubmission`, no option). Partial answers score over answered-only (excluded, not zero-filled); the drawer surfaces the unanswered count.
+
+**Process:** research → end-state Approach A → `/co-validate` re-sequence → **`/grill-with-docs`** (8 code-verified decisions; added the `Test Mode` term to `CONTEXT.md`) → spec + plan → **`/co-validate` with real Codex GPT-5.5 @ xhigh** (fixed a broken local codex install first — missing native binary, `npm i -g @openai/codex@latest`; 5 findings, all accepted — C1 LVA-prune wording, C2/C5 extract-now-not-force-dirty, C3 empty-state, C4 don't-overclaim-report) → **subagent-driven TDD** (8 tasks; one subagent correctly BLOCKED rather than editing a security guard's assertions; session-limit deaths were finished inline). **54 tests across 7 suites; tsc clean on all changed files; eslint clean; all PR checks green (Build/Migration/Vercel).**
+
+**No schema, no migration, no write path.** Kill = flag off (or revert — additive). **LAUNCH (adversarial review + live prod walk + flag flip) is a SEPARATE, authorization-gated step — NOT done here; no user-facing behavior until the flag flips.** Next overhaul waves (each separately gated): W2 live Safe-to-Publish → W3 extract shared editor hooks → W4 three-pane (Approach A, kill-able) → W5 polish.
+
 ### 2026-07-09 — Progress report Jul-9 SENT to Jeff (roadmap closed + editor-overhaul plan folded in) <!-- ENTRY_ISO:2026-07-09 ENTRY_SLUG:progress-report-jul9-sent -->
 
 **Progress report Jul-9 SENT to Jeff** — Slack + Loom (`loom.com/share/ad349fdea88440f68d263a8af436ea22`); deliverables at repo root: `Scaling-Up-Progress-Update-2026-07-09.html` (467 KB, self-contained — prod screenshots inlined as base64), `.pdf` (headless-Chrome render), and `-talk-track.md` (3-min script). House style, same series as Jul-1→8.
