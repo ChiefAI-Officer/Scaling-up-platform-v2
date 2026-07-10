@@ -64,4 +64,22 @@ describe("TestModeDrawer", () => {
     const { container } = render(<TestModeDrawer {...baseProps} open={false} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it("clearing a NUMBER field does not crash — treated as unanswered (review F1)", () => {
+    const withNumber: QuestionDraftRow[] = [
+      ...questions,
+      { uid: "u-q2", stableKey: "S1_q2", sectionStableKey: "S1", label: "How many?", helpText: "",
+        type: "NUMBER", isRequired: false, sortOrder: 2, isNewToDraft: false, isInherited: false,
+        scaleMin: 0, scaleMax: 0, scaleStep: 1, anchorMin: "", anchorMax: "",
+        options: [], findingBands: [], findingOptionTexts: {},
+        showIf: null } as unknown as QuestionDraftRow,
+    ];
+    render(<TestModeDrawer {...baseProps} questions={withNumber} />);
+    fireEvent.click(screen.getByLabelText("Set rating to 3")); // answer the slider
+    const numInput = screen.getByRole("spinbutton"); // the NUMBER <input>
+    fireEvent.change(numInput, { target: { value: "5" } });
+    fireEvent.change(numInput, { target: { value: "" } }); // clear it — must NOT crash
+    // Blank NUMBER = unanswered → the slider result still renders (no INVALID_TYPE crash).
+    expect(screen.getByText("Sections")).toBeInTheDocument();
+  });
 });
