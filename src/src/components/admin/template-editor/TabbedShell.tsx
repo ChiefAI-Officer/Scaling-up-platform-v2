@@ -51,9 +51,7 @@ import { PublishFailureModal } from "@/components/admin/PublishFailureModal";
 import { MetadataTab } from "@/components/admin/template-editor/MetadataTab";
 import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
 import { QuestionsTab } from "@/components/admin/template-editor/QuestionsTab";
-import type { EditorSelection } from "@/components/admin/template-editor/hooks/useEditorSelection";
-import { useTemplateEditorDraft } from "@/components/admin/template-editor/hooks/useTemplateEditorDraft";
-import { useVersionActions } from "@/components/admin/template-editor/hooks/useVersionActions";
+import type { TemplateEditorModel } from "@/components/admin/template-editor/hooks/useTemplateEditorModel";
 import { TestModeDrawer } from "@/components/admin/template-editor/TestModeDrawer";
 import { SafeToPublishBadge } from "@/components/admin/template-editor/SafeToPublishBadge";
 import {
@@ -241,8 +239,6 @@ export function TabbedShell({
   template,
   version,
   allVersions,
-  onSaveDraft,
-  initialDirtyFlags,
   waveQEnabled = false,
   questionEditorUnlocked = false,
   publishedQuestionKeys = EMPTY_PUBLISHED_QUESTION_KEYS,
@@ -251,15 +247,17 @@ export function TabbedShell({
   conditionalAuthoringEnabled = false,
   testModeEnabled = false,
   safeToPublishEnabled = false,
-  selection,
+  model,
 }: TabbedShellProps & {
   /**
-   * ED3 (spec 19ae, Task 3) — the lifted question-selection state, injected
-   * by TemplateEditorController via `useEditorSelection()`. NOT part of the
-   * public `TabbedShellProps` (the edit page never passes it); TabbedShell
-   * forwards its fields to `QuestionsTab`.
+   * ED3 (spec 19ae, Task 6) — the composed editor model (document model +
+   * save flow, publish/duplicate actions, and question-selection state),
+   * built ONCE by TemplateEditorController via `useTemplateEditorModel()`.
+   * NOT part of the public `TabbedShellProps` (the edit page never passes
+   * it); TabbedShell destructures the fields it needs and forwards
+   * `model.selection` to `QuestionsTab`.
    */
-  selection: EditorSelection;
+  model: TemplateEditorModel;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -298,9 +296,9 @@ export function TabbedShell({
     [pathname, router, searchParams],
   );
 
-  // ─── Document model + save flow (ED3 Task 4) ──────────────────────────
-  // Lifted VERBATIM into a single headless hook (Codex C3). As of T4c the
-  // save flow (handleSaveDraft) lives in the hook too; the shell consumes it.
+  // ─── Document model + save flow (ED3 Task 4; composed via Task 6's
+  // `useTemplateEditorModel` — TemplateEditorController calls the hooks,
+  // TabbedShell just destructures the resulting `model`) ─────────────────
   const {
     templateValues,
     versionValues,
@@ -332,16 +330,7 @@ export function TabbedShell({
     handleDuplicateQuestion,
     handleReorderQuestions,
     handleSaveDraft,
-  } = useTemplateEditorDraft({
-    template,
-    version,
-    publishedQuestionKeys,
-    publishedOptionKeys,
-    questionEditorUnlocked,
-    waveQEnabled,
-    onSaveDraft,
-    initialDirtyFlags,
-  });
+  } = model;
 
   // ─── Save Draft ───────────────────────────────────────────────────────
   // Wave ED1 (spec 19ac) — Test Mode drawer: drafts only, flag-gated.
@@ -364,7 +353,8 @@ export function TabbedShell({
     [dirtyFlags.questions, dirtyFlags.sections],
   );
 
-  // ─── Version lifecycle actions (publish/duplicate) — ED3 T5 hook ──────
+  // ─── Version lifecycle actions (publish/duplicate) — ED3 T5 hook,
+  // composed into `model` by Task 6's `useTemplateEditorModel` ───────────
   const {
     publishingVersionId,
     duplicatingVersionId,
@@ -374,7 +364,7 @@ export function TabbedShell({
     handlePublishVersion,
     handlePublish,
     handleDuplicateVersion,
-  } = useVersionActions({ template, version, isPublished });
+  } = model;
 
   // ─── Versions caption ─────────────────────────────────────────────────
   const publishedSibling = useMemo(
@@ -607,11 +597,13 @@ export function TabbedShell({
               publishedOptionKeys={publishedOptionKeys}
               findingsEnabled={findingsEnabled}
               conditionalEnabled={conditionalAuthoringEnabled}
-              selectedSectionStableKey={selection.selectedSectionStableKey}
-              setSelectedSectionStableKey={selection.setSelectedSectionStableKey}
-              focusedQuestionUid={selection.focusedQuestionUid}
-              setFocusedQuestionUid={selection.setFocusedQuestionUid}
-              resetSelection={selection.resetSelection}
+              selectedSectionStableKey={model.selection.selectedSectionStableKey}
+              setSelectedSectionStableKey={
+                model.selection.setSelectedSectionStableKey
+              }
+              focusedQuestionUid={model.selection.focusedQuestionUid}
+              setFocusedQuestionUid={model.selection.setFocusedQuestionUid}
+              resetSelection={model.selection.resetSelection}
             />
           </div>
         </TabsContent>
