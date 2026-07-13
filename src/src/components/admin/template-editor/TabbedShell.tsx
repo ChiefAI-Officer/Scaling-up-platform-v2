@@ -52,18 +52,9 @@ import {
   PublishFailureModal,
   type PublishFailureIssue,
 } from "@/components/admin/PublishFailureModal";
-import {
-  MetadataTab,
-  type MetadataTabValues,
-} from "@/components/admin/template-editor/MetadataTab";
+import { MetadataTab } from "@/components/admin/template-editor/MetadataTab";
 import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
-import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
-import { genUid } from "@/components/admin/template-editor/sections-serialization";
-import {
-  QuestionsTab,
-  genNewQuestionStableKey,
-  type QuestionDraft,
-} from "@/components/admin/template-editor/QuestionsTab";
+import { QuestionsTab } from "@/components/admin/template-editor/QuestionsTab";
 import type { EditorSelection } from "@/components/admin/template-editor/hooks/useEditorSelection";
 import { useTemplateEditorDraft } from "@/components/admin/template-editor/hooks/useTemplateEditorDraft";
 import {
@@ -311,10 +302,10 @@ export function TabbedShell({
   );
 
   // ─── Document model + save flow (ED3 Task 4) ──────────────────────────
-  // Lifted VERBATIM into a single headless hook (Codex C3). During the
-  // T4a→T4c sub-steps, handlers that still live in this shell read the
-  // transitional raw setters off the same return; each transitional setter is
-  // dropped from the return once its consuming handler is lifted in.
+  // Lifted VERBATIM into a single headless hook (Codex C3). handleSaveDraft
+  // still lives in this shell during T4b and reads the transitional raw
+  // setters (setQuestions/setDirtyFlags/setSavingDraft) off the hook return;
+  // they are dropped once it is lifted in (T4c).
   const {
     templateValues,
     versionValues,
@@ -331,20 +322,24 @@ export function TabbedShell({
     rawSectionsRef,
     scoringConfigRef,
     reportConfigRef,
-    setMetadataDirty,
-    setVersionDirty,
-    setSectionsDirty,
-    setQuestionsDirty,
-    setScoringConfigDirty,
-    setTemplateValues,
-    setVersionValues,
-    setSections,
+    handleScoringConfigChange,
+    handleTemplateFieldChange,
+    handleVersionFieldChange,
+    handleSendResultsDefaultChange,
+    handleSectionsAdd,
+    handleSectionsRename,
+    handleSectionsDelete,
+    handleSectionsMoveUp,
+    handleSectionsMoveDown,
+    handleSectionsReorder,
+    handleAddQuestion,
+    handleUpdateQuestion,
+    handleDeleteQuestion,
+    handleDuplicateQuestion,
+    handleReorderQuestions,
     setQuestions,
-    setScoringConfigState,
     setDirtyFlags,
     setSavingDraft,
-    setSendResultsDefault,
-    setSavingSendResultsDefault,
   } = useTemplateEditorDraft({
     template,
     version,
@@ -355,295 +350,6 @@ export function TabbedShell({
     onSaveDraft,
     initialDirtyFlags,
   });
-
-  const handleScoringConfigChange = useCallback(
-    (next: Record<string, unknown>) => {
-      setScoringConfigState(next);
-      scoringConfigRef.current = next;
-      setScoringConfigDirty();
-    },
-    [setScoringConfigDirty],
-  );
-
-  const handleTemplateFieldChange = useCallback(
-    (patch: Partial<Omit<MetadataTabValues, "language">>) => {
-      setTemplateValues((prev) => ({ ...prev, ...patch }));
-      setMetadataDirty();
-    },
-    [setMetadataDirty],
-  );
-  const handleVersionFieldChange = useCallback(
-    (patch: { language?: string }) => {
-      setVersionValues((prev) => ({ ...prev, ...patch }));
-      setVersionDirty();
-    },
-    [setVersionDirty],
-  );
-
-  // ─── Wave Q (#1) — sendResultsDefault toggle ──────────────────────────
-  // TEMPLATE-ROW field (like invitationSubject) — deliberately OUTSIDE the
-  // Save Draft / dirty-flags flow: Save Draft is unavailable on published
-  // versions, but this default must stay editable regardless of version
-  // publish state, so the switch PATCHes the template row immediately.
-  // The flip is independent of the results-email approval hash (a default
-  // flip never invalidates approval) and inert until approval.
-  const handleSendResultsDefaultChange = useCallback(
-    async (next: boolean) => {
-      if (savingSendResultsDefault) return;
-      setSavingSendResultsDefault(true);
-      try {
-        const res = await fetch(
-          `/api/admin/assessment-templates/${template.id}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sendResultsDefault: next }),
-          },
-        );
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          // 403 = the Wave Q server flag is off (or was killed) — the write
-          // capability is gated even if this UI rendered from a stale page.
-          if (res.status === 403) {
-            toast({
-              title: "Could not update the results-email default",
-              description:
-                "Admin template controls are not enabled on the server.",
-              variant: "destructive",
-            });
-            return;
-          }
-          toast({
-            title: "Could not update the results-email default",
-            description:
-              typeof body?.error === "string"
-                ? body.error
-                : "Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-        setSendResultsDefault(next);
-        toast({
-          title: next
-            ? "Results email on by default"
-            : "Results email off by default",
-          description: next
-            ? "New campaigns on this template start with the results email checked (once the content is approved)."
-            : "New campaigns on this template start with the results email unchecked.",
-        });
-      } catch (e) {
-        toast({
-          title: "Could not update the results-email default",
-          description: e instanceof Error ? e.message : "Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setSavingSendResultsDefault(false);
-      }
-    },
-    [savingSendResultsDefault, template.id, toast],
-  );
-
-  // Section operations — F2 / F2b.
-  const handleSectionsAdd = useCallback(() => {
-    setSections((prev) => [
-      ...prev,
-      {
-        uid: genUid(),
-        stableKey: `S${prev.length + 1}`,
-        name: "",
-      },
-    ]);
-    setSectionsDirty();
-  }, [setSectionsDirty]);
-
-  const handleSectionsRename = useCallback(
-    (uid: string, name: string) => {
-      setSections((prev) =>
-        prev.map((s) => (s.uid === uid ? { ...s, name } : s)),
-      );
-      setSectionsDirty();
-    },
-    [setSectionsDirty],
-  );
-
-  const handleSectionsDelete = useCallback(
-    (uid: string) => {
-      setSections((prev) => prev.filter((s) => s.uid !== uid));
-      setSectionsDirty();
-    },
-    [setSectionsDirty],
-  );
-
-  const handleSectionsMoveUp = useCallback(
-    (uid: string) => {
-      setSections((prev) => {
-        const idx = prev.findIndex((s) => s.uid === uid);
-        if (idx <= 0) return prev;
-        const next = [...prev];
-        [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-        return next;
-      });
-      setSectionsDirty();
-    },
-    [setSectionsDirty],
-  );
-
-  const handleSectionsMoveDown = useCallback(
-    (uid: string) => {
-      setSections((prev) => {
-        const idx = prev.findIndex((s) => s.uid === uid);
-        if (idx < 0 || idx >= prev.length - 1) return prev;
-        const next = [...prev];
-        [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-        return next;
-      });
-      setSectionsDirty();
-    },
-    [setSectionsDirty],
-  );
-
-  // F3 retrofit — drag-reorder via @dnd-kit. Receives the new uid order
-  // from SectionsCard's DndContext and re-sorts the sections array to
-  // match (preserves uid identity + stableKey across moves).
-  const handleSectionsReorder = useCallback(
-    (newOrderUids: string[]) => {
-      setSections((prev) => {
-        const byUid = new Map(prev.map((s) => [s.uid, s]));
-        const next: SectionDraft[] = [];
-        for (const uid of newOrderUids) {
-          const found = byUid.get(uid);
-          if (found) next.push(found);
-        }
-        // Any rows not present in newOrderUids fall through at the end
-        // to keep this defensive against partial lists.
-        for (const s of prev) {
-          if (!newOrderUids.includes(s.uid)) next.push(s);
-        }
-        return next;
-      });
-      setSectionsDirty();
-    },
-    [setSectionsDirty],
-  );
-
-  // ─── Question operations — F3 ─────────────────────────────────────────
-  const handleAddQuestion = useCallback(
-    (sectionStableKey: string) => {
-      setQuestions((prev) => {
-        const inSection = prev.filter(
-          (q) => q.sectionStableKey === sectionStableKey,
-        );
-        const nextSort =
-          inSection.reduce((max, q) => Math.max(max, q.sortOrder), 0) + 1;
-        return [
-          ...prev,
-          {
-            uid: genUid(),
-            // Wave T D8 — unlocked, the slug key is derived from the label
-            // AT SAVE (buildQuestionsPayload); until then the row shows
-            // "(assigned on save)". Locked keeps the legacy Q_NEW_ key.
-            stableKey: questionEditorUnlocked
-              ? ""
-              : genNewQuestionStableKey(),
-            sectionStableKey,
-            label: "",
-            helpText: "",
-            isRequired: true,
-            type: "SLIDER_LIKERT",
-            sortOrder: nextSort,
-            scaleMin: 0,
-            scaleMax: 3,
-            scaleStep: 1,
-            anchorMin: "Not true",
-            anchorMax: "Completely true",
-            options: [],
-            maxChoices: null,
-            isInherited: false,
-            isNewToDraft: true,
-            // Wave U — new questions start with no findings rules.
-            findingBands: [],
-            findingOptionTexts: {},
-            // Wave W — new questions start unconditional.
-            showIf: null,
-          },
-        ];
-      });
-      setQuestionsDirty();
-    },
-    [questionEditorUnlocked, setQuestionsDirty],
-  );
-
-  const handleUpdateQuestion = useCallback(
-    (uid: string, patch: Partial<QuestionDraft>) => {
-      setQuestions((prev) =>
-        prev.map((q) => (q.uid === uid ? { ...q, ...patch } : q)),
-      );
-      setQuestionsDirty();
-    },
-    [setQuestionsDirty],
-  );
-
-  const handleDeleteQuestion = useCallback(
-    (uid: string) => {
-      setQuestions((prev) => prev.filter((q) => q.uid !== uid));
-      setQuestionsDirty();
-    },
-    [setQuestionsDirty],
-  );
-
-  const handleDuplicateQuestion = useCallback(
-    (uid: string) => {
-      setQuestions((prev) => {
-        const src = prev.find((q) => q.uid === uid);
-        if (!src) return prev;
-        const inSection = prev.filter(
-          (q) => q.sectionStableKey === src.sectionStableKey,
-        );
-        const nextSort =
-          inSection.reduce((max, q) => Math.max(max, q.sortOrder), 0) + 1;
-        return [
-          ...prev,
-          {
-            ...src,
-            uid: genUid(),
-            // Wave T — a copy is a NEW question: unlocked it gets a slug
-            // key at save; locked it keeps the legacy Q_NEW_ key. Either
-            // way it is never inherited, and every copied option must be
-            // isNew:true (the serializer's inherited-option re-check has
-            // no raw row for a copy — spec 19t §T-3 Duplicate rule).
-            stableKey: questionEditorUnlocked
-              ? ""
-              : genNewQuestionStableKey(),
-            sortOrder: nextSort,
-            isInherited: false,
-            isNewToDraft: true,
-            options: src.options.map((o) => ({ ...o, isNew: true })),
-          },
-        ];
-      });
-      setQuestionsDirty();
-    },
-    [questionEditorUnlocked, setQuestionsDirty],
-  );
-
-  const handleReorderQuestions = useCallback(
-    (sectionStableKey: string, newOrderUids: string[]) => {
-      setQuestions((prev) => {
-        // Build a sortOrder map from newOrderUids: position-in-array → sortOrder.
-        const order = new Map<string, number>();
-        newOrderUids.forEach((uid, idx) => order.set(uid, idx + 1));
-        return prev.map((q) =>
-          q.sectionStableKey === sectionStableKey && order.has(q.uid)
-            ? { ...q, sortOrder: order.get(q.uid)! }
-            : q,
-        );
-      });
-      setQuestionsDirty();
-    },
-    [setQuestionsDirty],
-  );
 
   // ─── Save Draft ───────────────────────────────────────────────────────
   // Wave ED1 (spec 19ac) — Test Mode drawer: drafts only, flag-gated.
