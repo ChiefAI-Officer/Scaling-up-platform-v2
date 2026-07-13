@@ -734,11 +734,12 @@ export function useTemplateEditorDraft({
     sendResultsDefault,
     savingSendResultsDefault,
     questionCountByStableKey,
-    // ─── Refs (return the ref OBJECTS — callers read `.current`) ───
-    rawQuestionsRef,
-    rawSectionsRef,
-    scoringConfigRef,
-    reportConfigRef,
+    // ─── Raw snapshots — plain values (the refs stay internal to the hook,
+    //     read here where they are local so callers never touch `.current`
+    //     during render; reportConfigRef is used only by handleSaveDraft). ──
+    rawQuestions: rawQuestionsRef.current,
+    rawSections: rawSectionsRef.current,
+    scoringConfig: scoringConfigRef.current,
     // ─── Dirty setters ───
     setMetadataDirty,
     setVersionDirty,
