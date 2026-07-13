@@ -58,17 +58,14 @@ import {
 } from "@/components/admin/template-editor/MetadataTab";
 import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
-import {
-  genUid,
-  hydrateSectionsFromJson,
-} from "@/components/admin/template-editor/sections-serialization";
+import { genUid } from "@/components/admin/template-editor/sections-serialization";
 import {
   QuestionsTab,
-  hydrateQuestionsFromJson,
   genNewQuestionStableKey,
   type QuestionDraft,
 } from "@/components/admin/template-editor/QuestionsTab";
 import type { EditorSelection } from "@/components/admin/template-editor/hooks/useEditorSelection";
+import { useTemplateEditorDraft } from "@/components/admin/template-editor/hooks/useTemplateEditorDraft";
 import {
   QuestionSerializationError,
 } from "@/components/admin/template-editor/question-serialization";
@@ -313,116 +310,52 @@ export function TabbedShell({
     [pathname, router, searchParams],
   );
 
-  // ─── Cross-tab dirty state ────────────────────────────────────────────
-  const [dirtyFlags, setDirtyFlags] = useState<DirtyFlags>(
-    initialDirtyFlags ?? {},
-  );
-  const isAnyDirty = useMemo(
-    () => Object.values(dirtyFlags).some(Boolean),
-    [dirtyFlags],
-  );
-
-  // ─── Editable state — F2 (Checkpoint 1b) ──────────────────────────────
-  // Template-level editable fields. Hydrate from props; flip `metadata`
-  // dirty on any edit. Save Draft serializes these into a single
-  // template PATCH.
-  const [templateValues, setTemplateValues] = useState({
-    name: template.name,
-    alias: template.alias,
-    description: template.description ?? "",
-    invitationSubject: template.invitationSubject ?? "",
-    invitationBodyMarkdown: template.invitationBodyMarkdown ?? "",
-    resultsEmailSubject: template.resultsEmailSubject ?? "",
-    resultsEmailBodyMarkdown: template.resultsEmailBodyMarkdown ?? "",
-    resultsEmailContentApproved:
-      template.resultsEmailContentApproved ?? false,
-    aggregationMode: template.aggregationMode,
+  // ─── Document model + save flow (ED3 Task 4) ──────────────────────────
+  // Lifted VERBATIM into a single headless hook (Codex C3). During the
+  // T4a→T4c sub-steps, handlers that still live in this shell read the
+  // transitional raw setters off the same return; each transitional setter is
+  // dropped from the return once its consuming handler is lifted in.
+  const {
+    templateValues,
+    versionValues,
+    sections,
+    questions,
+    scoringConfigState,
+    dirtyFlags,
+    isAnyDirty,
+    savingDraft,
+    sendResultsDefault,
+    savingSendResultsDefault,
+    questionCountByStableKey,
+    rawQuestionsRef,
+    rawSectionsRef,
+    scoringConfigRef,
+    reportConfigRef,
+    setMetadataDirty,
+    setVersionDirty,
+    setSectionsDirty,
+    setQuestionsDirty,
+    setScoringConfigDirty,
+    setTemplateValues,
+    setVersionValues,
+    setSections,
+    setQuestions,
+    setScoringConfigState,
+    setDirtyFlags,
+    setSavingDraft,
+    setSendResultsDefault,
+    setSavingSendResultsDefault,
+  } = useTemplateEditorDraft({
+    template,
+    version,
+    publishedQuestionKeys,
+    publishedOptionKeys,
+    questionEditorUnlocked,
+    waveQEnabled,
+    onSaveDraft,
+    initialDirtyFlags,
   });
 
-  // Version-level editable fields (language only, in this checkpoint).
-  const [versionValues, setVersionValues] = useState({
-    language: version.language,
-  });
-
-  // Sections — hydrated from version.sections JSON. Dirty flag fires on
-  // any add/rename/reorder/delete. Save Draft hits the version PATCH
-  // with current questions/scoringConfig pass-through.
-  const [sections, setSections] = useState<SectionDraft[]>(() =>
-    hydrateSectionsFromJson(version.sections),
-  );
-
-  // F3 — Questions state hydrated from version.questions JSON. Dirty flag
-  // fires on any add/edit/reorder/delete. Save Draft serializes these
-  // into the version PATCH's questions[] (raw rows are preserved via
-  // rawQuestionByStableKey lookup so unknown fields survive).
-  const [questions, setQuestions] = useState<QuestionDraft[]>(() =>
-    hydrateQuestionsFromJson(version.questions, new Set(publishedQuestionKeys)),
-  );
-
-  // Stable references for scoringConfig / reportConfig so version PATCH
-  // can round-trip them unchanged when only sections/questions were
-  // edited. Questions raw pass-through is kept here for stableKey lookup
-  // during serialization (matches AssessmentVersionEditor's pattern).
-  const rawQuestionsRef = React.useRef<unknown[]>(
-    Array.isArray(version.questions) ? (version.questions as unknown[]) : [],
-  );
-  // Raw stored section rows — pass-through so a no-change save round-trips
-  // byte-for-byte (content-hash stable) and unknown/future fields + domain
-  // survive an edit to an unrelated surface (see sections-serialization.ts).
-  const rawSectionsRef = React.useRef<unknown[]>(
-    Array.isArray(version.sections) ? (version.sections as unknown[]) : [],
-  );
-  const scoringConfigRef = React.useRef<unknown>(version.scoringConfig ?? {});
-  const reportConfigRef = React.useRef<unknown>(version.reportConfig ?? null);
-
-  // F4 — Scoring & Tiers tab state. Hydrate from version.scoringConfig.
-  // On any edit, update scoringConfigRef.current (so Save Draft serializes
-  // it via version PATCH) and flip the scoringConfig dirty flag.
-  const [scoringConfigState, setScoringConfigState] = useState<
-    Record<string, unknown>
-  >(
-    () =>
-      (version.scoringConfig && typeof version.scoringConfig === "object"
-        ? (version.scoringConfig as Record<string, unknown>)
-        : {}),
-  );
-
-  // Derived: question count per section stableKey (for the Sections card
-  // count badge — used by MetadataTab right column + SectionsTab).
-  const questionCountByStableKey = useMemo(() => {
-    const out: Record<string, number> = {};
-    for (const q of questions) {
-      out[q.sectionStableKey] = (out[q.sectionStableKey] ?? 0) + 1;
-    }
-    return out;
-  }, [questions]);
-
-  // ─── Setters that auto-dirty the right surface ────────────────────────
-  const setMetadataDirty = useCallback(() => {
-    setDirtyFlags((prev) =>
-      prev.metadata ? prev : { ...prev, metadata: true },
-    );
-  }, []);
-  const setVersionDirty = useCallback(() => {
-    setDirtyFlags((prev) =>
-      prev.version ? prev : { ...prev, version: true },
-    );
-  }, []);
-  const setSectionsDirty = useCallback(() => {
-    setDirtyFlags((prev) =>
-      prev.sections ? prev : { ...prev, sections: true },
-    );
-  }, []);
-  const setQuestionsDirty = useCallback(() => {
-    setDirtyFlags((prev) =>
-      prev.questions ? prev : { ...prev, questions: true },
-    );
-  }, []);
-  const setScoringConfigDirty = useCallback(() => {
-    setDirtyFlags((prev) =>
-      prev.scoringConfig ? prev : { ...prev, scoringConfig: true },
-    );
-  }, []);
   const handleScoringConfigChange = useCallback(
     (next: Record<string, unknown>) => {
       setScoringConfigState(next);
@@ -454,11 +387,6 @@ export function TabbedShell({
   // publish state, so the switch PATCHes the template row immediately.
   // The flip is independent of the results-email approval hash (a default
   // flip never invalidates approval) and inert until approval.
-  const [sendResultsDefault, setSendResultsDefault] = useState(
-    template.sendResultsDefault ?? false,
-  );
-  const [savingSendResultsDefault, setSavingSendResultsDefault] =
-    useState(false);
   const handleSendResultsDefaultChange = useCallback(
     async (next: boolean) => {
       if (savingSendResultsDefault) return;
@@ -717,23 +645,7 @@ export function TabbedShell({
     [setQuestionsDirty],
   );
 
-  useEffect(() => {
-    if (!isAnyDirty) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      // Modern browsers ignore the returned string but still show a
-      // generic "Leave site?" prompt when preventDefault is called.
-      e.returnValue = "";
-      return "";
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => {
-      window.removeEventListener("beforeunload", handler);
-    };
-  }, [isAnyDirty]);
-
   // ─── Save Draft ───────────────────────────────────────────────────────
-  const [savingDraft, setSavingDraft] = useState(false);
   // Wave ED1 (spec 19ac) — Test Mode drawer: drafts only, flag-gated.
   const [testModeOpen, setTestModeOpen] = useState(false);
   const testModeAvailable = !isPublished && testModeEnabled;
