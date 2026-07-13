@@ -339,6 +339,115 @@ function fixtureC() {
   };
 }
 
+// ── Reorder fixture: two SLIDER questions in one section (drag-reorder) ──
+function fixtureReorder() {
+  return {
+    template: {
+      id: "tpl_1",
+      name: "Reorder Template",
+      alias: "REORD",
+      aggregationMode: "FULL_VISIBILITY" as const,
+      accessMode: "INVITED" as const,
+    },
+    version: {
+      id: "ver_2",
+      versionNumber: 2,
+      language: "en-US",
+      publishedAt: null,
+      contentHash: "abcdef012345",
+      sections: [{ stableKey: "S1", name: "S1" }],
+      questions: [
+        {
+          stableKey: "S1_a",
+          sectionStableKey: "S1",
+          label: "A",
+          type: "SLIDER_LIKERT",
+          isRequired: true,
+          sortOrder: 1,
+          scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" },
+        },
+        {
+          stableKey: "S1_b",
+          sectionStableKey: "S1",
+          label: "B",
+          type: "SLIDER_LIKERT",
+          isRequired: true,
+          sortOrder: 2,
+          scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" },
+        },
+      ],
+      scoringConfig: {},
+      reportConfig: null,
+    },
+    allVersions: allVersionsMeta,
+    publishedQuestionKeys: [] as string[],
+    publishedOptionKeys: {} as Record<string, string[]>,
+    ...ALL_FLAGS,
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// @dnd-kit keyboard-reorder enablement (jsdom has no layout). Give each
+// question-card <li> a distinct vertical slot by its index among sibling
+// cards, polyfill ResizeObserver (dnd-kit measures through it), and use fake
+// timers (dnd-kit schedules the keyboard move on a timer). This is the ONLY
+// way to drive a REAL question reorder — handleReorderQuestions — at the
+// component's public surface. Verified: the drop actually swaps the rows.
+function installDndLayout(): () => void {
+  const origRect = Element.prototype.getBoundingClientRect;
+  const hadRO = "ResizeObserver" in globalThis;
+  const origRO = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+  class RO {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = RO;
+  Element.prototype.getBoundingClientRect = function () {
+    const el = this as HTMLElement;
+    const tid = el.getAttribute?.("data-testid") ?? "";
+    if (tid.startsWith("question-card-")) {
+      const parent = el.parentElement;
+      const sibs = parent
+        ? Array.from(parent.children).filter((c) =>
+            (c.getAttribute("data-testid") ?? "").startsWith("question-card-"),
+          )
+        : [el];
+      const top = sibs.indexOf(el) * 60;
+      return {
+        top,
+        bottom: top + 50,
+        left: 0,
+        right: 200,
+        width: 200,
+        height: 50,
+        x: 0,
+        y: top,
+        toJSON() {},
+      } as DOMRect;
+    }
+    return {
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      width: 0,
+      height: 0,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    } as DOMRect;
+  };
+  return () => {
+    Element.prototype.getBoundingClientRect = origRect;
+    if (hadRO) {
+      (globalThis as { ResizeObserver?: unknown }).ResizeObserver = origRO;
+    } else {
+      delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    }
+  };
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // Interaction helpers
 // ────────────────────────────────────────────────────────────────────────
@@ -395,6 +504,15 @@ const VERSION_BODY_C =
   '{"stableKey":"S1_notes","sectionStableKey":"S1","label":"Notes edited","type":"TEXT","isRequired":false,"sortOrder":1},' +
   '{"stableKey":"S1_count","sectionStableKey":"S1","label":"Count","type":"NUMBER","isRequired":true,"sortOrder":2}' +
   '],"sections":[{"stableKey":"S1","name":"Mix Section"}],"scoringConfig":{},"reportConfig":null}';
+
+// Reorder: drag S1_a below S1_b. handleReorderQuestions reassigns sortOrder by
+// new position (S1_b→1, S1_a→2) but preserves the `questions` STATE array
+// order, so the emitted array stays [S1_a, S1_b] with the swapped sortOrders.
+const VERSION_BODY_REORDER =
+  '{"questions":[' +
+  '{"stableKey":"S1_a","sectionStableKey":"S1","label":"A","type":"SLIDER_LIKERT","isRequired":true,"sortOrder":2,"scale":{"min":0,"max":3,"step":1,"anchorMin":"lo","anchorMax":"hi"}},' +
+  '{"stableKey":"S1_b","sectionStableKey":"S1","label":"B","type":"SLIDER_LIKERT","isRequired":true,"sortOrder":1,"scale":{"min":0,"max":3,"step":1,"anchorMin":"lo","anchorMax":"hi"}}' +
+  '],"sections":[{"stableKey":"S1","name":"S1"}],"scoringConfig":{},"reportConfig":null}';
 
 // ════════════════════════════════════════════════════════════════════════
 // Tests
@@ -888,6 +1006,72 @@ describe("editor byte-equivalence guard", () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────
+  // Transition: question drag-reorder (handleReorderQuestions) via keyboard
+  // ──────────────────────────────────────────────────────────────────────
+  it("keyboard drag-reorder of two questions (handleReorderQuestions) → exact version body with swapped sortOrder", async () => {
+    const restoreDnd = installDndLayout();
+    jest.useFakeTimers();
+    const { calls } = installFetch();
+    try {
+      render(<TemplateEditorTabbed {...fixtureReorder()} />);
+
+      switchTab(/^Questions$/, "questions");
+      const list = screen.getByTestId("questions-question-list");
+      const orderNow = () =>
+        within(list)
+          .getAllByTestId(/^question-card-/)
+          .map((c) => c.getAttribute("data-testid"));
+
+      expect(orderNow()).toEqual([
+        "question-card-S1_a",
+        "question-card-S1_b",
+      ]);
+
+      // Pick up S1_a (Space on its drag handle), move down (ArrowDown), drop
+      // (Space). dnd-kit listens at the document level once lifted, and
+      // schedules the move on a timer — flush it after each key.
+      const handle = screen.getByTestId("drag-handle-S1_a");
+      act(() => {
+        handle.focus();
+      });
+      act(() => {
+        fireEvent.keyDown(handle, { key: " ", code: "Space" });
+        jest.runOnlyPendingTimers();
+      });
+      act(() => {
+        fireEvent.keyDown(document, { key: "ArrowDown", code: "ArrowDown" });
+        jest.runOnlyPendingTimers();
+      });
+      act(() => {
+        fireEvent.keyDown(document, { key: " ", code: "Space" });
+        jest.runOnlyPendingTimers();
+      });
+
+      // The drop actually reordered the rows (proves onReorderQuestions fired).
+      expect(orderNow()).toEqual([
+        "question-card-S1_b",
+        "question-card-S1_a",
+      ]);
+
+      jest.useRealTimers();
+
+      // Reorder dirtied the questions surface → Save issues one version PATCH.
+      await clickSave();
+      await waitFor(() => {
+        expect(calls.filter(isVersionPatch).length).toBe(1);
+      });
+      // Byte-exact: the emitted array keeps state order [S1_a, S1_b] with the
+      // swapped sortOrders (S1_a→2, S1_b→1).
+      expect(calls.filter(isVersionPatch)[0].body).toBe(VERSION_BODY_REORDER);
+      // No metadata PATCH — only the version surface was dirtied.
+      expect(calls.length).toBe(1);
+    } finally {
+      jest.useRealTimers();
+      restoreDnd();
+    }
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
   // Transition: publish 422 → PublishFailureModal
   // ──────────────────────────────────────────────────────────────────────
   it("publish 422 with issues[] opens the PublishFailureModal", async () => {
@@ -977,12 +1161,12 @@ describe("editor byte-equivalence guard", () => {
     const errSpy = jest
       .spyOn(console, "error")
       .mockImplementation((...args: unknown[]) => {
-        if (
-          typeof args[0] === "string" &&
-          args[0].includes("Not implemented: navigation")
-        ) {
-          return;
-        }
+        // jsdom logs the un-implemented navigation as an Error object, not a
+        // string — flatten all args before matching.
+        const flat = args
+          .map((a) => (a instanceof Error ? a.message : String(a)))
+          .join(" ");
+        if (flat.includes("Not implemented: navigation")) return;
         // Re-surface anything else.
         (origError as (...a: unknown[]) => void)(...args);
       });
