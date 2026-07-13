@@ -47,16 +47,13 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { useToast } from "@/components/ui/use-toast";
-import {
-  PublishFailureModal,
-  type PublishFailureIssue,
-} from "@/components/admin/PublishFailureModal";
+import { PublishFailureModal } from "@/components/admin/PublishFailureModal";
 import { MetadataTab } from "@/components/admin/template-editor/MetadataTab";
 import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
 import { QuestionsTab } from "@/components/admin/template-editor/QuestionsTab";
 import type { EditorSelection } from "@/components/admin/template-editor/hooks/useEditorSelection";
 import { useTemplateEditorDraft } from "@/components/admin/template-editor/hooks/useTemplateEditorDraft";
+import { useVersionActions } from "@/components/admin/template-editor/hooks/useVersionActions";
 import { TestModeDrawer } from "@/components/admin/template-editor/TestModeDrawer";
 import { SafeToPublishBadge } from "@/components/admin/template-editor/SafeToPublishBadge";
 import {
@@ -267,7 +264,6 @@ export function TabbedShell({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { toast } = useToast();
 
   const isPublished = version.publishedAt !== null;
 
@@ -278,6 +274,11 @@ export function TabbedShell({
   // Re-sync if the URL param changes externally (e.g. browser nav).
   useEffect(() => {
     const next = resolveTabFromUrl(searchParams.get("tab"));
+    // Intentional external-store sync: mirror the ?tab= URL param into local
+    // tab state on external navigation (pre-ED3 behavior, byte-identical —
+    // pinned by the guard's tab-routing test). Not derivable purely in render
+    // because handleTabChange also drives activeTab on user clicks.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTab((prev) => (prev === next ? prev : next));
   }, [searchParams]);
 
@@ -312,9 +313,9 @@ export function TabbedShell({
     sendResultsDefault,
     savingSendResultsDefault,
     questionCountByStableKey,
-    rawQuestionsRef,
-    rawSectionsRef,
-    scoringConfigRef,
+    rawQuestions,
+    rawSections,
+    scoringConfig,
     handleScoringConfigChange,
     handleTemplateFieldChange,
     handleVersionFieldChange,
@@ -363,118 +364,17 @@ export function TabbedShell({
     [dirtyFlags.questions, dirtyFlags.sections],
   );
 
-  // ─── Publish (mirrors AssessmentTemplateDetail.handlePublish) ─────────
-  // F5: handler accepts an explicit versionId so VersionsTab can publish
-  // any draft row, not just the currently-edited version. Header button
-  // calls it with the current version's id.
-  const [publishingVersionId, setPublishingVersionId] = useState<
-    string | null
-  >(null);
-  const publishing = publishingVersionId !== null;
-  const [publishIssues, setPublishIssues] = useState<
-    PublishFailureIssue[] | null
-  >(null);
-  const [duplicatingVersionId, setDuplicatingVersionId] = useState<
-    string | null
-  >(null);
-
-  const handlePublishVersion = useCallback(
-    async (versionId: string) => {
-      if (publishingVersionId) return;
-      const confirmed = window.confirm(
-        "Publish this version? Once published, content is immutable.",
-      );
-      if (!confirmed) return;
-      setPublishIssues(null);
-      setPublishingVersionId(versionId);
-      try {
-        const res = await fetch(
-          `/api/admin/assessment-templates/${template.id}/versions/${versionId}/publish`,
-          { method: "POST" },
-        );
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          if (
-            res.status === 422 &&
-            Array.isArray(body?.issues) &&
-            body.issues.every(
-              (i: unknown) =>
-                i !== null &&
-                typeof i === "object" &&
-                Array.isArray((i as { path?: unknown }).path) &&
-                typeof (i as { message?: unknown }).message === "string",
-            )
-          ) {
-            setPublishIssues(body.issues as PublishFailureIssue[]);
-            return;
-          }
-          if (res.status === 409) {
-            toast({
-              title: "Already published",
-              variant: "destructive",
-            });
-            router.refresh();
-            return;
-          }
-          toast({
-            title: "Could not publish",
-            description:
-              typeof body?.error === "string"
-                ? body.error
-                : "Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-        toast({ title: "Version published" });
-        router.refresh();
-      } catch (e) {
-        toast({
-          title: "Could not publish",
-          description: e instanceof Error ? e.message : "Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setPublishingVersionId(null);
-      }
-    },
-    [publishingVersionId, router, template.id, toast],
-  );
-
-  const handlePublish = useCallback(() => {
-    if (isPublished) return;
-    return handlePublishVersion(version.id);
-  }, [handlePublishVersion, isPublished, version.id]);
-
-  const handleDuplicateVersion = useCallback(
-    async (sourceVersionId: string) => {
-      if (duplicatingVersionId) return;
-      setDuplicatingVersionId(sourceVersionId);
-      try {
-        const res = await fetch(
-          `/api/admin/assessment-templates/${template.id}/versions/${sourceVersionId}/duplicate`,
-          { method: "POST" },
-        );
-        const body = await res.json().catch(() => ({}));
-        if (!res.ok || body.success === false) {
-          throw new Error(body.error || `HTTP ${res.status}`);
-        }
-        toast({
-          title: "New draft created",
-          description: `v${body.data.versionNumber} — opening editor…`,
-        });
-        window.location.href = `/admin/assessments/templates/${template.id}/versions/${body.data.newVersionId}/edit`;
-      } catch (e) {
-        toast({
-          title: "Could not duplicate version",
-          description: e instanceof Error ? e.message : "Please try again.",
-          variant: "destructive",
-        });
-        setDuplicatingVersionId(null);
-      }
-    },
-    [duplicatingVersionId, template.id, toast],
-  );
+  // ─── Version lifecycle actions (publish/duplicate) — ED3 T5 hook ──────
+  const {
+    publishingVersionId,
+    duplicatingVersionId,
+    publishing,
+    publishIssues,
+    setPublishIssues,
+    handlePublishVersion,
+    handlePublish,
+    handleDuplicateVersion,
+  } = useVersionActions({ template, version, isPublished });
 
   // ─── Versions caption ─────────────────────────────────────────────────
   const publishedSibling = useMemo(
@@ -534,9 +434,9 @@ export function TabbedShell({
             <SafeToPublishBadge
               questions={questions}
               sections={sections}
-              rawQuestions={rawQuestionsRef.current}
-              rawSections={rawSectionsRef.current}
-              scoringConfig={scoringConfigRef.current}
+              rawQuestions={rawQuestions}
+              rawSections={rawSections}
+              scoringConfig={scoringConfig}
               publishedKeys={badgePublishedKeys}
               publishedOptionKeys={publishedOptionKeys}
               dirty={badgeDirty}
@@ -774,9 +674,9 @@ export function TabbedShell({
           templateAlias={template.alias}
           questions={questions}
           sections={sections}
-          rawQuestions={rawQuestionsRef.current}
-          rawSections={rawSectionsRef.current}
-          scoringConfig={scoringConfigRef.current}
+          rawQuestions={rawQuestions}
+          rawSections={rawSections}
+          scoringConfig={scoringConfig}
           publishedKeys={new Set(publishedQuestionKeys)}
           publishedOptionKeys={publishedOptionKeys}
           dirty={{
