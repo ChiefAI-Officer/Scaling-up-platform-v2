@@ -15,10 +15,11 @@ import React from "react";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 
 import {
-  QuestionsTab,
   hydrateQuestionsFromJson,
   type QuestionDraft,
 } from "@/components/admin/template-editor/QuestionsTab";
+// ED3 Task 3 — selection lifted out of QuestionsTab; harness supplies it.
+import { QuestionsTabHarness } from "./questions-tab-harness";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 
 const originalConfirm = window.confirm;
@@ -89,7 +90,7 @@ function renderTab(opts: {
   const onUpdateQuestion = jest.fn();
   const onDeleteQuestion = jest.fn();
   const utils = render(
-    <QuestionsTab
+    <QuestionsTabHarness
       sections={sections}
       questions={opts.questions}
       onAddQuestion={jest.fn()}

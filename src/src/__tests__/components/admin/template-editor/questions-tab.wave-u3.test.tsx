@@ -17,9 +17,10 @@ import {
 } from "@testing-library/react";
 
 import {
-  QuestionsTab,
   type QuestionDraft,
 } from "@/components/admin/template-editor/QuestionsTab";
+// ED3 Task 3 — selection lifted out of QuestionsTab; harness supplies it.
+import { QuestionsTabHarness } from "./questions-tab-harness";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 
 beforeAll(() => {
@@ -61,7 +62,7 @@ function makeQuestion(overrides: Partial<QuestionDraft>): QuestionDraft {
 
 function renderTab(question: QuestionDraft) {
   return render(
-    <QuestionsTab
+    <QuestionsTabHarness
       sections={sections}
       questions={[question]}
       onAddQuestion={jest.fn()}
