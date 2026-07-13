@@ -6,7 +6,9 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
-### 2026-07-13 — Wave ED3 (assessment-editor overhaul — extract shared editor state + inspector into headless hooks) <!-- ENTRY_ISO:2026-07-13 ENTRY_SLUG:wave-ed3-extract-hooks -->
+### 2026-07-13 — Wave ED3 (assessment-editor overhaul — extract shared editor state + inspector into headless hooks) LAUNCHED <!-- ENTRY_ISO:2026-07-13 ENTRY_SLUG:wave-ed3-extract-hooks -->
+
+**LAUNCHED 2026-07-13** — PR #179 squash-merged → main `45554891`; prod deploy Ready; **no flag** (the merge is the launch — pure refactor); kill = revert-the-commit. Non-mutating verification done (prod build/deploy Ready = the refactor didn't break the live runtime); a full edit→save→publish parity walk is available on request (mutates prod).
 
 **Wave 3 of the re-sequenced 5-wave editor overhaul** (spec `docs/specs/v7.6/19ae-editor-overhaul-wave3-extract-hooks.md` + plan `19ae-plan-wave3-extract-hooks.md`). The **pivot wave**: a pure, behavior-neutral refactor that lifts the editor's stateful logic + the per-question inspector into headless hooks/components, so the future W4 three-pane becomes a *presentation swap, not a fork*. **No flag** (adds no capability) — ships live on merge; **kill = revert-the-commit**. Zero user-facing change.
 
