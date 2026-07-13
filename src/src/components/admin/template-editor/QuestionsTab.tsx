@@ -110,6 +110,20 @@ export interface QuestionsTabProps {
    * Optional (default false) so pre-Wave-W call sites render unchanged.
    */
   conditionalEnabled?: boolean;
+  /**
+   * ED3 (spec 19ae, Task 3) — question-selection state, LIFTED out of this
+   * component into `useEditorSelection` (owned by TemplateEditorController)
+   * so the future three-pane can share it. Behavior-neutral: `resetSelection`
+   * reproduces the pre-ED3 remount reset (see the mount effect below).
+   */
+  selectedSectionStableKey: string | null;
+  setSelectedSectionStableKey: (key: string | null) => void;
+  focusedQuestionUid: string | null;
+  setFocusedQuestionUid: (uid: string | null) => void;
+  resetSelection: (
+    selectedSectionStableKey: string | null,
+    focusedQuestionUid: string | null,
+  ) => void;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -1855,14 +1869,12 @@ export function QuestionsTab({
   publishedOptionKeys,
   findingsEnabled = false,
   conditionalEnabled = false,
+  selectedSectionStableKey,
+  setSelectedSectionStableKey,
+  focusedQuestionUid,
+  setFocusedQuestionUid,
+  resetSelection,
 }: QuestionsTabProps) {
-  const [selectedSectionStableKey, setSelectedSectionStableKey] = useState<
-    string | null
-  >(() => sections[0]?.stableKey ?? null);
-  const [focusedQuestionUid, setFocusedQuestionUid] = useState<string | null>(
-    null,
-  );
-
   // Group questions by section.
   const questionsBySection = useMemo(() => {
     const out: Record<string, QuestionDraft[]> = {};
@@ -1879,6 +1891,26 @@ export function QuestionsTab({
     }
     return out;
   }, [questions, sections]);
+
+  // ── ED3 — selection now lives in `useEditorSelection` (owned by the
+  // controller) and PERSISTS across this tab's Radix unmount/remount, so it
+  // no longer re-initializes on its own. Reproduce the pre-ED3 remount reset:
+  // on each mount, select the first section + focus that section's first
+  // question — resolved against the LIVE sections/questions at entry time,
+  // exactly what the old local `useState(() => sections[0])` initializer plus
+  // the section-change effect below produced on every remount. Mount-only by
+  // design; the section-change effect below handles subsequent USER section
+  // switches. Setting the focus DIRECTLY (not null) is deliberate: when the
+  // persisted section equals the reset section, the section-change effect
+  // would not re-run to derive it.
+  useEffect(() => {
+    const firstSection = sections[0]?.stableKey ?? null;
+    const firstQuestionUid = firstSection
+      ? (questionsBySection[firstSection] ?? [])[0]?.uid ?? null
+      : null;
+    resetSelection(firstSection, firstQuestionUid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Default focused question when the section changes.
   useEffect(() => {

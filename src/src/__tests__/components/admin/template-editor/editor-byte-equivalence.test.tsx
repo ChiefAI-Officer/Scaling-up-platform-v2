@@ -1200,4 +1200,95 @@ describe("editor byte-equivalence guard", () => {
       errSpy.mockRestore();
     }
   });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // ED3 Task 3 — CHARACTERIZATION of the CURRENT question-selection behavior
+  // across a tab switch, BEFORE selection is lifted into useEditorSelection.
+  //
+  // Today selection (`focusedQuestionUid` + `selectedSectionStableKey`) is
+  // LOCAL state inside QuestionsTab. The Questions `TabsContent` is NOT
+  // force-mounted, so leaving the tab UNMOUNTS QuestionsTab and returning
+  // REMOUNTS it — which RESETS selection to its initial value: the FIRST
+  // section (S1) and, via the section-change effect, the first question of
+  // that section (S1_q1). This test pins that reset so the lift (which moves
+  // the state ABOVE QuestionsTab, where it would otherwise PERSIST across the
+  // remount) must reproduce it exactly.
+  it("selection resets to the initial focus (S1 / first question) after leaving Questions and coming back — current behavior, ED3-pinned", () => {
+    installFetch();
+    render(<TemplateEditorTabbed {...fixtureA()} />);
+
+    // Open the Questions tab (mounts QuestionsTab → initial focus computed).
+    switchTab(/^Questions$/, "questions");
+
+    // Initial focus: first section S1, first question S1_q1.
+    const list1 = screen.getByTestId("questions-question-list");
+    expect(within(list1).getByTestId("question-card-S1_q1")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(
+      within(list1).getByTestId("question-card-S1_q2"),
+    ).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("questions-config-form")).toHaveTextContent(
+      "Edit Question — S1_q1",
+    );
+    // Section S1 is the selected section.
+    expect(screen.getByTestId("section-nav-item-S1")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+
+    // Move selection AWAY from the initial: focus a non-default question
+    // (S1_q2) …
+    act(() => {
+      fireEvent.click(
+        within(within(list1).getByTestId("question-card-S1_q2")).getByRole(
+          "button",
+          { name: /^Edit$/ },
+        ),
+      );
+    });
+    expect(within(list1).getByTestId("question-card-S1_q2")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(screen.getByTestId("questions-config-form")).toHaveTextContent(
+      "Edit Question — S1_q2",
+    );
+
+    // … and switch to a DIFFERENT section (S2), which focuses its own first
+    // question (S2_q3). Selection is now well away from the initial state.
+    act(() => {
+      fireEvent.click(screen.getByTestId("section-nav-item-S2"));
+    });
+    expect(screen.getByTestId("section-nav-item-S2")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(screen.getByTestId("questions-config-form")).toHaveTextContent(
+      "Edit Question — S2_q3",
+    );
+
+    // Leave Questions → Scoring, then come back to Questions.
+    switchTab(/Scoring & Tiers/, "scoring");
+    switchTab(/^Questions$/, "questions");
+
+    // CURRENT behavior: focus RESET to the initial focus (S1_q1), NOT the
+    // last-focused S1_q2; the selected section is back to S1.
+    const list2 = screen.getByTestId("questions-question-list");
+    expect(within(list2).getByTestId("question-card-S1_q1")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+    expect(
+      within(list2).getByTestId("question-card-S1_q2"),
+    ).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("questions-config-form")).toHaveTextContent(
+      "Edit Question — S1_q1",
+    );
+    expect(screen.getByTestId("section-nav-item-S1")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
 });

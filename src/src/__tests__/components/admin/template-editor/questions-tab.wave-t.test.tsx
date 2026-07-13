@@ -23,10 +23,11 @@ import {
 } from "@testing-library/react";
 
 import {
-  QuestionsTab,
   hydrateQuestionsFromJson,
   type QuestionDraft,
 } from "@/components/admin/template-editor/QuestionsTab";
+// ED3 Task 3 — selection lifted out of QuestionsTab; harness supplies it.
+import { QuestionsTabHarness } from "./questions-tab-harness";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 
 // ────────────────────────────────────────────────────────────────────────
@@ -96,7 +97,7 @@ function renderTab(opts: RenderOpts) {
   const onDuplicateQuestion = jest.fn();
   const onReorderQuestions = jest.fn();
   const utils = render(
-    <QuestionsTab
+    <QuestionsTabHarness
       sections={sections}
       questions={opts.questions}
       onAddQuestion={onAddQuestion}

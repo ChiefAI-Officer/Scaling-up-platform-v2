@@ -68,6 +68,7 @@ import {
   genNewQuestionStableKey,
   type QuestionDraft,
 } from "@/components/admin/template-editor/QuestionsTab";
+import type { EditorSelection } from "@/components/admin/template-editor/hooks/useEditorSelection";
 import {
   QuestionSerializationError,
 } from "@/components/admin/template-editor/question-serialization";
@@ -269,7 +270,16 @@ export function TabbedShell({
   conditionalAuthoringEnabled = false,
   testModeEnabled = false,
   safeToPublishEnabled = false,
-}: TabbedShellProps) {
+  selection,
+}: TabbedShellProps & {
+  /**
+   * ED3 (spec 19ae, Task 3) — the lifted question-selection state, injected
+   * by TemplateEditorController via `useEditorSelection()`. NOT part of the
+   * public `TabbedShellProps` (the edit page never passes it); TabbedShell
+   * forwards its fields to `QuestionsTab`.
+   */
+  selection: EditorSelection;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -1303,6 +1313,11 @@ export function TabbedShell({
               publishedOptionKeys={publishedOptionKeys}
               findingsEnabled={findingsEnabled}
               conditionalEnabled={conditionalAuthoringEnabled}
+              selectedSectionStableKey={selection.selectedSectionStableKey}
+              setSelectedSectionStableKey={selection.setSelectedSectionStableKey}
+              focusedQuestionUid={selection.focusedQuestionUid}
+              setFocusedQuestionUid={selection.setFocusedQuestionUid}
+              resetSelection={selection.resetSelection}
             />
           </div>
         </TabsContent>
