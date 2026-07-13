@@ -28,7 +28,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import { buildVersionScoringPayload } from "@/components/admin/template-editor/build-version-payload";
+import { QuestionSerializationError } from "@/components/admin/template-editor/question-serialization";
 import type { MetadataTabValues } from "@/components/admin/template-editor/MetadataTab";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 import {
@@ -72,10 +75,14 @@ export function useTemplateEditorDraft({
   template,
   version,
   publishedQuestionKeys,
+  publishedOptionKeys,
   questionEditorUnlocked,
+  onSaveDraft,
   initialDirtyFlags,
 }: UseTemplateEditorDraftArgs) {
   const { toast } = useToast();
+  const router = useRouter();
+  const isPublished = version.publishedAt !== null;
 
   // ─── Cross-tab dirty state ────────────────────────────────────────────
   const [dirtyFlags, setDirtyFlags] = useState<DirtyFlags>(
@@ -497,6 +504,223 @@ export function useTemplateEditorDraft({
     };
   }, [isAnyDirty]);
 
+  // ─── Save Draft (lifted from TabbedShell — ED3 T4c) ───
+  const handleSaveDraft = useCallback(async () => {
+    if (isPublished || savingDraft) return;
+    if (!isAnyDirty) return;
+    setSavingDraft(true);
+    try {
+      // F2: per-surface PATCH dispatch.
+      // Template-level dirty (metadata) → PATCH /api/admin/assessment-templates/{id}
+      // Version-level dirty (version + sections) → PATCH /api/admin/.../versions/{versionId}
+      const needsVersionPatch =
+        Boolean(dirtyFlags.version) ||
+        Boolean(dirtyFlags.sections) ||
+        Boolean(dirtyFlags.questions) ||
+        Boolean(dirtyFlags.scoringConfig);
+
+      // Serialize the version payloads BEFORE dispatching any fetch so a
+      // serializer guard violation (Wave T) aborts the whole save without
+      // a partial write.
+      let sectionsPayload: unknown = null;
+      let questionsPayload: unknown = null;
+      // Wave T §T-3 — slug keys assigned at THIS save (uid → stableKey),
+      // applied back to state after a successful PATCH.
+      let assignedKeys: Map<string, string> = new Map();
+      if (needsVersionPatch) {
+        // Assemble sections + questions via the SHARED helper (spec 19ac C2)
+        // so editor Test Mode scores byte-identically what Save persists —
+        // ONE seam, real dirty flags (not forced). Sections: not-dirty →
+        // rawSectionsRef passthrough; dirty → rebuilt (spread raw first,
+        // preserving description/partLabel/domain + unknown fields, so SU
+        // Full per-domain scoring survives a questions-only save). Questions
+        // (Wave T §T-3): per-type serialization, scale only on sliders /
+        // options only on MULTI_CHOICE, D8 slug keys for new-to-draft rows,
+        // inherited key/type/option-key locks re-checked client-side.
+        try {
+          const built = buildVersionScoringPayload({
+            questions,
+            sections,
+            rawQuestions: rawQuestionsRef.current,
+            rawSections: rawSectionsRef.current,
+            scoringConfig: scoringConfigRef.current,
+            publishedKeys: new Set(publishedQuestionKeys),
+            publishedOptionKeys,
+            dirty: {
+              questions: Boolean(dirtyFlags.questions),
+              sections: Boolean(dirtyFlags.sections),
+            },
+          });
+          questionsPayload = built.questions;
+          sectionsPayload = built.sections;
+          assignedKeys = built.assignedKeys;
+        } catch (e) {
+          if (e instanceof QuestionSerializationError) {
+            toast({
+              title: "Could not save draft",
+              description: e.message,
+              variant: "destructive",
+            });
+            return;
+          }
+          throw e;
+        }
+      }
+
+      const ops: Array<Promise<{ ok: boolean; status: number; surface: string }>> = [];
+
+      if (dirtyFlags.metadata) {
+        const body: Record<string, unknown> = {
+          name: templateValues.name,
+          description:
+            templateValues.description.length > 0
+              ? templateValues.description
+              : null,
+          invitationSubject: templateValues.invitationSubject,
+          invitationBodyMarkdown: templateValues.invitationBodyMarkdown,
+          aggregationMode: templateValues.aggregationMode,
+          resultsEmailSubject:
+            templateValues.resultsEmailSubject.length > 0
+              ? templateValues.resultsEmailSubject
+              : null,
+          resultsEmailBodyMarkdown:
+            templateValues.resultsEmailBodyMarkdown.length > 0
+              ? templateValues.resultsEmailBodyMarkdown
+              : null,
+          resultsEmailContentApproved:
+            templateValues.resultsEmailContentApproved,
+        };
+        ops.push(
+          fetch(`/api/admin/assessment-templates/${template.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          }).then((r) => ({
+            ok: r.ok,
+            status: r.status,
+            surface: "metadata",
+          })),
+        );
+      }
+
+      if (needsVersionPatch) {
+        const body: Record<string, unknown> = {
+          questions: questionsPayload,
+          sections: sectionsPayload,
+          scoringConfig: scoringConfigRef.current,
+          reportConfig: reportConfigRef.current,
+        };
+        if (dirtyFlags.version) {
+          body.language = versionValues.language;
+        }
+        ops.push(
+          fetch(
+            `/api/admin/assessment-templates/${template.id}/versions/${version.id}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            },
+          ).then((r) => ({
+            ok: r.ok,
+            status: r.status,
+            surface: "version",
+          })),
+        );
+      }
+
+      const results = await Promise.all(ops);
+      const failed = results.find((r) => !r.ok);
+      if (failed) {
+        toast({
+          title: "Could not save draft",
+          description: `Save failed (${failed.surface}). Please try again.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Optional test/observability hook.
+      await onSaveDraft?.();
+
+      // Wave T (adversarial-review fix) — the version PATCH just persisted
+      // these payloads, so they ARE the stored truth now. Without this, the
+      // refs keep the page-load rows and the NEXT save with that surface
+      // not-dirty (e.g. a sections-only save after adding questions) would
+      // pass the STALE rows through and silently delete the just-saved
+      // content.
+      if (needsVersionPatch) {
+        rawQuestionsRef.current = Array.isArray(questionsPayload)
+          ? (questionsPayload as unknown[])
+          : rawQuestionsRef.current;
+        rawSectionsRef.current = Array.isArray(sectionsPayload)
+          ? (sectionsPayload as unknown[])
+          : rawSectionsRef.current;
+      }
+
+      // Wave T — the slug keys assigned at this save become the rows'
+      // permanent stableKeys (immutable from here on, ADR-0020). Options on
+      // MULTI_CHOICE rows are synced from the persisted payload in the same
+      // pass (isNew:false + their derived keys) so an option-label rename on
+      // a later save can never re-derive (change) an already-persisted
+      // option key.
+      if (needsVersionPatch && Array.isArray(questionsPayload)) {
+        const applied = assignedKeys;
+        const persistedByKey = new Map<string, Record<string, unknown>>();
+        for (const row of questionsPayload as unknown[]) {
+          if (row && typeof row === "object") {
+            const r = row as Record<string, unknown>;
+            if (typeof r.stableKey === "string") persistedByKey.set(r.stableKey, r);
+          }
+        }
+        setQuestions((prev) =>
+          prev.map((q) => {
+            const finalKey = applied.get(q.uid) ?? q.stableKey;
+            const persisted = persistedByKey.get(finalKey);
+            const persistedOptions = Array.isArray(persisted?.options)
+              ? (persisted!.options as Array<{ key: string; label: string }>).map(
+                  (o) => ({ key: o.key, label: o.label, isNew: false }),
+                )
+              : q.options;
+            if (finalKey === q.stableKey && persistedOptions === q.options) {
+              return q;
+            }
+            return { ...q, stableKey: finalKey, options: persistedOptions };
+          }),
+        );
+      }
+
+      // Clear dirty flags on success.
+      setDirtyFlags({});
+      toast({ title: "Draft saved" });
+      router.refresh();
+    } catch (e) {
+      toast({
+        title: "Could not save draft",
+        description: e instanceof Error ? e.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingDraft(false);
+    }
+  }, [
+    dirtyFlags,
+    isAnyDirty,
+    isPublished,
+    onSaveDraft,
+    publishedOptionKeys,
+    publishedQuestionKeys,
+    questions,
+    router,
+    savingDraft,
+    sections,
+    template.id,
+    templateValues,
+    toast,
+    version.id,
+    versionValues,
+  ]);
+
   return {
     // ─── State ───
     templateValues,
@@ -537,10 +761,7 @@ export function useTemplateEditorDraft({
     handleDeleteQuestion,
     handleDuplicateQuestion,
     handleReorderQuestions,
-    // ─── Transitional raw setters (T4b→T4c) — consumed by handleSaveDraft,
-    //     which still lives in TabbedShell until it is lifted in T4c. ───
-    setQuestions,
-    setDirtyFlags,
-    setSavingDraft,
+    // ─── Save ───
+    handleSaveDraft,
   };
 }
