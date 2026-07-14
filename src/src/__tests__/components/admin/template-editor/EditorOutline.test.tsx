@@ -689,3 +689,35 @@ describe("EditorOutline — collapse persists across unmount (ED5 Task 3, audit 
     expect(screen.queryByTestId("question-card-S1_q1")).toBeNull();
   });
 });
+
+describe("EditorOutline — Logic map trigger (ED5 Task 8, B-1b)", () => {
+  it("shows the Logic map trigger when conditionalEnabled", () => {
+    renderOutline({ conditionalEnabled: true });
+    expect(
+      screen.getByTestId("editor-outline-logic-map-trigger"),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the Logic map trigger when conditionalEnabled is false", () => {
+    renderOutline({ conditionalEnabled: false });
+    expect(
+      screen.queryByTestId("editor-outline-logic-map-trigger"),
+    ).toBeNull();
+  });
+
+  it("clicking the trigger opens the read-only Logic map drawer", () => {
+    renderOutline({ conditionalEnabled: true });
+    expect(screen.queryByRole("dialog", { name: "Logic map" })).toBeNull();
+    fireEvent.click(screen.getByTestId("editor-outline-logic-map-trigger"));
+    expect(
+      screen.getByRole("dialog", { name: "Logic map" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the trigger in the empty-sections state too, when conditionalEnabled", () => {
+    renderOutline({ conditionalEnabled: true, sections: [] });
+    expect(
+      screen.getByTestId("editor-outline-logic-map-trigger"),
+    ).toBeInTheDocument();
+  });
+});

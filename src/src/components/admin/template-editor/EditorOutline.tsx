@@ -51,7 +51,7 @@
  * no surviving questions left.
  */
 
-import React, { useLayoutEffect, useMemo, useRef } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -78,6 +78,7 @@ import {
   computeSurvivorFocus,
   findShowIfDependents,
 } from "./question-commands";
+import { LogicMapDrawer } from "./LogicMapDrawer";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -284,6 +285,28 @@ export function EditorOutline({
   onReorderQuestions,
   onGoToSections,
 }: EditorOutlineProps) {
+  // ED5 Task 8 (B-1b) — read-only "Logic map" drawer, gated on the Wave-W
+  // conditional flag exactly like the row badges above.
+  const [logicMapOpen, setLogicMapOpen] = useState(false);
+  const logicMapTrigger = conditionalEnabled ? (
+    <button
+      type="button"
+      data-testid="editor-outline-logic-map-trigger"
+      onClick={() => setLogicMapOpen(true)}
+      className="wf-btn wf-btn-secondary wf-btn-sm"
+    >
+      Logic map
+    </button>
+  ) : null;
+  const logicMapDrawer = (
+    <LogicMapDrawer
+      open={logicMapOpen}
+      onClose={() => setLogicMapOpen(false)}
+      sections={sections}
+      questions={questions}
+    />
+  );
+
   // Group + sort questions by section (identical semantics to QuestionsTab).
   const questionsBySection = useMemo(() => {
     const out: Record<string, QuestionDraft[]> = {};
@@ -401,7 +424,10 @@ export function EditorOutline({
         style={{ padding: "1rem" }}
         data-testid="editor-outline"
       >
-        <h3 className="wf-card-title">Outline</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="wf-card-title">Outline</h3>
+          {logicMapTrigger}
+        </div>
         <div
           data-testid="editor-outline-empty"
           className="text-xs italic text-muted-foreground py-4 space-y-2"
@@ -416,6 +442,7 @@ export function EditorOutline({
             Go to Sections
           </button>
         </div>
+        {logicMapDrawer}
       </section>
     );
   }
@@ -426,7 +453,10 @@ export function EditorOutline({
       style={{ padding: "1rem" }}
       data-testid="editor-outline"
     >
-      <h3 className="wf-card-title">Outline</h3>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="wf-card-title">Outline</h3>
+        {logicMapTrigger}
+      </div>
 
       <ul className="space-y-3">
         {sections.map((s) => {
@@ -528,6 +558,7 @@ export function EditorOutline({
           );
         })}
       </ul>
+      {logicMapDrawer}
     </section>
   );
 }
