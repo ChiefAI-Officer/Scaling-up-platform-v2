@@ -431,7 +431,8 @@ export function EditorOutline({
                     )}
                   </span>
                   <span className="text-[0.625rem] text-muted-foreground whitespace-nowrap">
-                    {list.length}
+                    {list.filter((lq) => lq.label.trim() !== "").length}/
+                    {list.length} labeled
                   </span>
                 </button>
               </div>

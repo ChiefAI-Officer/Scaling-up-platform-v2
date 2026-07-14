@@ -290,6 +290,20 @@ describe("EditorOutline — nested tree", () => {
     // Toggling the header never focuses a question.
     expect(setFocusedSpy).not.toHaveBeenCalled();
   });
+
+  it("section header shows a labeled/total counter, not a raw question count (ED5 Task 6)", () => {
+    renderOutline({
+      questions: [
+        q("u1", "S1_q1", "S1", 1, { label: "Real label" }),
+        q("u2", "S1_q2", "S1", 2, { label: "   " }), // whitespace-only ⇒ unlabeled
+        q("u3", "S1_q3", "S1", 3),
+      ],
+      sections: [{ uid: "s1", stableKey: "S1", name: "Section One" }],
+    });
+
+    const s1 = screen.getByTestId("outline-section-S1");
+    expect(within(s1).getByText("2/3 labeled")).toBeInTheDocument();
+  });
 });
 
 describe("EditorOutline — focus", () => {
