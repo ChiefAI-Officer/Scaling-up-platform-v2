@@ -306,6 +306,43 @@ describe("EditorOutline — nested tree", () => {
   });
 });
 
+describe("EditorOutline — show-if row badges (ED5 Task 7, B-1a)", () => {
+  function showIfFixture(): QuestionDraftRow[] {
+    return [
+      q("ug", "S1_gate", "S1", 1, { type: "MULTI_CHOICE" }),
+      q("u1", "S1_q1", "S1", 2, {
+        showIf: { questionKey: "S1_gate", optionKey: "a" },
+      }),
+      q("u2", "S1_q2", "S1", 3, {
+        showIf: { questionKey: "S1_gate", optionKey: "a" },
+      }),
+    ];
+  }
+
+  it("a question with showIf shows a 'conditional' badge when conditionalEnabled", () => {
+    renderOutline({ questions: showIfFixture(), conditionalEnabled: true });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    expect(within(row).getByText("conditional")).toBeInTheDocument();
+  });
+
+  it("a gate with N dependents shows a 'gate (N)' badge when conditionalEnabled", () => {
+    renderOutline({ questions: showIfFixture(), conditionalEnabled: true });
+
+    const gateRow = screen.getByTestId("question-card-S1_gate");
+    expect(within(gateRow).getByText("gate (2)")).toBeInTheDocument();
+    // The gate itself carries no showIf, so it gets no "conditional" badge.
+    expect(within(gateRow).queryByText("conditional")).toBeNull();
+  });
+
+  it("neither badge renders when conditionalEnabled is false", () => {
+    renderOutline({ questions: showIfFixture(), conditionalEnabled: false });
+
+    expect(screen.queryByText("conditional")).toBeNull();
+    expect(screen.queryByText(/^gate \(/)).toBeNull();
+  });
+});
+
 describe("EditorOutline — focus", () => {
   it("clicking a row focuses that question (aria-current)", () => {
     const { setFocusedSpy } = renderOutline();

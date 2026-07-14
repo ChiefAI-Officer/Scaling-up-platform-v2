@@ -130,6 +130,21 @@ interface SortableOutlineRowProps {
   /** ED5 Task 5 — registers this row's focus button into the parent's DOM
    *  focus-ref map, keyed by uid (survives a blank stableKey pre-save). */
   registerFocusRef: (el: HTMLButtonElement | null) => void;
+  /**
+   * ED5 Task 7 (B-1a) — Wave W show-if awareness in the outline. `true` when
+   * this row's own `showIf` is set (it renders conditionally); `showIf`
+   * itself is only ever authored when `conditionalEnabled`, so this is
+   * already flag-gated by construction at the call site.
+   */
+  showConditionalBadge: boolean;
+  /**
+   * ED5 Task 7 (B-1a) — count of OTHER questions whose `showIf.questionKey`
+   * points at this row (via the shared `findShowIfDependents`, same
+   * predicate the delete-confirm dependents warning uses). Zero ⇒ no badge.
+   * Flag-gated at the call site (always 0 when `conditionalEnabled` is
+   * false).
+   */
+  gateDependentCount: number;
 }
 
 function SortableOutlineRow({
@@ -140,6 +155,8 @@ function SortableOutlineRow({
   onDuplicate,
   onDelete,
   registerFocusRef,
+  showConditionalBadge,
+  gateDependentCount,
 }: SortableOutlineRowProps) {
   const {
     attributes,
@@ -206,6 +223,16 @@ function SortableOutlineRow({
             <span className="inline-flex items-center px-1 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide rounded bg-success/10 text-success">
               {question.type}
             </span>
+            {showConditionalBadge && (
+              <span className="inline-flex items-center px-1 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide rounded bg-primary/10 text-primary">
+                conditional
+              </span>
+            )}
+            {gateDependentCount > 0 && (
+              <span className="inline-flex items-center px-1 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide rounded bg-warning/10 text-warning">
+                gate ({gateDependentCount})
+              </span>
+            )}
           </span>
           <span className="block text-xs text-foreground truncate">
             {question.label || (
@@ -467,6 +494,14 @@ export function EditorOutline({
                                 if (el) rowFocusRefs.current.set(q.uid, el);
                                 else rowFocusRefs.current.delete(q.uid);
                               }}
+                              showConditionalBadge={
+                                conditionalEnabled && !!q.showIf
+                              }
+                              gateDependentCount={
+                                conditionalEnabled
+                                  ? findShowIfDependents(questions, q).length
+                                  : 0
+                              }
                             />
                           ))}
                         </ul>
