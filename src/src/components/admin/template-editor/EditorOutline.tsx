@@ -70,13 +70,15 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  useDroppable,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import { resolveOutlineDrop } from "./outline-drop";
 import {
   SortableContext,
-  arrayMove,
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
@@ -165,7 +167,11 @@ export interface EditorOutlineProps {
    * an INHERITED question via the shared `buildMoveQuestionPrompt` (empty
    * string ⇒ skip the confirm entirely).
    */
-  onMoveQuestion: (uid: string, targetSectionKey: string) => void;
+  onMoveQuestion: (
+    uid: string,
+    targetSectionKey: string,
+    index?: number,
+  ) => void;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -205,6 +211,24 @@ interface SortableOutlineRowProps {
   otherSections: readonly Pick<SectionDraft, "uid" | "stableKey" | "name">[];
   /** ED5 Task 11 (B-3) — the row's own confirm-then-call handler. */
   onMove: (targetSectionKey: string) => void;
+}
+
+/** ED5 T20 (B-3) — makes a section's question area a drop target so a question
+ *  can be dragged INTO it (including an empty section). The droppable id is the
+ *  section stableKey, which `resolveOutlineDrop` recognises as a container. */
+function SectionDroppable({
+  sectionKey,
+  children,
+}: {
+  sectionKey: string;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef } = useDroppable({ id: sectionKey });
+  return (
+    <div ref={setNodeRef} data-testid={`outline-section-droppable-${sectionKey}`}>
+      {children}
+    </div>
+  );
 }
 
 function SortableOutlineRow({
@@ -448,16 +472,51 @@ export function EditorOutline({
     }),
   );
 
-  const handleDragEnd = (sectionKey: string, event: DragEndEvent) => {
+  // ED5 T20 (B-3) — ONE multi-container drag handler for the whole outline.
+  // Builds the per-section uid map and delegates the reorder-vs-move decision to
+  // the pure, tested `resolveOutlineDrop`; dispatches to the shared reorder/move
+  // commands. Within-section reorder semantics are unchanged (the frozen guard +
+  // parity suite pin them). Focus unchanged on reorder (G10).
+  const handleMultiDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const list = questionsBySection[sectionKey] ?? [];
-    const oldIndex = list.findIndex((q) => q.uid === String(active.id));
-    const newIndex = list.findIndex((q) => q.uid === String(over.id));
-    if (oldIndex < 0 || newIndex < 0) return;
-    const newOrderUids = arrayMove(list, oldIndex, newIndex).map((q) => q.uid);
-    onReorderQuestions(sectionKey, newOrderUids);
-    // Focus unchanged on reorder (G10).
+    if (!over) return;
+    const containers: Record<string, string[]> = {};
+    for (const s of sections) {
+      containers[s.stableKey] = (questionsBySection[s.stableKey] ?? []).map(
+        (q) => q.uid,
+      );
+    }
+    const result = resolveOutlineDrop(
+      String(active.id),
+      String(over.id),
+      containers,
+    );
+    if (!result) return;
+    if (result.kind === "reorder") {
+      onReorderQuestions(result.sectionKey, result.order);
+    } else {
+      onMoveQuestion(result.uid, result.targetSectionKey, result.index);
+    }
+  };
+
+  // SR announcements name the question's LABEL/key, not its random uid (ED5 T13
+  // a11y item, folded in here where the single DndContext lives).
+  const nameForUid = (id: string): string => {
+    const q = questions.find((qq) => qq.uid === id);
+    return q ? q.label.trim() || q.stableKey || "question" : "question";
+  };
+  const dndAnnouncements: Announcements = {
+    onDragStart: ({ active }) => `Picked up ${nameForUid(String(active.id))}.`,
+    onDragOver: ({ active, over }) =>
+      over
+        ? `${nameForUid(String(active.id))} is over ${String(over.id)}.`
+        : undefined,
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `Moved ${nameForUid(String(active.id))}.`
+        : `${nameForUid(String(active.id))} was dropped.`,
+    onDragCancel: ({ active }) =>
+      `Cancelled moving ${nameForUid(String(active.id))}.`,
   };
 
   // ── Section commands (ED5 Task 9, B-2) ──────────────────────────────────
@@ -660,8 +719,14 @@ export function EditorOutline({
         </div>
       </div>
 
-      <ul className="space-y-3">
-        {sections.map((s, idx) => {
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleMultiDragEnd}
+        accessibility={{ announcements: dndAnnouncements }}
+      >
+        <ul className="space-y-3">
+          {sections.map((s, idx) => {
           const list = questionsBySection[s.stableKey] ?? [];
           const expanded = isExpanded(s.stableKey);
           // ED5 Task 11 (B-3) — every OTHER section, for this section's rows'
@@ -740,20 +805,16 @@ export function EditorOutline({
 
               {expanded ? (
                 <div className="pl-4 pt-1.5 space-y-1.5">
-                  {list.length === 0 ? (
-                    <p className="text-[0.6875rem] italic text-muted-foreground py-1">
-                      No questions in this section.
-                    </p>
-                  ) : (
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={(e) => handleDragEnd(s.stableKey, e)}
-                    >
-                      <SortableContext
-                        items={list.map((q) => q.uid)}
-                        strategy={verticalListSortingStrategy}
-                      >
+                  <SortableContext
+                    items={list.map((q) => q.uid)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <SectionDroppable sectionKey={s.stableKey}>
+                      {list.length === 0 ? (
+                        <p className="text-[0.6875rem] italic text-muted-foreground py-1">
+                          No questions in this section.
+                        </p>
+                      ) : (
                         <ul className="space-y-1.5">
                           {list.map((q) => (
                             <SortableOutlineRow
@@ -783,9 +844,9 @@ export function EditorOutline({
                             />
                           ))}
                         </ul>
-                      </SortableContext>
-                    </DndContext>
-                  )}
+                      )}
+                    </SectionDroppable>
+                  </SortableContext>
 
                   <button
                     type="button"
@@ -805,7 +866,8 @@ export function EditorOutline({
             </li>
           );
         })}
-      </ul>
+        </ul>
+      </DndContext>
       {logicMapDrawer}
     </section>
   );

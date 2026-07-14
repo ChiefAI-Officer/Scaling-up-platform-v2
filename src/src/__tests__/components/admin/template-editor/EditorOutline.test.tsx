@@ -1062,4 +1062,20 @@ describe("EditorOutline — move to section (ED5 Task 11, B-3)", () => {
     const select = within(row).getByLabelText("Move to section");
     expect(select).toBeDisabled();
   });
+
+  describe("ED5 T20 — multi-container dnd structure (B-3)", () => {
+    it("renders a drop target (droppable) for each expanded section", () => {
+      renderOutline();
+      // Both sections expanded by default → each exposes a droppable so a
+      // question can be dragged INTO it (including an empty one). The
+      // reorder-vs-move decision itself is unit-tested in outline-drop.test.ts;
+      // within-section reorder byte-equivalence is pinned by the frozen guard.
+      expect(
+        screen.getByTestId("outline-section-droppable-S1"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("outline-section-droppable-S2"),
+      ).toBeInTheDocument();
+    });
+  });
 });
