@@ -1,7 +1,9 @@
 # Wave ED5 — editor-overhaul polish (arc close-out) — DESIGN
 
-> Status: DRAFT (brainstorm + grill-with-docs DONE; awaiting /co-validate + user approval).
-> Gated wave. NO code until /co-validate (real Codex) + user approval land.
+> Status: DRAFT (brainstorm + grill-with-docs + /co-validate DONE; awaiting user approval).
+> Gated wave. NO code until user approval lands.
+> /co-validate (real Codex GPT-5.5, thread `019f6066`) + own independent review: 6 findings accepted,
+> 1 (cross-section drag) surfaced to the user who chose to KEEP it hardened. See changelog at end.
 > Spec prefix `19ag` (design here; implementation plan → `19ag-plan-wave5-polish.md` via writing-plans).
 
 ## Goal
@@ -38,6 +40,25 @@ Flag-off byte-identity of the Questions surface is preserved by construction (W5
 question add/dup/delete/reorder semantics), pinned by the frozen ED3 guard (15) + the ED4
 parameterized parity suite (19).
 
+**Honest rollback (co-validate C5).** Flipping `WAVE_ED4_THREE_PANE_ENABLED` off restores ONLY the
+Questions authoring surface; the flagless half (cascade section-delete, tier-band bar + client tier
+validation) **stays active** on the Sections + Scoring tabs. There is no single "undo W5" lever. To
+make each flagless piece independently reversible, land the wave as **~3 separate PRs**, each a
+coherent revert unit:
+  - **PR-A (three-pane polish + shared model, flag-gated UI):** A-1/A-2/A-3, B-1, B-2 (outline CRUD),
+    B-4, bucket C, `moveQuestionToSection` command + explicit control, the `deleteSection` command,
+    `collapse` slice, focus-rule helper. Kill = ED4 flag off + redeploy (UI gone; the two commands sit
+    inert). Note: `deleteSection` is wired to BOTH surfaces here (see PR-B split below).
+  - **PR-B (global cascade wiring — flagless):** route the legacy Sections tab through `deleteSection`
+    + its updated confirm/test. Isolated so the Sections-tab behavior change can be reverted alone
+    without touching the three-pane. (The command itself lands in PR-A; PR-B only flips the Sections
+    tab's call site.)
+  - **PR-C (tier-band bar + domain-aware client validation — flagless):** Scoring tab only. Revertible
+    alone.
+  - **PR-D (cross-section multi-container drag — flag-gated, highest risk):** isolated so a stuck or
+    regressing dnd restructure can't block the rest of the arc close (co-validate C4 / own M4; kept
+    per user decision, hardened per below).
+
 ## Locked design (brainstorm + grill-with-docs)
 
 ### A — polish
@@ -46,16 +67,21 @@ parameterized parity suite (19).
   `threePaneEnabled` and `questions.length > 0`. Fires exactly once (the controller mounts once and
   survives tab switches), so it never clobbers a persisted focus on Edit-tab re-entry. Empty templates
   keep the empty state.
-- **A-2 answered/total counter.** Restore the per-section `answered/total` fraction in `EditorOutline`
-  (answered = non-empty label — the authoring-completeness semantic `QuestionsTab` used), replacing the
-  raw question count.
-- **A-3 canvas/preview stale state.** Resolved by B-4 (key the inspector preview by uid).
+- **A-2 authoring-completeness counter.** Restore the per-section fraction the legacy `QuestionsTab`
+  showed, using **authoring-appropriate wording — "N/total labeled" (not "answered")** (own M6):
+  "labeled" = questions with a non-empty label. "Answered" is respondent vocabulary and would confuse
+  authors. Replaces `EditorOutline`'s raw question count.
+- **A-3 canvas/preview stale state.** Resolved by B-4 — key BOTH the canvas and the inspector preview
+  by `uid + shapeSignature` (co-validate C1: `key={uid}` alone would NOT reset a stale sample when the
+  focused question's type/options/scale change).
 
 ### B — features
 - **B-1 Show-if visibility.** (a) Outline **row badges**: "conditional" (has a `showIf`) and "gate
   (N)" (N questions depend on it, via the shared `findShowIfDependents`). (b) A read-only **logic-map
-  drawer** (Test Mode drawer idiom) listing each relationship in plain language
-  (`'<dependent label>' shows only when '<gate label>' = '<option label>'`). Trigger button in the
+  drawer** listing each relationship in plain language
+  (`'<dependent label>' shows only when '<gate label>' = '<option label>'`). Reuse the drawer chrome by
+  **extracting a shared Drawer shell from `TestModeDrawer`** (or an existing UI primitive) rather than
+  building a second bespoke drawer (own M6). Trigger button in the
   **outline toolbar** (flag-on workspace only — never the shared header; preserves the single-shell
   kill guarantee). Badges + drawer render only when `conditionalEnabled` (Wave W flag), matching the
   inspector's ShowIf panel + `computeShowIfGates` gating. Editing stays per-question in the inspector.
@@ -74,6 +100,15 @@ parameterized parity suite (19).
   shared prompt builder `buildSectionDeletePrompt(...)`. **Global**: both the outline and the legacy
   Sections tab call it (one behavior; fixes the orphan bug where a dropped section stranded questions
   with a dangling `sectionStableKey`). Updates the existing Sections-tab delete confirm text + its test.
+   **Integrity does NOT depend on the confirm dialog (co-validate C3):** the cleanup (removing the
+   questions + clearing external show-if dependents) runs ATOMICALLY inside `deleteSection` (one
+   `setState`), never in the confirm handler — a caller that skips the dialog still can't leave a
+   dangling state. **Defense-in-depth:** the save serializer + the publish gate INDEPENDENTLY reject
+   any question whose `sectionStableKey` names a missing section AND any `showIf.questionKey` that
+   references a deleted key, so no bypass path can persist a corrupt draft. **Inherited removal is
+   PHYSICAL deletion from the draft, not a tombstone** — consistent with ADR-0020 (a deleted-then-
+   recreated key becomes a new `_2` suffix series; trend history never silently resurrects). Recorded
+   in ADR-0023.
 - **B-3 Cross-section question move.** New command
   `moveQuestionToSection(uid, targetSectionKey, targetIndex?)` (sets `sectionStableKey`, resequences
   `sortOrder` in the source + target sections). Two entry points, both through this one command:
@@ -84,6 +119,16 @@ parameterized parity suite (19).
     move-vs-within-reorder, `onDragOver` to cross containers, empty sections as drop targets). The
     within-section reorder command semantics stay identical. **This is the wave's highest-risk task**
     (own test surface; flagged for co-validate + extra adversarial testing).
+    - **Kept over both reviews' advice, hardened (co-validate C4 / own M4).** Codex + the independent
+      review both recommended shipping only the explicit control and deferring the drag; the user chose
+      to keep the full restructure. Hardening: (a) extract the drop-resolution as a PURE function
+      `resolveOutlineDrop(active, over, containers) → {kind:'reorder', sectionKey, order} |
+      {kind:'move', uid, targetSectionKey, index}` with exhaustive unit tests (jsdom cannot drive real
+      dnd-kit pointer drag, so the decision logic must not live behind the pointer machinery); the
+      dnd-kit wiring stays thin and calls the existing `reorderQuestions` / new `moveQuestionToSection`
+      commands. (b) The ED3 byte-equivalence guard + ED4 parity suite (which exercise within-section
+      keyboard reorder through the outline) MUST stay byte-green after the restructure. (c) Lands in its
+      OWN PR (PR-D) so a stuck/regressing dnd change can't block the arc close.
   - show-if stays **permissive**: a move that puts a gate after its dependent is caught by the existing
     publish gate (`checkShowIfIntegrity` + routed modal), matching Wave W — not blocked at move time.
   - **B-3 inherited wrinkle:** moving an INHERITED question is **allowed with a warning**
@@ -97,8 +142,9 @@ parameterized parity suite (19).
 - **B-4 Reconcile the double widget — two widgets, distinct roles.**
   - **Canvas** = pure respondent preview ("how a respondent sees it"); NO findings readout.
   - **Inspector "test-a-value" preview** = clearly relabeled "test which finding fires", and **keyed by
-    the focused uid** so its throwaway `sample` resets on focus change (fixes A-3 stale state; today it
-    persists and can bleed a value across questions).
+    `uid + shapeSignature(type, options.length, scale)`** — the SAME reset policy the canvas uses
+    (co-validate C1). Resets its throwaway `sample` on focus change AND when the focused question's
+    widget shape changes; today it persists and can bleed a value across questions/shapes.
   - **DRY:** unify the two near-duplicate draft→widget mappers (`QuestionCanvas.toForInput` +
     `QuestionInspector.FindingsPreview.forInput`) into ONE shared helper `toQuestionForInput(draft,
     opts)` with `opts` for the two intentional divergences (canvas: real `isRequired`, label fallback
@@ -106,9 +152,18 @@ parameterized parity suite (19).
     "Sample answer"/key fallback `__preview__`). Both widgets stay on screen (per grill B-4 choice).
 - **B-5 Drag-to-set tier bands.** A visual band bar with draggable + keyboard-movable dividers ABOVE
   the existing number-input `TierTable` (which stays for precision + a11y). Dragging a shared divider
-  sets the lower tier's `maxMetric` and the upper tier's `minMetric` together, keeping bands contiguous
-  by construction. Snapping honors integer/fractional mode (`getGlobalMetricMode` / per-domain always
-  fractional). Covers **global + per-domain** tiers (the shared `TierTable` makes both nearly free).
+  moves the boundary between two adjacent tiers using the CANONICAL boundary rule (co-validate C2):
+  **fractional mode → `upper.minMetric = lower.maxMetric` (touching); integer mode →
+  `upper.minMetric = lower.maxMetric + 1` (no inclusive overlap).** Setting them equal in integer mode
+  (my original wording) would overlap inclusive bands — wrong. The bar and `validateTierTiling` MUST
+  share ONE canonical boundary-conversion helper (bar-position ↔ tier min/max) so the visual and the
+  validator can never disagree; snapping uses that helper (integer step 1 / fractional metric step).
+  **Dynamic-domain behavior (own M3):** the metric domain shifts as questions are added/removed. When
+  the domain shrinks below an existing boundary, the bar renders the out-of-domain divider CLAMPED to
+  the domain edge and the (now live, see rider) validator flags "tiers don't span the domain"; tier
+  VALUES are never silently rewritten (author fixes them). If no scorable/slider questions exist yet
+  (metric N/A), the bar is not shown (falls to the finite gate below).
+  Covers **global + per-domain** tiers (the shared `TierTable` makes both nearly free).
   Domain bounds: export `computeGlobalTierDomain` (currently un-exported; one line) for global; reuse
   the already-exported `computePerDomainTierContexts` for per-domain. **Bar shown only when
   `domain.max` is finite**; for open-ended-max surfaces (e.g. `overallTotal`, open per-domain ranges),
@@ -121,7 +176,8 @@ parameterized parity suite (19).
 ### C — nice-to-have / polish
 - **Canvas cues:** a small "Preview only — answers here aren't saved" hint; re-key the canvas on
   `uid + shapeSignature(type, options.length, scale)` so an inspector edit that changes the widget
-  SHAPE (type/options/scale) remounts it and drops a now-invalid throwaway value;
+  SHAPE (type/options/scale) remounts it and drops a now-invalid throwaway value (the inspector preview
+  uses the identical `uid + shapeSignature` policy — B-4/co-validate C1);
   `scrollIntoView({ block: "nearest" })` on the focused outline row + canvas on focus/add/duplicate.
 - **Collapse persistence:** lift the section-collapse slice out of `EditorOutline`'s local `useState`
   into `useEditorSelection` so it survives the Edit-tab unmount/remount (today focus persists but
@@ -210,6 +266,16 @@ review, ADR-0023, SoT, Notion).
   multi-container dnd (within + cross) · row badges + logic map · unified mapper + preview keying ·
   focus-rule survivor helper · canvas shape re-key · TierBandBar interaction (global + per-domain,
   finite + open) · client domain-aware tiling validation · auto-focus-once · collapse persistence.
+- **Round-trip persistence tests (co-validate C6 / own M2)** — the paths that can silently corrupt a
+  draft, tested through the serializer + re-hydration (build-version-payload → PATCH body → hydrate),
+  not just at the component/model layer: **cascade-delete → save → reload** (no dangling
+  `sectionStableKey`/show-if survives), **cross-section move → save → reload** (question re-homed with
+  correct `sortOrder`, key/prefix unchanged), and **tier edits → publish validation** (domain-span +
+  contiguity enforced). Both cascade and move set BOTH the sections + questions dirty flags and are
+  covered by a follow-up-save reconciliation test (guards the Wave-T raw-ref class of bug where a
+  sections-only follow-up save dropped questions).
+- **Pure dnd resolution (own M1):** `resolveOutlineDrop(...)` unit-tested exhaustively (reorder vs move,
+  empty-section drop, no-op) independently of dnd-kit pointer machinery.
 - Jest-verify all counts from the summary line (never from memory).
 
 ## Rollout
@@ -237,3 +303,24 @@ safe; per-domain/report-grouping shift on future versions only); (2) section-del
 7. Logic-map drawer → **outline-toolbar trigger, gated on conditional flag**.
 8. Cascade scope → **global** (both outline + Sections tab; fixes orphan bug; flagless, kill=revert).
 9. Docs → **new ADR-0023**; CONTEXT.md untouched.
+
+## Co-validate changelog (real Codex GPT-5.5, thread `019f6066` + own independent review)
+6 findings accepted, 1 surfaced to the user (kept, hardened). Both reviews converged.
+1. **[Codex C1 — ACCEPTED]** `key={uid}` doesn't reset the preview on type/options/scale change → key
+   BOTH canvas + inspector preview on `uid + shapeSignature`. (A-3/B-4/C updated.)
+2. **[Codex C2 + own M3 — ACCEPTED]** Tier divider inclusivity bug (`upper.min = lower.max` overlaps
+   integer bands) → canonical mode-aware boundary conversion shared by bar + `validateTierTiling`; plus
+   dynamic-domain clamp + live error. (B-5 updated.)
+3. **[Codex C3 + own M2 — ACCEPTED]** Cascade integrity must be atomic in `deleteSection`, not in the
+   confirm; save + publish independently reject dangling `sectionStableKey`/show-if; inherited removal
+   is physical (no tombstone, ADR-0020). (B-2b updated.)
+4. **[Codex C4 + own M4 — SURFACED, user KEPT (override), hardened]** Both reviews recommended deferring
+   the cross-section drag (explicit control covers it, top risk for 3 users). User chose to keep the
+   full multi-container restructure; hardened with a pure `resolveOutlineDrop` function, guard-green
+   requirement, and its own PR (PR-D). (B-3 updated.)
+5. **[Codex C5 + own M5 — ACCEPTED]** Rollback overstated (flag-off doesn't revert cascade/tier/
+   validation) → honest rollback statement + ~3 independently-revertible PRs. (Safety/Rollout updated.)
+6. **[Codex C6 + own M1/M2 — ACCEPTED]** Add round-trip persistence tests (cascade→save→reload,
+   move→save→reload, tier→publish) + a pure dnd-resolution unit. (Verification updated.)
+7. **[own M6 — ACCEPTED]** Extract a shared Drawer shell (not a 2nd bespoke drawer); "answered/total"
+   → "labeled/total" wording. (B-1/A-2 updated.)
