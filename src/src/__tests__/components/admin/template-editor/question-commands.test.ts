@@ -18,6 +18,7 @@ import { renderHook, act } from "@testing-library/react";
 import {
   buildDeleteConfirmText,
   buildShowIfDependentsWarning,
+  computeSurvivorFocus,
   findShowIfDependents,
 } from "@/components/admin/template-editor/question-commands";
 import { useTemplateEditorDraft } from "@/components/admin/template-editor/hooks/useTemplateEditorDraft";
@@ -247,5 +248,46 @@ describe("useTemplateEditorDraft — question commands", () => {
     const depAfter = result.current.questions.find((q) => q.uid === dep.uid)!;
     expect(depAfter.sortOrder).toBe(1);
     expect(gateAfter.sortOrder).toBe(2);
+  });
+});
+
+// ── computeSurvivorFocus (ED5 Task 5, audit C — focus rule) ────────────────
+describe("computeSurvivorFocus", () => {
+  const sectionOrder = ["S1", "S2"];
+
+  it("next-in-section — prefers the next sibling by sortOrder", () => {
+    const q1 = draftQuestion({ uid: "q1", sectionStableKey: "S1", sortOrder: 1 });
+    const q2 = draftQuestion({ uid: "q2", sectionStableKey: "S1", sortOrder: 2 });
+    const q3 = draftQuestion({ uid: "q3", sectionStableKey: "S1", sortOrder: 3 });
+    expect(computeSurvivorFocus([q1, q2, q3], sectionOrder, "q1")).toBe("q2");
+  });
+
+  it("last→previous — removing the last sibling in a section focuses the previous one", () => {
+    const q1 = draftQuestion({ uid: "q1", sectionStableKey: "S1", sortOrder: 1 });
+    const q2 = draftQuestion({ uid: "q2", sectionStableKey: "S1", sortOrder: 2 });
+    expect(computeSurvivorFocus([q1, q2], sectionOrder, "q2")).toBe("q1");
+  });
+
+  it("section-empties→nearest section — falls through to the next section in order when the target's section has no survivors left", () => {
+    const q1 = draftQuestion({ uid: "q1", sectionStableKey: "S1", sortOrder: 1 });
+    const q2 = draftQuestion({ uid: "q2", sectionStableKey: "S2", sortOrder: 1 });
+    const q3 = draftQuestion({ uid: "q3", sectionStableKey: "S2", sortOrder: 2 });
+    expect(computeSurvivorFocus([q1, q2, q3], sectionOrder, "q1")).toBe("q2");
+  });
+
+  it("template-empty→null — removing the only remaining question returns null", () => {
+    const q1 = draftQuestion({ uid: "q1", sectionStableKey: "S1", sortOrder: 1 });
+    expect(computeSurvivorFocus([q1], sectionOrder, "q1")).toBeNull();
+  });
+
+  it("cascade (alsoRemoved) — skips also-removed questions when picking the next survivor", () => {
+    const q1 = draftQuestion({ uid: "q1", sectionStableKey: "S1", sortOrder: 1 });
+    const q2 = draftQuestion({ uid: "q2", sectionStableKey: "S1", sortOrder: 2 });
+    const q3 = draftQuestion({ uid: "q3", sectionStableKey: "S1", sortOrder: 3 });
+    // q2 would normally be the "next" survivor, but it's also being removed
+    // in the same cascade — the helper must skip it and land on q3.
+    expect(
+      computeSurvivorFocus([q1, q2, q3], sectionOrder, "q1", ["q2"]),
+    ).toBe("q3");
   });
 });

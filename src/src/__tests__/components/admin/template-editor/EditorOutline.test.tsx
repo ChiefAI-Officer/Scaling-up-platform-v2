@@ -169,6 +169,13 @@ function renderOutline(o: HarnessOverrides = {}) {
       setFocusedSpy(uid);
       setFocused(uid);
     };
+    // Questions live in state (not a fixed prop) so add/duplicate/delete
+    // reflect into the rendered tree exactly like the real model does —
+    // required for the ED5 Task 5 DOM-focus tests, which need the
+    // survivor/new row to actually exist in the DOM after a mutation.
+    const [questions, setQuestions] = useState<QuestionDraftRow[]>(
+      o.questions ?? baseQuestions(),
+    );
     // Collapse slice — model-backed in production (useEditorSelection); a
     // plain local useState here stands in for it (the outline itself no
     // longer owns this state — ED5 Task 3).
@@ -180,10 +187,54 @@ function renderOutline(o: HarnessOverrides = {}) {
       setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
     const setSectionCollapsed = (key: string, collapsed: boolean) =>
       setCollapsedSections((prev) => ({ ...prev, [key]: collapsed }));
+
+    const handleAddQuestion = (sectionKey: string): string => {
+      const impl = o.onAddQuestion ?? (() => "u-new");
+      const newUid = impl(sectionKey);
+      setQuestions((prev) => [
+        ...prev,
+        q(
+          newUid,
+          "",
+          sectionKey,
+          prev.filter((x) => x.sectionStableKey === sectionKey).length + 1,
+        ),
+      ]);
+      return newUid;
+    };
+
+    const handleDuplicateQuestion = (uid: string): string => {
+      const impl = o.onDuplicateQuestion ?? (() => "u-copy");
+      const newUid = impl(uid);
+      const src = questions.find((x) => x.uid === uid);
+      const sectionKey = src?.sectionStableKey ?? "S1";
+      setQuestions((prev) => [
+        ...prev,
+        q(
+          newUid,
+          "",
+          sectionKey,
+          prev.filter((x) => x.sectionStableKey === sectionKey).length + 1,
+        ),
+      ]);
+      return newUid;
+    };
+
+    const handleDeleteQuestion = (
+      uid: string,
+    ): { removedUid: string; affectedDependentUids: string[] } => {
+      const impl =
+        o.onDeleteQuestion ??
+        ((u: string) => ({ removedUid: u, affectedDependentUids: [] }));
+      const res = impl(uid);
+      setQuestions((prev) => prev.filter((x) => x.uid !== res.removedUid));
+      return res;
+    };
+
     return (
       <EditorOutline
         sections={o.sections ?? SECTIONS}
-        questions={o.questions ?? baseQuestions()}
+        questions={questions}
         focusedQuestionUid={focused}
         setFocusedQuestionUid={set}
         isReadOnly={o.isReadOnly ?? false}
@@ -192,12 +243,9 @@ function renderOutline(o: HarnessOverrides = {}) {
         isSectionCollapsed={isSectionCollapsed}
         toggleSectionCollapsed={toggleSectionCollapsed}
         setSectionCollapsed={setSectionCollapsed}
-        onAddQuestion={o.onAddQuestion ?? jest.fn(() => "u-new")}
-        onDuplicateQuestion={o.onDuplicateQuestion ?? jest.fn(() => "u-copy")}
-        onDeleteQuestion={
-          o.onDeleteQuestion ??
-          jest.fn((uid: string) => ({ removedUid: uid, affectedDependentUids: [] }))
-        }
+        onAddQuestion={handleAddQuestion}
+        onDuplicateQuestion={handleDuplicateQuestion}
+        onDeleteQuestion={handleDeleteQuestion}
         onReorderQuestions={o.onReorderQuestions ?? jest.fn()}
         onGoToSections={o.onGoToSections ?? jest.fn()}
       />
@@ -437,6 +485,73 @@ describe("EditorOutline — read-only (G4)", () => {
       fireEvent.click(screen.getByTestId("outline-focus-S1_q1"));
     });
     expect(setFocusedSpy).toHaveBeenCalledWith("u1");
+  });
+});
+
+describe("EditorOutline — DOM focus/scroll after mutation (ED5 Task 5, audit C — focus rule)", () => {
+  /**
+   * The model-focus policy above (G10) only ever moved
+   * `focusedQuestionUid` — it never moved real DOM keyboard focus or
+   * scrolled the row into view, so a keyboard/screen-reader user's focus
+   * could be silently dropped (delete → focus falls back to the page) or
+   * left behind (add/duplicate → the new row is off-screen, unfocused).
+   * These tests drive the real mutation path (the harness reflects
+   * add/duplicate/delete into its `questions` state, like the production
+   * model does) and assert `document.activeElement` actually lands on the
+   * new/survivor row's focus button.
+   */
+  it("after Add, DOM focus moves to the new row's focus button", () => {
+    const onAddQuestion = jest.fn(() => "u-added");
+    renderOutline({ onAddQuestion });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-add-question-S2"));
+    });
+
+    const newRowFocusBtn = screen.getByTestId("outline-focus-u-added");
+    expect(document.activeElement).toBe(newRowFocusBtn);
+  });
+
+  it("after Duplicate, DOM focus moves to the copy row's focus button", () => {
+    const onDuplicateQuestion = jest.fn(() => "u-dup");
+    renderOutline({ onDuplicateQuestion });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    act(() => {
+      fireEvent.click(within(row).getByRole("button", { name: "Duplicate" }));
+    });
+
+    const copyRowFocusBtn = screen.getByTestId("outline-focus-u-dup");
+    expect(document.activeElement).toBe(copyRowFocusBtn);
+  });
+
+  it("after Delete of the focused row, DOM focus moves to the surviving sibling row's focus button", () => {
+    renderOutline({ initialFocus: "u1" }); // S1_q1 focused; S1_q2 is the next sibling
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    act(() => {
+      fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    });
+
+    const survivorFocusBtn = screen.getByTestId("outline-focus-S1_q2");
+    expect(document.activeElement).toBe(survivorFocusBtn);
+  });
+
+  it("deleting the LAST surviving focused question moves DOM focus to its section's + Add question control", () => {
+    const onlyQuestion = [q("only", "S1_only", "S1", 1)];
+    renderOutline({
+      sections: [{ uid: "s1", stableKey: "S1", name: "Section One" }],
+      questions: onlyQuestion,
+      initialFocus: "only",
+    });
+
+    const row = screen.getByTestId("question-card-S1_only");
+    act(() => {
+      fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    });
+
+    const addBtn = screen.getByTestId("outline-add-question-S1");
+    expect(document.activeElement).toBe(addBtn);
   });
 });
 

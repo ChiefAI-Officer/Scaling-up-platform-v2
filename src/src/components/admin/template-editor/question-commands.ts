@@ -137,3 +137,42 @@ export function computeShowIfGates(
       options: q.options.map((o) => ({ key: o.key, label: o.label })),
     }));
 }
+
+/**
+ * ED5 (Task 5, audit C — focus rule) — which question should receive focus
+ * after `primaryRemovedUid` (plus any `alsoRemoved` cascade uids) is deleted,
+ * given the PRE-delete question list and the section render order. Prefers
+ * the next sibling in the removed question's own section (by `sortOrder`),
+ * else the previous sibling in that section, else the nearest surviving
+ * question in section order, else `null` when the template has no questions
+ * left. Pure — `EditorOutline` applies both the model focus
+ * (`setFocusedQuestionUid`) and the DOM keyboard focus/scroll from the
+ * result.
+ */
+export function computeSurvivorFocus(
+  questions: readonly Pick<QuestionDraftRow, "uid" | "sectionStableKey" | "sortOrder">[],
+  sectionOrder: readonly string[],
+  primaryRemovedUid: string,
+  alsoRemoved: readonly string[] = [],
+): string | null {
+  const removed = new Set([primaryRemovedUid, ...alsoRemoved]);
+  const target = questions.find((q) => q.uid === primaryRemovedUid);
+  const survivors = questions.filter((q) => !removed.has(q.uid));
+  if (survivors.length === 0) return null;
+  const bySection = (sec: string) =>
+    survivors
+      .filter((q) => q.sectionStableKey === sec)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  if (target) {
+    const same = bySection(target.sectionStableKey);
+    const next = same.find((q) => q.sortOrder > target.sortOrder);
+    if (next) return next.uid;
+    const prev = [...same].reverse().find((q) => q.sortOrder < target.sortOrder);
+    if (prev) return prev.uid;
+  }
+  for (const sec of sectionOrder) {
+    const list = bySection(sec);
+    if (list.length) return list[0].uid;
+  }
+  return survivors[0].uid;
+}

@@ -34,9 +34,24 @@
  * by the shared `useEditorSelection` slice (passed in as
  * `isSectionCollapsed`/`toggleSectionCollapsed`/`setSectionCollapsed`) so it
  * survives the same unmount/remount focus already does.
+ *
+ * DOM focus/scroll (ED5 Task 5, audit C — focus rule): the G10 policy above
+ * only ever moved the MODEL's `focusedQuestionUid` — real keyboard/DOM focus
+ * and viewport scroll never followed, so a keyboard or screen-reader user's
+ * focus could be silently dropped (delete sends it to the page top) or left
+ * behind (add/duplicate leaves it on the button that was just clicked while
+ * a new row appears elsewhere). Row focus buttons and each section's
+ * "+ Add question" button register themselves into ref maps; a
+ * `useLayoutEffect` keyed on `questions` applies a "pending focus" target —
+ * set synchronously by the mutation handlers, alongside the model focus
+ * call — once the mutated row list has re-rendered: add/duplicate → the
+ * new/copy row; delete of the FOCUSED row → the survivor computed by the
+ * shared `computeSurvivorFocus` (next sibling, else previous, else nearest
+ * section), or the section's "+ Add question" control when the template has
+ * no surviving questions left.
  */
 
-import React, { useMemo } from "react";
+import React, { useLayoutEffect, useMemo, useRef } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -60,6 +75,7 @@ import type { SectionDraft } from "./SectionsCard";
 import type { QuestionDraftRow } from "./question-serialization";
 import {
   buildQuestionDeletePrompt,
+  computeSurvivorFocus,
   findShowIfDependents,
 } from "./question-commands";
 
@@ -111,6 +127,9 @@ interface SortableOutlineRowProps {
   onFocus: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  /** ED5 Task 5 — registers this row's focus button into the parent's DOM
+   *  focus-ref map, keyed by uid (survives a blank stableKey pre-save). */
+  registerFocusRef: (el: HTMLButtonElement | null) => void;
 }
 
 function SortableOutlineRow({
@@ -120,6 +139,7 @@ function SortableOutlineRow({
   onFocus,
   onDuplicate,
   onDelete,
+  registerFocusRef,
 }: SortableOutlineRowProps) {
   const {
     attributes,
@@ -168,6 +188,7 @@ function SortableOutlineRow({
       <div className="flex-1 min-w-0 space-y-1">
         <button
           type="button"
+          ref={registerFocusRef}
           onClick={onFocus}
           data-testid={`outline-focus-${key}`}
           aria-pressed={isFocused}
@@ -256,6 +277,33 @@ export function EditorOutline({
   const isExpanded = (key: string) => !isSectionCollapsed(key);
   const toggleSection = (key: string) => toggleSectionCollapsed(key);
 
+  // ── DOM focus/scroll (ED5 Task 5, audit C) ──────────────────────────────
+  // Ref maps: row focus buttons keyed by uid (stable across a blank
+  // pre-save stableKey), "+ Add question" buttons keyed by section
+  // stableKey. A mutation handler stashes a "pending focus" target here
+  // synchronously; the layout effect below applies it once `questions` has
+  // re-rendered with the mutation reflected (the new/removed row exists or
+  // doesn't yet at the time the handler runs — a functional setState runs
+  // during render, so the DOM isn't ready until the NEXT commit).
+  const rowFocusRefs = useRef(new Map<string, HTMLButtonElement>());
+  const addButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const pendingFocusRef = useRef<
+    { kind: "row"; uid: string } | { kind: "add"; sectionKey: string } | null
+  >(null);
+
+  useLayoutEffect(() => {
+    const pending = pendingFocusRef.current;
+    if (!pending) return;
+    pendingFocusRef.current = null;
+    const el =
+      pending.kind === "row"
+        ? rowFocusRefs.current.get(pending.uid)
+        : addButtonRefs.current.get(pending.sectionKey);
+    if (!el) return;
+    el.focus();
+    el.scrollIntoView?.({ block: "nearest" });
+  }, [questions]);
+
   // Drag-and-drop sensors — pointer AND keyboard (the keyboard sensor is the
   // jsdom-drivable path; both call the SAME onDragEnd → onReorderQuestions).
   const sensors = useSensors(
@@ -283,12 +331,14 @@ export function EditorOutline({
     // Make sure the section is open so the new row is visible.
     setSectionCollapsed(sectionKey, false);
     setFocusedQuestionUid(newUid);
+    pendingFocusRef.current = { kind: "row", uid: newUid };
   };
 
   const handleDuplicate = (uid: string) => {
     if (isReadOnly) return;
     const newUid = onDuplicateQuestion(uid);
     setFocusedQuestionUid(newUid);
+    pendingFocusRef.current = { kind: "row", uid: newUid };
   };
 
   const handleDelete = (q: QuestionDraft) => {
@@ -300,12 +350,18 @@ export function EditorOutline({
       buildQuestionDeletePrompt(q, { isUnlocked, dependentKeys }),
     );
     if (!ok) return;
-    // Focus policy (G10): only move focus when the FOCUSED question is removed.
+    // Focus policy (G10): only move focus when the FOCUSED question is
+    // removed. Survivor computed by the SHARED `computeSurvivorFocus` (ED5
+    // Task 5) — next sibling, else previous, else nearest section, else
+    // null (template empty) — BEFORE the removal so the pre-delete order is
+    // intact for the computation.
     if (focusedQuestionUid === q.uid) {
-      const list = questionsBySection[q.sectionStableKey] ?? [];
-      const idx = list.findIndex((x) => x.uid === q.uid);
-      const neighbor = list[idx + 1] ?? list[idx - 1] ?? null;
-      setFocusedQuestionUid(neighbor?.uid ?? null);
+      const sectionOrder = sections.map((s) => s.stableKey);
+      const survivor = computeSurvivorFocus(questions, sectionOrder, q.uid);
+      setFocusedQuestionUid(survivor);
+      pendingFocusRef.current = survivor
+        ? { kind: "row", uid: survivor }
+        : { kind: "add", sectionKey: q.sectionStableKey };
     }
     onDeleteQuestion(q.uid);
   };
@@ -406,6 +462,10 @@ export function EditorOutline({
                               onFocus={() => setFocusedQuestionUid(q.uid)}
                               onDuplicate={() => handleDuplicate(q.uid)}
                               onDelete={() => handleDelete(q)}
+                              registerFocusRef={(el) => {
+                                if (el) rowFocusRefs.current.set(q.uid, el);
+                                else rowFocusRefs.current.delete(q.uid);
+                              }}
                             />
                           ))}
                         </ul>
@@ -415,6 +475,10 @@ export function EditorOutline({
 
                   <button
                     type="button"
+                    ref={(el) => {
+                      if (el) addButtonRefs.current.set(s.stableKey, el);
+                      else addButtonRefs.current.delete(s.stableKey);
+                    }}
                     data-testid={`outline-add-question-${s.stableKey}`}
                     onClick={() => handleAdd(s.stableKey)}
                     disabled={isReadOnly}
