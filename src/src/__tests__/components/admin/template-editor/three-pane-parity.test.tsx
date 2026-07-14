@@ -602,6 +602,44 @@ describe("ED4 three-pane parity contract (flag-ON ≡ flag-OFF)", () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────
+  // Canvas invariant (co-validate C4) — flag-ON only (the center canvas exists
+  // only in the three-pane). Interacting with the canvas preview NEVER dirties
+  // the model: Save stays disabled and no fetch is issued. Since the model is
+  // not dirtied, a subsequent real edit's save cannot carry the canvas value;
+  // we also confirm the real edit itself lands.
+  // ──────────────────────────────────────────────────────────────────────
+  it("[flag-ON] canvas interaction never dirties the model — Save disabled, zero fetch (C4)", async () => {
+    resetHarness();
+    const { calls } = installFetch();
+    render(<TemplateEditorTabbed {...fixtureA(true)} />);
+
+    focusQuestion(true, "S1_q1");
+    expect(saveBtn().disabled).toBe(true); // nothing dirty yet
+
+    // Interact with the CENTER canvas widget (distinct 'canvas-q-' id namespace).
+    const canvas = screen.getByTestId("question-canvas");
+    act(() => {
+      fireEvent.change(within(canvas).getByRole("slider"), {
+        target: { value: "7" },
+      });
+    });
+
+    // INVARIANT: the canvas interaction neither dirtied the model nor hit the wire.
+    expect(saveBtn().disabled).toBe(true);
+    expect(calls).toHaveLength(0);
+
+    // A subsequent REAL edit dirties + saves normally (proves the workspace is
+    // live); the canvas value could not have leaked in — the model was clean.
+    editFocusedLabel("Aligned — reworded");
+    expect(saveBtn().disabled).toBe(false);
+    await clickSave();
+    await waitFor(() => expect(calls.length).toBeGreaterThan(0));
+    const versionPatch = transcriptOf(calls).find(isVersionPatch);
+    expect(versionPatch).toBeDefined();
+    expect(versionPatch!.body).toContain("Aligned — reworded");
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
   // Double-save prevention: a second click while a save is in flight issues
   // no extra fetch. Dirtied via the reused Metadata Name field.
   // ──────────────────────────────────────────────────────────────────────

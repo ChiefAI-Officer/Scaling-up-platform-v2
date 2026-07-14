@@ -149,6 +149,15 @@ describe("ED4 T3 — flag ON: three-pane workspace pick", () => {
     expect(editTab).toHaveAttribute("data-state", "active");
     expect(screen.queryByRole("tab", { name: "Questions" })).toBeNull();
   });
+
+  it("desktop-first responsive: three panes side-by-side at lg+, stacked below (G6)", () => {
+    render(<TemplateEditorTabbed {...baseProps(true)} />);
+    const workspace = screen.getByTestId("three-pane-workspace");
+    // Single column (stacked) by default; three columns at the `lg` breakpoint —
+    // mirrors QuestionsTab's `sticky lg+`. No new responsive framework.
+    expect(workspace.className).toContain("grid-cols-1");
+    expect(workspace.className).toContain("lg:grid-cols-[20%_50%_30%]");
+  });
 });
 
 describe("ED4 T3 — flag OFF (default): unchanged QuestionsTab", () => {
