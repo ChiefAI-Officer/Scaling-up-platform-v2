@@ -51,6 +51,7 @@ import { PublishFailureModal } from "@/components/admin/PublishFailureModal";
 import { MetadataTab } from "@/components/admin/template-editor/MetadataTab";
 import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
 import { QuestionsTab } from "@/components/admin/template-editor/QuestionsTab";
+import { ThreePaneWorkspace } from "@/components/admin/template-editor/ThreePaneWorkspace";
 import type { TemplateEditorModel } from "@/components/admin/template-editor/hooks/useTemplateEditorModel";
 import { TestModeDrawer } from "@/components/admin/template-editor/TestModeDrawer";
 import { SafeToPublishBadge } from "@/components/admin/template-editor/SafeToPublishBadge";
@@ -209,6 +210,15 @@ export interface TabbedShellProps {
    * (`isSafeToPublishEnabled()`) and passed down from the edit page.
    */
   safeToPublishEnabled?: boolean;
+  /**
+   * Wave ED4 (spec 19af §3.1/§3.2) — three-pane authoring workspace.
+   * Server-computed (`isThreePaneEnabled()`) and passed down from the edit
+   * page. Default false ⇒ the Questions tab body renders the legacy
+   * `QuestionsTab` (byte-identical to today) and the default landing tab
+   * stays Metadata. True ⇒ the Questions body swaps to `ThreePaneWorkspace`,
+   * the tab is relabeled "Edit", and it becomes the default landing tab.
+   */
+  threePaneEnabled?: boolean;
 }
 
 /**
@@ -225,11 +235,14 @@ const EMPTY_PUBLISHED_OPTION_KEYS: Record<string, string[]> = {};
 // ────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────
-function resolveTabFromUrl(param: string | null): TabId {
+function resolveTabFromUrl(
+  param: string | null,
+  defaultTab: TabId = "metadata",
+): TabId {
   if (param && (VALID_TAB_IDS as string[]).includes(param)) {
     return param as TabId;
   }
-  return "metadata";
+  return defaultTab;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -247,6 +260,7 @@ export function TabbedShell({
   conditionalAuthoringEnabled = false,
   testModeEnabled = false,
   safeToPublishEnabled = false,
+  threePaneEnabled = false,
   model,
 }: TabbedShellProps & {
   /**
@@ -266,26 +280,33 @@ export function TabbedShell({
   const isPublished = version.publishedAt !== null;
 
   // ─── Tab selection ────────────────────────────────────────────────────
-  const tabFromUrl = resolveTabFromUrl(searchParams.get("tab"));
+  // Wave ED4 — when the three-pane workspace is on, the Questions ("Edit") tab
+  // becomes the param-less default (instead of Metadata). Flag OFF ⇒ default
+  // stays "metadata", so the ?tab= routing is byte-identical to today.
+  const defaultTab: TabId = threePaneEnabled ? "questions" : "metadata";
+  const tabFromUrl = resolveTabFromUrl(searchParams.get("tab"), defaultTab);
   const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl);
 
   // Re-sync if the URL param changes externally (e.g. browser nav).
   useEffect(() => {
-    const next = resolveTabFromUrl(searchParams.get("tab"));
+    const next = resolveTabFromUrl(searchParams.get("tab"), defaultTab);
     // Intentional external-store sync: mirror the ?tab= URL param into local
     // tab state on external navigation (pre-ED3 behavior, byte-identical —
     // pinned by the guard's tab-routing test). Not derivable purely in render
     // because handleTabChange also drives activeTab on user clicks.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTab((prev) => (prev === next ? prev : next));
-  }, [searchParams]);
+  }, [searchParams, defaultTab]);
 
   const handleTabChange = useCallback(
     (next: string) => {
       if (!(VALID_TAB_IDS as string[]).includes(next)) return;
       setActiveTab(next as TabId);
       const params = new URLSearchParams(searchParams.toString());
-      if (next === "metadata") {
+      // The default tab is represented by the ABSENCE of ?tab= (so the URL and
+      // the tab stay bijective). Flag OFF ⇒ defaultTab is "metadata" — the
+      // pre-ED4 behavior, byte-identical.
+      if (next === defaultTab) {
         params.delete("tab");
       } else {
         params.set("tab", next);
@@ -293,7 +314,7 @@ export function TabbedShell({
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
     },
-    [pathname, router, searchParams],
+    [pathname, router, searchParams, defaultTab],
   );
 
   // ─── Document model + save flow (ED3 Task 4; composed via Task 6's
@@ -503,7 +524,7 @@ export function TabbedShell({
             {TAB_LABELS.sections}
           </TabsTrigger>
           <TabsTrigger value="questions">
-            {TAB_LABELS.questions}
+            {threePaneEnabled ? "Edit" : TAB_LABELS.questions}
           </TabsTrigger>
           <TabsTrigger value="scoring">
             {TAB_LABELS.scoring}
@@ -584,27 +605,46 @@ export function TabbedShell({
         </TabsContent>
         <TabsContent value="questions">
           <div data-testid="tab-panel-questions">
-            <QuestionsTab
-              sections={sections}
-              questions={questions}
-              onAddQuestion={handleAddQuestion}
-              onUpdateQuestion={handleUpdateQuestion}
-              onDeleteQuestion={handleDeleteQuestion}
-              onDuplicateQuestion={handleDuplicateQuestion}
-              onReorderQuestions={handleReorderQuestions}
-              isReadOnly={isPublished}
-              isUnlocked={questionEditorUnlocked}
-              publishedOptionKeys={publishedOptionKeys}
-              findingsEnabled={findingsEnabled}
-              conditionalEnabled={conditionalAuthoringEnabled}
-              selectedSectionStableKey={model.selection.selectedSectionStableKey}
-              setSelectedSectionStableKey={
-                model.selection.setSelectedSectionStableKey
-              }
-              focusedQuestionUid={model.selection.focusedQuestionUid}
-              setFocusedQuestionUid={model.selection.setFocusedQuestionUid}
-              resetSelection={model.selection.resetSelection}
-            />
+            {/* Wave ED4 (spec 19af §3.2) — the ONE conditional: the Questions
+                authoring body swaps to the three-pane workspace when the flag
+                is on. Everything else (header, tab-nav, other surfaces,
+                modals, action wiring) stays single-source. Flag OFF renders
+                the legacy QuestionsTab byte-identically to today. */}
+            {threePaneEnabled ? (
+              <ThreePaneWorkspace
+                model={model}
+                isReadOnly={isPublished}
+                isUnlocked={questionEditorUnlocked}
+                findingsEnabled={findingsEnabled}
+                conditionalEnabled={conditionalAuthoringEnabled}
+                publishedOptionKeys={publishedOptionKeys}
+                onGoToSections={() => handleTabChange("sections")}
+              />
+            ) : (
+              <QuestionsTab
+                sections={sections}
+                questions={questions}
+                onAddQuestion={handleAddQuestion}
+                onUpdateQuestion={handleUpdateQuestion}
+                onDeleteQuestion={handleDeleteQuestion}
+                onDuplicateQuestion={handleDuplicateQuestion}
+                onReorderQuestions={handleReorderQuestions}
+                isReadOnly={isPublished}
+                isUnlocked={questionEditorUnlocked}
+                publishedOptionKeys={publishedOptionKeys}
+                findingsEnabled={findingsEnabled}
+                conditionalEnabled={conditionalAuthoringEnabled}
+                selectedSectionStableKey={
+                  model.selection.selectedSectionStableKey
+                }
+                setSelectedSectionStableKey={
+                  model.selection.setSelectedSectionStableKey
+                }
+                focusedQuestionUid={model.selection.focusedQuestionUid}
+                setFocusedQuestionUid={model.selection.setFocusedQuestionUid}
+                resetSelection={model.selection.resetSelection}
+              />
+            )}
           </div>
         </TabsContent>
         <TabsContent value="scoring">

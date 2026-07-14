@@ -43,6 +43,15 @@ interface QuestionInputProps {
   onChange: (stableKey: string, value: number | string | string[]) => void;
   disabled?: boolean;
   invalid?: boolean;
+  /**
+   * ED4 (spec 19af §3.3, co-validate C5) — namespace for the element `id`.
+   * Defaults to `"q-"`, byte-identical to the historical `q-${stableKey}` id,
+   * so every existing caller (surveys, Test Mode, the inspector's
+   * FindingsPreview) is unchanged. The three-pane `QuestionCanvas` passes a
+   * DISTINCT prefix so its widget and the inspector's simultaneous
+   * FindingsPreview widget don't emit duplicate DOM ids for the same question.
+   */
+  idPrefix?: string;
 }
 
 export function QuestionInput({
@@ -51,6 +60,7 @@ export function QuestionInput({
   onChange,
   disabled,
   invalid,
+  idPrefix = "q-",
 }: QuestionInputProps) {
   if (q.type === "SLIDER_LIKERT" && q.scale) {
     const { min, max, step, anchorMin, anchorMax } = q.scale;
@@ -64,7 +74,7 @@ export function QuestionInput({
     return (
       <div className={`survey-slider-wrap${answered ? "" : " is-unanswered"}${invalid ? " is-invalid" : ""}`}>
         <input
-          id={`q-${q.stableKey}`}
+          id={`${idPrefix}${q.stableKey}`}
           type="range"
           className={`survey-slider${invalid ? " is-invalid" : ""}`}
           min={min}
@@ -129,7 +139,7 @@ export function QuestionInput({
     return (
       <>
         <textarea
-          id={`q-${q.stableKey}`}
+          id={`${idPrefix}${q.stableKey}`}
           className={`survey-textarea${invalid ? " is-invalid" : ""}`}
           rows={3}
           value={textValue}
@@ -151,7 +161,7 @@ export function QuestionInput({
   if (q.type === "NUMBER") {
     return (
       <input
-        id={`q-${q.stableKey}`}
+        id={`${idPrefix}${q.stableKey}`}
         type="number"
         className={`survey-input-number${invalid ? " is-invalid" : ""}`}
         placeholder="Enter a number"
@@ -190,7 +200,7 @@ export function QuestionInput({
             <label key={opt.key} className="survey-checkbox-item">
               <input
                 type="checkbox"
-                id={idx === 0 ? `q-${q.stableKey}` : undefined}
+                id={idx === 0 ? `${idPrefix}${q.stableKey}` : undefined}
                 // aria-invalid belongs on a focusable widget, not on the
                 // role="group" wrapper (jsx-a11y/role-supports-aria-props). The
                 // first checkbox carries it; the group keeps the `is-invalid`

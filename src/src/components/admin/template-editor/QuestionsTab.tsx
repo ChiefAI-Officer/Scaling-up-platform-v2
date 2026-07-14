@@ -49,11 +49,18 @@ import { GripVertical } from "lucide-react";
 
 import type { SectionDraft } from "./SectionsCard";
 import type { QuestionDraftRow, FindingBandDraft } from "./question-serialization";
-import { canonicalQuestionOrderIndex } from "@/lib/assessments/section-pages";
 // ED3 Task 7 — the per-question inspector column lives in its own file now
 // (QuestionInspector, formerly the internal QuestionConfigForm). ShowIfGateOption
 // moved with it and is re-exported here to preserve this module's public surface.
 import { QuestionInspector, type ShowIfGateOption } from "./QuestionInspector";
+// ED4 (spec 19af §3.4) — the delete-confirm/warn text + show-if dependent
+// discovery are now SHARED with the model's question commands so the future
+// three-pane outline prompts + cleans up identically (co-validate C2).
+import {
+  buildQuestionDeletePrompt,
+  computeShowIfGates,
+  findShowIfDependents,
+} from "./question-commands";
 
 export type { ShowIfGateOption };
 
@@ -290,36 +297,10 @@ interface SortableQuestionCardProps {
   showIfDependentKeys?: readonly string[];
 }
 
-/**
- * Wave T D4 — deleting an INHERITED question (its stableKey exists in a
- * published version) is a history-affecting act; the confirm names the key
- * and the three consequence classes. New-to-draft rows keep the legacy
- * simple confirm.
- */
-function buildDeleteConfirmText(question: QuestionDraft): string {
-  return [
-    `Delete inherited question ${question.stableKey}?`,
-    "",
-    "This question exists in a published version of this template. Deleting it means:",
-    `• cross-version trend history for ${question.stableKey} ends with the last published version;`,
-    "• a locked Esperto import crosswalk that maps this key will refuse imports against the next published version;",
-    "• any peer benchmark set on this question will be pruned.",
-    "",
-    "Continue?",
-  ].join("\n");
-}
-
-/**
- * Wave W — appended to the delete confirm when other questions are shown
- * conditionally on the one being deleted.
- */
-function buildShowIfDependentsWarning(keys: readonly string[]): string {
-  if (keys.length === 0) return "";
-  return [
-    "",
-    `${keys.length} question${keys.length === 1 ? "" : "s"} shown conditionally on this one will become always-visible: ${keys.join(", ")}.`,
-  ].join("\n");
-}
+// ED4 (spec 19af §3.4) — `buildDeleteConfirmText` (Wave T D4) and
+// `buildShowIfDependentsWarning` (Wave W) moved VERBATIM into the shared
+// `question-commands` module (imported above) so the model's question
+// commands and both editor views prompt identically.
 
 function SortableQuestionCard({
   question,
@@ -418,10 +399,10 @@ function SortableQuestionCard({
           onClick={() => {
             if (isReadOnly) return;
             const ok = window.confirm(
-              (isUnlocked && question.isInherited
-                ? buildDeleteConfirmText(question)
-                : `Delete question ${question.stableKey}?`) +
-                buildShowIfDependentsWarning(showIfDependentKeys),
+              buildQuestionDeletePrompt(question, {
+                isUnlocked,
+                dependentKeys: showIfDependentKeys,
+              }),
             );
             if (ok) onDelete();
           }}
@@ -521,56 +502,23 @@ export function QuestionsTab({
   const focusedQuestion =
     sectionQuestions.find((q) => q.uid === focusedQuestionUid) ?? null;
 
-  // ── Wave W — canonical order + gate/dependent maps (C1) ──
-  // Order comes from THE shared helper (buildSectionPages' order: sections
-  // by editor array position, questions by sortOrder within) keyed by uid so
-  // unsaved rows (blank stableKey) can't collide.
-  const showIfOrderByUid = useMemo(() => {
-    if (!conditionalEnabled) return new Map<string, number>();
-    return canonicalQuestionOrderIndex(
-      sections.map((s, i) => ({ stableKey: s.stableKey, sortOrder: i })),
-      questions.map((q) => ({
-        stableKey: q.uid,
-        sortOrder: q.sortOrder,
-        sectionStableKey: q.sectionStableKey,
-      })),
-    );
-  }, [conditionalEnabled, sections, questions]);
-
-  // Eligible gates for the FOCUSED question: strictly-earlier MULTI_CHOICE
-  // with a persisted stableKey (unsaved rows can't be referenced yet) and no
-  // showIf of their own (chains are publish-rejected — don't author them).
+  // ── Wave W — eligible show-if gates for the FOCUSED question ──
+  // ED4 (spec 19af §3.4) — the eligibility logic is the SHARED
+  // `computeShowIfGates` (also used by the three-pane workspace) so both views
+  // render the identical gate picker; the conditional-flag gate stays
+  // presentation-side. Behavior-identical to the pre-ED4 inline memo.
   const focusedShowIfGates = useMemo<ShowIfGateOption[]>(() => {
     if (!conditionalEnabled || !focusedQuestion) return [];
-    const ownOrder = showIfOrderByUid.get(focusedQuestion.uid);
-    if (ownOrder === undefined) return [];
-    return questions
-      .filter(
-        (q) =>
-          q.type === "MULTI_CHOICE" &&
-          q.stableKey !== "" &&
-          q.uid !== focusedQuestion.uid &&
-          q.showIf === null &&
-          (showIfOrderByUid.get(q.uid) ?? Infinity) < ownOrder,
-      )
-      .sort(
-        (a, b) =>
-          (showIfOrderByUid.get(a.uid) ?? 0) - (showIfOrderByUid.get(b.uid) ?? 0),
-      )
-      .map((q) => ({
-        stableKey: q.stableKey,
-        label: q.label,
-        options: q.options.map((o) => ({ key: o.key, label: o.label })),
-      }));
-  }, [conditionalEnabled, focusedQuestion, questions, showIfOrderByUid]);
+    return computeShowIfGates(sections, questions, focusedQuestion);
+  }, [conditionalEnabled, focusedQuestion, questions, sections]);
 
-  // Questions whose showIf references a given question's stableKey.
+  // Questions whose showIf references a given question's stableKey. ED4 —
+  // the predicate is the SHARED `findShowIfDependents` (also used by the
+  // model's `deleteQuestion` command); the flag gate stays presentation-side.
   const showIfDependentsOf = useCallback(
     (gate: QuestionDraft): QuestionDraft[] => {
-      if (!conditionalEnabled || gate.stableKey === "") return [];
-      return questions.filter(
-        (q) => q.uid !== gate.uid && q.showIf?.questionKey === gate.stableKey,
-      );
+      if (!conditionalEnabled) return [];
+      return findShowIfDependents(questions, gate);
     },
     [conditionalEnabled, questions],
   );

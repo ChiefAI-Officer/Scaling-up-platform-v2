@@ -21,6 +21,7 @@ import { isFindingsLogicEnabled } from "@/lib/assessments/wave-u-flags";
 import { isConditionalAuthoringEnabled } from "@/lib/assessments/wave-w-flags";
 import { isTestModeEnabled } from "@/lib/assessments/wave-ed1-flags";
 import { isSafeToPublishEnabled } from "@/lib/assessments/wave-ed2-flags";
+import { isThreePaneEnabled } from "@/lib/assessments/wave-ed4-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import {
   isPeerRenderEnabledAlias,
@@ -202,6 +203,9 @@ export default async function AdminAssessmentVersionEditPage({
         conditionalAuthoringEnabled={isConditionalAuthoringEnabled()}
         testModeEnabled={isTestModeEnabled()}
         safeToPublishEnabled={isSafeToPublishEnabled()}
+        // Wave ED4 — three-pane authoring workspace (Questions-body swap +
+        // "Edit" default tab; presentation-only, kill = flag off + redeploy).
+        threePaneEnabled={isThreePaneEnabled()}
       />
       {peerBenchmarkRows && (
         <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />
