@@ -156,6 +156,10 @@ interface HarnessOverrides {
   };
   onReorderQuestions?: (sectionKey: string, order: string[]) => void;
   onGoToSections?: () => void;
+  onAddSection?: () => void;
+  onRenameSection?: (uid: string, name: string) => void;
+  onMoveSectionUp?: (uid: string) => void;
+  onMoveSectionDown?: (uid: string) => void;
   setFocusedSpy?: jest.Mock;
 }
 
@@ -248,6 +252,10 @@ function renderOutline(o: HarnessOverrides = {}) {
         onDeleteQuestion={handleDeleteQuestion}
         onReorderQuestions={o.onReorderQuestions ?? jest.fn()}
         onGoToSections={o.onGoToSections ?? jest.fn()}
+        onAddSection={o.onAddSection ?? jest.fn()}
+        onRenameSection={o.onRenameSection ?? jest.fn()}
+        onMoveSectionUp={o.onMoveSectionUp ?? jest.fn()}
+        onMoveSectionDown={o.onMoveSectionDown ?? jest.fn()}
       />
     );
   }
@@ -650,6 +658,10 @@ describe("EditorOutline — collapse persists across unmount (ED5 Task 3, audit 
             }))}
             onReorderQuestions={jest.fn()}
             onGoToSections={jest.fn()}
+            onAddSection={jest.fn()}
+            onRenameSection={jest.fn()}
+            onMoveSectionUp={jest.fn()}
+            onMoveSectionDown={jest.fn()}
           />
         ) : null}
       </div>
@@ -719,5 +731,77 @@ describe("EditorOutline — Logic map trigger (ED5 Task 8, B-1b)", () => {
     expect(
       screen.getByTestId("editor-outline-logic-map-trigger"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("EditorOutline — section add/rename/reorder (ED5 Task 9, B-2)", () => {
+  it("+ Add Section calls onAddSection", () => {
+    const onAddSection = jest.fn();
+    renderOutline({ onAddSection });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("editor-outline-add-section"));
+    });
+    expect(onAddSection).toHaveBeenCalledTimes(1);
+  });
+
+  it("editing a section name input calls onRenameSection(uid, newName)", () => {
+    const onRenameSection = jest.fn();
+    renderOutline({ onRenameSection });
+
+    const input = screen.getByTestId("outline-section-name-S1");
+    act(() => {
+      fireEvent.change(input, { target: { value: "Renamed" } });
+    });
+    expect(onRenameSection).toHaveBeenCalledWith("s1", "Renamed");
+  });
+
+  it("clicking the section move-down/move-up buttons calls onMoveSectionDown/Up(uid)", () => {
+    const onMoveSectionUp = jest.fn();
+    const onMoveSectionDown = jest.fn();
+    renderOutline({ onMoveSectionUp, onMoveSectionDown });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-move-down-S1"));
+    });
+    expect(onMoveSectionDown).toHaveBeenCalledWith("s1");
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-move-up-S2"));
+    });
+    expect(onMoveSectionUp).toHaveBeenCalledWith("s2");
+  });
+
+  it("move-up is disabled on the first section, move-down disabled on the last", () => {
+    renderOutline();
+
+    expect(screen.getByTestId("outline-section-move-up-S1")).toBeDisabled();
+    expect(screen.getByTestId("outline-section-move-down-S1")).toBeEnabled();
+    expect(screen.getByTestId("outline-section-move-up-S2")).toBeEnabled();
+    expect(screen.getByTestId("outline-section-move-down-S2")).toBeDisabled();
+  });
+
+  it("all section controls disabled when isReadOnly", () => {
+    renderOutline({ isReadOnly: true });
+
+    expect(screen.getByTestId("editor-outline-add-section")).toBeDisabled();
+    expect(screen.getByTestId("outline-section-name-S1")).toBeDisabled();
+    expect(screen.getByTestId("outline-section-move-up-S1")).toBeDisabled();
+    expect(screen.getByTestId("outline-section-move-down-S1")).toBeDisabled();
+  });
+
+  it("clicking into the section name input does not collapse the section", () => {
+    renderOutline();
+
+    const input = screen.getByTestId("outline-section-name-S1");
+    act(() => {
+      fireEvent.click(input);
+    });
+    // Section stays expanded — question rows still visible, toggle unchanged.
+    expect(screen.getByTestId("question-card-S1_q1")).toBeInTheDocument();
+    expect(screen.getByTestId("outline-section-toggle-S1")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
   });
 });

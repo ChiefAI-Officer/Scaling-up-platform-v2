@@ -62,6 +62,10 @@ export function ThreePaneWorkspace({
     duplicateQuestion,
     deleteQuestion,
     reorderQuestions,
+    handleSectionsAdd,
+    handleSectionsRename,
+    handleSectionsMoveUp,
+    handleSectionsMoveDown,
   } = model;
 
   const focusedQuestion: QuestionDraft | null =
@@ -111,6 +115,10 @@ export function ThreePaneWorkspace({
           onDeleteQuestion={deleteQuestion}
           onReorderQuestions={reorderQuestions}
           onGoToSections={onGoToSections}
+          onAddSection={handleSectionsAdd}
+          onRenameSection={handleSectionsRename}
+          onMoveSectionUp={handleSectionsMoveUp}
+          onMoveSectionDown={handleSectionsMoveDown}
         />
       </aside>
 

@@ -69,7 +69,13 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown, ChevronRight, GripVertical } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+} from "lucide-react";
 
 import type { SectionDraft } from "./SectionsCard";
 import type { QuestionDraftRow } from "./question-serialization";
@@ -115,6 +121,16 @@ export interface EditorOutlineProps {
   onReorderQuestions: (sectionStableKey: string, newOrderUids: string[]) => void;
   /** Switch the active tab to Sections (owned by the shell — G9 empty state). */
   onGoToSections: () => void;
+  /**
+   * ED5 Task 9 (B-2) — shared model section commands, so authors never have
+   * to leave the outline to add/rename/reorder a section. Mirrors
+   * `SectionsCard`'s inline-rename input + arrow-button reorder idiom.
+   * Section DELETE is a separate later task — intentionally not wired here.
+   */
+  onAddSection: () => void;
+  onRenameSection: (uid: string, name: string) => void;
+  onMoveSectionUp: (uid: string) => void;
+  onMoveSectionDown: (uid: string) => void;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -284,6 +300,10 @@ export function EditorOutline({
   onDeleteQuestion,
   onReorderQuestions,
   onGoToSections,
+  onAddSection,
+  onRenameSection,
+  onMoveSectionUp,
+  onMoveSectionDown,
 }: EditorOutlineProps) {
   // ED5 Task 8 (B-1b) — read-only "Logic map" drawer, gated on the Wave-W
   // conditional flag exactly like the row badges above.
@@ -375,6 +395,27 @@ export function EditorOutline({
     // Focus unchanged on reorder (G10).
   };
 
+  // ── Section commands (ED5 Task 9, B-2) ──────────────────────────────────
+  const handleAddSection = () => {
+    if (isReadOnly) return;
+    onAddSection();
+  };
+
+  const handleRenameSection = (uid: string, name: string) => {
+    if (isReadOnly) return;
+    onRenameSection(uid, name);
+  };
+
+  const handleMoveSectionUp = (uid: string) => {
+    if (isReadOnly) return;
+    onMoveSectionUp(uid);
+  };
+
+  const handleMoveSectionDown = (uid: string) => {
+    if (isReadOnly) return;
+    onMoveSectionDown(uid);
+  };
+
   const handleAdd = (sectionKey: string) => {
     if (isReadOnly) return;
     const newUid = onAddQuestion(sectionKey);
@@ -455,11 +496,22 @@ export function EditorOutline({
     >
       <div className="flex items-center justify-between gap-2">
         <h3 className="wf-card-title">Outline</h3>
-        {logicMapTrigger}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="editor-outline-add-section"
+            onClick={handleAddSection}
+            disabled={isReadOnly}
+            className="wf-btn wf-btn-secondary wf-btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            + Add Section
+          </button>
+          {logicMapTrigger}
+        </div>
       </div>
 
       <ul className="space-y-3">
-        {sections.map((s) => {
+        {sections.map((s, idx) => {
           const list = questionsBySection[s.stableKey] ?? [];
           const expanded = isExpanded(s.stableKey);
           return (
@@ -469,8 +521,9 @@ export function EditorOutline({
                   type="button"
                   data-testid={`outline-section-toggle-${s.stableKey}`}
                   aria-expanded={expanded}
+                  aria-label={`${expanded ? "Collapse" : "Expand"} section ${s.stableKey}`}
                   onClick={() => toggleSection(s.stableKey)}
-                  className="flex-1 min-w-0 flex items-center gap-1.5 px-1 py-1 rounded text-left text-sm font-semibold text-foreground hover:bg-muted"
+                  className="flex-shrink-0 flex items-center gap-1.5 px-1 py-1 rounded text-left text-sm font-semibold text-foreground hover:bg-muted"
                 >
                   {expanded ? (
                     <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" />
@@ -480,17 +533,42 @@ export function EditorOutline({
                   <span className="inline-flex items-center px-1 py-0.5 text-[0.5625rem] font-mono font-semibold uppercase tracking-wide rounded bg-muted text-muted-foreground">
                     {s.stableKey}
                   </span>
-                  <span className="flex-1 min-w-0 truncate">
-                    {s.name || (
-                      <span className="italic text-muted-foreground">
-                        (no name)
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[0.625rem] text-muted-foreground whitespace-nowrap">
-                    {list.filter((lq) => lq.label.trim() !== "").length}/
-                    {list.length} labeled
-                  </span>
+                </button>
+                <input
+                  type="text"
+                  data-testid={`outline-section-name-${s.stableKey}`}
+                  aria-label={`Section ${s.stableKey} name`}
+                  value={s.name}
+                  onChange={(e) => handleRenameSection(s.uid, e.target.value)}
+                  disabled={isReadOnly}
+                  placeholder="Section name"
+                  className="flex-1 min-w-0 bg-transparent px-1 py-0.5 text-sm font-semibold text-foreground border border-transparent rounded focus:outline-none focus:border-border focus:bg-background disabled:opacity-60 disabled:cursor-not-allowed"
+                />
+                <span className="flex-shrink-0 text-[0.625rem] text-muted-foreground whitespace-nowrap">
+                  {list.filter((lq) => lq.label.trim() !== "").length}/
+                  {list.length} labeled
+                </span>
+                <button
+                  type="button"
+                  data-testid={`outline-section-move-up-${s.stableKey}`}
+                  aria-label={`Move up ${s.stableKey}`}
+                  title="Move up"
+                  onClick={() => handleMoveSectionUp(s.uid)}
+                  disabled={isReadOnly || idx === 0}
+                  className="flex-shrink-0 p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ArrowUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  data-testid={`outline-section-move-down-${s.stableKey}`}
+                  aria-label={`Move down ${s.stableKey}`}
+                  title="Move down"
+                  onClick={() => handleMoveSectionDown(s.uid)}
+                  disabled={isReadOnly || idx === sections.length - 1}
+                  className="flex-shrink-0 p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ArrowDown className="w-3.5 h-3.5" />
                 </button>
               </div>
 
