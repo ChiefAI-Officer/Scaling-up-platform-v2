@@ -131,14 +131,15 @@ describe("ED4 T3 — flag ON: three-pane workspace pick", () => {
     render(<TemplateEditorTabbed {...baseProps(true)} />);
 
     // Body = the workspace (the real EditorOutline (T4) + the real
-    // QuestionCanvas (T5) + the reused inspector). Nothing is focused on the
-    // initial flag-ON mount (three-pane preserves focus, no mount-reset), so the
-    // canvas shows its empty state.
+    // QuestionCanvas (T5) + the reused inspector). ED5 Task 4 (audit A-1)
+    // auto-focuses the first section's first question once on mount, so the
+    // canvas shows that question rather than its empty state — see
+    // TemplateEditorController.test.tsx for the dedicated auto-focus suite.
     expect(screen.getByTestId("three-pane-workspace")).toBeInTheDocument();
     expect(screen.getByTestId("editor-outline")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("question-canvas-empty"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("question-canvas")).toHaveTextContent(
+      "Q1 label",
+    );
     expect(screen.getByTestId("questions-config-form")).toBeInTheDocument();
 
     // The legacy QuestionsTab body is NOT rendered.

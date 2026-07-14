@@ -532,11 +532,12 @@ describe("ED4 three-pane parity contract (flag-ON ≡ flag-OFF)", () => {
     installFetch();
     render(<TemplateEditorTabbed {...fixtureA(true)} />);
     // flag-ON: the workspace mounts (default tab), tab relabeled "Edit", and
-    // the reused inspector is present (empty state until T4 focuses one).
+    // the reused inspector is present — auto-focused (ED5 Task 4, audit A-1)
+    // to the first section's first question rather than its empty state.
     expect(screen.getByTestId("three-pane-workspace")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /^Edit$/ })).toBeInTheDocument();
     expect(screen.getByTestId("questions-config-form")).toHaveTextContent(
-      /Select a question/i,
+      /Q1 label/i,
     );
   });
 

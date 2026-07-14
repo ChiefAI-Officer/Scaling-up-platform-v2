@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * TemplateEditorController — ED3 (spec 19ae), Tasks 2–6.
+ * TemplateEditorController — ED3 (spec 19ae), Tasks 2–6; ED5 (spec 19ag), Task 4.
  *
  * Owner wrapper around the editor view. Task 2 was a PURE structural split
  * (state stayed in `TabbedShell`). Task 3 lifted the question-selection
@@ -19,12 +19,41 @@
  * reset (the selection used to be local `useState` that reset when the tab
  * unmounted). See the ED3-pinned characterization test in
  * editor-byte-equivalence.test.tsx.
+ *
+ * ED5 Task 4 (audit A-1, "cold empty landing") — a MOUNT-ONCE auto-focus
+ * effect. When the three-pane flag is on, the Questions tab is relabeled
+ * "Edit" and becomes the default landing tab (`TabbedShell`'s
+ * `threePaneEnabled` branch), but `focusedQuestionUid` starts `null` — the
+ * legacy `QuestionsTab` effectively opened on the first question (its own
+ * mount-only reset effect), so the flag-ON author instead landed on an empty
+ * canvas + empty inspector. This effect focuses the first section's first
+ * question (by canonical array order, then `sortOrder` within the section)
+ * exactly once on controller mount — flag-OFF is a no-op (byte-identity
+ * guard), and it never clobbers a focus a later re-render already carries
+ * (the controller mounts once and survives Edit-tab unmount/remount, so this
+ * effect fires exactly once for the life of the editor session).
  */
 
+import { useEffect } from "react";
 import { TabbedShell, type TabbedShellProps } from "./TabbedShell";
 import { useTemplateEditorModel } from "./hooks/useTemplateEditorModel";
 
 export function TemplateEditorController(props: TabbedShellProps) {
   const model = useTemplateEditorModel(props);
+
+  useEffect(() => {
+    if (!props.threePaneEnabled) return; // flag-off: no-op (byte-identity guard)
+    if (model.selection.focusedQuestionUid !== null) return; // don't clobber persisted focus
+    const firstSection = model.sections[0]; // array order = canonical section order
+    if (!firstSection) return;
+    const firstQuestion = model.questions
+      .filter((q) => q.sectionStableKey === firstSection.stableKey)
+      .sort((a, b) => a.sortOrder - b.sortOrder)[0];
+    if (firstQuestion) {
+      model.selection.resetSelection(firstSection.stableKey, firstQuestion.uid);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // once on mount
+
   return <TabbedShell {...props} model={model} />;
 }
