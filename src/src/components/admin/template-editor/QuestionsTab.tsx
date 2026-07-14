@@ -54,6 +54,14 @@ import { canonicalQuestionOrderIndex } from "@/lib/assessments/section-pages";
 // (QuestionInspector, formerly the internal QuestionConfigForm). ShowIfGateOption
 // moved with it and is re-exported here to preserve this module's public surface.
 import { QuestionInspector, type ShowIfGateOption } from "./QuestionInspector";
+// ED4 (spec 19af §3.4) — the delete-confirm/warn text + show-if dependent
+// discovery are now SHARED with the model's question commands so the future
+// three-pane outline prompts + cleans up identically (co-validate C2).
+import {
+  buildDeleteConfirmText,
+  buildShowIfDependentsWarning,
+  findShowIfDependents,
+} from "./question-commands";
 
 export type { ShowIfGateOption };
 
@@ -290,36 +298,10 @@ interface SortableQuestionCardProps {
   showIfDependentKeys?: readonly string[];
 }
 
-/**
- * Wave T D4 — deleting an INHERITED question (its stableKey exists in a
- * published version) is a history-affecting act; the confirm names the key
- * and the three consequence classes. New-to-draft rows keep the legacy
- * simple confirm.
- */
-function buildDeleteConfirmText(question: QuestionDraft): string {
-  return [
-    `Delete inherited question ${question.stableKey}?`,
-    "",
-    "This question exists in a published version of this template. Deleting it means:",
-    `• cross-version trend history for ${question.stableKey} ends with the last published version;`,
-    "• a locked Esperto import crosswalk that maps this key will refuse imports against the next published version;",
-    "• any peer benchmark set on this question will be pruned.",
-    "",
-    "Continue?",
-  ].join("\n");
-}
-
-/**
- * Wave W — appended to the delete confirm when other questions are shown
- * conditionally on the one being deleted.
- */
-function buildShowIfDependentsWarning(keys: readonly string[]): string {
-  if (keys.length === 0) return "";
-  return [
-    "",
-    `${keys.length} question${keys.length === 1 ? "" : "s"} shown conditionally on this one will become always-visible: ${keys.join(", ")}.`,
-  ].join("\n");
-}
+// ED4 (spec 19af §3.4) — `buildDeleteConfirmText` (Wave T D4) and
+// `buildShowIfDependentsWarning` (Wave W) moved VERBATIM into the shared
+// `question-commands` module (imported above) so the model's question
+// commands and both editor views prompt identically.
 
 function SortableQuestionCard({
   question,
@@ -564,13 +546,13 @@ export function QuestionsTab({
       }));
   }, [conditionalEnabled, focusedQuestion, questions, showIfOrderByUid]);
 
-  // Questions whose showIf references a given question's stableKey.
+  // Questions whose showIf references a given question's stableKey. ED4 —
+  // the predicate is the SHARED `findShowIfDependents` (also used by the
+  // model's `deleteQuestion` command); the flag gate stays presentation-side.
   const showIfDependentsOf = useCallback(
     (gate: QuestionDraft): QuestionDraft[] => {
-      if (!conditionalEnabled || gate.stableKey === "") return [];
-      return questions.filter(
-        (q) => q.uid !== gate.uid && q.showIf?.questionKey === gate.stableKey,
-      );
+      if (!conditionalEnabled) return [];
+      return findShowIfDependents(questions, gate);
     },
     [conditionalEnabled, questions],
   );

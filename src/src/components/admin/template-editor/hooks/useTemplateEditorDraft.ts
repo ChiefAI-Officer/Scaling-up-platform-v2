@@ -32,6 +32,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
 import { buildVersionScoringPayload } from "@/components/admin/template-editor/build-version-payload";
 import { QuestionSerializationError } from "@/components/admin/template-editor/question-serialization";
+import { findShowIfDependents } from "@/components/admin/template-editor/question-commands";
 import type { MetadataTabValues } from "@/components/admin/template-editor/MetadataTab";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 import {
@@ -371,7 +372,13 @@ export function useTemplateEditorDraft({
 
   // ─── Question operations — F3 ─────────────────────────────────────────
   const handleAddQuestion = useCallback(
-    (sectionStableKey: string) => {
+    (sectionStableKey: string): string => {
+      // ED4 (spec 19af §3.4, C2) — mint the uid OUTSIDE the state updater so
+      // the command can RETURN it (the three-pane outline focuses the new
+      // question by uid; a functional updater runs during render, not
+      // synchronously here). Otherwise byte-identical: one genUid() per add,
+      // same appended row.
+      const newUid = genUid();
       setQuestions((prev) => {
         const inSection = prev.filter(
           (q) => q.sectionStableKey === sectionStableKey,
@@ -381,7 +388,7 @@ export function useTemplateEditorDraft({
         return [
           ...prev,
           {
-            uid: genUid(),
+            uid: newUid,
             // Wave T D8 — unlocked, the slug key is derived from the label
             // AT SAVE (buildQuestionsPayload); until then the row shows
             // "(assigned on save)". Locked keeps the legacy Q_NEW_ key.
@@ -412,6 +419,7 @@ export function useTemplateEditorDraft({
         ];
       });
       setQuestionsDirty();
+      return newUid;
     },
     [questionEditorUnlocked, setQuestionsDirty],
   );
@@ -435,7 +443,11 @@ export function useTemplateEditorDraft({
   );
 
   const handleDuplicateQuestion = useCallback(
-    (uid: string) => {
+    (uid: string): string => {
+      // ED4 (spec 19af §3.4, C2) — mint the copy's uid OUTSIDE the updater so
+      // the command can RETURN it (outline focuses the copy). Byte-identical
+      // otherwise; the copy row still carries every Wave-T Duplicate rule.
+      const newUid = genUid();
       setQuestions((prev) => {
         const src = prev.find((q) => q.uid === uid);
         if (!src) return prev;
@@ -448,7 +460,7 @@ export function useTemplateEditorDraft({
           ...prev,
           {
             ...src,
-            uid: genUid(),
+            uid: newUid,
             // Wave T — a copy is a NEW question: unlocked it gets a slug
             // key at save; locked it keeps the legacy Q_NEW_ key. Either
             // way it is never inherited, and every copied option must be
@@ -465,6 +477,7 @@ export function useTemplateEditorDraft({
         ];
       });
       setQuestionsDirty();
+      return newUid;
     },
     [questionEditorUnlocked, setQuestionsDirty],
   );
@@ -484,6 +497,36 @@ export function useTemplateEditorDraft({
       setQuestionsDirty();
     },
     [setQuestionsDirty],
+  );
+
+  // ─── Shared question commands (ED4 spec 19af §3.4, co-validate C2) ─────
+  // The three-pane outline (W4) must run mutations through the model so it
+  // can't bypass the show-if dependent cleanup. `deleteQuestion` is the
+  // CONSOLIDATED delete: it removes the row AND clears the `showIf` of every
+  // question that gated on it, returning the affected uids so the caller can
+  // move focus. (The existing `handleDeleteQuestion` above stays as the raw
+  // row-remove that `QuestionsTab` pairs with its own presentation cleanup —
+  // byte-identical, pinned by the 241 editor tests. `addQuestion` /
+  // `duplicateQuestion` / `reorderQuestions` are the return-value aliases of
+  // the handlers above.) Discovery is done from the current `questions`
+  // closure — an updater runs during render, so the returned affected list
+  // must be computed here, not inside `setQuestions`.
+  const deleteQuestion = useCallback(
+    (uid: string): { removedUid: string; affectedDependentUids: string[] } => {
+      const gate = questions.find((q) => q.uid === uid);
+      const affectedDependentUids = gate
+        ? findShowIfDependents(questions, gate).map((d) => d.uid)
+        : [];
+      const clearSet = new Set(affectedDependentUids);
+      setQuestions((prev) =>
+        prev
+          .filter((q) => q.uid !== uid)
+          .map((q) => (clearSet.has(q.uid) ? { ...q, showIf: null } : q)),
+      );
+      setQuestionsDirty();
+      return { removedUid: uid, affectedDependentUids };
+    },
+    [questions, setQuestionsDirty],
   );
 
   // ─── Save Draft — in-flight guard ─────────────────────────────────────
@@ -762,6 +805,14 @@ export function useTemplateEditorDraft({
     handleDeleteQuestion,
     handleDuplicateQuestion,
     handleReorderQuestions,
+    // ─── Shared question commands (ED4 §3.4) — return-value commands the
+    //     three-pane outline calls; addQuestion/duplicateQuestion/
+    //     reorderQuestions are the handlers above (now returning the new/
+    //     affected UIDs), deleteQuestion is the consolidated remove+cleanup. ──
+    addQuestion: handleAddQuestion,
+    duplicateQuestion: handleDuplicateQuestion,
+    reorderQuestions: handleReorderQuestions,
+    deleteQuestion,
     // ─── Save ───
     handleSaveDraft,
   };
