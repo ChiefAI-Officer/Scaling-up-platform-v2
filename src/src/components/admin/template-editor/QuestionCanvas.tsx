@@ -24,11 +24,9 @@
  */
 
 import { useState } from "react";
-import {
-  QuestionInput,
-  type QuestionForInput,
-} from "@/components/assessments/question-input";
+import { QuestionInput } from "@/components/assessments/question-input";
 import type { QuestionDraftRow } from "./question-serialization";
+import { toQuestionForInput } from "./question-widget-mapper";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -39,38 +37,6 @@ export interface QuestionCanvasProps {
   question: QuestionDraft | null;
   /** Display name of the focused question's section (heading), if resolvable. */
   sectionName: string | null;
-}
-
-/** Map an editor draft question to the respondent-widget shape (same per-type
- *  discrimination the inspector's FindingsPreview uses). */
-function toForInput(question: QuestionDraft): QuestionForInput {
-  return {
-    stableKey: question.stableKey || "__canvas__",
-    type: question.type,
-    label: question.label || "(untitled question)",
-    isRequired: question.isRequired,
-    ...(question.type === "SLIDER_LIKERT"
-      ? {
-          scale: {
-            min: question.scaleMin,
-            max: question.scaleMax,
-            step: question.scaleStep,
-            anchorMin: question.anchorMin,
-            anchorMax: question.anchorMax,
-          },
-        }
-      : {}),
-    ...(question.type === "MULTI_CHOICE"
-      ? {
-          options: question.options
-            .filter((o) => o.key !== "")
-            .map((o) => ({ key: o.key, label: o.label || o.key })),
-          ...(question.maxChoices !== null
-            ? { maxChoices: question.maxChoices }
-            : {}),
-        }
-      : {}),
-  };
 }
 
 export function QuestionCanvas({ question, sectionName }: QuestionCanvasProps) {
@@ -93,7 +59,10 @@ export function QuestionCanvas({ question, sectionName }: QuestionCanvasProps) {
     );
   }
 
-  const forInput = toForInput(question);
+  const forInput = toQuestionForInput(question, {
+    labelFallback: "(untitled question)",
+    keyFallback: "__canvas__",
+  });
 
   return (
     <section
