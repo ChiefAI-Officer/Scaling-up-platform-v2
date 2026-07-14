@@ -1,6 +1,6 @@
 # ED4 Three-Pane Editor — Post-Launch Audit & W5 Candidate Backlog
 
-**Date:** 2026-07-14
+**Date:** 2026-07-14\
 **Source:** verified multi-agent audit (`wf_020e403c-51f`) of the *shipped* ED4 three-pane —
 5 review dimensions (layout · interaction · a11y · inspector · design-gap) → adversarial
 verify per finding → this synthesis. 25 raw findings; 24 verified; **23 confirmed** in-scope
@@ -71,8 +71,9 @@ cross-question stale-state divergence in the inspector copy).
   section collapse state resets on every tab round-trip (while focus persists — inconsistent).
 - **Layout:** the row-action hotfix is confirmed sound, but the 20% outline column stays cramped
   at `lg`; consider widening it (`minmax`) — must not disturb the responsive-grid parity test.
-- **DRY:** two hand-maintained draft→widget mappers (`QuestionCanvas.toForInput` vs
-  `FindingsPreview.forInput`) already diverge and will drift; unify (folds into B-4).
+- **DRY:** two hand-maintained draft→widget mappers (`QuestionCanvas.tsx:toForInput` vs
+  `QuestionInspector.tsx:FindingsPreview.forInput`) already diverge and will drift; unify
+  (folds into B-4).
 
 ## D. Ruled out / already handled (do NOT re-litigate)
 - Gate-deletion dependent cleanup is correctly + consistently wired (outline delete, inspector
