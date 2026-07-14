@@ -160,6 +160,11 @@ interface HarnessOverrides {
   onRenameSection?: (uid: string, name: string) => void;
   onMoveSectionUp?: (uid: string) => void;
   onMoveSectionDown?: (uid: string) => void;
+  onDeleteSection?: (uid: string) => {
+    removedSectionKey: string;
+    removedQuestionUids: string[];
+    affectedDependentUids: string[];
+  };
   setFocusedSpy?: jest.Mock;
 }
 
@@ -179,6 +184,12 @@ function renderOutline(o: HarnessOverrides = {}) {
     // survivor/new row to actually exist in the DOM after a mutation.
     const [questions, setQuestions] = useState<QuestionDraftRow[]>(
       o.questions ?? baseQuestions(),
+    );
+    // Sections ALSO live in state (ED5 Task 10) — deleteSection removes a
+    // section from the tree, so the harness must reflect that atomically,
+    // same reasoning as the questions state above.
+    const [sections, setSections] = useState<SectionDraft[]>(
+      o.sections ?? SECTIONS,
     );
     // Collapse slice — model-backed in production (useEditorSelection); a
     // plain local useState here stands in for it (the outline itself no
@@ -235,9 +246,36 @@ function renderOutline(o: HarnessOverrides = {}) {
       return res;
     };
 
+    const handleDeleteSection = (
+      uid: string,
+    ): {
+      removedSectionKey: string;
+      removedQuestionUids: string[];
+      affectedDependentUids: string[];
+    } => {
+      const impl =
+        o.onDeleteSection ??
+        ((sectionUid: string) => {
+          const sec = sections.find((s) => s.uid === sectionUid);
+          const removedSectionKey = sec?.stableKey ?? "";
+          const removedQuestionUids = questions
+            .filter((x) => x.sectionStableKey === removedSectionKey)
+            .map((x) => x.uid);
+          return { removedSectionKey, removedQuestionUids, affectedDependentUids: [] };
+        });
+      const res = impl(uid);
+      // Reflect the cascade ATOMICALLY into the harness's own state, same as
+      // the real model does in one handler.
+      setSections((prev) => prev.filter((s) => s.uid !== uid));
+      setQuestions((prev) =>
+        prev.filter((x) => !res.removedQuestionUids.includes(x.uid)),
+      );
+      return res;
+    };
+
     return (
       <EditorOutline
-        sections={o.sections ?? SECTIONS}
+        sections={sections}
         questions={questions}
         focusedQuestionUid={focused}
         setFocusedQuestionUid={set}
@@ -256,6 +294,7 @@ function renderOutline(o: HarnessOverrides = {}) {
         onRenameSection={o.onRenameSection ?? jest.fn()}
         onMoveSectionUp={o.onMoveSectionUp ?? jest.fn()}
         onMoveSectionDown={o.onMoveSectionDown ?? jest.fn()}
+        onDeleteSection={handleDeleteSection}
       />
     );
   }
@@ -803,5 +842,106 @@ describe("EditorOutline — section add/rename/reorder (ED5 Task 9, B-2)", () =>
       "aria-expanded",
       "true",
     );
+  });
+});
+
+// ── Section DELETE — cascade (ED5 Task 10, B-2b) ────────────────────────────
+describe("EditorOutline — section delete (ED5 Task 10, B-2b cascade)", () => {
+  it("clicking Delete on a non-empty section shows the aggregated confirm and calls onDeleteSection(uid) on OK", () => {
+    const onDeleteSection = jest.fn((uid: string) => ({
+      removedSectionKey: uid === "s1" ? "S1" : "S2",
+      removedQuestionUids: uid === "s1" ? ["u1", "u2"] : ["u3"],
+      affectedDependentUids: [],
+    }));
+    renderOutline({ onDeleteSection });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+
+    const promptText = (window.confirm as jest.Mock).mock.calls[0][0] as string;
+    expect(promptText).toContain("Delete section S1 and its 2 questions?");
+    expect(onDeleteSection).toHaveBeenCalledWith("s1");
+  });
+
+  it("the confirm prompt names an INHERITED question's key when isUnlocked", () => {
+    const questions = [
+      q("u1", "S1_q1", "S1", 1, { isInherited: true }),
+      q("u2", "S1_q2", "S1", 2),
+      q("u3", "S2_q3", "S2", 1),
+    ];
+    renderOutline({ questions, onDeleteSection: jest.fn(() => ({
+      removedSectionKey: "S1",
+      removedQuestionUids: ["u1", "u2"],
+      affectedDependentUids: [],
+    })) });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+
+    const promptText = (window.confirm as jest.Mock).mock.calls[0][0] as string;
+    expect(promptText).toContain("S1_q1");
+    expect(promptText).toContain("published version");
+  });
+
+  it("the confirm prompt names an EXTERNAL show-if dependent freed by the cascade", () => {
+    const questions = [
+      q("u1", "S1_q1", "S1", 1, { type: "MULTI_CHOICE" }),
+      q("u2", "S1_q2", "S1", 2),
+      q("u3", "S2_q3", "S2", 1, {
+        showIf: { questionKey: "S1_q1", optionKey: "a" },
+      }),
+    ];
+    renderOutline({ questions, onDeleteSection: jest.fn(() => ({
+      removedSectionKey: "S1",
+      removedQuestionUids: ["u1", "u2"],
+      affectedDependentUids: ["u3"],
+    })) });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+
+    const promptText = (window.confirm as jest.Mock).mock.calls[0][0] as string;
+    expect(promptText).toContain("S2_q3");
+    expect(promptText).toContain("always-visible");
+  });
+
+  it("canceling the confirm makes no call to onDeleteSection", () => {
+    (window.confirm as jest.Mock).mockImplementation(() => false);
+    const onDeleteSection = jest.fn();
+    renderOutline({ onDeleteSection });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+
+    expect(onDeleteSection).not.toHaveBeenCalled();
+    // Section still present.
+    expect(screen.getByTestId("outline-section-S1")).toBeInTheDocument();
+  });
+
+  it("deleting a section whose questions are NOT focused leaves focus unchanged", () => {
+    const { setFocusedSpy } = renderOutline({ initialFocus: "u3" }); // S2_q3
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+    expect(setFocusedSpy).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("outline-section-S1")).not.toBeInTheDocument();
+  });
+
+  it("deleting the section containing the FOCUSED question moves focus to the nearest surviving section's first question", () => {
+    const { setFocusedSpy } = renderOutline({ initialFocus: "u1" }); // S1_q1
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+    // S1 removed entirely; the only survivor is S2_q3 (u3).
+    expect(setFocusedSpy).toHaveBeenCalledWith("u3");
+  });
+
+  it("the Delete button is disabled when isReadOnly", () => {
+    renderOutline({ isReadOnly: true });
+    expect(screen.getByTestId("outline-section-delete-S1")).toBeDisabled();
   });
 });

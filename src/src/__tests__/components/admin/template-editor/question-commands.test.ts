@@ -17,6 +17,7 @@ import { renderHook, act } from "@testing-library/react";
 
 import {
   buildDeleteConfirmText,
+  buildSectionDeletePrompt,
   buildShowIfDependentsWarning,
   computeSurvivorFocus,
   findShowIfDependents,
@@ -81,6 +82,69 @@ function renderDraft() {
     useTemplateEditorDraft({
       template,
       version: makeVersion(),
+      publishedQuestionKeys: [],
+      publishedOptionKeys: {},
+      questionEditorUnlocked: true,
+      waveQEnabled: false,
+    }),
+  );
+}
+
+// ED5 Task 10 (B-2b) — two sections, with a cross-section show-if AND an
+// in-section show-if, so `deleteSection` can be pinned on the distinction
+// between "external dependent" (cleared, reported) and "in-section
+// dependent" (just removed along with its gate — never reported).
+function makeVersionWithTwoSections() {
+  return {
+    id: "ver_3",
+    versionNumber: 3,
+    language: "en-US",
+    publishedAt: null as string | null,
+    contentHash: "abcdef012345",
+    sections: [
+      { stableKey: "S1", name: "Section One" },
+      { stableKey: "S2", name: "Section Two" },
+    ],
+    questions: [
+      {
+        stableKey: "S1_a",
+        sectionStableKey: "S1",
+        label: "Gate",
+        type: "MULTI_CHOICE",
+        isRequired: true,
+        sortOrder: 1,
+        options: [{ key: "a", label: "Alpha" }],
+        maxChoices: 1,
+      },
+      {
+        stableKey: "S1_b",
+        sectionStableKey: "S1",
+        label: "In-section dependent",
+        type: "TEXT",
+        isRequired: false,
+        sortOrder: 2,
+        showIf: { questionKey: "S1_a", optionKey: "a" },
+      },
+      {
+        stableKey: "S2_x",
+        sectionStableKey: "S2",
+        label: "External dependent",
+        type: "TEXT",
+        isRequired: false,
+        sortOrder: 1,
+        showIf: { questionKey: "S1_a", optionKey: "a" },
+      },
+    ],
+    scoringConfig: {},
+    reportConfig: null,
+  };
+}
+
+function renderDraftTwoSections() {
+  return renderHook(() =>
+    useTemplateEditorDraft({
+      template,
+      version: makeVersionWithTwoSections(),
       publishedQuestionKeys: [],
       publishedOptionKeys: {},
       questionEditorUnlocked: true,
@@ -175,6 +239,81 @@ describe("findShowIfDependents", () => {
   });
 });
 
+// ── Aggregated section-delete prompt (ED5 Task 10, B-2b) ───────────────────
+describe("buildSectionDeletePrompt", () => {
+  it("empty section = simple prompt, no count/consequence/dependents lines", () => {
+    const prompt = buildSectionDeletePrompt(
+      { name: "Intro", stableKey: "S1" },
+      {
+        questionCount: 0,
+        inheritedKeys: [],
+        freedDependentKeys: [],
+        isUnlocked: true,
+      },
+    );
+    expect(prompt).toBe("Delete section S1?");
+  });
+
+  it("non-empty section names the count, enumerates inherited keys with consequence language, and names freed dependents", () => {
+    const prompt = buildSectionDeletePrompt(
+      { name: "Recruit", stableKey: "S3" },
+      {
+        questionCount: 3,
+        inheritedKeys: ["S3_a", "S3_b"],
+        freedDependentKeys: ["S5_why"],
+        isUnlocked: true,
+      },
+    );
+    expect(prompt).toContain("Delete section S3 and its 3 questions?");
+    expect(prompt).toContain("S3_a, S3_b");
+    expect(prompt).toContain("trend");
+    expect(prompt).toContain("S5_why");
+    expect(prompt).toContain("Continue?");
+  });
+
+  it("singular question count uses the singular noun", () => {
+    const prompt = buildSectionDeletePrompt(
+      { name: "Solo", stableKey: "S4" },
+      {
+        questionCount: 1,
+        inheritedKeys: [],
+        freedDependentKeys: [],
+        isUnlocked: true,
+      },
+    );
+    expect(prompt).toContain("Delete section S4 and its 1 question?");
+  });
+
+  it("inherited keys are NOT enumerated when isUnlocked is false", () => {
+    const prompt = buildSectionDeletePrompt(
+      { name: "Recruit", stableKey: "S3" },
+      {
+        questionCount: 2,
+        inheritedKeys: ["S3_a"],
+        freedDependentKeys: [],
+        isUnlocked: false,
+      },
+    );
+    expect(prompt).not.toContain("published version");
+    expect(prompt).not.toContain("S3_a");
+  });
+
+  it("freed dependents are named even when there are no inherited keys", () => {
+    const prompt = buildSectionDeletePrompt(
+      { name: "Recruit", stableKey: "S3" },
+      {
+        questionCount: 1,
+        inheritedKeys: [],
+        freedDependentKeys: ["S5_why", "S5_other"],
+        isUnlocked: true,
+      },
+    );
+    expect(prompt).toContain(
+      "2 questions shown conditionally on deleted questions will become always-visible: S5_why, S5_other.",
+    );
+  });
+});
+
 // ── Model commands ─────────────────────────────────────────────────────────
 describe("useTemplateEditorDraft — question commands", () => {
   it("addQuestion returns a NEW uid not previously present, added to the section", () => {
@@ -248,6 +387,89 @@ describe("useTemplateEditorDraft — question commands", () => {
     const depAfter = result.current.questions.find((q) => q.uid === dep.uid)!;
     expect(depAfter.sortOrder).toBe(1);
     expect(gateAfter.sortOrder).toBe(2);
+  });
+});
+
+// ── deleteSection — cascade command (ED5 Task 10, B-2b) ────────────────────
+describe("useTemplateEditorDraft — deleteSection", () => {
+  it("removes the section + its questions atomically, clears the EXTERNAL dependent's showIf, and does NOT report the in-section dependent as affected", () => {
+    const { result } = renderDraftTwoSections();
+    const s1 = result.current.sections.find((s) => s.stableKey === "S1")!;
+    const gate = result.current.questions.find((q) => q.stableKey === "S1_a")!;
+    const inSectionDep = result.current.questions.find(
+      (q) => q.stableKey === "S1_b",
+    )!;
+    const externalDep = result.current.questions.find(
+      (q) => q.stableKey === "S2_x",
+    )!;
+    expect(externalDep.showIf).toEqual({ questionKey: "S1_a", optionKey: "a" });
+
+    let res:
+      | {
+          removedSectionKey: string;
+          removedQuestionUids: string[];
+          affectedDependentUids: string[];
+        }
+      | undefined;
+    act(() => {
+      res = result.current.deleteSection(s1.uid);
+    });
+
+    expect(res!.removedSectionKey).toBe("S1");
+    expect(new Set(res!.removedQuestionUids)).toEqual(
+      new Set([gate.uid, inSectionDep.uid]),
+    );
+    // The in-section dependent is removed too — it must NOT show up as an
+    // "affected" (survives-with-cleared-showIf) dependent.
+    expect(res!.affectedDependentUids).toEqual([externalDep.uid]);
+
+    // Section physically removed (atomic with the questions below).
+    expect(result.current.sections.map((s) => s.stableKey)).toEqual(["S2"]);
+
+    // Both S1 questions gone.
+    expect(
+      result.current.questions.some((q) => q.stableKey === "S1_a"),
+    ).toBe(false);
+    expect(
+      result.current.questions.some((q) => q.stableKey === "S1_b"),
+    ).toBe(false);
+
+    // External dependent survives with showIf CLEARED.
+    const externalAfter = result.current.questions.find(
+      (q) => q.stableKey === "S2_x",
+    )!;
+    expect(externalAfter).toBeDefined();
+    expect(externalAfter.showIf).toBeNull();
+
+    // Both surfaces flagged dirty by the one atomic handler.
+    expect(result.current.dirtyFlags.sections).toBe(true);
+    expect(result.current.dirtyFlags.questions).toBe(true);
+  });
+
+  it("an empty section deletes cleanly with no removed questions and no affected dependents", () => {
+    const { result } = renderDraft(); // single-section S1 fixture
+    act(() => {
+      result.current.handleSectionsAdd(); // adds an empty S2-ish section
+    });
+    const empty = result.current.sections.find((s) => s.stableKey !== "S1")!;
+    let res:
+      | {
+          removedSectionKey: string;
+          removedQuestionUids: string[];
+          affectedDependentUids: string[];
+        }
+      | undefined;
+    act(() => {
+      res = result.current.deleteSection(empty.uid);
+    });
+    expect(res).toEqual({
+      removedSectionKey: empty.stableKey,
+      removedQuestionUids: [],
+      affectedDependentUids: [],
+    });
+    expect(
+      result.current.sections.some((s) => s.uid === empty.uid),
+    ).toBe(false);
   });
 });
 

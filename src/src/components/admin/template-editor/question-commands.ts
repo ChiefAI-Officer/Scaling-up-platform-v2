@@ -176,3 +176,46 @@ export function computeSurvivorFocus(
   }
   return survivors[0].uid;
 }
+
+/**
+ * ED5 (Task 10, audit B-2b) — the AGGREGATED confirm prompt for a section
+ * cascade delete (the model's `deleteSection` command removes the section
+ * AND every question in it, atomically). Unlike a single-question delete,
+ * this must summarize a WHOLE removed set: the question count, which of them
+ * are inherited (Wave T history-consequence language — enumerated only when
+ * `isUnlocked`, mirroring `buildQuestionDeletePrompt`'s own gate), and which
+ * EXTERNAL questions (outside the section) had a show-if gate removed out
+ * from under them and so become always-visible. An empty section needs none
+ * of this — a bare confirm is enough.
+ */
+export function buildSectionDeletePrompt(
+  section: { name: string; stableKey: string },
+  opts: {
+    questionCount: number;
+    inheritedKeys: readonly string[];
+    freedDependentKeys: readonly string[];
+    isUnlocked: boolean;
+  },
+): string {
+  if (opts.questionCount === 0) return `Delete section ${section.stableKey}?`;
+  const lines = [
+    `Delete section ${section.stableKey} and its ${opts.questionCount} question${opts.questionCount === 1 ? "" : "s"}?`,
+  ];
+  if (opts.isUnlocked && opts.inheritedKeys.length) {
+    lines.push(
+      "",
+      `${opts.inheritedKeys.length} of these exist in a published version (${opts.inheritedKeys.join(", ")}). Deleting them means:`,
+      "• cross-version trend history for those keys ends with the last published version;",
+      "• a locked Esperto import crosswalk that maps them will refuse imports;",
+      "• any peer benchmarks on them are pruned.",
+    );
+  }
+  if (opts.freedDependentKeys.length) {
+    lines.push(
+      "",
+      `${opts.freedDependentKeys.length} question${opts.freedDependentKeys.length === 1 ? "" : "s"} shown conditionally on deleted questions will become always-visible: ${opts.freedDependentKeys.join(", ")}.`,
+    );
+  }
+  lines.push("", "Continue?");
+  return lines.join("\n");
+}

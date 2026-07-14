@@ -49,6 +49,19 @@
  * shared `computeSurvivorFocus` (next sibling, else previous, else nearest
  * section), or the section's "+ Add question" control when the template has
  * no surviving questions left.
+ *
+ * Section DELETE (ED5 Task 10, audit B-2b): the cascade lives on the model
+ * (`useTemplateEditorDraft.deleteSection`) — it removes the section AND every
+ * question in it, ATOMICALLY, clearing the `showIf` of any question OUTSIDE
+ * the section that gated on one of them (a dependent INSIDE the section is
+ * just removed, never reported). The outline assembles the aggregated
+ * confirm (`buildSectionDeletePrompt` — count, inherited-key enumeration when
+ * Wave T is unlocked, freed-dependent names) from its own local
+ * `questions`/`findShowIfDependents` read BEFORE calling the command, then
+ * applies the same G10 focus discipline as a question delete: only
+ * reposition focus when the currently focused question was inside the
+ * deleted section (survivor via the shared `computeSurvivorFocus`, same DOM
+ * focus/scroll mechanism as above).
  */
 
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -75,12 +88,14 @@ import {
   ChevronDown,
   ChevronRight,
   GripVertical,
+  Trash2,
 } from "lucide-react";
 
 import type { SectionDraft } from "./SectionsCard";
 import type { QuestionDraftRow } from "./question-serialization";
 import {
   buildQuestionDeletePrompt,
+  buildSectionDeletePrompt,
   computeSurvivorFocus,
   findShowIfDependents,
 } from "./question-commands";
@@ -125,12 +140,23 @@ export interface EditorOutlineProps {
    * ED5 Task 9 (B-2) — shared model section commands, so authors never have
    * to leave the outline to add/rename/reorder a section. Mirrors
    * `SectionsCard`'s inline-rename input + arrow-button reorder idiom.
-   * Section DELETE is a separate later task — intentionally not wired here.
    */
   onAddSection: () => void;
   onRenameSection: (uid: string, name: string) => void;
   onMoveSectionUp: (uid: string) => void;
   onMoveSectionDown: (uid: string) => void;
+  /**
+   * ED5 Task 10 (B-2b) — shared model CASCADE command: removes the section
+   * AND every question in it atomically, clearing external show-if
+   * dependents (see the model's `deleteSection` doc). The outline assembles
+   * the aggregated confirm and the survivor-focus recompute itself before
+   * calling this.
+   */
+  onDeleteSection: (uid: string) => {
+    removedSectionKey: string;
+    removedQuestionUids: string[];
+    affectedDependentUids: string[];
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -304,6 +330,7 @@ export function EditorOutline({
   onRenameSection,
   onMoveSectionUp,
   onMoveSectionDown,
+  onDeleteSection,
 }: EditorOutlineProps) {
   // ED5 Task 8 (B-1b) — read-only "Logic map" drawer, gated on the Wave-W
   // conditional flag exactly like the row badges above.
@@ -414,6 +441,72 @@ export function EditorOutline({
   const handleMoveSectionDown = (uid: string) => {
     if (isReadOnly) return;
     onMoveSectionDown(uid);
+  };
+
+  // ── Section DELETE — cascade (ED5 Task 10, B-2b) ────────────────────────
+  const handleDeleteSection = (s: SectionDraft) => {
+    if (isReadOnly) return;
+    const list = questionsBySection[s.stableKey] ?? [];
+    const inheritedKeys = list.filter((qq) => qq.isInherited).map((qq) => qq.stableKey);
+    const removedUidSet = new Set(list.map((qq) => qq.uid));
+    // Union of gates' dependents, restricted to questions the cascade does
+    // NOT already remove (an in-section dependent is being removed too — it
+    // never "becomes always-visible", so it isn't named here).
+    const freedDependentKeys = Array.from(
+      new Set(
+        list
+          .flatMap((gate) => findShowIfDependents(questions, gate))
+          .filter((dep) => !removedUidSet.has(dep.uid))
+          .map((dep) => dep.stableKey),
+      ),
+    );
+    const ok = window.confirm(
+      buildSectionDeletePrompt(
+        { name: s.name, stableKey: s.stableKey },
+        {
+          questionCount: list.length,
+          inheritedKeys,
+          freedDependentKeys,
+          isUnlocked,
+        },
+      ),
+    );
+    if (!ok) return;
+
+    // Focus policy (mirrors the per-question G10 rule): only reposition
+    // focus when the currently FOCUSED question is one this cascade removes
+    // — an unrelated focus elsewhere in the template must not be disturbed
+    // by deleting a different section. Computed BEFORE the delete call so
+    // the pre-cascade question order is intact for `computeSurvivorFocus`.
+    const removedUids = list.map((qq) => qq.uid);
+    const wasFocusInSection =
+      focusedQuestionUid !== null && removedUidSet.has(focusedQuestionUid);
+    const survivor = wasFocusInSection
+      ? computeSurvivorFocus(
+          questions,
+          sections.map((sec) => sec.stableKey),
+          removedUids[0],
+          removedUids.slice(1),
+        )
+      : null;
+
+    onDeleteSection(s.uid);
+
+    if (wasFocusInSection) {
+      setFocusedQuestionUid(survivor);
+      if (survivor) {
+        pendingFocusRef.current = { kind: "row", uid: survivor };
+      } else {
+        // No surviving question anywhere — try the first remaining
+        // section's "+ Add question" control; if no section survives
+        // either, the outline falls back to the G9 empty state and there
+        // is nothing left in this component's DOM to focus.
+        const nextSection = sections.find((sec) => sec.uid !== s.uid);
+        pendingFocusRef.current = nextSection
+          ? { kind: "add", sectionKey: nextSection.stableKey }
+          : null;
+      }
+    }
   };
 
   const handleAdd = (sectionKey: string) => {
@@ -569,6 +662,17 @@ export function EditorOutline({
                   className="flex-shrink-0 p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <ArrowDown className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  data-testid={`outline-section-delete-${s.stableKey}`}
+                  aria-label={`Delete section ${s.stableKey}`}
+                  title="Delete section"
+                  onClick={() => handleDeleteSection(s)}
+                  disabled={isReadOnly}
+                  className="flex-shrink-0 p-1 rounded text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
 

@@ -370,6 +370,69 @@ export function useTemplateEditorDraft({
     [setSectionsDirty],
   );
 
+  // ─── Section CASCADE delete (ED5 Task 10, audit B-2b) ──────────────────
+  // `handleSectionsDelete` above (kept UNTOUCHED for its existing Sections-tab
+  // callers — T15 later routes them to this instead) just filters out the
+  // section, ORPHANING its questions (audit finding B-2b). This is the real
+  // fix: remove the section AND every question in it, ATOMICALLY (one
+  // `setSections` + one `setQuestions`, so React commits both in the same
+  // render — no intermediate state where a question dangles on a deleted
+  // section). External show-if dependents (questions OUTSIDE the section
+  // gated on one of the removed questions) have their `showIf` cleared and
+  // are reported back so the caller can warn/refocus; a dependent INSIDE the
+  // deleted section is just removed along with everything else — it was
+  // never going to survive, so it is never reported as "affected".
+  const deleteSection = useCallback(
+    (
+      uid: string,
+    ): {
+      removedSectionKey: string;
+      removedQuestionUids: string[];
+      affectedDependentUids: string[];
+    } => {
+      const section = sections.find((s) => s.uid === uid);
+      if (!section) {
+        return {
+          removedSectionKey: "",
+          removedQuestionUids: [],
+          affectedDependentUids: [],
+        };
+      }
+      const removedSectionKey = section.stableKey;
+      const removedQuestionRows = questions.filter(
+        (q) => q.sectionStableKey === removedSectionKey,
+      );
+      const removedQuestionUids = removedQuestionRows.map((q) => q.uid);
+      const removedSet = new Set(removedQuestionUids);
+
+      // Union of findShowIfDependents(questions, gate) for every removed
+      // gate, restricted to questions OUTSIDE the section (an in-section
+      // dependent is being removed anyway — it never survives to be
+      // "affected"), de-duplicated across gates.
+      const affectedSet = new Set<string>();
+      for (const gate of removedQuestionRows) {
+        for (const dep of findShowIfDependents(questions, gate)) {
+          if (dep.sectionStableKey !== removedSectionKey && !removedSet.has(dep.uid)) {
+            affectedSet.add(dep.uid);
+          }
+        }
+      }
+      const affectedDependentUids = Array.from(affectedSet);
+
+      setSections((prev) => prev.filter((s) => s.uid !== uid));
+      setQuestions((prev) =>
+        prev
+          .filter((q) => !removedSet.has(q.uid))
+          .map((q) => (affectedSet.has(q.uid) ? { ...q, showIf: null } : q)),
+      );
+      setSectionsDirty();
+      setQuestionsDirty();
+
+      return { removedSectionKey, removedQuestionUids, affectedDependentUids };
+    },
+    [sections, questions, setSectionsDirty, setQuestionsDirty],
+  );
+
   // ─── Question operations — F3 ─────────────────────────────────────────
   const handleAddQuestion = useCallback(
     (sectionStableKey: string): string => {
@@ -813,6 +876,9 @@ export function useTemplateEditorDraft({
     duplicateQuestion: handleDuplicateQuestion,
     reorderQuestions: handleReorderQuestions,
     deleteQuestion,
+    // ED5 Task 10 (B-2b) — the section-cascade analog of `deleteQuestion`:
+    // atomic section+questions removal, external show-if dependents cleared.
+    deleteSection,
     // ─── Save ───
     handleSaveDraft,
   };
