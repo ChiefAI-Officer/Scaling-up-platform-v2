@@ -145,51 +145,57 @@ function SortableOutlineRow({
         <GripVertical className="w-4 h-4" />
       </button>
 
-      <button
-        type="button"
-        onClick={onFocus}
-        data-testid={`outline-focus-${key}`}
-        aria-pressed={isFocused}
-        aria-label={`Edit ${question.stableKey || "new question"}`}
-        className="flex-1 min-w-0 text-left"
-      >
-        <span className="flex items-center gap-1.5 mb-0.5">
-          <span
-            className="inline-flex items-center px-1 py-0.5 text-[0.5625rem] font-mono font-semibold uppercase tracking-wide rounded bg-muted text-muted-foreground"
-          >
-            {question.stableKey || (
-              <span className="italic normal-case">(assigned on save)</span>
+      {/* flex-1 column: content on top, actions BELOW — so the type/key badges
+          never compete horizontally with Duplicate/Delete in the narrow outline
+          column (ED4 launch hotfix — the badges used to overflow and overlap the
+          action buttons at ~20% width). */}
+      <div className="flex-1 min-w-0 space-y-1">
+        <button
+          type="button"
+          onClick={onFocus}
+          data-testid={`outline-focus-${key}`}
+          aria-pressed={isFocused}
+          aria-label={`Edit ${question.stableKey || "new question"}`}
+          className="block w-full min-w-0 text-left"
+        >
+          <span className="flex flex-wrap items-center gap-1.5 mb-0.5">
+            <span
+              className="inline-flex items-center px-1 py-0.5 text-[0.5625rem] font-mono font-semibold uppercase tracking-wide rounded bg-muted text-muted-foreground"
+            >
+              {question.stableKey || (
+                <span className="italic normal-case">(assigned on save)</span>
+              )}
+            </span>
+            <span className="inline-flex items-center px-1 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide rounded bg-success/10 text-success">
+              {question.type}
+            </span>
+          </span>
+          <span className="block text-xs text-foreground truncate">
+            {question.label || (
+              <span className="italic text-muted-foreground">(no label yet)</span>
             )}
           </span>
-          <span className="inline-flex items-center px-1 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-wide rounded bg-success/10 text-success">
-            {question.type}
-          </span>
-        </span>
-        <span className="block text-xs text-foreground truncate">
-          {question.label || (
-            <span className="italic text-muted-foreground">(no label yet)</span>
-          )}
-        </span>
-      </button>
+        </button>
 
-      <span className="flex items-center gap-0.5 flex-shrink-0">
-        <button
-          type="button"
-          onClick={onDuplicate}
-          disabled={isReadOnly}
-          className="text-[0.6875rem] font-medium px-1.5 py-1 rounded text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Duplicate
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={isReadOnly}
-          className="text-[0.6875rem] font-medium px-1.5 py-1 rounded text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Delete
-        </button>
-      </span>
+        <span className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onDuplicate}
+            disabled={isReadOnly}
+            className="text-[0.6875rem] font-medium px-1.5 py-1 rounded text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={isReadOnly}
+            className="text-[0.6875rem] font-medium px-1.5 py-1 rounded text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Delete
+          </button>
+        </span>
+      </div>
     </li>
   );
 }

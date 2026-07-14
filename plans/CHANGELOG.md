@@ -6,6 +6,18 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-14 — Wave ED4 (three-pane authoring workspace) LAUNCHED — live on production <!-- ENTRY_ISO:2026-07-14 ENTRY_SLUG:wave-ed4-launched -->
+
+**Launch of the ED4 three-pane workspace built the prior day** (PR #181, `wave-ed4-three-pane` entry below). The single default-OFF lever `WAVE_ED4_THREE_PANE_ENABLED` was set to `1` on Vercel **Production** (`vercel env add`, authed as `josh-4119`) and the ED4 merge was **redeployed** → new production deployment `fdtz0t805` (Ready, aliased `platformtest.scalingup.com`). The flag is read server-side at request time (`isThreePaneEnabled()` in `wave-ed4-flags.ts`), so the redeploy is what makes it live; **kill stays flag-off + redeploy → byte-identical `QuestionsTab`** (presentation-only; no persisted data is touched).
+
+**Launch-verified live (read-only, no prod-data writes).** Logged into prod as admin and opened the Leadership Vision Alignment editor (a published v3 version). Confirmed end-to-end: the Questions tab is **relabeled "Edit" and is the default tab** (the flag-ON signal); the three-pane renders — `EditorOutline` (all sections + questions) · `QuestionCanvas` · reused `QuestionInspector`; **focusing a question populates the canvas with the real respondent widget** (SLIDER, `id="canvas-q-S3_recruitment"` `type="range"`, section heading + label + required — the co-validate-C5 `canvas-q-` idPrefix, no DOM-id collision with the inspector's FindingsPreview); the inspector populates; and **Add / Duplicate / Delete / Drag are correctly disabled** on the published version (G4 read-only). The keep-or-kill judgment is the ~3 internal admins' walk.
+
+**Launch-walk-found defect → same-session hotfix (`EditorOutline` only).** The outline question rows overlapped: in the ~20% outline column (further squeezed by the Assessments left sub-nav), the non-wrapping stableKey + type badges (e.g. `SLIDER_LIKERT`) overflowed the focus button and spilled onto the row's Duplicate/Delete buttons. Fix: restructured `SortableOutlineRow` so the focus button and the action buttons share one `flex-1 min-w-0` **column** — the actions now sit **below** the content instead of competing horizontally with the badges (the badge row also gets `flex-wrap`). No horizontal overlap is possible at any column width. This is **flag-ON-only code** (`EditorOutline` renders only when the flag is on), so it cannot touch the byte-identical flag-OFF path or the responsive-grid parity test. All row testids/aria and the jsdom drag-reorder harness are preserved; **230 template-editor tests / 18 suites green**, ESLint clean, `CI=true next build --turbopack` green.
+
+Kill = flag off + redeploy (presentation only; no persisted data). SoT anchor `wave-ed4-launched`.
+
+---
+
 ### 2026-07-13 — Wave ED4 (assessment-editor overhaul — three-pane authoring workspace) <!-- ENTRY_ISO:2026-07-13 ENTRY_SLUG:wave-ed4-three-pane -->
 
 **Wave 4 of the re-sequenced 5-wave editor overhaul** (spec `docs/specs/v7.6/19af-editor-overhaul-wave4-three-pane.md` + plan `19af-plan-wave4-three-pane.md`). The **layout rebuild** — the Approach-A **three-pane authoring workspace** (left outline · center in-context canvas · right inspector) — earned last, after the three capability/pivot waves (ED1 Test Mode, ED2 Safe-to-Publish, ED3 extract-hooks). **Ships dark** behind a single default-OFF flag **`WAVE_ED4_THREE_PANE_ENABLED`**; **kill = flag off + redeploy** (Vercel env needs a redeploy — NOT zero-deploy), restoring a **byte-identical** `QuestionsTab`. No schema/migration/ADR.
