@@ -131,14 +131,15 @@ describe("ED4 T3 — flag ON: three-pane workspace pick", () => {
     render(<TemplateEditorTabbed {...baseProps(true)} />);
 
     // Body = the workspace (the real EditorOutline (T4) + the real
-    // QuestionCanvas (T5) + the reused inspector). Nothing is focused on the
-    // initial flag-ON mount (three-pane preserves focus, no mount-reset), so the
-    // canvas shows its empty state.
+    // QuestionCanvas (T5) + the reused inspector). ED5 Task 4 (audit A-1)
+    // auto-focuses the first section's first question once on mount, so the
+    // canvas shows that question rather than its empty state — see
+    // TemplateEditorController.test.tsx for the dedicated auto-focus suite.
     expect(screen.getByTestId("three-pane-workspace")).toBeInTheDocument();
     expect(screen.getByTestId("editor-outline")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("question-canvas-empty"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("question-canvas")).toHaveTextContent(
+      "Q1 label",
+    );
     expect(screen.getByTestId("questions-config-form")).toBeInTheDocument();
 
     // The legacy QuestionsTab body is NOT rendered.
@@ -156,7 +157,24 @@ describe("ED4 T3 — flag ON: three-pane workspace pick", () => {
     // Single column (stacked) by default; three columns at the `lg` breakpoint —
     // mirrors QuestionsTab's `sticky lg+`. No new responsive framework.
     expect(workspace.className).toContain("grid-cols-1");
-    expect(workspace.className).toContain("lg:grid-cols-[20%_50%_30%]");
+    // ED5 T14 — outline column widened from a fixed 20% to a min-width floor so
+    // long type/key badges aren't cramped; centre flexes, inspector stays 30%.
+    expect(workspace.className).toContain(
+      "lg:grid-cols-[minmax(14rem,22%)_1fr_30%]",
+    );
+  });
+
+  it("ED5 T13 — the three panes carry landmark labels (a11y)", () => {
+    render(<TemplateEditorTabbed {...baseProps(true)} />);
+    expect(
+      screen.getByRole("complementary", { name: "Question outline" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("complementary", { name: "Question inspector" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Question preview" }),
+    ).toBeInTheDocument();
   });
 });
 

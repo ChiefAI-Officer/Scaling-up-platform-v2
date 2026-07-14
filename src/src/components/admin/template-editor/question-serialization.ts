@@ -92,7 +92,8 @@ export type QuestionSerializationErrorCode =
   | "INHERITED_TYPE_MUTATED"
   | "INHERITED_OPTION_KEY_MUTATED"
   | "MULTI_CHOICE_NO_OPTIONS"
-  | "MAX_CHOICES_EXCEEDS_OPTIONS";
+  | "MAX_CHOICES_EXCEEDS_OPTIONS"
+  | "ORPHAN_SECTION_REF";
 
 export class QuestionSerializationError extends Error {
   readonly code: QuestionSerializationErrorCode;

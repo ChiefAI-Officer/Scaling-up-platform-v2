@@ -73,6 +73,60 @@ export function findShowIfDependents(
   );
 }
 
+export interface SectionDeleteImpact {
+  /** Questions in the section (all deleted by a cascade). */
+  questionCount: number;
+  removedQuestionUids: string[];
+  /** stableKeys of the deleted questions that exist in a published version. */
+  inheritedKeys: string[];
+  /** stableKeys of EXTERNAL dependents (outside the section) whose showIf gates
+   *  on a deleted question — they become always-visible. In-section dependents
+   *  are just removed and never reported here. */
+  freedDependentKeys: string[];
+}
+
+/**
+ * ED5 (B-2b / co-validate C2) — the SINGLE computation of a section-delete's
+ * blast radius, shared by BOTH the three-pane outline AND the legacy Sections
+ * tab so their confirm prompts (built by `buildSectionDeletePrompt`) can never
+ * diverge. Mirrors the model's `deleteSection` external-dependent rule exactly.
+ */
+export function collectSectionDeleteImpact(
+  sections: readonly { uid: string; stableKey: string }[],
+  questions: readonly QuestionDraftRow[],
+  sectionUid: string,
+): SectionDeleteImpact {
+  const empty: SectionDeleteImpact = {
+    questionCount: 0,
+    removedQuestionUids: [],
+    inheritedKeys: [],
+    freedDependentKeys: [],
+  };
+  const section = sections.find((s) => s.uid === sectionUid);
+  if (!section) return empty;
+  const removed = questions.filter(
+    (q) => q.sectionStableKey === section.stableKey,
+  );
+  const removedUidSet = new Set(removed.map((q) => q.uid));
+  const freed = new Set<string>();
+  for (const gate of removed) {
+    for (const dep of findShowIfDependents(questions, gate)) {
+      if (
+        dep.sectionStableKey !== section.stableKey &&
+        !removedUidSet.has(dep.uid)
+      ) {
+        freed.add(dep.stableKey);
+      }
+    }
+  }
+  return {
+    questionCount: removed.length,
+    removedQuestionUids: removed.map((q) => q.uid),
+    inheritedKeys: removed.filter((q) => q.isInherited).map((q) => q.stableKey),
+    freedDependentKeys: Array.from(freed),
+  };
+}
+
 /**
  * ED4 (spec 19af §3.4) — the FULL delete-confirm prompt, lifted VERBATIM out
  * of `QuestionsTab`'s row so BOTH the legacy tab and the three-pane outline
@@ -136,4 +190,115 @@ export function computeShowIfGates(
       label: q.label,
       options: q.options.map((o) => ({ key: o.key, label: o.label })),
     }));
+}
+
+/**
+ * ED5 (Task 5, audit C — focus rule) — which question should receive focus
+ * after `primaryRemovedUid` (plus any `alsoRemoved` cascade uids) is deleted,
+ * given the PRE-delete question list and the section render order. Prefers
+ * the next sibling in the removed question's own section (by `sortOrder`),
+ * else the previous sibling in that section, else the nearest surviving
+ * question in section order, else `null` when the template has no questions
+ * left. Pure — `EditorOutline` applies both the model focus
+ * (`setFocusedQuestionUid`) and the DOM keyboard focus/scroll from the
+ * result.
+ */
+export function computeSurvivorFocus(
+  questions: readonly Pick<QuestionDraftRow, "uid" | "sectionStableKey" | "sortOrder">[],
+  sectionOrder: readonly string[],
+  primaryRemovedUid: string,
+  alsoRemoved: readonly string[] = [],
+): string | null {
+  const removed = new Set([primaryRemovedUid, ...alsoRemoved]);
+  const target = questions.find((q) => q.uid === primaryRemovedUid);
+  const survivors = questions.filter((q) => !removed.has(q.uid));
+  if (survivors.length === 0) return null;
+  const bySection = (sec: string) =>
+    survivors
+      .filter((q) => q.sectionStableKey === sec)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  if (target) {
+    const same = bySection(target.sectionStableKey);
+    const next = same.find((q) => q.sortOrder > target.sortOrder);
+    if (next) return next.uid;
+    const prev = [...same].reverse().find((q) => q.sortOrder < target.sortOrder);
+    if (prev) return prev.uid;
+  }
+  for (const sec of sectionOrder) {
+    const list = bySection(sec);
+    if (list.length) return list[0].uid;
+  }
+  return survivors[0].uid;
+}
+
+/**
+ * ED5 (Task 10, audit B-2b) — the AGGREGATED confirm prompt for a section
+ * cascade delete (the model's `deleteSection` command removes the section
+ * AND every question in it, atomically). Unlike a single-question delete,
+ * this must summarize a WHOLE removed set: the question count, which of them
+ * are inherited (Wave T history-consequence language — enumerated only when
+ * `isUnlocked`, mirroring `buildQuestionDeletePrompt`'s own gate), and which
+ * EXTERNAL questions (outside the section) had a show-if gate removed out
+ * from under them and so become always-visible. An empty section needs none
+ * of this — a bare confirm is enough.
+ */
+export function buildSectionDeletePrompt(
+  section: { name: string; stableKey: string },
+  opts: {
+    questionCount: number;
+    inheritedKeys: readonly string[];
+    freedDependentKeys: readonly string[];
+    isUnlocked: boolean;
+  },
+): string {
+  if (opts.questionCount === 0) return `Delete section ${section.stableKey}?`;
+  const lines = [
+    `Delete section ${section.stableKey} and its ${opts.questionCount} question${opts.questionCount === 1 ? "" : "s"}?`,
+  ];
+  if (opts.isUnlocked && opts.inheritedKeys.length) {
+    lines.push(
+      "",
+      `${opts.inheritedKeys.length} of these exist in a published version (${opts.inheritedKeys.join(", ")}). Deleting them means:`,
+      "• cross-version trend history for those keys ends with the last published version;",
+      "• a locked Esperto import crosswalk that maps them will refuse imports;",
+      "• any peer benchmarks on them are pruned.",
+    );
+  }
+  if (opts.freedDependentKeys.length) {
+    lines.push(
+      "",
+      `${opts.freedDependentKeys.length} question${opts.freedDependentKeys.length === 1 ? "" : "s"} shown conditionally on deleted questions will become always-visible: ${opts.freedDependentKeys.join(", ")}.`,
+    );
+  }
+  lines.push("", "Continue?");
+  return lines.join("\n");
+}
+
+/**
+ * ED5 (Task 11, audit B-3) — confirm text for moving a question to a
+ * DIFFERENT section via the outline's explicit "Move to section…" control.
+ * `stableKey` is immutable (a move never changes it, even for an inherited
+ * question whose key carries the OLD section's prefix); only
+ * `sectionStableKey`/`sortOrder` change (the model's `moveQuestionToSection`
+ * command). A new-to-draft question has no history to protect, so it moves
+ * silently (empty string ⇒ the caller skips `window.confirm` entirely); an
+ * INHERITED question's move is a history-affecting act for the NEXT
+ * published version (report grouping + per-domain scoring), so it is named
+ * explicitly, mirroring `buildDeleteConfirmText`'s consequence-language
+ * idiom.
+ */
+export function buildMoveQuestionPrompt(
+  q: Pick<QuestionDraftRow, "stableKey" | "isInherited">,
+  targetSectionName: string,
+): string {
+  if (!q.isInherited) return "";
+  return [
+    `Move inherited question ${q.stableKey} to "${targetSectionName}"?`,
+    "",
+    "Its key keeps the original section prefix (keys are immutable). From the NEXT published version,",
+    "reports group it under the new section and per-domain scoring counts it toward the new section's",
+    "domain. Past published versions are unaffected.",
+    "",
+    "Continue?",
+  ].join("\n");
 }

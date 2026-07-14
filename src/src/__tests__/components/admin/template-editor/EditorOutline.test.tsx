@@ -24,6 +24,7 @@ import {
 import "@testing-library/jest-dom";
 
 import { EditorOutline } from "@/components/admin/template-editor/EditorOutline";
+import { useEditorSelection } from "@/components/admin/template-editor/hooks/useEditorSelection";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 import type { QuestionDraftRow } from "@/components/admin/template-editor/question-serialization";
 
@@ -155,6 +156,16 @@ interface HarnessOverrides {
   };
   onReorderQuestions?: (sectionKey: string, order: string[]) => void;
   onGoToSections?: () => void;
+  onAddSection?: () => void;
+  onRenameSection?: (uid: string, name: string) => void;
+  onMoveSectionUp?: (uid: string) => void;
+  onMoveSectionDown?: (uid: string) => void;
+  onDeleteSection?: (uid: string) => {
+    removedSectionKey: string;
+    removedQuestionUids: string[];
+    affectedDependentUids: string[];
+  };
+  onMoveQuestion?: (uid: string, targetSectionKey: string) => void;
   setFocusedSpy?: jest.Mock;
 }
 
@@ -168,23 +179,137 @@ function renderOutline(o: HarnessOverrides = {}) {
       setFocusedSpy(uid);
       setFocused(uid);
     };
+    // Questions live in state (not a fixed prop) so add/duplicate/delete
+    // reflect into the rendered tree exactly like the real model does —
+    // required for the ED5 Task 5 DOM-focus tests, which need the
+    // survivor/new row to actually exist in the DOM after a mutation.
+    const [questions, setQuestions] = useState<QuestionDraftRow[]>(
+      o.questions ?? baseQuestions(),
+    );
+    // Sections ALSO live in state (ED5 Task 10) — deleteSection removes a
+    // section from the tree, so the harness must reflect that atomically,
+    // same reasoning as the questions state above.
+    const [sections, setSections] = useState<SectionDraft[]>(
+      o.sections ?? SECTIONS,
+    );
+    // Collapse slice — model-backed in production (useEditorSelection); a
+    // plain local useState here stands in for it (the outline itself no
+    // longer owns this state — ED5 Task 3).
+    const [collapsedSections, setCollapsedSections] = useState<
+      Record<string, boolean>
+    >({});
+    const isSectionCollapsed = (key: string) => !!collapsedSections[key];
+    const toggleSectionCollapsed = (key: string) =>
+      setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+    const setSectionCollapsed = (key: string, collapsed: boolean) =>
+      setCollapsedSections((prev) => ({ ...prev, [key]: collapsed }));
+
+    const handleAddQuestion = (sectionKey: string): string => {
+      const impl = o.onAddQuestion ?? (() => "u-new");
+      const newUid = impl(sectionKey);
+      setQuestions((prev) => [
+        ...prev,
+        q(
+          newUid,
+          "",
+          sectionKey,
+          prev.filter((x) => x.sectionStableKey === sectionKey).length + 1,
+        ),
+      ]);
+      return newUid;
+    };
+
+    const handleDuplicateQuestion = (uid: string): string => {
+      const impl = o.onDuplicateQuestion ?? (() => "u-copy");
+      const newUid = impl(uid);
+      const src = questions.find((x) => x.uid === uid);
+      const sectionKey = src?.sectionStableKey ?? "S1";
+      setQuestions((prev) => [
+        ...prev,
+        q(
+          newUid,
+          "",
+          sectionKey,
+          prev.filter((x) => x.sectionStableKey === sectionKey).length + 1,
+        ),
+      ]);
+      return newUid;
+    };
+
+    const handleDeleteQuestion = (
+      uid: string,
+    ): { removedUid: string; affectedDependentUids: string[] } => {
+      const impl =
+        o.onDeleteQuestion ??
+        ((u: string) => ({ removedUid: u, affectedDependentUids: [] }));
+      const res = impl(uid);
+      setQuestions((prev) => prev.filter((x) => x.uid !== res.removedUid));
+      return res;
+    };
+
+    const handleDeleteSection = (
+      uid: string,
+    ): {
+      removedSectionKey: string;
+      removedQuestionUids: string[];
+      affectedDependentUids: string[];
+    } => {
+      const impl =
+        o.onDeleteSection ??
+        ((sectionUid: string) => {
+          const sec = sections.find((s) => s.uid === sectionUid);
+          const removedSectionKey = sec?.stableKey ?? "";
+          const removedQuestionUids = questions
+            .filter((x) => x.sectionStableKey === removedSectionKey)
+            .map((x) => x.uid);
+          return { removedSectionKey, removedQuestionUids, affectedDependentUids: [] };
+        });
+      const res = impl(uid);
+      // Reflect the cascade ATOMICALLY into the harness's own state, same as
+      // the real model does in one handler.
+      setSections((prev) => prev.filter((s) => s.uid !== uid));
+      setQuestions((prev) =>
+        prev.filter((x) => !res.removedQuestionUids.includes(x.uid)),
+      );
+      return res;
+    };
+
+    // ED5 Task 11 (B-3) — reflects the move into the harness's own question
+    // state (section reassignment only; a real resequence is the model's
+    // job, pinned directly against `useTemplateEditorDraft` elsewhere).
+    const handleMoveQuestion = (uid: string, targetSectionKey: string) => {
+      const impl = o.onMoveQuestion ?? (() => {});
+      impl(uid, targetSectionKey);
+      setQuestions((prev) =>
+        prev.map((x) =>
+          x.uid === uid ? { ...x, sectionStableKey: targetSectionKey } : x,
+        ),
+      );
+    };
+
     return (
       <EditorOutline
-        sections={o.sections ?? SECTIONS}
-        questions={o.questions ?? baseQuestions()}
+        sections={sections}
+        questions={questions}
         focusedQuestionUid={focused}
         setFocusedQuestionUid={set}
         isReadOnly={o.isReadOnly ?? false}
         isUnlocked={o.isUnlocked ?? true}
         conditionalEnabled={o.conditionalEnabled ?? true}
-        onAddQuestion={o.onAddQuestion ?? jest.fn(() => "u-new")}
-        onDuplicateQuestion={o.onDuplicateQuestion ?? jest.fn(() => "u-copy")}
-        onDeleteQuestion={
-          o.onDeleteQuestion ??
-          jest.fn((uid: string) => ({ removedUid: uid, affectedDependentUids: [] }))
-        }
+        isSectionCollapsed={isSectionCollapsed}
+        toggleSectionCollapsed={toggleSectionCollapsed}
+        setSectionCollapsed={setSectionCollapsed}
+        onAddQuestion={handleAddQuestion}
+        onDuplicateQuestion={handleDuplicateQuestion}
+        onDeleteQuestion={handleDeleteQuestion}
         onReorderQuestions={o.onReorderQuestions ?? jest.fn()}
         onGoToSections={o.onGoToSections ?? jest.fn()}
+        onAddSection={o.onAddSection ?? jest.fn()}
+        onRenameSection={o.onRenameSection ?? jest.fn()}
+        onMoveSectionUp={o.onMoveSectionUp ?? jest.fn()}
+        onMoveSectionDown={o.onMoveSectionDown ?? jest.fn()}
+        onDeleteSection={handleDeleteSection}
+        onMoveQuestion={handleMoveQuestion}
       />
     );
   }
@@ -226,6 +351,57 @@ describe("EditorOutline — nested tree", () => {
     expect(screen.queryByTestId("question-card-S1_q1")).toBeNull();
     // Toggling the header never focuses a question.
     expect(setFocusedSpy).not.toHaveBeenCalled();
+  });
+
+  it("section header shows a labeled/total counter, not a raw question count (ED5 Task 6)", () => {
+    renderOutline({
+      questions: [
+        q("u1", "S1_q1", "S1", 1, { label: "Real label" }),
+        q("u2", "S1_q2", "S1", 2, { label: "   " }), // whitespace-only ⇒ unlabeled
+        q("u3", "S1_q3", "S1", 3),
+      ],
+      sections: [{ uid: "s1", stableKey: "S1", name: "Section One" }],
+    });
+
+    const s1 = screen.getByTestId("outline-section-S1");
+    expect(within(s1).getByText("2/3 labeled")).toBeInTheDocument();
+  });
+});
+
+describe("EditorOutline — show-if row badges (ED5 Task 7, B-1a)", () => {
+  function showIfFixture(): QuestionDraftRow[] {
+    return [
+      q("ug", "S1_gate", "S1", 1, { type: "MULTI_CHOICE" }),
+      q("u1", "S1_q1", "S1", 2, {
+        showIf: { questionKey: "S1_gate", optionKey: "a" },
+      }),
+      q("u2", "S1_q2", "S1", 3, {
+        showIf: { questionKey: "S1_gate", optionKey: "a" },
+      }),
+    ];
+  }
+
+  it("a question with showIf shows a 'conditional' badge when conditionalEnabled", () => {
+    renderOutline({ questions: showIfFixture(), conditionalEnabled: true });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    expect(within(row).getByText("conditional")).toBeInTheDocument();
+  });
+
+  it("a gate with N dependents shows a 'gate (N)' badge when conditionalEnabled", () => {
+    renderOutline({ questions: showIfFixture(), conditionalEnabled: true });
+
+    const gateRow = screen.getByTestId("question-card-S1_gate");
+    expect(within(gateRow).getByText("gate (2)")).toBeInTheDocument();
+    // The gate itself carries no showIf, so it gets no "conditional" badge.
+    expect(within(gateRow).queryByText("conditional")).toBeNull();
+  });
+
+  it("neither badge renders when conditionalEnabled is false", () => {
+    renderOutline({ questions: showIfFixture(), conditionalEnabled: false });
+
+    expect(screen.queryByText("conditional")).toBeNull();
+    expect(screen.queryByText(/^gate \(/)).toBeNull();
   });
 });
 
@@ -422,5 +598,484 @@ describe("EditorOutline — read-only (G4)", () => {
       fireEvent.click(screen.getByTestId("outline-focus-S1_q1"));
     });
     expect(setFocusedSpy).toHaveBeenCalledWith("u1");
+  });
+});
+
+describe("EditorOutline — DOM focus/scroll after mutation (ED5 Task 5, audit C — focus rule)", () => {
+  /**
+   * The model-focus policy above (G10) only ever moved
+   * `focusedQuestionUid` — it never moved real DOM keyboard focus or
+   * scrolled the row into view, so a keyboard/screen-reader user's focus
+   * could be silently dropped (delete → focus falls back to the page) or
+   * left behind (add/duplicate → the new row is off-screen, unfocused).
+   * These tests drive the real mutation path (the harness reflects
+   * add/duplicate/delete into its `questions` state, like the production
+   * model does) and assert `document.activeElement` actually lands on the
+   * new/survivor row's focus button.
+   */
+  it("after Add, DOM focus moves to the new row's focus button", () => {
+    const onAddQuestion = jest.fn(() => "u-added");
+    renderOutline({ onAddQuestion });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-add-question-S2"));
+    });
+
+    const newRowFocusBtn = screen.getByTestId("outline-focus-u-added");
+    expect(document.activeElement).toBe(newRowFocusBtn);
+  });
+
+  it("after Duplicate, DOM focus moves to the copy row's focus button", () => {
+    const onDuplicateQuestion = jest.fn(() => "u-dup");
+    renderOutline({ onDuplicateQuestion });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    act(() => {
+      fireEvent.click(within(row).getByRole("button", { name: "Duplicate" }));
+    });
+
+    const copyRowFocusBtn = screen.getByTestId("outline-focus-u-dup");
+    expect(document.activeElement).toBe(copyRowFocusBtn);
+  });
+
+  it("after Delete of the focused row, DOM focus moves to the surviving sibling row's focus button", () => {
+    renderOutline({ initialFocus: "u1" }); // S1_q1 focused; S1_q2 is the next sibling
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    act(() => {
+      fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    });
+
+    const survivorFocusBtn = screen.getByTestId("outline-focus-S1_q2");
+    expect(document.activeElement).toBe(survivorFocusBtn);
+  });
+
+  it("deleting the LAST surviving focused question moves DOM focus to its section's + Add question control", () => {
+    const onlyQuestion = [q("only", "S1_only", "S1", 1)];
+    renderOutline({
+      sections: [{ uid: "s1", stableKey: "S1", name: "Section One" }],
+      questions: onlyQuestion,
+      initialFocus: "only",
+    });
+
+    const row = screen.getByTestId("question-card-S1_only");
+    act(() => {
+      fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    });
+
+    const addBtn = screen.getByTestId("outline-add-question-S1");
+    expect(document.activeElement).toBe(addBtn);
+  });
+});
+
+describe("EditorOutline — collapse persists across unmount (ED5 Task 3, audit C)", () => {
+  /**
+   * Reproduces the flag-ON "Edit" tab lifecycle: Radix `TabsContent` is NOT
+   * force-mounted, so `EditorOutline` unmounts on tab-away and remounts on
+   * tab-back. Collapse used to live in a LOCAL `useState` inside
+   * `EditorOutline` and reset on every remount; it now lives in the
+   * always-mounted `useEditorSelection` slice the controller owns, so it must
+   * survive. This harness calls the REAL hook in a parent that stays mounted
+   * across a simulated tab round-trip, toggling whether `EditorOutline`
+   * itself is in the tree — exactly the unmount boundary the flag-ON shell
+   * imposes.
+   */
+  function Harness() {
+    const selection = useEditorSelection();
+    const [mounted, setMounted] = useState(true);
+    return (
+      <div>
+        <button
+          type="button"
+          data-testid="toggle-mount"
+          onClick={() => setMounted((m) => !m)}
+        >
+          toggle mount
+        </button>
+        {mounted ? (
+          <EditorOutline
+            sections={SECTIONS}
+            questions={baseQuestions()}
+            focusedQuestionUid={selection.focusedQuestionUid}
+            setFocusedQuestionUid={selection.setFocusedQuestionUid}
+            isReadOnly={false}
+            isUnlocked={true}
+            conditionalEnabled={true}
+            isSectionCollapsed={selection.isSectionCollapsed}
+            toggleSectionCollapsed={selection.toggleSectionCollapsed}
+            setSectionCollapsed={selection.setSectionCollapsed}
+            onAddQuestion={jest.fn(() => "u-new")}
+            onDuplicateQuestion={jest.fn(() => "u-copy")}
+            onDeleteQuestion={jest.fn((uid: string) => ({
+              removedUid: uid,
+              affectedDependentUids: [],
+            }))}
+            onReorderQuestions={jest.fn()}
+            onGoToSections={jest.fn()}
+            onAddSection={jest.fn()}
+            onRenameSection={jest.fn()}
+            onMoveSectionUp={jest.fn()}
+            onMoveSectionDown={jest.fn()}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
+  it("collapsing a section, unmounting EditorOutline, and remounting it keeps the section collapsed", () => {
+    render(<Harness />);
+
+    // Collapse S1.
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-toggle-S1"));
+    });
+    expect(screen.queryByTestId("question-card-S1_q1")).toBeNull();
+    expect(screen.getByTestId("outline-section-toggle-S1")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    // Simulate a tab-away: EditorOutline unmounts (the parent — the
+    // always-mounted controller in production — stays up).
+    act(() => {
+      fireEvent.click(screen.getByTestId("toggle-mount"));
+    });
+    expect(screen.queryByTestId("editor-outline")).toBeNull();
+
+    // Simulate tab-back: EditorOutline remounts.
+    act(() => {
+      fireEvent.click(screen.getByTestId("toggle-mount"));
+    });
+
+    // Collapse survived the unmount — S1 is still collapsed.
+    expect(screen.getByTestId("outline-section-toggle-S1")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByTestId("question-card-S1_q1")).toBeNull();
+  });
+});
+
+describe("EditorOutline — Logic map trigger (ED5 Task 8, B-1b)", () => {
+  it("shows the Logic map trigger when conditionalEnabled", () => {
+    renderOutline({ conditionalEnabled: true });
+    expect(
+      screen.getByTestId("editor-outline-logic-map-trigger"),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the Logic map trigger when conditionalEnabled is false", () => {
+    renderOutline({ conditionalEnabled: false });
+    expect(
+      screen.queryByTestId("editor-outline-logic-map-trigger"),
+    ).toBeNull();
+  });
+
+  it("clicking the trigger opens the read-only Logic map drawer", () => {
+    renderOutline({ conditionalEnabled: true });
+    expect(screen.queryByRole("dialog", { name: "Logic map" })).toBeNull();
+    fireEvent.click(screen.getByTestId("editor-outline-logic-map-trigger"));
+    expect(
+      screen.getByRole("dialog", { name: "Logic map" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the trigger in the empty-sections state too, when conditionalEnabled", () => {
+    renderOutline({ conditionalEnabled: true, sections: [] });
+    expect(
+      screen.getByTestId("editor-outline-logic-map-trigger"),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("EditorOutline — section add/rename/reorder (ED5 Task 9, B-2)", () => {
+  it("+ Add Section calls onAddSection", () => {
+    const onAddSection = jest.fn();
+    renderOutline({ onAddSection });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("editor-outline-add-section"));
+    });
+    expect(onAddSection).toHaveBeenCalledTimes(1);
+  });
+
+  it("editing a section name input calls onRenameSection(uid, newName)", () => {
+    const onRenameSection = jest.fn();
+    renderOutline({ onRenameSection });
+
+    const input = screen.getByTestId("outline-section-name-S1");
+    act(() => {
+      fireEvent.change(input, { target: { value: "Renamed" } });
+    });
+    expect(onRenameSection).toHaveBeenCalledWith("s1", "Renamed");
+  });
+
+  it("clicking the section move-down/move-up buttons calls onMoveSectionDown/Up(uid)", () => {
+    const onMoveSectionUp = jest.fn();
+    const onMoveSectionDown = jest.fn();
+    renderOutline({ onMoveSectionUp, onMoveSectionDown });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-move-down-S1"));
+    });
+    expect(onMoveSectionDown).toHaveBeenCalledWith("s1");
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-move-up-S2"));
+    });
+    expect(onMoveSectionUp).toHaveBeenCalledWith("s2");
+  });
+
+  it("move-up is disabled on the first section, move-down disabled on the last", () => {
+    renderOutline();
+
+    expect(screen.getByTestId("outline-section-move-up-S1")).toBeDisabled();
+    expect(screen.getByTestId("outline-section-move-down-S1")).toBeEnabled();
+    expect(screen.getByTestId("outline-section-move-up-S2")).toBeEnabled();
+    expect(screen.getByTestId("outline-section-move-down-S2")).toBeDisabled();
+  });
+
+  it("all section controls disabled when isReadOnly", () => {
+    renderOutline({ isReadOnly: true });
+
+    expect(screen.getByTestId("editor-outline-add-section")).toBeDisabled();
+    expect(screen.getByTestId("outline-section-name-S1")).toBeDisabled();
+    expect(screen.getByTestId("outline-section-move-up-S1")).toBeDisabled();
+    expect(screen.getByTestId("outline-section-move-down-S1")).toBeDisabled();
+  });
+
+  it("clicking into the section name input does not collapse the section", () => {
+    renderOutline();
+
+    const input = screen.getByTestId("outline-section-name-S1");
+    act(() => {
+      fireEvent.click(input);
+    });
+    // Section stays expanded — question rows still visible, toggle unchanged.
+    expect(screen.getByTestId("question-card-S1_q1")).toBeInTheDocument();
+    expect(screen.getByTestId("outline-section-toggle-S1")).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+});
+
+// ── Section DELETE — cascade (ED5 Task 10, B-2b) ────────────────────────────
+describe("EditorOutline — section delete (ED5 Task 10, B-2b cascade)", () => {
+  it("clicking Delete on a non-empty section shows the aggregated confirm and calls onDeleteSection(uid) on OK", () => {
+    const onDeleteSection = jest.fn((uid: string) => ({
+      removedSectionKey: uid === "s1" ? "S1" : "S2",
+      removedQuestionUids: uid === "s1" ? ["u1", "u2"] : ["u3"],
+      affectedDependentUids: [],
+    }));
+    renderOutline({ onDeleteSection });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+
+    const promptText = (window.confirm as jest.Mock).mock.calls[0][0] as string;
+    expect(promptText).toContain("Delete section S1 and its 2 questions?");
+    expect(onDeleteSection).toHaveBeenCalledWith("s1");
+  });
+
+  it("the confirm prompt names an INHERITED question's key when isUnlocked", () => {
+    const questions = [
+      q("u1", "S1_q1", "S1", 1, { isInherited: true }),
+      q("u2", "S1_q2", "S1", 2),
+      q("u3", "S2_q3", "S2", 1),
+    ];
+    renderOutline({ questions, onDeleteSection: jest.fn(() => ({
+      removedSectionKey: "S1",
+      removedQuestionUids: ["u1", "u2"],
+      affectedDependentUids: [],
+    })) });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+
+    const promptText = (window.confirm as jest.Mock).mock.calls[0][0] as string;
+    expect(promptText).toContain("S1_q1");
+    expect(promptText).toContain("published version");
+  });
+
+  it("the confirm prompt names an EXTERNAL show-if dependent freed by the cascade", () => {
+    const questions = [
+      q("u1", "S1_q1", "S1", 1, { type: "MULTI_CHOICE" }),
+      q("u2", "S1_q2", "S1", 2),
+      q("u3", "S2_q3", "S2", 1, {
+        showIf: { questionKey: "S1_q1", optionKey: "a" },
+      }),
+    ];
+    renderOutline({ questions, onDeleteSection: jest.fn(() => ({
+      removedSectionKey: "S1",
+      removedQuestionUids: ["u1", "u2"],
+      affectedDependentUids: ["u3"],
+    })) });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+
+    const promptText = (window.confirm as jest.Mock).mock.calls[0][0] as string;
+    expect(promptText).toContain("S2_q3");
+    expect(promptText).toContain("always-visible");
+  });
+
+  it("canceling the confirm makes no call to onDeleteSection", () => {
+    (window.confirm as jest.Mock).mockImplementation(() => false);
+    const onDeleteSection = jest.fn();
+    renderOutline({ onDeleteSection });
+
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+
+    expect(onDeleteSection).not.toHaveBeenCalled();
+    // Section still present.
+    expect(screen.getByTestId("outline-section-S1")).toBeInTheDocument();
+  });
+
+  it("deleting a section whose questions are NOT focused leaves focus unchanged", () => {
+    const { setFocusedSpy } = renderOutline({ initialFocus: "u3" }); // S2_q3
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+    expect(setFocusedSpy).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("outline-section-S1")).not.toBeInTheDocument();
+  });
+
+  it("deleting the section containing the FOCUSED question moves focus to the nearest surviving section's first question", () => {
+    const { setFocusedSpy } = renderOutline({ initialFocus: "u1" }); // S1_q1
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-delete-S1"));
+    });
+    // S1 removed entirely; the only survivor is S2_q3 (u3).
+    expect(setFocusedSpy).toHaveBeenCalledWith("u3");
+  });
+
+  it("the Delete button is disabled when isReadOnly", () => {
+    renderOutline({ isReadOnly: true });
+    expect(screen.getByTestId("outline-section-delete-S1")).toBeDisabled();
+  });
+});
+
+// ── Move to section (ED5 Task 11, B-3) ──────────────────────────────────────
+describe("EditorOutline — move to section (ED5 Task 11, B-3)", () => {
+  it("choosing another section calls onMoveQuestion(uid, targetSectionKey)", () => {
+    const onMoveQuestion = jest.fn();
+    renderOutline({ onMoveQuestion });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    act(() => {
+      fireEvent.change(select, { target: { value: "S2" } });
+    });
+
+    expect(onMoveQuestion).toHaveBeenCalledWith("u1", "S2");
+  });
+
+  it("moving an INHERITED question confirms with a string naming its key", () => {
+    const questions = [
+      q("u1", "S1_q1", "S1", 1, { isInherited: true }),
+      q("u2", "S1_q2", "S1", 2),
+      q("u3", "S2_q3", "S2", 1),
+    ];
+    const onMoveQuestion = jest.fn();
+    renderOutline({ questions, onMoveQuestion });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    act(() => {
+      fireEvent.change(select, { target: { value: "S2" } });
+    });
+
+    expect(window.confirm).toHaveBeenCalled();
+    const promptText = (window.confirm as jest.Mock).mock.calls[0][0] as string;
+    expect(promptText).toContain("S1_q1");
+    expect(onMoveQuestion).toHaveBeenCalledWith("u1", "S2");
+  });
+
+  it("declining the confirm for an inherited question does NOT call onMoveQuestion", () => {
+    (window.confirm as jest.Mock).mockImplementation(() => false);
+    const questions = [
+      q("u1", "S1_q1", "S1", 1, { isInherited: true }),
+      q("u2", "S1_q2", "S1", 2),
+      q("u3", "S2_q3", "S2", 1),
+    ];
+    const onMoveQuestion = jest.fn();
+    renderOutline({ questions, onMoveQuestion });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    act(() => {
+      fireEvent.change(select, { target: { value: "S2" } });
+    });
+
+    expect(onMoveQuestion).not.toHaveBeenCalled();
+  });
+
+  it("a NON-inherited question's move skips the confirm entirely", () => {
+    const onMoveQuestion = jest.fn();
+    renderOutline({ onMoveQuestion }); // baseQuestions() are all new-to-draft
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    act(() => {
+      fireEvent.change(select, { target: { value: "S2" } });
+    });
+
+    expect(window.confirm).not.toHaveBeenCalled();
+    expect(onMoveQuestion).toHaveBeenCalledWith("u1", "S2");
+  });
+
+  it("the control lists only OTHER sections, not the question's own", () => {
+    renderOutline();
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText(
+      "Move to section",
+    ) as HTMLSelectElement;
+    const optionValues = Array.from(select.options).map((opt) => opt.value);
+    expect(optionValues).not.toContain("S1");
+    expect(optionValues).toContain("S2");
+  });
+
+  it("the control is disabled when there is only one section", () => {
+    const oneSection = [{ uid: "s1", stableKey: "S1", name: "Section One" }];
+    const oneSectionQuestions = [
+      q("u1", "S1_q1", "S1", 1),
+      q("u2", "S1_q2", "S1", 2),
+    ];
+    renderOutline({ sections: oneSection, questions: oneSectionQuestions });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    expect(select).toBeDisabled();
+  });
+
+  it("the control is disabled when isReadOnly", () => {
+    renderOutline({ isReadOnly: true });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    expect(select).toBeDisabled();
+  });
+
+  describe("ED5 T20 — multi-container dnd structure (B-3)", () => {
+    it("renders a drop target (droppable) for each expanded section", () => {
+      renderOutline();
+      // Both sections expanded by default → each exposes a droppable so a
+      // question can be dragged INTO it (including an empty one). The
+      // reorder-vs-move decision itself is unit-tested in outline-drop.test.ts;
+      // within-section reorder byte-equivalence is pinned by the frozen guard.
+      expect(
+        screen.getByTestId("outline-section-droppable-S1"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("outline-section-droppable-S2"),
+      ).toBeInTheDocument();
+    });
   });
 });

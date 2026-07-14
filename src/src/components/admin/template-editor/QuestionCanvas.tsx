@@ -24,11 +24,9 @@
  */
 
 import { useState } from "react";
-import {
-  QuestionInput,
-  type QuestionForInput,
-} from "@/components/assessments/question-input";
+import { QuestionInput } from "@/components/assessments/question-input";
 import type { QuestionDraftRow } from "./question-serialization";
+import { toQuestionForInput } from "./question-widget-mapper";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -41,38 +39,6 @@ export interface QuestionCanvasProps {
   sectionName: string | null;
 }
 
-/** Map an editor draft question to the respondent-widget shape (same per-type
- *  discrimination the inspector's FindingsPreview uses). */
-function toForInput(question: QuestionDraft): QuestionForInput {
-  return {
-    stableKey: question.stableKey || "__canvas__",
-    type: question.type,
-    label: question.label || "(untitled question)",
-    isRequired: question.isRequired,
-    ...(question.type === "SLIDER_LIKERT"
-      ? {
-          scale: {
-            min: question.scaleMin,
-            max: question.scaleMax,
-            step: question.scaleStep,
-            anchorMin: question.anchorMin,
-            anchorMax: question.anchorMax,
-          },
-        }
-      : {}),
-    ...(question.type === "MULTI_CHOICE"
-      ? {
-          options: question.options
-            .filter((o) => o.key !== "")
-            .map((o) => ({ key: o.key, label: o.label || o.key })),
-          ...(question.maxChoices !== null
-            ? { maxChoices: question.maxChoices }
-            : {}),
-        }
-      : {}),
-  };
-}
-
 export function QuestionCanvas({ question, sectionName }: QuestionCanvasProps) {
   // Local, throwaway preview answer — never touches the model (INVARIANT).
   const [previewValue, setPreviewValue] = useState<
@@ -82,6 +48,7 @@ export function QuestionCanvas({ question, sectionName }: QuestionCanvasProps) {
   if (!question) {
     return (
       <section
+        aria-label="Question preview"
         className="wf-card space-y-3"
         style={{ padding: "1rem" }}
         data-testid="question-canvas-empty"
@@ -93,12 +60,16 @@ export function QuestionCanvas({ question, sectionName }: QuestionCanvasProps) {
     );
   }
 
-  const forInput = toForInput(question);
+  const forInput = toQuestionForInput(question, {
+    labelFallback: "(untitled question)",
+    keyFallback: "__canvas__",
+  });
 
   return (
     <section
       className="wf-card space-y-3"
       style={{ padding: "1rem" }}
+      aria-label="Question preview"
       data-testid="question-canvas"
     >
       {sectionName ? (
@@ -137,6 +108,12 @@ export function QuestionCanvas({ question, sectionName }: QuestionCanvasProps) {
           onChange={(_key, v) => setPreviewValue(v)}
           idPrefix={CANVAS_ID_PREFIX}
         />
+        <p
+          className="text-[0.6875rem] italic text-muted-foreground"
+          data-testid="question-canvas-preview-note"
+        >
+          Preview only — answers here aren’t saved.
+        </p>
       </div>
     </section>
   );

@@ -18,7 +18,14 @@
 
 import React, { useCallback, useMemo } from "react";
 
-import { scoreSubmission } from "@/lib/assessments/scoring";
+import {
+  scoreSubmission,
+  computeGlobalTierDomain,
+  computePerDomainTierContexts,
+  validateTierTiling,
+  type TierDomain,
+} from "@/lib/assessments/scoring";
+import { TierBandBar } from "./TierBandBar";
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -327,7 +334,10 @@ export function ScoringTiersTab({
 }: ScoringTiersTabProps) {
   const tierMetric = scoringConfig.tierMetric;
   const passThreshold = scoringConfig.passThreshold;
-  const tiers = scoringConfig.tiers ?? [];
+  const tiers = useMemo(
+    () => scoringConfig.tiers ?? [],
+    [scoringConfig.tiers],
+  );
   const domains = useMemo(() => scoringConfig.domains ?? [], [scoringConfig.domains]);
   const rollupOverall = scoringConfig.rollup?.overall;
 
@@ -350,6 +360,63 @@ export function ScoringTiersTab({
   // Validation
   const globalMode = getGlobalMetricMode(tierMetric, rollupOverall);
   const globalIssue = validateTiersClient(tiers, globalMode, "Global tiers");
+
+  // ED5 T16/T17 (B-5) — the REAL metric domain, computed client-side from the
+  // slider questions + config (all tab questions are SLIDER_LIKERT). Null when
+  // the domain is ambiguous (mixed scales throw) or open-ended (non-finite max):
+  // the visual bar is hidden and the domain-span check is skipped, mirroring the
+  // publish-time behaviour.
+  const globalDomain: TierDomain | null = useMemo(() => {
+    try {
+      const d = computeGlobalTierDomain(
+        questions as unknown as Parameters<typeof computeGlobalTierDomain>[0],
+        {
+          rollup: scoringConfig.rollup as Parameters<
+            typeof computeGlobalTierDomain
+          >[1]["rollup"],
+          tierMetric,
+        },
+      );
+      return Number.isFinite(d.max) && d.max > d.min ? d : null;
+    } catch {
+      return null;
+    }
+  }, [questions, scoringConfig.rollup, tierMetric]);
+
+  // ED5 T16 rider — surface the publish-time domain-SPAN check LIVE (today the
+  // client only checks internal contiguity; a non-spanning draft published then
+  // 400'd every submit — the Wave V gap). Uses the SAME exported validator.
+  const globalDomainIssue: TilingIssue | null = useMemo(() => {
+    if (!globalDomain) return null;
+    const issues = validateTierTiling(
+      tiers as unknown as Parameters<typeof validateTierTiling>[0],
+      globalDomain,
+    );
+    return issues.length > 0 ? { message: `Global tiers: ${issues[0].message}` } : null;
+  }, [globalDomain, tiers]);
+
+  // ED5 T18 (B-5) — per-domain metric bounds for the per-domain band bars. The
+  // already-exported computePerDomainTierContexts owns the (fractional) domain
+  // per key; a domain with no questions / an ambiguous config yields a
+  // non-finite max, so its bar is hidden (table only), mirroring publish.
+  const perDomainBounds = useMemo(() => {
+    const out = new Map<string, TierDomain>();
+    if (domains.length === 0) return out;
+    try {
+      for (const ctx of computePerDomainTierContexts(
+        sections as unknown as Parameters<typeof computePerDomainTierContexts>[0],
+        questions as unknown as Parameters<typeof computePerDomainTierContexts>[1],
+        domains.map((d) => d.key),
+      )) {
+        if (Number.isFinite(ctx.domain.max) && ctx.domain.max > ctx.domain.min) {
+          out.set(ctx.domainKey, ctx.domain);
+        }
+      }
+    } catch {
+      /* ambiguous config → no per-domain bars (table stays authoritative) */
+    }
+    return out;
+  }, [sections, questions, domains]);
   const domainIssues = useMemo(() => {
     const out: TilingIssue[] = [];
     for (const d of domains) {
@@ -364,7 +431,8 @@ export function ScoringTiersTab({
     return out;
   }, [domains]);
 
-  const firstIssue = globalIssue ?? domainIssues[0] ?? null;
+  const firstIssue =
+    globalIssue ?? globalDomainIssue ?? domainIssues[0] ?? null;
 
   // Live preview
   const preview = useMemo(
@@ -465,6 +533,25 @@ export function ScoringTiersTab({
               gaps or overlaps (Zod refine enforces this on save).
             </p>
           </header>
+          {globalDomain ? (
+            <TierBandBar
+              tiers={tiers}
+              domain={globalDomain}
+              mode={globalMode}
+              step={globalMode === "integer" ? 1 : 0.1}
+              onChange={handleTiersChange}
+              isReadOnly={isReadOnly}
+              testIdPrefix="global-tier-band"
+            />
+          ) : (
+            <p
+              className="text-[0.625rem] italic text-muted-foreground"
+              data-testid="global-tier-band-unavailable"
+            >
+              Visual band editor unavailable for this metric (open-ended or
+              ambiguous domain) — use the table below.
+            </p>
+          )}
           <TierTable
             tiers={tiers}
             onChange={handleTiersChange}
@@ -557,6 +644,17 @@ export function ScoringTiersTab({
                   </span>
                 </h4>
               </header>
+              {perDomainBounds.has(domain.key) && (
+                <TierBandBar
+                  tiers={domain.tiers ?? []}
+                  domain={perDomainBounds.get(domain.key)!}
+                  mode="fractional"
+                  step={0.1}
+                  onChange={(next) => handleDomainTiersChange(domain.key, next)}
+                  isReadOnly={isReadOnly}
+                  testIdPrefix={`domain-tier-band-${domain.key}`}
+                />
+              )}
               <TierTable
                 tiers={domain.tiers ?? []}
                 onChange={(next) => handleDomainTiersChange(domain.key, next)}

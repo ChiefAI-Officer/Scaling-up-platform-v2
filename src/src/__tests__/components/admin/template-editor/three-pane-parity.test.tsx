@@ -532,11 +532,12 @@ describe("ED4 three-pane parity contract (flag-ON ≡ flag-OFF)", () => {
     installFetch();
     render(<TemplateEditorTabbed {...fixtureA(true)} />);
     // flag-ON: the workspace mounts (default tab), tab relabeled "Edit", and
-    // the reused inspector is present (empty state until T4 focuses one).
+    // the reused inspector is present — auto-focused (ED5 Task 4, audit A-1)
+    // to the first section's first question rather than its empty state.
     expect(screen.getByTestId("three-pane-workspace")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /^Edit$/ })).toBeInTheDocument();
     expect(screen.getByTestId("questions-config-form")).toHaveTextContent(
-      /Select a question/i,
+      /Q1 label/i,
     );
   });
 
@@ -637,6 +638,42 @@ describe("ED4 three-pane parity contract (flag-ON ≡ flag-OFF)", () => {
     const versionPatch = transcriptOf(calls).find(isVersionPatch);
     expect(versionPatch).toBeDefined();
     expect(versionPatch!.body).toContain("Aligned — reworded");
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // ED5 Task 2 (B-4/A-3/C1) — the canvas's throwaway preview value must
+  // reset not just on FOCUS change but also when the FOCUSED question's
+  // widget SHAPE changes underneath it (e.g. an inspector scale edit),
+  // because the canvas key is now `uid:shapeSignature`, not just `uid`.
+  // ──────────────────────────────────────────────────────────────────────
+  it("[flag-ON] canvas remounts (clears throwaway preview) when the focused question's scale changes via the inspector (B-4/A-3/C1)", () => {
+    resetHarness();
+    installFetch();
+    render(<TemplateEditorTabbed {...fixtureA(true)} />);
+
+    focusQuestion(true, "S1_q1");
+    const canvasSlider = () =>
+      within(screen.getByTestId("question-canvas")).getByRole(
+        "slider",
+      ) as HTMLInputElement;
+
+    act(() => {
+      fireEvent.change(canvasSlider(), { target: { value: "7" } });
+    });
+    expect(canvasSlider().getAttribute("aria-valuenow")).toBe("7");
+
+    // Real edit via the inspector: change the focused question's Scale max —
+    // this dirties the model (expected) and changes the widget SHAPE.
+    act(() => {
+      fireEvent.change(
+        within(screen.getByTestId("questions-config-form")).getByLabelText(
+          "Scale max",
+        ),
+        { target: { value: "20" } },
+      );
+    });
+
+    expect(canvasSlider().getAttribute("aria-valuenow")).toBeNull();
   });
 
   // ──────────────────────────────────────────────────────────────────────

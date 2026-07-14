@@ -23,6 +23,7 @@ import { QuestionInspector, type ShowIfGateOption } from "./QuestionInspector";
 import { computeShowIfGates, findShowIfDependents } from "./question-commands";
 import { EditorOutline } from "./EditorOutline";
 import { QuestionCanvas } from "./QuestionCanvas";
+import { shapeSignature } from "./question-widget-mapper";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -61,6 +62,12 @@ export function ThreePaneWorkspace({
     duplicateQuestion,
     deleteQuestion,
     reorderQuestions,
+    handleSectionsAdd,
+    handleSectionsRename,
+    handleSectionsMoveUp,
+    handleSectionsMoveDown,
+    deleteSection,
+    moveQuestionToSection,
   } = model;
 
   const focusedQuestion: QuestionDraft | null =
@@ -90,15 +97,18 @@ export function ThreePaneWorkspace({
   return (
     <div
       data-testid="three-pane-workspace"
-      className="grid grid-cols-1 lg:grid-cols-[20%_50%_30%] gap-4"
+      className="grid grid-cols-1 lg:grid-cols-[minmax(14rem,22%)_1fr_30%] gap-4"
     >
       {/* LEFT — EditorOutline (section→question tree, shared commands). */}
-      <aside className="lg:sticky lg:top-4 lg:self-start">
+      <aside aria-label="Question outline" className="lg:sticky lg:top-4 lg:self-start">
         <EditorOutline
           sections={sections}
           questions={questions}
           focusedQuestionUid={selection.focusedQuestionUid}
           setFocusedQuestionUid={selection.setFocusedQuestionUid}
+          isSectionCollapsed={selection.isSectionCollapsed}
+          toggleSectionCollapsed={selection.toggleSectionCollapsed}
+          setSectionCollapsed={selection.setSectionCollapsed}
           isReadOnly={isReadOnly}
           isUnlocked={isUnlocked}
           conditionalEnabled={conditionalEnabled}
@@ -107,19 +117,31 @@ export function ThreePaneWorkspace({
           onDeleteQuestion={deleteQuestion}
           onReorderQuestions={reorderQuestions}
           onGoToSections={onGoToSections}
+          onAddSection={handleSectionsAdd}
+          onRenameSection={handleSectionsRename}
+          onMoveSectionUp={handleSectionsMoveUp}
+          onMoveSectionDown={handleSectionsMoveDown}
+          onDeleteSection={deleteSection}
+          onMoveQuestion={moveQuestionToSection}
         />
       </aside>
 
-      {/* CENTER — in-context canvas. Keyed by the focused uid so the local,
-          throwaway preview answer-state resets on focus change (co-validate C4). */}
+      {/* CENTER — in-context canvas. Keyed by uid + shapeSignature so the local,
+          throwaway preview answer-state resets on focus change AND on a
+          widget-shape change (type/scale/options) to the SAME focused question
+          (ED5 B-4/A-3/C1 — co-validate C4). */}
       <QuestionCanvas
-        key={focusedQuestion?.uid ?? "none"}
+        key={
+          focusedQuestion
+            ? `${focusedQuestion.uid}:${shapeSignature(focusedQuestion)}`
+            : "none"
+        }
         question={focusedQuestion}
         sectionName={focusedSectionName}
       />
 
       {/* RIGHT — reused QuestionInspector (verbatim). */}
-      <aside className="lg:sticky lg:top-4 lg:self-start">
+      <aside aria-label="Question inspector" className="lg:sticky lg:top-4 lg:self-start">
         <QuestionInspector
           question={focusedQuestion}
           isReadOnly={isReadOnly}

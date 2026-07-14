@@ -27,10 +27,8 @@ import {
   buildFindingRecommendations,
 } from "./question-serialization";
 import { resolveFindings } from "@/lib/assessments/findings";
-import {
-  QuestionInput,
-  type QuestionForInput,
-} from "@/components/assessments/question-input";
+import { QuestionInput } from "@/components/assessments/question-input";
+import { toQuestionForInput, shapeSignature } from "./question-widget-mapper";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -148,35 +146,12 @@ function FindingsPreview({ question }: { question: QuestionDraft }) {
     number | string | string[] | undefined
   >(undefined);
 
-  const previewKey = question.stableKey || "__preview__";
-
-  const forInput: QuestionForInput = {
-    stableKey: previewKey,
-    type: question.type,
-    label: question.label || "Sample answer",
-    isRequired: false,
-    ...(question.type === "SLIDER_LIKERT"
-      ? {
-          scale: {
-            min: question.scaleMin,
-            max: question.scaleMax,
-            step: question.scaleStep,
-            anchorMin: question.anchorMin,
-            anchorMax: question.anchorMax,
-          },
-        }
-      : {}),
-    ...(question.type === "MULTI_CHOICE"
-      ? {
-          options: question.options
-            .filter((o) => o.key !== "")
-            .map((o) => ({ key: o.key, label: o.label || o.key })),
-          ...(question.maxChoices !== null
-            ? { maxChoices: question.maxChoices }
-            : {}),
-        }
-      : {}),
-  };
+  const forInput = toQuestionForInput(question, {
+    labelFallback: "Sample answer",
+    keyFallback: "__preview__",
+    forceRequired: false,
+  });
+  const previewKey = forInput.stableKey;
 
   const fired = useMemo(() => {
     const recs = buildFindingRecommendations(question) ?? [];
@@ -204,7 +179,7 @@ function FindingsPreview({ question }: { question: QuestionDraft }) {
       data-testid="q-findings-preview"
     >
       <p className="text-[0.6875rem] font-semibold text-muted-foreground">
-        Test a value — preview which finding fires
+        Test which finding fires
       </p>
       <QuestionInput
         question={forInput}
@@ -448,7 +423,12 @@ function FindingsPanel({
           ))}
         </div>
       )}
-      {open && <FindingsPreview question={question} />}
+      {open && (
+        <FindingsPreview
+          key={`${question.uid}:${shapeSignature(question)}`}
+          question={question}
+        />
+      )}
     </div>
   );
 }

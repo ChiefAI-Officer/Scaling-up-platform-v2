@@ -118,6 +118,22 @@ describe("QuestionCanvas", () => {
     // absence of any callback surface: the only props are question + sectionName.)
   });
 
+  it("shows a muted 'Preview only' note next to the widget (B-4)", () => {
+    render(
+      <QuestionCanvas question={sliderQuestion()} sectionName="Section One" />,
+    );
+    const note = screen.getByTestId("question-canvas-preview-note");
+    expect(note).toHaveTextContent(/preview only/i);
+    expect(note).toHaveTextContent(/answers here/i);
+  });
+
+  it("does NOT show the preview-only note in the empty state", () => {
+    render(<QuestionCanvas question={null} sectionName={null} />);
+    expect(
+      screen.queryByTestId("question-canvas-preview-note"),
+    ).not.toBeInTheDocument();
+  });
+
   it("re-mounting (as the parent does on focus change) starts unanswered again", () => {
     const { rerender } = render(
       <QuestionCanvas

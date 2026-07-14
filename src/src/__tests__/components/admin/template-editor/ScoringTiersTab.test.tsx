@@ -334,8 +334,83 @@ describe("ScoringTiersTab — F4 (Checkpoint 3)", () => {
     });
 
     it("does NOT render an alert when global tiers are clean", () => {
-      render(<ScoringTiersTab {...makeProps()} />);
+      // ED5 T16/T17: the live domain-aware check (validateTierTiling) now also
+      // runs. The 2-question fixture's `countAchieved` domain is [0, 2], so the
+      // "clean" tiers must actually tile [0, 2] (the base fixture's 0–40 tiers
+      // were only contiguity-clean, not domain-spanning — the Wave V gap the
+      // rider closes).
+      const clean = {
+        ...rockefellerScoringConfig,
+        tiers: [
+          { minMetric: 0, maxMetric: 1, label: "Low", message: "." },
+          { minMetric: 2, maxMetric: 2, label: "High", message: "." },
+        ],
+      };
+      render(<ScoringTiersTab {...makeProps({ scoringConfig: clean })} />);
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("ED5 T17/T18 — visual band bars (B-5)", () => {
+    it("renders the global band bar for a finite (countAchieved) domain", () => {
+      const cfg = {
+        ...rockefellerScoringConfig,
+        tiers: [
+          { minMetric: 0, maxMetric: 1, label: "Low", message: "." },
+          { minMetric: 2, maxMetric: 2, label: "High", message: "." },
+        ],
+      };
+      render(<ScoringTiersTab {...makeProps({ scoringConfig: cfg })} />);
+      expect(screen.getByTestId("global-tier-band-bar")).toBeInTheDocument();
+      expect(screen.getByTestId("global-tier-band-divider-0")).toBeInTheDocument();
+    });
+
+    it("renders a per-domain band bar for a domain with matching-scale questions", () => {
+      const domainSections = [
+        { stableKey: "S1", sortOrder: 1, name: "People", domain: "D1" },
+      ];
+      const domainQuestions = [
+        {
+          stableKey: "Q1",
+          sortOrder: 1,
+          sectionStableKey: "S1",
+          type: "SLIDER_LIKERT" as const,
+          label: "Q1",
+          isRequired: true,
+          scale: { min: 0, max: 3, step: 1, anchorMin: "Low", anchorMax: "High" },
+        },
+      ];
+      const cfg = {
+        tierMetric: "overallAvg" as const,
+        passThreshold: 2,
+        rollup: { overall: "meanOfDomains" as const },
+        tiers: [
+          { minMetric: 0, maxMetric: 1.5, label: "Low", message: "." },
+          { minMetric: 1.5, maxMetric: 3, label: "High", message: "." },
+        ],
+        domains: [
+          {
+            key: "D1",
+            label: "Domain 1",
+            tiers: [
+              { minMetric: 0, maxMetric: 1.5, label: "Low", message: "." },
+              { minMetric: 1.5, maxMetric: 3, label: "High", message: "." },
+            ],
+          },
+        ],
+      };
+      render(
+        <ScoringTiersTab
+          {...makeProps({
+            sections: domainSections,
+            questions: domainQuestions,
+            scoringConfig: cfg,
+          })}
+        />,
+      );
+      expect(
+        screen.getByTestId("domain-tier-band-D1-bar"),
+      ).toBeInTheDocument();
     });
   });
 });
