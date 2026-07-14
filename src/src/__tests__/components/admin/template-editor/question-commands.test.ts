@@ -20,6 +20,7 @@ import {
   buildMoveQuestionPrompt,
   buildSectionDeletePrompt,
   buildShowIfDependentsWarning,
+  collectSectionDeleteImpact,
   computeSurvivorFocus,
   findShowIfDependents,
 } from "@/components/admin/template-editor/question-commands";
@@ -607,5 +608,58 @@ describe("computeSurvivorFocus", () => {
     expect(
       computeSurvivorFocus([q1, q2, q3], sectionOrder, "q1", ["q2"]),
     ).toBe("q3");
+  });
+});
+
+describe("collectSectionDeleteImpact (ED5 T15 — shared cascade prompt inputs)", () => {
+  const sections = [
+    { uid: "us1", stableKey: "S1" },
+    { uid: "us2", stableKey: "S2" },
+  ];
+
+  it("reports count, inherited keys, and EXTERNAL freed dependents only", () => {
+    const gate = draftQuestion({
+      uid: "g",
+      stableKey: "S1_gate",
+      sectionStableKey: "S1",
+      type: "MULTI_CHOICE",
+      isInherited: true,
+    });
+    const other = draftQuestion({
+      uid: "o",
+      stableKey: "S1_other",
+      sectionStableKey: "S1",
+    });
+    const inDep = draftQuestion({
+      uid: "id",
+      stableKey: "S1_indep",
+      sectionStableKey: "S1",
+      showIf: { questionKey: "S1_gate", optionKey: "a" },
+    });
+    const extDep = draftQuestion({
+      uid: "ed",
+      stableKey: "S2_extdep",
+      sectionStableKey: "S2",
+      showIf: { questionKey: "S1_gate", optionKey: "a" },
+    });
+    const impact = collectSectionDeleteImpact(
+      sections,
+      [gate, other, inDep, extDep],
+      "us1",
+    );
+    expect(impact.questionCount).toBe(3);
+    expect([...impact.removedQuestionUids].sort()).toEqual(["g", "id", "o"]);
+    expect(impact.inheritedKeys).toEqual(["S1_gate"]);
+    // external dependent freed; the in-section dependent is removed, not "freed"
+    expect(impact.freedDependentKeys).toEqual(["S2_extdep"]);
+  });
+
+  it("returns an empty impact for an unknown section uid", () => {
+    expect(collectSectionDeleteImpact(sections, [], "nope")).toEqual({
+      questionCount: 0,
+      removedQuestionUids: [],
+      inheritedKeys: [],
+      freedDependentKeys: [],
+    });
   });
 });

@@ -73,6 +73,60 @@ export function findShowIfDependents(
   );
 }
 
+export interface SectionDeleteImpact {
+  /** Questions in the section (all deleted by a cascade). */
+  questionCount: number;
+  removedQuestionUids: string[];
+  /** stableKeys of the deleted questions that exist in a published version. */
+  inheritedKeys: string[];
+  /** stableKeys of EXTERNAL dependents (outside the section) whose showIf gates
+   *  on a deleted question — they become always-visible. In-section dependents
+   *  are just removed and never reported here. */
+  freedDependentKeys: string[];
+}
+
+/**
+ * ED5 (B-2b / co-validate C2) — the SINGLE computation of a section-delete's
+ * blast radius, shared by BOTH the three-pane outline AND the legacy Sections
+ * tab so their confirm prompts (built by `buildSectionDeletePrompt`) can never
+ * diverge. Mirrors the model's `deleteSection` external-dependent rule exactly.
+ */
+export function collectSectionDeleteImpact(
+  sections: readonly { uid: string; stableKey: string }[],
+  questions: readonly QuestionDraftRow[],
+  sectionUid: string,
+): SectionDeleteImpact {
+  const empty: SectionDeleteImpact = {
+    questionCount: 0,
+    removedQuestionUids: [],
+    inheritedKeys: [],
+    freedDependentKeys: [],
+  };
+  const section = sections.find((s) => s.uid === sectionUid);
+  if (!section) return empty;
+  const removed = questions.filter(
+    (q) => q.sectionStableKey === section.stableKey,
+  );
+  const removedUidSet = new Set(removed.map((q) => q.uid));
+  const freed = new Set<string>();
+  for (const gate of removed) {
+    for (const dep of findShowIfDependents(questions, gate)) {
+      if (
+        dep.sectionStableKey !== section.stableKey &&
+        !removedUidSet.has(dep.uid)
+      ) {
+        freed.add(dep.stableKey);
+      }
+    }
+  }
+  return {
+    questionCount: removed.length,
+    removedQuestionUids: removed.map((q) => q.uid),
+    inheritedKeys: removed.filter((q) => q.isInherited).map((q) => q.stableKey),
+    freedDependentKeys: Array.from(freed),
+  };
+}
+
 /**
  * ED4 (spec 19af §3.4) — the FULL delete-confirm prompt, lifted VERBATIM out
  * of `QuestionsTab`'s row so BOTH the legacy tab and the three-pane outline
