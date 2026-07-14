@@ -334,7 +334,19 @@ describe("ScoringTiersTab — F4 (Checkpoint 3)", () => {
     });
 
     it("does NOT render an alert when global tiers are clean", () => {
-      render(<ScoringTiersTab {...makeProps()} />);
+      // ED5 T16/T17: the live domain-aware check (validateTierTiling) now also
+      // runs. The 2-question fixture's `countAchieved` domain is [0, 2], so the
+      // "clean" tiers must actually tile [0, 2] (the base fixture's 0–40 tiers
+      // were only contiguity-clean, not domain-spanning — the Wave V gap the
+      // rider closes).
+      const clean = {
+        ...rockefellerScoringConfig,
+        tiers: [
+          { minMetric: 0, maxMetric: 1, label: "Low", message: "." },
+          { minMetric: 2, maxMetric: 2, label: "High", message: "." },
+        ],
+      };
+      render(<ScoringTiersTab {...makeProps({ scoringConfig: clean })} />);
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
   });
