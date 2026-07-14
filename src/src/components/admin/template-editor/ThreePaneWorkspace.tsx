@@ -100,6 +100,9 @@ export function ThreePaneWorkspace({
           questions={questions}
           focusedQuestionUid={selection.focusedQuestionUid}
           setFocusedQuestionUid={selection.setFocusedQuestionUid}
+          isSectionCollapsed={selection.isSectionCollapsed}
+          toggleSectionCollapsed={selection.toggleSectionCollapsed}
+          setSectionCollapsed={selection.setSectionCollapsed}
           isReadOnly={isReadOnly}
           isUnlocked={isUnlocked}
           conditionalEnabled={conditionalEnabled}

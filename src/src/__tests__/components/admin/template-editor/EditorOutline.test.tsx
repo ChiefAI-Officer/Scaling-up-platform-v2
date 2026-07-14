@@ -24,6 +24,7 @@ import {
 import "@testing-library/jest-dom";
 
 import { EditorOutline } from "@/components/admin/template-editor/EditorOutline";
+import { useEditorSelection } from "@/components/admin/template-editor/hooks/useEditorSelection";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 import type { QuestionDraftRow } from "@/components/admin/template-editor/question-serialization";
 
@@ -168,6 +169,17 @@ function renderOutline(o: HarnessOverrides = {}) {
       setFocusedSpy(uid);
       setFocused(uid);
     };
+    // Collapse slice — model-backed in production (useEditorSelection); a
+    // plain local useState here stands in for it (the outline itself no
+    // longer owns this state — ED5 Task 3).
+    const [collapsedSections, setCollapsedSections] = useState<
+      Record<string, boolean>
+    >({});
+    const isSectionCollapsed = (key: string) => !!collapsedSections[key];
+    const toggleSectionCollapsed = (key: string) =>
+      setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+    const setSectionCollapsed = (key: string, collapsed: boolean) =>
+      setCollapsedSections((prev) => ({ ...prev, [key]: collapsed }));
     return (
       <EditorOutline
         sections={o.sections ?? SECTIONS}
@@ -177,6 +189,9 @@ function renderOutline(o: HarnessOverrides = {}) {
         isReadOnly={o.isReadOnly ?? false}
         isUnlocked={o.isUnlocked ?? true}
         conditionalEnabled={o.conditionalEnabled ?? true}
+        isSectionCollapsed={isSectionCollapsed}
+        toggleSectionCollapsed={toggleSectionCollapsed}
+        setSectionCollapsed={setSectionCollapsed}
         onAddQuestion={o.onAddQuestion ?? jest.fn(() => "u-new")}
         onDuplicateQuestion={o.onDuplicateQuestion ?? jest.fn(() => "u-copy")}
         onDeleteQuestion={
@@ -422,5 +437,89 @@ describe("EditorOutline — read-only (G4)", () => {
       fireEvent.click(screen.getByTestId("outline-focus-S1_q1"));
     });
     expect(setFocusedSpy).toHaveBeenCalledWith("u1");
+  });
+});
+
+describe("EditorOutline — collapse persists across unmount (ED5 Task 3, audit C)", () => {
+  /**
+   * Reproduces the flag-ON "Edit" tab lifecycle: Radix `TabsContent` is NOT
+   * force-mounted, so `EditorOutline` unmounts on tab-away and remounts on
+   * tab-back. Collapse used to live in a LOCAL `useState` inside
+   * `EditorOutline` and reset on every remount; it now lives in the
+   * always-mounted `useEditorSelection` slice the controller owns, so it must
+   * survive. This harness calls the REAL hook in a parent that stays mounted
+   * across a simulated tab round-trip, toggling whether `EditorOutline`
+   * itself is in the tree — exactly the unmount boundary the flag-ON shell
+   * imposes.
+   */
+  function Harness() {
+    const selection = useEditorSelection();
+    const [mounted, setMounted] = useState(true);
+    return (
+      <div>
+        <button
+          type="button"
+          data-testid="toggle-mount"
+          onClick={() => setMounted((m) => !m)}
+        >
+          toggle mount
+        </button>
+        {mounted ? (
+          <EditorOutline
+            sections={SECTIONS}
+            questions={baseQuestions()}
+            focusedQuestionUid={selection.focusedQuestionUid}
+            setFocusedQuestionUid={selection.setFocusedQuestionUid}
+            isReadOnly={false}
+            isUnlocked={true}
+            conditionalEnabled={true}
+            isSectionCollapsed={selection.isSectionCollapsed}
+            toggleSectionCollapsed={selection.toggleSectionCollapsed}
+            setSectionCollapsed={selection.setSectionCollapsed}
+            onAddQuestion={jest.fn(() => "u-new")}
+            onDuplicateQuestion={jest.fn(() => "u-copy")}
+            onDeleteQuestion={jest.fn((uid: string) => ({
+              removedUid: uid,
+              affectedDependentUids: [],
+            }))}
+            onReorderQuestions={jest.fn()}
+            onGoToSections={jest.fn()}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
+  it("collapsing a section, unmounting EditorOutline, and remounting it keeps the section collapsed", () => {
+    render(<Harness />);
+
+    // Collapse S1.
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-section-toggle-S1"));
+    });
+    expect(screen.queryByTestId("question-card-S1_q1")).toBeNull();
+    expect(screen.getByTestId("outline-section-toggle-S1")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    // Simulate a tab-away: EditorOutline unmounts (the parent — the
+    // always-mounted controller in production — stays up).
+    act(() => {
+      fireEvent.click(screen.getByTestId("toggle-mount"));
+    });
+    expect(screen.queryByTestId("editor-outline")).toBeNull();
+
+    // Simulate tab-back: EditorOutline remounts.
+    act(() => {
+      fireEvent.click(screen.getByTestId("toggle-mount"));
+    });
+
+    // Collapse survived the unmount — S1 is still collapsed.
+    expect(screen.getByTestId("outline-section-toggle-S1")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+    expect(screen.queryByTestId("question-card-S1_q1")).toBeNull();
   });
 });

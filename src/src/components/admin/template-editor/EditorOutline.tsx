@@ -26,9 +26,17 @@
  *
  * Read-only (G4): a published version disables add/duplicate/delete/reorder;
  * rows stay navigable (focus allowed).
+ *
+ * Collapse (ED5 Task 3, audit C): section-collapse used to be LOCAL state
+ * here, which reset on every unmount — the flag-ON "Edit" tab body unmounts
+ * on tab-away (Radix `TabsContent` is not force-mounted) while focus (already
+ * in `useEditorSelection`) persisted, an inconsistency. Collapse is now owned
+ * by the shared `useEditorSelection` slice (passed in as
+ * `isSectionCollapsed`/`toggleSectionCollapsed`/`setSectionCollapsed`) so it
+ * survives the same unmount/remount focus already does.
  */
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -63,6 +71,14 @@ export interface EditorOutlineProps {
   /** Shared selection slice (persists across tab switches — G5). */
   focusedQuestionUid: string | null;
   setFocusedQuestionUid: (uid: string | null) => void;
+  /**
+   * Shared collapse slice (ED5 Task 3, audit C) — lives in
+   * `useEditorSelection` so it survives an EditorOutline unmount/remount,
+   * just like `focusedQuestionUid`.
+   */
+  isSectionCollapsed: (key: string) => boolean;
+  toggleSectionCollapsed: (key: string) => void;
+  setSectionCollapsed: (key: string, collapsed: boolean) => void;
   /** Published version ⇒ read-only mutation affordances (G4). */
   isReadOnly: boolean;
   /** Wave T — inherited-question delete uses the history-consequence confirm. */
@@ -208,6 +224,9 @@ export function EditorOutline({
   questions,
   focusedQuestionUid,
   setFocusedQuestionUid,
+  isSectionCollapsed,
+  toggleSectionCollapsed,
+  setSectionCollapsed,
   isReadOnly,
   isUnlocked,
   conditionalEnabled,
@@ -231,11 +250,11 @@ export function EditorOutline({
     return out;
   }, [questions, sections]);
 
-  // Collapse state — sections start EXPANDED (undefined ⇒ open).
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const isExpanded = (key: string) => !collapsed[key];
-  const toggleSection = (key: string) =>
-    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+  // Collapse state — sections start EXPANDED (undefined ⇒ open). Owned by
+  // the shared `useEditorSelection` slice (ED5 Task 3) so it survives an
+  // unmount/remount of this component.
+  const isExpanded = (key: string) => !isSectionCollapsed(key);
+  const toggleSection = (key: string) => toggleSectionCollapsed(key);
 
   // Drag-and-drop sensors — pointer AND keyboard (the keyboard sensor is the
   // jsdom-drivable path; both call the SAME onDragEnd → onReorderQuestions).
@@ -262,7 +281,7 @@ export function EditorOutline({
     if (isReadOnly) return;
     const newUid = onAddQuestion(sectionKey);
     // Make sure the section is open so the new row is visible.
-    setCollapsed((prev) => ({ ...prev, [sectionKey]: false }));
+    setSectionCollapsed(sectionKey, false);
     setFocusedQuestionUid(newUid);
   };
 
