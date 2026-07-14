@@ -29,6 +29,7 @@ import { QuestionSerializationError } from "@/components/admin/template-editor/q
 import type { QuestionDraftRow } from "@/components/admin/template-editor/question-serialization";
 import type { SectionDraft } from "@/components/admin/template-editor/SectionsCard";
 import type { PagerQuestion } from "@/lib/assessments/section-pages";
+import { EditorDrawer } from "@/components/admin/template-editor/EditorDrawer";
 
 export interface TestModeDrawerProps {
   open: boolean;
@@ -109,20 +110,8 @@ export function TestModeDrawer(props: TestModeDrawerProps) {
 
   const scored = scoreDraft(parsed, answerList, props.templateAlias);
 
-  if (!props.open) return null;
-
   return (
-    <aside
-      role="dialog"
-      aria-label="Test Mode"
-      className="fixed inset-y-0 right-0 z-50 w-[min(720px,100vw)] overflow-y-auto border-l bg-background p-6 shadow-xl"
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Test Mode</h2>
-        <button type="button" onClick={props.onClose} className="text-sm underline">
-          Close
-        </button>
-      </div>
+    <EditorDrawer open={props.open} onClose={props.onClose} title="Test Mode">
       <p className="mb-4 text-sm text-muted-foreground">
         Sample answers — nothing is saved. See the scores, tier, and recommendations a respondent would get.
       </p>
@@ -161,7 +150,7 @@ export function TestModeDrawer(props: TestModeDrawerProps) {
           </div>
         </div>
       )}
-    </aside>
+    </EditorDrawer>
   );
 }
 

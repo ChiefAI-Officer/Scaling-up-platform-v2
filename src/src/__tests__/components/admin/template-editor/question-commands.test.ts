@@ -17,7 +17,11 @@ import { renderHook, act } from "@testing-library/react";
 
 import {
   buildDeleteConfirmText,
+  buildMoveQuestionPrompt,
+  buildSectionDeletePrompt,
   buildShowIfDependentsWarning,
+  collectSectionDeleteImpact,
+  computeSurvivorFocus,
   findShowIfDependents,
 } from "@/components/admin/template-editor/question-commands";
 import { useTemplateEditorDraft } from "@/components/admin/template-editor/hooks/useTemplateEditorDraft";
@@ -80,6 +84,69 @@ function renderDraft() {
     useTemplateEditorDraft({
       template,
       version: makeVersion(),
+      publishedQuestionKeys: [],
+      publishedOptionKeys: {},
+      questionEditorUnlocked: true,
+      waveQEnabled: false,
+    }),
+  );
+}
+
+// ED5 Task 10 (B-2b) — two sections, with a cross-section show-if AND an
+// in-section show-if, so `deleteSection` can be pinned on the distinction
+// between "external dependent" (cleared, reported) and "in-section
+// dependent" (just removed along with its gate — never reported).
+function makeVersionWithTwoSections() {
+  return {
+    id: "ver_3",
+    versionNumber: 3,
+    language: "en-US",
+    publishedAt: null as string | null,
+    contentHash: "abcdef012345",
+    sections: [
+      { stableKey: "S1", name: "Section One" },
+      { stableKey: "S2", name: "Section Two" },
+    ],
+    questions: [
+      {
+        stableKey: "S1_a",
+        sectionStableKey: "S1",
+        label: "Gate",
+        type: "MULTI_CHOICE",
+        isRequired: true,
+        sortOrder: 1,
+        options: [{ key: "a", label: "Alpha" }],
+        maxChoices: 1,
+      },
+      {
+        stableKey: "S1_b",
+        sectionStableKey: "S1",
+        label: "In-section dependent",
+        type: "TEXT",
+        isRequired: false,
+        sortOrder: 2,
+        showIf: { questionKey: "S1_a", optionKey: "a" },
+      },
+      {
+        stableKey: "S2_x",
+        sectionStableKey: "S2",
+        label: "External dependent",
+        type: "TEXT",
+        isRequired: false,
+        sortOrder: 1,
+        showIf: { questionKey: "S1_a", optionKey: "a" },
+      },
+    ],
+    scoringConfig: {},
+    reportConfig: null,
+  };
+}
+
+function renderDraftTwoSections() {
+  return renderHook(() =>
+    useTemplateEditorDraft({
+      template,
+      version: makeVersionWithTwoSections(),
       publishedQuestionKeys: [],
       publishedOptionKeys: {},
       questionEditorUnlocked: true,
@@ -174,6 +241,113 @@ describe("findShowIfDependents", () => {
   });
 });
 
+// ── Aggregated section-delete prompt (ED5 Task 10, B-2b) ───────────────────
+describe("buildSectionDeletePrompt", () => {
+  it("empty section = simple prompt, no count/consequence/dependents lines", () => {
+    const prompt = buildSectionDeletePrompt(
+      { name: "Intro", stableKey: "S1" },
+      {
+        questionCount: 0,
+        inheritedKeys: [],
+        freedDependentKeys: [],
+        isUnlocked: true,
+      },
+    );
+    expect(prompt).toBe("Delete section S1?");
+  });
+
+  it("non-empty section names the count, enumerates inherited keys with consequence language, and names freed dependents", () => {
+    const prompt = buildSectionDeletePrompt(
+      { name: "Recruit", stableKey: "S3" },
+      {
+        questionCount: 3,
+        inheritedKeys: ["S3_a", "S3_b"],
+        freedDependentKeys: ["S5_why"],
+        isUnlocked: true,
+      },
+    );
+    expect(prompt).toContain("Delete section S3 and its 3 questions?");
+    expect(prompt).toContain("S3_a, S3_b");
+    expect(prompt).toContain("trend");
+    expect(prompt).toContain("S5_why");
+    expect(prompt).toContain("Continue?");
+  });
+
+  it("singular question count uses the singular noun", () => {
+    const prompt = buildSectionDeletePrompt(
+      { name: "Solo", stableKey: "S4" },
+      {
+        questionCount: 1,
+        inheritedKeys: [],
+        freedDependentKeys: [],
+        isUnlocked: true,
+      },
+    );
+    expect(prompt).toContain("Delete section S4 and its 1 question?");
+  });
+
+  it("inherited keys are NOT enumerated when isUnlocked is false", () => {
+    const prompt = buildSectionDeletePrompt(
+      { name: "Recruit", stableKey: "S3" },
+      {
+        questionCount: 2,
+        inheritedKeys: ["S3_a"],
+        freedDependentKeys: [],
+        isUnlocked: false,
+      },
+    );
+    expect(prompt).not.toContain("published version");
+    expect(prompt).not.toContain("S3_a");
+  });
+
+  it("freed dependents are named even when there are no inherited keys", () => {
+    const prompt = buildSectionDeletePrompt(
+      { name: "Recruit", stableKey: "S3" },
+      {
+        questionCount: 1,
+        inheritedKeys: [],
+        freedDependentKeys: ["S5_why", "S5_other"],
+        isUnlocked: true,
+      },
+    );
+    expect(prompt).toContain(
+      "2 questions shown conditionally on deleted questions will become always-visible: S5_why, S5_other.",
+    );
+  });
+});
+
+// ── Move-question confirm prompt (ED5 Task 11, B-3) ────────────────────────
+describe("buildMoveQuestionPrompt", () => {
+  it("inherited question — names the key, keeps immutability language, and names the per-domain scoring/report consequence", () => {
+    const prompt = buildMoveQuestionPrompt(
+      { stableKey: "S1_gate", isInherited: true },
+      "Section Two",
+    );
+    expect(prompt).toBe(
+      [
+        `Move inherited question S1_gate to "Section Two"?`,
+        "",
+        "Its key keeps the original section prefix (keys are immutable). From the NEXT published version,",
+        "reports group it under the new section and per-domain scoring counts it toward the new section's",
+        "domain. Past published versions are unaffected.",
+        "",
+        "Continue?",
+      ].join("\n"),
+    );
+    expect(prompt).toContain("S1_gate");
+    expect(prompt).toContain("per-domain");
+  });
+
+  it("non-inherited (new-to-draft) question — empty string, no confirm needed", () => {
+    expect(
+      buildMoveQuestionPrompt(
+        { stableKey: "S1_x", isInherited: false },
+        "Section Two",
+      ),
+    ).toBe("");
+  });
+});
+
 // ── Model commands ─────────────────────────────────────────────────────────
 describe("useTemplateEditorDraft — question commands", () => {
   it("addQuestion returns a NEW uid not previously present, added to the section", () => {
@@ -247,5 +421,245 @@ describe("useTemplateEditorDraft — question commands", () => {
     const depAfter = result.current.questions.find((q) => q.uid === dep.uid)!;
     expect(depAfter.sortOrder).toBe(1);
     expect(gateAfter.sortOrder).toBe(2);
+  });
+});
+
+// ── deleteSection — cascade command (ED5 Task 10, B-2b) ────────────────────
+describe("useTemplateEditorDraft — deleteSection", () => {
+  it("removes the section + its questions atomically, clears the EXTERNAL dependent's showIf, and does NOT report the in-section dependent as affected", () => {
+    const { result } = renderDraftTwoSections();
+    const s1 = result.current.sections.find((s) => s.stableKey === "S1")!;
+    const gate = result.current.questions.find((q) => q.stableKey === "S1_a")!;
+    const inSectionDep = result.current.questions.find(
+      (q) => q.stableKey === "S1_b",
+    )!;
+    const externalDep = result.current.questions.find(
+      (q) => q.stableKey === "S2_x",
+    )!;
+    expect(externalDep.showIf).toEqual({ questionKey: "S1_a", optionKey: "a" });
+
+    let res:
+      | {
+          removedSectionKey: string;
+          removedQuestionUids: string[];
+          affectedDependentUids: string[];
+        }
+      | undefined;
+    act(() => {
+      res = result.current.deleteSection(s1.uid);
+    });
+
+    expect(res!.removedSectionKey).toBe("S1");
+    expect(new Set(res!.removedQuestionUids)).toEqual(
+      new Set([gate.uid, inSectionDep.uid]),
+    );
+    // The in-section dependent is removed too — it must NOT show up as an
+    // "affected" (survives-with-cleared-showIf) dependent.
+    expect(res!.affectedDependentUids).toEqual([externalDep.uid]);
+
+    // Section physically removed (atomic with the questions below).
+    expect(result.current.sections.map((s) => s.stableKey)).toEqual(["S2"]);
+
+    // Both S1 questions gone.
+    expect(
+      result.current.questions.some((q) => q.stableKey === "S1_a"),
+    ).toBe(false);
+    expect(
+      result.current.questions.some((q) => q.stableKey === "S1_b"),
+    ).toBe(false);
+
+    // External dependent survives with showIf CLEARED.
+    const externalAfter = result.current.questions.find(
+      (q) => q.stableKey === "S2_x",
+    )!;
+    expect(externalAfter).toBeDefined();
+    expect(externalAfter.showIf).toBeNull();
+
+    // Both surfaces flagged dirty by the one atomic handler.
+    expect(result.current.dirtyFlags.sections).toBe(true);
+    expect(result.current.dirtyFlags.questions).toBe(true);
+  });
+
+  it("an empty section deletes cleanly with no removed questions and no affected dependents", () => {
+    const { result } = renderDraft(); // single-section S1 fixture
+    act(() => {
+      result.current.handleSectionsAdd(); // adds an empty S2-ish section
+    });
+    const empty = result.current.sections.find((s) => s.stableKey !== "S1")!;
+    let res:
+      | {
+          removedSectionKey: string;
+          removedQuestionUids: string[];
+          affectedDependentUids: string[];
+        }
+      | undefined;
+    act(() => {
+      res = result.current.deleteSection(empty.uid);
+    });
+    expect(res).toEqual({
+      removedSectionKey: empty.stableKey,
+      removedQuestionUids: [],
+      affectedDependentUids: [],
+    });
+    expect(
+      result.current.sections.some((s) => s.uid === empty.uid),
+    ).toBe(false);
+  });
+});
+
+// ── moveQuestionToSection (ED5 Task 11, B-3) ────────────────────────────────
+describe("useTemplateEditorDraft — moveQuestionToSection", () => {
+  it("moves a question to another section, resequencing sortOrder contiguously in BOTH sections; stableKey and showIf are untouched", () => {
+    const { result } = renderDraftTwoSections();
+    const a = result.current.questions.find((q) => q.stableKey === "S1_a")!;
+    const b = result.current.questions.find((q) => q.stableKey === "S1_b")!;
+    const x = result.current.questions.find((q) => q.stableKey === "S2_x")!;
+    expect(b.showIf).toEqual({ questionKey: "S1_a", optionKey: "a" });
+
+    act(() => {
+      result.current.moveQuestionToSection(b.uid, "S2");
+    });
+
+    const bAfter = result.current.questions.find((q) => q.uid === b.uid)!;
+    expect(bAfter.sectionStableKey).toBe("S2");
+    expect(bAfter.stableKey).toBe("S1_b"); // immutable — never rewritten by a move
+    expect(bAfter.showIf).toEqual({ questionKey: "S1_a", optionKey: "a" }); // untouched
+
+    // S1 resequenced to just the remaining question, contiguous from 1.
+    const s1After = result.current.questions
+      .filter((q) => q.sectionStableKey === "S1")
+      .sort((p, q2) => p.sortOrder - q2.sortOrder);
+    expect(s1After.map((q) => q.uid)).toEqual([a.uid]);
+    expect(s1After.map((q) => q.sortOrder)).toEqual([1]);
+
+    // S2 resequenced with the moved question appended at the END, contiguous.
+    const s2After = result.current.questions
+      .filter((q) => q.sectionStableKey === "S2")
+      .sort((p, q2) => p.sortOrder - q2.sortOrder);
+    expect(s2After.map((q) => q.uid)).toEqual([x.uid, b.uid]);
+    expect(s2After.map((q) => q.sortOrder)).toEqual([1, 2]);
+
+    expect(result.current.dirtyFlags.questions).toBe(true);
+  });
+
+  it("an explicit targetIndex inserts before that position in the target section", () => {
+    const { result } = renderDraftTwoSections();
+    const b = result.current.questions.find((q) => q.stableKey === "S1_b")!;
+    const x = result.current.questions.find((q) => q.stableKey === "S2_x")!;
+
+    act(() => {
+      result.current.moveQuestionToSection(b.uid, "S2", 0);
+    });
+
+    const s2After = result.current.questions
+      .filter((q) => q.sectionStableKey === "S2")
+      .sort((p, q2) => p.sortOrder - q2.sortOrder);
+    expect(s2After.map((q) => q.uid)).toEqual([b.uid, x.uid]);
+    expect(s2After.map((q) => q.sortOrder)).toEqual([1, 2]);
+  });
+
+  it("moving a question to its OWN current section is a true no-op (questions reference unchanged, not dirtied)", () => {
+    const { result } = renderDraftTwoSections();
+    const a = result.current.questions.find((q) => q.stableKey === "S1_a")!;
+    const before = result.current.questions;
+    act(() => {
+      result.current.moveQuestionToSection(a.uid, "S1");
+    });
+    expect(result.current.questions).toBe(before);
+    expect(result.current.dirtyFlags.questions).toBeUndefined();
+  });
+});
+
+// ── computeSurvivorFocus (ED5 Task 5, audit C — focus rule) ────────────────
+describe("computeSurvivorFocus", () => {
+  const sectionOrder = ["S1", "S2"];
+
+  it("next-in-section — prefers the next sibling by sortOrder", () => {
+    const q1 = draftQuestion({ uid: "q1", sectionStableKey: "S1", sortOrder: 1 });
+    const q2 = draftQuestion({ uid: "q2", sectionStableKey: "S1", sortOrder: 2 });
+    const q3 = draftQuestion({ uid: "q3", sectionStableKey: "S1", sortOrder: 3 });
+    expect(computeSurvivorFocus([q1, q2, q3], sectionOrder, "q1")).toBe("q2");
+  });
+
+  it("last→previous — removing the last sibling in a section focuses the previous one", () => {
+    const q1 = draftQuestion({ uid: "q1", sectionStableKey: "S1", sortOrder: 1 });
+    const q2 = draftQuestion({ uid: "q2", sectionStableKey: "S1", sortOrder: 2 });
+    expect(computeSurvivorFocus([q1, q2], sectionOrder, "q2")).toBe("q1");
+  });
+
+  it("section-empties→nearest section — falls through to the next section in order when the target's section has no survivors left", () => {
+    const q1 = draftQuestion({ uid: "q1", sectionStableKey: "S1", sortOrder: 1 });
+    const q2 = draftQuestion({ uid: "q2", sectionStableKey: "S2", sortOrder: 1 });
+    const q3 = draftQuestion({ uid: "q3", sectionStableKey: "S2", sortOrder: 2 });
+    expect(computeSurvivorFocus([q1, q2, q3], sectionOrder, "q1")).toBe("q2");
+  });
+
+  it("template-empty→null — removing the only remaining question returns null", () => {
+    const q1 = draftQuestion({ uid: "q1", sectionStableKey: "S1", sortOrder: 1 });
+    expect(computeSurvivorFocus([q1], sectionOrder, "q1")).toBeNull();
+  });
+
+  it("cascade (alsoRemoved) — skips also-removed questions when picking the next survivor", () => {
+    const q1 = draftQuestion({ uid: "q1", sectionStableKey: "S1", sortOrder: 1 });
+    const q2 = draftQuestion({ uid: "q2", sectionStableKey: "S1", sortOrder: 2 });
+    const q3 = draftQuestion({ uid: "q3", sectionStableKey: "S1", sortOrder: 3 });
+    // q2 would normally be the "next" survivor, but it's also being removed
+    // in the same cascade — the helper must skip it and land on q3.
+    expect(
+      computeSurvivorFocus([q1, q2, q3], sectionOrder, "q1", ["q2"]),
+    ).toBe("q3");
+  });
+});
+
+describe("collectSectionDeleteImpact (ED5 T15 — shared cascade prompt inputs)", () => {
+  const sections = [
+    { uid: "us1", stableKey: "S1" },
+    { uid: "us2", stableKey: "S2" },
+  ];
+
+  it("reports count, inherited keys, and EXTERNAL freed dependents only", () => {
+    const gate = draftQuestion({
+      uid: "g",
+      stableKey: "S1_gate",
+      sectionStableKey: "S1",
+      type: "MULTI_CHOICE",
+      isInherited: true,
+    });
+    const other = draftQuestion({
+      uid: "o",
+      stableKey: "S1_other",
+      sectionStableKey: "S1",
+    });
+    const inDep = draftQuestion({
+      uid: "id",
+      stableKey: "S1_indep",
+      sectionStableKey: "S1",
+      showIf: { questionKey: "S1_gate", optionKey: "a" },
+    });
+    const extDep = draftQuestion({
+      uid: "ed",
+      stableKey: "S2_extdep",
+      sectionStableKey: "S2",
+      showIf: { questionKey: "S1_gate", optionKey: "a" },
+    });
+    const impact = collectSectionDeleteImpact(
+      sections,
+      [gate, other, inDep, extDep],
+      "us1",
+    );
+    expect(impact.questionCount).toBe(3);
+    expect([...impact.removedQuestionUids].sort()).toEqual(["g", "id", "o"]);
+    expect(impact.inheritedKeys).toEqual(["S1_gate"]);
+    // external dependent freed; the in-section dependent is removed, not "freed"
+    expect(impact.freedDependentKeys).toEqual(["S2_extdep"]);
+  });
+
+  it("returns an empty impact for an unknown section uid", () => {
+    expect(collectSectionDeleteImpact(sections, [], "nope")).toEqual({
+      questionCount: 0,
+      removedQuestionUids: [],
+      inheritedKeys: [],
+      freedDependentKeys: [],
+    });
   });
 });

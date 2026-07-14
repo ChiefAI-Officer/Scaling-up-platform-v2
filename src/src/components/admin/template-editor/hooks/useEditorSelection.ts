@@ -22,6 +22,17 @@
  * effect, reproducing the pre-ED3 remount initialization exactly (resolved by
  * the caller against the *live* sections/questions at entry time). See the
  * ED3-pinned characterization test in editor-byte-equivalence.test.tsx.
+ *
+ * ED5 Task 3 (audit C) additive extension: a `collapsedSections` slice.
+ * `EditorOutline` used to own section-collapse as LOCAL `useState`, which is
+ * fine while `QuestionsTab` hosts it (mount-reset is the existing, accepted
+ * behavior there) but wrong for the flag-ON three-pane "Edit" tab: its Radix
+ * `TabsContent` is NOT force-mounted, so `EditorOutline` unmounts on
+ * tab-away and remounts on tab-back — resetting local collapse state while
+ * `focusedQuestionUid` (already lifted here) persists. Moving collapse into
+ * this always-mounted hook closes that inconsistency; it is a pure addition
+ * and does not change `selectedSectionStableKey` / `focusedQuestionUid` /
+ * `resetSelection` behavior.
  */
 
 import { useCallback, useState } from "react";
@@ -42,6 +53,16 @@ export interface EditorSelection {
     selectedSectionStableKey: string | null,
     focusedQuestionUid: string | null,
   ) => void;
+  /**
+   * Section-collapse slice (ED5 Task 3). Keyed by section `stableKey`;
+   * absent ⇒ expanded (undefined is falsy, matching the pre-lift
+   * `EditorOutline` default of "sections start EXPANDED").
+   */
+  collapsedSections: Record<string, boolean>;
+  isSectionCollapsed: (key: string) => boolean;
+  toggleSectionCollapsed: (key: string) => void;
+  /** Explicit set — used by "expand on add" (called with `false`). */
+  setSectionCollapsed: (key: string, collapsed: boolean) => void;
 }
 
 export function useEditorSelection(): EditorSelection {
@@ -60,11 +81,32 @@ export function useEditorSelection(): EditorSelection {
     [],
   );
 
+  const [collapsedSections, setCollapsedSections] = useState<
+    Record<string, boolean>
+  >({});
+
+  const isSectionCollapsed = useCallback(
+    (key: string) => !!collapsedSections[key],
+    [collapsedSections],
+  );
+
+  const toggleSectionCollapsed = useCallback((key: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const setSectionCollapsed = useCallback((key: string, collapsed: boolean) => {
+    setCollapsedSections((prev) => ({ ...prev, [key]: collapsed }));
+  }, []);
+
   return {
     selectedSectionStableKey,
     setSelectedSectionStableKey,
     focusedQuestionUid,
     setFocusedQuestionUid,
     resetSelection,
+    collapsedSections,
+    isSectionCollapsed,
+    toggleSectionCollapsed,
+    setSectionCollapsed,
   };
 }

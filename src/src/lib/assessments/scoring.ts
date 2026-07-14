@@ -992,7 +992,7 @@ type Question = z.infer<typeof QuestionSchema>;
 type ScoringConfig = z.infer<typeof ScoringConfigSchema>;
 type Tier = z.infer<typeof TierSchema>;
 
-interface TierDomain {
+export interface TierDomain {
   min: number;
   max: number;
   isInteger: boolean;
@@ -1097,7 +1097,7 @@ function computeRollupTierDomain(questions: SliderLikertQuestion[]): TierDomain 
  * Rockefeller/QSP behavior). Throws ScoringValidationError on ambiguous
  * configs (mixed scales, zero questions), matching runtime behavior.
  */
-function computeGlobalTierDomain(
+export function computeGlobalTierDomain(
   scorableQuestions: SliderLikertQuestion[],
   scoringConfig: Pick<ScoringConfig, "rollup" | "tierMetric">
 ): TierDomain {

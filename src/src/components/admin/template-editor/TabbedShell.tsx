@@ -60,6 +60,11 @@ import {
   type ScoringConfigShape,
 } from "@/components/admin/template-editor/ScoringTiersTab";
 import { VersionsTab } from "@/components/admin/template-editor/VersionsTab";
+import {
+  buildSectionDeletePrompt,
+  collectSectionDeleteImpact,
+} from "@/components/admin/template-editor/question-commands";
+import type { QuestionDraftRow } from "@/components/admin/template-editor/question-serialization";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tab definitions
@@ -341,10 +346,10 @@ export function TabbedShell({
     handleSendResultsDefaultChange,
     handleSectionsAdd,
     handleSectionsRename,
-    handleSectionsDelete,
     handleSectionsMoveUp,
     handleSectionsMoveDown,
     handleSectionsReorder,
+    deleteSection,
     handleAddQuestion,
     handleUpdateQuestion,
     handleDeleteQuestion,
@@ -372,6 +377,37 @@ export function TabbedShell({
       sections: Boolean(dirtyFlags.sections),
     }),
     [dirtyFlags.questions, dirtyFlags.sections],
+  );
+
+  // ED5 T15 (B-2b, global) — the Sections tab now deletes through the SAME
+  // cascade `deleteSection` command the three-pane outline uses (no orphaning).
+  // The confirm is assembled HERE (the caller has the full questions list) via
+  // the shared `collectSectionDeleteImpact` + `buildSectionDeletePrompt`, so the
+  // two surfaces prompt identically (co-validate C2). SectionsCard no longer
+  // runs its own confirm.
+  const handleSectionsCascadeDelete = useCallback(
+    (uid: string) => {
+      const section = sections.find((s) => s.uid === uid);
+      if (!section) return;
+      const impact = collectSectionDeleteImpact(
+        sections,
+        questions as QuestionDraftRow[],
+        uid,
+      );
+      const ok = window.confirm(
+        buildSectionDeletePrompt(
+          { name: section.name, stableKey: section.stableKey },
+          {
+            questionCount: impact.questionCount,
+            inheritedKeys: impact.inheritedKeys,
+            freedDependentKeys: impact.freedDependentKeys,
+            isUnlocked: questionEditorUnlocked,
+          },
+        ),
+      );
+      if (ok) deleteSection(uid);
+    },
+    [sections, questions, questionEditorUnlocked, deleteSection],
   );
 
   // ─── Version lifecycle actions (publish/duplicate) — ED3 T5 hook,
@@ -573,7 +609,7 @@ export function TabbedShell({
               questionCountByStableKey={questionCountByStableKey}
               onSectionsAdd={handleSectionsAdd}
               onSectionsRename={handleSectionsRename}
-              onSectionsDelete={handleSectionsDelete}
+              onSectionsDelete={handleSectionsCascadeDelete}
               onSectionsMoveUp={handleSectionsMoveUp}
               onSectionsMoveDown={handleSectionsMoveDown}
               onSectionsReorder={handleSectionsReorder}
@@ -595,7 +631,7 @@ export function TabbedShell({
               questionCountByStableKey={questionCountByStableKey}
               onSectionsAdd={handleSectionsAdd}
               onSectionsRename={handleSectionsRename}
-              onSectionsDelete={handleSectionsDelete}
+              onSectionsDelete={handleSectionsCascadeDelete}
               onSectionsMoveUp={handleSectionsMoveUp}
               onSectionsMoveDown={handleSectionsMoveDown}
               onSectionsReorder={handleSectionsReorder}

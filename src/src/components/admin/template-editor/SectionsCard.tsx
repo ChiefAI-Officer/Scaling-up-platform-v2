@@ -162,11 +162,11 @@ function SortableSectionRow({
         <button
           type="button"
           onClick={() => {
+            // ED5 T15 — the confirm (cascade prompt) is owned by the caller
+            // (TabbedShell.handleSectionsCascadeDelete), which has the full
+            // questions list; SectionsCard just requests the delete.
             if (isReadOnly) return;
-            const ok = window.confirm(
-              `Delete section ${section.stableKey}? Questions in this section will need to be reassigned.`,
-            );
-            if (ok) onDelete(section.uid);
+            onDelete(section.uid);
           }}
           disabled={isReadOnly}
           aria-label={`Delete ${section.stableKey}`}
