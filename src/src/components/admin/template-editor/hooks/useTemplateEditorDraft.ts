@@ -592,6 +592,70 @@ export function useTemplateEditorDraft({
     [questions, setQuestionsDirty],
   );
 
+  // ED5 (Task 11, audit B-3) — move a question to a DIFFERENT section. The
+  // outline's explicit "Move to section…" control calls this after its own
+  // confirm (via the shared `buildMoveQuestionPrompt`, inherited-only).
+  // `stableKey` and `showIf` are NEVER touched — a move only ever changes
+  // `sectionStableKey` + `sortOrder` (show-if ordering is enforced at
+  // publish, not here — the D-level decision behind this task: permissive
+  // move, strict publish gate). Already-in-target is a true no-op (no
+  // `setQuestions` call at all, so identity + dirty flag are both
+  // untouched) — that belongs to `reorderQuestions`, not this command.
+  // Resequencing matches `handleReorderQuestions`' own convention: 1-based,
+  // contiguous, by position in the (new) order array.
+  const moveQuestionToSection = useCallback(
+    (uid: string, targetSectionKey: string, targetIndex?: number) => {
+      const moved = questions.find((q) => q.uid === uid);
+      if (!moved || moved.sectionStableKey === targetSectionKey) return;
+      const sourceSectionKey = moved.sectionStableKey;
+
+      // Target section's CURRENT order (the moved row isn't in it yet);
+      // splice it in at targetIndex (default: END).
+      const targetOrderUids = questions
+        .filter((q) => q.sectionStableKey === targetSectionKey)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((q) => q.uid);
+      const insertAt =
+        targetIndex === undefined
+          ? targetOrderUids.length
+          : Math.max(0, Math.min(targetIndex, targetOrderUids.length));
+      targetOrderUids.splice(insertAt, 0, uid);
+      const targetOrder = new Map<string, number>();
+      targetOrderUids.forEach((u, idx) => targetOrder.set(u, idx + 1));
+
+      // Source section's remaining order (moved row excluded), resequenced
+      // contiguously so no gap is left behind.
+      const sourceOrder = new Map<string, number>();
+      questions
+        .filter(
+          (q) => q.sectionStableKey === sourceSectionKey && q.uid !== uid,
+        )
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .forEach((q, idx) => sourceOrder.set(q.uid, idx + 1));
+
+      setQuestions((prev) =>
+        prev.map((q) => {
+          if (q.uid === uid) {
+            return {
+              ...q,
+              sectionStableKey: targetSectionKey,
+              sortOrder: targetOrder.get(uid)!,
+            };
+          }
+          if (targetOrder.has(q.uid)) {
+            return { ...q, sortOrder: targetOrder.get(q.uid)! };
+          }
+          if (sourceOrder.has(q.uid)) {
+            return { ...q, sortOrder: sourceOrder.get(q.uid)! };
+          }
+          return q;
+        }),
+      );
+      setQuestionsDirty();
+    },
+    [questions, setQuestionsDirty],
+  );
+
   // ─── Save Draft — in-flight guard ─────────────────────────────────────
   const [savingDraft, setSavingDraft] = useState(false);
 
@@ -879,6 +943,9 @@ export function useTemplateEditorDraft({
     // ED5 Task 10 (B-2b) — the section-cascade analog of `deleteQuestion`:
     // atomic section+questions removal, external show-if dependents cleared.
     deleteSection,
+    // ED5 Task 11 (B-3) — moves a question to a different section
+    // (stableKey/showIf untouched; sortOrder resequenced in both sections).
+    moveQuestionToSection,
     // ─── Save ───
     handleSaveDraft,
   };

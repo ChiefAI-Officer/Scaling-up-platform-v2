@@ -219,3 +219,32 @@ export function buildSectionDeletePrompt(
   lines.push("", "Continue?");
   return lines.join("\n");
 }
+
+/**
+ * ED5 (Task 11, audit B-3) — confirm text for moving a question to a
+ * DIFFERENT section via the outline's explicit "Move to section…" control.
+ * `stableKey` is immutable (a move never changes it, even for an inherited
+ * question whose key carries the OLD section's prefix); only
+ * `sectionStableKey`/`sortOrder` change (the model's `moveQuestionToSection`
+ * command). A new-to-draft question has no history to protect, so it moves
+ * silently (empty string ⇒ the caller skips `window.confirm` entirely); an
+ * INHERITED question's move is a history-affecting act for the NEXT
+ * published version (report grouping + per-domain scoring), so it is named
+ * explicitly, mirroring `buildDeleteConfirmText`'s consequence-language
+ * idiom.
+ */
+export function buildMoveQuestionPrompt(
+  q: Pick<QuestionDraftRow, "stableKey" | "isInherited">,
+  targetSectionName: string,
+): string {
+  if (!q.isInherited) return "";
+  return [
+    `Move inherited question ${q.stableKey} to "${targetSectionName}"?`,
+    "",
+    "Its key keeps the original section prefix (keys are immutable). From the NEXT published version,",
+    "reports group it under the new section and per-domain scoring counts it toward the new section's",
+    "domain. Past published versions are unaffected.",
+    "",
+    "Continue?",
+  ].join("\n");
+}

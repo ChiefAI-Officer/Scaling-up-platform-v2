@@ -17,6 +17,7 @@ import { renderHook, act } from "@testing-library/react";
 
 import {
   buildDeleteConfirmText,
+  buildMoveQuestionPrompt,
   buildSectionDeletePrompt,
   buildShowIfDependentsWarning,
   computeSurvivorFocus,
@@ -314,6 +315,38 @@ describe("buildSectionDeletePrompt", () => {
   });
 });
 
+// ── Move-question confirm prompt (ED5 Task 11, B-3) ────────────────────────
+describe("buildMoveQuestionPrompt", () => {
+  it("inherited question — names the key, keeps immutability language, and names the per-domain scoring/report consequence", () => {
+    const prompt = buildMoveQuestionPrompt(
+      { stableKey: "S1_gate", isInherited: true },
+      "Section Two",
+    );
+    expect(prompt).toBe(
+      [
+        `Move inherited question S1_gate to "Section Two"?`,
+        "",
+        "Its key keeps the original section prefix (keys are immutable). From the NEXT published version,",
+        "reports group it under the new section and per-domain scoring counts it toward the new section's",
+        "domain. Past published versions are unaffected.",
+        "",
+        "Continue?",
+      ].join("\n"),
+    );
+    expect(prompt).toContain("S1_gate");
+    expect(prompt).toContain("per-domain");
+  });
+
+  it("non-inherited (new-to-draft) question — empty string, no confirm needed", () => {
+    expect(
+      buildMoveQuestionPrompt(
+        { stableKey: "S1_x", isInherited: false },
+        "Section Two",
+      ),
+    ).toBe("");
+  });
+});
+
 // ── Model commands ─────────────────────────────────────────────────────────
 describe("useTemplateEditorDraft — question commands", () => {
   it("addQuestion returns a NEW uid not previously present, added to the section", () => {
@@ -470,6 +503,69 @@ describe("useTemplateEditorDraft — deleteSection", () => {
     expect(
       result.current.sections.some((s) => s.uid === empty.uid),
     ).toBe(false);
+  });
+});
+
+// ── moveQuestionToSection (ED5 Task 11, B-3) ────────────────────────────────
+describe("useTemplateEditorDraft — moveQuestionToSection", () => {
+  it("moves a question to another section, resequencing sortOrder contiguously in BOTH sections; stableKey and showIf are untouched", () => {
+    const { result } = renderDraftTwoSections();
+    const a = result.current.questions.find((q) => q.stableKey === "S1_a")!;
+    const b = result.current.questions.find((q) => q.stableKey === "S1_b")!;
+    const x = result.current.questions.find((q) => q.stableKey === "S2_x")!;
+    expect(b.showIf).toEqual({ questionKey: "S1_a", optionKey: "a" });
+
+    act(() => {
+      result.current.moveQuestionToSection(b.uid, "S2");
+    });
+
+    const bAfter = result.current.questions.find((q) => q.uid === b.uid)!;
+    expect(bAfter.sectionStableKey).toBe("S2");
+    expect(bAfter.stableKey).toBe("S1_b"); // immutable — never rewritten by a move
+    expect(bAfter.showIf).toEqual({ questionKey: "S1_a", optionKey: "a" }); // untouched
+
+    // S1 resequenced to just the remaining question, contiguous from 1.
+    const s1After = result.current.questions
+      .filter((q) => q.sectionStableKey === "S1")
+      .sort((p, q2) => p.sortOrder - q2.sortOrder);
+    expect(s1After.map((q) => q.uid)).toEqual([a.uid]);
+    expect(s1After.map((q) => q.sortOrder)).toEqual([1]);
+
+    // S2 resequenced with the moved question appended at the END, contiguous.
+    const s2After = result.current.questions
+      .filter((q) => q.sectionStableKey === "S2")
+      .sort((p, q2) => p.sortOrder - q2.sortOrder);
+    expect(s2After.map((q) => q.uid)).toEqual([x.uid, b.uid]);
+    expect(s2After.map((q) => q.sortOrder)).toEqual([1, 2]);
+
+    expect(result.current.dirtyFlags.questions).toBe(true);
+  });
+
+  it("an explicit targetIndex inserts before that position in the target section", () => {
+    const { result } = renderDraftTwoSections();
+    const b = result.current.questions.find((q) => q.stableKey === "S1_b")!;
+    const x = result.current.questions.find((q) => q.stableKey === "S2_x")!;
+
+    act(() => {
+      result.current.moveQuestionToSection(b.uid, "S2", 0);
+    });
+
+    const s2After = result.current.questions
+      .filter((q) => q.sectionStableKey === "S2")
+      .sort((p, q2) => p.sortOrder - q2.sortOrder);
+    expect(s2After.map((q) => q.uid)).toEqual([b.uid, x.uid]);
+    expect(s2After.map((q) => q.sortOrder)).toEqual([1, 2]);
+  });
+
+  it("moving a question to its OWN current section is a true no-op (questions reference unchanged, not dirtied)", () => {
+    const { result } = renderDraftTwoSections();
+    const a = result.current.questions.find((q) => q.stableKey === "S1_a")!;
+    const before = result.current.questions;
+    act(() => {
+      result.current.moveQuestionToSection(a.uid, "S1");
+    });
+    expect(result.current.questions).toBe(before);
+    expect(result.current.dirtyFlags.questions).toBeUndefined();
   });
 });
 

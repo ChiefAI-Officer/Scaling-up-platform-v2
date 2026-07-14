@@ -94,6 +94,7 @@ import {
 import type { SectionDraft } from "./SectionsCard";
 import type { QuestionDraftRow } from "./question-serialization";
 import {
+  buildMoveQuestionPrompt,
   buildQuestionDeletePrompt,
   buildSectionDeletePrompt,
   computeSurvivorFocus,
@@ -157,6 +158,14 @@ export interface EditorOutlineProps {
     removedQuestionUids: string[];
     affectedDependentUids: string[];
   };
+  /**
+   * ED5 Task 11 (B-3) — shared model command: moves a question to a
+   * DIFFERENT section (`stableKey`/`showIf` untouched — only
+   * `sectionStableKey`/`sortOrder` change). The outline confirms first for
+   * an INHERITED question via the shared `buildMoveQuestionPrompt` (empty
+   * string ⇒ skip the confirm entirely).
+   */
+  onMoveQuestion: (uid: string, targetSectionKey: string) => void;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -188,6 +197,14 @@ interface SortableOutlineRowProps {
    * false).
    */
   gateDependentCount: number;
+  /**
+   * ED5 Task 11 (B-3) — sections OTHER than this row's own (by stableKey),
+   * the "Move to section…" control's option list. Empty ⇒ the control is
+   * disabled (only one section exists).
+   */
+  otherSections: readonly Pick<SectionDraft, "uid" | "stableKey" | "name">[];
+  /** ED5 Task 11 (B-3) — the row's own confirm-then-call handler. */
+  onMove: (targetSectionKey: string) => void;
 }
 
 function SortableOutlineRow({
@@ -200,6 +217,8 @@ function SortableOutlineRow({
   registerFocusRef,
   showConditionalBadge,
   gateDependentCount,
+  otherSections,
+  onMove,
 }: SortableOutlineRowProps) {
   const {
     attributes,
@@ -301,6 +320,24 @@ function SortableOutlineRow({
           >
             Delete
           </button>
+          <select
+            aria-label="Move to section"
+            data-testid={`outline-move-select-${key}`}
+            value=""
+            onChange={(e) => {
+              const targetSectionKey = e.target.value;
+              if (targetSectionKey) onMove(targetSectionKey);
+            }}
+            disabled={isReadOnly || otherSections.length === 0}
+            className="text-[0.6875rem] font-medium px-1 py-1 rounded border border-border bg-background text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">Move to section…</option>
+            {otherSections.map((sec) => (
+              <option key={sec.uid} value={sec.stableKey}>
+                {sec.name || sec.stableKey}
+              </option>
+            ))}
+          </select>
         </span>
       </div>
     </li>
@@ -331,6 +368,7 @@ export function EditorOutline({
   onMoveSectionUp,
   onMoveSectionDown,
   onDeleteSection,
+  onMoveQuestion,
 }: EditorOutlineProps) {
   // ED5 Task 8 (B-1b) — read-only "Logic map" drawer, gated on the Wave-W
   // conditional flag exactly like the row badges above.
@@ -550,6 +588,25 @@ export function EditorOutline({
     onDeleteQuestion(q.uid);
   };
 
+  // ED5 Task 11 (B-3) — the row's explicit "Move to section…" select calls
+  // this with the chosen target stableKey. Inherited questions confirm via
+  // the shared `buildMoveQuestionPrompt` (empty string for a new-to-draft
+  // question ⇒ the `msg &&` short-circuits before `window.confirm` is even
+  // called — non-inherited moves never prompt). Focus stays ON the moved
+  // question (its uid never changes) — reuse the pending-focus/DOM-scroll
+  // mechanism so it stays visibly focused even though it re-renders under a
+  // different section in the tree.
+  const handleMove = (q: QuestionDraft, targetSectionKey: string) => {
+    if (isReadOnly) return;
+    const targetSection = sections.find((s) => s.stableKey === targetSectionKey);
+    if (!targetSection) return;
+    const msg = buildMoveQuestionPrompt(q, targetSection.name);
+    if (msg && !window.confirm(msg)) return;
+    onMoveQuestion(q.uid, targetSectionKey);
+    setFocusedQuestionUid(q.uid);
+    pendingFocusRef.current = { kind: "row", uid: q.uid };
+  };
+
   // ── G9 empty state — zero sections → link to the Sections tab. ──
   if (sections.length === 0) {
     return (
@@ -607,6 +664,11 @@ export function EditorOutline({
         {sections.map((s, idx) => {
           const list = questionsBySection[s.stableKey] ?? [];
           const expanded = isExpanded(s.stableKey);
+          // ED5 Task 11 (B-3) — every OTHER section, for this section's rows'
+          // "Move to section…" option list (excludes the row's own section).
+          const otherSections = sections.filter(
+            (sec) => sec.stableKey !== s.stableKey,
+          );
           return (
             <li key={s.uid} data-testid={`outline-section-${s.stableKey}`}>
               <div className="flex items-center gap-1">
@@ -713,6 +775,10 @@ export function EditorOutline({
                                 conditionalEnabled
                                   ? findShowIfDependents(questions, q).length
                                   : 0
+                              }
+                              otherSections={otherSections}
+                              onMove={(targetSectionKey) =>
+                                handleMove(q, targetSectionKey)
                               }
                             />
                           ))}

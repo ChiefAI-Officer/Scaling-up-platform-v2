@@ -67,6 +67,7 @@ export function ThreePaneWorkspace({
     handleSectionsMoveUp,
     handleSectionsMoveDown,
     deleteSection,
+    moveQuestionToSection,
   } = model;
 
   const focusedQuestion: QuestionDraft | null =
@@ -121,6 +122,7 @@ export function ThreePaneWorkspace({
           onMoveSectionUp={handleSectionsMoveUp}
           onMoveSectionDown={handleSectionsMoveDown}
           onDeleteSection={deleteSection}
+          onMoveQuestion={moveQuestionToSection}
         />
       </aside>
 

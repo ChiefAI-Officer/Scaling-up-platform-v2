@@ -165,6 +165,7 @@ interface HarnessOverrides {
     removedQuestionUids: string[];
     affectedDependentUids: string[];
   };
+  onMoveQuestion?: (uid: string, targetSectionKey: string) => void;
   setFocusedSpy?: jest.Mock;
 }
 
@@ -273,6 +274,19 @@ function renderOutline(o: HarnessOverrides = {}) {
       return res;
     };
 
+    // ED5 Task 11 (B-3) — reflects the move into the harness's own question
+    // state (section reassignment only; a real resequence is the model's
+    // job, pinned directly against `useTemplateEditorDraft` elsewhere).
+    const handleMoveQuestion = (uid: string, targetSectionKey: string) => {
+      const impl = o.onMoveQuestion ?? (() => {});
+      impl(uid, targetSectionKey);
+      setQuestions((prev) =>
+        prev.map((x) =>
+          x.uid === uid ? { ...x, sectionStableKey: targetSectionKey } : x,
+        ),
+      );
+    };
+
     return (
       <EditorOutline
         sections={sections}
@@ -295,6 +309,7 @@ function renderOutline(o: HarnessOverrides = {}) {
         onMoveSectionUp={o.onMoveSectionUp ?? jest.fn()}
         onMoveSectionDown={o.onMoveSectionDown ?? jest.fn()}
         onDeleteSection={handleDeleteSection}
+        onMoveQuestion={handleMoveQuestion}
       />
     );
   }
@@ -943,5 +958,108 @@ describe("EditorOutline — section delete (ED5 Task 10, B-2b cascade)", () => {
   it("the Delete button is disabled when isReadOnly", () => {
     renderOutline({ isReadOnly: true });
     expect(screen.getByTestId("outline-section-delete-S1")).toBeDisabled();
+  });
+});
+
+// ── Move to section (ED5 Task 11, B-3) ──────────────────────────────────────
+describe("EditorOutline — move to section (ED5 Task 11, B-3)", () => {
+  it("choosing another section calls onMoveQuestion(uid, targetSectionKey)", () => {
+    const onMoveQuestion = jest.fn();
+    renderOutline({ onMoveQuestion });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    act(() => {
+      fireEvent.change(select, { target: { value: "S2" } });
+    });
+
+    expect(onMoveQuestion).toHaveBeenCalledWith("u1", "S2");
+  });
+
+  it("moving an INHERITED question confirms with a string naming its key", () => {
+    const questions = [
+      q("u1", "S1_q1", "S1", 1, { isInherited: true }),
+      q("u2", "S1_q2", "S1", 2),
+      q("u3", "S2_q3", "S2", 1),
+    ];
+    const onMoveQuestion = jest.fn();
+    renderOutline({ questions, onMoveQuestion });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    act(() => {
+      fireEvent.change(select, { target: { value: "S2" } });
+    });
+
+    expect(window.confirm).toHaveBeenCalled();
+    const promptText = (window.confirm as jest.Mock).mock.calls[0][0] as string;
+    expect(promptText).toContain("S1_q1");
+    expect(onMoveQuestion).toHaveBeenCalledWith("u1", "S2");
+  });
+
+  it("declining the confirm for an inherited question does NOT call onMoveQuestion", () => {
+    (window.confirm as jest.Mock).mockImplementation(() => false);
+    const questions = [
+      q("u1", "S1_q1", "S1", 1, { isInherited: true }),
+      q("u2", "S1_q2", "S1", 2),
+      q("u3", "S2_q3", "S2", 1),
+    ];
+    const onMoveQuestion = jest.fn();
+    renderOutline({ questions, onMoveQuestion });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    act(() => {
+      fireEvent.change(select, { target: { value: "S2" } });
+    });
+
+    expect(onMoveQuestion).not.toHaveBeenCalled();
+  });
+
+  it("a NON-inherited question's move skips the confirm entirely", () => {
+    const onMoveQuestion = jest.fn();
+    renderOutline({ onMoveQuestion }); // baseQuestions() are all new-to-draft
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    act(() => {
+      fireEvent.change(select, { target: { value: "S2" } });
+    });
+
+    expect(window.confirm).not.toHaveBeenCalled();
+    expect(onMoveQuestion).toHaveBeenCalledWith("u1", "S2");
+  });
+
+  it("the control lists only OTHER sections, not the question's own", () => {
+    renderOutline();
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText(
+      "Move to section",
+    ) as HTMLSelectElement;
+    const optionValues = Array.from(select.options).map((opt) => opt.value);
+    expect(optionValues).not.toContain("S1");
+    expect(optionValues).toContain("S2");
+  });
+
+  it("the control is disabled when there is only one section", () => {
+    const oneSection = [{ uid: "s1", stableKey: "S1", name: "Section One" }];
+    const oneSectionQuestions = [
+      q("u1", "S1_q1", "S1", 1),
+      q("u2", "S1_q2", "S1", 2),
+    ];
+    renderOutline({ sections: oneSection, questions: oneSectionQuestions });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    expect(select).toBeDisabled();
+  });
+
+  it("the control is disabled when isReadOnly", () => {
+    renderOutline({ isReadOnly: true });
+
+    const row = screen.getByTestId("question-card-S1_q1");
+    const select = within(row).getByLabelText("Move to section");
+    expect(select).toBeDisabled();
   });
 });
