@@ -271,7 +271,7 @@ function SortableOutlineRow({
           onClick={onFocus}
           data-testid={`outline-focus-${key}`}
           aria-pressed={isFocused}
-          aria-label={`Edit ${question.stableKey || "new question"}`}
+          aria-label={`Edit ${question.label || question.stableKey || "new question"} (${question.type})`}
           className="block w-full min-w-0 text-left"
         >
           <span className="flex flex-wrap items-center gap-1.5 mb-0.5">

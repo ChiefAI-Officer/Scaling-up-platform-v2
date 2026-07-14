@@ -157,7 +157,24 @@ describe("ED4 T3 — flag ON: three-pane workspace pick", () => {
     // Single column (stacked) by default; three columns at the `lg` breakpoint —
     // mirrors QuestionsTab's `sticky lg+`. No new responsive framework.
     expect(workspace.className).toContain("grid-cols-1");
-    expect(workspace.className).toContain("lg:grid-cols-[20%_50%_30%]");
+    // ED5 T14 — outline column widened from a fixed 20% to a min-width floor so
+    // long type/key badges aren't cramped; centre flexes, inspector stays 30%.
+    expect(workspace.className).toContain(
+      "lg:grid-cols-[minmax(14rem,22%)_1fr_30%]",
+    );
+  });
+
+  it("ED5 T13 — the three panes carry landmark labels (a11y)", () => {
+    render(<TemplateEditorTabbed {...baseProps(true)} />);
+    expect(
+      screen.getByRole("complementary", { name: "Question outline" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("complementary", { name: "Question inspector" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Question preview" }),
+    ).toBeInTheDocument();
   });
 });
 

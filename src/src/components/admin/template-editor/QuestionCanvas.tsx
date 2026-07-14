@@ -48,6 +48,7 @@ export function QuestionCanvas({ question, sectionName }: QuestionCanvasProps) {
   if (!question) {
     return (
       <section
+        aria-label="Question preview"
         className="wf-card space-y-3"
         style={{ padding: "1rem" }}
         data-testid="question-canvas-empty"
@@ -68,6 +69,7 @@ export function QuestionCanvas({ question, sectionName }: QuestionCanvasProps) {
     <section
       className="wf-card space-y-3"
       style={{ padding: "1rem" }}
+      aria-label="Question preview"
       data-testid="question-canvas"
     >
       {sectionName ? (
