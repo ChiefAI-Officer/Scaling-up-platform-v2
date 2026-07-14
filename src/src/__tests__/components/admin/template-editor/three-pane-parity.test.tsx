@@ -45,6 +45,7 @@ import {
   act,
   fireEvent,
   waitFor,
+  within,
 } from "@testing-library/react";
 
 import { TemplateEditorTabbed } from "@/components/admin/TemplateEditorTabbed";
@@ -312,6 +313,199 @@ function editTemplateName(value: string) {
     });
   });
 }
+
+// MULTI_CHOICE fixture with ZERO options (serializer-guard scenario). Mirrors
+// the ED3 guard's fixture (b) emptied — a dirty questions save throws
+// MULTI_CHOICE_NO_OPTIONS before any fetch dispatches.
+function fixtureMC(threePaneEnabled: boolean) {
+  return {
+    template: {
+      id: "tpl_1",
+      name: "Beta Template",
+      alias: "BETA",
+      aggregationMode: "FULL_VISIBILITY" as const,
+      accessMode: "INVITED" as const,
+    },
+    version: {
+      id: "ver_2",
+      versionNumber: 2,
+      language: "en-US",
+      publishedAt: null,
+      contentHash: "abcdef012345",
+      sections: [{ stableKey: "S1", name: "Only Section" }],
+      questions: [
+        {
+          stableKey: "S1_pick",
+          sectionStableKey: "S1",
+          label: "Pick",
+          type: "MULTI_CHOICE",
+          isRequired: true,
+          sortOrder: 1,
+          options: [] as Array<{ key: string; label: string }>,
+          maxChoices: null,
+        },
+      ],
+      scoringConfig: {},
+      reportConfig: null,
+    },
+    allVersions: allVersionsMeta,
+    publishedQuestionKeys: [] as string[],
+    publishedOptionKeys: {} as Record<string, string[]>,
+    threePaneEnabled,
+    ...ALL_FLAGS,
+  };
+}
+
+// @dnd-kit keyboard-reorder enablement (jsdom has no layout) — verbatim from
+// the ED3 byte-equivalence guard. jsdom cannot dispatch real PointerEvents, so
+// the KEYBOARD sensor is the only way to drive a REAL reorder at the public
+// surface; both sensors call the same onDragEnd → reorder command.
+function installDndLayout(): () => void {
+  const origRect = Element.prototype.getBoundingClientRect;
+  const hadRO = "ResizeObserver" in globalThis;
+  const origRO = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+  class RO {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = RO;
+  Element.prototype.getBoundingClientRect = function () {
+    const el = this as HTMLElement;
+    const tid = el.getAttribute?.("data-testid") ?? "";
+    if (tid.startsWith("question-card-")) {
+      const parent = el.parentElement;
+      const sibs = parent
+        ? Array.from(parent.children).filter((c) =>
+            (c.getAttribute("data-testid") ?? "").startsWith("question-card-"),
+          )
+        : [el];
+      const top = sibs.indexOf(el) * 60;
+      return { top, bottom: top + 50, left: 0, right: 200, width: 200, height: 50, x: 0, y: top, toJSON() {} } as DOMRect;
+    }
+    return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0, toJSON() {} } as DOMRect;
+  };
+  return () => {
+    Element.prototype.getBoundingClientRect = origRect;
+    if (hadRO) (globalThis as { ResizeObserver?: unknown }).ResizeObserver = origRO;
+    else delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+  };
+}
+
+// ── Mode-aware authoring helpers ─────────────────────────────────────────
+// flag-ON drives the NEW outline + reused inspector; flag-OFF drives the
+// legacy QuestionsTab. Both call the SAME shared model commands underneath.
+
+/** Reach the question-authoring surface. flag-ON: "Edit" is the default tab. */
+function goToEditor(threePane: boolean) {
+  if (!threePane) switchTab(/^Questions$/, "questions");
+}
+
+/** Focus a question by stableKey (its section is assumed visible/selected). */
+function focusQuestion(threePane: boolean, stableKey: string) {
+  if (threePane) {
+    act(() => {
+      fireEvent.click(screen.getByTestId(`outline-focus-${stableKey}`));
+    });
+  } else {
+    const card = screen.getByTestId(`question-card-${stableKey}`);
+    act(() => {
+      fireEvent.click(within(card).getByRole("button", { name: /^Edit$/ }));
+    });
+  }
+}
+
+/** Edit the FOCUSED question's Label in the reused inspector (both modes). */
+function editFocusedLabel(value: string) {
+  act(() => {
+    fireEvent.change(
+      within(screen.getByTestId("questions-config-form")).getByLabelText(
+        "Label",
+      ),
+      { target: { value } },
+    );
+  });
+}
+
+/** Set the FOCUSED question's Type in the reused inspector (both modes). */
+function setFocusedType(value: string) {
+  act(() => {
+    fireEvent.change(
+      within(screen.getByTestId("questions-config-form")).getByLabelText(
+        "Question Type",
+      ),
+      { target: { value } },
+    );
+  });
+}
+
+/** Add a question to S1 and leave the reused inspector focused on it. */
+function addAndFocusNewInS1(threePane: boolean) {
+  if (threePane) {
+    // Outline "+ Add question" focuses the returned new uid automatically.
+    act(() => {
+      fireEvent.click(screen.getByTestId("outline-add-question-S1"));
+    });
+  } else {
+    act(() => {
+      fireEvent.click(screen.getByTestId("section-nav-item-S1"));
+    });
+    const list = screen.getByTestId("questions-question-list");
+    act(() => {
+      fireEvent.click(
+        within(list).getByRole("button", { name: /^\+ Add Question$/ }),
+      );
+    });
+    const newCard = within(list)
+      .getAllByTestId(/^question-card-/)
+      .find((c) => c.textContent?.includes("(assigned on save)"));
+    act(() => {
+      fireEvent.click(within(newCard!).getByRole("button", { name: /^Edit$/ }));
+    });
+  }
+}
+
+/** Delete an S1 question by stableKey (confirm is globally mocked → true). */
+function deleteS1Question(threePane: boolean, stableKey: string) {
+  if (!threePane) {
+    act(() => {
+      fireEvent.click(screen.getByTestId("section-nav-item-S1"));
+    });
+  }
+  const card = screen.getByTestId(`question-card-${stableKey}`);
+  act(() => {
+    fireEvent.click(within(card).getByRole("button", { name: /^Delete$/ }));
+  });
+}
+
+/** Keyboard-reorder S1's first question one slot down (needs fake timers). */
+function keyboardReorderS1FirstDown(threePane: boolean) {
+  if (!threePane) {
+    act(() => {
+      fireEvent.click(screen.getByTestId("section-nav-item-S1"));
+    });
+  }
+  const handle = screen.getByTestId("drag-handle-S1_q1");
+  act(() => {
+    handle.focus();
+  });
+  act(() => {
+    fireEvent.keyDown(handle, { key: " ", code: "Space" });
+    jest.runOnlyPendingTimers();
+  });
+  act(() => {
+    fireEvent.keyDown(document, { key: "ArrowDown", code: "ArrowDown" });
+    jest.runOnlyPendingTimers();
+  });
+  act(() => {
+    fireEvent.keyDown(document, { key: " ", code: "Space" });
+    jest.runOnlyPendingTimers();
+  });
+}
+
+const isVersionPatch = (c: FetchCall) =>
+  c.url === "/api/admin/assessment-templates/tpl_1/versions/ver_2" &&
+  c.method === "PATCH";
 
 const MODES: { threePane: boolean; key: "off" | "on" }[] = [
   { threePane: false, key: "off" },
@@ -840,57 +1034,263 @@ describe("ED4 three-pane parity contract (flag-ON ≡ flag-OFF)", () => {
   // force-mounted TabsContent unmounts). The three-pane deliberately PRESERVES
   // `focusedQuestionUid` across tab switches (the model lives above the shell).
   // This is a per-mode difference and must NEVER be cross-asserted.
-  //
-  // It cannot be exercised yet: establishing focus in flag-ON requires the T4
-  // outline (the T3 stub has placeholder panes with no focus affordance, and
-  // `focusedQuestionUid` starts null). Skipped with reason until T4/T7 land the
-  // outline + the focus-persistence assertion (plan Task 7).
   // ══════════════════════════════════════════════════════════════════════
-  it.skip("[flag-ON] focus persists across tab switches (vs. QuestionsTab mount-reset) — pending T4 outline", () => {
-    // Enable once EditorOutline (T4) provides a DOM affordance to focus a
-    // question; then focus S1_q2, switch Metadata↔Edit, and assert S1_q2 is
-    // still focused (the opposite of the ED3-pinned flag-OFF reset).
+  it("[flag-ON] focus persists across tab switches (vs. QuestionsTab mount-reset)", () => {
+    resetHarness();
+    installFetch();
+    render(<TemplateEditorTabbed {...fixtureA(true)} />);
+
+    // Edit is the default tab. Focus S1_q2 via the outline (NOT the default).
+    focusQuestion(true, "S1_q2");
+    expect(screen.getByTestId("questions-config-form")).toHaveTextContent(
+      "Edit Question — S1_q2",
+    );
+
+    // Leave to Metadata (workspace unmounts) then return to Edit (remounts).
+    switchTab(/^Metadata$/, "metadata");
+    switchTab(/^Edit$/, "");
+
+    // The three-pane PRESERVES focus (model lives above the shell) — S1_q2 is
+    // still focused, the OPPOSITE of the ED3-pinned flag-OFF reset to S1_q1.
+    expect(screen.getByTestId("questions-config-form")).toHaveTextContent(
+      "Edit Question — S1_q2",
+    );
+    expect(screen.getByTestId("question-card-S1_q2")).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
   });
 
   // ══════════════════════════════════════════════════════════════════════
-  // Scenarios that REQUIRE the left outline (T4) / center canvas (T5) — the
-  // T3 stub cannot focus a question (no outline yet) and has no canvas, so the
-  // per-question authoring actions below are not drivable in flag-ON. Skipped
-  // with an explicit reason so there are NO silent gaps; each flips to a real
-  // both-modes parity assertion when its pane lands.
+  // Per-question authoring parity — flag-ON via the outline + reused inspector,
+  // flag-OFF via QuestionsTab. Both route through the SAME shared model
+  // commands, so the fetch transcripts are DEEP-EQUAL.
   // ══════════════════════════════════════════════════════════════════════
-  it.skip("edit a question label via the inspector → Save (transcript parity) — pending T4 outline", () => {
-    // Needs the outline to focus a question so the inspector's Label field
-    // renders in flag-ON; flag-OFF drives it via QuestionsTab's config form.
+  it("edit a question label via the inspector → Save (transcript parity)", async () => {
+    const cap: Record<string, { transcript: FetchCall[]; toasts: unknown[] }> = {};
+
+    for (const { threePane, key } of MODES) {
+      resetHarness();
+      const { calls } = installFetch();
+      render(<TemplateEditorTabbed {...fixtureA(threePane)} />);
+
+      goToEditor(threePane);
+      focusQuestion(threePane, "S1_q1");
+      editFocusedLabel("Q1 relabelled");
+      await clickSave();
+      await waitFor(() => expect(calls.filter(isVersionPatch).length).toBe(1));
+
+      cap[key] = { transcript: transcriptOf(calls), toasts: toastArgs() };
+      cleanup();
+    }
+
+    expect(cap.on.transcript).toEqual(cap.off.transcript);
+    // Exactly one version PATCH; body carries the relabeled question.
+    expect(cap.off.transcript).toHaveLength(1);
+    expect(cap.off.transcript[0]).toMatchObject({
+      method: "PATCH",
+      url: "/api/admin/assessment-templates/tpl_1/versions/ver_2",
+    });
+    expect(cap.off.transcript[0].body).toContain("Q1 relabelled");
+    expect(cap.on.toasts).toEqual(cap.off.toasts);
   });
 
-  it.skip("serializer guard (MULTI_CHOICE zero options) → ZERO fetch + destructive toast (parity) — pending T4 outline", () => {
-    // Code-verified: buildVersionScoringPayload only re-validates (and can
-    // throw MULTI_CHOICE_NO_OPTIONS) when the QUESTIONS surface is dirty; a
-    // clean questions surface is raw pass-through (build-version-payload.ts
-    // + useTemplateEditorDraft save dispatch). So the guard needs a question
-    // edit, which in flag-ON needs the inspector focus the T4 outline sets.
-    // flag-OFF drives it via QuestionsTab's config form (see the ED3 guard).
+  it("serializer guard (MULTI_CHOICE zero options) → ZERO fetch + destructive toast (parity)", async () => {
+    const cap: Record<string, { count: number; toasts: unknown[] }> = {};
+
+    for (const { threePane, key } of MODES) {
+      resetHarness();
+      const { calls } = installFetch();
+      render(<TemplateEditorTabbed {...fixtureMC(threePane)} />);
+
+      goToEditor(threePane);
+      focusQuestion(threePane, "S1_pick");
+      // Dirty the questions surface → the serializer re-validates on save and
+      // throws MULTI_CHOICE_NO_OPTIONS BEFORE dispatching any fetch.
+      editFocusedLabel("Pick (edited)");
+      await clickSave();
+
+      cap[key] = { count: calls.length, toasts: toastArgs() };
+      cleanup();
+    }
+
+    expect(cap.on.count).toBe(cap.off.count);
+    expect(cap.off.count).toBe(0);
+    expect(cap.on.toasts).toEqual(cap.off.toasts);
+    // Both surfaced the same destructive "at least one option" toast.
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Could not save draft",
+        variant: "destructive",
+        description: expect.stringMatching(/at least one option/i),
+      }),
+    );
   });
 
-  it.skip("add-question via the outline → focus-new + Save (parity) — pending T4 outline", () => {
-    // "+ Add question" lives on the outline (T4); focus the returned uid.
+  it("add-question via the outline → focus-new + Save (transcript parity)", async () => {
+    const cap: Record<string, { transcript: FetchCall[] }> = {};
+
+    for (const { threePane, key } of MODES) {
+      resetHarness();
+      const { calls } = installFetch();
+      render(<TemplateEditorTabbed {...fixtureA(threePane)} />);
+
+      goToEditor(threePane);
+      addAndFocusNewInS1(threePane);
+      // The new question is focused in the reused inspector (flag-ON: the
+      // outline focused the returned uid; flag-OFF: we clicked its card Edit).
+      editFocusedLabel("Added Slider");
+      await clickSave();
+      await waitFor(() => expect(calls.filter(isVersionPatch).length).toBe(1));
+
+      cap[key] = { transcript: transcriptOf(calls) };
+      cleanup();
+    }
+
+    expect(cap.on.transcript).toEqual(cap.off.transcript);
+    // The new slider (slug-derived key) is present in the emitted body.
+    expect(cap.off.transcript.filter(isVersionPatch)[0].body).toContain(
+      "S1_added_slider",
+    );
   });
 
-  it.skip("delete-question via the outline (shared confirm) → Save (parity) — pending T4 outline", () => {
-    // Delete affordance + shared confirm live on the outline (T4).
+  it("delete-question via the outline (shared confirm) → Save (transcript parity)", async () => {
+    const cap: Record<string, { transcript: FetchCall[]; confirmed: boolean }> = {};
+
+    for (const { threePane, key } of MODES) {
+      resetHarness();
+      const { calls } = installFetch();
+      render(<TemplateEditorTabbed {...fixtureA(threePane)} />);
+
+      goToEditor(threePane);
+      deleteS1Question(threePane, "S1_q2");
+      const confirmed = (window.confirm as jest.Mock).mock.calls.length === 1;
+      await clickSave();
+      await waitFor(() => expect(calls.filter(isVersionPatch).length).toBe(1));
+
+      cap[key] = { transcript: transcriptOf(calls), confirmed };
+      cleanup();
+    }
+
+    expect(cap.on.transcript).toEqual(cap.off.transcript);
+    expect(cap.on.confirmed).toBe(cap.off.confirmed);
+    expect(cap.on.confirmed).toBe(true);
+    // The deleted question is gone from the emitted body in BOTH modes.
+    const body = cap.off.transcript.filter(isVersionPatch)[0].body!;
+    expect(body).not.toContain("S1_q2");
+    expect(body).toContain("S1_q1");
   });
 
-  it.skip("within-section reorder (drag) via the outline → Save (parity) — pending T4 outline", () => {
-    // Drag reorder lives on the outline (T4).
+  it("within-section reorder (keyboard) via the outline → Save (transcript parity)", async () => {
+    const cap: Record<string, { transcript: FetchCall[] }> = {};
+
+    for (const { threePane, key } of MODES) {
+      resetHarness();
+      const restoreDnd = installDndLayout();
+      jest.useFakeTimers();
+      const { calls } = installFetch();
+      try {
+        render(<TemplateEditorTabbed {...fixtureA(threePane)} />);
+        goToEditor(threePane);
+        keyboardReorderS1FirstDown(threePane);
+      } finally {
+        jest.useRealTimers();
+        restoreDnd();
+      }
+
+      await clickSave();
+      await waitFor(() => expect(calls.filter(isVersionPatch).length).toBe(1));
+
+      cap[key] = { transcript: transcriptOf(calls) };
+      cleanup();
+    }
+
+    expect(cap.on.transcript).toEqual(cap.off.transcript);
+    // Byte-exact swap: S1_q1 → sortOrder 2, S1_q2 → sortOrder 1.
+    const body = cap.off.transcript.filter(isVersionPatch)[0].body!;
+    expect(body).toContain('"stableKey":"S1_q1","sectionStableKey":"S1","label":"Q1 label","type":"SLIDER_LIKERT","isRequired":true,"sortOrder":2');
+    expect(body).toContain('"stableKey":"S1_q2","sectionStableKey":"S1","label":"Q2 label","type":"SLIDER_LIKERT","isRequired":true,"sortOrder":1');
   });
 
-  it.skip("within-section reorder (keyboard) via the outline → Save (parity) — pending T4 outline", () => {
-    // Keyboard reorder sensor lives on the outline (T4).
+  // Pointer-drag reorder: jsdom cannot dispatch the real PointerEvents dnd-kit's
+  // PointerSensor needs (documented in the ED3 byte-equivalence guard, which
+  // drives reorder via the keyboard sensor for the same reason). Both sensors
+  // call the identical onDragEnd → reorderQuestions, so the DROP→transcript is
+  // proven by the keyboard scenario above; here we assert the pointer-drag
+  // AFFORDANCE is present + enabled in BOTH modes (draft) — full parity of the
+  // reorder capability without fabricating pointer events.
+  it("within-section reorder (drag) affordance parity — draggable handles present + enabled", () => {
+    const cap: Record<string, { enabled: boolean; sortable: boolean }> = {};
+    for (const { threePane, key } of MODES) {
+      resetHarness();
+      installFetch();
+      render(<TemplateEditorTabbed {...fixtureA(threePane)} />);
+      goToEditor(threePane);
+      if (!threePane) {
+        act(() => {
+          fireEvent.click(screen.getByTestId("section-nav-item-S1"));
+        });
+      }
+      const handle = screen.getByTestId("drag-handle-S1_q1") as HTMLButtonElement;
+      cap[key] = {
+        enabled: !handle.disabled,
+        sortable: handle.getAttribute("aria-roledescription") === "sortable",
+      };
+      cleanup();
+    }
+    expect(cap.on).toEqual(cap.off);
+    expect(cap.off.enabled).toBe(true);
+    expect(cap.off.sortable).toBe(true);
   });
 
-  it.skip("Wave-T follow-up-save data-loss regression (add question, then sections-only save) — pending T4 outline", () => {
-    // Requires adding a question via the outline (T4), then a sections-only
-    // save; asserts the added question survives (the raw-ref sync guard).
+  it("Wave-T follow-up-save data-loss regression (add question, then sections-only save) — parity", async () => {
+    const cap: Record<string, {
+      body1Keys: string[];
+      body2Keys: string[];
+    }> = {};
+
+    for (const { threePane, key } of MODES) {
+      resetHarness();
+      const { calls } = installFetch();
+      render(<TemplateEditorTabbed {...fixtureA(threePane)} />);
+
+      // Save 1 — add a TEXT question to S1 and persist it.
+      goToEditor(threePane);
+      addAndFocusNewInS1(threePane);
+      editFocusedLabel("Top Priorities");
+      setFocusedType("TEXT");
+      await clickSave();
+      await waitFor(() => expect(calls.filter(isVersionPatch).length).toBe(1));
+      const body1 = JSON.parse(calls.filter(isVersionPatch)[0].body!) as {
+        questions: Array<{ stableKey: string }>;
+      };
+
+      // Save 2 — dirty ONLY the sections surface (rename S1) and save again.
+      renameSectionS1("Section One (renamed)");
+      await clickSave();
+      await waitFor(() => expect(calls.filter(isVersionPatch).length).toBe(2));
+      const body2 = JSON.parse(calls.filter(isVersionPatch)[1].body!) as {
+        questions: Array<{ stableKey: string }>;
+      };
+
+      cap[key] = {
+        body1Keys: body1.questions.map((q) => q.stableKey),
+        body2Keys: body2.questions.map((q) => q.stableKey),
+      };
+      cleanup();
+    }
+
+    expect(cap.on).toEqual(cap.off);
+    // First save: 3 sliders + the new TEXT (slug-derived key).
+    expect(cap.off.body1Keys).toHaveLength(4);
+    expect(cap.off.body1Keys).toEqual(
+      expect.arrayContaining(["S1_top_priorities"]),
+    );
+    // Follow-up sections-only save STILL carries the added question (raw-ref
+    // sync) — the Wave-T data-loss regression, in BOTH modes.
+    expect(cap.off.body2Keys).toHaveLength(4);
+    expect(cap.off.body2Keys).toEqual(
+      expect.arrayContaining(["S1_top_priorities"]),
+    );
   });
 });

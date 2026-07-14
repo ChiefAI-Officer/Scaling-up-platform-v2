@@ -22,6 +22,8 @@
  */
 
 import type { QuestionDraftRow } from "./question-serialization";
+import type { ShowIfGateOption } from "./QuestionInspector";
+import { canonicalQuestionOrderIndex } from "@/lib/assessments/section-pages";
 
 /**
  * Wave T D4 — deleting an INHERITED question (its stableKey exists in a
@@ -69,4 +71,69 @@ export function findShowIfDependents(
   return questions.filter(
     (q) => q.uid !== gate.uid && q.showIf?.questionKey === gate.stableKey,
   );
+}
+
+/**
+ * ED4 (spec 19af §3.4) — the FULL delete-confirm prompt, lifted VERBATIM out
+ * of `QuestionsTab`'s row so BOTH the legacy tab and the three-pane outline
+ * "prompt identically" (co-validate C2). The prompt keeps the Wave-T D4
+ * distinction (inherited rows use the history-consequence text only when the
+ * type-unlock is enabled) and appends the Wave-W dependents warning. This is
+ * the single builder both views call — no fork.
+ */
+export function buildQuestionDeletePrompt(
+  question: QuestionDraftRow,
+  opts: { isUnlocked: boolean; dependentKeys: readonly string[] },
+): string {
+  const base =
+    opts.isUnlocked && question.isInherited
+      ? buildDeleteConfirmText(question)
+      : `Delete question ${question.stableKey}?`;
+  return base + buildShowIfDependentsWarning(opts.dependentKeys);
+}
+
+/**
+ * ED4 (spec 19af §3.3/§3.4) — eligible show-if gates for a FOCUSED question,
+ * lifted VERBATIM out of `QuestionsTab`'s `focusedShowIfGates` memo so the
+ * inspector renders the SAME gate picker whether it is hosted by the legacy
+ * `QuestionsTab` or the three-pane `ThreePaneWorkspace` (no forked eligibility
+ * logic). A gate is eligible when it is a strictly-earlier (canonical render
+ * order) MULTI_CHOICE with a persisted stableKey and no showIf of its own
+ * (chains are publish-rejected). Order comes from the SHARED
+ * `canonicalQuestionOrderIndex` keyed by uid (so unsaved rows with a blank
+ * stableKey can't collide). The caller gates this on the Wave-W conditional
+ * flag exactly as before (returns none when the flag is off).
+ */
+export function computeShowIfGates(
+  sections: readonly { stableKey: string }[],
+  questions: readonly QuestionDraftRow[],
+  focusedQuestion: QuestionDraftRow,
+): ShowIfGateOption[] {
+  const orderByUid = canonicalQuestionOrderIndex(
+    sections.map((s, i) => ({ stableKey: s.stableKey, sortOrder: i })),
+    questions.map((q) => ({
+      stableKey: q.uid,
+      sortOrder: q.sortOrder,
+      sectionStableKey: q.sectionStableKey,
+    })),
+  );
+  const ownOrder = orderByUid.get(focusedQuestion.uid);
+  if (ownOrder === undefined) return [];
+  return questions
+    .filter(
+      (q) =>
+        q.type === "MULTI_CHOICE" &&
+        q.stableKey !== "" &&
+        q.uid !== focusedQuestion.uid &&
+        q.showIf === null &&
+        (orderByUid.get(q.uid) ?? Infinity) < ownOrder,
+    )
+    .sort(
+      (a, b) => (orderByUid.get(a.uid) ?? 0) - (orderByUid.get(b.uid) ?? 0),
+    )
+    .map((q) => ({
+      stableKey: q.stableKey,
+      label: q.label,
+      options: q.options.map((o) => ({ key: o.key, label: o.label })),
+    }));
 }

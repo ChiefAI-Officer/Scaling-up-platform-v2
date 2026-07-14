@@ -49,7 +49,6 @@ import { GripVertical } from "lucide-react";
 
 import type { SectionDraft } from "./SectionsCard";
 import type { QuestionDraftRow, FindingBandDraft } from "./question-serialization";
-import { canonicalQuestionOrderIndex } from "@/lib/assessments/section-pages";
 // ED3 Task 7 — the per-question inspector column lives in its own file now
 // (QuestionInspector, formerly the internal QuestionConfigForm). ShowIfGateOption
 // moved with it and is re-exported here to preserve this module's public surface.
@@ -58,8 +57,8 @@ import { QuestionInspector, type ShowIfGateOption } from "./QuestionInspector";
 // discovery are now SHARED with the model's question commands so the future
 // three-pane outline prompts + cleans up identically (co-validate C2).
 import {
-  buildDeleteConfirmText,
-  buildShowIfDependentsWarning,
+  buildQuestionDeletePrompt,
+  computeShowIfGates,
   findShowIfDependents,
 } from "./question-commands";
 
@@ -400,10 +399,10 @@ function SortableQuestionCard({
           onClick={() => {
             if (isReadOnly) return;
             const ok = window.confirm(
-              (isUnlocked && question.isInherited
-                ? buildDeleteConfirmText(question)
-                : `Delete question ${question.stableKey}?`) +
-                buildShowIfDependentsWarning(showIfDependentKeys),
+              buildQuestionDeletePrompt(question, {
+                isUnlocked,
+                dependentKeys: showIfDependentKeys,
+              }),
             );
             if (ok) onDelete();
           }}
@@ -503,48 +502,15 @@ export function QuestionsTab({
   const focusedQuestion =
     sectionQuestions.find((q) => q.uid === focusedQuestionUid) ?? null;
 
-  // ── Wave W — canonical order + gate/dependent maps (C1) ──
-  // Order comes from THE shared helper (buildSectionPages' order: sections
-  // by editor array position, questions by sortOrder within) keyed by uid so
-  // unsaved rows (blank stableKey) can't collide.
-  const showIfOrderByUid = useMemo(() => {
-    if (!conditionalEnabled) return new Map<string, number>();
-    return canonicalQuestionOrderIndex(
-      sections.map((s, i) => ({ stableKey: s.stableKey, sortOrder: i })),
-      questions.map((q) => ({
-        stableKey: q.uid,
-        sortOrder: q.sortOrder,
-        sectionStableKey: q.sectionStableKey,
-      })),
-    );
-  }, [conditionalEnabled, sections, questions]);
-
-  // Eligible gates for the FOCUSED question: strictly-earlier MULTI_CHOICE
-  // with a persisted stableKey (unsaved rows can't be referenced yet) and no
-  // showIf of their own (chains are publish-rejected — don't author them).
+  // ── Wave W — eligible show-if gates for the FOCUSED question ──
+  // ED4 (spec 19af §3.4) — the eligibility logic is the SHARED
+  // `computeShowIfGates` (also used by the three-pane workspace) so both views
+  // render the identical gate picker; the conditional-flag gate stays
+  // presentation-side. Behavior-identical to the pre-ED4 inline memo.
   const focusedShowIfGates = useMemo<ShowIfGateOption[]>(() => {
     if (!conditionalEnabled || !focusedQuestion) return [];
-    const ownOrder = showIfOrderByUid.get(focusedQuestion.uid);
-    if (ownOrder === undefined) return [];
-    return questions
-      .filter(
-        (q) =>
-          q.type === "MULTI_CHOICE" &&
-          q.stableKey !== "" &&
-          q.uid !== focusedQuestion.uid &&
-          q.showIf === null &&
-          (showIfOrderByUid.get(q.uid) ?? Infinity) < ownOrder,
-      )
-      .sort(
-        (a, b) =>
-          (showIfOrderByUid.get(a.uid) ?? 0) - (showIfOrderByUid.get(b.uid) ?? 0),
-      )
-      .map((q) => ({
-        stableKey: q.stableKey,
-        label: q.label,
-        options: q.options.map((o) => ({ key: o.key, label: o.label })),
-      }));
-  }, [conditionalEnabled, focusedQuestion, questions, showIfOrderByUid]);
+    return computeShowIfGates(sections, questions, focusedQuestion);
+  }, [conditionalEnabled, focusedQuestion, questions, sections]);
 
   // Questions whose showIf references a given question's stableKey. ED4 —
   // the predicate is the SHARED `findShowIfDependents` (also used by the

@@ -23,7 +23,8 @@
 import type { TemplateEditorModel } from "./hooks/useTemplateEditorModel";
 import type { QuestionDraftRow } from "./question-serialization";
 import { QuestionInspector, type ShowIfGateOption } from "./QuestionInspector";
-import { findShowIfDependents } from "./question-commands";
+import { computeShowIfGates, findShowIfDependents } from "./question-commands";
+import { EditorOutline } from "./EditorOutline";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -40,6 +41,8 @@ export interface ThreePaneWorkspaceProps {
   conditionalEnabled: boolean;
   /** Wave T — union of published option keys per question stableKey. */
   publishedOptionKeys: Record<string, readonly string[]>;
+  /** Switch the active tab to Sections (owned by the shell — G9 empty state). */
+  onGoToSections: () => void;
 }
 
 export function ThreePaneWorkspace({
@@ -49,15 +52,29 @@ export function ThreePaneWorkspace({
   findingsEnabled,
   conditionalEnabled,
   publishedOptionKeys,
+  onGoToSections,
 }: ThreePaneWorkspaceProps) {
-  const { questions, selection, handleUpdateQuestion } = model;
+  const {
+    sections,
+    questions,
+    selection,
+    handleUpdateQuestion,
+    addQuestion,
+    duplicateQuestion,
+    deleteQuestion,
+    reorderQuestions,
+  } = model;
 
   const focusedQuestion: QuestionDraft | null =
     questions.find((q) => q.uid === selection.focusedQuestionUid) ?? null;
 
-  // T4 (EditorOutline) computes the real eligible-gate list; the stub passes
-  // none so the inspector renders without a broken gate picker.
-  const showIfGates: ShowIfGateOption[] = [];
+  // Eligible show-if gates for the focused question — via the SHARED
+  // `computeShowIfGates` helper (also used by QuestionsTab), gated on the
+  // conditional flag exactly as the legacy tab does.
+  const showIfGates: ShowIfGateOption[] =
+    focusedQuestion && conditionalEnabled
+      ? computeShowIfGates(sections, questions, focusedQuestion)
+      : [];
 
   // Questions whose showIf references the focused question — via the SHARED
   // predicate (co-validate C2), gated on the conditional flag as elsewhere.
@@ -71,18 +88,22 @@ export function ThreePaneWorkspace({
       data-testid="three-pane-workspace"
       className="grid grid-cols-1 lg:grid-cols-[20%_50%_30%] gap-4"
     >
-      {/* LEFT — outline (T4 replaces this placeholder). */}
+      {/* LEFT — EditorOutline (section→question tree, shared commands). */}
       <aside className="lg:sticky lg:top-4 lg:self-start">
-        <section
-          className="wf-card space-y-2"
-          style={{ padding: "1rem" }}
-          data-testid="editor-outline-placeholder"
-        >
-          <h3 className="wf-card-title">Outline</h3>
-          <p className="text-xs italic text-muted-foreground py-2">
-            Section &amp; question outline lands here.
-          </p>
-        </section>
+        <EditorOutline
+          sections={sections}
+          questions={questions}
+          focusedQuestionUid={selection.focusedQuestionUid}
+          setFocusedQuestionUid={selection.setFocusedQuestionUid}
+          isReadOnly={isReadOnly}
+          isUnlocked={isUnlocked}
+          conditionalEnabled={conditionalEnabled}
+          onAddQuestion={addQuestion}
+          onDuplicateQuestion={duplicateQuestion}
+          onDeleteQuestion={deleteQuestion}
+          onReorderQuestions={reorderQuestions}
+          onGoToSections={onGoToSections}
+        />
       </aside>
 
       {/* CENTER — in-context canvas (T5 replaces this placeholder). */}

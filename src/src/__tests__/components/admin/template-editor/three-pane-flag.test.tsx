@@ -130,11 +130,10 @@ describe("ED4 T3 — flag ON: three-pane workspace pick", () => {
   it("renders ThreePaneWorkspace in the Questions body, relabels the tab 'Edit', and defaults to it", () => {
     render(<TemplateEditorTabbed {...baseProps(true)} />);
 
-    // Body = the workspace (its outline/canvas placeholders + reused inspector).
+    // Body = the workspace (the real EditorOutline (T4) + the T5 canvas
+    // placeholder + the reused inspector).
     expect(screen.getByTestId("three-pane-workspace")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("editor-outline-placeholder"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("editor-outline")).toBeInTheDocument();
     expect(
       screen.getByTestId("question-canvas-placeholder"),
     ).toBeInTheDocument();

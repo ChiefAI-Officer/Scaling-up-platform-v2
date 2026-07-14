@@ -618,6 +618,7 @@ export function TabbedShell({
                 findingsEnabled={findingsEnabled}
                 conditionalEnabled={conditionalAuthoringEnabled}
                 publishedOptionKeys={publishedOptionKeys}
+                onGoToSections={() => handleTabChange("sections")}
               />
             ) : (
               <QuestionsTab
