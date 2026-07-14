@@ -4,12 +4,9 @@
  * ThreePaneWorkspace — ED4 (spec 19af §3.1–§3.3), Task 3 STUB.
  *
  * Flag-ON (`WAVE_ED4_THREE_PANE_ENABLED`) replacement for the Questions tab
- * body inside `TabbedShell`: left outline · center in-context canvas · right
- * reused `QuestionInspector`. This is the TASK-3 STUB — the left/center panes
- * are placeholders (`editor-outline-placeholder` / `question-canvas-placeholder`);
- * the real `EditorOutline` (T4) and `QuestionCanvas` (T5) land next. The RIGHT
- * pane already mounts the REAL, verbatim-reused `QuestionInspector` for the
- * question the shared model currently focuses
+ * body inside `TabbedShell`: left `EditorOutline` (T4) · center `QuestionCanvas`
+ * (T5) · right the REAL, verbatim-reused `QuestionInspector`. All three panes
+ * render the question the shared model currently focuses
  * (`model.selection.focusedQuestionUid`).
  *
  * ONE shell (co-validate C1): this is a flag-selected workspace, NOT a forked
@@ -25,6 +22,7 @@ import type { QuestionDraftRow } from "./question-serialization";
 import { QuestionInspector, type ShowIfGateOption } from "./QuestionInspector";
 import { computeShowIfGates, findShowIfDependents } from "./question-commands";
 import { EditorOutline } from "./EditorOutline";
+import { QuestionCanvas } from "./QuestionCanvas";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -68,6 +66,12 @@ export function ThreePaneWorkspace({
   const focusedQuestion: QuestionDraft | null =
     questions.find((q) => q.uid === selection.focusedQuestionUid) ?? null;
 
+  // Section heading for the canvas (respondent-fidelity context).
+  const focusedSectionName: string | null = focusedQuestion
+    ? (sections.find((s) => s.stableKey === focusedQuestion.sectionStableKey)
+        ?.name ?? null)
+    : null;
+
   // Eligible show-if gates for the focused question — via the SHARED
   // `computeShowIfGates` helper (also used by QuestionsTab), gated on the
   // conditional flag exactly as the legacy tab does.
@@ -106,19 +110,13 @@ export function ThreePaneWorkspace({
         />
       </aside>
 
-      {/* CENTER — in-context canvas (T5 replaces this placeholder). */}
-      <section
-        className="wf-card space-y-3"
-        style={{ padding: "1rem" }}
-        data-testid="question-canvas-placeholder"
-      >
-        <h3 className="wf-card-title">Preview</h3>
-        <p className="text-xs italic text-muted-foreground py-2">
-          {focusedQuestion
-            ? "In-context question preview lands here."
-            : "Select a question to preview it."}
-        </p>
-      </section>
+      {/* CENTER — in-context canvas. Keyed by the focused uid so the local,
+          throwaway preview answer-state resets on focus change (co-validate C4). */}
+      <QuestionCanvas
+        key={focusedQuestion?.uid ?? "none"}
+        question={focusedQuestion}
+        sectionName={focusedSectionName}
+      />
 
       {/* RIGHT — reused QuestionInspector (verbatim). */}
       <aside className="lg:sticky lg:top-4 lg:self-start">
