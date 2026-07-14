@@ -28,7 +28,7 @@ import {
 } from "./question-serialization";
 import { resolveFindings } from "@/lib/assessments/findings";
 import { QuestionInput } from "@/components/assessments/question-input";
-import { toQuestionForInput } from "./question-widget-mapper";
+import { toQuestionForInput, shapeSignature } from "./question-widget-mapper";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -179,7 +179,7 @@ function FindingsPreview({ question }: { question: QuestionDraft }) {
       data-testid="q-findings-preview"
     >
       <p className="text-[0.6875rem] font-semibold text-muted-foreground">
-        Test a value — preview which finding fires
+        Test which finding fires
       </p>
       <QuestionInput
         question={forInput}
@@ -423,7 +423,12 @@ function FindingsPanel({
           ))}
         </div>
       )}
-      {open && <FindingsPreview question={question} />}
+      {open && (
+        <FindingsPreview
+          key={`${question.uid}:${shapeSignature(question)}`}
+          question={question}
+        />
+      )}
     </div>
   );
 }

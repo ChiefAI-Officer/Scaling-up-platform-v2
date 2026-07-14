@@ -10,7 +10,13 @@
  */
 
 import React from "react";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import {
+  render,
+  screen,
+  cleanup,
+  fireEvent,
+  within,
+} from "@testing-library/react";
 
 import {
   QuestionInspector,
@@ -111,5 +117,78 @@ describe("QuestionInspector (ED3 T7 extraction)", () => {
     });
 
     expect(onUpdate).toHaveBeenCalledWith({ label: "Reworded label" });
+  });
+
+  // ── ED5 Task 2 (B-4/A-3/C1) — findings-preview keyed reset ─────────────
+  it("relabels the findings preview header to 'Test which finding fires'", () => {
+    render(
+      <QuestionInspector
+        {...baseProps}
+        question={makeQuestion()}
+        onUpdate={jest.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("q-findings-toggle"));
+
+    expect(screen.getByText(/test which finding fires/i)).toBeInTheDocument();
+    expect(screen.queryByText(/test a value/i)).not.toBeInTheDocument();
+  });
+
+  it("resets the findings-preview throwaway widget when the focused question's SHAPE changes (same uid)", () => {
+    const { rerender } = render(
+      <QuestionInspector
+        {...baseProps}
+        question={makeQuestion()}
+        onUpdate={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("q-findings-toggle"));
+
+    const preview = () => screen.getByTestId("q-findings-preview");
+    const previewSlider = () =>
+      within(preview()).getByRole("slider") as HTMLInputElement;
+
+    fireEvent.change(previewSlider(), { target: { value: "2" } });
+    expect(previewSlider().getAttribute("aria-valuenow")).toBe("2");
+
+    // Same uid, but the scale (widget SHAPE) changed — shapeSignature differs,
+    // so the preview must remount and its throwaway sample must clear.
+    rerender(
+      <QuestionInspector
+        {...baseProps}
+        question={makeQuestion({ scaleMax: 10 })}
+        onUpdate={jest.fn()}
+      />,
+    );
+    expect(previewSlider().getAttribute("aria-valuenow")).toBeNull();
+  });
+
+  it("resets the findings-preview throwaway widget when focus moves to a different question (different uid, same shape)", () => {
+    const { rerender } = render(
+      <QuestionInspector
+        {...baseProps}
+        question={makeQuestion()}
+        onUpdate={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("q-findings-toggle"));
+
+    const preview = () => screen.getByTestId("q-findings-preview");
+    const previewSlider = () =>
+      within(preview()).getByRole("slider") as HTMLInputElement;
+
+    fireEvent.change(previewSlider(), { target: { value: "3" } });
+    expect(previewSlider().getAttribute("aria-valuenow")).toBe("3");
+
+    // Different question entirely (new uid), identical shape otherwise.
+    rerender(
+      <QuestionInspector
+        {...baseProps}
+        question={makeQuestion({ uid: "u_test_2", stableKey: "S1_Q2" })}
+        onUpdate={jest.fn()}
+      />,
+    );
+    expect(previewSlider().getAttribute("aria-valuenow")).toBeNull();
   });
 });

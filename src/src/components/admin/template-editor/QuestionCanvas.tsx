@@ -106,6 +106,12 @@ export function QuestionCanvas({ question, sectionName }: QuestionCanvasProps) {
           onChange={(_key, v) => setPreviewValue(v)}
           idPrefix={CANVAS_ID_PREFIX}
         />
+        <p
+          className="text-[0.6875rem] italic text-muted-foreground"
+          data-testid="question-canvas-preview-note"
+        >
+          Preview only — answers here aren’t saved.
+        </p>
       </div>
     </section>
   );
