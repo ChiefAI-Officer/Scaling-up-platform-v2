@@ -21,6 +21,7 @@ import React, { useCallback, useMemo } from "react";
 import {
   scoreSubmission,
   computeGlobalTierDomain,
+  computePerDomainTierContexts,
   validateTierTiling,
   type TierDomain,
 } from "@/lib/assessments/scoring";
@@ -393,6 +394,29 @@ export function ScoringTiersTab({
     );
     return issues.length > 0 ? { message: `Global tiers: ${issues[0].message}` } : null;
   }, [globalDomain, tiers]);
+
+  // ED5 T18 (B-5) — per-domain metric bounds for the per-domain band bars. The
+  // already-exported computePerDomainTierContexts owns the (fractional) domain
+  // per key; a domain with no questions / an ambiguous config yields a
+  // non-finite max, so its bar is hidden (table only), mirroring publish.
+  const perDomainBounds = useMemo(() => {
+    const out = new Map<string, TierDomain>();
+    if (domains.length === 0) return out;
+    try {
+      for (const ctx of computePerDomainTierContexts(
+        sections as unknown as Parameters<typeof computePerDomainTierContexts>[0],
+        questions as unknown as Parameters<typeof computePerDomainTierContexts>[1],
+        domains.map((d) => d.key),
+      )) {
+        if (Number.isFinite(ctx.domain.max) && ctx.domain.max > ctx.domain.min) {
+          out.set(ctx.domainKey, ctx.domain);
+        }
+      }
+    } catch {
+      /* ambiguous config → no per-domain bars (table stays authoritative) */
+    }
+    return out;
+  }, [sections, questions, domains]);
   const domainIssues = useMemo(() => {
     const out: TilingIssue[] = [];
     for (const d of domains) {
@@ -620,6 +644,17 @@ export function ScoringTiersTab({
                   </span>
                 </h4>
               </header>
+              {perDomainBounds.has(domain.key) && (
+                <TierBandBar
+                  tiers={domain.tiers ?? []}
+                  domain={perDomainBounds.get(domain.key)!}
+                  mode="fractional"
+                  step={0.1}
+                  onChange={(next) => handleDomainTiersChange(domain.key, next)}
+                  isReadOnly={isReadOnly}
+                  testIdPrefix={`domain-tier-band-${domain.key}`}
+                />
+              )}
               <TierTable
                 tiers={domain.tiers ?? []}
                 onChange={(next) => handleDomainTiersChange(domain.key, next)}
