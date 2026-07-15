@@ -1,8 +1,8 @@
 # Wave ED6 — editor-overhaul single-column form builder — DESIGN (DRAFT)
 
-> **Status:** BUILT (2026-07-15) — shipped via PR on `feat/wave-ed6-single-column`, dark behind default-OFF
-> `WAVE_ED6_SINGLE_COLUMN_ENABLED`; **launch = flag flip + redeploy after an internal walk (gated on the
-> user)**; kill = flag off → byte-identical three-pane/legacy. Brainstorm + grill + co-validate (real Codex
+> **Status:** LAUNCHED (2026-07-15) — PR #186 merged to `main` (`8e9fdd79`); `WAVE_ED6_SINGLE_COLUMN_ENABLED=1`
+> on Vercel Production + prod redeploy `5rrern1yr` Ready (aliased `platformtest.scalingup.com`); single-column
+> is now the default editor (wins over the live ED4 flag). Kill = flag off + redeploy → byte-identical fallback. Brainstorm + grill + co-validate (real Codex
 > GPT-5.5 + own 4-lens) + TDD build (16 commits; PR-A + T4 subagent-reviewed, T5–T15 inline under an account
 > session limit) all complete. Frozen ED3 guard 15/15 + ED4 parity 20/20 green throughout; editor sweep 38
 > suites / 403; `CI=true next build --turbopack` + eslint clean. Grill outcomes in §14; **co-validate
