@@ -46,6 +46,10 @@ import { useEditorCommands, type EditorCommandsModel } from "./hooks/useEditorCo
 import { buildCardViewModels } from "./single-column-view-model";
 import { resolveOutlineDrop } from "./outline-drop";
 import { QuestionCard } from "./QuestionCard";
+import { QuestionCanvas } from "./QuestionCanvas";
+import { QuestionInspector } from "./QuestionInspector";
+import { computeShowIfGates, findShowIfDependents } from "./question-commands";
+import { shapeSignature } from "./question-widget-mapper";
 
 export interface SingleColumnFormBuilderProps {
   /** The composed editor model, shared with `TabbedShell` (ONE shell rule). */
@@ -68,7 +72,9 @@ export function SingleColumnFormBuilder({
   model,
   isReadOnly,
   isUnlocked,
+  findingsEnabled,
   conditionalEnabled,
+  publishedOptionKeys,
 }: SingleColumnFormBuilderProps) {
   const { sections, questions, selection } = model;
 
@@ -296,7 +302,43 @@ export function SingleColumnFormBuilder({
                               onDelete={deleteQuestion}
                               onMove={moveQuestion}
                               registerFocusRef={registerFocusRef}
-                            />
+                            >
+                              {focused && (
+                                <>
+                                  <QuestionCanvas
+                                    key={`${q.uid}:${shapeSignature(q)}`}
+                                    question={q}
+                                    sectionName={s.name.trim() || null}
+                                  />
+                                  <QuestionInspector
+                                    bare
+                                    question={q}
+                                    isReadOnly={isReadOnly}
+                                    isUnlocked={isUnlocked}
+                                    findingsEnabled={findingsEnabled}
+                                    conditionalEnabled={conditionalEnabled}
+                                    showIfGates={
+                                      conditionalEnabled
+                                        ? computeShowIfGates(sections, questions, q)
+                                        : []
+                                    }
+                                    showIfDependents={
+                                      conditionalEnabled
+                                        ? findShowIfDependents(questions, q)
+                                        : []
+                                    }
+                                    onClearDependents={(uids) => {
+                                      for (const uid of uids)
+                                        model.handleUpdateQuestion(uid, { showIf: null });
+                                    }}
+                                    publishedOptionKeys={publishedOptionKeys}
+                                    onUpdate={(patch) =>
+                                      model.handleUpdateQuestion(q.uid, patch)
+                                    }
+                                  />
+                                </>
+                              )}
+                            </QuestionCard>
                             {focused && !isReadOnly && (
                               <button
                                 type="button"

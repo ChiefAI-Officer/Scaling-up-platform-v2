@@ -75,6 +75,12 @@ describe("QuestionCard render guard (ED6 T9)", () => {
     expect(questionCardPropsAreEqual(props(), props({ isFocused: true }))).toBe(false);
   });
 
+  it("NEVER skips a focused card (it renders the live expanded body — T11)", () => {
+    expect(
+      questionCardPropsAreEqual(props({ isFocused: true }), props({ isFocused: true })),
+    ).toBe(false);
+  });
+
   it("re-renders when a state badge changes", () => {
     expect(
       questionCardPropsAreEqual(props(), props({ vm: vm({ badges: { findings: true } }) })),

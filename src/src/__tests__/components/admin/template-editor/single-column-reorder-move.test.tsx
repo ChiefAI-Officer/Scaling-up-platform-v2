@@ -100,11 +100,17 @@ describe("SingleColumnFormBuilder — move + add-below + drag wiring (ED6 T8)", 
     expect(cardCount("sc-section-S1")).toBe(2);
     expect(cardCount("sc-section-S2")).toBe(0);
 
-    const revenueCard = screen.getByText("Revenue").closest('[data-testid^="question-card-"]')!;
+    // Query the focus BUTTON by role — after a move the card is focused, so its
+    // label also appears in the live preview and getByText would be ambiguous.
+    const revenueCard = screen
+      .getByRole("button", { name: "Revenue" })
+      .closest('[data-testid^="question-card-"]')!;
     const moveSelect = revenueCard.querySelector('[data-testid^="card-move-"]') as HTMLSelectElement;
     fireEvent.change(moveSelect, { target: { value: "S2" } });
 
-    expect(within(screen.getByTestId("sc-section-S2")).getByText("Revenue")).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("sc-section-S2")).getByRole("button", { name: "Revenue" }),
+    ).toBeInTheDocument();
     expect(cardCount("sc-section-S1")).toBe(1);
     expect(cardCount("sc-section-S2")).toBe(1);
   });

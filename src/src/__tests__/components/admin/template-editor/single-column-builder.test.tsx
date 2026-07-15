@@ -131,9 +131,11 @@ describe("SingleColumnFormBuilder (ED6 T7)", () => {
 
   it("clicking a card focuses it (aria-current) and reveals its expanded body slot", () => {
     render(<TemplateEditorTabbed {...props({})} />);
-    fireEvent.click(screen.getByText("Revenue"));
+    // Target the collapsed focus BUTTON by role — after focus, the label also
+    // appears in the live preview, so getByText would be ambiguous.
+    fireEvent.click(screen.getByRole("button", { name: "Revenue" }));
     const revenueCard = screen
-      .getByText("Revenue")
+      .getByRole("button", { name: "Revenue" })
       .closest('[data-testid^="question-card-"]')!;
     expect(revenueCard).toHaveAttribute("aria-current", "true");
     expect(document.querySelector('[data-testid^="card-body-"]')).not.toBeNull();
