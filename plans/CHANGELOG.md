@@ -6,9 +6,9 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
-### 2026-07-15 — Wave ED6: single-column form builder (BUILT) <!-- ENTRY_ISO:2026-07-15 ENTRY_SLUG:wave-ed6-single-column -->
+### 2026-07-15 — Wave ED6: single-column form builder (LAUNCHED) <!-- ENTRY_ISO:2026-07-15 ENTRY_SLUG:wave-ed6-single-column -->
 
-**Status: BUILT** — shipped via PR on `feat/wave-ed6-single-column`, dark behind default-OFF `WAVE_ED6_SINGLE_COLUMN_ENABLED`. Launch = flip the flag + redeploy after an internal walk (gated on the user). Kill = flag off → byte-identical three-pane (if the ED4 flag is on) or the legacy `QuestionsTab`.
+**Status: LAUNCHED (2026-07-15)** — PR #186 merged to `main` (`8e9fdd79`); `WAVE_ED6_SINGLE_COLUMN_ENABLED=1` set on Vercel Production + prod redeploy `5rrern1yr` Ready (aliased `platformtest.scalingup.com`). Single-column wins over the live ED4 flag, so it is now the default editor. Kill = flag off + redeploy → byte-identical fallback. Kill = flag off → byte-identical three-pane (if the ED4 flag is on) or the legacy `QuestionsTab`.
 
 **Why:** live review of the ED4/ED5 three-pane workbench found it cluttered; the client asked for the simplicity of Google Forms (the original overhaul artifact's passed-over "Option B"). Spec `19ah`; **ADR-0024** (single-column supersedes the three-pane as the default authoring surface).
 
