@@ -63,3 +63,6 @@ From Jeff/*
 
 # Playwright test artifacts (regenerated on every run)
 src/test-results/
+
+# Superpowers visual-brainstorm session mockups (local only)
+.superpowers/

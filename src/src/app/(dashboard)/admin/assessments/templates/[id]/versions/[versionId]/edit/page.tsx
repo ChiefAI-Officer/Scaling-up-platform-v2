@@ -22,6 +22,7 @@ import { isConditionalAuthoringEnabled } from "@/lib/assessments/wave-w-flags";
 import { isTestModeEnabled } from "@/lib/assessments/wave-ed1-flags";
 import { isSafeToPublishEnabled } from "@/lib/assessments/wave-ed2-flags";
 import { isThreePaneEnabled } from "@/lib/assessments/wave-ed4-flags";
+import { isSingleColumnEnabled } from "@/lib/assessments/wave-ed6-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import {
   isPeerRenderEnabledAlias,
@@ -206,6 +207,11 @@ export default async function AdminAssessmentVersionEditPage({
         // Wave ED4 — three-pane authoring workspace (Questions-body swap +
         // "Edit" default tab; presentation-only, kill = flag off + redeploy).
         threePaneEnabled={isThreePaneEnabled()}
+        // Wave ED6 — single-column form-builder editor. WINS over ED4
+        // three-pane (Questions body → SingleColumnFormBuilder, "Build" tab
+        // label, Sections folded in); presentation-only, kill = flag off +
+        // redeploy.
+        singleColumnEnabled={isSingleColumnEnabled()}
       />
       {peerBenchmarkRows && (
         <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />

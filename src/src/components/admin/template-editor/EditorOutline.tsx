@@ -95,13 +95,8 @@ import {
 
 import type { SectionDraft } from "./SectionsCard";
 import type { QuestionDraftRow } from "./question-serialization";
-import {
-  buildMoveQuestionPrompt,
-  buildQuestionDeletePrompt,
-  buildSectionDeletePrompt,
-  computeSurvivorFocus,
-  findShowIfDependents,
-} from "./question-commands";
+import { findShowIfDependents } from "./question-commands";
+import { useEditorCommands } from "./hooks/useEditorCommands";
 import { LogicMapDrawer } from "./LogicMapDrawer";
 
 type QuestionDraft = QuestionDraftRow;
@@ -446,14 +441,35 @@ export function EditorOutline({
   // during render, so the DOM isn't ready until the NEXT commit).
   const rowFocusRefs = useRef(new Map<string, HTMLButtonElement>());
   const addButtonRefs = useRef(new Map<string, HTMLButtonElement>());
-  const pendingFocusRef = useRef<
-    { kind: "row"; uid: string } | { kind: "add"; sectionKey: string } | null
-  >(null);
+
+  // ED6 Task 4 — the confirm→command→focus orchestration (add/duplicate/delete/
+  // section-delete/move) lives in the SHARED `useEditorCommands` hook now, so
+  // the flag-ON single-column builder reuses the SAME glue rather than a copy.
+  // This view assembles the model shape from its props, and drives the real DOM
+  // keyboard focus/scroll off the hook's `consumePendingFocus()` in the layout
+  // effect below (the "pending focus" ref lives inside the hook now).
+  const commands = useEditorCommands(
+    {
+      sections,
+      questions,
+      selection: {
+        focusedQuestionUid,
+        setFocusedQuestionUid,
+        setSectionCollapsed,
+      },
+      addQuestion: onAddQuestion,
+      duplicateQuestion: onDuplicateQuestion,
+      deleteQuestion: onDeleteQuestion,
+      deleteSection: onDeleteSection,
+      moveQuestionToSection: onMoveQuestion,
+    },
+    { conditionalEnabled, isReadOnly, isUnlocked },
+  );
+  const { consumePendingFocus } = commands;
 
   useLayoutEffect(() => {
-    const pending = pendingFocusRef.current;
+    const pending = consumePendingFocus();
     if (!pending) return;
-    pendingFocusRef.current = null;
     const el =
       pending.kind === "row"
         ? rowFocusRefs.current.get(pending.uid)
@@ -461,7 +477,7 @@ export function EditorOutline({
     if (!el) return;
     el.focus();
     el.scrollIntoView?.({ block: "nearest" });
-  }, [questions]);
+  }, [questions, consumePendingFocus]);
 
   // Drag-and-drop sensors — pointer AND keyboard (the keyboard sensor is the
   // jsdom-drivable path; both call the SAME onDragEnd → onReorderQuestions).
@@ -538,132 +554,6 @@ export function EditorOutline({
   const handleMoveSectionDown = (uid: string) => {
     if (isReadOnly) return;
     onMoveSectionDown(uid);
-  };
-
-  // ── Section DELETE — cascade (ED5 Task 10, B-2b) ────────────────────────
-  const handleDeleteSection = (s: SectionDraft) => {
-    if (isReadOnly) return;
-    const list = questionsBySection[s.stableKey] ?? [];
-    const inheritedKeys = list.filter((qq) => qq.isInherited).map((qq) => qq.stableKey);
-    const removedUidSet = new Set(list.map((qq) => qq.uid));
-    // Union of gates' dependents, restricted to questions the cascade does
-    // NOT already remove (an in-section dependent is being removed too — it
-    // never "becomes always-visible", so it isn't named here).
-    const freedDependentKeys = Array.from(
-      new Set(
-        list
-          .flatMap((gate) => findShowIfDependents(questions, gate))
-          .filter((dep) => !removedUidSet.has(dep.uid))
-          .map((dep) => dep.stableKey),
-      ),
-    );
-    const ok = window.confirm(
-      buildSectionDeletePrompt(
-        { name: s.name, stableKey: s.stableKey },
-        {
-          questionCount: list.length,
-          inheritedKeys,
-          freedDependentKeys,
-          isUnlocked,
-        },
-      ),
-    );
-    if (!ok) return;
-
-    // Focus policy (mirrors the per-question G10 rule): only reposition
-    // focus when the currently FOCUSED question is one this cascade removes
-    // — an unrelated focus elsewhere in the template must not be disturbed
-    // by deleting a different section. Computed BEFORE the delete call so
-    // the pre-cascade question order is intact for `computeSurvivorFocus`.
-    const removedUids = list.map((qq) => qq.uid);
-    const wasFocusInSection =
-      focusedQuestionUid !== null && removedUidSet.has(focusedQuestionUid);
-    const survivor = wasFocusInSection
-      ? computeSurvivorFocus(
-          questions,
-          sections.map((sec) => sec.stableKey),
-          removedUids[0],
-          removedUids.slice(1),
-        )
-      : null;
-
-    onDeleteSection(s.uid);
-
-    if (wasFocusInSection) {
-      setFocusedQuestionUid(survivor);
-      if (survivor) {
-        pendingFocusRef.current = { kind: "row", uid: survivor };
-      } else {
-        // No surviving question anywhere — try the first remaining
-        // section's "+ Add question" control; if no section survives
-        // either, the outline falls back to the G9 empty state and there
-        // is nothing left in this component's DOM to focus.
-        const nextSection = sections.find((sec) => sec.uid !== s.uid);
-        pendingFocusRef.current = nextSection
-          ? { kind: "add", sectionKey: nextSection.stableKey }
-          : null;
-      }
-    }
-  };
-
-  const handleAdd = (sectionKey: string) => {
-    if (isReadOnly) return;
-    const newUid = onAddQuestion(sectionKey);
-    // Make sure the section is open so the new row is visible.
-    setSectionCollapsed(sectionKey, false);
-    setFocusedQuestionUid(newUid);
-    pendingFocusRef.current = { kind: "row", uid: newUid };
-  };
-
-  const handleDuplicate = (uid: string) => {
-    if (isReadOnly) return;
-    const newUid = onDuplicateQuestion(uid);
-    setFocusedQuestionUid(newUid);
-    pendingFocusRef.current = { kind: "row", uid: newUid };
-  };
-
-  const handleDelete = (q: QuestionDraft) => {
-    if (isReadOnly) return;
-    const dependentKeys = conditionalEnabled
-      ? findShowIfDependents(questions, q).map((d) => d.stableKey)
-      : [];
-    const ok = window.confirm(
-      buildQuestionDeletePrompt(q, { isUnlocked, dependentKeys }),
-    );
-    if (!ok) return;
-    // Focus policy (G10): only move focus when the FOCUSED question is
-    // removed. Survivor computed by the SHARED `computeSurvivorFocus` (ED5
-    // Task 5) — next sibling, else previous, else nearest section, else
-    // null (template empty) — BEFORE the removal so the pre-delete order is
-    // intact for the computation.
-    if (focusedQuestionUid === q.uid) {
-      const sectionOrder = sections.map((s) => s.stableKey);
-      const survivor = computeSurvivorFocus(questions, sectionOrder, q.uid);
-      setFocusedQuestionUid(survivor);
-      pendingFocusRef.current = survivor
-        ? { kind: "row", uid: survivor }
-        : { kind: "add", sectionKey: q.sectionStableKey };
-    }
-    onDeleteQuestion(q.uid);
-  };
-
-  // ED5 Task 11 (B-3) — the row's explicit "Move to section…" select calls
-  // this with the chosen target stableKey. Inherited questions confirm via
-  // the shared `buildMoveQuestionPrompt` (empty string for a new-to-draft
-  // question ⇒ the `msg &&` short-circuits before `window.confirm` is even
-  // called — non-inherited moves never prompt). Focus stays ON the moved
-  // question (its uid never changes) — reuse the pending-focus/DOM-scroll
-  // mechanism so it stays visibly focused even though it re-renders under a
-  // different section in the tree.
-  const handleMove = (q: QuestionDraft, targetSectionKey: string) => {
-    if (isReadOnly) return;
-    const targetSection = sections.find((s) => s.stableKey === targetSectionKey);
-    if (!targetSection) return;
-    const msg = buildMoveQuestionPrompt(q, targetSection.name);
-    if (msg && !window.confirm(msg)) return;
-    onMoveQuestion(q.uid, targetSectionKey);
-    setFocusedQuestionUid(q.uid);
-    pendingFocusRef.current = { kind: "row", uid: q.uid };
   };
 
   // ── G9 empty state — zero sections → link to the Sections tab. ──
@@ -795,7 +685,7 @@ export function EditorOutline({
                   data-testid={`outline-section-delete-${s.stableKey}`}
                   aria-label={`Delete section ${s.stableKey}`}
                   title="Delete section"
-                  onClick={() => handleDeleteSection(s)}
+                  onClick={() => commands.deleteSection(s.uid)}
                   disabled={isReadOnly}
                   className="flex-shrink-0 p-1 rounded text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
@@ -823,8 +713,8 @@ export function EditorOutline({
                               isFocused={focusedQuestionUid === q.uid}
                               isReadOnly={isReadOnly}
                               onFocus={() => setFocusedQuestionUid(q.uid)}
-                              onDuplicate={() => handleDuplicate(q.uid)}
-                              onDelete={() => handleDelete(q)}
+                              onDuplicate={() => commands.duplicateQuestion(q.uid)}
+                              onDelete={() => commands.deleteQuestion(q.uid)}
                               registerFocusRef={(el) => {
                                 if (el) rowFocusRefs.current.set(q.uid, el);
                                 else rowFocusRefs.current.delete(q.uid);
@@ -839,7 +729,7 @@ export function EditorOutline({
                               }
                               otherSections={otherSections}
                               onMove={(targetSectionKey) =>
-                                handleMove(q, targetSectionKey)
+                                commands.moveQuestion(q.uid, targetSectionKey)
                               }
                             />
                           ))}
@@ -855,7 +745,7 @@ export function EditorOutline({
                       else addButtonRefs.current.delete(s.stableKey);
                     }}
                     data-testid={`outline-add-question-${s.stableKey}`}
-                    onClick={() => handleAdd(s.stableKey)}
+                    onClick={() => commands.addQuestion(s.stableKey)}
                     disabled={isReadOnly}
                     className="text-xs font-medium text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
                   >

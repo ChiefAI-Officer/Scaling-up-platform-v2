@@ -1,0 +1,389 @@
+"use client";
+
+/**
+ * SingleColumnFormBuilder — ED6 (spec 19ah), the flag-ON authoring surface.
+ *
+ * Flag-ON (`WAVE_ED6_SINGLE_COLUMN_ENABLED`, which WINS over the ED4
+ * `WAVE_ED4_THREE_PANE_ENABLED`) replacement for the Questions tab body inside
+ * `TabbedShell`: a single scrolling column, **Google-Forms-style** — one card per
+ * question grouped under inline section-header bands. The Sections tab folds in
+ * here (its trigger disappears in single mode), so section create/rename/reorder/
+ * cascade-delete happen on the bands.
+ *
+ * ONE shell (co-validate C1): reads the SAME `model` `TabbedShell` uses (no second
+ * hook call), so flag-OFF stays byte-identical by construction. Every structural
+ * mutation routes through the SHARED `useEditorCommands` glue (confirm → model
+ * command → focus) that `EditorOutline` also uses — no bypass, no duplicated
+ * orchestration (co-validate §15.5). Per-card display data is derived ONCE via
+ * `buildCardViewModels` and handed to memoized `QuestionCard`s (co-validate §15.6).
+ *
+ * T8 — within-section drag reorder (one DndContext + per-section SortableContext,
+ * keyboard sensor drivable in jsdom, decision delegated to the pure
+ * `resolveOutlineDrop`); cross-section MOVE via each card's "Move to section…"
+ * select (cross-section drag is a fast-follow, co-validate Q1); contextual "+ Add
+ * question below" inserts after the focused card. The expanded card body — live
+ * preview + bare `QuestionInspector` (T11) — fills the `card-body-<uid>` slot next.
+ */
+
+import React, { useCallback, useLayoutEffect, useMemo, useRef } from "react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+
+import type { TemplateEditorModel } from "./hooks/useTemplateEditorModel";
+import { useEditorCommands, type EditorCommandsModel } from "./hooks/useEditorCommands";
+import { buildCardViewModels } from "./single-column-view-model";
+import { resolveOutlineDrop } from "./outline-drop";
+import { QuestionCard } from "./QuestionCard";
+import { QuestionCanvas } from "./QuestionCanvas";
+import { QuestionInspector } from "./QuestionInspector";
+import { computeShowIfGates, findShowIfDependents } from "./question-commands";
+import { shapeSignature } from "./question-widget-mapper";
+
+export interface SingleColumnFormBuilderProps {
+  /** The composed editor model, shared with `TabbedShell` (ONE shell rule). */
+  model: TemplateEditorModel;
+  /** Published version ⇒ read-only mutation affordances (reused signal). */
+  isReadOnly: boolean;
+  /** Wave T — per-type question editing unlocked. */
+  isUnlocked: boolean;
+  /** Wave U — findings-logic authoring panel. */
+  findingsEnabled: boolean;
+  /** Wave W — conditional (show-if) authoring panel. */
+  conditionalEnabled: boolean;
+  /** Wave T — union of published option keys per question stableKey. */
+  publishedOptionKeys: Record<string, readonly string[]>;
+  /** Retained for prop-parity with `ThreePaneWorkspace`; unused here. */
+  onGoToSections: () => void;
+}
+
+export function SingleColumnFormBuilder({
+  model,
+  isReadOnly,
+  isUnlocked,
+  findingsEnabled,
+  conditionalEnabled,
+  publishedOptionKeys,
+}: SingleColumnFormBuilderProps) {
+  const { sections, questions, selection } = model;
+
+  const commandsModel: EditorCommandsModel = {
+    sections,
+    questions,
+    selection: {
+      focusedQuestionUid: selection.focusedQuestionUid,
+      setFocusedQuestionUid: selection.setFocusedQuestionUid,
+      setSectionCollapsed: selection.setSectionCollapsed,
+    },
+    addQuestion: model.addQuestion,
+    duplicateQuestion: model.duplicateQuestion,
+    deleteQuestion: model.deleteQuestion,
+    deleteSection: model.deleteSection,
+    moveQuestionToSection: model.moveQuestionToSection,
+  };
+  const commands = useEditorCommands(commandsModel, {
+    conditionalEnabled,
+    isReadOnly,
+    isUnlocked,
+  });
+  const { consumePendingFocus, duplicateQuestion, deleteQuestion, moveQuestion } =
+    commands;
+
+  const vms = useMemo(
+    () => buildCardViewModels(questions, sections, { conditionalEnabled }),
+    [questions, sections, conditionalEnabled],
+  );
+
+  const rowFocusRefs = useRef(new Map<string, HTMLButtonElement>());
+  const addButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  useLayoutEffect(() => {
+    const pending = consumePendingFocus();
+    if (!pending) return;
+    const el =
+      pending.kind === "row"
+        ? rowFocusRefs.current.get(pending.uid)
+        : addButtonRefs.current.get(pending.sectionKey);
+    if (!el) return;
+    el.focus();
+    el.scrollIntoView?.({ block: "nearest" });
+  }, [questions, consumePendingFocus]);
+
+  const registerFocusRef = useCallback(
+    (uid: string, el: HTMLButtonElement | null) => {
+      if (el) rowFocusRefs.current.set(uid, el);
+      else rowFocusRefs.current.delete(uid);
+    },
+    [],
+  );
+
+  const onFocus = selection.setFocusedQuestionUid;
+
+  // Group questions by section, ascending sortOrder.
+  const bySection = useMemo(() => {
+    const grouped = new Map<string, (typeof questions)[number][]>();
+    for (const s of sections) grouped.set(s.stableKey, []);
+    for (const q of [...questions].sort((a, b) => a.sortOrder - b.sortOrder)) {
+      const arr = grouped.get(q.sectionStableKey);
+      if (arr) arr.push(q);
+    }
+    return grouped;
+  }, [questions, sections]);
+
+  // DnD — pointer + keyboard (the keyboard sensor is the jsdom-drivable path).
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // Reorder-vs-move decision via the pure, tested `resolveOutlineDrop`. v1 wires
+  // WITHIN-section reorder only; a cross-section drag result is ignored (the
+  // "Move to section…" select is the reliable cross-section path — co-validate Q1).
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    const containers: Record<string, string[]> = {};
+    for (const s of sections) {
+      containers[s.stableKey] = (bySection.get(s.stableKey) ?? []).map((q) => q.uid);
+    }
+    const result = resolveOutlineDrop(String(active.id), String(over.id), containers);
+    if (result && result.kind === "reorder") {
+      model.reorderQuestions(result.sectionKey, result.order);
+    }
+  };
+
+  // SR reorder announcements name the question's LABEL/key, never its random uid.
+  const nameForUid = (id: string): string => {
+    const q = questions.find((qq) => qq.uid === id);
+    return q ? q.label.trim() || q.stableKey || "question" : "question";
+  };
+  const dndAnnouncements: Announcements = {
+    onDragStart: ({ active }) => `Picked up ${nameForUid(String(active.id))}.`,
+    onDragOver: ({ active, over }) =>
+      over ? `${nameForUid(String(active.id))} is over ${String(over.id)}.` : undefined,
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `Moved ${nameForUid(String(active.id))}.`
+        : `${nameForUid(String(active.id))} was dropped.`,
+    onDragCancel: ({ active }) => `Cancelled moving ${nameForUid(String(active.id))}.`,
+  };
+
+  if (sections.length === 0) {
+    return (
+      <div data-testid="single-column-builder">
+        <div
+          data-testid="single-column-empty"
+          className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-10 text-center text-muted-foreground"
+        >
+          <p>No sections yet. Add your first section to start building.</p>
+          {!isReadOnly && (
+            <button
+              type="button"
+              data-testid="single-column-add-first-section"
+              onClick={model.handleSectionsAdd}
+              className="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+            >
+              Add your first section
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+      accessibility={{ announcements: dndAnnouncements }}
+    >
+      <div data-testid="single-column-builder" className="flex flex-col gap-4">
+        {sections.map((s) => {
+          const list = bySection.get(s.stableKey) ?? [];
+          const collapsed = selection.isSectionCollapsed(s.stableKey);
+          const labeled = list.filter((q) => (q.label ?? "").trim() !== "").length;
+          const uids = list.map((q) => q.uid);
+          return (
+            <section
+              key={s.uid}
+              role="group"
+              aria-label={s.name.trim() || "Untitled section"}
+              data-testid={`sc-section-${s.stableKey}`}
+              className="rounded-lg border border-border"
+            >
+              <div className="sticky top-0 z-10 flex items-center gap-2 rounded-t-lg border-b border-border bg-muted px-3 py-2">
+                <button
+                  type="button"
+                  data-testid={`sc-section-toggle-${s.stableKey}`}
+                  aria-expanded={!collapsed}
+                  aria-label={collapsed ? "Expand section" : "Collapse section"}
+                  onClick={() => selection.toggleSectionCollapsed(s.stableKey)}
+                  className="text-muted-foreground"
+                >
+                  {collapsed ? "▸" : "▾"}
+                </button>
+                <input
+                  data-testid={`sc-section-name-${s.stableKey}`}
+                  aria-label="Section name"
+                  value={s.name}
+                  placeholder="Section name"
+                  disabled={isReadOnly}
+                  onChange={(e) => model.handleSectionsRename(s.uid, e.target.value)}
+                  className="flex-1 bg-transparent font-semibold outline-none"
+                />
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  {labeled}/{list.length} labeled
+                </span>
+                {!isReadOnly && (
+                  <span className="flex shrink-0 gap-2 text-xs text-muted-foreground">
+                    <button
+                      type="button"
+                      data-testid={`sc-section-add-q-${s.stableKey}`}
+                      onClick={() => commands.addQuestion(s.stableKey)}
+                    >
+                      + Question
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`sc-section-up-${s.stableKey}`}
+                      aria-label="Move section up"
+                      onClick={() => model.handleSectionsMoveUp(s.uid)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`sc-section-down-${s.stableKey}`}
+                      aria-label="Move section down"
+                      onClick={() => model.handleSectionsMoveDown(s.uid)}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`sc-section-delete-${s.stableKey}`}
+                      onClick={() => commands.deleteSection(s.uid)}
+                      className="text-destructive"
+                    >
+                      Delete
+                    </button>
+                  </span>
+                )}
+              </div>
+
+              {!collapsed && (
+                <div className="flex flex-col gap-2 p-2">
+                  {list.length === 0 ? (
+                    <div
+                      data-testid={`sc-section-empty-${s.stableKey}`}
+                      className="flex flex-col items-center gap-2 rounded border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
+                    >
+                      No questions yet.
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          ref={(el) => {
+                            if (el) addButtonRefs.current.set(s.stableKey, el);
+                            else addButtonRefs.current.delete(s.stableKey);
+                          }}
+                          data-testid={`sc-add-question-${s.stableKey}`}
+                          onClick={() => commands.addQuestion(s.stableKey)}
+                          className="rounded bg-primary px-3 py-1 text-primary-foreground"
+                        >
+                          + Add question
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <SortableContext items={uids} strategy={verticalListSortingStrategy}>
+                      {list.map((q) => {
+                        const vm = vms.get(q.uid);
+                        if (!vm) return null;
+                        const focused = selection.focusedQuestionUid === q.uid;
+                        return (
+                          <React.Fragment key={q.uid}>
+                            <QuestionCard
+                              vm={vm}
+                              isFocused={focused}
+                              isReadOnly={isReadOnly}
+                              sections={sections}
+                              onFocus={onFocus}
+                              onDuplicate={duplicateQuestion}
+                              onDelete={deleteQuestion}
+                              onMove={moveQuestion}
+                              registerFocusRef={registerFocusRef}
+                            >
+                              {focused && (
+                                <>
+                                  <QuestionCanvas
+                                    key={`${q.uid}:${shapeSignature(q)}`}
+                                    question={q}
+                                    sectionName={s.name.trim() || null}
+                                  />
+                                  <QuestionInspector
+                                    bare
+                                    question={q}
+                                    isReadOnly={isReadOnly}
+                                    isUnlocked={isUnlocked}
+                                    findingsEnabled={findingsEnabled}
+                                    conditionalEnabled={conditionalEnabled}
+                                    showIfGates={
+                                      conditionalEnabled
+                                        ? computeShowIfGates(sections, questions, q)
+                                        : []
+                                    }
+                                    showIfDependents={
+                                      conditionalEnabled
+                                        ? findShowIfDependents(questions, q)
+                                        : []
+                                    }
+                                    onClearDependents={(uids) => {
+                                      for (const uid of uids)
+                                        model.handleUpdateQuestion(uid, { showIf: null });
+                                    }}
+                                    publishedOptionKeys={publishedOptionKeys}
+                                    onUpdate={(patch) =>
+                                      model.handleUpdateQuestion(q.uid, patch)
+                                    }
+                                  />
+                                </>
+                              )}
+                            </QuestionCard>
+                            {focused && !isReadOnly && (
+                              <button
+                                type="button"
+                                data-testid={`sc-add-below-${q.uid}`}
+                                onClick={() =>
+                                  commands.addQuestion(s.stableKey, { afterUid: q.uid })
+                                }
+                                className="self-center rounded-full border border-border px-3 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                + Add question below
+                              </button>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </SortableContext>
+                  )}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </DndContext>
+  );
+}

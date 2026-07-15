@@ -57,6 +57,13 @@ interface QuestionInspectorProps {
   onClearDependents: (uids: string[]) => void;
   publishedOptionKeys: Record<string, readonly string[]>;
   onUpdate: (patch: Partial<QuestionDraft>) => void;
+  /**
+   * ED6 (spec 19ah, T10) — drop this component's OWN chrome (the outer `wf-card`
+   * class/padding + the "Edit Question — {key}" header) so it sits flush inside a
+   * single-column card. Default false ⇒ byte-identical to today (three-pane /
+   * legacy). Additive; the ED3 guard + QuestionInspector.test.tsx stay green.
+   */
+  bare?: boolean;
 }
 
 /** Wave U — how many findings rules a draft question currently carries. */
@@ -627,6 +634,7 @@ export function QuestionInspector({
   onClearDependents,
   publishedOptionKeys,
   onUpdate,
+  bare = false,
 }: QuestionInspectorProps) {
   const [numberOpen, setNumberOpen] = useState(false);
   const [multiOpen, setMultiOpen] = useState(false);
@@ -737,8 +745,8 @@ export function QuestionInspector({
   if (!question) {
     return (
       <section
-        className="wf-card"
-        style={{ padding: "1.25rem" }}
+        className={bare ? "" : "wf-card"}
+        style={bare ? undefined : { padding: "1.25rem" }}
         data-testid="questions-config-form"
       >
         <p className="text-xs italic text-muted-foreground text-center py-8">
@@ -750,15 +758,17 @@ export function QuestionInspector({
 
   return (
     <section
-      className="wf-card space-y-4"
-      style={{ padding: "1.25rem" }}
+      className={bare ? "space-y-4" : "wf-card space-y-4"}
+      style={bare ? undefined : { padding: "1.25rem" }}
       data-testid="questions-config-form"
     >
-      <header className="border-b border-border pb-3">
-        <h3 className="wf-card-title">
-          Edit Question — {question.stableKey}
-        </h3>
-      </header>
+      {!bare && (
+        <header className="border-b border-border pb-3">
+          <h3 className="wf-card-title">
+            Edit Question — {question.stableKey}
+          </h3>
+        </header>
+      )}
 
       {/* stableKey (read-only) */}
       <div className="space-y-1">
