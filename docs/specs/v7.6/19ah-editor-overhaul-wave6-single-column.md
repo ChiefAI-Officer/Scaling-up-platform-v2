@@ -1,9 +1,12 @@
 # Wave ED6 — editor-overhaul single-column form builder — DESIGN (DRAFT)
 
-> **Status:** DRAFT. Brainstorm + grill + **co-validate complete** (real Codex GPT-5.5 thread `019f6477` +
-> own 4-lens review, 2026-07-15). **Gated wave** — next: `writing-plans` → subagent-driven TDD build (both
-> pending explicit user approval). **Nothing is built yet.** Grill outcomes in §14; **co-validate outcomes
-> in §15 — §15 supersedes §14 and any conflicting inline text.**
+> **Status:** BUILT (2026-07-15) — shipped via PR on `feat/wave-ed6-single-column`, dark behind default-OFF
+> `WAVE_ED6_SINGLE_COLUMN_ENABLED`; **launch = flag flip + redeploy after an internal walk (gated on the
+> user)**; kill = flag off → byte-identical three-pane/legacy. Brainstorm + grill + co-validate (real Codex
+> GPT-5.5 + own 4-lens) + TDD build (16 commits; PR-A + T4 subagent-reviewed, T5–T15 inline under an account
+> session limit) all complete. Frozen ED3 guard 15/15 + ED4 parity 20/20 green throughout; editor sweep 38
+> suites / 403; `CI=true next build --turbopack` + eslint clean. Grill outcomes in §14; **co-validate
+> outcomes in §15 — §15 supersedes §14 and any conflicting inline text.**
 >
 > **Spec seq:** `19ah` (follows 19ac ED1 · 19ad ED2 · 19ae ED3 · 19af ED4 · 19ag ED5).
 
