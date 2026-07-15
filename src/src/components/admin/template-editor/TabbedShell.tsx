@@ -52,6 +52,7 @@ import { MetadataTab } from "@/components/admin/template-editor/MetadataTab";
 import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
 import { QuestionsTab } from "@/components/admin/template-editor/QuestionsTab";
 import { ThreePaneWorkspace } from "@/components/admin/template-editor/ThreePaneWorkspace";
+import { SingleColumnFormBuilder } from "@/components/admin/template-editor/SingleColumnFormBuilder";
 import type { TemplateEditorModel } from "@/components/admin/template-editor/hooks/useTemplateEditorModel";
 import { TestModeDrawer } from "@/components/admin/template-editor/TestModeDrawer";
 import { SafeToPublishBadge } from "@/components/admin/template-editor/SafeToPublishBadge";
@@ -224,6 +225,17 @@ export interface TabbedShellProps {
    * the tab is relabeled "Edit", and it becomes the default landing tab.
    */
   threePaneEnabled?: boolean;
+  /**
+   * Wave ED6 (spec 19ah, PR-A) — single-column form-builder editor. Server-
+   * computed (`isSingleColumnEnabled()`) and passed down from the edit page.
+   * WINS over `threePaneEnabled`: true ⇒ the Questions body swaps to
+   * `SingleColumnFormBuilder`, the tab is relabeled "Build" and becomes the
+   * default landing tab, and the Sections tab is folded in (its trigger +
+   * panel disappear; a `?tab=sections` deep-link resolves to the Build tab).
+   * Default false ⇒ falls through to the ED4 three-pane / legacy behavior,
+   * byte-identical to today.
+   */
+  singleColumnEnabled?: boolean;
 }
 
 /**
@@ -240,10 +252,21 @@ const EMPTY_PUBLISHED_OPTION_KEYS: Record<string, string[]> = {};
 // ────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────
+type AuthoringMode = "single" | "three" | "legacy";
+
 function resolveTabFromUrl(
   param: string | null,
   defaultTab: TabId = "metadata",
+  activeAuthoringMode: AuthoringMode = "legacy",
 ): TabId {
+  // ED6 (spec 19ah) — single-column folds the Sections tab into the Build tab,
+  // so its trigger + panel don't exist. A `?tab=sections` deep-link (or any
+  // stale bookmark) resolves to the Build/questions tab so the URL never lands
+  // on a tab with no panel. `"questions"` stays a valid id (VALID_TAB_IDS is
+  // unchanged) — only the display label differs.
+  if (activeAuthoringMode === "single" && param === "sections") {
+    return "questions";
+  }
   if (param && (VALID_TAB_IDS as string[]).includes(param)) {
     return param as TabId;
   }
@@ -266,6 +289,7 @@ export function TabbedShell({
   testModeEnabled = false,
   safeToPublishEnabled = false,
   threePaneEnabled = false,
+  singleColumnEnabled = false,
   model,
 }: TabbedShellProps & {
   /**
@@ -284,24 +308,47 @@ export function TabbedShell({
 
   const isPublished = version.publishedAt !== null;
 
+  // ─── Authoring-mode selection (ED4/ED6) ───────────────────────────────
+  // The Questions-body presentation is picked by a single derived value:
+  //   single  (ED6) — flag WINS; body = SingleColumnFormBuilder, "Build" tab,
+  //                    Sections folded in.
+  //   three   (ED4) — body = ThreePaneWorkspace, "Edit" tab.
+  //   legacy         — body = QuestionsTab, "Questions" tab (byte-identical to
+  //                    today; both flags OFF).
+  const activeAuthoringMode: AuthoringMode = singleColumnEnabled
+    ? "single"
+    : threePaneEnabled
+      ? "three"
+      : "legacy";
+
   // ─── Tab selection ────────────────────────────────────────────────────
-  // Wave ED4 — when the three-pane workspace is on, the Questions ("Edit") tab
-  // becomes the param-less default (instead of Metadata). Flag OFF ⇒ default
-  // stays "metadata", so the ?tab= routing is byte-identical to today.
-  const defaultTab: TabId = threePaneEnabled ? "questions" : "metadata";
-  const tabFromUrl = resolveTabFromUrl(searchParams.get("tab"), defaultTab);
+  // Wave ED4/ED6 — when a workspace mode is on (single or three), the Questions
+  // ("Build"/"Edit") tab becomes the param-less default (instead of Metadata).
+  // Legacy ⇒ default stays "metadata", so the ?tab= routing is byte-identical
+  // to today.
+  const defaultTab: TabId =
+    activeAuthoringMode !== "legacy" ? "questions" : "metadata";
+  const tabFromUrl = resolveTabFromUrl(
+    searchParams.get("tab"),
+    defaultTab,
+    activeAuthoringMode,
+  );
   const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl);
 
   // Re-sync if the URL param changes externally (e.g. browser nav).
   useEffect(() => {
-    const next = resolveTabFromUrl(searchParams.get("tab"), defaultTab);
+    const next = resolveTabFromUrl(
+      searchParams.get("tab"),
+      defaultTab,
+      activeAuthoringMode,
+    );
     // Intentional external-store sync: mirror the ?tab= URL param into local
     // tab state on external navigation (pre-ED3 behavior, byte-identical —
     // pinned by the guard's tab-routing test). Not derivable purely in render
     // because handleTabChange also drives activeTab on user clicks.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTab((prev) => (prev === next ? prev : next));
-  }, [searchParams, defaultTab]);
+  }, [searchParams, defaultTab, activeAuthoringMode]);
 
   const handleTabChange = useCallback(
     (next: string) => {
@@ -556,11 +603,19 @@ export function TabbedShell({
           <TabsTrigger value="metadata">
             {TAB_LABELS.metadata}
           </TabsTrigger>
-          <TabsTrigger value="sections">
-            {TAB_LABELS.sections}
-          </TabsTrigger>
+          {/* ED6 — single-column folds Sections into the Build tab, so its
+              trigger disappears in single mode. Three/legacy render it. */}
+          {activeAuthoringMode !== "single" && (
+            <TabsTrigger value="sections">
+              {TAB_LABELS.sections}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="questions">
-            {threePaneEnabled ? "Edit" : TAB_LABELS.questions}
+            {activeAuthoringMode === "single"
+              ? "Build"
+              : activeAuthoringMode === "three"
+                ? "Edit"
+                : TAB_LABELS.questions}
           </TabsTrigger>
           <TabsTrigger value="scoring">
             {TAB_LABELS.scoring}
@@ -623,30 +678,46 @@ export function TabbedShell({
             />
           </div>
         </TabsContent>
-        {/* F2b — Sections tab (standalone, full-width). */}
-        <TabsContent value="sections">
-          <div data-testid="tab-panel-sections">
-            <SectionsTab
-              sections={sections}
-              questionCountByStableKey={questionCountByStableKey}
-              onSectionsAdd={handleSectionsAdd}
-              onSectionsRename={handleSectionsRename}
-              onSectionsDelete={handleSectionsCascadeDelete}
-              onSectionsMoveUp={handleSectionsMoveUp}
-              onSectionsMoveDown={handleSectionsMoveDown}
-              onSectionsReorder={handleSectionsReorder}
-              isReadOnly={isPublished}
-            />
-          </div>
-        </TabsContent>
+        {/* F2b — Sections tab (standalone, full-width). ED6 — folded into the
+            single-column Build tab, so its panel is not mounted in single
+            mode (its trigger is also gone). */}
+        {activeAuthoringMode !== "single" && (
+          <TabsContent value="sections">
+            <div data-testid="tab-panel-sections">
+              <SectionsTab
+                sections={sections}
+                questionCountByStableKey={questionCountByStableKey}
+                onSectionsAdd={handleSectionsAdd}
+                onSectionsRename={handleSectionsRename}
+                onSectionsDelete={handleSectionsCascadeDelete}
+                onSectionsMoveUp={handleSectionsMoveUp}
+                onSectionsMoveDown={handleSectionsMoveDown}
+                onSectionsReorder={handleSectionsReorder}
+                isReadOnly={isPublished}
+              />
+            </div>
+          </TabsContent>
+        )}
         <TabsContent value="questions">
           <div data-testid="tab-panel-questions">
-            {/* Wave ED4 (spec 19af §3.2) — the ONE conditional: the Questions
-                authoring body swaps to the three-pane workspace when the flag
-                is on. Everything else (header, tab-nav, other surfaces,
-                modals, action wiring) stays single-source. Flag OFF renders
-                the legacy QuestionsTab byte-identically to today. */}
-            {threePaneEnabled ? (
+            {/* Wave ED4 (spec 19af §3.2) / ED6 (spec 19ah PR-A) — the ONE
+                conditional: the Questions authoring body swaps by mode.
+                single (ED6, WINS) ⇒ SingleColumnFormBuilder;
+                three  (ED4)       ⇒ ThreePaneWorkspace;
+                legacy (both OFF)  ⇒ QuestionsTab (byte-identical to today).
+                Everything else (header, tab-nav, other surfaces, modals,
+                action wiring) stays single-source. */}
+            {activeAuthoringMode === "single" ? (
+              <SingleColumnFormBuilder
+                model={model}
+                isReadOnly={isPublished}
+                isUnlocked={questionEditorUnlocked}
+                findingsEnabled={findingsEnabled}
+                conditionalEnabled={conditionalAuthoringEnabled}
+                publishedOptionKeys={publishedOptionKeys}
+                onGoToSections={() => handleTabChange("sections")}
+              />
+            ) : threePaneEnabled ? (
               <ThreePaneWorkspace
                 model={model}
                 isReadOnly={isPublished}
