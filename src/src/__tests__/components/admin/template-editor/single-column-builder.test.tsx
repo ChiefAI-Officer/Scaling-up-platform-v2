@@ -160,4 +160,12 @@ describe("SingleColumnFormBuilder (ED6 T7)", () => {
     expect(screen.getByTestId("single-column-empty")).toBeInTheDocument();
     expect(screen.getByTestId("single-column-add-first-section")).toBeInTheDocument();
   });
+
+  it("'+ Add section' adds a new section band when sections already exist", () => {
+    render(<TemplateEditorTabbed {...props({})} />);
+    // Fixture has S1 + S2; handleSectionsAdd mints S{n+1} = S3.
+    expect(screen.queryByTestId("sc-section-S3")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("single-column-add-section"));
+    expect(screen.getByTestId("sc-section-S3")).toBeInTheDocument();
+  });
 });

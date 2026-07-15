@@ -383,6 +383,18 @@ export function SingleColumnFormBuilder({
             </section>
           );
         })}
+        {!isReadOnly && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              data-testid="single-column-add-section"
+              onClick={model.handleSectionsAdd}
+              className="rounded border border-dashed border-border px-4 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+            >
+              + Add section
+            </button>
+          </div>
+        )}
       </div>
     </DndContext>
   );
