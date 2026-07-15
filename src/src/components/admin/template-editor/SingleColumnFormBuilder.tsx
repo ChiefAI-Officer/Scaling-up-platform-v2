@@ -33,6 +33,7 @@ import {
   closestCenter,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
@@ -162,6 +163,22 @@ export function SingleColumnFormBuilder({
     }
   };
 
+  // SR reorder announcements name the question's LABEL/key, never its random uid.
+  const nameForUid = (id: string): string => {
+    const q = questions.find((qq) => qq.uid === id);
+    return q ? q.label.trim() || q.stableKey || "question" : "question";
+  };
+  const dndAnnouncements: Announcements = {
+    onDragStart: ({ active }) => `Picked up ${nameForUid(String(active.id))}.`,
+    onDragOver: ({ active, over }) =>
+      over ? `${nameForUid(String(active.id))} is over ${String(over.id)}.` : undefined,
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `Moved ${nameForUid(String(active.id))}.`
+        : `${nameForUid(String(active.id))} was dropped.`,
+    onDragCancel: ({ active }) => `Cancelled moving ${nameForUid(String(active.id))}.`,
+  };
+
   if (sections.length === 0) {
     return (
       <div data-testid="single-column-builder">
@@ -186,7 +203,12 @@ export function SingleColumnFormBuilder({
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+      accessibility={{ announcements: dndAnnouncements }}
+    >
       <div data-testid="single-column-builder" className="flex flex-col gap-4">
         {sections.map((s) => {
           const list = bySection.get(s.stableKey) ?? [];
