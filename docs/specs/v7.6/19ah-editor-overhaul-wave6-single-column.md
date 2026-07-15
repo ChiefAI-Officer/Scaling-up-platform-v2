@@ -1,9 +1,9 @@
 # Wave ED6 — editor-overhaul single-column form builder — DESIGN (DRAFT)
 
-> **Status:** DRAFT. Brainstorm + **grill complete** (visual-companion + code-grounded grill, 2026-07-15).
-> **Gated wave** — next gate: `/co-validate` (real Codex) → explicit user approval → `writing-plans` →
-> subagent-driven TDD build. **Nothing is built yet.** Grill outcomes are recorded in §14 and supersede any
-> conflicting inline text.
+> **Status:** DRAFT. Brainstorm + grill + **co-validate complete** (real Codex GPT-5.5 thread `019f6477` +
+> own 4-lens review, 2026-07-15). **Gated wave** — next: `writing-plans` → subagent-driven TDD build (both
+> pending explicit user approval). **Nothing is built yet.** Grill outcomes in §14; **co-validate outcomes
+> in §15 — §15 supersedes §14 and any conflicting inline text.**
 >
 > **Spec seq:** `19ah` (follows 19ac ED1 · 19ad ED2 · 19ae ED3 · 19af ED4 · 19ag ED5).
 
@@ -58,20 +58,24 @@ Notation: **[user]** = decided by the user in brainstorm; **[default]** = my cal
 - **D2 — Scope: the "Build" tab replaces "Edit."** The single-column surface takes over the Edit tab's
   contents. The **Sections** tab **folds in** (sections become inline header bands authored in the
   column). **Metadata · Scoring & Tiers · Access · Versions are untouched.** **[user — "Proposed"]**
-  - Note: "Scoring & Tiers" (template-level *global* bands) is distinct from *per-question* scoring
-    (which lives in a card's Advanced). Both remain; they do different jobs.
+  - Note: the "Scoring & Tiers" tab (template-level *global* tier bands) stays separate; per-question
+    Advanced holds **findings + show-if + slider scale**, not scoring (only sliders are scored — §15).
 - **D3 — Card anatomy: one component, three visual states** — collapsed (resting) / expanded-basic
   (focused) / expanded-advanced. Exactly one card focused at a time
   (`model.selection.focusedQuestionUid`). Focus is a persistent visual treatment (left accent stripe +
   elevation), independent of DOM focus. **[default]**
 - **D4 — Collapsed = a fixed-height one-line summary:** drag handle (on hover/focus, ≥24×24px), position
-  + type badge, truncated prompt, **state badges** (`Scored`, `Findings`, `Show-if`; warnings
-  `Required`, `Unassigned`) that are **text+icon, never color-only**, and a kebab (Duplicate · Delete ·
+  + type badge, truncated prompt, **state badges** (`Findings`, `Show-if`; warnings
+  `Required`, `Unassigned` — **no per-question `Scored` badge**: all sliders score automatically, §15) that
+  are **text+icon, never color-only**, and a kebab (Duplicate · Delete ·
   Move to section…). A plain slider shows **no** badges → reads identically to Google Forms. **[default]**
-- **D5 — Advanced = ONE collapsed region per focused card**, holding scoring tier-bands / findings /
-  show-if as **type-gated** sub-sections (scoring only for NUMBER/SLIDER; findings hidden for TEXT).
-  NOT a Google-Forms-style "⋮ → add scoring" menu — one scannable region wins because most questions are
-  scored. **[default, user-confirmed on the locked-design screen]**
+- **D5 — Advanced config lives inside the focused card (decision A, §15).** The expanded card body **is**
+  the re-hosted `QuestionInspector` (bare chrome) — there is **NO separate "basic editor" layer** (that
+  would duplicate its controls, Codex C1). It shows label/type/options inline (Forms-like) with **findings**
+  and **show-if** as its existing collapsible sub-panels, plus per-type scale/range. **Only the focused card
+  mounts the inspector.** Per-question config is **findings + show-if + slider scale — NOT "scoring
+  tier-bands"**: only SLIDER_LIKERT is scored (verified `scoring.ts:1356–1457`), and template-level tier
+  bands stay in the separate "Scoring & Tiers" tab. **[decision A]**
 - **D6 — Live preview built into the card.** The card's answer area renders the **real** `QuestionInput`
   widget (editor doubles as preview, like Forms). Preview state is **throwaway-local** (no model/mutation
   prop → structurally cannot persist), keyed on `` `${uid}:${shapeSignature(q)}` ``, and uses a
@@ -129,8 +133,9 @@ edit/page.tsx (RSC: auth, DB fetch, flag reads incl. isSingleColumnEnabled())
 `SingleColumnFormBuilder` (**NEW** — the only genuinely new component) maps `questions` grouped by
 `sections` + `sortOrder` into: sticky section header bands, question cards (collapsed/expanded), the
 contextual add toolbar, empty states, and the dnd wiring. Each expanded card composes:
-`QuestionInput` (preview) + the type/prompt/options basic editors + the re-hosted `QuestionInspector`
-(Advanced). All mutations call `model` commands; nothing is mutated locally.
+`QuestionInput` (preview) + the re-hosted **bare** `QuestionInspector` as the card body — the inspector
+itself provides type/label/options inline plus its collapsible findings/show-if (decision A, §15); there is
+no separate basic-editor layer. All mutations call `model` commands; nothing is mutated locally.
 
 ---
 
@@ -181,19 +186,20 @@ Route **every** structural mutation through `model` commands → `buildVersionSc
 
 - **ED3 golden byte-equivalence** (`editor-byte-equivalence.test.tsx`, 15) — **untouched**. If it needs an
   edit, the rebuild changed serializer/model behavior — a conscious break, not a refactor.
-- **Generalize the parity runner to a 3rd mode.** Grill-verified: MODES is `{threePane:boolean;
-  key:"off"|"on"}`, so this is more than a one-line append — widen the `key` union to include `"single"`,
-  thread a new `singleColumnEnabled` prop through `TemplateEditorTabbed`→`TabbedShell` (the 3-way seam)
-  **and** into the `fixtureA`/`fixtureMC` signatures, and add an explicit `cap.single≡cap.off` assert
-  (transcript + UI/dirty + toast) to each of the ~11 cross-asserting scenarios. Because ED3 freezes `off`
-  byte-exact, single≡off transitively freezes single-column — **still no new golden strings**. The
-  single-column cards **must emit `question-card-*` + `drag-handle-*` test-ids** so the existing
-  `installDndLayout()` keyboard-reorder stub works.
+- **Single-column gets its OWN focused suite — do NOT force it through the legacy cross-assert harness
+  (co-validate C5 + own lenses, §15).** Cross-asserting `single≡off` on DOM/UI would cage the redesign to
+  legacy markup. Instead: (a) leave the 2-mode parity harness untouched; (b) a new single-column suite
+  asserts each DOM affordance dispatches the correct model command (add/delete/duplicate/reorder/move/
+  section-CRUD) + spot-checks 2–3 author-action→save-payload flows (payload parity is fine, DOM parity is
+  not); (c) a **render-count assertion** (editing card A must not re-render card B). Single-column cards
+  **must emit `question-card-*` + `drag-handle-*` test-ids** so the existing `installDndLayout()`
+  keyboard-reorder stub drives them.
 - **New mode-aware authoring helpers** keyed off the new DOM test-ids; drive reorder via the **keyboard
   sensor** (jsdom can't dispatch dnd-kit PointerEvents); keep the `installDndLayout()` rect stub.
 - **New flag-branch-pick test**: flag ON ⇒ single-column mounts/relabels; OFF ⇒ byte-identical fallback;
-  plus a11y landmarks + responsive classes. **The ED3 byte-equivalence guard must be EXTENDED** for the
-  flag-ON default-tab behavior (not assumed to stay green); the tab **id** must stay literal `"questions"`.
+  plus a11y landmarks + responsive classes. The ED3 byte-equivalence guard stays **flag-OFF and green**
+  (it never sets the flag; ED4's identical default-tab swap left it green — §15); the new coverage is this
+  flag-branch-pick test, **not** a guard edit. The tab **id** must stay literal `"questions"`.
 - `question-commands.test.ts` (30) + `ed5-round-trip.test.ts` (2) unchanged and green (mutations already
   route through shared commands; the new suite only proves the DOM affordances dispatch them). Baseline
   counts (jest-verified): byte-equivalence **15**, parity **20**, three-pane-flag **5**.
@@ -301,3 +307,57 @@ Grill decisions (Q1–Q3) + code-grounded verification (a background pass read t
    cross-asserting scenario, and single-column cards must emit `question-card-*` + `drag-handle-*` test-ids
    for the `installDndLayout()` reorder stub. Baseline counts (jest-verified): byte-equivalence 15,
    parity 20, three-pane-flag 5, question-commands 30, ed5-round-trip 2.
+
+---
+
+## 15. Co-validate outcomes (2026-07-15)
+
+Real Codex (GPT-5.5, thread `019f6477`) + my own 4-lens review (3 lenses completed; the correctness lens +
+synthesis were lost to an account session limit and reconciled inline). Both converged on the
+inspector-monolith issue. **§15 supersedes §14 and any conflicting inline text.**
+
+**Load-bearing decision — the user chose A.** The existing `QuestionInspector` is a single ~1,400-line
+interwoven form (label/type/options AND findings/show-if together), so the original "separate basic fields
++ one tidy 'Advanced' box" (old D5) is not cheaply buildable and would duplicate controls (Codex C1).
+**Decision A:** the expanded card body **is** the re-hosted bare inspector — no separate basic layer;
+findings/show-if are its existing collapsible sub-panels; **only the focused card mounts it**. Keeps ~90%
+reuse, stays Forms-clean. (Alternatives weighed and set aside: B bottom-sheet; C invest in a shared
+`QuestionEditorForm` split — a follow-on only if the focused card reads busy after the launch walk.)
+
+**Accepted — folded into the spec:**
+1. **Scoring language corrected (Codex C2, verified `scoring.ts:1356–1457`):** only SLIDER_LIKERT is scored;
+   NUMBER/TEXT/MULTI_CHOICE are not. Per-question Advanced = **findings + show-if + slider scale**, NOT
+   "scoring tier-bands." Dropped the per-question `Scored` badge; template-level tier bands stay in the
+   "Scoring & Tiers" tab. (D4, D5.)
+2. **Sections routing (Codex C3):** flag-ON removes the Sections trigger + panel; `?tab=sections` resolves
+   to the Build tab (no orphaned/hidden tab). (D2/D10.)
+3. **Contextual insert (Codex C4):** "insert below the focused card" is NOT verbatim — `addQuestion`
+   appends. Add an optional `targetIndex` to the command (or a tested add-then-reorder). (D7/§5.)
+4. **Testing (Codex C5 + own lenses):** do NOT generalize the legacy parity harness to a 3rd cross-asserted
+   mode — give single-column its own focused wiring suite + a flag-branch-pick test + a render-count
+   assertion; keep the ED3 byte-equivalence guard strictly flag-OFF (NOT "extended" — the grill note
+   over-corrected). (§7.)
+5. **Don't duplicate glue (own simplification lens):** the new card-list surface should **share** the
+   drag/move/cascade-confirm/`computeSurvivorFocus` glue with `EditorOutline` (a shared hook/module, or a
+   full-width expandable variant) — never copy it. Plan decides extend-vs-shared-hook. (§5.)
+6. **Re-render churn (own risk lens):** hoist per-card derived data (badges, showIfGates, dependent counts)
+   into ONE `useMemo` → `Map<uid, CardViewModel>`; pass cards a primitive id + their slice + stable
+   `useCallback(uid)` handlers. Do NOT copy `EditorOutline`'s per-row inline lambdas / O(n²)
+   `findShowIfDependents`. (§6/§8.)
+7. **Single `activeAuthoringMode` (own risk lens):** derive one `single | three | legacy` value at the
+   shell feeding BOTH the body seam AND the label/default-tab (single-wins in one place). (D10.)
+8. **Three-pane framing (own lenses):** three-pane is the **current live prod default**, NOT a rollback
+   rung — the kill switch (D12) falls back to the byte-identical legacy `QuestionsTab`. Keep three-pane
+   until **cross-section drag** lands in single-column (the picker is v1-sufficient but not equivalent — a
+   logged capability regression, ADR-0024). Commit a **named retirement trigger**: on ED6 launch (flag ON
+   in prod), the immediate follow-on removes `ThreePaneWorkspace` + its flag + the seam branch. (D11/D12/ADR.)
+9. **Dropped "Preview as respondent"** (carry-to-grill d) — redundant with in-card live preview + Test Mode.
+10. **Card states:** two (collapsed / expanded) + a nested disclosure — not a 3-state machine. (D3.)
+
+**Overridden:**
+- Keeping the standalone Sections tab in v1 (own simplification lens) — **overridden**: the user chose to
+  fold it in (D2), and the grill verified inline section management already fully exists in `EditorOutline`,
+  so folding in adds no risk.
+
+**Not changed (both reviews agreed sound):** single-column direction, the flag / 3-way seam, sections
+inline, the ADR-0024 reversal rationale, cross-section move = picker in v1.

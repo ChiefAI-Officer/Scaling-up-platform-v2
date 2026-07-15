@@ -25,8 +25,11 @@ demoting the three-pane to a flag-selected fallback.**
 
 - The single-column surface is a third rendering at the existing `TabbedShell` seam, selected by a new
   default-OFF flag `WAVE_ED6_SINGLE_COLUMN_ENABLED` (wins over the three-pane flag when both are on).
-- The three-pane (`ThreePaneWorkspace` and its parts) is **kept as a fallback this wave** and retired as
-  dead code in a later cleanup once single-column is launched and stable.
+- The three-pane (`ThreePaneWorkspace` and its parts) is **kept this wave** — it is the *current live
+  production* authoring surface, not a rollback rung (the kill switch falls back to the byte-identical
+  legacy `QuestionsTab`). **Named retirement trigger:** on ED6 launch (flag ON in prod), the immediate
+  follow-on wave removes `ThreePaneWorkspace` + its flag + the seam branch — but **not before cross-section
+  drag lands in single-column** (see trade-offs).
 - Advanced per-question config (scoring tier-bands, findings, show-if) moves **inside the focused card**
   behind one "Advanced" region — there is **no persistent right-hand inspector**. This is the load-bearing
   divergence from the three-pane and from the form-builder field's common "right inspector" pattern; it is
@@ -48,6 +51,10 @@ demoting the three-pane to a flag-selected fallback.**
   follow-on, mitigated by fixed-height collapsed cards + section collapse.
 - **Two authoring surfaces coexist** until the three-pane is retired — extra flag branches and per-mode
   parity tests in the interim.
+- **Cross-section *drag* is a temporary capability regression.** The live three-pane ships working
+  cross-section drag today; single-column v1 offers the reliable "Move to section…" picker instead (drag is
+  a fast-follow). The picker is sufficient but not equivalent — so three-pane is retained until
+  cross-section drag lands in single-column, then retired.
 - This is the **second** direction change for the editor's authoring surface (three-pane → single-column);
   the reversal is recorded here so future readers understand it was a deliberate response to live-review
   feedback, not churn.
