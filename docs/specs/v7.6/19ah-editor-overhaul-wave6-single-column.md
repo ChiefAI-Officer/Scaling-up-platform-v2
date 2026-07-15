@@ -1,8 +1,9 @@
 # Wave ED6 — editor-overhaul single-column form builder — DESIGN (DRAFT)
 
-> **Status:** DRAFT. Brainstorm complete (visual-companion session, 2026-07-15). This is a **gated wave**:
-> next gates are `/grill-with-docs` → `/co-validate` (real Codex) → explicit user approval → `writing-plans`
-> → subagent-driven TDD build. **Nothing is built yet.** Decisions below are provisional until the grill.
+> **Status:** DRAFT. Brainstorm + **grill complete** (visual-companion + code-grounded grill, 2026-07-15).
+> **Gated wave** — next gate: `/co-validate` (real Codex) → explicit user approval → `writing-plans` →
+> subagent-driven TDD build. **Nothing is built yet.** Grill outcomes are recorded in §14 and supersede any
+> conflicting inline text.
 >
 > **Spec seq:** `19ah` (follows 19ac ED1 · 19ad ED2 · 19ae ED3 · 19af ED4 · 19ag ED5).
 
@@ -80,16 +81,22 @@ Notation: **[user]** = decided by the user in brainstorm; **[default]** = my cal
 - **D7 — Sections inline.** Sticky tinted header band (`role="group"` + `aria-labelledby`) with the ED5
   labeled/total counter, a collapse caret, and a section kebab (rename · add question · move up/down ·
   **cascade delete**). Create/rename/reorder/delete route through the existing shared commands; **cascade
-  delete uses the atomic `deleteSection` (never the orphan-leaving legacy path)**. Cross-section move of a
-  question = **explicit "Move to section…" picker (reliable) + multi-container drag (fluid)**, both
-  calling `moveQuestionToSection`. Contextual "＋ Add question" inserts **below the focused card**, not at
+  delete uses the atomic `deleteSection` (never the orphan-leaving legacy path)**. Within-section reorder
+  ships as drag (dnd-kit) + keyboard; **cross-section move ships as the explicit "Move to section…" picker
+  only in v1** (reliable + testable), with cross-section **drag as a fast-follow** (grill Q1) — both call
+  `moveQuestionToSection`. Section reorder = arrow up/down (matches today's inline outline; section drag is
+  a later nicety). Contextual "＋ Add question" inserts **below the focused card**, not at
   the end. Empty section = dashed "Add question" drop-zone + focus landing spot; empty instrument =
   centered "Add your first section/question" CTA. **[default]**
 - **D8 — Reuse Path A: re-host `QuestionInspector` in-card.** Mount the existing inspector inside the
   expanded card's Advanced region (it is already fully props-controlled and surface-agnostic — mounted
-  this exact way by `ThreePaneWorkspace`), wrapped to suppress its "Edit Question — {key}" header so it
-  reads as in-card sections. **Do NOT** extract the private `FindingsPanel`/`ShowIfPanel`/`FindingsPreview`
-  sub-panels for v1 (Path B lifts ~250 lines of confirm-orchestration for no v1 payoff). **[default]**
+  this exact way by `ThreePaneWorkspace`). **Grill-verified:** the inspector renders BOTH its own
+  `<header>` ("Edit Question — {key}") AND its own outer `wf-card` `<section>` chrome, and **neither is
+  suppressible today** — so D8's one genuine code change is a single **additive boolean prop** (e.g.
+  `bare`/`hideChrome`, default `false` → byte-identical) that drops both so it sits flush in the card, plus
+  updating tests that assume a single `questions-config-form` node (now one per card). **Do NOT** extract
+  the private `FindingsPanel`/`ShowIfPanel`/`FindingsPreview` sub-panels for v1 (Path B lifts ~250 lines of
+  confirm-orchestration for no v1 payoff). **[default]**
 - **D9 — Collapse granularity: per-section only for v1** (reuse `collapsedSections` /
   `toggleSectionCollapsed` verbatim). A per-question collapse slice is additive and cheap to add later if
   wanted. **[default]**
@@ -174,15 +181,22 @@ Route **every** structural mutation through `model` commands → `buildVersionSc
 
 - **ED3 golden byte-equivalence** (`editor-byte-equivalence.test.tsx`, 15) — **untouched**. If it needs an
   edit, the rebuild changed serializer/model behavior — a conscious break, not a refactor.
-- **Generalize the parity runner to a 3rd mode.** Add `{mode:"single"}` to `MODES` in the parity suite
-  (currently `three-pane-parity.test.tsx`); assert `cap.single.transcript === cap.off.transcript`. Because
-  ED3 freezes `off` byte-exact, this **transitively freezes single-column** — no new golden strings.
+- **Generalize the parity runner to a 3rd mode.** Grill-verified: MODES is `{threePane:boolean;
+  key:"off"|"on"}`, so this is more than a one-line append — widen the `key` union to include `"single"`,
+  thread a new `singleColumnEnabled` prop through `TemplateEditorTabbed`→`TabbedShell` (the 3-way seam)
+  **and** into the `fixtureA`/`fixtureMC` signatures, and add an explicit `cap.single≡cap.off` assert
+  (transcript + UI/dirty + toast) to each of the ~11 cross-asserting scenarios. Because ED3 freezes `off`
+  byte-exact, single≡off transitively freezes single-column — **still no new golden strings**. The
+  single-column cards **must emit `question-card-*` + `drag-handle-*` test-ids** so the existing
+  `installDndLayout()` keyboard-reorder stub works.
 - **New mode-aware authoring helpers** keyed off the new DOM test-ids; drive reorder via the **keyboard
   sensor** (jsdom can't dispatch dnd-kit PointerEvents); keep the `installDndLayout()` rect stub.
 - **New flag-branch-pick test**: flag ON ⇒ single-column mounts/relabels; OFF ⇒ byte-identical fallback;
-  plus a11y landmarks + responsive classes.
-- `ed5-round-trip.test.ts` + `question-commands.test.ts` (30) unchanged and green (mutations already route
-  through shared commands; the new suite only proves the DOM affordances dispatch them).
+  plus a11y landmarks + responsive classes. **The ED3 byte-equivalence guard must be EXTENDED** for the
+  flag-ON default-tab behavior (not assumed to stay green); the tab **id** must stay literal `"questions"`.
+- `question-commands.test.ts` (30) + `ed5-round-trip.test.ts` (2) unchanged and green (mutations already
+  route through shared commands; the new suite only proves the DOM affordances dispatch them). Baseline
+  counts (jest-verified): byte-equivalence **15**, parity **20**, three-pane-flag **5**.
 - **Jest-verify every count in the SoT** (house rule; loose counts were caught in Waves T & U).
 
 ---
@@ -228,10 +242,11 @@ touch persisted data.
 
 ## 11. ADR candidate (decide at grill)
 
-**"Single-column form builder supersedes the three-pane as the default authoring surface."** It is
-flag-reversible (so not irreversible), but it is a **surprising direction reversal** of ED4/ED5 that a
-future reader will question — a good candidate for a short ADR recording *why* (live-review usability
-rejection of the three-pane; Google-Forms simplicity mandate). Confirm during `/grill-with-docs`.
+**DECIDED (grill Q2): write ADR-0024** — "Single-column form builder supersedes the three-pane as the
+default authoring surface." Flag-reversible (so not code-irreversible), but a **surprising direction
+reversal** of ED4/ED5 that a future reader will question. The ADR records *why* (live-review usability
+rejection of the three-pane; Google-Forms simplicity mandate) and the trade-off (three-pane side-by-side
+density vs one-column simplicity).
 
 ---
 
@@ -249,7 +264,40 @@ respondent" affordance distinct from Test Mode.
 
 ## 13. Gate status
 
-**DRAFT — brainstorm done.** No code. Next: `/grill-with-docs` (pressure-test D1–D12 + carry-to-grill
-items) → `/co-validate` (real Codex) → **explicit user approval** → `writing-plans` (per-task TDD plan,
-grouped into revertible PR-units) → subagent-driven TDD build. Per the gated-wave rule, catalog decisions
-here are provisional, not build instructions.
+**DRAFT — brainstorm + grill done.** No code. Next: `/co-validate` (real Codex) → **explicit user
+approval** → `writing-plans` (per-task TDD plan, grouped into revertible PR-units) → subagent-driven TDD
+build. Per the gated-wave rule, catalog decisions here are provisional, not build instructions.
+
+---
+
+## 14. Grill outcomes (2026-07-15)
+
+Grill decisions (Q1–Q3) + code-grounded verification (a background pass read the real editor). These
+**supersede** any conflicting inline text above.
+
+**Decisions**
+- **Q1 — cross-section move:** v1 = within-section drag + a "Move to section…" picker for cross-section
+  moves; cross-section **drag** is a fast-follow. Section reorder = arrows (matches today's inline outline).
+- **Q2 — ADR:** YES → **ADR-0024** (three-pane → single-column reversal).
+- **Q3 — tab label:** **"Build"** (the tab *id* stays the literal `"questions"`).
+
+**Code-verified (all confirm the design; refinements folded in)**
+1. **Seam/flag (D10):** the 3-way seam is a ~few-line additive edit at `TabbedShell.tsx:649`; new
+   `singleColumnEnabled` prop + `wave-ed6-flags.ts`. **Hard rule:** the tab **id** must stay the literal
+   `"questions"` — renaming it breaks `?tab=` bookmarks *and* the ED3 guard. Only the display label changes.
+2. **Sections fold-in (D2):** no author capability lost — the inline outline already does
+   add/rename/arrow-reorder/cascade-delete/count. Only *section drag-reorder* is net-new (deferrable). Must
+   preserve the serialization round-trip (`description`/`partLabel`/`domain`/positional `sortOrder`).
+3. **Published/inherited locks (§6):** reused **verbatim** — consume the shared `model` + pass-through
+   `isReadOnly`/`isUnlocked`/`publishedOptionKeys` + baked `question.isInherited`. **Must NOT** call the
+   model hook twice or re-derive locally (breaks flag-OFF byte-identity + anti-drift).
+4. **Inspector re-host (D8):** the one genuine code change is a single **additive `bare`/`hideChrome` prop**
+   on `QuestionInspector` that drops its self-rendered `<header>` + outer `wf-card` `<section>` (byte-
+   identical when omitted; not a fork), plus updating tests that assume a single `questions-config-form`
+   node (now one per card).
+5. **Parity harness (§7):** the "3rd mode, no new golden strings" claim holds, but effort is a notch
+   heavier — widen the MODES `key` union to `"single"`, thread `singleColumnEnabled` through the fixtures
+   (`fixtureA`/`fixtureMC` signature change), add an explicit `cap.single≡cap.off` assert per
+   cross-asserting scenario, and single-column cards must emit `question-card-*` + `drag-handle-*` test-ids
+   for the `installDndLayout()` reorder stub. Baseline counts (jest-verified): byte-equivalence 15,
+   parity 20, three-pane-flag 5, question-commands 30, ed5-round-trip 2.
