@@ -435,7 +435,7 @@ export function useTemplateEditorDraft({
 
   // ─── Question operations — F3 ─────────────────────────────────────────
   const handleAddQuestion = useCallback(
-    (sectionStableKey: string): string => {
+    (sectionStableKey: string, opts?: { afterUid?: string }): string => {
       // ED4 (spec 19af §3.4, C2) — mint the uid OUTSIDE the state updater so
       // the command can RETURN it (the three-pane outline focuses the new
       // question by uid; a functional updater runs during render, not
@@ -448,38 +448,56 @@ export function useTemplateEditorDraft({
         );
         const nextSort =
           inSection.reduce((max, q) => Math.max(max, q.sortOrder), 0) + 1;
-        return [
-          ...prev,
-          {
-            uid: newUid,
-            // Wave T D8 — unlocked, the slug key is derived from the label
-            // AT SAVE (buildQuestionsPayload); until then the row shows
-            // "(assigned on save)". Locked keeps the legacy Q_NEW_ key.
-            stableKey: questionEditorUnlocked
-              ? ""
-              : genNewQuestionStableKey(),
-            sectionStableKey,
-            label: "",
-            helpText: "",
-            isRequired: true,
-            type: "SLIDER_LIKERT",
-            sortOrder: nextSort,
-            scaleMin: 0,
-            scaleMax: 3,
-            scaleStep: 1,
-            anchorMin: "Not true",
-            anchorMax: "Completely true",
-            options: [],
-            maxChoices: null,
-            isInherited: false,
-            isNewToDraft: true,
-            // Wave U — new questions start with no findings rules.
-            findingBands: [],
-            findingOptionTexts: {},
-            // Wave W — new questions start unconditional.
-            showIf: null,
-          },
-        ];
+        const newQuestion = {
+          uid: newUid,
+          // Wave T D8 — unlocked, the slug key is derived from the label
+          // AT SAVE (buildQuestionsPayload); until then the row shows
+          // "(assigned on save)". Locked keeps the legacy Q_NEW_ key.
+          stableKey: questionEditorUnlocked ? "" : genNewQuestionStableKey(),
+          sectionStableKey,
+          label: "",
+          helpText: "",
+          isRequired: true,
+          type: "SLIDER_LIKERT",
+          sortOrder: nextSort,
+          scaleMin: 0,
+          scaleMax: 3,
+          scaleStep: 1,
+          anchorMin: "Not true",
+          anchorMax: "Completely true",
+          options: [],
+          maxChoices: null,
+          isInherited: false,
+          isNewToDraft: true,
+          // Wave U — new questions start with no findings rules.
+          findingBands: [],
+          findingOptionTexts: {},
+          // Wave W — new questions start unconditional.
+          showIf: null,
+        };
+        // ED6 (co-validate C4) — optional insert-AFTER a focused row. When
+        // `afterUid` names a question in THIS section, splice the new row in
+        // right after it and resequence this section's sortOrder 1-based (other
+        // sections untouched). Absent / unknown afterUid ⇒ APPEND, byte-
+        // identical to today (frozen by the question-commands suite).
+        const afterUid = opts?.afterUid;
+        const insertAfter =
+          afterUid != null && inSection.some((q) => q.uid === afterUid);
+        if (!insertAfter) {
+          return [...prev, newQuestion];
+        }
+        const ordered = [...inSection].sort((a, b) => a.sortOrder - b.sortOrder);
+        const at = ordered.findIndex((q) => q.uid === afterUid);
+        ordered.splice(at + 1, 0, newQuestion);
+        const resequenced = new Map<string, number>();
+        ordered.forEach((q, i) => resequenced.set(q.uid, i + 1));
+        return prev.flatMap((q) => {
+          if (q.sectionStableKey !== sectionStableKey) return [q];
+          const updated = { ...q, sortOrder: resequenced.get(q.uid)! };
+          return q.uid === afterUid
+            ? [updated, { ...newQuestion, sortOrder: resequenced.get(newUid)! }]
+            : [updated];
+        });
       });
       setQuestionsDirty();
       return newUid;

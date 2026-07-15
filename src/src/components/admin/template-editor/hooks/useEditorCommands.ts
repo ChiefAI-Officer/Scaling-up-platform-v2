@@ -78,8 +78,12 @@ export interface EditorCommandsModel {
     setFocusedQuestionUid: (uid: string | null) => void;
     setSectionCollapsed: (key: string, collapsed: boolean) => void;
   };
-  /** Shared model command — appends a question, returns the new uid. */
-  addQuestion: (sectionStableKey: string) => string;
+  /** Shared model command — appends (or, with `afterUid`, inserts after that
+   *  row in the section), returns the new uid. */
+  addQuestion: (
+    sectionStableKey: string,
+    opts?: { afterUid?: string },
+  ) => string;
   /** Shared model command — duplicates a question, returns the copy uid. */
   duplicateQuestion: (uid: string) => string;
   /** Shared model command — removes a question + clears its show-if dependents. */
