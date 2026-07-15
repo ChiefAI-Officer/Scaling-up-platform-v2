@@ -173,7 +173,8 @@ describe("useEditorCommands — addQuestion", () => {
     });
 
     expect(addQuestion).toHaveBeenCalledTimes(1);
-    expect(addQuestion).toHaveBeenCalledWith("S2");
+    // ED6 T8 — the hook now forwards the optional insert-after opts (undefined here).
+    expect(addQuestion).toHaveBeenCalledWith("S2", undefined);
     expect(setSectionCollapsed).toHaveBeenCalledWith("S2", false);
     expect(setFocusedQuestionUid).toHaveBeenCalledWith("u-new");
     expect(result.current.consumePendingFocus()).toEqual({

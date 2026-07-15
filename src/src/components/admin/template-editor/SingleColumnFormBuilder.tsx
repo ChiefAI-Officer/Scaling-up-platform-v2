@@ -17,17 +17,34 @@
  * orchestration (co-validate §15.5). Per-card display data is derived ONCE via
  * `buildCardViewModels` and handed to memoized `QuestionCard`s (co-validate §15.6).
  *
- * Task 7 scope: section bands + COLLAPSED cards + focus + empty states. Reorder /
- * cross-section move (Task 8) and the expanded card body — live preview + the bare
- * `QuestionInspector` (Task 11) — layer on next; the focused card already renders
- * an empty `card-body-<uid>` slot for Task 11 to fill.
+ * T8 — within-section drag reorder (one DndContext + per-section SortableContext,
+ * keyboard sensor drivable in jsdom, decision delegated to the pure
+ * `resolveOutlineDrop`); cross-section MOVE via each card's "Move to section…"
+ * select (cross-section drag is a fast-follow, co-validate Q1); contextual "+ Add
+ * question below" inserts after the focused card. The expanded card body — live
+ * preview + bare `QuestionInspector` (T11) — fills the `card-body-<uid>` slot next.
  */
 
 import React, { useCallback, useLayoutEffect, useMemo, useRef } from "react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
 import type { TemplateEditorModel } from "./hooks/useTemplateEditorModel";
 import { useEditorCommands, type EditorCommandsModel } from "./hooks/useEditorCommands";
 import { buildCardViewModels } from "./single-column-view-model";
+import { resolveOutlineDrop } from "./outline-drop";
 import { QuestionCard } from "./QuestionCard";
 
 export interface SingleColumnFormBuilderProps {
@@ -43,11 +60,7 @@ export interface SingleColumnFormBuilderProps {
   conditionalEnabled: boolean;
   /** Wave T — union of published option keys per question stableKey. */
   publishedOptionKeys: Record<string, readonly string[]>;
-  /**
-   * Switch the active tab to Sections. Retained for prop-parity with
-   * `ThreePaneWorkspace`; single-column folds sections inline, so this surface
-   * does not use it (its empty state adds a section directly).
-   */
+  /** Retained for prop-parity with `ThreePaneWorkspace`; unused here. */
   onGoToSections: () => void;
 }
 
@@ -59,8 +72,6 @@ export function SingleColumnFormBuilder({
 }: SingleColumnFormBuilderProps) {
   const { sections, questions, selection } = model;
 
-  // Shared orchestration (confirm → command → focus). Structural subset of the
-  // model; latest-latched inside the hook, so building it inline is fine.
   const commandsModel: EditorCommandsModel = {
     sections,
     questions,
@@ -80,16 +91,14 @@ export function SingleColumnFormBuilder({
     isReadOnly,
     isUnlocked,
   });
-  const { consumePendingFocus, duplicateQuestion, deleteQuestion } = commands;
+  const { consumePendingFocus, duplicateQuestion, deleteQuestion, moveQuestion } =
+    commands;
 
-  // Per-card view-models — ONE pass over the whole instrument (co-validate §15.6).
   const vms = useMemo(
     () => buildCardViewModels(questions, sections, { conditionalEnabled }),
     [questions, sections, conditionalEnabled],
   );
 
-  // Focus glue (mirrors EditorOutline) — apply the hook's pending DOM-focus target
-  // after the commit that added/removed the row.
   const rowFocusRefs = useRef(new Map<string, HTMLButtonElement>());
   const addButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   useLayoutEffect(() => {
@@ -116,15 +125,36 @@ export function SingleColumnFormBuilder({
 
   // Group questions by section, ascending sortOrder.
   const bySection = useMemo(() => {
-    const grouped = new Map<string, typeof questions>();
+    const grouped = new Map<string, (typeof questions)[number][]>();
     for (const s of sections) grouped.set(s.stableKey, []);
-    const ordered = [...questions].sort((a, b) => a.sortOrder - b.sortOrder);
-    for (const q of ordered) {
+    for (const q of [...questions].sort((a, b) => a.sortOrder - b.sortOrder)) {
       const arr = grouped.get(q.sectionStableKey);
-      if (arr) (arr as (typeof questions)[number][]).push(q);
+      if (arr) arr.push(q);
     }
     return grouped;
   }, [questions, sections]);
+
+  // DnD — pointer + keyboard (the keyboard sensor is the jsdom-drivable path).
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // Reorder-vs-move decision via the pure, tested `resolveOutlineDrop`. v1 wires
+  // WITHIN-section reorder only; a cross-section drag result is ignored (the
+  // "Move to section…" select is the reliable cross-section path — co-validate Q1).
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    const containers: Record<string, string[]> = {};
+    for (const s of sections) {
+      containers[s.stableKey] = (bySection.get(s.stableKey) ?? []).map((q) => q.uid);
+    }
+    const result = resolveOutlineDrop(String(active.id), String(over.id), containers);
+    if (result && result.kind === "reorder") {
+      model.reorderQuestions(result.sectionKey, result.order);
+    }
+  };
 
   if (sections.length === 0) {
     return (
@@ -150,125 +180,146 @@ export function SingleColumnFormBuilder({
   }
 
   return (
-    <div data-testid="single-column-builder" className="flex flex-col gap-4">
-      {sections.map((s) => {
-        const list = (bySection.get(s.stableKey) ?? []) as (typeof questions)[number][];
-        const collapsed = selection.isSectionCollapsed(s.stableKey);
-        const labeled = list.filter((q) => (q.label ?? "").trim() !== "").length;
-        return (
-          <section
-            key={s.uid}
-            role="group"
-            aria-label={s.name.trim() || "Untitled section"}
-            data-testid={`sc-section-${s.stableKey}`}
-            className="rounded-lg border border-border"
-          >
-            <div className="sticky top-0 z-10 flex items-center gap-2 rounded-t-lg border-b border-border bg-muted px-3 py-2">
-              <button
-                type="button"
-                data-testid={`sc-section-toggle-${s.stableKey}`}
-                aria-expanded={!collapsed}
-                aria-label={collapsed ? "Expand section" : "Collapse section"}
-                onClick={() => selection.toggleSectionCollapsed(s.stableKey)}
-                className="text-muted-foreground"
-              >
-                {collapsed ? "▸" : "▾"}
-              </button>
-              <input
-                data-testid={`sc-section-name-${s.stableKey}`}
-                aria-label="Section name"
-                value={s.name}
-                placeholder="Section name"
-                disabled={isReadOnly}
-                onChange={(e) => model.handleSectionsRename(s.uid, e.target.value)}
-                className="flex-1 bg-transparent font-semibold outline-none"
-              />
-              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {labeled}/{list.length} labeled
-              </span>
-              {!isReadOnly && (
-                <span className="flex shrink-0 gap-2 text-xs text-muted-foreground">
-                  <button
-                    type="button"
-                    data-testid={`sc-section-add-q-${s.stableKey}`}
-                    onClick={() => commands.addQuestion(s.stableKey)}
-                  >
-                    + Question
-                  </button>
-                  <button
-                    type="button"
-                    data-testid={`sc-section-up-${s.stableKey}`}
-                    aria-label="Move section up"
-                    onClick={() => model.handleSectionsMoveUp(s.uid)}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    data-testid={`sc-section-down-${s.stableKey}`}
-                    aria-label="Move section down"
-                    onClick={() => model.handleSectionsMoveDown(s.uid)}
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    data-testid={`sc-section-delete-${s.stableKey}`}
-                    onClick={() => commands.deleteSection(s.uid)}
-                    className="text-destructive"
-                  >
-                    Delete
-                  </button>
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <div data-testid="single-column-builder" className="flex flex-col gap-4">
+        {sections.map((s) => {
+          const list = bySection.get(s.stableKey) ?? [];
+          const collapsed = selection.isSectionCollapsed(s.stableKey);
+          const labeled = list.filter((q) => (q.label ?? "").trim() !== "").length;
+          const uids = list.map((q) => q.uid);
+          return (
+            <section
+              key={s.uid}
+              role="group"
+              aria-label={s.name.trim() || "Untitled section"}
+              data-testid={`sc-section-${s.stableKey}`}
+              className="rounded-lg border border-border"
+            >
+              <div className="sticky top-0 z-10 flex items-center gap-2 rounded-t-lg border-b border-border bg-muted px-3 py-2">
+                <button
+                  type="button"
+                  data-testid={`sc-section-toggle-${s.stableKey}`}
+                  aria-expanded={!collapsed}
+                  aria-label={collapsed ? "Expand section" : "Collapse section"}
+                  onClick={() => selection.toggleSectionCollapsed(s.stableKey)}
+                  className="text-muted-foreground"
+                >
+                  {collapsed ? "▸" : "▾"}
+                </button>
+                <input
+                  data-testid={`sc-section-name-${s.stableKey}`}
+                  aria-label="Section name"
+                  value={s.name}
+                  placeholder="Section name"
+                  disabled={isReadOnly}
+                  onChange={(e) => model.handleSectionsRename(s.uid, e.target.value)}
+                  className="flex-1 bg-transparent font-semibold outline-none"
+                />
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  {labeled}/{list.length} labeled
                 </span>
-              )}
-            </div>
-
-            {!collapsed && (
-              <div className="flex flex-col gap-2 p-2">
-                {list.length === 0 ? (
-                  <div
-                    data-testid={`sc-section-empty-${s.stableKey}`}
-                    className="flex flex-col items-center gap-2 rounded border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
-                  >
-                    No questions yet.
-                    {!isReadOnly && (
-                      <button
-                        type="button"
-                        ref={(el) => {
-                          if (el) addButtonRefs.current.set(s.stableKey, el);
-                          else addButtonRefs.current.delete(s.stableKey);
-                        }}
-                        data-testid={`sc-add-question-${s.stableKey}`}
-                        onClick={() => commands.addQuestion(s.stableKey)}
-                        className="rounded bg-primary px-3 py-1 text-primary-foreground"
-                      >
-                        + Add question
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  list.map((q) => {
-                    const vm = vms.get(q.uid);
-                    if (!vm) return null;
-                    return (
-                      <QuestionCard
-                        key={q.uid}
-                        vm={vm}
-                        isFocused={selection.focusedQuestionUid === q.uid}
-                        isReadOnly={isReadOnly}
-                        onFocus={onFocus}
-                        onDuplicate={duplicateQuestion}
-                        onDelete={deleteQuestion}
-                        registerFocusRef={registerFocusRef}
-                      />
-                    );
-                  })
+                {!isReadOnly && (
+                  <span className="flex shrink-0 gap-2 text-xs text-muted-foreground">
+                    <button
+                      type="button"
+                      data-testid={`sc-section-add-q-${s.stableKey}`}
+                      onClick={() => commands.addQuestion(s.stableKey)}
+                    >
+                      + Question
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`sc-section-up-${s.stableKey}`}
+                      aria-label="Move section up"
+                      onClick={() => model.handleSectionsMoveUp(s.uid)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`sc-section-down-${s.stableKey}`}
+                      aria-label="Move section down"
+                      onClick={() => model.handleSectionsMoveDown(s.uid)}
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      data-testid={`sc-section-delete-${s.stableKey}`}
+                      onClick={() => commands.deleteSection(s.uid)}
+                      className="text-destructive"
+                    >
+                      Delete
+                    </button>
+                  </span>
                 )}
               </div>
-            )}
-          </section>
-        );
-      })}
-    </div>
+
+              {!collapsed && (
+                <div className="flex flex-col gap-2 p-2">
+                  {list.length === 0 ? (
+                    <div
+                      data-testid={`sc-section-empty-${s.stableKey}`}
+                      className="flex flex-col items-center gap-2 rounded border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
+                    >
+                      No questions yet.
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          ref={(el) => {
+                            if (el) addButtonRefs.current.set(s.stableKey, el);
+                            else addButtonRefs.current.delete(s.stableKey);
+                          }}
+                          data-testid={`sc-add-question-${s.stableKey}`}
+                          onClick={() => commands.addQuestion(s.stableKey)}
+                          className="rounded bg-primary px-3 py-1 text-primary-foreground"
+                        >
+                          + Add question
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <SortableContext items={uids} strategy={verticalListSortingStrategy}>
+                      {list.map((q) => {
+                        const vm = vms.get(q.uid);
+                        if (!vm) return null;
+                        const focused = selection.focusedQuestionUid === q.uid;
+                        return (
+                          <React.Fragment key={q.uid}>
+                            <QuestionCard
+                              vm={vm}
+                              isFocused={focused}
+                              isReadOnly={isReadOnly}
+                              sections={sections}
+                              onFocus={onFocus}
+                              onDuplicate={duplicateQuestion}
+                              onDelete={deleteQuestion}
+                              onMove={moveQuestion}
+                              registerFocusRef={registerFocusRef}
+                            />
+                            {focused && !isReadOnly && (
+                              <button
+                                type="button"
+                                data-testid={`sc-add-below-${q.uid}`}
+                                onClick={() =>
+                                  commands.addQuestion(s.stableKey, { afterUid: q.uid })
+                                }
+                                className="self-center rounded-full border border-border px-3 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                + Add question below
+                              </button>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </SortableContext>
+                  )}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </DndContext>
   );
 }

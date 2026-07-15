@@ -115,8 +115,12 @@ export interface EditorCommandsOptions {
 }
 
 export interface EditorCommands {
-  /** Append a question to a section, expand it, focus + pend the new uid. */
-  addQuestion: (sectionStableKey: string) => string | undefined;
+  /** Append (or, with `afterUid`, insert after that row), expand the section,
+   *  focus + pend the new uid. */
+  addQuestion: (
+    sectionStableKey: string,
+    opts?: { afterUid?: string },
+  ) => string | undefined;
   /** Duplicate a question, focus + pend the copy uid. */
   duplicateQuestion: (uid: string) => string | undefined;
   /** Confirm (naming dependents), delete, and move focus to the survivor. */
@@ -158,16 +162,19 @@ export function useEditorCommands(
     return pending;
   }, []);
 
-  const addQuestion = useCallback((sectionStableKey: string) => {
-    const m = modelRef.current;
-    if (optionsRef.current.isReadOnly) return undefined;
-    const newUid = m.addQuestion(sectionStableKey);
-    // Make sure the section is open so the new row is visible.
-    m.selection.setSectionCollapsed(sectionStableKey, false);
-    m.selection.setFocusedQuestionUid(newUid);
-    pendingFocusRef.current = { kind: "row", uid: newUid };
-    return newUid;
-  }, []);
+  const addQuestion = useCallback(
+    (sectionStableKey: string, opts?: { afterUid?: string }) => {
+      const m = modelRef.current;
+      if (optionsRef.current.isReadOnly) return undefined;
+      const newUid = m.addQuestion(sectionStableKey, opts);
+      // Make sure the section is open so the new row is visible.
+      m.selection.setSectionCollapsed(sectionStableKey, false);
+      m.selection.setFocusedQuestionUid(newUid);
+      pendingFocusRef.current = { kind: "row", uid: newUid };
+      return newUid;
+    },
+    [],
+  );
 
   const duplicateQuestion = useCallback((uid: string) => {
     const m = modelRef.current;
