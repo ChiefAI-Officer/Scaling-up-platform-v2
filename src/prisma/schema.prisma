@@ -1253,6 +1253,9 @@ model AssessmentTemplateVersion {
   publishedAt   DateTime?
   publishedBy   String?
   archivedAt    DateTime? // Wave ED8 (spec 19ak): retire/unretire mark on PUBLISHED rows — the ONLY column mutable post-publish (DB-trigger-enforced). No index; grouping is client-side.
+  // WARNING: never add @updatedAt to this model — Prisma would auto-bump it on
+  // archive/unarchive writes and the immutability trigger (archivedAt-only
+  // allow-list, migration 20260716150000) would reject every lifecycle update.
   createdAt     DateTime  @default(now())
 
   template  AssessmentTemplate   @relation(fields: [templateId], references: [id])
