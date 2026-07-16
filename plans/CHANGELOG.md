@@ -6,6 +6,24 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-16 — Wave ED7 t2: Build-tab de-jargon (LAUNCHED) + Peer averages panel hidden <!-- ENTRY_ISO:2026-07-16 ENTRY_SLUG:ed7-dejargon-peers-hide -->
+
+**Status: LAUNCHED (2026-07-16)** — PR #189 squash-merged to `main` (`8999b6b6`); live via prod deploy `9kvh73bgg` (Ready). Same session, ops: `WAVE_S_PEER_BENCHMARKS_KILL=1` set on Vercel Production + redeploy `iep5xdn0g` (Ready, aliased `platformtest.scalingup.com`) — the "Peer averages" panel no longer renders. Kill stories: ED7 = revert (flagless, display-only); peers-hide = unset the kill env.
+
+**Why:** the 2026-07-16 admin walk (user) raised three simplification asks — versions UX, the confusing peers panel, and a more Google-Forms Build tab. A 10-ticket pipeline was approved (governing principle: **the WHOLE editor as simple as possible**; standing rule: **every UI/UX decision gets a visual review before build**). This entry ships ticket #2 (code) + ticket #1 (ops). The consolidated design-review Artifact (ticket #4) was delivered the same session and gates ED8 (version lifecycle) + ED9 (Forms overhaul).
+
+**Ticket #2 — Build-tab de-jargon (Wave ED7, part 1):**
+- New shared `enum-labels.ts` (`QUESTION_TYPE_LABELS`) — display text ONLY; option/payload VALUES stay enum strings everywhere (`LABELS[value] ?? value` degrade). Ticket #3 (Metadata) must EXTEND this module (aggregation/access maps), not create another.
+- `QuestionCard` badge + BOTH inspector type selects show **Slider / Multiple choice / Number / Short text**; locked-select optgroups "Available"/"Coming soon" with "(coming soon)" suffixes replacing "— v1.5"; dormant-branch helper reworded.
+- Config headings: "Slider settings" / "Answer options" / "Number" / "Short text" (raw `SLIDER_LIKERT — config` etc. gone). Anchors → "Label for the lowest/highest point"; the `(value - min) % step === 0` code chip → "Respondents pick a whole number between the min and max, moving in steps of the step size." TEXT note reworded ("type their answer in a text box (up to 10,000 characters)") — review-found: it contradicted the "Short text" label ("Short text" kept — the user's word; "Text" is a one-map-entry change if ever wanted).
+- "Sort order within section" hidden **in bare (single-column) mode only** (`{!bare && …}`) — drag + "Add question below" already resequence; legacy/three-pane editors keep the field (their full surface stays byte-identical).
+- **NO new flag** (verified by tracing every literal through the test tree: the frozen suites pin option VALUES + HTTP bytes, never display text). Rollback = revert; surface rollback stays `WAVE_ED6_SINGLE_COLUMN_ENABLED=0`.
+- Tests: frozen ED3 byte-equivalence 15/15 + ED4 parity 20/20 with **zero diffs to those files**; editor sweep **40 suites / 428 tests** (jest-verified); eslint + `CI=true next build --turbopack` clean. TDD red→green per slice (6 commits). Two-axis review (standards + spec vs ticket ACs): spec CONFORMS; findings fixed (TEXT-note contradiction, "(coming soon)" dedupe inside the Coming-soon optgroup, test-comment scope). Non-frozen pins updated: `QuestionsTab.test.tsx` anchor labels (2), `questions-tab.wave-t.test.tsx` TEXT-note (1).
+
+**Ticket #1 — Peer averages hidden (ops, no code):** the Wave S panel (`PeerBenchmarksPanel`, ADR-0019) mounts OUTSIDE the tab shell so it dangled at the bottom of every editor tab on LVA; empty since launch (Esperto LVA has no peers — the honest-data stance meant nothing was ever seeded, and the "LVA peer numbers" waiting-on-Jeff item was a recorded phantom). `WAVE_S_PEER_BENCHMARKS_KILL=1` hides panel + report join together (no dead switch); reports byte-identical (omit-empty already rendered zero peer content). `AssessmentBenchmark` rows/schema/code stay DORMANT pending Jeff's SU-Full industry-benchmarking decision; re-enable = unset the kill.
+
+**Pipeline state:** #2 done · #1 done · #3 (Metadata de-jargon) unblocked · #4 design-review Artifact DELIVERED (awaiting the user's keep/cut verdicts) → gates #5-8 (ED8 version lifecycle: "Published is permanent. Archive it instead. Drafts can be deleted." — additive `archivedAt`, active-never-archivable guard, draft-only delete, Restore=duplicate) and ED9 (Forms overhaul, 11 candidates). #9 docs (SoT spec 19ai + ADR-0025) + #10 live-app e2e follow the builds. Notion: ED7 task Done.
+
 ### 2026-07-15 — Wave ED6: single-column form builder (LAUNCHED) <!-- ENTRY_ISO:2026-07-15 ENTRY_SLUG:wave-ed6-single-column -->
 
 **Status: LAUNCHED (2026-07-15)** — PR #186 merged to `main` (`8e9fdd79`); `WAVE_ED6_SINGLE_COLUMN_ENABLED=1` set on Vercel Production + prod redeploy `5rrern1yr` Ready (aliased `platformtest.scalingup.com`). Single-column wins over the live ED4 flag, so it is now the default editor. Kill = flag off + redeploy → byte-identical fallback. Kill = flag off → byte-identical three-pane (if the ED4 flag is on) or the legacy `QuestionsTab`.
