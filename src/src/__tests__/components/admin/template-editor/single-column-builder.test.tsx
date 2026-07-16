@@ -129,6 +129,21 @@ describe("SingleColumnFormBuilder (ED6 T7)", () => {
     expect(marginCard.querySelector('[data-testid="card-badge-required"]')).toBeNull();
   });
 
+  it("shows friendly type names on card badges, never raw enums (ED7)", () => {
+    render(<TemplateEditorTabbed {...props({})} />);
+    const revenueCard = screen
+      .getByText("Revenue")
+      .closest('[data-testid^="question-card-"]')!;
+    const marginCard = screen
+      .getByText("Margin")
+      .closest('[data-testid^="question-card-"]')!;
+    expect(revenueCard.textContent).toContain("Slider");
+    expect(marginCard.textContent).toContain("Number");
+    expect(screen.queryByText("SLIDER_LIKERT")).toBeNull();
+    expect(screen.queryByText("SLIDER")).toBeNull();
+    expect(screen.queryByText("NUMBER")).toBeNull();
+  });
+
   it("clicking a card focuses it (aria-current) and reveals its expanded body slot", () => {
     render(<TemplateEditorTabbed {...props({})} />);
     // Target the collapsed focus BUTTON by role — after focus, the label also
