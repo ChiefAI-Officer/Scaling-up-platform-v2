@@ -23,6 +23,7 @@ import { isTestModeEnabled } from "@/lib/assessments/wave-ed1-flags";
 import { isSafeToPublishEnabled } from "@/lib/assessments/wave-ed2-flags";
 import { isThreePaneEnabled } from "@/lib/assessments/wave-ed4-flags";
 import { isSingleColumnEnabled } from "@/lib/assessments/wave-ed6-flags";
+import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import { activePublishedWhere } from "@/lib/assessments/active-version";
 import {
@@ -95,6 +96,10 @@ export default async function AdminAssessmentVersionEditPage({
         language: true,
         publishedAt: true,
         contentHash: true,
+        // Wave ED8 (spec 19ak §2) — lifecycle status input for the Versions
+        // tab / header pill. Display only — the list keeps ALL versions
+        // (drafts + archived) on purpose.
+        archivedAt: true,
       },
     }),
     // Wave T (spec 19t §T-4) — every PUBLISHED version's questions JSON,
@@ -194,6 +199,11 @@ export default async function AdminAssessmentVersionEditPage({
               ? v.publishedAt.toISOString()
               : v.publishedAt,
           contentHash: v.contentHash,
+          // Wave ED8 — serialized like publishedAt (ISO string | null).
+          archivedAt:
+            v.archivedAt instanceof Date
+              ? v.archivedAt.toISOString()
+              : v.archivedAt,
         }))}
         // Wave Q — server-only env read; the client editor receives the flag
         // as a prop and gates the sendResultsDefault toggle on it.
@@ -220,6 +230,11 @@ export default async function AdminAssessmentVersionEditPage({
         // label, Sections folded in); presentation-only, kill = flag off +
         // redeploy.
         singleColumnEnabled={isSingleColumnEnabled()}
+        // Wave ED8 — version-lifecycle UI (lifecycle VersionsTab table,
+        // derived-status pill, Metadata strip removal). Flag gates the UI
+        // only; archived-exclusion in read paths is persisted admin intent
+        // and never flag-gated (Wave-Q doctrine).
+        versionLifecycleEnabled={isVersionLifecycleEnabled()}
       />
       {peerBenchmarkRows && (
         <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />
