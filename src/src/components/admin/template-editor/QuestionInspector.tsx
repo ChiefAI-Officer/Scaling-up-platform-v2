@@ -850,13 +850,13 @@ export function QuestionInspector({
             </optgroup>
             <optgroup label="Coming soon">
               <option value="TEXT" disabled>
-                {QUESTION_TYPE_LABELS.TEXT} (coming soon)
+                {QUESTION_TYPE_LABELS.TEXT}
               </option>
               <option value="TEXTAREA" disabled>
-                {QUESTION_TYPE_LABELS.TEXTAREA} (coming soon)
+                {QUESTION_TYPE_LABELS.TEXTAREA}
               </option>
               <option value="COMPOUND" disabled>
-                {QUESTION_TYPE_LABELS.COMPOUND} (coming soon)
+                {QUESTION_TYPE_LABELS.COMPOUND}
               </option>
             </optgroup>
           </select>
@@ -1101,8 +1101,8 @@ export function QuestionInspector({
             Short text
           </h4>
           <p className="text-[0.6875rem] italic text-muted-foreground">
-            Renders as a multi-line answer box on the respondent form.
-            Answers are capped at 10,000 characters.
+            Respondents type their answer in a text box (up to 10,000
+            characters).
           </p>
         </div>
       )}

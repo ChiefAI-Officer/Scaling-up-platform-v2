@@ -1,8 +1,10 @@
 /**
  * Wave ED7 — shared friendly labels for author-facing enum values.
  *
- * The editor must never show raw enum strings (SLIDER_LIKERT, MULTI_CHOICE)
- * to an author. Display text only — option/payload VALUES stay enum strings.
+ * The single-column builder's authoring surfaces must not show raw enum
+ * strings (SLIDER_LIKERT, MULTI_CHOICE) to an author. Display text only —
+ * option/payload VALUES stay enum strings. (Dormant legacy flag-off surfaces
+ * are out of ED7 scope.)
  */
 import { QUESTION_TYPE_LABELS } from "@/components/admin/template-editor/enum-labels";
 
