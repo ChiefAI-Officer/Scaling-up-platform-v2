@@ -340,6 +340,10 @@ export async function PATCH(
 
     // Server-side identity enforcement (co-validate C1): ONE extra query —
     // all published versions of this template (~few versions × ≤65 rows).
+    // Wave ED8: do NOT add `archivedAt: null` here — identity locks against
+    // ALL published history INCLUDING archived versions (an archived version's
+    // stableKeys/types must still lock; spec 19ak §4). Pinned by
+    // template-version-patch.wave-t.test.ts (the archived-still-locks cases).
     const publishedVersions = await db.assessmentTemplateVersion.findMany({
       where: { templateId, publishedAt: { not: null } },
       select: { questions: true },

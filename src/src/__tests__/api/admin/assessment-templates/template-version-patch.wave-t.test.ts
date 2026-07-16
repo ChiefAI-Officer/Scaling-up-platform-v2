@@ -343,6 +343,67 @@ describe("PATCH version — Wave T question validation", () => {
     );
   });
 
+  // ─── Wave ED8 §7 — ARCHIVED versions still lock identity ────────────────
+  // Wave-T identity locks (KEY_COLLIDES_WITH_PUBLISHED / TYPE_LOCKED) must
+  // enforce against ALL published history INCLUDING archived versions:
+  // archiving a version must never free its stableKeys/types. These pins
+  // FAIL if a future "add archivedAt: null everywhere" sweep sneaks an
+  // archived filter onto the lock-union findMany in the PATCH route (spec
+  // 19ak §4). The `expect(findMany).toHaveBeenCalledWith(...)` assertions are
+  // the real pin — the where must carry NO archivedAt key.
+  it("KEY_COLLIDES_WITH_PUBLISHED — an ARCHIVED published version's stableKey still locks (Wave ED8 §7)", async () => {
+    mockDraftVersion([textQ]); // stored draft has only S1_notes
+    // Published history is a SINGLE version that is archived (archivedAt set)
+    // yet still publishedAt — carrying key S9_archived.
+    (db.assessmentTemplateVersion.findMany as jest.Mock).mockResolvedValue([
+      {
+        archivedAt: new Date("2026-01-01T00:00:00Z"),
+        publishedAt: new Date("2025-01-01T00:00:00Z"),
+        questions: [{ stableKey: "S9_archived", type: "TEXT", label: "Old" }],
+      },
+    ]);
+    const body = await expect400(
+      [textQ, { ...numberQ, stableKey: "S9_archived" }],
+      "KEY_COLLIDES_WITH_PUBLISHED",
+    );
+    expect(body.error).toContain("S9_archived");
+    // THE PIN: the lock-union query selects ALL published versions with NO
+    // archivedAt filter — archived versions are still returned, so their keys
+    // still collide. Adding `archivedAt: null` here would break the pin.
+    expect(db.assessmentTemplateVersion.findMany).toHaveBeenCalledWith({
+      where: { templateId: "tpl-1", publishedAt: { not: null } },
+      select: { questions: true },
+    });
+  });
+
+  it("TYPE_LOCKED — an ARCHIVED published version's type still locks an inherited key (Wave ED8 §7)", async () => {
+    // Draft inherits key S9_metric as SLIDER_LIKERT (present in the draft).
+    mockDraftVersion([
+      { stableKey: "S9_metric", type: "SLIDER_LIKERT", label: "Metric" },
+    ]);
+    // The published version carrying S9_metric is ARCHIVED — type still locks.
+    (db.assessmentTemplateVersion.findMany as jest.Mock).mockResolvedValue([
+      {
+        archivedAt: new Date("2026-01-01T00:00:00Z"),
+        publishedAt: new Date("2025-01-01T00:00:00Z"),
+        questions: [
+          { stableKey: "S9_metric", type: "SLIDER_LIKERT", label: "Metric" },
+        ],
+      },
+    ]);
+    const body = await expect400(
+      [{ ...numberQ, stableKey: "S9_metric" }], // retype SLIDER_LIKERT → NUMBER
+      "TYPE_LOCKED",
+    );
+    expect(body.error).toContain("S9_metric");
+    expect(body.error).toContain("SLIDER_LIKERT");
+    // THE PIN (see the KEY_COLLIDES test above): NO archivedAt filter.
+    expect(db.assessmentTemplateVersion.findMany).toHaveBeenCalledWith({
+      where: { templateId: "tpl-1", publishedAt: { not: null } },
+      select: { questions: true },
+    });
+  });
+
   it("200 legacy-shape acceptance — TEXT row carrying a stale scale object still passes", async () => {
     const staleScaleText = {
       ...textQ,

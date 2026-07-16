@@ -12,7 +12,9 @@
  *     published version by `versionNumber: "desc"`.
  *   - trends (`trends.ts`) selects "latest" by `publishedAt: "desc"` (ties
  *     broken by versionNumber). Trends KEEPS its own publishedAt-desc
- *     selection — it only gains the `archivedAt: null` filter in T3; it does
+ *     selection — it only gains an in-memory archived skip inside
+ *     `selectLatestVersion` (NOT a DB where filter: its loader must keep
+ *     loading archived rows for excluded-campaign bookkeeping); it does
  *     NOT adopt this helper's ordering.
  *   So the two orderings are deliberately different; this helper encodes the
  *   campaign-create-style (versionNumber desc) Active used by the resolver

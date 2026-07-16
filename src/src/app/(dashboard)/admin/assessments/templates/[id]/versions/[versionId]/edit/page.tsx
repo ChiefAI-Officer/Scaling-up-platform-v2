@@ -100,6 +100,9 @@ export default async function AdminAssessmentVersionEditPage({
     // Wave T (spec 19t §T-4) — every PUBLISHED version's questions JSON,
     // for the inherited-lock unions. Fetched UNCONDITIONALLY (not flag-
     // gated): the unions also drive the save path's inherited re-checks.
+    // Wave ED8: do NOT add `archivedAt: null` here — identity locks against
+    // ALL published history INCLUDING archived versions (spec 19ak §4). The
+    // matching save-path query is pinned by template-version-patch.wave-t.test.ts.
     db.assessmentTemplateVersion.findMany({
       where: { templateId: id, publishedAt: { not: null } },
       select: { questions: true },
