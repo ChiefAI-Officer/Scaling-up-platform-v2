@@ -29,6 +29,7 @@ import {
 import { resolveFindings } from "@/lib/assessments/findings";
 import { QuestionInput } from "@/components/assessments/question-input";
 import { toQuestionForInput, shapeSignature } from "./question-widget-mapper";
+import { QUESTION_TYPE_LABELS } from "./enum-labels";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -818,10 +819,14 @@ export function QuestionInspector({
             disabled={isReadOnly || question.isInherited}
             className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <option value="SLIDER_LIKERT">SLIDER_LIKERT</option>
-            <option value="TEXT">TEXT</option>
-            <option value="NUMBER">NUMBER</option>
-            <option value="MULTI_CHOICE">MULTI_CHOICE</option>
+            <option value="SLIDER_LIKERT">
+              {QUESTION_TYPE_LABELS.SLIDER_LIKERT}
+            </option>
+            <option value="TEXT">{QUESTION_TYPE_LABELS.TEXT}</option>
+            <option value="NUMBER">{QUESTION_TYPE_LABELS.NUMBER}</option>
+            <option value="MULTI_CHOICE">
+              {QUESTION_TYPE_LABELS.MULTI_CHOICE}
+            </option>
           </select>
         ) : (
           <select
@@ -831,25 +836,27 @@ export function QuestionInspector({
             disabled={isReadOnly}
             className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <optgroup label="Active in v1">
-              <option value="SLIDER_LIKERT">SLIDER_LIKERT</option>
+            <optgroup label="Available">
+              <option value="SLIDER_LIKERT">
+                {QUESTION_TYPE_LABELS.SLIDER_LIKERT}
+              </option>
               {/* Gap E + grill Q9 — NUMBER + MULTI_CHOICE deferred to v1.5 */}
               <option value="NUMBER" disabled>
-                NUMBER — v1.5
+                {QUESTION_TYPE_LABELS.NUMBER} (coming soon)
               </option>
               <option value="MULTI_CHOICE" disabled>
-                MULTI_CHOICE — v1.5
+                {QUESTION_TYPE_LABELS.MULTI_CHOICE} (coming soon)
               </option>
             </optgroup>
-            <optgroup label="v1.5 (deferred)">
+            <optgroup label="Coming soon">
               <option value="TEXT" disabled>
-                TEXT — v1.5
+                {QUESTION_TYPE_LABELS.TEXT} (coming soon)
               </option>
               <option value="TEXTAREA" disabled>
-                TEXTAREA — v1.5
+                {QUESTION_TYPE_LABELS.TEXTAREA} (coming soon)
               </option>
               <option value="COMPOUND" disabled>
-                COMPOUND — v1.5
+                {QUESTION_TYPE_LABELS.COMPOUND} (coming soon)
               </option>
             </optgroup>
           </select>
@@ -863,8 +870,7 @@ export function QuestionInspector({
           ) : null
         ) : (
           <span className="block text-[0.6875rem] italic text-muted-foreground">
-            v1 active types cover all 4 default INVITED templates. v1.5 types
-            stay disabled until QSP v2 compound questions ship.
+            More question types are coming soon.
           </span>
         )}
       </div>
@@ -979,7 +985,7 @@ export function QuestionInspector({
       {question.type === "SLIDER_LIKERT" && (
       <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
         <h4 className="text-xs font-semibold text-foreground">
-          SLIDER_LIKERT — config
+          Slider settings
         </h4>
 
         <div className="grid grid-cols-3 gap-2">
@@ -1091,7 +1097,7 @@ export function QuestionInspector({
           data-testid="text-config-note"
         >
           <h4 className="text-xs font-semibold text-foreground">
-            TEXT — free text
+            Short text
           </h4>
           <p className="text-[0.6875rem] italic text-muted-foreground">
             Renders as a multi-line answer box on the respondent form.
@@ -1106,7 +1112,7 @@ export function QuestionInspector({
           data-testid="number-config-note"
         >
           <h4 className="text-xs font-semibold text-foreground">
-            NUMBER — numeric entry
+            Number
           </h4>
           <p className="text-[0.6875rem] italic text-muted-foreground">
             Free numeric entry with finite-number validation at submit.
@@ -1121,7 +1127,7 @@ export function QuestionInspector({
           data-testid="multichoice-config"
         >
           <h4 className="text-xs font-semibold text-foreground">
-            MULTI_CHOICE — options
+            Answer options
           </h4>
           {question.options.length === 0 && (
             <p className="text-[0.6875rem] italic text-warning">
