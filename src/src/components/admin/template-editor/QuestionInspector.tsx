@@ -1051,7 +1051,7 @@ export function QuestionInspector({
               className="block text-[0.6875rem] font-medium text-foreground"
               htmlFor={`q-anchor-min-${question.uid}`}
             >
-              Anchor — min
+              Label for the lowest point
             </label>
             <input
               id={`q-anchor-min-${question.uid}`}
@@ -1067,7 +1067,7 @@ export function QuestionInspector({
               className="block text-[0.6875rem] font-medium text-foreground"
               htmlFor={`q-anchor-max-${question.uid}`}
             >
-              Anchor — max
+              Label for the highest point
             </label>
             <input
               id={`q-anchor-max-${question.uid}`}
@@ -1081,11 +1081,8 @@ export function QuestionInspector({
         </div>
 
         <span className="block text-[0.6875rem] italic text-muted-foreground">
-          Slider answers stored as integers. Validation enforces{" "}
-          <code className="font-mono bg-muted px-1 rounded text-[0.625rem]">
-            (value - min) % step === 0
-          </code>
-          .
+          Respondents pick a whole number between the min and max, moving in
+          steps of the step size.
         </span>
       </div>
       )}

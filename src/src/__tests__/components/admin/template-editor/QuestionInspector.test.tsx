@@ -230,6 +230,29 @@ describe("QuestionInspector (ED3 T7 extraction)", () => {
       expect(screen.queryByText(/SLIDER_LIKERT — config/)).toBeNull();
     });
 
+    it("explains slider storage in plain language, no formulas or code chips", () => {
+      render(
+        <QuestionInspector
+          {...baseProps}
+          question={makeQuestion()}
+          onUpdate={jest.fn()}
+        />,
+      );
+      expect(
+        screen.getByLabelText("Label for the lowest point"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Label for the highest point"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Respondents pick a whole number between the min and max/,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/% step === 0/)).toBeNull();
+      expect(screen.queryByText(/stored as integers/)).toBeNull();
+    });
+
     it("titles the multi-choice config block 'Answer options'", () => {
       render(
         <QuestionInspector
