@@ -25,6 +25,7 @@ import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { computeTemplateContentHash } from "@/lib/assessments/template-content-hash";
 import { QuestionSchema } from "@/lib/assessments/scoring";
+import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
 
 export async function GET(
   _request: NextRequest,
@@ -419,6 +420,133 @@ export async function PATCH(
     console.error("Error updating template version:", error);
     return NextResponse.json(
       { success: false, error: "Failed to update version" },
+      { status: 500 },
+    );
+  }
+}
+
+// ─── Wave ED8 (spec 19ak §5) — draft-only DELETE ───────────────────────────
+//
+// Deletes a DRAFT version row. Published rows are never deletable (409
+// ALREADY_PUBLISHED — also enforced by the DB immutability trigger, but the
+// route refuses cleanly first). Flag-gated to the ED8 lifecycle capability
+// (opaque 404 when off — GET/PATCH above are deliberately NOT flag-gated).
+//
+// Campaign preflight (co-validate C5): a campaign already pinned to this
+// version blocks the delete with 409 VERSION_IN_USE; a campaign created
+// between the preflight and the delete surfaces as a Prisma P2003 FK error,
+// which maps to the SAME 409 instead of a raw 500.
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; versionId: string }> },
+) {
+  try {
+    const rate = await withRateLimit(request, RateLimits.standard);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { success: false, error: "Too many requests" },
+        { status: 429, headers: rate.headers },
+      );
+    }
+
+    const actor = await getApiActor();
+    if (!actor) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 },
+      );
+    }
+    if (!isPrivilegedRole(actor.role)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 },
+      );
+    }
+
+    // Flag OFF ⇒ the capability does not exist (opaque 404, zero DB reads).
+    if (!isVersionLifecycleEnabled()) {
+      return NextResponse.json(
+        { success: false, error: "Not found" },
+        { status: 404 },
+      );
+    }
+
+    const { id: templateId, versionId } = await params;
+
+    const version = await db.assessmentTemplateVersion.findUnique({
+      where: { id: versionId },
+      select: {
+        id: true,
+        templateId: true,
+        language: true,
+        versionNumber: true,
+        publishedAt: true,
+      },
+    });
+    if (!version || version.templateId !== templateId) {
+      return NextResponse.json(
+        { success: false, error: "Version not found" },
+        { status: 404 },
+      );
+    }
+    if (version.publishedAt !== null) {
+      return NextResponse.json(
+        { success: false, error: "ALREADY_PUBLISHED" },
+        { status: 409 },
+      );
+    }
+
+    // Campaign preflight (co-validate C5).
+    const campaignCount = await db.assessmentCampaign.count({
+      where: { versionId },
+    });
+    if (campaignCount > 0) {
+      return NextResponse.json(
+        { success: false, error: "VERSION_IN_USE" },
+        { status: 409 },
+      );
+    }
+
+    try {
+      await db.assessmentTemplateVersion.delete({ where: { id: versionId } });
+    } catch (error) {
+      // Race: a campaign was created between the preflight and the delete —
+      // the FK violation maps to the same clean 409.
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        (error as { code?: unknown }).code === "P2003"
+      ) {
+        return NextResponse.json(
+          { success: false, error: "VERSION_IN_USE" },
+          { status: 409 },
+        );
+      }
+      throw error;
+    }
+
+    await logAudit({
+      entityType: "AssessmentTemplateVersion",
+      entityId: versionId,
+      action: "TEMPLATE_VERSION_DELETED",
+      performedBy: actor.email ?? actor.userId,
+      changes: {
+        templateId,
+        versionNumber: version.versionNumber,
+        language: version.language,
+        wasDraft: true,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: { deletedVersionId: versionId },
+    });
+  } catch (error) {
+    console.error("Error deleting template version:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to delete version" },
       { status: 500 },
     );
   }
