@@ -946,27 +946,31 @@ export function QuestionInspector({
         )}
       </div>
 
-      {/* Sort order */}
-      <div className="space-y-1">
-        <label
-          className="wf-label"
-          htmlFor={`q-sort-${question.uid}`}
-        >
-          Sort order within section
-        </label>
-        <input
-          id={`q-sort-${question.uid}`}
-          type="number"
-          min={1}
-          value={question.sortOrder}
-          onChange={(e) =>
-            onUpdate({ sortOrder: Number(e.target.value) || 1 })
-          }
-          disabled={isReadOnly}
-          style={{ width: "5rem" }}
-          className="px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
-        />
-      </div>
+      {/* Sort order — hidden in bare mode (ED7): the single-column builder
+          reorders via drag + "Add question below"; the raw number can create
+          ties/gaps. Legacy/three-pane keep their full editing surface. */}
+      {!bare && (
+        <div className="space-y-1">
+          <label
+            className="wf-label"
+            htmlFor={`q-sort-${question.uid}`}
+          >
+            Sort order within section
+          </label>
+          <input
+            id={`q-sort-${question.uid}`}
+            type="number"
+            min={1}
+            value={question.sortOrder}
+            onChange={(e) =>
+              onUpdate({ sortOrder: Number(e.target.value) || 1 })
+            }
+            disabled={isReadOnly}
+            style={{ width: "5rem" }}
+            className="px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+          />
+        </div>
+      )}
 
       {/* Read-only fallback for non-SLIDER_LIKERT question types (legacy,
           flag-off only — Wave T unlocks per-type editing) */}
