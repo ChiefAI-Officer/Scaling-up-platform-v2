@@ -191,4 +191,107 @@ describe("QuestionInspector (ED3 T7 extraction)", () => {
     );
     expect(previewSlider().getAttribute("aria-valuenow")).toBeNull();
   });
+
+  // ── ED7 — de-jargon: friendly type names + plain config headings ────────
+  describe("ED7 de-jargon", () => {
+    it("shows friendly names in the type select while option VALUES stay enum strings", () => {
+      render(
+        <QuestionInspector
+          {...baseProps}
+          question={makeQuestion()}
+          onUpdate={jest.fn()}
+        />,
+      );
+      const select = screen.getByLabelText("Question Type");
+      expect(
+        within(select).getByRole("option", { name: "Slider" }),
+      ).toHaveValue("SLIDER_LIKERT");
+      expect(
+        within(select).getByRole("option", { name: "Multiple choice" }),
+      ).toHaveValue("MULTI_CHOICE");
+      expect(
+        within(select).getByRole("option", { name: "Number" }),
+      ).toHaveValue("NUMBER");
+      expect(
+        within(select).getByRole("option", { name: "Short text" }),
+      ).toHaveValue("TEXT");
+      expect(within(select).queryByText("SLIDER_LIKERT")).toBeNull();
+    });
+
+    it("titles the slider config block 'Slider settings'", () => {
+      render(
+        <QuestionInspector
+          {...baseProps}
+          question={makeQuestion()}
+          onUpdate={jest.fn()}
+        />,
+      );
+      expect(screen.getByText("Slider settings")).toBeInTheDocument();
+      expect(screen.queryByText(/SLIDER_LIKERT — config/)).toBeNull();
+    });
+
+    it("explains slider storage in plain language, no formulas or code chips", () => {
+      render(
+        <QuestionInspector
+          {...baseProps}
+          question={makeQuestion()}
+          onUpdate={jest.fn()}
+        />,
+      );
+      expect(
+        screen.getByLabelText("Label for the lowest point"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Label for the highest point"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Respondents pick a whole number between the min and max/,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/% step === 0/)).toBeNull();
+      expect(screen.queryByText(/stored as integers/)).toBeNull();
+    });
+
+    it("titles the multi-choice config block 'Answer options'", () => {
+      render(
+        <QuestionInspector
+          {...baseProps}
+          question={makeQuestion({
+            stableKey: "S1_Q2",
+            type: "MULTI_CHOICE",
+            options: [{ key: "K1", label: "First option", isNew: false }],
+          })}
+          onUpdate={jest.fn()}
+        />,
+      );
+      const block = screen.getByTestId("multichoice-config");
+      expect(within(block).getByText("Answer options")).toBeInTheDocument();
+      expect(screen.queryByText(/MULTI_CHOICE — options/)).toBeNull();
+    });
+
+    it("titles the number and text config notes without raw enum headings", () => {
+      const { rerender } = render(
+        <QuestionInspector
+          {...baseProps}
+          question={makeQuestion({ stableKey: "S1_Q3", type: "NUMBER" })}
+          onUpdate={jest.fn()}
+        />,
+      );
+      const numberBlock = screen.getByTestId("number-config-note");
+      expect(within(numberBlock).getByText("Number")).toBeInTheDocument();
+      expect(screen.queryByText(/NUMBER — numeric entry/)).toBeNull();
+
+      rerender(
+        <QuestionInspector
+          {...baseProps}
+          question={makeQuestion({ stableKey: "S1_Q4", type: "TEXT" })}
+          onUpdate={jest.fn()}
+        />,
+      );
+      const textBlock = screen.getByTestId("text-config-note");
+      expect(within(textBlock).getByText("Short text")).toBeInTheDocument();
+      expect(screen.queryByText(/TEXT — free text/)).toBeNull();
+    });
+  });
 });

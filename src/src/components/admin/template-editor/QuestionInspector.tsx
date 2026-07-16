@@ -29,6 +29,7 @@ import {
 import { resolveFindings } from "@/lib/assessments/findings";
 import { QuestionInput } from "@/components/assessments/question-input";
 import { toQuestionForInput, shapeSignature } from "./question-widget-mapper";
+import { QUESTION_TYPE_LABELS } from "./enum-labels";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -818,10 +819,14 @@ export function QuestionInspector({
             disabled={isReadOnly || question.isInherited}
             className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <option value="SLIDER_LIKERT">SLIDER_LIKERT</option>
-            <option value="TEXT">TEXT</option>
-            <option value="NUMBER">NUMBER</option>
-            <option value="MULTI_CHOICE">MULTI_CHOICE</option>
+            <option value="SLIDER_LIKERT">
+              {QUESTION_TYPE_LABELS.SLIDER_LIKERT}
+            </option>
+            <option value="TEXT">{QUESTION_TYPE_LABELS.TEXT}</option>
+            <option value="NUMBER">{QUESTION_TYPE_LABELS.NUMBER}</option>
+            <option value="MULTI_CHOICE">
+              {QUESTION_TYPE_LABELS.MULTI_CHOICE}
+            </option>
           </select>
         ) : (
           <select
@@ -831,25 +836,27 @@ export function QuestionInspector({
             disabled={isReadOnly}
             className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <optgroup label="Active in v1">
-              <option value="SLIDER_LIKERT">SLIDER_LIKERT</option>
+            <optgroup label="Available">
+              <option value="SLIDER_LIKERT">
+                {QUESTION_TYPE_LABELS.SLIDER_LIKERT}
+              </option>
               {/* Gap E + grill Q9 — NUMBER + MULTI_CHOICE deferred to v1.5 */}
               <option value="NUMBER" disabled>
-                NUMBER — v1.5
+                {QUESTION_TYPE_LABELS.NUMBER} (coming soon)
               </option>
               <option value="MULTI_CHOICE" disabled>
-                MULTI_CHOICE — v1.5
+                {QUESTION_TYPE_LABELS.MULTI_CHOICE} (coming soon)
               </option>
             </optgroup>
-            <optgroup label="v1.5 (deferred)">
+            <optgroup label="Coming soon">
               <option value="TEXT" disabled>
-                TEXT — v1.5
+                {QUESTION_TYPE_LABELS.TEXT}
               </option>
               <option value="TEXTAREA" disabled>
-                TEXTAREA — v1.5
+                {QUESTION_TYPE_LABELS.TEXTAREA}
               </option>
               <option value="COMPOUND" disabled>
-                COMPOUND — v1.5
+                {QUESTION_TYPE_LABELS.COMPOUND}
               </option>
             </optgroup>
           </select>
@@ -863,8 +870,7 @@ export function QuestionInspector({
           ) : null
         ) : (
           <span className="block text-[0.6875rem] italic text-muted-foreground">
-            v1 active types cover all 4 default INVITED templates. v1.5 types
-            stay disabled until QSP v2 compound questions ship.
+            More question types are coming soon.
           </span>
         )}
       </div>
@@ -940,27 +946,31 @@ export function QuestionInspector({
         )}
       </div>
 
-      {/* Sort order */}
-      <div className="space-y-1">
-        <label
-          className="wf-label"
-          htmlFor={`q-sort-${question.uid}`}
-        >
-          Sort order within section
-        </label>
-        <input
-          id={`q-sort-${question.uid}`}
-          type="number"
-          min={1}
-          value={question.sortOrder}
-          onChange={(e) =>
-            onUpdate({ sortOrder: Number(e.target.value) || 1 })
-          }
-          disabled={isReadOnly}
-          style={{ width: "5rem" }}
-          className="px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
-        />
-      </div>
+      {/* Sort order — hidden in bare mode (ED7): the single-column builder
+          reorders via drag + "Add question below"; the raw number can create
+          ties/gaps. Legacy/three-pane keep their full editing surface. */}
+      {!bare && (
+        <div className="space-y-1">
+          <label
+            className="wf-label"
+            htmlFor={`q-sort-${question.uid}`}
+          >
+            Sort order within section
+          </label>
+          <input
+            id={`q-sort-${question.uid}`}
+            type="number"
+            min={1}
+            value={question.sortOrder}
+            onChange={(e) =>
+              onUpdate({ sortOrder: Number(e.target.value) || 1 })
+            }
+            disabled={isReadOnly}
+            style={{ width: "5rem" }}
+            className="px-2 py-1 text-sm border border-border rounded bg-background text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
+          />
+        </div>
+      )}
 
       {/* Read-only fallback for non-SLIDER_LIKERT question types (legacy,
           flag-off only — Wave T unlocks per-type editing) */}
@@ -979,7 +989,7 @@ export function QuestionInspector({
       {question.type === "SLIDER_LIKERT" && (
       <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
         <h4 className="text-xs font-semibold text-foreground">
-          SLIDER_LIKERT — config
+          Slider settings
         </h4>
 
         <div className="grid grid-cols-3 gap-2">
@@ -1045,7 +1055,7 @@ export function QuestionInspector({
               className="block text-[0.6875rem] font-medium text-foreground"
               htmlFor={`q-anchor-min-${question.uid}`}
             >
-              Anchor — min
+              Label for the lowest point
             </label>
             <input
               id={`q-anchor-min-${question.uid}`}
@@ -1061,7 +1071,7 @@ export function QuestionInspector({
               className="block text-[0.6875rem] font-medium text-foreground"
               htmlFor={`q-anchor-max-${question.uid}`}
             >
-              Anchor — max
+              Label for the highest point
             </label>
             <input
               id={`q-anchor-max-${question.uid}`}
@@ -1075,11 +1085,8 @@ export function QuestionInspector({
         </div>
 
         <span className="block text-[0.6875rem] italic text-muted-foreground">
-          Slider answers stored as integers. Validation enforces{" "}
-          <code className="font-mono bg-muted px-1 rounded text-[0.625rem]">
-            (value - min) % step === 0
-          </code>
-          .
+          Respondents pick a whole number between the min and max, moving in
+          steps of the step size.
         </span>
       </div>
       )}
@@ -1091,11 +1098,11 @@ export function QuestionInspector({
           data-testid="text-config-note"
         >
           <h4 className="text-xs font-semibold text-foreground">
-            TEXT — free text
+            Short text
           </h4>
           <p className="text-[0.6875rem] italic text-muted-foreground">
-            Renders as a multi-line answer box on the respondent form.
-            Answers are capped at 10,000 characters.
+            Respondents type their answer in a text box (up to 10,000
+            characters).
           </p>
         </div>
       )}
@@ -1106,7 +1113,7 @@ export function QuestionInspector({
           data-testid="number-config-note"
         >
           <h4 className="text-xs font-semibold text-foreground">
-            NUMBER — numeric entry
+            Number
           </h4>
           <p className="text-[0.6875rem] italic text-muted-foreground">
             Free numeric entry with finite-number validation at submit.
@@ -1121,7 +1128,7 @@ export function QuestionInspector({
           data-testid="multichoice-config"
         >
           <h4 className="text-xs font-semibold text-foreground">
-            MULTI_CHOICE — options
+            Answer options
           </h4>
           {question.options.length === 0 && (
             <p className="text-[0.6875rem] italic text-warning">

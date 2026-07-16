@@ -215,12 +215,14 @@ describe("QuestionsTab — Wave T flag ON (isUnlocked=true)", () => {
     ).toBeNull();
   });
 
-  it("shows the TEXT helper note (multi-line answer box + 10,000-char cap)", () => {
+  it("shows the TEXT helper note (text box + 10,000-char cap; ED7 plain copy)", () => {
     renderTab({
       isUnlocked: true,
       questions: [makeQuestion({ type: "TEXT" })],
     });
-    expect(screen.getByText(/multi-line answer box/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/type their answer in a text box/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/10,000/)).toBeInTheDocument();
   });
 

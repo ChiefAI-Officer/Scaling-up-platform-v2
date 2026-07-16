@@ -389,8 +389,12 @@ describe("QuestionsTab — F3 (Checkpoint 2)", () => {
     expect(within(form).getByLabelText("Scale min")).toBeInTheDocument();
     expect(within(form).getByLabelText("Scale max")).toBeInTheDocument();
     expect(within(form).getByLabelText("Scale step")).toBeInTheDocument();
-    expect(within(form).getByLabelText("Anchor — min")).toBeInTheDocument();
-    expect(within(form).getByLabelText("Anchor — max")).toBeInTheDocument();
+    expect(
+      within(form).getByLabelText("Label for the lowest point"),
+    ).toBeInTheDocument();
+    expect(
+      within(form).getByLabelText("Label for the highest point"),
+    ).toBeInTheDocument();
   });
 
   it("editing Label flips questionsDirty (Save Draft enabled)", () => {

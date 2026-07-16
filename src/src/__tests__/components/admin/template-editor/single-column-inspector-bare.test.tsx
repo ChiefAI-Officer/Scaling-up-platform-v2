@@ -68,4 +68,21 @@ describe("QuestionInspector bare prop (ED6 T10)", () => {
     // Fields still render (the stableKey field is always present).
     expect(screen.getByText("stableKey")).toBeInTheDocument();
   });
+
+  // ── ED7 — the manual sort-order number is hidden in the single-column
+  // builder (drag + "Add question below" already resequence; the raw box can
+  // create ties/gaps). The dormant legacy/three-pane editors keep it.
+  it("ED7: bare hides the 'Sort order within section' field", () => {
+    renderInspector(true);
+    expect(
+      screen.queryByLabelText("Sort order within section"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ED7: not-bare keeps the 'Sort order within section' field (legacy/three-pane)", () => {
+    renderInspector(false);
+    expect(
+      screen.getByLabelText("Sort order within section"),
+    ).toBeInTheDocument();
+  });
 });
