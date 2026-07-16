@@ -21,6 +21,7 @@ import {
   CampaignCreateError,
   resolvePublishedTemplateVersion,
 } from "@/lib/assessments/campaign-create-service";
+import { DEFAULT_TEMPLATE_LANGUAGE } from "@/lib/assessments/active-version";
 
 // ─── alias helpers (copied from assessment-campaigns/route.ts) ───────────────
 
@@ -142,7 +143,13 @@ export async function POST(request: NextRequest) {
     // 4. Resolve published template version — 422 on unpublished
     let version: Awaited<ReturnType<typeof resolvePublishedTemplateVersion>>;
     try {
-      version = await resolvePublishedTemplateVersion(db, templateId, "enUS");
+      // C4 (Wave ED8) — shared default-language constant (value-identical to
+      // the old "enUS" literal, zero behavior change).
+      version = await resolvePublishedTemplateVersion(
+        db,
+        templateId,
+        DEFAULT_TEMPLATE_LANGUAGE,
+      );
     } catch (err) {
       if (
         err instanceof CampaignCreateError &&

@@ -24,6 +24,7 @@ import { isSafeToPublishEnabled } from "@/lib/assessments/wave-ed2-flags";
 import { isThreePaneEnabled } from "@/lib/assessments/wave-ed4-flags";
 import { isSingleColumnEnabled } from "@/lib/assessments/wave-ed6-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
+import { activePublishedWhere } from "@/lib/assessments/active-version";
 import {
   isPeerRenderEnabledAlias,
   listRatingQuestionKeys,
@@ -119,12 +120,16 @@ export default async function AdminAssessmentVersionEditPage({
   // Wave S (spec 19s S-3) — peer-averages editor rows. Rendered ONLY when the
   // flag is ON and the alias is render-enabled (D10 — same list as the report
   // joins, so no dead switches); otherwise nothing is fetched or rendered.
-  // Rows come from the currently-PUBLISHED version (not the URL's version),
-  // matching the API's validKeys resolution.
+  // Rows come from the current ACTIVE version (not the URL's version),
+  // matching the API's validKeys resolution. Wave ED8 (C3) — archived
+  // versions are excluded here exactly like the benchmarks API route
+  // (persisted admin intent, never flag-gated); the Wave-T lock-union query
+  // above deliberately KEEPS archived versions (identity locks against ALL
+  // history).
   let peerBenchmarkRows: PeerBenchmarkRow[] | null = null;
   if (isPeerBenchmarksEnabled() && isPeerRenderEnabledAlias(template.alias)) {
     const published = await db.assessmentTemplateVersion.findFirst({
-      where: { templateId: id, publishedAt: { not: null } },
+      where: { templateId: id, ...activePublishedWhere },
       orderBy: { versionNumber: "desc" },
       select: { questions: true },
     });

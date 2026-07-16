@@ -450,6 +450,28 @@ describe("POST /api/assessments/import — results (coach-scoped)", () => {
     expect(body.error).toBe("TEMPLATE_VERSION_NOT_PUBLISHED");
   });
 
+  it("ED8: version preflight excludes archived versions at the DB level (where carries archivedAt null)", async () => {
+    // Archived-exclusion is PERSISTED admin intent (Wave-Q doctrine) — the
+    // filter lives in the where, never behind the ED8 flag. An all-archived
+    // template models as findFirst → null and 422s like never-published.
+    (getCrosswalkByVariant as jest.Mock).mockReturnValue(lockedQspV2);
+    (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue(null);
+    const res = await POST(
+      req({ mode: "preview", kind: "results", payload: reportFixture }),
+    );
+    expect(res.status).toBe(422);
+    expect(db.assessmentTemplateVersion.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          templateId: "tmpl-1",
+          publishedAt: { not: null },
+          archivedAt: null,
+        },
+        orderBy: { versionNumber: "desc" },
+      }),
+    );
+  });
+
   it("happy preview (locked crosswalk + roster owned by coach-1): 200 with campaigns, NO writes", async () => {
     (getCrosswalkByVariant as jest.Mock).mockReturnValue(lockedQspV2);
     const res = await POST(
