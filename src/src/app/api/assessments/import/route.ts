@@ -46,6 +46,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { activePublishedWhere } from "@/lib/assessments/active-version";
 import {
   parseEspertoExport,
   EspertoParseError,
@@ -498,7 +499,10 @@ async function handleResultsImport(
 
   // ── PREFLIGHT: a published, crosswalk-compatible version must exist (§6.2).
   const publishedVersion = await db.assessmentTemplateVersion.findFirst({
-    where: { templateId: template.id, publishedAt: { not: null } },
+    // Wave ED8 — Active = published + non-archived. Archived-exclusion is
+    // PERSISTED admin intent (Wave-Q doctrine): expressed in the DB where,
+    // NEVER flag-gated.
+    where: { templateId: template.id, ...activePublishedWhere },
     orderBy: { versionNumber: "desc" },
     select: {
       id: true,

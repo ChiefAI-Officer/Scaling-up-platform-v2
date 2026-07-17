@@ -30,6 +30,7 @@ import {
   CampaignCreateError,
   resolvePublishedTemplateVersion,
 } from "@/lib/assessments/campaign-create-service";
+import { DEFAULT_TEMPLATE_LANGUAGE } from "@/lib/assessments/active-version";
 import { splitName } from "@/lib/assessments/respondent-csv";
 import { normalizeEmail } from "@/app/api/organizations/[id]/respondents/route";
 import { buildTeamPath } from "@/app/api/assessment-campaigns/[id]/participants/route";
@@ -53,7 +54,9 @@ import { inngest } from "@/inngest/client";
 // fan-out function module) so the route never evaluates inngest.createFunction.
 import { ASSESSMENT_SEND_INVITES_EVENT } from "@/inngest/functions/assessment-invite-fanout-event";
 
-const CAMPAIGN_LANGUAGE_DEFAULT = "enUS";
+// C4 (Wave ED8) — the local `CAMPAIGN_LANGUAGE_DEFAULT = "enUS"` constant was
+// replaced by the shared DEFAULT_TEMPLATE_LANGUAGE (value-identical) so
+// campaign-create and version-sections can never drift again.
 
 function pad2(n: number): string {
   return n.toString().padStart(2, "0");
@@ -244,7 +247,7 @@ export async function POST(request: NextRequest) {
       version = await resolvePublishedTemplateVersion(
         db,
         data.templateId,
-        CAMPAIGN_LANGUAGE_DEFAULT,
+        DEFAULT_TEMPLATE_LANGUAGE,
       );
     } catch (err) {
       if (

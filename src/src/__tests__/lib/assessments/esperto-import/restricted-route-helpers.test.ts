@@ -136,6 +136,25 @@ describe("resolveRestrictedImportContext — error branches", () => {
     }
   });
 
+  it("ED8: published-version preflight excludes archived versions at the DB level (where carries archivedAt null)", async () => {
+    // Archived-exclusion is PERSISTED admin intent (Wave-Q doctrine) — the
+    // filter lives in the where, never behind the ED8 flag. An all-archived
+    // template models as findFirst → null → TEMPLATE_VERSION_NOT_PUBLISHED
+    // (the 422 branch above).
+    const db = makeDb();
+    await resolveRestrictedImportContext(db);
+    expect(db.assessmentTemplateVersion.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          templateId: "tmpl-sufull",
+          publishedAt: { not: null },
+          archivedAt: null,
+        },
+        orderBy: { versionNumber: "desc" },
+      }),
+    );
+  });
+
   it("CROSSWALK_INCOMPATIBLE_WITH_VERSION (422) when the compat check fails", async () => {
     (validateCrosswalkAgainstVersion as jest.Mock).mockReturnValue({
       ok: false,

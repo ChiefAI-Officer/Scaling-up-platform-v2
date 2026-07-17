@@ -34,6 +34,7 @@
  */
 
 import { liveCampaignWhere } from "../campaign-live";
+import { activePublishedWhere } from "../active-version";
 import {
   completenessKeysFor,
   getInstrumentByBatchKind,
@@ -69,7 +70,7 @@ export interface RestrictedContextDb {
   };
   assessmentTemplateVersion: {
     findFirst: (args: {
-      where: { templateId: string; publishedAt: { not: null } };
+      where: { templateId: string; publishedAt: { not: null }; archivedAt: null };
       orderBy: { versionNumber: "desc" };
       select?: object;
     }) => Promise<{
@@ -194,7 +195,10 @@ export async function resolveRestrictedImportContext(
   // ── PREFLIGHT: a published, crosswalk-compatible version must exist. Same
   //    inline pattern + `select` as handleResultsImport's QSP path. ─────────
   const publishedVersion = await db.assessmentTemplateVersion.findFirst({
-    where: { templateId: template.id, publishedAt: { not: null } },
+    // Wave ED8 — Active = published + non-archived. Archived-exclusion is
+    // PERSISTED admin intent (Wave-Q doctrine): expressed in the DB where,
+    // NEVER flag-gated.
+    where: { templateId: template.id, ...activePublishedWhere },
     orderBy: { versionNumber: "desc" },
     select: {
       id: true,

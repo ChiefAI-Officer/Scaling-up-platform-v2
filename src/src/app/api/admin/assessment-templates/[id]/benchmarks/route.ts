@@ -29,6 +29,7 @@ import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
+import { activePublishedWhere } from "@/lib/assessments/active-version";
 import {
   isPeerRenderEnabledAlias,
   listRatingQuestionKeys,
@@ -111,10 +112,12 @@ export async function PUT(
       );
     }
 
-    // validKeys = the CURRENTLY-published version's rating questions. Latest
-    // published wins (same resolution rule as campaign create).
+    // validKeys = the current ACTIVE version's rating questions. Latest
+    // published non-archived wins (same resolution rule as campaign create).
+    // Wave ED8 — archived-exclusion is PERSISTED admin intent (Wave-Q
+    // doctrine): expressed in the DB where, NEVER flag-gated.
     const published = await db.assessmentTemplateVersion.findFirst({
-      where: { templateId: id, publishedAt: { not: null } },
+      where: { templateId: id, ...activePublishedWhere },
       orderBy: { versionNumber: "desc" },
       select: { questions: true },
     });

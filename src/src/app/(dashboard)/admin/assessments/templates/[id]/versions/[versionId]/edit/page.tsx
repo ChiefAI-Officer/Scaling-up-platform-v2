@@ -23,7 +23,9 @@ import { isTestModeEnabled } from "@/lib/assessments/wave-ed1-flags";
 import { isSafeToPublishEnabled } from "@/lib/assessments/wave-ed2-flags";
 import { isThreePaneEnabled } from "@/lib/assessments/wave-ed4-flags";
 import { isSingleColumnEnabled } from "@/lib/assessments/wave-ed6-flags";
+import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
+import { activePublishedWhere } from "@/lib/assessments/active-version";
 import {
   isPeerRenderEnabledAlias,
   listRatingQuestionKeys,
@@ -94,11 +96,18 @@ export default async function AdminAssessmentVersionEditPage({
         language: true,
         publishedAt: true,
         contentHash: true,
+        // Wave ED8 (spec 19ak §2) — lifecycle status input for the Versions
+        // tab / header pill. Display only — the list keeps ALL versions
+        // (drafts + archived) on purpose.
+        archivedAt: true,
       },
     }),
     // Wave T (spec 19t §T-4) — every PUBLISHED version's questions JSON,
     // for the inherited-lock unions. Fetched UNCONDITIONALLY (not flag-
     // gated): the unions also drive the save path's inherited re-checks.
+    // Wave ED8: do NOT add `archivedAt: null` here — identity locks against
+    // ALL published history INCLUDING archived versions (spec 19ak §4). The
+    // matching save-path query is pinned by template-version-patch.wave-t.test.ts.
     db.assessmentTemplateVersion.findMany({
       where: { templateId: id, publishedAt: { not: null } },
       select: { questions: true },
@@ -119,12 +128,16 @@ export default async function AdminAssessmentVersionEditPage({
   // Wave S (spec 19s S-3) — peer-averages editor rows. Rendered ONLY when the
   // flag is ON and the alias is render-enabled (D10 — same list as the report
   // joins, so no dead switches); otherwise nothing is fetched or rendered.
-  // Rows come from the currently-PUBLISHED version (not the URL's version),
-  // matching the API's validKeys resolution.
+  // Rows come from the current ACTIVE version (not the URL's version),
+  // matching the API's validKeys resolution. Wave ED8 (C3) — archived
+  // versions are excluded here exactly like the benchmarks API route
+  // (persisted admin intent, never flag-gated); the Wave-T lock-union query
+  // above deliberately KEEPS archived versions (identity locks against ALL
+  // history).
   let peerBenchmarkRows: PeerBenchmarkRow[] | null = null;
   if (isPeerBenchmarksEnabled() && isPeerRenderEnabledAlias(template.alias)) {
     const published = await db.assessmentTemplateVersion.findFirst({
-      where: { templateId: id, publishedAt: { not: null } },
+      where: { templateId: id, ...activePublishedWhere },
       orderBy: { versionNumber: "desc" },
       select: { questions: true },
     });
@@ -186,6 +199,11 @@ export default async function AdminAssessmentVersionEditPage({
               ? v.publishedAt.toISOString()
               : v.publishedAt,
           contentHash: v.contentHash,
+          // Wave ED8 — serialized like publishedAt (ISO string | null).
+          archivedAt:
+            v.archivedAt instanceof Date
+              ? v.archivedAt.toISOString()
+              : v.archivedAt,
         }))}
         // Wave Q — server-only env read; the client editor receives the flag
         // as a prop and gates the sendResultsDefault toggle on it.
@@ -212,6 +230,11 @@ export default async function AdminAssessmentVersionEditPage({
         // label, Sections folded in); presentation-only, kill = flag off +
         // redeploy.
         singleColumnEnabled={isSingleColumnEnabled()}
+        // Wave ED8 — version-lifecycle UI (lifecycle VersionsTab table,
+        // derived-status pill, Metadata strip removal). Flag gates the UI
+        // only; archived-exclusion in read paths is persisted admin intent
+        // and never flag-gated (Wave-Q doctrine).
+        versionLifecycleEnabled={isVersionLifecycleEnabled()}
       />
       {peerBenchmarkRows && (
         <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />

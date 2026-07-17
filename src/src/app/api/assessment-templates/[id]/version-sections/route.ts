@@ -11,7 +11,18 @@
  *   - 404 if the actor cannot access the template (canAccessTemplate; admin
  *     bypass) — same opaque 404 the templates surfaces use, so a coach probing
  *     other templates can't distinguish "no access" from "doesn't exist".
- *   - 404 if no PUBLISHED version exists for (templateId, "en").
+ *   - 404 if no ACTIVE (published + non-archived) version exists for
+ *     (templateId, DEFAULT_TEMPLATE_LANGUAGE).
+ *
+ * C4 (Wave ED8, spec 19ak): this route used to default the language to a
+ * local `"en"` constant while campaign-create defaulted to `"enUS"` — against
+ * real data (every seeded published version is `"enUS"`) `"en"` resolved a
+ * DIFFERENT (empty) row set, breaking the wizard's expectedVersionId
+ * hand-off. The version is now resolved through the SHARED
+ * `resolveActiveVersion` helper, guaranteeing where + ordering + language
+ * parity with the campaign-create resolver BY CONSTRUCTION. Archived
+ * versions are excluded there too (persisted admin intent — never
+ * flag-gated).
  *
  * Returns ONLY non-PII section metadata (stableKey + display name); never the
  * questions/scoring JSON.
@@ -21,8 +32,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import { asAccessDb, canAccessTemplate } from "@/lib/assessments/access-control";
-
-const CAMPAIGN_LANGUAGE_DEFAULT = "en";
+import {
+  DEFAULT_TEMPLATE_LANGUAGE,
+  resolveActiveVersion,
+} from "@/lib/assessments/active-version";
 
 export async function GET(
   _request: NextRequest,
@@ -48,20 +61,34 @@ export async function GET(
       );
     }
 
-    // Latest PUBLISHED version for (templateId, language) — mirrors the
-    // campaign-create resolver so the wizard's expectedVersionId matches what
-    // the create route will resolve.
-    const version = await db.assessmentTemplateVersion.findFirst({
-      where: {
-        templateId,
-        language: CAMPAIGN_LANGUAGE_DEFAULT,
-        publishedAt: { not: null },
-      },
-      orderBy: { versionNumber: "desc" },
-      select: { id: true, sections: true },
+    // ACTIVE version for (templateId, language) — resolved via the SHARED
+    // helper (C4) so the wizard's expectedVersionId matches what the create
+    // route will resolve BY CONSTRUCTION (same where — published AND
+    // non-archived — same versionNumber-desc ordering, same enUS default
+    // language). Archived-exclusion is persisted admin intent (Wave-Q
+    // doctrine) — never flag-gated.
+    const active = await resolveActiveVersion(
+      db,
+      templateId,
+      DEFAULT_TEMPLATE_LANGUAGE,
+    );
+
+    if (!active) {
+      return NextResponse.json(
+        { success: false, error: "No published version for this template" },
+        { status: 404 },
+      );
+    }
+
+    // The helper returns metadata only; fetch the (potentially large)
+    // sections JSON for just the resolved row.
+    const version = await db.assessmentTemplateVersion.findUnique({
+      where: { id: active.id },
+      select: { sections: true },
     });
 
     if (!version) {
+      // Row vanished between the two reads — treat as not published.
       return NextResponse.json(
         { success: false, error: "No published version for this template" },
         { status: 404 },
@@ -73,7 +100,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: { versionId: version.id, sections },
+      data: { versionId: active.id, sections },
     });
   } catch (error) {
     console.error("Error loading template version sections:", error);

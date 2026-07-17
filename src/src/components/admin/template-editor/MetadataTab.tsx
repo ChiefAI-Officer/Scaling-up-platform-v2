@@ -90,6 +90,16 @@ export interface MetadataTabProps {
   sendResultsDefaultSaving?: boolean;
   /** Wave Q (#1) — flips the default via an immediate template-row PATCH. */
   onSendResultsDefaultChange?: (next: boolean) => void;
+  /**
+   * Wave ED8 (spec 19ak §2) — version-lifecycle mode. When true the Version
+   * History strip below the grid is NOT rendered: its per-version labels call
+   * EVERY published version "● Active", which is wrong under the lifecycle
+   * model (Active is derived, exactly one per language), and the Versions tab
+   * becomes the single lifecycle surface. Default false ⇒ byte-identical
+   * pre-ED8 render (strip included) so existing render sites/tests compile
+   * and render unchanged.
+   */
+  versionLifecycleEnabled?: boolean;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -114,6 +124,7 @@ export function MetadataTab({
   sendResultsDefault = false,
   sendResultsDefaultSaving = false,
   onSendResultsDefaultChange,
+  versionLifecycleEnabled = false,
 }: MetadataTabProps) {
   return (
     <div className="space-y-8">
@@ -180,10 +191,16 @@ export function MetadataTab({
       </div>
 
       {/* ───────────────────── Version History strip ───────────────────── */}
-      <VersionHistoryStrip
-        allVersions={allVersions}
-        currentVersionId={currentVersionId}
-      />
+      {/* Wave ED8 (spec 19ak §2) — removed in lifecycle mode (the strip's
+          all-"● Active" labels are wrong once Active is derived; the
+          Versions tab is the single lifecycle surface). Flag OFF renders
+          the strip byte-identically to pre-ED8. */}
+      {!versionLifecycleEnabled && (
+        <VersionHistoryStrip
+          allVersions={allVersions}
+          currentVersionId={currentVersionId}
+        />
+      )}
     </div>
   );
 }

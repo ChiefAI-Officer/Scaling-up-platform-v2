@@ -61,6 +61,7 @@ import {
   type ScoringConfigShape,
 } from "@/components/admin/template-editor/ScoringTiersTab";
 import { VersionsTab } from "@/components/admin/template-editor/VersionsTab";
+import { deriveVersionStatuses } from "@/components/admin/template-editor/version-lifecycle";
 import {
   buildSectionDeletePrompt,
   collectSectionDeleteImpact,
@@ -150,6 +151,12 @@ export interface TemplateEditorTabbedVersionMeta {
   publishedAt: string | null;
   /** F5 — Versions tab renders the first 12 chars in the row. */
   contentHash: string;
+  /**
+   * Wave ED8 (spec 19ak) — ISO string when the version is archived; null/
+   * absent otherwise. OPTIONAL (treated as null) so pre-ED8 fixtures stay
+   * byte-compatible; the flag-OFF pill/caption/VersionsTab never read it.
+   */
+  archivedAt?: string | null;
 }
 
 export interface DirtyFlags {
@@ -236,6 +243,17 @@ export interface TabbedShellProps {
    * byte-identical to today.
    */
   singleColumnEnabled?: boolean;
+  /**
+   * Wave ED8 (spec 19ak §2) — version-lifecycle UI. Server-computed
+   * (`isVersionLifecycleEnabled()`) and passed down from the edit page.
+   * Default false ⇒ legacy VersionsTab table, MetadataTab Version History
+   * strip, and the `v{n} (published|draft)` pill all render byte-identically
+   * to today. True ⇒ VersionsTab becomes the lifecycle table (derived
+   * Active/Superseded/Draft/Archived statuses + Roll back/Archive/Unarchive/
+   * Delete verbs), the Metadata strip is removed, and the pill shows the
+   * derived status.
+   */
+  versionLifecycleEnabled?: boolean;
 }
 
 /**
@@ -290,6 +308,7 @@ export function TabbedShell({
   safeToPublishEnabled = false,
   threePaneEnabled = false,
   singleColumnEnabled = false,
+  versionLifecycleEnabled = false,
   model,
 }: TabbedShellProps & {
   /**
@@ -468,15 +487,31 @@ export function TabbedShell({
     handlePublishVersion,
     handlePublish,
     handleDuplicateVersion,
+    // Wave ED8 (spec 19ak) — lifecycle actions (T6 hook, spread into model).
+    archivingVersionId,
+    unarchivingVersionId,
+    deletingVersionId,
+    handleArchiveVersion,
+    handleUnarchiveVersion,
+    handleDeleteVersion,
   } = model;
 
   // ─── Versions caption ─────────────────────────────────────────────────
   const publishedSibling = useMemo(
     () =>
       allVersions.find(
-        (v) => v.publishedAt !== null && v.id !== version.id,
+        (v) =>
+          v.publishedAt !== null &&
+          v.id !== version.id &&
+          // Wave ED8 (spec 19ak §2) — UNCONDITIONAL correctness fix: the
+          // "Published vN active since …" caption must come from the SAME
+          // language as the open version (Active is per-language). A no-op
+          // for single-language templates (all frozen-guard fixtures).
+          v.language === version.language &&
+          // Flag ON — an archived sibling is retired; never caption it.
+          (!versionLifecycleEnabled || (v.archivedAt ?? null) === null),
       ),
-    [allVersions, version.id],
+    [allVersions, version.id, version.language, versionLifecycleEnabled],
   );
 
   const caption = useMemo(() => {
@@ -496,6 +531,28 @@ export function TabbedShell({
     return "(you are here)";
   }, [isPublished, publishedSibling, version.publishedAt]);
 
+  // ─── Header pill wording (Wave ED8, spec 19ak §2) ─────────────────────
+  // Flag OFF ⇒ the EXACT legacy `v{n} (published|draft)` wording + classes.
+  // Flag ON ⇒ the open version's DERIVED lifecycle status within allVersions
+  // (active / superseded / draft / archived); draft keeps the draft pill
+  // style, all published statuses keep the published style (no new tokens).
+  const pillStatusWord = useMemo(() => {
+    const legacyWord = isPublished ? "published" : "draft";
+    if (!versionLifecycleEnabled) return legacyWord;
+    const statuses = deriveVersionStatuses(
+      allVersions.map((v) => ({
+        id: v.id,
+        versionNumber: v.versionNumber,
+        language: v.language,
+        publishedAt: v.publishedAt,
+        archivedAt: v.archivedAt ?? null,
+      })),
+    );
+    // The open version is always in allVersions; fall back to the legacy
+    // wording defensively if a fixture ever omits it.
+    return statuses.get(version.id) ?? legacyWord;
+  }, [versionLifecycleEnabled, allVersions, version.id, isPublished]);
+
   return (
     <div className="space-y-6">
       {/* ───────── Header (WF16/17/18 page-header-row) ───────── */}
@@ -506,12 +563,12 @@ export function TabbedShell({
             <span
               data-testid="template-editor-version-pill"
               className={
-                isPublished
-                  ? "wf-version-pill-published"
-                  : "wf-version-pill-draft"
+                pillStatusWord === "draft"
+                  ? "wf-version-pill-draft"
+                  : "wf-version-pill-published"
               }
             >
-              v{version.versionNumber} ({isPublished ? "published" : "draft"})
+              v{version.versionNumber} ({pillStatusWord})
             </span>
             <span className="wf-pill wf-pill-access-invited">
               {template.accessMode ?? "INVITED"}
@@ -675,6 +732,7 @@ export function TabbedShell({
               sendResultsDefault={sendResultsDefault}
               sendResultsDefaultSaving={savingSendResultsDefault}
               onSendResultsDefaultChange={handleSendResultsDefaultChange}
+              versionLifecycleEnabled={versionLifecycleEnabled}
             />
           </div>
         </TabsContent>
@@ -796,11 +854,21 @@ export function TabbedShell({
                 language: v.language,
                 publishedAt: v.publishedAt,
                 contentHash: v.contentHash,
+                // Wave ED8 — lifecycle status input; null-normalized so the
+                // derivation helper sees a complete row.
+                archivedAt: v.archivedAt ?? null,
               }))}
               publishingVersionId={publishingVersionId}
               duplicatingVersionId={duplicatingVersionId}
               onPublish={handlePublishVersion}
               onDuplicate={handleDuplicateVersion}
+              versionLifecycleEnabled={versionLifecycleEnabled}
+              archivingVersionId={archivingVersionId}
+              unarchivingVersionId={unarchivingVersionId}
+              deletingVersionId={deletingVersionId}
+              onArchive={handleArchiveVersion}
+              onUnarchive={handleUnarchiveVersion}
+              onDelete={handleDeleteVersion}
             />
           </div>
         </TabsContent>

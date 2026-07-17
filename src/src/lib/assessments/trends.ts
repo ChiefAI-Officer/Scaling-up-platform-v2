@@ -32,10 +32,12 @@
  *  - Sorting: campaigns by `openAt` ASC (oldest → newest, left → right
  *    on the time-series chart). Submissions inside a campaign by
  *    `submittedAt` ASC for stable rendering.
- *  - "Latest version" = the most recent `publishedAt`. Ties broken by
- *    `versionNumber` DESC. v1 has a single published version per
- *    template (Rockefeller alias `RockHabits`, v1 enUS) — this code is
- *    written to be correct on day one with the v1.5 multi-version case.
+ *  - "Latest version" = the most recent `publishedAt` among NON-ARCHIVED
+ *    rows (Wave ED8 — archived versions are skipped as the anchor; their
+ *    campaigns count as excluded). Ties broken by `versionNumber` DESC. v1
+ *    has a single published version per template (Rockefeller alias
+ *    `RockHabits`, v1 enUS) — this code is written to be correct on day one
+ *    with the v1.5 multi-version case.
  *  - Soft-delete (SEC-M6): the Wave-D migration added
  *    `AssessmentCampaign.deletedAt`. Deleted campaigns are excluded at the
  *    DB level (`deletedAt: null` in the campaign findMany where). A
@@ -130,6 +132,9 @@ interface VersionRow {
   versionNumber: number;
   language: string;
   publishedAt: Date | null;
+  // Wave ED8 — archived versions are skipped by selectLatestVersion but the
+  // loader still fetches them (excluded-campaign bookkeeping needs the rows).
+  archivedAt: Date | null;
   questions: unknown;
 }
 
@@ -273,13 +278,20 @@ function mean(values: number[]): number {
 }
 
 /**
- * Choose the latest published version. Highest `publishedAt`; ties broken
- * by highest `versionNumber`. Already-published rows only.
+ * Choose the latest ACTIVE (published + non-archived) version. Highest
+ * `publishedAt`; ties broken by highest `versionNumber`.
+ *
+ * Wave ED8 — archived rows are skipped here (persisted admin intent, never
+ * flag-gated). Consequence: archiving/rolling back the newest version also
+ * rolls the trends anchor back to the previous published version — INTENDED
+ * (spec 19ak §8), not a bug. Campaigns riding the archived version move into
+ * the excluded-campaign count rather than vanishing.
  */
 function selectLatestVersion(rows: VersionRow[]): VersionRow | null {
   let latest: VersionRow | null = null;
   for (const r of rows) {
     if (r.publishedAt === null) continue;
+    if (r.archivedAt !== null) continue;
     if (latest === null) {
       latest = r;
       continue;
@@ -314,6 +326,10 @@ export async function getLongitudinalTrend(
       where: { id: organizationId },
       select: { id: true, name: true, deletedAt: true },
     }),
+    // Wave ED8 — this loader deliberately KEEPS loading ALL published rows
+    // (archived included): publishedCount + excluded-campaign bookkeeping
+    // need every published version's row. Archived-exclusion happens in
+    // selectLatestVersion (anchor choice only).
     db.assessmentTemplateVersion.findMany({
       where: { templateId, publishedAt: { not: null } },
       orderBy: [{ publishedAt: "desc" }, { versionNumber: "desc" }],
@@ -323,6 +339,7 @@ export async function getLongitudinalTrend(
         versionNumber: true,
         language: true,
         publishedAt: true,
+        archivedAt: true,
         questions: true,
       },
     }),

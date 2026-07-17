@@ -81,6 +81,9 @@ interface DbFixture {
     versionNumber: number;
     language: string;
     publishedAt: Date | null;
+    // ED8 — optional in fixtures; buildDb defaults it to null (non-archived),
+    // matching the real Prisma row shape.
+    archivedAt?: Date | null;
     questions: Array<{ stableKey: string; label: string; sortOrder: number }>;
   }>;
   campaigns: CampaignFixture[];
@@ -107,7 +110,11 @@ function buildDb(f: DbFixture): TrendsDb {
         ),
     },
     assessmentTemplateVersion: {
-      findMany: jest.fn().mockResolvedValue(f.versions),
+      // ED8 — real rows always carry archivedAt (Date | null); default the
+      // fixture to non-archived so the strict `!== null` skip stays honest.
+      findMany: jest
+        .fn()
+        .mockResolvedValue(f.versions.map((v) => ({ archivedAt: null, ...v }))),
     },
     assessmentCampaign: {
       findMany: jest.fn().mockResolvedValue(
@@ -494,6 +501,85 @@ describe("getLongitudinalTrend", () => {
     expect(out.excludedCampaignCount).toBe(1);
     expect(out.hasMultipleVersions).toBe(true);
     expect(out.latestVersion.id).toBe("ver-2");
+  });
+
+  it("ED8: archived latest is skipped — the previous published version becomes the trend anchor", async () => {
+    // v2 is the newest published version but was archived (e.g. a rollback —
+    // spec 19ak §8: rolling back also rolls the trends anchor back, intended).
+    // The campaign riding the archived version stays visible to the
+    // excluded-campaign bookkeeping (it is counted, not vanished).
+    const db = buildDb({
+      versions: [
+        v1,
+        { ...v2, archivedAt: new Date("2026-07-01T00:00:00Z") },
+      ],
+      campaigns: [
+        {
+          id: "c-on-archived",
+          name: "Campaign on archived v2",
+          alias: "acme_arch",
+          openAt: new Date("2026-05-01T00:00:00Z"),
+          closeAt: null,
+          status: "ACTIVE",
+          versionId: "ver-2",
+          versionNumber: 2,
+          language: "enUS",
+          submissions: [],
+        },
+        {
+          id: "c-on-v1",
+          name: "Campaign on v1",
+          alias: "acme_v1",
+          openAt: new Date("2026-02-01T00:00:00Z"),
+          closeAt: null,
+          status: "ACTIVE",
+          versionId: "ver-1",
+          versionNumber: 1,
+          language: "enUS",
+          submissions: [
+            {
+              respondentId: "r-1",
+              respondentName: { firstName: "A", lastName: "A" },
+              submittedAt: new Date("2026-02-10T00:00:00Z"),
+              result: buildResult({
+                countAchieved: 10,
+                overallTotal: 30,
+                overallAverage: 1.0,
+                perQuestion: [{ stableKey: "Q1", value: 3 }],
+              }),
+            },
+          ],
+        },
+      ],
+    });
+
+    const out = await getLongitudinalTrend(db, "tpl-1", "org-1");
+
+    // Anchor rolled back to v1 (archived v2 skipped).
+    expect(out.latestVersion.id).toBe("ver-1");
+    expect(out.campaigns).toHaveLength(1);
+    expect(out.campaigns[0].campaign.id).toBe("c-on-v1");
+    // Bookkeeping still sees the archived version's campaign: excluded, not lost.
+    expect(out.excludedCampaignCount).toBe(1);
+    // The loader keeps ALL published rows (archived included) — publishedCount
+    // still counts v2, so the multi-version banner stays truthful.
+    expect(out.hasMultipleVersions).toBe(true);
+  });
+
+  it("ED8: every published version archived → empty placeholder (same as never-published)", async () => {
+    const db = buildDb({
+      versions: [
+        { ...v1, archivedAt: new Date("2026-07-01T00:00:00Z") },
+        { ...v2, archivedAt: new Date("2026-07-02T00:00:00Z") },
+      ],
+      campaigns: [],
+    });
+
+    const out = await getLongitudinalTrend(db, "tpl-1", "org-1");
+
+    expect(out.campaigns).toEqual([]);
+    expect(out.latestVersion.id).toBe("");
+    expect(out.latestVersion.versionNumber).toBe(0);
   });
 
   it("missing template → throws", async () => {

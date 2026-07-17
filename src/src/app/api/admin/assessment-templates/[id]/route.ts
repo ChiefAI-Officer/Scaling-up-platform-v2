@@ -60,6 +60,10 @@ export async function GET(
             publishedBy: true,
             contentHash: true,
             createdAt: true,
+            // Wave ED8 (spec 19ak §4) — display list only: consumers can
+            // derive lifecycle status. NO filter change — drafts + archived
+            // versions stay listed (historical submissions stay reachable).
+            archivedAt: true,
           },
           orderBy: [{ versionNumber: "desc" }, { language: "asc" }],
         },

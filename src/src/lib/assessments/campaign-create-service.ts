@@ -6,11 +6,18 @@
  * so any future code that calls into the campaign-create service
  * directly cannot bypass it.
  *
- * `resolvePublishedTemplateVersion` returns the latest PUBLISHED version
- * for a (templateId, language) pair OR throws `CampaignCreateError` with
- * code `TEMPLATE_VERSION_NOT_PUBLISHED` when no published version exists.
+ * `resolvePublishedTemplateVersion` returns the latest ACTIVE version —
+ * published AND non-archived (Wave ED8, spec 19ak §4) — for a
+ * (templateId, language) pair OR throws `CampaignCreateError` with
+ * code `TEMPLATE_VERSION_NOT_PUBLISHED` when no such version exists
+ * (never published, or every published version archived).
  * The API route layer catches this and maps it to 422.
+ *
+ * Wave-Q doctrine: archived-exclusion is PERSISTED admin intent — it lives
+ * in the DB `where` (`activePublishedWhere`) and is NEVER flag-gated.
  */
+
+import { activePublishedWhere } from "@/lib/assessments/active-version";
 
 export type CampaignCreateCode = "TEMPLATE_VERSION_NOT_PUBLISHED";
 
@@ -35,6 +42,7 @@ export interface CampaignCreateDb {
         templateId: string;
         language: string;
         publishedAt: { not: null };
+        archivedAt: null;
       };
       orderBy: { versionNumber: "desc" };
     }) => Promise<{
@@ -47,9 +55,12 @@ export interface CampaignCreateDb {
 }
 
 /**
- * Return the latest PUBLISHED version for the (templateId, language) pair.
- * Throws `CampaignCreateError("TEMPLATE_VERSION_NOT_PUBLISHED")` when no
- * row satisfies `publishedAt IS NOT NULL`.
+ * Return the latest ACTIVE (published + non-archived) version for the
+ * (templateId, language) pair. Throws
+ * `CampaignCreateError("TEMPLATE_VERSION_NOT_PUBLISHED")` when no row
+ * satisfies `publishedAt IS NOT NULL AND archivedAt IS NULL` — an archived
+ * Active falls through to the previous published version; an all-archived
+ * template throws exactly like a never-published one (Wave ED8).
  */
 export async function resolvePublishedTemplateVersion(
   db: CampaignCreateDb,
@@ -65,7 +76,10 @@ export async function resolvePublishedTemplateVersion(
     where: {
       templateId,
       language,
-      publishedAt: { not: null },
+      // Wave ED8 — Active = published + non-archived. Archived-exclusion is
+      // PERSISTED admin intent (Wave-Q doctrine): expressed in the DB where,
+      // NEVER flag-gated.
+      ...activePublishedWhere,
     },
     orderBy: { versionNumber: "desc" },
   });

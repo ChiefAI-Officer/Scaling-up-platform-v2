@@ -242,6 +242,28 @@ describe("PUT /api/admin/assessment-templates/[id]/benchmarks", () => {
     expect(reconcileQuestionBenchmarks).not.toHaveBeenCalled();
   });
 
+  it("ED8: validKeys resolve from the ACTIVE version — where excludes archived (never flag-gated)", async () => {
+    // Archived-exclusion is PERSISTED admin intent (Wave-Q doctrine); an
+    // all-archived template models as findFirst → null → the 409 above.
+    // Here: the latest-published query itself must carry archivedAt: null.
+    (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue(null);
+    const res = await PUT(
+      putReq({ entries: [{ stableKey: "S3_market", value: 5 }] }) as never,
+      routeParams,
+    );
+    expect(res.status).toBe(409);
+    expect(db.assessmentTemplateVersion.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          templateId: "tpl-1",
+          publishedAt: { not: null },
+          archivedAt: null,
+        },
+        orderBy: { versionNumber: "desc" },
+      }),
+    );
+  });
+
   it("400 with the validation code when reconcile throws PeerBenchmarkValidationError", async () => {
     (reconcileQuestionBenchmarks as jest.Mock).mockImplementationOnce(() => {
       throw new PeerBenchmarkValidationError(

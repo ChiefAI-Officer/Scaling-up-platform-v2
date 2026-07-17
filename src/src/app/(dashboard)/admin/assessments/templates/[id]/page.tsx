@@ -40,11 +40,24 @@ export default async function AdminAssessmentTemplateDetailPage({
   });
   if (!template) notFound();
 
-  const latestVersion = await db.assessmentTemplateVersion.findFirst({
-    where: { templateId: id },
-    orderBy: { versionNumber: "desc" },
-    select: { id: true },
-  });
+  // Wave ED8 (spec 19ak §5, post-rollback landing) — prefer the highest
+  // NON-ARCHIVED version (draft or published): after a rollback the operator
+  // should land on the version that matters, not the version they just
+  // retired. UNCONDITIONAL (Wave-Q doctrine): `archivedAt` is persisted admin
+  // intent on a read path, so this is never flag-gated.
+  const latestVersion =
+    (await db.assessmentTemplateVersion.findFirst({
+      where: { templateId: id, archivedAt: null },
+      orderBy: { versionNumber: "desc" },
+      select: { id: true },
+    })) ??
+    // Every version archived — fall back to the overall max so the redirect
+    // still lands somewhere (the editor renders archived versions read-only).
+    (await db.assessmentTemplateVersion.findFirst({
+      where: { templateId: id },
+      orderBy: { versionNumber: "desc" },
+      select: { id: true },
+    }));
 
   if (!latestVersion) {
     // Shouldn't happen in current flows — every template has at least v1

@@ -222,6 +222,28 @@ describe("POST /api/assessment-campaigns", () => {
     expect(body.error).toBe("TEMPLATE_VERSION_NOT_PUBLISHED");
   });
 
+  it("ED8: version resolution carries the archived-exclusion where (persisted admin intent — never flag-gated)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    // All-archived template models as findFirst → null under the Active
+    // where; the route must 422 exactly like never-published.
+    (db.assessmentTemplateVersion.findFirst as jest.Mock).mockResolvedValue(null);
+    const res = await POST(jsonReq(validBody) as never);
+    expect(res.status).toBe(422);
+    expect(db.assessmentTemplateVersion.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          templateId: "tpl-1",
+          // C4 — the shared DEFAULT_TEMPLATE_LANGUAGE (value-identical to the
+          // old local constant).
+          language: "enUS",
+          publishedAt: { not: null },
+          archivedAt: null,
+        },
+        orderBy: { versionNumber: "desc" },
+      }),
+    );
+  });
+
   // ───────────────────────────────────────────────────────────────────────
   // Wave Q (#6) — disabled templates are rejected UNCONDITIONALLY (durable
   // rule: enforcement of persisted admin intent is never flag-gated).
