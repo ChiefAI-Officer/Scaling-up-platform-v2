@@ -55,9 +55,20 @@ interface SectionPagerProps {
    * is SU-Full-only AND CEO-only (team members never see it).
    */
   isCEO?: boolean;
+  /**
+   * ED10 Task 4 — additive, default-OFF read-only preview (the editor Preview
+   * tab reuses this LIVE respondent pager). When true: every question control
+   * is DISABLED (its `<label>`/help text stay in the accessibility tree — C4:
+   * we freeze via `disabled`, NOT `inert`, so the content stays readable), Next
+   * always advances (both the required-answer gate AND requireAtLeastOneAnswer
+   * are no-ops), and every submit affordance (last-page Submit, empty-state
+   * Submit) is disabled so `onSubmit` never fires. The live INVITED/PUBLIC
+   * survey passes nothing here ⇒ byte-identical when off.
+   */
+  previewMode?: boolean;
 }
 
-export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName, requireAtLeastOneAnswer, templateAlias, isCEO }: SectionPagerProps) {
+export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitting, onExit, assessmentName, companyName, requireAtLeastOneAnswer, templateAlias, isCEO, previewMode }: SectionPagerProps) {
   const [sectionIndex, setSectionIndex] = React.useState(0);
   // Wave J-1: when set, the SU-Full growth-phase interstitial is shown in place
   // of the next section. Continue clears it and performs the real advance. It is
@@ -74,11 +85,23 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
   // Release the synchronous double-click latch once a submit settles.
   React.useEffect(() => { if (!submitting) submitLatch.current = false; }, [submitting]);
 
+  // ED10 Task 4 — the Preview tab swaps the `pages` array when the author
+  // toggles Active↔draft (or a page is dropped), which can leave `sectionIndex`
+  // pointing past the shorter list. Clamp it back into range. This is a pure
+  // safety net: for a STABLE `pages` array (the live survey never shrinks its
+  // pages mid-session) the guard is false and `setSectionIndex` never fires, so
+  // the flag-OFF render is byte-identical.
+  React.useEffect(() => {
+    if (sectionIndex > pages.length - 1) {
+      setSectionIndex(pages.length > 0 ? pages.length - 1 : 0);
+    }
+  }, [pages.length, sectionIndex]);
+
   if (!page) {
     return (
       <div className="su-assessment-brand survey-section">
         <p>Nothing to answer yet.</p>
-        <button type="button" className="wf-btn wf-btn-primary" onClick={onSubmit} disabled={submitting}>Submit</button>
+        <button type="button" className="wf-btn wf-btn-primary" onClick={previewMode ? undefined : onSubmit} disabled={submitting || previewMode}>Submit</button>
       </div>
     );
   }
@@ -168,6 +191,7 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     focusHeading();
   }
   function attemptSubmit() {
+    if (previewMode) return; // ED10 preview never submits (defensive — handleNext also short-circuits)
     const totalAnswered = sectionQuestions(pages).filter((q) => isAnswered(answers[q.stableKey])).length;
     if (requireAtLeastOneAnswer && totalAnswered === 0) {
       setGateMessage("Please answer at least one question before submitting.");
@@ -180,6 +204,13 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
     onSubmit();
   }
   function handleNext() {
+    // ED10 preview: skip the required-answer gate entirely — Next always
+    // advances; on the last page the Submit button is disabled (below) and this
+    // never enters the submit branch, so onSubmit can't fire.
+    if (previewMode) {
+      if (!isLast) advance();
+      return;
+    }
     // The required-answer gate is a no-op on a slide page (pageQuestions === []),
     // so a slide's forward button always advances (or submits, if trailing).
     const unanswered = pageQuestions.filter((q) => q.isRequired && !isAnswered(answers[q.stableKey]));
@@ -234,7 +265,7 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
 
         <div className="survey-nav">
           <button type="button" className="wf-btn wf-btn-secondary" onClick={handleBack}>Back</button>
-          <button type="button" className="wf-btn wf-btn-primary" onClick={handleNext} disabled={submitting}>{isLast ? "Submit" : "Next"}</button>
+          <button type="button" className="wf-btn wf-btn-primary" onClick={handleNext} disabled={submitting || (previewMode && isLast)}>{isLast ? "Submit" : "Next"}</button>
         </div>
       </div>
     );
@@ -288,7 +319,7 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
                 {q.label}{q.isRequired ? <span className="survey-required" aria-hidden="true"> *</span> : null}
               </label>
               {q.helpText ? <p className="survey-question-help">{q.helpText}</p> : null}
-              <QuestionInput question={q} value={answers[q.stableKey]} onChange={handleAnswerChange} disabled={submitting} invalid={invalidKeys.has(q.stableKey)} />
+              <QuestionInput question={q} value={answers[q.stableKey]} onChange={handleAnswerChange} disabled={submitting || previewMode} invalid={invalidKeys.has(q.stableKey)} />
             </li>
           ))}
         </ul>
@@ -298,7 +329,7 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
 
       <div className="survey-nav">
         <button type="button" className="wf-btn wf-btn-secondary" onClick={handleBack}>Back</button>
-        <button type="button" className="wf-btn wf-btn-primary" onClick={handleNext} disabled={submitting}>{isLast ? "Submit" : "Next"}</button>
+        <button type="button" className="wf-btn wf-btn-primary" onClick={handleNext} disabled={submitting || (previewMode && isLast)}>{isLast ? "Submit" : "Next"}</button>
       </div>
     </div>
   );
