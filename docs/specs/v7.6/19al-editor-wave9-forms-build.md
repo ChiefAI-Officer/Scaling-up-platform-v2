@@ -1,7 +1,7 @@
 <!-- SPEC_ID:19al STATUS:DRAFT GATED WAVE:ED9 -->
 # 19al — Wave ED9: Build-tab Forms overhaul (design + SoT)
 
-**Status:** DRAFT · GATED (visual mockups approved + grilled 2026-07-17; per-wave plan = `19al-plan-wave9-forms-build.md`). No code until the plan is co-validated and the user authorizes the build.
+**Status:** BUILT · DARK (2026-07-17) — branch `feat/wave-ed9-forms-build`, 13 TDD tasks green behind `WAVE_ED9_FORMS_BUILD_ENABLED` (default OFF ⇒ byte-identical to ED6). House gate: full editor sweep **608 tests / 54 suites** green (734 with the a11y polish sweep), frozen `editor-byte-equivalence` 15/15 + `three-pane-parity` 20/20 **zero-diff**, 7 golden `innerHTML` snapshots unchanged, eslint clean, `CI=true next build --turbopack` (flag ON) compiles, final adversarial review = **SHIP** (0 Critical/Important). Launch = set `WAVE_ED9_FORMS_BUILD_ENABLED=1` on Vercel Production + redeploy + live-app walk; then the CLAUDE.md anchor + CHANGELOG `ed9-forms-build-launched` entry. _(Was: DRAFT · GATED — visual mockups approved + grilled 2026-07-17; plan co-validated by Codex.)_
 
 **Ticket:** #5 of the 10-ticket editor-simplification pipeline (governing principle: *the whole assessment editor as simple as possible*). ED7 shipped #1–#2, ED8 (version lifecycle) shipped as #3, the design-review Artifact was #4.
 
