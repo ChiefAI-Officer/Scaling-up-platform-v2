@@ -46,11 +46,17 @@ jest.mock("@/components/ui/use-toast", () => ({
 
 // ── window.confirm ──────────────────────────────────────────────────────────
 const originalConfirm = window.confirm;
+// installFetch() reassigns global.fetch directly (not a jest.spyOn), so
+// afterEach's restoreAllMocks() would not undo it — snapshot + restore it here
+// for hygiene parity with window.confirm. (jsdom recreates the global sandbox
+// per test file, so this can't cross file boundaries either way.)
+const originalFetch = global.fetch;
 beforeAll(() => {
   window.confirm = jest.fn(() => true) as unknown as typeof window.confirm;
 });
 afterAll(() => {
   window.confirm = originalConfirm;
+  global.fetch = originalFetch;
 });
 
 // ── console.error — capture the jsdom navigation signal, forward the rest ────
