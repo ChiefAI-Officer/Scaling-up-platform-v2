@@ -16,7 +16,7 @@
  * byte-identical to the pre-ED3 QuestionsTab inspector column.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type {
   QuestionDraftRow,
@@ -30,6 +30,10 @@ import { resolveFindings } from "@/lib/assessments/findings";
 import { QuestionInput } from "@/components/assessments/question-input";
 import { toQuestionForInput, shapeSignature } from "./question-widget-mapper";
 import { QUESTION_TYPE_LABELS } from "./enum-labels";
+import {
+  useQuestionEditorActions,
+  countFindingRules,
+} from "./hooks/useQuestionEditorActions";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -65,72 +69,6 @@ interface QuestionInspectorProps {
    * legacy). Additive; the ED3 guard + QuestionInspector.test.tsx stay green.
    */
   bare?: boolean;
-}
-
-/** Wave U — how many findings rules a draft question currently carries. */
-function countFindingRules(q: QuestionDraft): number {
-  if (q.type === "SLIDER_LIKERT" || q.type === "NUMBER") {
-    return q.findingBands.filter((b) => b.text.trim() !== "").length;
-  }
-  if (q.type === "MULTI_CHOICE") {
-    return Object.values(q.findingOptionTexts).filter((t) => t.trim() !== "")
-      .length;
-  }
-  return 0;
-}
-
-/**
- * Wave U D21 — ANY retype drops that question's findings rules (even the
- * band-compatible SLIDER→NUMBER — re-author deliberately).
- */
-function buildTypeChangeFindingsConfirmText(
-  ruleCount: number,
-  fromType: string,
-  toType: string,
-): string {
-  return [
-    `Change this question's type from ${fromType} to ${toType}?`,
-    "",
-    `It carries ${ruleCount} finding rule${ruleCount === 1 ? "" : "s"} — changing the type removes ${
-      ruleCount === 1 ? "it" : "them all"
-    }. Re-author findings for the new type deliberately.`,
-    "",
-    "Continue?",
-  ].join("\n");
-}
-
-/**
- * Wave T D9 — removing an option whose key exists in a published version
- * orphans its `S5_why_<optionKey>` conditional followup pairing and breaks
- * the option's historical vote-share continuity.
- */
-function buildOptionRemoveConfirmText(
-  optionKey: string,
-  questionStableKey: string,
-): string {
-  return [
-    `Remove option "${optionKey}" from ${questionStableKey}?`,
-    "",
-    "This option key exists in a published version. Removing it:",
-    `• breaks its "S5_why_${optionKey}"-style conditional followup pairing;`,
-    "• ends the option's historical vote-share continuity across versions.",
-    "",
-    "Continue?",
-  ].join("\n");
-}
-
-/**
- * Wave T D9 (co-validate C4) — changing an inherited slider's scale
- * (min/max/step) drifts its measurement semantics across versions.
- */
-function buildScaleChangeConfirmText(questionStableKey: string): string {
-  return [
-    `Change the scale of inherited question ${questionStableKey}?`,
-    "",
-    "This question exists in a published version. Changing scale min/max/step drifts its measurement semantics across versions — answers before and after will be on different scales.",
-    "",
-    "Continue?",
-  ].join("\n");
 }
 
 /**
@@ -639,109 +577,20 @@ export function QuestionInspector({
 }: QuestionInspectorProps) {
   const [numberOpen, setNumberOpen] = useState(false);
   const [multiOpen, setMultiOpen] = useState(false);
-  // D9 scale-change warning — acknowledged once per question per session.
-  const scaleAckUidsRef = useRef<Set<string>>(new Set());
 
-  // Wave T — scale edits on an INHERITED slider warn once (measurement-
-  // semantics drift), then apply silently for that question. Cancel
-  // discards the field change. Locked mode keeps today's silent behavior.
-  const handleScaleUpdate = (
-    patch: Pick<Partial<QuestionDraft>, "scaleMin" | "scaleMax" | "scaleStep">,
-  ) => {
-    if (!question) return;
-    if (
-      isUnlocked &&
-      question.isInherited &&
-      !scaleAckUidsRef.current.has(question.uid)
-    ) {
-      const ok = window.confirm(
-        buildScaleChangeConfirmText(question.stableKey),
-      );
-      if (!ok) return;
-      scaleAckUidsRef.current.add(question.uid);
-    }
-    onUpdate(patch);
-  };
-
-  const handleRemoveOption = (idx: number) => {
-    if (!question) return;
-    const opt = question.options[idx];
-    if (!opt) return;
-    const published = publishedOptionKeys[question.stableKey] ?? [];
-    const hasRule =
-      findingsEnabled &&
-      opt.key !== "" &&
-      (question.findingOptionTexts[opt.key] ?? "").trim() !== "";
-    // Wave W — other questions shown conditionally on THIS option lose
-    // their rule with it (confirm-drop, never silent).
-    const optionDependents =
-      conditionalEnabled && opt.key !== ""
-        ? showIfDependents.filter((d) => d.showIf?.optionKey === opt.key)
-        : [];
-    if (opt.key !== "" && (published.includes(opt.key) || optionDependents.length > 0)) {
-      const ok = window.confirm(
-        buildOptionRemoveConfirmText(opt.key, question.stableKey) +
-          (hasRule
-            ? `\n\nIt also carries a finding rule, which will be removed with it.`
-            : "") +
-          (optionDependents.length > 0
-            ? `\n\n${optionDependents.length} question${optionDependents.length === 1 ? "" : "s"} shown conditionally on this option will become always-visible: ${optionDependents.map((d) => d.stableKey).join(", ")}.`
-            : ""),
-      );
-      if (!ok) return;
-    }
-    // Wave U — removing an option drops its finding rule with it (silently
-    // for new-to-draft options; named in the confirm above for published).
-    const patch: Partial<QuestionDraft> = {
-      options: question.options.filter((_, i) => i !== idx),
-    };
-    if (opt.key !== "" && question.findingOptionTexts[opt.key] !== undefined) {
-      const texts = { ...question.findingOptionTexts };
-      delete texts[opt.key];
-      patch.findingOptionTexts = texts;
-    }
-    onUpdate(patch);
-    if (optionDependents.length > 0) {
-      onClearDependents(optionDependents.map((d) => d.uid));
-    }
-  };
-
-  // Wave U D21 — ANY retype drops the question's findings rules, behind a
-  // confirm naming the loss. (Retype is only possible on new-to-draft
-  // questions — the dropdown is disabled for inherited ones.)
-  const handleTypeChange = (nextType: string) => {
-    if (!question || nextType === question.type) return;
-    // Wave W — retyping a gate away from MULTI_CHOICE strands its
-    // dependents' rules; confirm names them, then their rules are cleared.
-    const typeDependents =
-      conditionalEnabled &&
-      question.type === "MULTI_CHOICE" &&
-      nextType !== "MULTI_CHOICE"
-        ? showIfDependents
-        : [];
-    const ruleCount = findingsEnabled ? countFindingRules(question) : 0;
-    if (ruleCount > 0 || typeDependents.length > 0) {
-      const ok = window.confirm(
-        (ruleCount > 0
-          ? buildTypeChangeFindingsConfirmText(ruleCount, question.type, nextType)
-          : `Change question type ${question.type} → ${nextType}?`) +
-          (typeDependents.length > 0
-            ? `\n\n${typeDependents.length} question${typeDependents.length === 1 ? "" : "s"} shown conditionally on this one will become always-visible: ${typeDependents.map((d) => d.stableKey).join(", ")}.`
-            : ""),
-      );
-      if (!ok) return;
-      if (ruleCount > 0) {
-        onUpdate({ type: nextType, findingBands: [], findingOptionTexts: {} });
-      } else {
-        onUpdate({ type: nextType });
-      }
-      if (typeDependents.length > 0) {
-        onClearDependents(typeDependents.map((d) => d.uid));
-      }
-      return;
-    }
-    onUpdate({ type: nextType });
-  };
+  // ED9 T3 — the destructive edits (type change / option remove / inherited-
+  // slider scale change) run through the SHARED command layer so the future
+  // inline type-picker performs the identical confirm(s) + findings/showIf
+  // drops. The hook owns the once-per-question scale-ack ref.
+  const { changeType, removeOption, updateScale } = useQuestionEditorActions({
+    isUnlocked,
+    findingsEnabled,
+    conditionalEnabled,
+    showIfDependents,
+    onClearDependents,
+    publishedOptionKeys,
+    onUpdate,
+  });
 
   if (!question) {
     return (
@@ -815,7 +664,7 @@ export function QuestionInspector({
           <select
             id={`q-type-${question.uid}`}
             value={question.type}
-            onChange={(e) => handleTypeChange(e.target.value)}
+            onChange={(e) => changeType(question, e.target.value)}
             disabled={isReadOnly || question.isInherited}
             className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
           >
@@ -832,7 +681,7 @@ export function QuestionInspector({
           <select
             id={`q-type-${question.uid}`}
             value={question.type}
-            onChange={(e) => handleTypeChange(e.target.value)}
+            onChange={(e) => changeType(question, e.target.value)}
             disabled={isReadOnly}
             className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
           >
@@ -1005,7 +854,7 @@ export function QuestionInspector({
               type="number"
               value={question.scaleMin}
               onChange={(e) =>
-                handleScaleUpdate({ scaleMin: Number(e.target.value) })
+                updateScale(question, { scaleMin: Number(e.target.value) })
               }
               disabled={isReadOnly}
               className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
@@ -1023,7 +872,7 @@ export function QuestionInspector({
               type="number"
               value={question.scaleMax}
               onChange={(e) =>
-                handleScaleUpdate({ scaleMax: Number(e.target.value) })
+                updateScale(question, { scaleMax: Number(e.target.value) })
               }
               disabled={isReadOnly}
               className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
@@ -1041,7 +890,7 @@ export function QuestionInspector({
               type="number"
               value={question.scaleStep}
               onChange={(e) =>
-                handleScaleUpdate({ scaleStep: Number(e.target.value) })
+                updateScale(question, { scaleStep: Number(e.target.value) })
               }
               disabled={isReadOnly}
               className="wf-input disabled:opacity-60 disabled:cursor-not-allowed"
@@ -1163,7 +1012,7 @@ export function QuestionInspector({
                 <button
                   type="button"
                   data-testid={`q-option-remove-${idx}`}
-                  onClick={() => handleRemoveOption(idx)}
+                  onClick={() => removeOption(question, idx)}
                   disabled={isReadOnly}
                   className="text-xs font-medium px-2 py-1 rounded text-destructive hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
