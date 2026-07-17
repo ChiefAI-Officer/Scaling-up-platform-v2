@@ -267,6 +267,14 @@ export interface TabbedShellProps {
    * derived status.
    */
   versionLifecycleEnabled?: boolean;
+  /**
+   * Wave ED10 (spec 19am-plan) — Metadata→Preview + Settings tab rebuild.
+   * Server-computed (`isPreviewSettingsEnabled()`) and passed down from the
+   * edit page. Default false ⇒ the editor renders byte-identical to today's
+   * ED9 shell (Metadata tab, no Settings tab). Reserved for later ED10 tasks;
+   * inert today (accepted + defaulted, not yet read). Presentation-only.
+   */
+  previewSettingsEnabled?: boolean;
 }
 
 /**
@@ -323,6 +331,12 @@ export function TabbedShell({
   singleColumnEnabled = false,
   formsBuildEnabled = false,
   versionLifecycleEnabled = false,
+  // ED10 Task 1 (spec 19am-plan): plumbed through but intentionally inert —
+  // a later ED10 task reads it to gate the Preview/Settings rebuild. Kept in
+  // the destructure (mirroring formsBuildEnabled) so the prop is accepted +
+  // defaulted today; referencing it anywhere now would change rendering.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  previewSettingsEnabled = false,
   model,
 }: TabbedShellProps & {
   /**

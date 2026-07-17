@@ -25,6 +25,7 @@ import { isThreePaneEnabled } from "@/lib/assessments/wave-ed4-flags";
 import { isSingleColumnEnabled } from "@/lib/assessments/wave-ed6-flags";
 import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
 import { isFormsBuildEnabled } from "@/lib/assessments/wave-ed9-flags";
+import { isPreviewSettingsEnabled } from "@/lib/assessments/wave-ed10-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import { activePublishedWhere } from "@/lib/assessments/active-version";
 import {
@@ -241,6 +242,11 @@ export default async function AdminAssessmentVersionEditPage({
         // only; archived-exclusion in read paths is persisted admin intent
         // and never flag-gated (Wave-Q doctrine).
         versionLifecycleEnabled={isVersionLifecycleEnabled()}
+        // Wave ED10 — Metadata→Preview + Settings tab rebuild. Plumbed through
+        // now (Task 1); TabbedShell accepts + defaults it but does not read it
+        // yet. Default false ⇒ byte-identical ED9 shell. Presentation-only,
+        // kill = flag off + redeploy.
+        previewSettingsEnabled={isPreviewSettingsEnabled()}
       />
       {peerBenchmarkRows && (
         <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />
