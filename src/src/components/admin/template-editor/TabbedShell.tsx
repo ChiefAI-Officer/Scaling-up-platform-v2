@@ -81,13 +81,28 @@ type TabId =
   | "sections"
   | "questions"
   | "scoring"
-  | "versions";
+  | "versions"
+  // ED10 (spec 19am-plan, T3) — the Preview + Settings tabs. Valid ids ONLY
+  // when ed10Active (see editorTabConfig); the triggers/panels render in T10.
+  | "preview"
+  | "settings";
 
 const VALID_TAB_IDS: TabId[] = [
   "metadata",
   "sections",
   "questions",
   "scoring",
+  "versions",
+];
+
+// ED10 (spec 19am-plan, T3) — valid ids when ed10Active: the Metadata tab folds
+// into Settings and a Preview tab leads (Sections stays folded, ED6). Selected
+// by editorTabConfig; flag OFF ⇒ VALID_TAB_IDS above, byte-identical to today.
+const ED10_VALID_TAB_IDS: TabId[] = [
+  "preview",
+  "questions",
+  "scoring",
+  "settings",
   "versions",
 ];
 // NOTE (Wave W, spec 19w D5): the disabled "Conditional Logic" ghost tab is
@@ -104,6 +119,10 @@ const TAB_LABELS: Record<TabId, string> = {
   questions: "Questions",
   scoring: "Scoring & Tiers",
   versions: "Versions",
+  // ED10 (T3) — labels exist so Record<TabId, string> stays total; the
+  // triggers that render them are wired in T10 (dark until launch).
+  preview: "Preview",
+  settings: "Settings",
 };
 
 // ────────────────────────────────────────────────────────────────────────
@@ -297,20 +316,62 @@ const EMPTY_PUBLISHED_OPTION_KEYS: Record<string, string[]> = {};
 // ────────────────────────────────────────────────────────────────────────
 type AuthoringMode = "single" | "three" | "legacy";
 
-function resolveTabFromUrl(
+/**
+ * ED10 (spec 19am-plan, T3) — the valid-id set + param-less default, both
+ * DERIVED from ed10Active. Exported (pure) for unit tests.
+ *   ed10Active  → { preview, questions, scoring, settings, versions },
+ *                 default "preview" (Metadata folds into Settings; Preview
+ *                 leads).
+ *   otherwise   → today's set (VALID_TAB_IDS) + today's computed default
+ *                 ("questions" in a workspace mode, else "metadata") —
+ *                 byte-identical to the flag-OFF path. Forcing "metadata" as
+ *                 the inactive default here would regress ED9 forms mode (C5).
+ */
+export function editorTabConfig(
+  activeAuthoringMode: AuthoringMode,
+  ed10Active: boolean,
+): { defaultTab: TabId; validTabIds: readonly TabId[] } {
+  if (ed10Active) {
+    return { defaultTab: "preview", validTabIds: ED10_VALID_TAB_IDS };
+  }
+  return {
+    defaultTab: activeAuthoringMode !== "legacy" ? "questions" : "metadata",
+    validTabIds: VALID_TAB_IDS,
+  };
+}
+
+/**
+ * ED10 (spec 19am-plan, T3) — single source of truth for editor tab routing:
+ * maps the ?tab= URL param + the two mode signals to a resolved TabId. The
+ * component calls this for BOTH the initial tab and the URL-resync effect, so
+ * the unit tests exercise the exact production path. Exported (pure).
+ *
+ * Order matters:
+ *   1. ED6 (spec 19ah) — single-column folds the Sections tab into Build, so a
+ *      `?tab=sections` deep-link resolves to Build/questions (also holds under
+ *      ED10, where the mode is always single). `"questions"` stays valid.
+ *   2. ED10 — the Metadata tab is absorbed into Settings, so a stale
+ *      `?tab=metadata` resolves to Settings (metadata is NOT in the ED10 valid
+ *      set). Fires ONLY when ed10Active; flag OFF ⇒ metadata stays metadata.
+ *   3. Any other id in the (ed10Active-derived) valid set passes through.
+ *   4. Unknown / param-less ⇒ the (ed10Active-derived) default.
+ */
+export function resolveEditorTab(
   param: string | null,
-  defaultTab: TabId = "metadata",
-  activeAuthoringMode: AuthoringMode = "legacy",
+  activeAuthoringMode: AuthoringMode,
+  ed10Active: boolean,
 ): TabId {
-  // ED6 (spec 19ah) — single-column folds the Sections tab into the Build tab,
-  // so its trigger + panel don't exist. A `?tab=sections` deep-link (or any
-  // stale bookmark) resolves to the Build/questions tab so the URL never lands
-  // on a tab with no panel. `"questions"` stays a valid id (VALID_TAB_IDS is
-  // unchanged) — only the display label differs.
+  const { defaultTab, validTabIds } = editorTabConfig(
+    activeAuthoringMode,
+    ed10Active,
+  );
   if (activeAuthoringMode === "single" && param === "sections") {
     return "questions";
   }
-  if (param && (VALID_TAB_IDS as string[]).includes(param)) {
+  if (ed10Active && param === "metadata") {
+    return "settings";
+  }
+  if (param && (validTabIds as readonly string[]).includes(param)) {
     return param as TabId;
   }
   return defaultTab;
@@ -384,21 +445,26 @@ export function TabbedShell({
   // ("Build"/"Edit") tab becomes the param-less default (instead of Metadata).
   // Legacy ⇒ default stays "metadata", so the ?tab= routing is byte-identical
   // to today.
-  const defaultTab: TabId =
-    activeAuthoringMode !== "legacy" ? "questions" : "metadata";
-  const tabFromUrl = resolveTabFromUrl(
-    searchParams.get("tab"),
-    defaultTab,
+  // ED10 (T3) — the valid-id set + param-less default both derive from
+  // ed10Active (via editorTabConfig). Flag OFF ⇒ today's set + today's computed
+  // default (Build in a workspace mode, Metadata in legacy), byte-identical.
+  const { defaultTab, validTabIds } = editorTabConfig(
     activeAuthoringMode,
+    ed10Active,
+  );
+  const tabFromUrl = resolveEditorTab(
+    searchParams.get("tab"),
+    activeAuthoringMode,
+    ed10Active,
   );
   const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl);
 
   // Re-sync if the URL param changes externally (e.g. browser nav).
   useEffect(() => {
-    const next = resolveTabFromUrl(
+    const next = resolveEditorTab(
       searchParams.get("tab"),
-      defaultTab,
       activeAuthoringMode,
+      ed10Active,
     );
     // Intentional external-store sync: mirror the ?tab= URL param into local
     // tab state on external navigation (pre-ED3 behavior, byte-identical —
@@ -406,16 +472,16 @@ export function TabbedShell({
     // because handleTabChange also drives activeTab on user clicks.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTab((prev) => (prev === next ? prev : next));
-  }, [searchParams, defaultTab, activeAuthoringMode]);
+  }, [searchParams, activeAuthoringMode, ed10Active]);
 
   const handleTabChange = useCallback(
     (next: string) => {
-      if (!(VALID_TAB_IDS as string[]).includes(next)) return;
+      if (!(validTabIds as readonly string[]).includes(next)) return;
       setActiveTab(next as TabId);
       const params = new URLSearchParams(searchParams.toString());
       // The default tab is represented by the ABSENCE of ?tab= (so the URL and
-      // the tab stay bijective). Flag OFF ⇒ defaultTab is "metadata" — the
-      // pre-ED4 behavior, byte-identical.
+      // the tab stay bijective). Flag OFF ⇒ defaultTab is "metadata" (legacy)
+      // or "questions" (workspace mode) — the pre-ED10 behavior, byte-identical.
       if (next === defaultTab) {
         params.delete("tab");
       } else {
@@ -424,7 +490,7 @@ export function TabbedShell({
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
     },
-    [pathname, router, searchParams, defaultTab],
+    [pathname, router, searchParams, defaultTab, validTabIds],
   );
 
   // ─── Document model + save flow (ED3 Task 4; composed via Task 6's
