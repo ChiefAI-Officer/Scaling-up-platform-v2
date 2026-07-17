@@ -67,6 +67,10 @@ import {
   buildSectionDeletePrompt,
   collectSectionDeleteImpact,
 } from "@/components/admin/template-editor/question-commands";
+import {
+  ACCESS_MODE_LABELS,
+  AGGREGATION_MODE_LABELS,
+} from "@/components/admin/template-editor/enum-labels";
 import type { QuestionDraftRow } from "@/components/admin/template-editor/question-serialization";
 
 // ────────────────────────────────────────────────────────────────────────
@@ -331,11 +335,8 @@ export function TabbedShell({
   singleColumnEnabled = false,
   formsBuildEnabled = false,
   versionLifecycleEnabled = false,
-  // ED10 Task 1 (spec 19am-plan): plumbed through but intentionally inert —
-  // a later ED10 task reads it to gate the Preview/Settings rebuild. Kept in
-  // the destructure (mirroring formsBuildEnabled) so the prop is accepted +
-  // defaulted today; referencing it anywhere now would change rendering.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // ED10 (spec 19am-plan): gates the Preview/Settings rebuild. As of Task 2
+  // it feeds `ed10Active` (below), which humanizes the header pills.
   previewSettingsEnabled = false,
   model,
 }: TabbedShellProps & {
@@ -367,6 +368,16 @@ export function TabbedShell({
     : threePaneEnabled
       ? "three"
       : "legacy";
+
+  // ─── ED10 gate (spec 19am-plan, T2) ───────────────────────────────────
+  // The Preview/Settings rebuild lights up ONLY in the ED9 production shell
+  // (single-column + Google-Forms Build) with the ED10 flag on. Task 2 uses
+  // it to humanize the header access/aggregation pills; Task 3 reuses it. Any
+  // leg false ⇒ raw enums / today's shell, byte-identical to the flag-OFF path.
+  const ed10Active =
+    previewSettingsEnabled &&
+    formsBuildEnabled &&
+    activeAuthoringMode === "single";
 
   // ─── Tab selection ────────────────────────────────────────────────────
   // Wave ED4/ED6 — when a workspace mode is on (single or three), the Questions
@@ -608,10 +619,16 @@ export function TabbedShell({
               v{version.versionNumber} ({pillStatusWord})
             </span>
             <span className="wf-pill wf-pill-access-invited">
-              {template.accessMode ?? "INVITED"}
+              {ed10Active
+                ? (ACCESS_MODE_LABELS[template.accessMode ?? "INVITED"] ??
+                  (template.accessMode ?? "INVITED"))
+                : (template.accessMode ?? "INVITED")}
             </span>
             <span className="wf-pill wf-pill-agg-full">
-              {template.aggregationMode}
+              {ed10Active
+                ? (AGGREGATION_MODE_LABELS[template.aggregationMode] ??
+                  template.aggregationMode)
+                : template.aggregationMode}
             </span>
             <span style={{ fontStyle: "italic" }}>{caption}</span>
           </div>

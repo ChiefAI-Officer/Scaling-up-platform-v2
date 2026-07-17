@@ -16,3 +16,34 @@ export const QUESTION_TYPE_LABELS: Record<string, string> = {
   TEXTAREA: "Paragraph",
   COMPOUND: "Compound",
 };
+
+/**
+ * Wave ED10 (spec 19am-plan, T2) — friendly labels for the template-editor
+ * header pills + (reserved) language display. Values stay the raw enum
+ * strings everywhere; consumers render `LABELS[value] ?? value`, gated behind
+ * the ED10 flag so the flag-OFF path keeps the raw enum byte-identical.
+ */
+
+/** Access mode — how respondents reach the survey. */
+export const ACCESS_MODE_LABELS: Record<string, string> = {
+  INVITED: "Invited",
+  PUBLIC: "Public",
+};
+
+/** Aggregation mode — who can see aggregated results. */
+export const AGGREGATION_MODE_LABELS: Record<string, string> = {
+  FULL_VISIBILITY: "Everyone",
+  CEO_ONLY: "CEO-only",
+};
+
+/**
+ * Template/version language, keyed by the REAL stored values — camelCase
+ * `enUS` (= `DEFAULT_TEMPLATE_LANGUAGE` in `lib/assessments/active-version.ts`),
+ * NOT the hyphenated `en-US`. An unstored language degrades to itself.
+ */
+export const LANGUAGE_LABELS: Record<string, string> = {
+  enUS: "English (US)",
+  enGB: "English (UK)",
+  esES: "Spanish (Spain)",
+  frFR: "French (France)",
+};
