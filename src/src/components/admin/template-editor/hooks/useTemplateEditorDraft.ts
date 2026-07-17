@@ -318,6 +318,20 @@ export function useTemplateEditorDraft({
     [setSectionsDirty],
   );
 
+  // ED9 (spec 19al-plan, Task 8) — sets a section's description. The field
+  // already round-trips through save (spread from the raw row in
+  // `buildVersionScoringPayload`); this is the first handler that writes it,
+  // mirroring `handleSectionsRename` exactly.
+  const handleSectionsSetDescription = useCallback(
+    (uid: string, description: string) => {
+      setSections((prev) =>
+        prev.map((s) => (s.uid === uid ? { ...s, description } : s)),
+      );
+      setSectionsDirty();
+    },
+    [setSectionsDirty],
+  );
+
   const handleSectionsMoveUp = useCallback(
     (uid: string) => {
       setSections((prev) => {
@@ -941,6 +955,7 @@ export function useTemplateEditorDraft({
     handleSendResultsDefaultChange,
     handleSectionsAdd,
     handleSectionsRename,
+    handleSectionsSetDescription,
     handleSectionsDelete,
     handleSectionsMoveUp,
     handleSectionsMoveDown,

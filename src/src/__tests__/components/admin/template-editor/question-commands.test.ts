@@ -570,6 +570,56 @@ describe("useTemplateEditorDraft — moveQuestionToSection", () => {
   });
 });
 
+// ── handleSectionsSetDescription (ED9 spec 19al-plan, Task 8) ──────────────
+// `SectionDraft.description` already round-trips through save (spread from
+// the raw row in buildVersionScoringPayload), but nothing sets it — this is
+// the first handler that does, mirroring `handleSectionsRename`'s shape.
+describe("useTemplateEditorDraft — handleSectionsSetDescription", () => {
+  it("sets the section's description and marks the sections surface dirty", () => {
+    const { result } = renderDraft();
+    const s1 = result.current.sections.find((s) => s.stableKey === "S1")!;
+    expect(result.current.dirtyFlags.sections).toBeUndefined();
+
+    act(() => {
+      result.current.handleSectionsSetDescription(s1.uid, "Why this matters");
+    });
+
+    const after = result.current.sections.find((s) => s.uid === s1.uid)!;
+    expect(after.description).toBe("Why this matters");
+    expect(result.current.dirtyFlags.sections).toBe(true);
+  });
+
+  it("only touches the targeted section, leaving others (and their descriptions) untouched", () => {
+    const { result } = renderDraftTwoSections();
+    const s1 = result.current.sections.find((s) => s.stableKey === "S1")!;
+    const s2Before = result.current.sections.find((s) => s.stableKey === "S2")!;
+
+    act(() => {
+      result.current.handleSectionsSetDescription(s1.uid, "S1 description");
+    });
+
+    const s2After = result.current.sections.find((s) => s.stableKey === "S2")!;
+    expect(s2After).toEqual(s2Before);
+    expect(
+      result.current.sections.find((s) => s.uid === s1.uid)!.description,
+    ).toBe("S1 description");
+  });
+
+  it("can clear a description back to an empty string", () => {
+    const { result } = renderDraft();
+    const s1 = result.current.sections.find((s) => s.stableKey === "S1")!;
+    act(() => {
+      result.current.handleSectionsSetDescription(s1.uid, "First");
+    });
+    act(() => {
+      result.current.handleSectionsSetDescription(s1.uid, "");
+    });
+    expect(
+      result.current.sections.find((s) => s.uid === s1.uid)!.description,
+    ).toBe("");
+  });
+});
+
 // ── computeSurvivorFocus (ED5 Task 5, audit C — focus rule) ────────────────
 describe("computeSurvivorFocus", () => {
   const sectionOrder = ["S1", "S2"];
