@@ -22,10 +22,11 @@
  * and stays enabled either way.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 
 import type { SectionDraft } from "./SectionsCard";
+import { useOnClickOutside } from "./hooks/useOnClickOutside";
 
 export interface FormSectionCardProps {
   section: SectionDraft;
@@ -60,6 +61,8 @@ export function FormSectionCard({
 }: FormSectionCardProps) {
   const { uid, stableKey, name, description } = section;
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useOnClickOutside(menuRef, () => setMenuOpen(false), menuOpen);
 
   function runAndClose(fn: () => void) {
     setMenuOpen(false);
@@ -111,11 +114,10 @@ export function FormSectionCard({
         </span>
 
         {!isReadOnly && (
-          <div className="relative shrink-0">
+          <div ref={menuRef} className="relative shrink-0">
             <button
               type="button"
               data-testid={`section-menu-${stableKey}`}
-              aria-haspopup="true"
               aria-expanded={menuOpen}
               aria-label="Section options"
               onClick={() => setMenuOpen((open) => !open)}

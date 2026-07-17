@@ -34,13 +34,6 @@ interface QuestionSettingsProps {
   question: QuestionDraft;
   isReadOnly: boolean;
   isUnlocked: boolean;
-  /**
-   * Per-question published option keys. Consumed indirectly through
-   * `actions.removeOption` (the command layer owns the confirm gate); accepted
-   * here for interface completeness so a composing card can reason about the
-   * same input set.
-   */
-  publishedOptionKeys: Record<string, readonly string[]>;
   onUpdate: (patch: Partial<QuestionDraft>) => void;
   /** The shared command layer (from `useQuestionEditorActions`) — one instance
    *  per inspector, passed down so scale/option-remove confirms don't fork. */

@@ -158,3 +158,43 @@ describe("QuestionTypePicker", () => {
     expect(changeType).not.toHaveBeenCalled();
   });
 });
+
+describe("QuestionTypePicker — menu dismissal (T12 review fix)", () => {
+  it("closes the menu on an outside mousedown", () => {
+    render(
+      <QuestionTypePicker
+        question={baseQuestion({ type: "MULTI_CHOICE" })}
+        isReadOnly={false}
+        isUnlocked={true}
+        changeType={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("question-type-picker"));
+    expect(screen.getByTestId("question-type-picker-menu")).toBeInTheDocument();
+
+    fireEvent.mouseDown(document.body);
+
+    expect(
+      screen.queryByTestId("question-type-picker-menu"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("closes the menu on Escape", () => {
+    render(
+      <QuestionTypePicker
+        question={baseQuestion({ type: "MULTI_CHOICE" })}
+        isReadOnly={false}
+        isUnlocked={true}
+        changeType={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("question-type-picker"));
+    expect(screen.getByTestId("question-type-picker-menu")).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(
+      screen.queryByTestId("question-type-picker-menu"),
+    ).not.toBeInTheDocument();
+  });
+});

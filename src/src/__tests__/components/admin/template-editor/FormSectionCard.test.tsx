@@ -170,6 +170,28 @@ describe("FormSectionCard — ⋯ overflow menu", () => {
   });
 });
 
+describe("FormSectionCard — ⋯ menu dismissal (T12 review fix)", () => {
+  it("closes the menu on an outside mousedown", () => {
+    render(<FormSectionCard {...baseProps()} />);
+    fireEvent.click(screen.getByTestId("section-menu-S1"));
+    expect(screen.getByTestId("section-menu-S1-panel")).toBeInTheDocument();
+
+    fireEvent.mouseDown(document.body);
+
+    expect(screen.queryByTestId("section-menu-S1-panel")).not.toBeInTheDocument();
+  });
+
+  it("closes the menu on Escape", () => {
+    render(<FormSectionCard {...baseProps()} />);
+    fireEvent.click(screen.getByTestId("section-menu-S1"));
+    expect(screen.getByTestId("section-menu-S1-panel")).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(screen.queryByTestId("section-menu-S1-panel")).not.toBeInTheDocument();
+  });
+});
+
 describe("FormSectionCard — isReadOnly", () => {
   it("hides the ⋯ menu entirely", () => {
     render(<FormSectionCard {...baseProps({ isReadOnly: true })} />);

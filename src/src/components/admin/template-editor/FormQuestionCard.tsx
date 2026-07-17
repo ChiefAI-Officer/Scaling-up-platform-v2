@@ -293,7 +293,6 @@ function FormQuestionCardImpl({
             question={question}
             isReadOnly={isReadOnly}
             isUnlocked={isUnlocked}
-            publishedOptionKeys={publishedOptionKeys}
             onUpdate={onUpdate}
             actions={actions}
           />

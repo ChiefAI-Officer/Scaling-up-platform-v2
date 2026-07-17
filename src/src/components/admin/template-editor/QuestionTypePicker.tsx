@@ -25,7 +25,7 @@
  *     v1.5-placeholder `<select>` QuestionInspector renders flag-off.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   SlidersHorizontal,
   ListChecks,
@@ -38,6 +38,7 @@ import {
 
 import type { QuestionDraftRow } from "./question-serialization";
 import { QUESTION_TYPE_LABELS } from "./enum-labels";
+import { useOnClickOutside } from "./hooks/useOnClickOutside";
 
 type QuestionDraft = QuestionDraftRow;
 
@@ -71,6 +72,8 @@ export interface QuestionTypePickerProps {
 export function QuestionTypePicker(props: QuestionTypePickerProps) {
   const { question, isReadOnly, isUnlocked, changeType } = props;
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  useOnClickOutside(containerRef, () => setOpen(false), open);
 
   const locked = isReadOnly || question.isInherited || !isUnlocked;
   const CurrentIcon = TYPE_ICONS[question.type];
@@ -93,12 +96,11 @@ export function QuestionTypePicker(props: QuestionTypePickerProps) {
   }
 
   return (
-    <div className="relative inline-block">
+    <div ref={containerRef} className="relative inline-block">
       <button
         type="button"
         data-testid="question-type-picker"
         onClick={() => setOpen((v) => !v)}
-        aria-haspopup="true"
         aria-expanded={open}
         className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-muted"
       >

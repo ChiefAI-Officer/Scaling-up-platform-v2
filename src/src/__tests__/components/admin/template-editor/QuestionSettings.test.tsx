@@ -80,7 +80,6 @@ function renderSettings(question: QuestionDraftRow, opts: RenderOpts = {}) {
       question={question}
       isReadOnly={opts.isReadOnly ?? false}
       isUnlocked={opts.isUnlocked ?? true}
-      publishedOptionKeys={{}}
       onUpdate={onUpdate}
       actions={actions}
     />,
