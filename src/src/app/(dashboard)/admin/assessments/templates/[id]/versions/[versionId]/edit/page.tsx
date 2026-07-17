@@ -24,6 +24,7 @@ import { isSafeToPublishEnabled } from "@/lib/assessments/wave-ed2-flags";
 import { isThreePaneEnabled } from "@/lib/assessments/wave-ed4-flags";
 import { isSingleColumnEnabled } from "@/lib/assessments/wave-ed6-flags";
 import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
+import { isFormsBuildEnabled } from "@/lib/assessments/wave-ed9-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
 import { activePublishedWhere } from "@/lib/assessments/active-version";
 import {
@@ -230,6 +231,11 @@ export default async function AdminAssessmentVersionEditPage({
         // label, Sections folded in); presentation-only, kill = flag off +
         // redeploy.
         singleColumnEnabled={isSingleColumnEnabled()}
+        // Wave ED9 — Google-Forms Build-tab presentation. Only meaningful with
+        // single-column on; swaps the Build body to FormsBuilder + hides the
+        // page-header title (the hero card owns it). Presentation-only, kill =
+        // flag off + redeploy.
+        formsBuildEnabled={isFormsBuildEnabled()}
         // Wave ED8 — version-lifecycle UI (lifecycle VersionsTab table,
         // derived-status pill, Metadata strip removal). Flag gates the UI
         // only; archived-exclusion in read paths is persisted admin intent

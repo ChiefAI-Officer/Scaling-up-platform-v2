@@ -53,6 +53,7 @@ import { SectionsTab } from "@/components/admin/template-editor/SectionsTab";
 import { QuestionsTab } from "@/components/admin/template-editor/QuestionsTab";
 import { ThreePaneWorkspace } from "@/components/admin/template-editor/ThreePaneWorkspace";
 import { SingleColumnFormBuilder } from "@/components/admin/template-editor/SingleColumnFormBuilder";
+import { FormsBuilder } from "@/components/admin/template-editor/FormsBuilder";
 import type { TemplateEditorModel } from "@/components/admin/template-editor/hooks/useTemplateEditorModel";
 import { TestModeDrawer } from "@/components/admin/template-editor/TestModeDrawer";
 import { SafeToPublishBadge } from "@/components/admin/template-editor/SafeToPublishBadge";
@@ -244,6 +245,18 @@ export interface TabbedShellProps {
    */
   singleColumnEnabled?: boolean;
   /**
+   * Wave ED9 (spec 19al-plan, Task 11) — Google-Forms Build-tab presentation.
+   * Server-computed (`isFormsBuildEnabled()`) and passed down from the edit
+   * page. Only meaningful when `singleColumnEnabled` is also on (the ED6
+   * single-column mode). True + single ⇒ the Build panel swaps
+   * `SingleColumnFormBuilder` → `FormsBuilder` AND the page-header
+   * `<h2 class="wf-page-title">` is hidden (the hero card owns the title,
+   * decision D1). Default false ⇒ byte-identical to today's ED6 single mode
+   * (`SingleColumnFormBuilder` + the `<h2>`). Presentation-only; kill = flag
+   * off + redeploy. Three-pane/legacy keep the `<h2>` regardless of the flag.
+   */
+  formsBuildEnabled?: boolean;
+  /**
    * Wave ED8 (spec 19ak §2) — version-lifecycle UI. Server-computed
    * (`isVersionLifecycleEnabled()`) and passed down from the edit page.
    * Default false ⇒ legacy VersionsTab table, MetadataTab Version History
@@ -308,6 +321,7 @@ export function TabbedShell({
   safeToPublishEnabled = false,
   threePaneEnabled = false,
   singleColumnEnabled = false,
+  formsBuildEnabled = false,
   versionLifecycleEnabled = false,
   model,
 }: TabbedShellProps & {
@@ -558,7 +572,16 @@ export function TabbedShell({
       {/* ───────── Header (WF16/17/18 page-header-row) ───────── */}
       <header className="wf-page-header-row">
         <div className="wf-page-title-block">
-          <h2 className="wf-page-title">{template.name}</h2>
+          {/* Wave ED9 (spec 19al-plan, T11, D1) — hide the page-header title
+              EXACTLY when the Google-Forms Build body is active (flag ON +
+              single mode); the FormHeaderCard hero owns the title there. Must
+              be flag-gated like this — keying off `activeAuthoringMode ===
+              "single"` alone would strip the h2 from today's flag-OFF ED6
+              single mode and break the goldens + byte-identity. Three-pane/
+              legacy always keep the h2. */}
+          {!(formsBuildEnabled && activeAuthoringMode === "single") && (
+            <h2 className="wf-page-title">{template.name}</h2>
+          )}
           <div className="wf-page-pill-row">
             <span
               data-testid="template-editor-version-pill"
@@ -766,15 +789,30 @@ export function TabbedShell({
                 Everything else (header, tab-nav, other surfaces, modals,
                 action wiring) stays single-source. */}
             {activeAuthoringMode === "single" ? (
-              <SingleColumnFormBuilder
-                model={model}
-                isReadOnly={isPublished}
-                isUnlocked={questionEditorUnlocked}
-                findingsEnabled={findingsEnabled}
-                conditionalEnabled={conditionalAuthoringEnabled}
-                publishedOptionKeys={publishedOptionKeys}
-                onGoToSections={() => handleTabChange("sections")}
-              />
+              // Wave ED9 (spec 19al-plan, T11) — flag ON swaps the ED6
+              // single-column builder for the Google-Forms `FormsBuilder`
+              // (same prop shape). Flag OFF ⇒ byte-identical ED6 body.
+              formsBuildEnabled ? (
+                <FormsBuilder
+                  model={model}
+                  isReadOnly={isPublished}
+                  isUnlocked={questionEditorUnlocked}
+                  findingsEnabled={findingsEnabled}
+                  conditionalEnabled={conditionalAuthoringEnabled}
+                  publishedOptionKeys={publishedOptionKeys}
+                  onGoToSections={() => handleTabChange("sections")}
+                />
+              ) : (
+                <SingleColumnFormBuilder
+                  model={model}
+                  isReadOnly={isPublished}
+                  isUnlocked={questionEditorUnlocked}
+                  findingsEnabled={findingsEnabled}
+                  conditionalEnabled={conditionalAuthoringEnabled}
+                  publishedOptionKeys={publishedOptionKeys}
+                  onGoToSections={() => handleTabChange("sections")}
+                />
+              )
             ) : threePaneEnabled ? (
               <ThreePaneWorkspace
                 model={model}
