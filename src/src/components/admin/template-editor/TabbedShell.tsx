@@ -191,6 +191,24 @@ export interface DirtyFlags {
   scoringConfig?: boolean;
 }
 
+/**
+ * Wave ED10 (spec 19am-plan, Task 5) — the Active PUBLISHED version snapshot
+ * that feeds the Preview tab's read-only "Active" mode (Task 6). Built
+ * server-side on the edit page ONLY when `isPreviewSettingsEnabled()` and a
+ * published version exists (null otherwise). `sections` / `questions` are the
+ * stored version JSON (survey-shaped, as the /me route emits it); the Preview
+ * tab normalizes them via preview-version-adapter's stored-JSON adapter. `name`
+ * is the template name (versions carry no name). Presentation-only.
+ */
+export interface ActivePreview {
+  versionNumber: number;
+  publishedAt: string | null;
+  language: string;
+  name: string;
+  sections: unknown;
+  questions: unknown;
+}
+
 export interface TabbedShellProps {
   template: TemplateEditorTabbedTemplate;
   version: TemplateEditorTabbedVersion;
@@ -298,6 +316,15 @@ export interface TabbedShellProps {
    * inert today (accepted + defaulted, not yet read). Presentation-only.
    */
   previewSettingsEnabled?: boolean;
+  /**
+   * Wave ED10 (spec 19am-plan, Task 5) — the Active PUBLISHED version snapshot
+   * for the Preview tab's read-only "Active" mode. Built server-side on the
+   * edit page ONLY when `isPreviewSettingsEnabled()` (null when the flag is off
+   * OR no published version exists). Flows through TemplateEditorController's
+   * `{...props}` spread; TabbedShell holds it for the Preview tab (Task 6) —
+   * inert until then. Presentation-only.
+   */
+  activePreview?: ActivePreview | null;
 }
 
 /**
