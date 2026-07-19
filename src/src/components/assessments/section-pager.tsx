@@ -87,15 +87,17 @@ export function SectionPager({ pages, answers, onAnswerChange, onSubmit, submitt
 
   // ED10 Task 4 — the Preview tab swaps the `pages` array when the author
   // toggles Active↔draft (or a page is dropped), which can leave `sectionIndex`
-  // pointing past the shorter list. Clamp it back into range. This is a pure
-  // safety net: for a STABLE `pages` array (the live survey never shrinks its
-  // pages mid-session) the guard is false and `setSectionIndex` never fires, so
-  // the flag-OFF render is byte-identical.
+  // pointing past the shorter list. Clamp it back into range. **Gated on
+  // `previewMode`** (review finding #1): only the read-only editor preview ever
+  // shrinks its `pages` mid-mount; the live INVITED/PUBLIC survey never does, so
+  // this stays strictly additive — the effect body is unreachable off-preview,
+  // and depending on a cross-module show-if invariant to keep it inert would be
+  // fragile. Off-preview the live "Nothing to answer yet." fallback is untouched.
   React.useEffect(() => {
-    if (sectionIndex > pages.length - 1) {
+    if (previewMode && sectionIndex > pages.length - 1) {
       setSectionIndex(pages.length > 0 ? pages.length - 1 : 0);
     }
-  }, [pages.length, sectionIndex]);
+  }, [previewMode, pages.length, sectionIndex]);
 
   if (!page) {
     return (
