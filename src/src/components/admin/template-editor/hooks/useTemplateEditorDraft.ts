@@ -95,8 +95,15 @@ export interface UseTemplateEditorDraftArgs {
  */
 export type TemplateRowPatch = Partial<{
   aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
-  resultsEmailSubject: string;
-  resultsEmailBodyMarkdown: string;
+  // ED10 (spec 19am-plan, Task 10) — widened to `string | null` so the
+  // Settings-tab ResultsEmailCard can send a coerced-empty field as `null`
+  // (its own `SettingsRowPatch` already types these `string | null`). The
+  // PATCH route accepts null (`.nullable()`) and the Save-Draft lane already
+  // sends null, so this is a type-only widen with no runtime change — the
+  // local mirror below coerces null → "" to keep `templateValues` a string
+  // record (MetadataTab still reads these as `string`).
+  resultsEmailSubject: string | null;
+  resultsEmailBodyMarkdown: string | null;
   resultsEmailContentApproved: boolean;
 }>;
 
@@ -364,8 +371,19 @@ export function useTemplateEditorDraft({
         // Reflect the persisted patch locally so the tab shows the saved
         // values immediately (mirrors the setState-on-success in
         // handleSendResultsDefaultChange). Fields not in the patch are
-        // untouched.
-        setTemplateValues((prev) => ({ ...prev, ...patch }));
+        // untouched. The results-email fields are widened to `string | null`
+        // on TemplateRowPatch (Task 10); coerce a `null` back to "" here so
+        // `templateValues` stays a string record (byte-identical for every
+        // non-null case — `?? ""` is a no-op on a value already carried from
+        // `prev` or a non-empty patch).
+        setTemplateValues((prev) => {
+          const merged = { ...prev, ...patch };
+          return {
+            ...merged,
+            resultsEmailSubject: merged.resultsEmailSubject ?? "",
+            resultsEmailBodyMarkdown: merged.resultsEmailBodyMarkdown ?? "",
+          };
+        });
       } catch (e) {
         const description =
           e instanceof Error ? e.message : "Please try again.";

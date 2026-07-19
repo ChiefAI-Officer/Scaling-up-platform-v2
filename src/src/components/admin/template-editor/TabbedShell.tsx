@@ -54,6 +54,8 @@ import { QuestionsTab } from "@/components/admin/template-editor/QuestionsTab";
 import { ThreePaneWorkspace } from "@/components/admin/template-editor/ThreePaneWorkspace";
 import { SingleColumnFormBuilder } from "@/components/admin/template-editor/SingleColumnFormBuilder";
 import { FormsBuilder } from "@/components/admin/template-editor/FormsBuilder";
+import { PreviewTab } from "@/components/admin/template-editor/PreviewTab";
+import { SettingsTab } from "@/components/admin/template-editor/SettingsTab";
 import type { TemplateEditorModel } from "@/components/admin/template-editor/hooks/useTemplateEditorModel";
 import { TestModeDrawer } from "@/components/admin/template-editor/TestModeDrawer";
 import { SafeToPublishBadge } from "@/components/admin/template-editor/SafeToPublishBadge";
@@ -424,8 +426,13 @@ export function TabbedShell({
   formsBuildEnabled = false,
   versionLifecycleEnabled = false,
   // ED10 (spec 19am-plan): gates the Preview/Settings rebuild. As of Task 2
-  // it feeds `ed10Active` (below), which humanizes the header pills.
+  // it feeds `ed10Active` (below), which humanizes the header pills; Task 10
+  // mounts the Preview + Settings tabs when `ed10Active`.
   previewSettingsEnabled = false,
+  // ED10 (spec 19am-plan, Task 5/10) — Active published-version snapshot for
+  // the Preview tab's "Active" side; null when nothing is published (or the
+  // flag is off). Threaded into PreviewTab below.
+  activePreview = null,
   model,
 }: TabbedShellProps & {
   /**
@@ -542,6 +549,11 @@ export function TabbedShell({
     handleTemplateFieldChange,
     handleVersionFieldChange,
     handleSendResultsDefaultChange,
+    // ED10 (spec 19am-plan, Task 7/10) — per-card template-row Save + its
+    // in-flight/error state, consumed by the Settings tab (Task 8).
+    handleTemplateRowSave,
+    templateRowSaving,
+    templateRowError,
     handleSectionsAdd,
     handleSectionsRename,
     handleSectionsMoveUp,
@@ -804,9 +816,18 @@ export function TabbedShell({
         aria-label="Template editor tabs"
       >
         <TabsList className="mb-6">
-          <TabsTrigger value="metadata">
-            {TAB_LABELS.metadata}
-          </TabsTrigger>
+          {/* ED10 (spec 19am-plan, T10) — Metadata folds into Settings and a
+              Preview tab leads. Flag OFF ⇒ the Metadata trigger renders EXACTLY
+              as today (byte-identical). */}
+          {ed10Active ? (
+            <TabsTrigger value="preview">
+              {TAB_LABELS.preview}
+            </TabsTrigger>
+          ) : (
+            <TabsTrigger value="metadata">
+              {TAB_LABELS.metadata}
+            </TabsTrigger>
+          )}
           {/* ED6 — single-column folds Sections into the Build tab, so its
               trigger disappears in single mode. Three/legacy render it. */}
           {activeAuthoringMode !== "single" && (
@@ -824,27 +845,59 @@ export function TabbedShell({
           <TabsTrigger value="scoring">
             {TAB_LABELS.scoring}
           </TabsTrigger>
-          {/* Access — link, not a tab panel. Per WF16 spec it navigates
+          {/* ED10 (spec 19am-plan, T10) — the Settings tab takes the Access
+              slot when active; Access management moves inside Settings
+              (the AccessGroupsRow "Manage" link). Flag OFF ⇒ the Access
+              <Link> renders EXACTLY as today (byte-identical).
+
+              Access — link, not a tab panel. Per WF16 spec it navigates
               to /admin/assessments/access-groups. We render it inside the
               tab nav so it sits in the same visual row, but as a Radix
               tab trigger that doesn't have a panel. To keep keyboard
               semantics correct we mark it as a tab but override its
               click to navigate instead of switching panels. */}
-          <Link
-            href="/admin/assessments/access-groups"
-            role="tab"
-            aria-selected="false"
-            data-testid="template-editor-access-link"
-            className="inline-flex items-center gap-1.5 whitespace-nowrap px-0.5 py-2.5 text-sm font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground"
-          >
-            Access
-          </Link>
+          {ed10Active ? (
+            <TabsTrigger value="settings">
+              {TAB_LABELS.settings}
+            </TabsTrigger>
+          ) : (
+            <Link
+              href="/admin/assessments/access-groups"
+              role="tab"
+              aria-selected="false"
+              data-testid="template-editor-access-link"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap px-0.5 py-2.5 text-sm font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground"
+            >
+              Access
+            </Link>
+          )}
           <TabsTrigger value="versions">
             {TAB_LABELS.versions}
           </TabsTrigger>
         </TabsList>
 
-        {/* F2 — Metadata tab (WF16). */}
+        {/* ED10 (spec 19am-plan, T10) — Preview tab (read-only respondent
+            render). Mounted ONLY when ed10Active; T3 routing makes it the
+            param-less default, in place of the Metadata panel below. */}
+        {ed10Active && (
+          <TabsContent value="preview">
+            <div data-testid="tab-panel-preview">
+              <PreviewTab
+                sections={sections}
+                questions={questions as QuestionDraftRow[]}
+                version={{
+                  versionNumber: version.versionNumber,
+                  language: versionValues.language,
+                }}
+                template={{ name: template.name, alias: template.alias }}
+                activePreview={activePreview}
+              />
+            </div>
+          </TabsContent>
+        )}
+        {/* F2 — Metadata tab (WF16). ED10 (T10) — the Metadata panel renders
+            ONLY when NOT ed10Active (byte-identical to today when off). */}
+        {!ed10Active && (
         <TabsContent value="metadata">
           <div data-testid="tab-panel-metadata">
             <MetadataTab
@@ -883,6 +936,7 @@ export function TabbedShell({
             />
           </div>
         </TabsContent>
+        )}
         {/* F2b — Sections tab (standalone, full-width). ED6 — folded into the
             single-column Build tab, so its panel is not mounted in single
             mode (its trigger is also gone). */}
@@ -1005,6 +1059,30 @@ export function TabbedShell({
             />
           </div>
         </TabsContent>
+        {/* ED10 (spec 19am-plan, T10) — Settings tab (the Metadata field wall
+            rebuilt as one plain-language column). Mounted ONLY when ed10Active;
+            it takes the Access slot in the bar. No onSections* threading — the
+            Settings tab has no Sections card (D6). */}
+        {ed10Active && (
+          <TabsContent value="settings">
+            <div data-testid="tab-panel-settings">
+              <SettingsTab
+                templateValues={templateValues}
+                language={versionValues.language}
+                isReadOnly={isPublished}
+                onTemplateFieldChange={handleTemplateFieldChange}
+                onVersionFieldChange={handleVersionFieldChange}
+                handleTemplateRowSave={handleTemplateRowSave}
+                templateRowSaving={templateRowSaving}
+                templateRowError={templateRowError}
+                sendResultsDefault={sendResultsDefault}
+                onSendResultsDefaultChange={handleSendResultsDefaultChange}
+                savingSendResultsDefault={savingSendResultsDefault}
+                waveQEnabled={waveQEnabled}
+              />
+            </div>
+          </TabsContent>
+        )}
         <TabsContent value="versions">
           <div data-testid="tab-panel-versions">
             <VersionsTab
