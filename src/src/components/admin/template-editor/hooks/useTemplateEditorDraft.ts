@@ -70,7 +70,35 @@ export interface UseTemplateEditorDraftArgs {
   onSaveDraft?: () => void | Promise<void>;
   /** Test-only injection for the dirty state slice. */
   initialDirtyFlags?: DirtyFlags;
+  /**
+   * ED10 (spec 19am-plan, Task 7) — the Preview/Settings shell is fully live
+   * (previewSettings + formsBuild + single-column, mirrored from TabbedShell's
+   * own `ed10Active`). When true, the per-card Settings tab OWNS
+   * `aggregationMode` + the results-email content/approval via an immediate
+   * `handleTemplateRowSave` PATCH, so those fields are TRIMMED out of the
+   * version-governed Save-Draft metadata body (the invitation email stays —
+   * it's in the version contentHash, draft-only). Default `false` keeps the
+   * Save-Draft body the FULL set exactly as today: flag-OFF, the legacy
+   * `MetadataTab` still edits those fields through Save Draft, so trimming
+   * them unconditionally would silently stop persisting them (a regression).
+   * Byte-identical flag-OFF, pinned by the editor-byte-equivalence guard.
+   */
+  ed10Active?: boolean;
 }
+
+/**
+ * ED10 (spec 19am-plan, Task 7) — the per-card Settings-tab Save payload.
+ * A subset of the TEMPLATE ROW that is NOT part of the version contentHash,
+ * so it persists immediately (independent of the version-governed Save Draft)
+ * and stays editable while the version is published. The results-email trio
+ * travels together so the server binds the SEC-H2 approval hash atomically.
+ */
+export type TemplateRowPatch = Partial<{
+  aggregationMode: "FULL_VISIBILITY" | "CEO_ONLY";
+  resultsEmailSubject: string;
+  resultsEmailBodyMarkdown: string;
+  resultsEmailContentApproved: boolean;
+}>;
 
 export function useTemplateEditorDraft({
   template,
@@ -80,6 +108,7 @@ export function useTemplateEditorDraft({
   questionEditorUnlocked,
   onSaveDraft,
   initialDirtyFlags,
+  ed10Active = false,
 }: UseTemplateEditorDraftArgs) {
   const { toast } = useToast();
   const router = useRouter();
@@ -285,6 +314,72 @@ export function useTemplateEditorDraft({
       }
     },
     [savingSendResultsDefault, template.id, toast],
+  );
+
+  // ─── ED10 (spec 19am-plan, Task 7) — per-card template-row Save ────────
+  // The Settings tab's per-card SAVE writes TEMPLATE-ROW fields (aggregation
+  // mode + results-email content/approval) DIRECTLY on an explicit Save click
+  // — NOT on-blur, NOT via Save Draft, and NOT gated by `isReadOnly` (these
+  // fields must stay editable while the viewed version is published, exactly
+  // like `sendResultsDefault`). Mirrors `handleSendResultsDefaultChange`'s
+  // immediate-PATCH structure. SEC-H2: the "Approve & save" action carries
+  // `resultsEmailContentApproved` + subject + body in ONE body so the server
+  // binds the approval hash to the exact approved content atomically (Task 8
+  // owns the disabled-while-dirty UI + local auto-clear mirror; this is the
+  // save primitive that can carry all three fields together).
+  const [templateRowSaving, setTemplateRowSaving] = useState(false);
+  const [templateRowError, setTemplateRowError] = useState<string | null>(
+    null,
+  );
+  const handleTemplateRowSave = useCallback(
+    async (patch: TemplateRowPatch) => {
+      if (templateRowSaving) return;
+      setTemplateRowSaving(true);
+      setTemplateRowError(null);
+      try {
+        const res = await fetch(
+          `/api/admin/assessment-templates/${template.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(patch),
+          },
+        );
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const description =
+            res.status === 403
+              ? "Admin template controls are not enabled on the server."
+              : typeof body?.error === "string"
+                ? body.error
+                : "Please try again.";
+          setTemplateRowError(description);
+          toast({
+            title: "Could not save",
+            description,
+            variant: "destructive",
+          });
+          return;
+        }
+        // Reflect the persisted patch locally so the tab shows the saved
+        // values immediately (mirrors the setState-on-success in
+        // handleSendResultsDefaultChange). Fields not in the patch are
+        // untouched.
+        setTemplateValues((prev) => ({ ...prev, ...patch }));
+      } catch (e) {
+        const description =
+          e instanceof Error ? e.message : "Please try again.";
+        setTemplateRowError(description);
+        toast({
+          title: "Could not save",
+          description,
+          variant: "destructive",
+        });
+      } finally {
+        setTemplateRowSaving(false);
+      }
+    },
+    [templateRowSaving, template.id, toast],
   );
 
   // Section operations — F2 / F2b.
@@ -772,6 +867,15 @@ export function useTemplateEditorDraft({
       const ops: Array<Promise<{ ok: boolean; status: number; surface: string }>> = [];
 
       if (dirtyFlags.metadata) {
+        // ED10 split-save (Task 7): the per-card Settings tab owns
+        // aggregationMode + the results-email content/approval (immediate
+        // PATCH via handleTemplateRowSave), so they are TRIMMED from the
+        // version-governed Save-Draft body when ED10 is active. The
+        // invitation email STAYS (it's in the version contentHash, draft-
+        // only). Flag-OFF (`!ed10Active`, the default) appends the extra
+        // fields in their original insertion order, so the emitted JSON is
+        // byte-identical to today — the legacy MetadataTab still edits those
+        // fields through Save Draft (editor-byte-equivalence guard).
         const body: Record<string, unknown> = {
           name: templateValues.name,
           description:
@@ -780,18 +884,20 @@ export function useTemplateEditorDraft({
               : null,
           invitationSubject: templateValues.invitationSubject,
           invitationBodyMarkdown: templateValues.invitationBodyMarkdown,
-          aggregationMode: templateValues.aggregationMode,
-          resultsEmailSubject:
+        };
+        if (!ed10Active) {
+          body.aggregationMode = templateValues.aggregationMode;
+          body.resultsEmailSubject =
             templateValues.resultsEmailSubject.length > 0
               ? templateValues.resultsEmailSubject
-              : null,
-          resultsEmailBodyMarkdown:
+              : null;
+          body.resultsEmailBodyMarkdown =
             templateValues.resultsEmailBodyMarkdown.length > 0
               ? templateValues.resultsEmailBodyMarkdown
-              : null,
-          resultsEmailContentApproved:
-            templateValues.resultsEmailContentApproved,
-        };
+              : null;
+          body.resultsEmailContentApproved =
+            templateValues.resultsEmailContentApproved;
+        }
         ops.push(
           fetch(`/api/admin/assessment-templates/${template.id}`, {
             method: "PATCH",
@@ -907,6 +1013,7 @@ export function useTemplateEditorDraft({
     }
   }, [
     dirtyFlags,
+    ed10Active,
     isAnyDirty,
     isPublished,
     onSaveDraft,
@@ -935,6 +1042,9 @@ export function useTemplateEditorDraft({
     savingDraft,
     sendResultsDefault,
     savingSendResultsDefault,
+    // ED10 (Task 7) — per-card template-row Save in-flight + error state.
+    templateRowSaving,
+    templateRowError,
     questionCountByStableKey,
     // ─── Raw snapshots — plain values (the refs stay internal to the hook,
     //     read here where they are local so callers never touch `.current`
@@ -953,6 +1063,8 @@ export function useTemplateEditorDraft({
     handleTemplateFieldChange,
     handleVersionFieldChange,
     handleSendResultsDefaultChange,
+    // ED10 (Task 7) — per-card immediate template-row Save (Settings tab).
+    handleTemplateRowSave,
     handleSectionsAdd,
     handleSectionsRename,
     handleSectionsSetDescription,
