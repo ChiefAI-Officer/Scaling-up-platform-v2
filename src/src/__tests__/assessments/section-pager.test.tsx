@@ -294,3 +294,136 @@ describe("SectionPager", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });
+
+// ── ED10 Task 4 — additive, default-OFF `previewMode` (read-only preview) ──
+// The editor Preview tab reuses this LIVE respondent pager read-only. previewMode
+// must: disable every control (labels/help stay in the a11y tree — C4, NOT
+// `inert`), skip both answer gates so Next always advances, disable every submit
+// affordance so onSubmit never fires, and clamp sectionIndex when the pages list
+// shrinks (Active↔draft toggle). Default (no previewMode) stays byte-identical.
+describe("SectionPager — previewMode (ED10 Task 4)", () => {
+  const previewSections: PagerSection[] = [
+    { stableKey: "P1", sortOrder: 1, name: "First", description: "First intro" },
+    { stableKey: "P2", sortOrder: 2, name: "Second" },
+  ];
+  const previewQuestions: PagerQuestion[] = [
+    {
+      stableKey: "pq1",
+      sortOrder: 1,
+      sectionStableKey: "P1",
+      type: "SLIDER_LIKERT",
+      label: "Required Q",
+      helpText: "Helpful hint",
+      isRequired: true,
+      scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" },
+    },
+  ];
+
+  function renderPreview(extra: Partial<React.ComponentProps<typeof SectionPager>> = {}) {
+    const onSubmit = jest.fn();
+    const onExit = jest.fn();
+    const onAnswerChange = jest.fn();
+    const pages = makePages(previewSections, previewQuestions);
+    const utils = render(
+      <SectionPager pages={pages} answers={{}} onAnswerChange={onAnswerChange}
+        onSubmit={onSubmit} onExit={onExit} submitting={false} previewMode {...extra} />,
+    );
+    return { onSubmit, onExit, onAnswerChange, ...utils };
+  }
+
+  it("disables the question control but keeps the label + help text readable in the DOM", () => {
+    renderPreview();
+    // Page 0 = P1 (intro + required slider). Control is frozen…
+    const slider = screen.getByRole("slider", { name: "Required Q" });
+    expect(slider).toBeDisabled();
+    // …but the label + help text stay in the accessibility tree (readable, not inert/removed).
+    expect(screen.getByText("Required Q")).toBeInTheDocument();
+    expect(screen.getByText("Helpful hint")).toBeInTheDocument();
+  });
+
+  it("Next advances past a section with an UNANSWERED required question (no gate)", () => {
+    renderPreview();
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    // Advanced to the second section despite the unanswered required slider.
+    expect(screen.getByRole("heading", { name: "Second" })).toBeInTheDocument();
+    // No blocking alert was raised.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("last-page Submit is disabled and never calls onSubmit", () => {
+    const { onSubmit } = renderPreview();
+    fireEvent.click(screen.getByRole("button", { name: /next/i })); // → last page (P2)
+    const submit = screen.getByRole("button", { name: /submit/i });
+    expect(submit).toBeDisabled();
+    fireEvent.click(submit);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("Back on the FIRST page still calls onExit", () => {
+    const { onExit } = renderPreview();
+    fireEvent.click(screen.getByRole("button", { name: /back/i }));
+    expect(onExit).toHaveBeenCalled();
+  });
+
+  it("empty pages: the Submit affordance is disabled and never calls onSubmit", () => {
+    const onSubmit = jest.fn();
+    render(<SectionPager pages={[]} answers={{}} onAnswerChange={jest.fn()}
+      onSubmit={onSubmit} submitting={false} previewMode />);
+    expect(screen.getByText(/nothing to answer yet/i)).toBeInTheDocument();
+    const submit = screen.getByRole("button", { name: /submit/i });
+    expect(submit).toBeDisabled();
+    fireEvent.click(submit);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("clamps sectionIndex when the pages list shrinks below the current index", () => {
+    const threeSecs: PagerSection[] = [
+      { stableKey: "A", sortOrder: 1, name: "Alpha" },
+      { stableKey: "B", sortOrder: 2, name: "Bravo" },
+      { stableKey: "C", sortOrder: 3, name: "Charlie" },
+    ];
+    const pages3 = makePages(threeSecs, []);
+    const { rerender } = render(
+      <SectionPager pages={pages3} answers={{}} onAnswerChange={jest.fn()}
+        onSubmit={jest.fn()} submitting={false} previewMode />,
+    );
+    // Walk to the last page (index 2).
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(screen.getByRole("heading", { name: "Charlie" })).toBeInTheDocument();
+
+    // Shrink pages to one — index 2 is now out of range; the clamp effect resets it.
+    const pages1 = makePages([{ stableKey: "A", sortOrder: 1, name: "Alpha" }], []);
+    rerender(<SectionPager pages={pages1} answers={{}} onAnswerChange={jest.fn()}
+      onSubmit={jest.fn()} submitting={false} previewMode />);
+    // Clamped into range → the only remaining page renders (no crash, no empty state).
+    expect(screen.getByRole("heading", { name: "Alpha" })).toBeInTheDocument();
+    expect(screen.queryByText(/nothing to answer yet/i)).not.toBeInTheDocument();
+  });
+
+  it("DEFAULT (no previewMode): controls are enabled and the required gate still BLOCKS", () => {
+    const onSubmit = jest.fn();
+    const pages = makePages(previewSections, previewQuestions);
+    render(<SectionPager pages={pages} answers={{}} onAnswerChange={jest.fn()}
+      onSubmit={onSubmit} submitting={false} />);
+    // Control is interactive.
+    expect(screen.getByRole("slider", { name: "Required Q" })).not.toBeDisabled();
+    // Next blocks on the unanswered required question and does NOT advance.
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "First" })).toBeInTheDocument();
+  });
+
+  it("DEFAULT (no previewMode): Submit still fires when the required question is answered", () => {
+    const onSubmit = jest.fn();
+    const secs: PagerSection[] = [{ stableKey: "P1", sortOrder: 1, name: "Only" }];
+    const qs: PagerQuestion[] = [
+      { stableKey: "pq1", sortOrder: 1, sectionStableKey: "P1", type: "SLIDER_LIKERT", label: "Req", isRequired: true, scale: { min: 0, max: 3, step: 1, anchorMin: "lo", anchorMax: "hi" } },
+    ];
+    const pages = makePages(secs, qs);
+    render(<SectionPager pages={pages} answers={{ pq1: 2 }} onAnswerChange={jest.fn()}
+      onSubmit={onSubmit} submitting={false} />);
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+});

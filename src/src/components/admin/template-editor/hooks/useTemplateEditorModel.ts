@@ -39,6 +39,20 @@ const EMPTY_PUBLISHED_QUESTION_KEYS: string[] = [];
 const EMPTY_PUBLISHED_OPTION_KEYS: Record<string, string[]> = {};
 
 export function useTemplateEditorModel(props: TabbedShellProps) {
+  // ED10 (spec 19am-plan, Task 7) — mirrors TabbedShell's own `ed10Active`
+  // (previewSettings + formsBuild + single-column all on). Threaded into the
+  // draft hook so Save Draft TRIMS the per-card-owned template-row fields
+  // (aggregationMode + results-email) out of the metadata PATCH when the
+  // Preview/Settings shell is live. Equivalent to TabbedShell's
+  // `activeAuthoringMode === "single"` leg because single-column mode ⟺
+  // `singleColumnEnabled`. All three legs false by default ⇒ byte-identical
+  // flag-OFF Save-Draft body (editor-byte-equivalence guard).
+  const ed10Active = Boolean(
+    props.previewSettingsEnabled &&
+      props.formsBuildEnabled &&
+      props.singleColumnEnabled,
+  );
+
   const draft = useTemplateEditorDraft({
     template: props.template,
     version: props.version,
@@ -50,6 +64,7 @@ export function useTemplateEditorModel(props: TabbedShellProps) {
     waveQEnabled: props.waveQEnabled ?? false,
     onSaveDraft: props.onSaveDraft,
     initialDirtyFlags: props.initialDirtyFlags,
+    ed10Active,
   });
 
   const versionActions = useVersionActions({

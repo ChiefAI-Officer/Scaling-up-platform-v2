@@ -13,7 +13,10 @@ import { redirect, notFound } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth";
 import { db } from "@/lib/db";
-import { TemplateEditorTabbed } from "@/components/admin/TemplateEditorTabbed";
+import {
+  TemplateEditorTabbed,
+  type ActivePreview,
+} from "@/components/admin/TemplateEditorTabbed";
 import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
 import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
 import { isQuestionEditorUnlockEnabled } from "@/lib/assessments/wave-t-flags";
@@ -25,8 +28,12 @@ import { isThreePaneEnabled } from "@/lib/assessments/wave-ed4-flags";
 import { isSingleColumnEnabled } from "@/lib/assessments/wave-ed6-flags";
 import { isVersionLifecycleEnabled } from "@/lib/assessments/wave-ed8-flags";
 import { isFormsBuildEnabled } from "@/lib/assessments/wave-ed9-flags";
+import { isPreviewSettingsEnabled } from "@/lib/assessments/wave-ed10-flags";
 import { computePublishedQuestionUnions } from "@/lib/assessments/published-question-unions";
-import { activePublishedWhere } from "@/lib/assessments/active-version";
+import {
+  activePublishedWhere,
+  DEFAULT_TEMPLATE_LANGUAGE,
+} from "@/lib/assessments/active-version";
 import {
   isPeerRenderEnabledAlias,
   listRatingQuestionKeys,
@@ -158,6 +165,47 @@ export default async function AdminAssessmentVersionEditPage({
     }
   }
 
+  // Wave ED10 (spec 19am-plan, Task 5) — the Active PUBLISHED version snapshot
+  // for the Preview tab's read-only "Active" mode. Queried ONLY when the flag
+  // is on (byte-identical flag-OFF path): the highest-versionNumber row that is
+  // published AND non-archived for the canonical language (enUS — see
+  // active-version.ts:43 DEFAULT_TEMPLATE_LANGUAGE; NOT "en-US"), which is
+  // exactly the version new campaigns pin. `name` comes from the template
+  // (versions carry none). Null when the flag is off OR nothing is published
+  // yet. No schema/route change; the stored questions/sections JSON is passed
+  // through as-is (the Preview tab normalizes it via the stored-JSON adapter).
+  let activePreview: ActivePreview | null = null;
+  if (isPreviewSettingsEnabled()) {
+    const active = await db.assessmentTemplateVersion.findFirst({
+      where: {
+        templateId: id,
+        language: DEFAULT_TEMPLATE_LANGUAGE,
+        ...activePublishedWhere,
+      },
+      orderBy: { versionNumber: "desc" },
+      select: {
+        versionNumber: true,
+        publishedAt: true,
+        language: true,
+        questions: true,
+        sections: true,
+      },
+    });
+    if (active) {
+      activePreview = {
+        versionNumber: active.versionNumber,
+        publishedAt:
+          active.publishedAt instanceof Date
+            ? active.publishedAt.toISOString()
+            : active.publishedAt,
+        language: active.language,
+        name: template.name,
+        sections: active.sections,
+        questions: active.questions,
+      };
+    }
+  }
+
   return (
     <div className="space-y-6">
       <TemplateEditorTabbed
@@ -241,6 +289,16 @@ export default async function AdminAssessmentVersionEditPage({
         // only; archived-exclusion in read paths is persisted admin intent
         // and never flag-gated (Wave-Q doctrine).
         versionLifecycleEnabled={isVersionLifecycleEnabled()}
+        // Wave ED10 — Metadata→Preview + Settings tab rebuild. Plumbed through
+        // now (Task 1); TabbedShell accepts + defaults it but does not read it
+        // yet. Default false ⇒ byte-identical ED9 shell. Presentation-only,
+        // kill = flag off + redeploy.
+        previewSettingsEnabled={isPreviewSettingsEnabled()}
+        // Wave ED10 (spec 19am-plan, Task 5) — the Active published version
+        // snapshot for the Preview tab's read-only "Active" mode. Null when
+        // the flag is off or nothing is published. TabbedShell holds it;
+        // the Preview tab (Task 6) consumes it.
+        activePreview={activePreview}
       />
       {peerBenchmarkRows && (
         <PeerBenchmarksPanel templateId={template.id} rows={peerBenchmarkRows} />

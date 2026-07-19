@@ -31,11 +31,19 @@ _Avoid_: "existing question" (ambiguous — existing in the draft vs existing in
 
 **Test Mode** (Wave ED1, assessment-editor overhaul):
 An authoring aid on the **Template Version** editor. While editing a *draft*, an admin enters sample answers and immediately sees the computed result — per-section/domain scores, the overall **Scoring tier** (when the instrument shows one), and which **findings rules** fire — to validate the instrument's *outputs* before publishing. It is a sandbox: it **records nothing** (no **Respondent**, no submission, no email), and its display of tier/score-table follows the same per-instrument config the real **Results report** uses, so the two can't diverge.
-_Avoid_: "preview" (there is no respondent-walkthrough preview here — Test Mode validates *outputs*, not the survey-taking experience); "submission" (a Test Mode run is never persisted).
+_Avoid_: conflating with the **Preview tab** (Wave ED10) — Test Mode validates *outputs* (scores/findings, interactively), the Preview tab shows the read-only survey-taking *experience*; "submission" (a Test Mode run is never persisted).
 
 **Safe-to-Publish** (Wave ED2, assessment-editor overhaul):
 A live publish-readiness readout on the **Template Version** editor. While editing a *draft*, the author sees — before clicking Publish — a **Prevent** list (the exact issues that would block publish, mirroring the *same* publish validation the server runs) and a short advisory **Warn** list (authoring-quality nudges that do **not** block publish: an empty section, an unassigned question, or a template with no **findings rules** authored). It is **passive**: the server's publish check stays the authoritative gate, and it records nothing.
 _Avoid_: conflating **Warn** with **Prevent** (warnings never block publish); "linter" or any wording implying a *new* gate — Safe-to-Publish only surfaces the existing publish gate earlier, it never adds one.
+
+**Preview tab** (Wave ED10, assessment-editor overhaul):
+The template editor's landing tab (replaces the old **Metadata** tab). Renders a published or draft **Template Version** **read-only, exactly as a Respondent sees it** — the branded **Section pager** — with a facts summary above it (Active vN, publish date, access, aggregation, language, question/section counts). Nothing is interactive and nothing is recorded. Complements **Test Mode**: Preview = the survey-taking *experience*, Test Mode = the scored *outputs*.
+_Avoid_: "test" / "sandbox" (the Preview tab never takes answers — that's Test Mode); "the Metadata tab" (Metadata is retired; its settings moved to the **Settings tab**).
+
+**Settings tab** (Wave ED10, assessment-editor overhaul):
+The template editor's single home for everything that isn't a question: who can take it (**access**), who sees individual answers (**aggregation**), **language**, the **Invitation email** and **Results email** (with the results-email approval and the **Results-email default**), a link out to **Access groups**, and the read-only **alias**. Replaces the old **Metadata** tab's field wall and absorbs the standalone Access nav link. Plain-language presentation of existing fields — nothing here is a new field.
+_Avoid_: "Metadata tab" (retired); putting question/section editing here (that lives in the **Build** tab).
 
 **Domain** (Scaling Up Full only):
 One of the five top-level categories a Scaling Up Full question rolls up into: **People, Strategy, Execution, Cash, You**.

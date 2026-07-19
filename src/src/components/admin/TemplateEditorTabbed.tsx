@@ -28,4 +28,5 @@ export type {
   TemplateEditorTabbedVersion,
   TemplateEditorTabbedVersionMeta,
   DirtyFlags,
+  ActivePreview,
 } from "./template-editor/TabbedShell";

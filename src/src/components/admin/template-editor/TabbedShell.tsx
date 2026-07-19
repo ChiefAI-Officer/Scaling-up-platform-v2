@@ -54,6 +54,8 @@ import { QuestionsTab } from "@/components/admin/template-editor/QuestionsTab";
 import { ThreePaneWorkspace } from "@/components/admin/template-editor/ThreePaneWorkspace";
 import { SingleColumnFormBuilder } from "@/components/admin/template-editor/SingleColumnFormBuilder";
 import { FormsBuilder } from "@/components/admin/template-editor/FormsBuilder";
+import { PreviewTab } from "@/components/admin/template-editor/PreviewTab";
+import { SettingsTab } from "@/components/admin/template-editor/SettingsTab";
 import type { TemplateEditorModel } from "@/components/admin/template-editor/hooks/useTemplateEditorModel";
 import { TestModeDrawer } from "@/components/admin/template-editor/TestModeDrawer";
 import { SafeToPublishBadge } from "@/components/admin/template-editor/SafeToPublishBadge";
@@ -67,6 +69,10 @@ import {
   buildSectionDeletePrompt,
   collectSectionDeleteImpact,
 } from "@/components/admin/template-editor/question-commands";
+import {
+  ACCESS_MODE_LABELS,
+  AGGREGATION_MODE_LABELS,
+} from "@/components/admin/template-editor/enum-labels";
 import type { QuestionDraftRow } from "@/components/admin/template-editor/question-serialization";
 
 // ────────────────────────────────────────────────────────────────────────
@@ -77,13 +83,28 @@ type TabId =
   | "sections"
   | "questions"
   | "scoring"
-  | "versions";
+  | "versions"
+  // ED10 (spec 19am-plan, T3) — the Preview + Settings tabs. Valid ids ONLY
+  // when ed10Active (see editorTabConfig); the triggers/panels render in T10.
+  | "preview"
+  | "settings";
 
 const VALID_TAB_IDS: TabId[] = [
   "metadata",
   "sections",
   "questions",
   "scoring",
+  "versions",
+];
+
+// ED10 (spec 19am-plan, T3) — valid ids when ed10Active: the Metadata tab folds
+// into Settings and a Preview tab leads (Sections stays folded, ED6). Selected
+// by editorTabConfig; flag OFF ⇒ VALID_TAB_IDS above, byte-identical to today.
+const ED10_VALID_TAB_IDS: TabId[] = [
+  "preview",
+  "questions",
+  "scoring",
+  "settings",
   "versions",
 ];
 // NOTE (Wave W, spec 19w D5): the disabled "Conditional Logic" ghost tab is
@@ -100,6 +121,10 @@ const TAB_LABELS: Record<TabId, string> = {
   questions: "Questions",
   scoring: "Scoring & Tiers",
   versions: "Versions",
+  // ED10 (T3) — labels exist so Record<TabId, string> stays total; the
+  // triggers that render them are wired in T10 (dark until launch).
+  preview: "Preview",
+  settings: "Settings",
 };
 
 // ────────────────────────────────────────────────────────────────────────
@@ -166,6 +191,24 @@ export interface DirtyFlags {
   sections?: boolean;
   questions?: boolean;
   scoringConfig?: boolean;
+}
+
+/**
+ * Wave ED10 (spec 19am-plan, Task 5) — the Active PUBLISHED version snapshot
+ * that feeds the Preview tab's read-only "Active" mode (Task 6). Built
+ * server-side on the edit page ONLY when `isPreviewSettingsEnabled()` and a
+ * published version exists (null otherwise). `sections` / `questions` are the
+ * stored version JSON (survey-shaped, as the /me route emits it); the Preview
+ * tab normalizes them via preview-version-adapter's stored-JSON adapter. `name`
+ * is the template name (versions carry no name). Presentation-only.
+ */
+export interface ActivePreview {
+  versionNumber: number;
+  publishedAt: string | null;
+  language: string;
+  name: string;
+  sections: unknown;
+  questions: unknown;
 }
 
 export interface TabbedShellProps {
@@ -267,6 +310,23 @@ export interface TabbedShellProps {
    * derived status.
    */
   versionLifecycleEnabled?: boolean;
+  /**
+   * Wave ED10 (spec 19am-plan) — Metadata→Preview + Settings tab rebuild.
+   * Server-computed (`isPreviewSettingsEnabled()`) and passed down from the
+   * edit page. Default false ⇒ the editor renders byte-identical to today's
+   * ED9 shell (Metadata tab, no Settings tab). Reserved for later ED10 tasks;
+   * inert today (accepted + defaulted, not yet read). Presentation-only.
+   */
+  previewSettingsEnabled?: boolean;
+  /**
+   * Wave ED10 (spec 19am-plan, Task 5) — the Active PUBLISHED version snapshot
+   * for the Preview tab's read-only "Active" mode. Built server-side on the
+   * edit page ONLY when `isPreviewSettingsEnabled()` (null when the flag is off
+   * OR no published version exists). Flows through TemplateEditorController's
+   * `{...props}` spread; TabbedShell holds it for the Preview tab (Task 6) —
+   * inert until then. Presentation-only.
+   */
+  activePreview?: ActivePreview | null;
 }
 
 /**
@@ -285,20 +345,62 @@ const EMPTY_PUBLISHED_OPTION_KEYS: Record<string, string[]> = {};
 // ────────────────────────────────────────────────────────────────────────
 type AuthoringMode = "single" | "three" | "legacy";
 
-function resolveTabFromUrl(
+/**
+ * ED10 (spec 19am-plan, T3) — the valid-id set + param-less default, both
+ * DERIVED from ed10Active. Exported (pure) for unit tests.
+ *   ed10Active  → { preview, questions, scoring, settings, versions },
+ *                 default "preview" (Metadata folds into Settings; Preview
+ *                 leads).
+ *   otherwise   → today's set (VALID_TAB_IDS) + today's computed default
+ *                 ("questions" in a workspace mode, else "metadata") —
+ *                 byte-identical to the flag-OFF path. Forcing "metadata" as
+ *                 the inactive default here would regress ED9 forms mode (C5).
+ */
+export function editorTabConfig(
+  activeAuthoringMode: AuthoringMode,
+  ed10Active: boolean,
+): { defaultTab: TabId; validTabIds: readonly TabId[] } {
+  if (ed10Active) {
+    return { defaultTab: "preview", validTabIds: ED10_VALID_TAB_IDS };
+  }
+  return {
+    defaultTab: activeAuthoringMode !== "legacy" ? "questions" : "metadata",
+    validTabIds: VALID_TAB_IDS,
+  };
+}
+
+/**
+ * ED10 (spec 19am-plan, T3) — single source of truth for editor tab routing:
+ * maps the ?tab= URL param + the two mode signals to a resolved TabId. The
+ * component calls this for BOTH the initial tab and the URL-resync effect, so
+ * the unit tests exercise the exact production path. Exported (pure).
+ *
+ * Order matters:
+ *   1. ED6 (spec 19ah) — single-column folds the Sections tab into Build, so a
+ *      `?tab=sections` deep-link resolves to Build/questions (also holds under
+ *      ED10, where the mode is always single). `"questions"` stays valid.
+ *   2. ED10 — the Metadata tab is absorbed into Settings, so a stale
+ *      `?tab=metadata` resolves to Settings (metadata is NOT in the ED10 valid
+ *      set). Fires ONLY when ed10Active; flag OFF ⇒ metadata stays metadata.
+ *   3. Any other id in the (ed10Active-derived) valid set passes through.
+ *   4. Unknown / param-less ⇒ the (ed10Active-derived) default.
+ */
+export function resolveEditorTab(
   param: string | null,
-  defaultTab: TabId = "metadata",
-  activeAuthoringMode: AuthoringMode = "legacy",
+  activeAuthoringMode: AuthoringMode,
+  ed10Active: boolean,
 ): TabId {
-  // ED6 (spec 19ah) — single-column folds the Sections tab into the Build tab,
-  // so its trigger + panel don't exist. A `?tab=sections` deep-link (or any
-  // stale bookmark) resolves to the Build/questions tab so the URL never lands
-  // on a tab with no panel. `"questions"` stays a valid id (VALID_TAB_IDS is
-  // unchanged) — only the display label differs.
+  const { defaultTab, validTabIds } = editorTabConfig(
+    activeAuthoringMode,
+    ed10Active,
+  );
   if (activeAuthoringMode === "single" && param === "sections") {
     return "questions";
   }
-  if (param && (VALID_TAB_IDS as string[]).includes(param)) {
+  if (ed10Active && param === "metadata") {
+    return "settings";
+  }
+  if (param && (validTabIds as readonly string[]).includes(param)) {
     return param as TabId;
   }
   return defaultTab;
@@ -323,6 +425,14 @@ export function TabbedShell({
   singleColumnEnabled = false,
   formsBuildEnabled = false,
   versionLifecycleEnabled = false,
+  // ED10 (spec 19am-plan): gates the Preview/Settings rebuild. As of Task 2
+  // it feeds `ed10Active` (below), which humanizes the header pills; Task 10
+  // mounts the Preview + Settings tabs when `ed10Active`.
+  previewSettingsEnabled = false,
+  // ED10 (spec 19am-plan, Task 5/10) — Active published-version snapshot for
+  // the Preview tab's "Active" side; null when nothing is published (or the
+  // flag is off). Threaded into PreviewTab below.
+  activePreview = null,
   model,
 }: TabbedShellProps & {
   /**
@@ -354,26 +464,41 @@ export function TabbedShell({
       ? "three"
       : "legacy";
 
+  // ─── ED10 gate (spec 19am-plan, T2) ───────────────────────────────────
+  // The Preview/Settings rebuild lights up ONLY in the ED9 production shell
+  // (single-column + Google-Forms Build) with the ED10 flag on. Task 2 uses
+  // it to humanize the header access/aggregation pills; Task 3 reuses it. Any
+  // leg false ⇒ raw enums / today's shell, byte-identical to the flag-OFF path.
+  const ed10Active =
+    previewSettingsEnabled &&
+    formsBuildEnabled &&
+    activeAuthoringMode === "single";
+
   // ─── Tab selection ────────────────────────────────────────────────────
   // Wave ED4/ED6 — when a workspace mode is on (single or three), the Questions
   // ("Build"/"Edit") tab becomes the param-less default (instead of Metadata).
   // Legacy ⇒ default stays "metadata", so the ?tab= routing is byte-identical
   // to today.
-  const defaultTab: TabId =
-    activeAuthoringMode !== "legacy" ? "questions" : "metadata";
-  const tabFromUrl = resolveTabFromUrl(
-    searchParams.get("tab"),
-    defaultTab,
+  // ED10 (T3) — the valid-id set + param-less default both derive from
+  // ed10Active (via editorTabConfig). Flag OFF ⇒ today's set + today's computed
+  // default (Build in a workspace mode, Metadata in legacy), byte-identical.
+  const { defaultTab, validTabIds } = editorTabConfig(
     activeAuthoringMode,
+    ed10Active,
+  );
+  const tabFromUrl = resolveEditorTab(
+    searchParams.get("tab"),
+    activeAuthoringMode,
+    ed10Active,
   );
   const [activeTab, setActiveTab] = useState<TabId>(tabFromUrl);
 
   // Re-sync if the URL param changes externally (e.g. browser nav).
   useEffect(() => {
-    const next = resolveTabFromUrl(
+    const next = resolveEditorTab(
       searchParams.get("tab"),
-      defaultTab,
       activeAuthoringMode,
+      ed10Active,
     );
     // Intentional external-store sync: mirror the ?tab= URL param into local
     // tab state on external navigation (pre-ED3 behavior, byte-identical —
@@ -381,16 +506,16 @@ export function TabbedShell({
     // because handleTabChange also drives activeTab on user clicks.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTab((prev) => (prev === next ? prev : next));
-  }, [searchParams, defaultTab, activeAuthoringMode]);
+  }, [searchParams, activeAuthoringMode, ed10Active]);
 
   const handleTabChange = useCallback(
     (next: string) => {
-      if (!(VALID_TAB_IDS as string[]).includes(next)) return;
+      if (!(validTabIds as readonly string[]).includes(next)) return;
       setActiveTab(next as TabId);
       const params = new URLSearchParams(searchParams.toString());
       // The default tab is represented by the ABSENCE of ?tab= (so the URL and
-      // the tab stay bijective). Flag OFF ⇒ defaultTab is "metadata" — the
-      // pre-ED4 behavior, byte-identical.
+      // the tab stay bijective). Flag OFF ⇒ defaultTab is "metadata" (legacy)
+      // or "questions" (workspace mode) — the pre-ED10 behavior, byte-identical.
       if (next === defaultTab) {
         params.delete("tab");
       } else {
@@ -399,7 +524,7 @@ export function TabbedShell({
       const qs = params.toString();
       router.replace(qs ? `${pathname}?${qs}` : pathname);
     },
-    [pathname, router, searchParams, defaultTab],
+    [pathname, router, searchParams, defaultTab, validTabIds],
   );
 
   // ─── Document model + save flow (ED3 Task 4; composed via Task 6's
@@ -424,6 +549,11 @@ export function TabbedShell({
     handleTemplateFieldChange,
     handleVersionFieldChange,
     handleSendResultsDefaultChange,
+    // ED10 (spec 19am-plan, Task 7/10) — per-card template-row Save + its
+    // in-flight/error state, consumed by the Settings tab (Task 8).
+    handleTemplateRowSave,
+    templateRowSaving,
+    templateRowError,
     handleSectionsAdd,
     handleSectionsRename,
     handleSectionsMoveUp,
@@ -594,10 +724,16 @@ export function TabbedShell({
               v{version.versionNumber} ({pillStatusWord})
             </span>
             <span className="wf-pill wf-pill-access-invited">
-              {template.accessMode ?? "INVITED"}
+              {ed10Active
+                ? (ACCESS_MODE_LABELS[template.accessMode ?? "INVITED"] ??
+                  (template.accessMode ?? "INVITED"))
+                : (template.accessMode ?? "INVITED")}
             </span>
             <span className="wf-pill wf-pill-agg-full">
-              {template.aggregationMode}
+              {ed10Active
+                ? (AGGREGATION_MODE_LABELS[template.aggregationMode] ??
+                  template.aggregationMode)
+                : template.aggregationMode}
             </span>
             <span style={{ fontStyle: "italic" }}>{caption}</span>
           </div>
@@ -680,9 +816,18 @@ export function TabbedShell({
         aria-label="Template editor tabs"
       >
         <TabsList className="mb-6">
-          <TabsTrigger value="metadata">
-            {TAB_LABELS.metadata}
-          </TabsTrigger>
+          {/* ED10 (spec 19am-plan, T10) — Metadata folds into Settings and a
+              Preview tab leads. Flag OFF ⇒ the Metadata trigger renders EXACTLY
+              as today (byte-identical). */}
+          {ed10Active ? (
+            <TabsTrigger value="preview">
+              {TAB_LABELS.preview}
+            </TabsTrigger>
+          ) : (
+            <TabsTrigger value="metadata">
+              {TAB_LABELS.metadata}
+            </TabsTrigger>
+          )}
           {/* ED6 — single-column folds Sections into the Build tab, so its
               trigger disappears in single mode. Three/legacy render it. */}
           {activeAuthoringMode !== "single" && (
@@ -700,27 +845,59 @@ export function TabbedShell({
           <TabsTrigger value="scoring">
             {TAB_LABELS.scoring}
           </TabsTrigger>
-          {/* Access — link, not a tab panel. Per WF16 spec it navigates
+          {/* ED10 (spec 19am-plan, T10) — the Settings tab takes the Access
+              slot when active; Access management moves inside Settings
+              (the AccessGroupsRow "Manage" link). Flag OFF ⇒ the Access
+              <Link> renders EXACTLY as today (byte-identical).
+
+              Access — link, not a tab panel. Per WF16 spec it navigates
               to /admin/assessments/access-groups. We render it inside the
               tab nav so it sits in the same visual row, but as a Radix
               tab trigger that doesn't have a panel. To keep keyboard
               semantics correct we mark it as a tab but override its
               click to navigate instead of switching panels. */}
-          <Link
-            href="/admin/assessments/access-groups"
-            role="tab"
-            aria-selected="false"
-            data-testid="template-editor-access-link"
-            className="inline-flex items-center gap-1.5 whitespace-nowrap px-0.5 py-2.5 text-sm font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground"
-          >
-            Access
-          </Link>
+          {ed10Active ? (
+            <TabsTrigger value="settings">
+              {TAB_LABELS.settings}
+            </TabsTrigger>
+          ) : (
+            <Link
+              href="/admin/assessments/access-groups"
+              role="tab"
+              aria-selected="false"
+              data-testid="template-editor-access-link"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap px-0.5 py-2.5 text-sm font-medium text-muted-foreground border-b-2 border-transparent hover:text-foreground"
+            >
+              Access
+            </Link>
+          )}
           <TabsTrigger value="versions">
             {TAB_LABELS.versions}
           </TabsTrigger>
         </TabsList>
 
-        {/* F2 — Metadata tab (WF16). */}
+        {/* ED10 (spec 19am-plan, T10) — Preview tab (read-only respondent
+            render). Mounted ONLY when ed10Active; T3 routing makes it the
+            param-less default, in place of the Metadata panel below. */}
+        {ed10Active && (
+          <TabsContent value="preview">
+            <div data-testid="tab-panel-preview">
+              <PreviewTab
+                sections={sections}
+                questions={questions as QuestionDraftRow[]}
+                version={{
+                  versionNumber: version.versionNumber,
+                  language: versionValues.language,
+                }}
+                template={{ name: template.name, alias: template.alias }}
+                activePreview={activePreview}
+              />
+            </div>
+          </TabsContent>
+        )}
+        {/* F2 — Metadata tab (WF16). ED10 (T10) — the Metadata panel renders
+            ONLY when NOT ed10Active (byte-identical to today when off). */}
+        {!ed10Active && (
         <TabsContent value="metadata">
           <div data-testid="tab-panel-metadata">
             <MetadataTab
@@ -759,6 +936,7 @@ export function TabbedShell({
             />
           </div>
         </TabsContent>
+        )}
         {/* F2b — Sections tab (standalone, full-width). ED6 — folded into the
             single-column Build tab, so its panel is not mounted in single
             mode (its trigger is also gone). */}
@@ -881,6 +1059,30 @@ export function TabbedShell({
             />
           </div>
         </TabsContent>
+        {/* ED10 (spec 19am-plan, T10) — Settings tab (the Metadata field wall
+            rebuilt as one plain-language column). Mounted ONLY when ed10Active;
+            it takes the Access slot in the bar. No onSections* threading — the
+            Settings tab has no Sections card (D6). */}
+        {ed10Active && (
+          <TabsContent value="settings">
+            <div data-testid="tab-panel-settings">
+              <SettingsTab
+                templateValues={templateValues}
+                language={versionValues.language}
+                isReadOnly={isPublished}
+                onTemplateFieldChange={handleTemplateFieldChange}
+                onVersionFieldChange={handleVersionFieldChange}
+                handleTemplateRowSave={handleTemplateRowSave}
+                templateRowSaving={templateRowSaving}
+                templateRowError={templateRowError}
+                sendResultsDefault={sendResultsDefault}
+                onSendResultsDefaultChange={handleSendResultsDefaultChange}
+                savingSendResultsDefault={savingSendResultsDefault}
+                waveQEnabled={waveQEnabled}
+              />
+            </div>
+          </TabsContent>
+        )}
         <TabsContent value="versions">
           <div data-testid="tab-panel-versions">
             <VersionsTab
