@@ -6,6 +6,16 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-20 — Wave ED10 LAUNCHED + Neon prod DB restored (editor-simplification pipeline complete: ED1–ED10 all live) <!-- ENTRY_ISO:2026-07-20 ENTRY_SLUG:ed10-launched -->
+
+**Status: LAUNCHED (2026-07-20).** The Neon compute-quota outage that had blocked ED10 (see `ed10-preview-settings-merged-dark` below) is cleared — Josh **upgraded the Neon project to the Launch plan**, so the prod DB is reachable again (`prisma migrate status` → "Database schema is up to date", no P1001; the live app recovered too). Then the authorized two-step launch:
+- **Dark redeploy** — redeployed current `main` (ED10 code, flag OFF) to Vercel Production (`e4b4iezx7`, Ready, aliased `platformtest.scalingup.com`). Build green now the DB is healthy; live app byte-identical to ED9 — confirmed the deploy pipeline recovered and prod carried the ED10-dark code (the outage had `● Error`'d every deploy since the Jul-19 merge, so prod had been stuck on 3-day-old ED9).
+- **Flag flip** — set `WAVE_ED10_PREVIEW_SETTINGS_ENABLED=1` on Vercel Production + redeploy (`4z6ge1u7a`, Ready, aliased). ED10 now active (`ed10Active = previewSettingsEnabled && formsBuildEnabled && singleColumn`, all true on prod).
+
+**Launch walk (headless admin, Rockefeller Habits Checklist v3 draft editor):** tab bar is the ED10 shape — **Preview (default) · Build · Scoring & Tiers · Settings · Versions**; **no Metadata tab**. Preview renders the questionnaire **read-only exactly as a respondent sees it**, with the **Active v2 ⇄ This draft v3** toggle + "40 questions in 10 sections · English (US)" + the "Use Test Mode to answer & score" hint. Header pills humanized (**Invited · Everyone**, not `INVITED`/`FULL_VISIBILITY`). Settings is one plain-language column — "Who takes it & who sees results" (Invited only; Everyone / CEO only) with the per-card **Save**, Language, Invitation email, Results email. Kill = `WAVE_ED10_PREVIEW_SETTINGS_KILL=1` or unset the flag → byte-identical ED9.
+
+**Editor-simplification pipeline (ED1–ED10): all ten passes now in production.** Remaining pipeline items are docs (#9) + a live e2e follow-on (#10). A comprehensive ED1–ED10 progress report (self-contained HTML + PDF + a 2-min talk track, real prod screenshots + the ED10 locked-design renders) was produced for Jeff (repo root `Scaling-Up-Assessment-Editor-Report-2026-07-20.*`). ED10 build detail is in the `ed10-preview-settings-merged-dark` entry below.
+
 ### 2026-07-19 — Wave ED10: Metadata→Preview tab + one Settings tab (BUILT + MERGED DARK; launch blocked on Neon quota) <!-- ENTRY_ISO:2026-07-19 ENTRY_SLUG:ed10-preview-settings-merged-dark -->
 
 **Status: BUILT + MERGED DARK (2026-07-19); LAUNCH BLOCKED by a Neon Free-tier compute-quota outage.** PR #195 squash-merged to `main` (`cfe21566`) behind flag `WAVE_ED10_PREVIEW_SETTINGS_ENABLED` (+ `_KILL`) — **OFF on prod**, so the editor is byte-identical to ED9. Ticket #6 of the 10-ticket editor-simplification pipeline. Spec/plan `docs/specs/v7.6/19am` (grilled — 13 decisions; co-validated by real Codex — no-go-as-written → 6 findings folded + D9 re-decided). **Not launched:** the flag flip needs a healthy DB + a separate walk (see the Neon block below).
