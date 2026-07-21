@@ -31,6 +31,10 @@ import { logAudit } from "@/lib/audit";
 import { computeScoreResult } from "@/lib/assessments/compute-score-result";
 import type { PagerQuestion } from "@/lib/assessments/section-pages";
 import {
+  SU_FULL_ALIAS,
+  SU_FULL_BACKGROUND_SECTION,
+} from "@/lib/assessments/assemble-survey-pages";
+import {
   waveDResultsEmailEnabled,
   waveDCoachNotifyEnabled,
   assessmentSendsPaused,
@@ -392,9 +396,47 @@ export async function POST(
       const allQuestions = invitation.campaign.version.questions as Array<
         Record<string, unknown>
       >;
+
+      // #79 / Wave J-1 — SU-Full has a CEO-only S_BACKGROUND section that
+      // contains a REQUIRED NUMBER (Q_FTE_CONTRACT). The client hides that
+      // section from non-CEO respondents (org-survey-client + assembleSurveyPages
+      // both drop it), so their payload never carries those keys. The
+      // submit/scoring path must apply the SAME audience policy BEFORE the
+      // required-key check, or every non-CEO respondent trips
+      // MISSING_REQUIRED_KEY and can never submit. Only SU-Full needs the
+      // participant lookup — every other template scores the full set unchanged.
+      let scoredQuestions = allQuestions;
+      let scoredSections = invitation.campaign.version.sections as Array<
+        Record<string, unknown>
+      >;
+      if (invitation.campaign.template?.alias === SU_FULL_ALIAS) {
+        const participant = await db.assessmentCampaignParticipant.findUnique({
+          where: {
+            campaignId_respondentId: {
+              campaignId: invitation.campaignId,
+              respondentId: invitation.respondentId,
+            },
+          },
+          select: { isCEO: true },
+        });
+        // Fail-safe: no participant row → treat as non-CEO (drop the section),
+        // matching the survey-render policy (me/route.ts + org-survey-client).
+        if (participant?.isCEO !== true) {
+          // Mirror assembleSurveyPages EXACTLY: drop the CEO-only section from
+          // BOTH the questions AND the sections, so scoring never sees an empty
+          // S_BACKGROUND section that a non-CEO respondent never had.
+          scoredQuestions = allQuestions.filter(
+            (q) => q.sectionStableKey !== SU_FULL_BACKGROUND_SECTION,
+          );
+          scoredSections = scoredSections.filter(
+            (s) => s.stableKey !== SU_FULL_BACKGROUND_SECTION,
+          );
+        }
+      }
+
       const versionParsed = TemplateVersionForScoringSchema.safeParse({
-        questions: allQuestions,
-        sections: invitation.campaign.version.sections,
+        questions: scoredQuestions,
+        sections: scoredSections,
         scoringConfig: invitation.campaign.version.scoringConfig,
       });
       if (!versionParsed.success) {
@@ -408,7 +450,7 @@ export async function POST(
       // ScoringValidationError → caught by outer catch.
       const { result: scoreResult, prunedAnswers: rawAnswers } = computeScoreResult(
         versionParsed.data,
-        allQuestions as unknown as PagerQuestion[],
+        scoredQuestions as unknown as PagerQuestion[],
         answers.map((a) => ({ stableKey: a.stableKey, value: a.value })),
       );
 
