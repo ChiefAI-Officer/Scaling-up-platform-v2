@@ -116,23 +116,48 @@ describe("EditMemberModal", () => {
   });
 
   /**
-   * (2) Email field is rendered read-only / disabled.
-   *     Defense-in-depth: check both disabled AND readOnly so neither
-   *     protection is accidentally removed in isolation.
+   * (2) Email field is EDITABLE (#60) — no longer disabled/read-only.
+   *     Jeff asked to be able to fix a member's email in place.
    */
-  test("(2) email field is disabled and read-only", () => {
+  test("(2) email field is editable (#60)", () => {
     renderModal();
     const emailInput = screen.getByLabelText(/e-mail/i) as HTMLInputElement;
-    expect(emailInput.disabled).toBe(true);
-    // m1: also assert readOnly so the defense-in-depth intent is locked in
-    expect(emailInput).toHaveAttribute("readonly");
+    expect(emailInput.disabled).toBe(false);
+    expect(emailInput).not.toHaveAttribute("readonly");
   });
 
   /**
-   * (3) Valid submit PATCHes the correct URL with the right body shape.
-   *     Email must NOT be in the body.
+   * (2b) Changing the email includes the new email in the PATCH body (#60).
    */
-  test("(3) valid submit PATCHes the correct endpoint with body — no email", async () => {
+  test("(2b) changing the email sends the new email in the PATCH body (#60)", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: { id: "respondent-1" } }),
+    });
+
+    renderModal();
+
+    fireEvent.change(screen.getByLabelText(/e-mail/i), {
+      target: { value: "jane.new@example.com" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    const call = (global.fetch as jest.Mock).mock.calls[0];
+    const sentBody = JSON.parse(call[1].body as string);
+    expect(sentBody.email).toBe("jane.new@example.com");
+  });
+
+  /**
+   * (3) Valid submit PATCHes the correct URL with the right body shape,
+   *     now INCLUDING the (unchanged) email (#60).
+   */
+  test("(3) valid submit PATCHes the correct endpoint with body incl. email", async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -176,9 +201,9 @@ describe("EditMemberModal", () => {
     const call = (global.fetch as jest.Mock).mock.calls[0];
     const sentBody = JSON.parse(call[1].body as string);
 
-    // email must NOT be in body
-    expect(sentBody).not.toHaveProperty("email");
+    // email is now part of the body (unchanged here) (#60)
     expect(sentBody).toEqual({
+      email: "jane.smith@example.com",
       firstName: "Janet",
       lastName: "Smithson",
       jobTitle: "VP",

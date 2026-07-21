@@ -5,6 +5,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { updateRespondentSchema } from "@/lib/validations";
+// Reuse the SAME normalizeEmail the create/bulk paths use so an email edit
+// computes normalizedEmail / dedupe identically (#60). Already the established
+// cross-route import convention (bulk/route.ts, assessment-campaigns/route.ts).
+import { normalizeEmail } from "@/app/api/organizations/[id]/respondents/route";
 import { getApiActor } from "@/lib/auth/authorization";
 import {
   canAccessOrganization,
@@ -102,12 +106,26 @@ export async function PATCH(
     }
 
     const updateData: {
+      email?: string;
+      normalizedEmail?: string;
+      dedupeValue?: string;
       firstName?: string;
       lastName?: string;
       jobTitle?: string | null;
       teamId?: string | null;
       roleType?: string | null;
     } = {};
+    if (data.email !== undefined) {
+      const normalizedEmail = normalizeEmail(data.email);
+      updateData.email = data.email;
+      updateData.normalizedEmail = normalizedEmail;
+      // The dedupe key is email-derived ONLY for email-sourced members
+      // (dedupeSource === "email"). For externalId-sourced members it stays
+      // externalId-based, so an email edit must NOT shift the dedupe key (#60).
+      if (existing.dedupeSource === "email") {
+        updateData.dedupeValue = normalizedEmail;
+      }
+    }
     if (data.firstName !== undefined) updateData.firstName = data.firstName;
     if (data.lastName !== undefined) updateData.lastName = data.lastName;
     if (data.jobTitle !== undefined)
@@ -115,10 +133,41 @@ export async function PATCH(
     if (data.teamId !== undefined) updateData.teamId = data.teamId ?? null;
     if (data.roleType !== undefined) updateData.roleType = data.roleType;
 
-    const respondent = await db.orgRespondent.update({
-      where: { id: respondentId },
-      data: updateData,
-    });
+    let respondent;
+    try {
+      respondent = await db.orgRespondent.update({
+        where: { id: respondentId },
+        data: updateData,
+      });
+    } catch (error) {
+      // A changed email can collide with another member's dedupe key in the
+      // same org (@@unique([organizationId, dedupeSource, dedupeValue])) — mirror
+      // the create route: surface a 409 rather than a raw 500 (#60).
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code: string }).code === "P2002"
+      ) {
+        const conflict = await db.orgRespondent.findFirst({
+          where: {
+            organizationId,
+            dedupeSource: existing.dedupeSource,
+            dedupeValue: updateData.dedupeValue ?? existing.dedupeValue,
+          },
+        });
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "A member with this email already exists for this organization.",
+            existingId: conflict?.id ?? null,
+          },
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
 
     await logAudit({
       entityType: "OrgRespondent",

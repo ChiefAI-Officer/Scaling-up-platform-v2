@@ -11,9 +11,9 @@
  *   - Array.isArray(json.error) ? json.error[0]?.message : ... unwrap
  *   - onUpdated awaited BEFORE onClose()
  *
- * EMAIL IS READ-ONLY: email is the dedupe key for OrgRespondent — the PATCH
- * API does not accept an email change. The field is displayed disabled with a
- * helper note but is never included in the request body.
+ * EMAIL IS EDITABLE (#60): the PATCH API accepts an email change and recomputes
+ * normalizedEmail (and, for email-sourced members, the dedupe key). A collision
+ * with another member in the org comes back as a 409 shown inline.
  *
  * PROPS
  * ─────
@@ -40,7 +40,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ApiTeamNode } from "./members-teams-view";
 import { RESPONDENT_LEVELS, RESPONDENT_LEVEL_VALUES } from "@/lib/assessments/respondent-levels";
-import type { RespondentLevelValue } from "@/lib/assessments/respondent-levels";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -91,6 +90,7 @@ export function EditMemberModal({
   const levelId     = useId();
 
   // Form state — pre-filled from member prop
+  const [email,           setEmail]           = useState(member.email);
   const [firstName,       setFirstName]       = useState(member.firstName);
   const [lastName,        setLastName]        = useState(member.lastName);
   const [jobTitle,        setJobTitle]        = useState(member.jobTitle ?? "");
@@ -107,6 +107,7 @@ export function EditMemberModal({
   // Reset form whenever the dialog opens (sync to new member prop)
   useEffect(() => {
     if (open) {
+      setEmail(member.email);
       setFirstName(member.firstName);
       setLastName(member.lastName);
       setJobTitle(member.jobTitle ?? "");
@@ -115,14 +116,14 @@ export function EditMemberModal({
       setInitialRoleType(member.roleType);
       setError(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, member.id, member.firstName, member.lastName, member.jobTitle, member.teamId, member.roleType]);
+  }, [open, member.id, member.email, member.firstName, member.lastName, member.jobTitle, member.teamId, member.roleType]);
 
   // ---------------------------------------------------------------------------
   // Validation + submit
   // ---------------------------------------------------------------------------
 
   function validate(): string | null {
+    if (!email.trim())     return "Email is required.";
     if (!firstName.trim()) return "First name is required.";
     if (!lastName.trim())  return "Last name is required.";
     return null;
@@ -141,6 +142,7 @@ export function EditMemberModal({
     setSubmitting(true);
     try {
       const body: Record<string, unknown> = {
+        email:     email.trim(),
         firstName: firstName.trim(),
         lastName:  lastName.trim(),
       };
@@ -152,6 +154,9 @@ export function EditMemberModal({
       if (teamId) {
         body.teamId = teamId;
       }
+      // email is always sent (#60) — the server recomputes normalizedEmail and,
+      // for email-sourced members, the dedupe key; sending the unchanged value
+      // is idempotent.
       // roleType handling:
       //  - If the user explicitly cleared the field (empty string), send null to wipe it.
       //  - If the user explicitly picked a known slug, send it.
@@ -165,8 +170,6 @@ export function EditMemberModal({
       if (!isLegacyUnchanged) {
         body.roleType = roleType || null;
       }
-      // NOTE: email is intentionally NOT included — the API rejects email changes
-      // (email is the dedupe key for OrgRespondent).
 
       const res = await fetch(
         `/api/organizations/${member.orgId}/respondents/${member.id}`,
@@ -243,20 +246,21 @@ export function EditMemberModal({
               />
             </div>
 
-            {/* ---- E-mail (read-only — email is the dedupe key) ---- */}
+            {/* ---- E-mail (editable — #60) ---- */}
             <div className="space-y-1.5">
-              <Label htmlFor={emailId}>E-mail</Label>
+              <Label htmlFor={emailId}>E-mail *</Label>
               <Input
                 id={emailId}
                 type="email"
-                value={member.email}
-                disabled={true}
-                readOnly
-                className="cursor-not-allowed"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. jane@example.com"
+                disabled={submitting}
+                required
                 aria-describedby={`${emailId}-hint`}
               />
               <p id={`${emailId}-hint`} className="text-xs text-muted-foreground italic">
-                Email cannot be changed here.
+                Used for assessment invitations.
               </p>
             </div>
 
