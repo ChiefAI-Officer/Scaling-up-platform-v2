@@ -73,13 +73,20 @@
   margin-bottom: 0;
 }
 
-/* ── Print button (screen-only utility) ──────────────────────────────────── */
-.su-public-brand .su-report-print-btn {
-  /* Inherits .su-cta styles from su-public-brand.css */
+/* ── Print / Download actions (screen-only utility, #64) ─────────────────── */
+/* The fixed positioning lives on the ACTIONS BAR so the two buttons sit
+   side-by-side in the top-right instead of stacking on top of each other. */
+.su-public-brand .su-report-print-actions {
   position: fixed;
   top: 18px;
   right: 24px;
   z-index: 50;
+  display: flex;
+  gap: 10px;
+}
+.su-public-brand .su-report-print-btn,
+.su-public-brand .su-report-download-btn {
+  /* Inherits .su-cta styles from su-public-brand.css */
   box-shadow: 0 6px 20px rgba(40, 20, 70, 0.22);
   font-size: 13px;
   padding: 11px 18px;
@@ -832,7 +839,7 @@
   .su-public-brand .su-report-additional { padding: 32px 24px; }
   .su-public-brand .su-report-conclusion { padding: 32px 24px; }
   .su-public-brand .su-report-footer { padding: 16px 24px; flex-direction: column; align-items: flex-start; }
-  .su-public-brand .su-report-print-btn { position: static; margin: 16px auto; display: block; width: fit-content; }
+  .su-public-brand .su-report-print-actions { position: static; margin: 16px auto; justify-content: center; flex-wrap: wrap; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -916,8 +923,10 @@
     border-top: 1px solid rgba(255, 255, 255, 0.3);
   }
 
-  /* Ensure the fixed print-button is gone (belt + suspenders) */
-  .su-public-brand .su-report-print-btn {
+  /* Ensure the fixed print/download actions are gone (belt + suspenders) */
+  .su-public-brand .su-report-print-actions,
+  .su-public-brand .su-report-print-btn,
+  .su-public-brand .su-report-download-btn {
     display: none !important;
   }
 

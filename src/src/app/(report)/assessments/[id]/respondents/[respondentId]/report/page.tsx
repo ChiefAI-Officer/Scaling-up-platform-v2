@@ -90,7 +90,9 @@ export default async function RespondentReportPage({ params }: PageProps) {
   return (
     <div className="su-report-page">
       <div className="su-report-actions no-print">
-        <PrintReportButton />
+        <PrintReportButton
+          fileName={`${report.respondentName} - ${report.assessmentName} - Report`}
+        />
         {longitudinal && (
           // prefetch is irrelevant for a plain <a>, but per spec the
           // longitudinal surface is NEVER prefetched: a plain anchor (not a
