@@ -128,3 +128,26 @@ export function classifyEspertoExport(json: unknown): EspertoExportKind {
     topLevelKeys: Object.keys(json).slice(0, 20),
   });
 }
+
+/**
+ * #87 — a human, actionable message for when the Results import lane receives
+ * an export that ISN'T a results Report. The old message ("Expected a report
+ * export for kind:results, got restricted-individual") leaked the internal
+ * classifier vocabulary and gave no next step, so operators couldn't tell what
+ * they'd uploaded or where it belonged. Keyed on the detected kind and shared
+ * by BOTH import routes (admin + coach) so they stay in lockstep.
+ *
+ * The param excludes "report" — a report IS the valid Results input, so the
+ * caller only reaches this on a genuine mismatch.
+ */
+export function resultsLaneMismatchMessage(
+  kind: Exclude<EspertoExportKind, "report">,
+): string {
+  switch (kind) {
+    case "members":
+      return "This looks like a Members export (a roster/contact list), not a results Report. Use the 'Roster (people)' import option for member lists instead.";
+    case "restricted-individual":
+    case "restricted-aggregate":
+      return "This looks like a restricted 'Scaling Up Assessment' export, not a standard results Report. Use the 'Historical rounds' import option for restricted exports instead.";
+  }
+}

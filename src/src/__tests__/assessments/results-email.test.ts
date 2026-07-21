@@ -74,6 +74,7 @@ describe("buildCoachNotifyEmail", () => {
       campaignId: "camp-1",
       respondentId: "resp-1",
       assessmentName: "Rockefeller Habits Checklist",
+      respondentName: "Jane Doe",
     });
     expect(subject.length).toBeGreaterThan(0);
     expect(bodyHtml).toContain(
@@ -89,30 +90,67 @@ describe("buildCoachNotifyEmail", () => {
       campaignId: "c",
       respondentId: "r",
       assessmentName: "X",
+      respondentName: "Jane Doe",
     });
     expect(bodyHtml).toContain("https://app.example.com/assessments/c/respondents/r/report");
     expect(bodyHtml).not.toContain("example.com//assessments");
   });
 
-  it("does NOT leak respondent PII (email/name) into the coach-notify body", () => {
-    const { bodyHtml } = buildCoachNotifyEmail({
+  it("shows the respondent's name in the subject and body (#50)", () => {
+    // Jeff #50: the coach must be able to see WHO completed the assessment
+    // without clicking through — name in the inbox preview (subject) and body.
+    const { subject, bodyHtml } = buildCoachNotifyEmail({
+      appUrl: "https://app.example.com",
+      campaignId: "c",
+      respondentId: "r",
+      assessmentName: "Rockefeller Habits Checklist",
+      respondentName: "Jane Doe",
+    });
+    expect(subject).toContain("Jane Doe");
+    expect(bodyHtml).toContain("Jane Doe");
+  });
+
+  it("renders the email fallback the caller resolved when the name was blank (#50 + Wave P)", () => {
+    // The caller resolves the display name via respondentDisplayName, which
+    // falls back to the email when first/last are blank. Coach-facing surfaces
+    // intentionally show that email so the coach knows who completed it — this
+    // reverses the old PII-minimal design per Jeff #50.
+    const { subject, bodyHtml } = buildCoachNotifyEmail({
       appUrl: "https://app.example.com",
       campaignId: "c",
       respondentId: "r",
       assessmentName: "X",
+      respondentName: "jane@example.com",
     });
-    // The builder is given no PII; the link is the only way to the data.
-    expect(bodyHtml).not.toContain("@");
+    expect(subject).toContain("jane@example.com");
+    expect(bodyHtml).toContain("jane@example.com");
   });
 
-  it("escapes the assessment name", () => {
+  it("keeps the generic 'A respondent' wording when the name is blank (no leading space, no empty <strong>)", () => {
+    const { subject, bodyHtml } = buildCoachNotifyEmail({
+      appUrl: "https://app.example.com",
+      campaignId: "c",
+      respondentId: "r",
+      assessmentName: "X",
+      respondentName: "",
+    });
+    expect(subject).toBe("A respondent completed X");
+    expect(bodyHtml).toContain("A respondent");
+    // No empty bold placeholder where a name would go.
+    expect(bodyHtml).not.toContain("<strong></strong>");
+  });
+
+  it("escapes the respondent name and the assessment name", () => {
     const { bodyHtml } = buildCoachNotifyEmail({
       appUrl: "https://app.example.com",
       campaignId: "c",
       respondentId: "r",
       assessmentName: "<b>X</b>",
+      respondentName: "<i>Jane</i>",
     });
     expect(bodyHtml).not.toContain("<b>X</b>");
     expect(bodyHtml).toContain("&lt;b&gt;X&lt;/b&gt;");
+    expect(bodyHtml).not.toContain("<i>Jane</i>");
+    expect(bodyHtml).toContain("&lt;i&gt;Jane&lt;/i&gt;");
   });
 });
