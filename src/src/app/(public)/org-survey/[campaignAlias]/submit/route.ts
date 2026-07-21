@@ -45,6 +45,7 @@ import {
   buildResultsEmailHtml,
   buildCoachNotifyEmail,
 } from "@/lib/assessments/results-email";
+import { respondentDisplayName } from "@/lib/assessments/respondent-display-name";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
@@ -217,6 +218,13 @@ function buildWaveDOutboxRows({
         campaignId: campaign.id,
         respondentId,
         assessmentName: campaign.template?.name ?? "an assessment",
+        // Jeff #50 — show the coach WHO completed it. respondentDisplayName
+        // falls back to the email when the roster name is blank (Wave P).
+        respondentName: respondentDisplayName(
+          respondent?.firstName,
+          respondent?.lastName,
+          respondent?.email,
+        ),
       });
       rows.push({
         recipientEmail: coachEmail,
