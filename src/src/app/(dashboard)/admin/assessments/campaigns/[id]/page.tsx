@@ -37,6 +37,7 @@ import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-fl
 import {
   isGroupReportEnabled,
   isGroupReportAlias,
+  groupReportRequiresPublishedVersion,
 } from "@/lib/assessments/wave-f-flags";
 
 const ADMIN_CAMPAIGNS = "/admin/assessments/campaigns";
@@ -89,7 +90,9 @@ export default async function AdminCampaignDetailPage({ params }: PageProps) {
     campaignForFlag !== null &&
     campaignForFlag.accessMode === "INVITED" &&
     isGroupReportAlias(campaignForFlag.template?.alias) &&
-    (campaignForFlag.template?.alias !== "scaling-up-full" ||
+    // Publish guard, lock-step with the loader (R3-H1): a scored surface needs
+    // a published version; qualitative (LVA/QSP) is never gated on publishedAt.
+    (!groupReportRequiresPublishedVersion(campaignForFlag.template?.alias) ||
       campaignForFlag.version?.publishedAt != null) &&
     isGroupReportEnabled(actor, campaignForFlag) &&
     (await canViewGroupReport(asAccessDb(db), actor, id));
