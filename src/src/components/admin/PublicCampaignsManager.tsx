@@ -10,7 +10,7 @@
  * Task 8: Quick Assessment PUBLIC campaign flow.
  */
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 
 interface TemplateSummary {
   id: string;
@@ -36,6 +36,15 @@ interface PublicCampaignRow {
   organization?: { id: string; name: string } | null;
 }
 
+/** #83 — a public-quiz submission row (from the admin submissions endpoint). */
+interface SubmissionRow {
+  id: string;
+  takerName: string;
+  takerEmail: string | null;
+  referringCoachEmail: string | null;
+  submittedAt: string;
+}
+
 export function PublicCampaignsManager() {
   const [campaigns, setCampaigns] = useState<PublicCampaignRow[]>([]);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
@@ -46,6 +55,44 @@ export function PublicCampaignsManager() {
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // #83 — per-campaign public-quiz submissions, lazy-loaded when a row expands.
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [submissionsByCampaign, setSubmissionsByCampaign] = useState<
+    Record<string, SubmissionRow[]>
+  >({});
+  const [subsLoading, setSubsLoading] = useState<string | null>(null);
+  const [subsError, setSubsError] = useState<string | null>(null);
+
+  async function toggleSubmissions(id: string) {
+    // Collapse if already open.
+    if (expandedId === id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(id);
+    setSubsError(null);
+    // Serve from cache if we've already loaded this campaign's submissions.
+    if (submissionsByCampaign[id]) return;
+    setSubsLoading(id);
+    try {
+      const res = await fetch(`/api/admin/public-campaigns/${id}/submissions`);
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setSubsError(
+          typeof json.error === "string"
+            ? json.error
+            : "Failed to load submissions.",
+        );
+        return;
+      }
+      setSubmissionsByCampaign((prev) => ({ ...prev, [id]: json.data ?? [] }));
+    } catch {
+      setSubsError("Failed to load submissions.");
+    } finally {
+      setSubsLoading(null);
+    }
+  }
 
   // Form state
   const [templateId, setTemplateId] = useState("");
@@ -190,39 +237,95 @@ export function PublicCampaignsManager() {
             </thead>
             <tbody>
               {campaigns.map((c) => (
-                <tr key={c.id} className="wf-tr">
-                  <td className="wf-td">{c.name}</td>
-                  <td className="wf-td">
-                    <code className="wf-code">{c.alias}</code>
-                  </td>
-                  <td className="wf-td">{c.template?.name ?? c.template?.alias ?? "—"}</td>
-                  <td className="wf-td">
-                    <span
-                      className={
-                        c.status === "ACTIVE"
-                          ? "wf-badge wf-badge-green"
-                          : c.status === "CLOSED"
-                          ? "wf-badge wf-badge-red"
-                          : "wf-badge wf-badge-yellow"
-                      }
-                    >
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="wf-td">
-                    {c.status === "DRAFT" && (
-                      <button
-                        className="wf-btn wf-btn-primary wf-btn-sm"
-                        onClick={() => handlePublish(c.id)}
+                <Fragment key={c.id}>
+                  <tr className="wf-tr">
+                    <td className="wf-td">{c.name}</td>
+                    <td className="wf-td">
+                      <code className="wf-code">{c.alias}</code>
+                    </td>
+                    <td className="wf-td">{c.template?.name ?? c.template?.alias ?? "—"}</td>
+                    <td className="wf-td">
+                      <span
+                        className={
+                          c.status === "ACTIVE"
+                            ? "wf-badge wf-badge-green"
+                            : c.status === "CLOSED"
+                            ? "wf-badge wf-badge-red"
+                            : "wf-badge wf-badge-yellow"
+                        }
                       >
-                        Publish
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="wf-td">
+                      {c.status === "DRAFT" && (
+                        <button
+                          className="wf-btn wf-btn-primary wf-btn-sm"
+                          onClick={() => handlePublish(c.id)}
+                        >
+                          Publish
+                        </button>
+                      )}
+                      {/* #83 — self-enrolled submissions + which coach referred them */}
+                      <button
+                        className="wf-btn wf-btn-sm"
+                        onClick={() => toggleSubmissions(c.id)}
+                        aria-expanded={expandedId === c.id}
+                      >
+                        {expandedId === c.id ? "Hide" : "View submissions"}
                       </button>
-                    )}
-                    {c.status !== "DRAFT" && (
-                      <span className="wf-muted-text">—</span>
-                    )}
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                  {expandedId === c.id && (
+                    <tr className="wf-tr">
+                      <td className="wf-td" colSpan={5}>
+                        {subsLoading === c.id ? (
+                          <p className="wf-muted-text">Loading…</p>
+                        ) : subsError ? (
+                          <p className="wf-muted-text" role="alert">
+                            {subsError}
+                          </p>
+                        ) : (submissionsByCampaign[c.id]?.length ?? 0) === 0 ? (
+                          <p className="wf-muted-text">No submissions yet.</p>
+                        ) : (
+                          <table className="wf-table" style={{ width: "100%" }}>
+                            <thead>
+                              <tr>
+                                <th className="wf-th">Respondent</th>
+                                <th className="wf-th">Referred by coach</th>
+                                <th className="wf-th">Submitted</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {submissionsByCampaign[c.id].map((s) => (
+                                <tr key={s.id} className="wf-tr">
+                                  <td className="wf-td">
+                                    {s.takerName}
+                                    {s.takerEmail &&
+                                      s.takerEmail !== s.takerName && (
+                                        <div
+                                          className="wf-muted-text"
+                                          style={{ fontSize: "0.85em" }}
+                                        >
+                                          {s.takerEmail}
+                                        </div>
+                                      )}
+                                  </td>
+                                  <td className="wf-td">
+                                    {s.referringCoachEmail ?? "—"}
+                                  </td>
+                                  <td className="wf-td">
+                                    {s.submittedAt.slice(0, 10)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
