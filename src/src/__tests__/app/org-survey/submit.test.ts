@@ -57,6 +57,7 @@ const txMock = {
 var dbMock: {
   $transaction: jest.Mock;
   assessmentInvitation: { findUnique: jest.Mock };
+  assessmentCampaignParticipant: { findUnique: jest.Mock };
   auditLog: { create: jest.Mock };
 };
 
@@ -64,6 +65,7 @@ jest.mock("@/lib/db", () => {
   dbMock = {
     $transaction: jest.fn((fn: (tx: typeof txMock) => unknown) => fn(txMock)),
     assessmentInvitation: { findUnique: jest.fn() },
+    assessmentCampaignParticipant: { findUnique: jest.fn() },
     auditLog: { create: jest.fn().mockResolvedValue(undefined) },
   };
   return { db: dbMock };
@@ -734,5 +736,106 @@ describe("Wave D C-M2 — stale email render-input re-check under the lock", () 
     expect(enqueuedRoles()).toContain("RESPONDENT");
     expect(enqueuedRoles()).toContain("OWNING_COACH");
     expect(enqueuedRoles()).toHaveLength(2);
+  });
+});
+
+// ── #79 / Wave J-1 — SU-Full CEO-only S_BACKGROUND section on the submit path ─
+// SU-Full hides the CEO-only S_BACKGROUND section (which holds a REQUIRED
+// NUMBER, Q_FTE_CONTRACT) from non-CEO respondents, so their payload never
+// carries those keys. The submit/scoring path must apply the same audience drop
+// BEFORE the required-key check — otherwise every non-CEO respondent trips
+// MISSING_REQUIRED_KEY and can never submit (#79).
+describe("#79 — SU-Full CEO-only S_BACKGROUND on submit", () => {
+  const suFullVersion = {
+    questions: [
+      {
+        stableKey: "q1",
+        sortOrder: 1,
+        type: "SLIDER_LIKERT" as const,
+        label: "Q1",
+        isRequired: true,
+        sectionStableKey: "s1",
+        scale: { min: 0, max: 3, step: 1, anchorMin: "Lo", anchorMax: "Hi" },
+      },
+      {
+        stableKey: "Q_FTE_CONTRACT",
+        sortOrder: 2,
+        type: "NUMBER" as const,
+        label: "Full-time employees",
+        isRequired: true,
+        sectionStableKey: "S_BACKGROUND",
+      },
+    ],
+    sections: [
+      { stableKey: "s1", sortOrder: 1, name: "S1" },
+      { stableKey: "S_BACKGROUND", sortOrder: 2, name: "About your company" },
+    ],
+    scoringConfig: goodVersion.scoringConfig,
+  };
+
+  function mockSuFullInvitation(isCEO: boolean) {
+    const invitation = {
+      id: "inv-1",
+      status: "VIEWED",
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      respondentId: "r1",
+      campaignId: "c1",
+      respondent: {
+        email: "respondent@example.com",
+        firstName: "Resp",
+        lastName: "Ondent",
+      },
+      campaign: {
+        id: "c1",
+        alias: "demo",
+        deletedAt: null,
+        status: "ACTIVE",
+        accessMode: "INVITED",
+        openAt: new Date(Date.now() - 1000),
+        closeAt: null,
+        sendResultsToRespondent: true,
+        notifyCoachOnCompletion: true,
+        createdByCoachId: "coach-1",
+        creatorCoach: { email: "coach@example.com" },
+        version: {
+          id: "v1",
+          questions: suFullVersion.questions,
+          sections: suFullVersion.sections,
+          scoringConfig: suFullVersion.scoringConfig,
+        },
+        template: {
+          name: "Scaling Up Full",
+          alias: "scaling-up-full",
+          resultsEmailSubject: "Your results",
+          resultsEmailBodyMarkdown: "Here are your results.",
+          resultsEmailContentApproved: true,
+          resultsEmailContentApprovedHash: "hash",
+        },
+      },
+    };
+    dbMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
+    txMock.assessmentInvitation.findUnique.mockResolvedValue(invitation);
+    dbMock.assessmentCampaignParticipant.findUnique.mockResolvedValue({ isCEO });
+  }
+
+  it("non-CEO submits WITHOUT the CEO-only S_BACKGROUND answer → 200 (#79)", async () => {
+    mockSuFullInvitation(false);
+    const res = await POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo"),
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("CEO still MUST answer the required S_BACKGROUND question → 400 MISSING_REQUIRED_KEY", async () => {
+    mockSuFullInvitation(true);
+    const res = await POST(
+      jsonReq({ answers: [{ stableKey: "q1", value: 2 }] }) as never,
+      aliasParams("demo"),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("MISSING_REQUIRED_KEY");
   });
 });

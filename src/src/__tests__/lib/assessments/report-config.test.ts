@@ -14,12 +14,28 @@ describe("reportConfigFor", () => {
     }
   });
   it("unknown + null fall back to scored + table", () => {
-    for (const a of ["five-dysfunctions", "scaling-up-quick", "nope", null, undefined]) {
+    for (const a of ["scaling-up-quick", "nope", null, undefined]) {
       expect(reportConfigFor(a)).toEqual({
         reportType: "scored",
         showScoreTable: true,
         showTier: true,
       });
+    }
+  });
+
+  // ── #81: five-dysfunctions hides the "Talk to your coach" CTA ───────────────
+  it("five-dysfunctions is scored but hides the coach CTA (#81)", () => {
+    expect(reportConfigFor("five-dysfunctions")).toEqual({
+      reportType: "scored",
+      showScoreTable: true,
+      showTier: true,
+      showCoachCta: false,
+    });
+  });
+
+  it("every other scored report shows the coach CTA by default (#81) — only five-dysfunctions opts out", () => {
+    for (const a of ["RockHabits", "scaling-up-full", "scaling-up-quick", "nope", null, undefined]) {
+      expect(reportConfigFor(a).showCoachCta).not.toBe(false);
     }
   });
 
