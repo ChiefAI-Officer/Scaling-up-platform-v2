@@ -157,7 +157,9 @@ export default async function CampaignGroupReportPage({ params }: PageProps) {
           full render (the complete <GroupReport/> still renders), not a distinct
           outcome — so a degraded-but-full report keeps the button. */}
       <div className="su-report-actions no-print">
-        <PrintReportButton />
+        <PrintReportButton
+          fileName={`${provenance.companyName} - ${provenance.assessmentName} - Group Report`}
+        />
       </div>
       <GroupReport
         report={report}
