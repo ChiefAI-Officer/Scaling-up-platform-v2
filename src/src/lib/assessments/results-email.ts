@@ -91,29 +91,53 @@ export interface BuildCoachNotifyArgs {
   respondentId: string;
   /** Instrument title (template.name). Escaped before render. */
   assessmentName: string;
+  /**
+   * Respondent display name the caller already resolved via
+   * respondentDisplayName (name, else the email fallback). Shown in the
+   * subject + body so the coach knows WHO completed the assessment (Jeff #50).
+   * Escaped before render. Blank → the generic "A respondent" wording.
+   */
+  respondentName: string;
 }
 
 /**
- * #16 OWNING_COACH notify — a short, PII-minimal email whose ONLY pointer to
- * the respondent's data is an absolute link to the auth-gated Spec-13 report.
- * The link follows the (report) route group: /assessments/{id}/respondents/{rid}/report.
+ * #16 OWNING_COACH notify — a short email carrying the respondent's name
+ * (Jeff #50) and an absolute link to the auth-gated Spec-13 report. The name
+ * lets the coach see WHO completed the assessment straight from their inbox;
+ * the respondent's answers still live behind the auth-gated link. The link
+ * follows the (report) route group: /assessments/{id}/respondents/{rid}/report.
+ *
+ * `respondentName` is resolved by the caller via respondentDisplayName (name,
+ * else the email fallback per Wave P). Blank → the generic "A respondent"
+ * wording, byte-identical to the pre-#50 email (no leading space, no empty
+ * <strong>).
  */
 export function buildCoachNotifyEmail({
   appUrl,
   campaignId,
   respondentId,
   assessmentName,
+  respondentName,
 }: BuildCoachNotifyArgs): { subject: string; bodyHtml: string } {
   const origin = appUrl.replace(/\/+$/, "");
   const reportUrl = `${origin}/assessments/${encodeURIComponent(
     campaignId,
   )}/respondents/${encodeURIComponent(respondentId)}/report`;
-  const name = escapeHtml(assessmentName);
+  const escAssessment = escapeHtml(assessmentName);
 
-  const subject = `A respondent completed ${assessmentName}`;
+  // Subjects are plain text (not HTML), so the raw name/title is correct here.
+  const who = respondentName.trim();
+  const subject = who
+    ? `${who} completed ${assessmentName}`
+    : `A respondent completed ${assessmentName}`;
+
+  const completedLine = who
+    ? `<strong>${escapeHtml(who)}</strong> has completed the <strong>${escAssessment}</strong> assessment.`
+    : `A respondent has completed the <strong>${escAssessment}</strong> assessment.`;
+
   const bodyHtml = `
 <div style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;color:#374151;">
-  <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">A respondent has completed the <strong>${name}</strong> assessment.</p>
+  <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">${completedLine}</p>
   <p style="margin:0 0 20px;font-size:15px;line-height:1.6;">View their full results report:</p>
   <p style="text-align:center;margin:0 0 20px;">
     <a href="${escapeHtml(reportUrl)}" style="display:inline-block;background:${PURPLE};color:#ffffff;padding:14px 30px;text-decoration:none;border-radius:8px;font-weight:700;font-size:15px;">View the report</a>
