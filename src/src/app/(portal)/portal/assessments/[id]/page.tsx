@@ -26,6 +26,7 @@ import { waveDCustomHtmlEmailEnabled } from "@/lib/assessments/wave-d-feature-fl
 import {
   isGroupReportEnabled,
   isGroupReportAlias,
+  groupReportRequiresPublishedVersion,
 } from "@/lib/assessments/wave-f-flags";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import {
@@ -97,11 +98,12 @@ export default async function CampaignDetailPage({ params }: PageProps) {
   const canShowGroupReport =
     campaignForFlag !== null &&
     campaignForFlag.accessMode === "INVITED" &&
-    // Allowlisted surface — LVA (Jeff 2026-06-18) + SU-Full (Wave J J-3).
+    // Allowlisted surface — LVA + SU-Full + QSP + Rockefeller (#72 / DT-5).
     isGroupReportAlias(campaignForFlag.template?.alias) &&
-    // SU-Full-SCOPED publish guard, lock-step with the loader (R3-H1). A DRAFT
-    // SU-Full version hides the link; LVA is NEVER gated on publishedAt.
-    (campaignForFlag.template?.alias !== "scaling-up-full" ||
+    // Publish guard, lock-step with the loader (R3-H1): a scored surface (SU-Full,
+    // Rockefeller) needs a published version; qualitative (LVA, QSP) is NEVER
+    // gated on publishedAt.
+    (!groupReportRequiresPublishedVersion(campaignForFlag.template?.alias) ||
       campaignForFlag.version?.publishedAt != null) &&
     isGroupReportEnabled(actor, campaignForFlag) &&
     (await canViewGroupReport(asAccessDb(db), actor, id));

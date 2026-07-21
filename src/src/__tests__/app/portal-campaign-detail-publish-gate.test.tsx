@@ -2,8 +2,9 @@
  * Wave J (J-3) — entry-point publish gate on the coach CampaignDetail page.
  *
  * The "View group report" entry link must be hidden for a DRAFT (unpublished)
- * SU-Full campaign EVEN when the flag is on — lock-step with the loader's
- * SU-Full-scoped publish guard. LVA is NEVER gated on publishedAt.
+ * SCORED campaign (SU-Full, Rockefeller) EVEN when the flag is on — lock-step
+ * with the loader's publish guard, which is keyed on scored report type (#72
+ * DT-5). Qualitative surfaces (LVA, QSP) are NEVER gated on publishedAt.
  *
  * Strategy: drive the REAL server component with every leaf mocked, and capture
  * the `canViewGroupReport` boolean the page hands to <CampaignDetail>. We assert
@@ -165,7 +166,7 @@ describe("CampaignDetail entry-point publish gate (Wave J J-3)", () => {
     expect(await runPage()).toBe(false);
   });
 
-  it("LVA with a NULL publishedAt → still true (publish guard is SU-Full-scoped)", async () => {
+  it("LVA with a NULL publishedAt → still true (publish guard is scored-only; LVA is qualitative)", async () => {
     process.env.WAVE_F_GROUP_REPORT_ENABLED = "1";
     mockFindFirst.mockResolvedValue(
       makeCampaign({

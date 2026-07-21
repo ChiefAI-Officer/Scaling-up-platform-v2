@@ -201,6 +201,9 @@ afterEach(() => {
   delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
   delete process.env.WAVE_J_SUFULL_GROUP_CANARY;
   delete process.env.WAVE_J_SUFULL_GROUP_KILL;
+  delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED;
+  delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_CANARY;
+  delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_KILL;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -223,12 +226,14 @@ test("PUBLIC campaign → notApplicable (no model built)", async () => {
   expect(mock._findManySubmissions).not.toHaveBeenCalled();
 });
 
-test("non-LVA INVITED campaign → notApplicable (unsupported-template; scored engine not surfaced)", async () => {
-  // Jeff 2026-06-18: the group report is surfaced for LVA only. A scored
-  // template (Rockefeller) must NOT build/audit a group report even when INVITED.
+test("non-allowlisted INVITED campaign → notApplicable (unsupported-template; scored engine not surfaced)", async () => {
+  // #72 (DT-5) surfaced LVA + SU-Full + QSP + Rockefeller. Five Dysfunctions is
+  // deliberately NOT surfaced (Jeff 2026-06-18: its scored group report
+  // "over-showed"), so it stands in here for a scored template that must NOT
+  // build/audit a group report even when INVITED + flag-on.
   const mock = makeMockDb({
     campaign: makeCampaign({
-      template: { alias: "RockHabits", name: "Rockefeller Habits" },
+      template: { alias: "five-dysfunctions", name: "Five Dysfunctions" },
     }),
   });
 
@@ -238,8 +243,88 @@ test("non-LVA INVITED campaign → notApplicable (unsupported-template; scored e
   if (res.kind !== "notApplicable") return;
   expect(res.reason).toBe("unsupported-template");
   // Wave J (J-3): the alias is carried even for unsupported templates.
-  expect(res.templateAlias).toBe("RockHabits");
+  expect(res.templateAlias).toBe("five-dysfunctions");
   expect(mock._findManySubmissions).not.toHaveBeenCalled();
+});
+
+// ── #72 / DT-5 — QSP + Rockefeller group-report expansion (loader wiring) ─────
+
+test("RockHabits INVITED with DT-5 OFF → notEnabled (ships dark; WAVE_F does not enable it)", async () => {
+  // WAVE_F on (beforeEach), WAVE_QSP_ROCK off → Rockefeller is NOT enabled: it rides
+  // its own independent flag, so it stays dark even while LVA (WAVE_F) is live.
+  delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED;
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      template: { alias: "RockHabits", name: "Rockefeller Habits" },
+      version: { ...VERSION, publishedAt: new Date("2026-06-01T00:00:00Z") },
+    }),
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("notEnabled");
+  expect(mockCanViewGroupReport).not.toHaveBeenCalled();
+  expect(mock._findManySubmissions).not.toHaveBeenCalled();
+});
+
+test("PUBLISHED RockHabits with WAVE_QSP_ROCK on → ok (scored surface builds)", async () => {
+  process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED = "1";
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      template: { alias: "RockHabits", name: "Rockefeller Habits" },
+      version: { ...VERSION, publishedAt: new Date("2026-06-01T00:00:00Z") },
+    }),
+    participants: PARTICIPANTS,
+    submissions: [makeSubmission("resp-ceo", 3)],
+    invitedCount: 1,
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("ok");
+  if (res.kind !== "ok") return;
+  expect(res.provenance.templateAlias).toBe("RockHabits");
+  delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED;
+});
+
+test("DRAFT RockHabits with WAVE_QSP_ROCK on → notApplicable(unpublished) — scored publish guard bites Rockefeller too", async () => {
+  process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED = "1";
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      template: { alias: "RockHabits", name: "Rockefeller Habits" },
+      version: { ...VERSION, publishedAt: null }, // DRAFT / unpublished
+    }),
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("notApplicable");
+  if (res.kind !== "notApplicable") return;
+  expect(res.reason).toBe("unpublished");
+  expect(res.templateAlias).toBe("RockHabits");
+  // The publish guard fires BEFORE the cohort load / model build.
+  expect(mock._findManySubmissions).not.toHaveBeenCalled();
+  delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED;
+});
+
+test("QSP-v2 (qualitative) with WAVE_QSP_ROCK on + null publishedAt → ok (qualitative surface NOT publish-gated)", async () => {
+  process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED = "1";
+  const mock = makeMockDb({
+    campaign: makeCampaign({
+      template: { alias: "qsp-v2", name: "Quick Scaling Up Assessment" },
+      version: { ...VERSION, publishedAt: null },
+    }),
+    participants: PARTICIPANTS,
+    submissions: [makeSubmission("resp-ceo", 3)],
+    invitedCount: 1,
+  });
+
+  const res = await callLoader(mock);
+
+  expect(res.kind).toBe("ok");
+  if (res.kind !== "ok") return;
+  expect(res.provenance.templateAlias).toBe("qsp-v2");
+  delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED;
 });
 
 // ── Wave J (J-3) — alias-aware enablement (single source of truth) ───────────
@@ -312,9 +397,10 @@ test("published LVA campaign still loads ok (guard only bites SU-Full)", async (
   expect(res.kind).toBe("ok");
 });
 
-test("null-publishedAt LVA campaign STILL loads ok (publish guard is SU-Full-scoped)", async () => {
+test("null-publishedAt LVA campaign STILL loads ok (publish guard is scored-only; LVA is qualitative)", async () => {
   // R3-H1 regression: a legacy/imported LVA version with a null publishedAt
-  // must NOT be regressed by the SU-Full publish guard.
+  // must NOT be regressed by the publish guard — the guard is keyed on scored
+  // report type (#72 DT-5), and LVA is qualitative, so it is never gated.
   const mock = makeMockDb({
     campaign: makeCampaign({
       version: { ...VERSION, publishedAt: null },
