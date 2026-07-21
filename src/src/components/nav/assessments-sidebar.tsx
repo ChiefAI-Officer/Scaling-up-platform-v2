@@ -3,8 +3,8 @@
  * lane (wireframe 24).
  *
  * Renders:
- *   - Admin section (visible to ADMIN + STAFF) with 7 entries, with the
- *     Aggregate Report row gated by canAccessAggregateReport (also admin/staff
+ *   - Admin section (visible to ADMIN + STAFF), one entry per admin surface,
+ *     with the Aggregate Report row gated by canAccessAggregateReport (admin/staff
  *     in v1, but spec'd as a distinct predicate so future tightening lands
  *     in one place).
  *   - Coach-lane section (visible to COACH only) with 2 entries pointing at
@@ -50,6 +50,10 @@ const ADMIN_ENTRIES: SidebarEntry[] = [
   { href: "/admin/assessments/campaigns", label: "Campaigns" },
   { href: "/admin/assessments/public-campaigns", label: "Public Campaigns" },
   { href: "/admin/assessments/import", label: "Import" },
+  // #85: the observability dashboard (import health + DB-derived counters) was
+  // built but never linked — operators had to know the URL. Sits next to Import
+  // since it surfaces import-health signals. ADMIN/STAFF-only, like this section.
+  { href: "/admin/assessments/observability", label: "Observability" },
   { href: "/admin/assessments/aggregate", label: "Aggregate Report" },
 ];
 
