@@ -249,7 +249,9 @@ describe("Cover + as-of provenance line", () => {
     const cover = screen.getByTestId("group-report-cover");
     const footerLogo = within(footer).getByTestId("coach-logo");
     expect(footerLogo).toHaveAttribute("src", "https://cdn.example.com/coach.png");
-    expect(footerLogo).toHaveAttribute("alt", "Dana Coach");
+    // a11y: logo decorative because the coach name shows as visible text (#63/etc).
+    expect(footerLogo).toHaveAttribute("alt", "");
+    expect(within(footer).getByTestId("coach-name")).toHaveTextContent("Dana Coach");
     expect(within(cover).getByTestId("coach-logo")).not.toBeNull();
   });
 
