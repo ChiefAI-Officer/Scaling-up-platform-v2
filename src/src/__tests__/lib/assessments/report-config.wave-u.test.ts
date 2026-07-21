@@ -75,7 +75,9 @@ describe("reportConfigFor — walk-qual- reserved namespace (Wave U D14)", () =>
   });
 
   it("unknown / null / undefined still fall back to the scored default", () => {
-    for (const a of ["five-dysfunctions", "nope", null, undefined]) {
+    // five-dysfunctions now has its own config entry (#81, coach CTA hidden), so
+    // it is no longer a fall-back-to-default alias.
+    for (const a of ["nope", null, undefined]) {
       expect(reportConfigFor(a)).toEqual(DEFAULT_REPORT_CONFIG);
     }
     expect(DEFAULT_REPORT_CONFIG).toEqual({

@@ -785,6 +785,23 @@
   max-height: 40px;
 }
 
+/* Coach identity wrapper — groups the coach logo (if any) + the coach NAME as
+ * one unit in the brandbar (#63/67/73/78/81). The name is white text since the
+ * cover + footer brandbars are on the brand purple. */
+.su-public-brand .su-report-coach {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.su-public-brand .su-report-coach-name {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
 .su-public-brand .su-report-provenance {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.65);

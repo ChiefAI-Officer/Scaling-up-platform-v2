@@ -15,9 +15,16 @@ export interface ReportConfig {
    * percentile, so standing is expressed as peer-deviation.
    */
   showTier: boolean;
+  /**
+   * #81 — whether the scored per-respondent report shows the "Talk to your
+   * Scaling Up Certified Coach" CTA (BrandedReport conclusion + the emailed
+   * report). Optional; OMITTED means shown (back-compatible). Only
+   * five-dysfunctions opts out (`false`). Read as `showCoachCta !== false`.
+   */
+  showCoachCta?: boolean;
 }
 
-/** Default = current behaviour (back-compatible): scored report with the table and tier shown. */
+/** Default = current behaviour (back-compatible): scored report with the table and tier shown, coach CTA shown. */
 export const DEFAULT_REPORT_CONFIG: ReportConfig = {
   reportType: "scored",
   showScoreTable: true,
@@ -44,6 +51,17 @@ const REPORT_CONFIG: Readonly<Record<string, ReportConfig>> = {
    * standing is peer-deviation. The ScaleUp score + score table still render.
    */
   "scaling-up-full": { reportType: "scored", showScoreTable: true, showTier: false },
+  /**
+   * Five Dysfunctions: scored (DEFAULT presentation) but WITHOUT the
+   * "Talk to your Scaling Up Certified Coach" CTA (#81). All other scored
+   * behaviour matches the default (table + tier shown).
+   */
+  "five-dysfunctions": {
+    reportType: "scored",
+    showScoreTable: true,
+    showTier: true,
+    showCoachCta: false,
+  },
 };
 
 /**
