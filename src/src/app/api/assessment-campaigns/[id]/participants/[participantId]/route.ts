@@ -128,10 +128,13 @@ export async function DELETE(
       },
     });
 
-    // Use NextResponse.json so the route mirrors the rest of the API
-    // (the mocked NextResponse in jest only exposes .json). An empty body
-    // is still effectively "no content".
-    return NextResponse.json({ success: true }, { status: 204 });
+    // A 204 is a null-body status — it MUST NOT carry a body. Returning
+    // NextResponse.json({...}, { status: 204 }) throws at runtime because the
+    // Response constructor rejects a body on a 204. That throw fired AFTER the
+    // delete transaction had already committed, so the client saw a 500 and
+    // showed "could not remove" even though the row was gone (bug #59). Send
+    // an empty body instead. logAudit above is already fail-silent.
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error("Error removing participant:", error);
     return NextResponse.json(

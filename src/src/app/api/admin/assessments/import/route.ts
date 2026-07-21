@@ -49,6 +49,7 @@ import {
   parseEspertoExport,
   EspertoParseError,
 } from "@/lib/assessments/esperto-import/parse";
+import { resultsLaneMismatchMessage } from "@/lib/assessments/esperto-import/classify";
 import {
   buildRosterImportPlan,
   normalizeEmail,
@@ -448,10 +449,7 @@ async function handleResultsImport(
 
   if (parsed.kind !== "report") {
     return NextResponse.json(
-      {
-        success: false,
-        error: `Expected a report export for kind:results, got ${parsed.kind}`,
-      },
+      { success: false, error: resultsLaneMismatchMessage(parsed.kind) },
       { status: 400 },
     );
   }
