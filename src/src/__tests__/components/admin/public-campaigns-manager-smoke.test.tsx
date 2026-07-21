@@ -6,7 +6,7 @@
  */
 
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { PublicCampaignsManager } from "@/components/admin/PublicCampaignsManager";
 
 const PUBLIC_CAMPAIGN = {
@@ -50,5 +50,55 @@ describe("PublicCampaignsManager — orphaned-page render smoke (Z-1)", () => {
       expect(screen.getByText("Quick Scaling Up Check")).toBeInTheDocument(),
     );
     expect(screen.getByText("Existing PUBLIC Campaigns")).toBeInTheDocument();
+  });
+});
+
+// #83 — surface public-quiz submissions (taker + referring coach) per campaign.
+describe("PublicCampaignsManager — public-quiz submissions (#83)", () => {
+  const SUBMISSIONS = [
+    {
+      id: "s1",
+      takerName: "Jane Smith",
+      takerEmail: "jane@x.com",
+      referringCoachEmail: "coach@x.com",
+      submittedAt: "2026-07-20T10:00:00.000Z",
+    },
+    {
+      id: "s2",
+      takerName: "bob@x.com",
+      takerEmail: "bob@x.com",
+      referringCoachEmail: null,
+      submittedAt: "2026-07-19T10:00:00.000Z",
+    },
+  ];
+
+  beforeEach(() => {
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : String(input);
+      const json = url.endsWith("/api/assessment-campaigns")
+        ? { success: true, data: [PUBLIC_CAMPAIGN] }
+        : url.endsWith("/api/admin/assessment-templates")
+          ? { success: true, data: [] }
+          : url.endsWith("/api/organizations")
+            ? { success: true, data: [] }
+            : url.endsWith("/api/admin/public-campaigns/pc-1/submissions")
+              ? { success: true, data: SUBMISSIONS }
+              : { success: true, data: [] };
+      return { ok: true, status: 200, json: async () => json } as unknown as Response;
+    }) as unknown as typeof fetch;
+  });
+
+  it("lists submissions (taker name + referring coach) when the row is expanded", async () => {
+    render(<PublicCampaignsManager />);
+    await screen.findByText("Quick Scaling Up Check");
+
+    fireEvent.click(screen.getByRole("button", { name: /view submissions/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Jane Smith")).toBeInTheDocument(),
+    );
+    // Referring coach shown for the attributed taker; the un-attributed one too.
+    expect(screen.getByText("coach@x.com")).toBeInTheDocument();
+    expect(screen.getByText("bob@x.com")).toBeInTheDocument();
   });
 });
