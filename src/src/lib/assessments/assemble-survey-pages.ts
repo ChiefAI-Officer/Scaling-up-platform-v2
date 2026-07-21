@@ -53,8 +53,10 @@ export type SurveyAnswersMap = Record<string, number | string | string[]>;
 
 // Wave J-1 — SU-Full CEO-only background section gating. These MUST stay in
 // lockstep with the identically-named constants in org-survey-client.tsx.
-const SU_FULL_ALIAS = "scaling-up-full";
-const SU_FULL_BACKGROUND_SECTION = "S_BACKGROUND";
+// Exported so the submit/scoring path (org-survey/.../submit/route.ts) applies
+// the SAME audience policy before its required-key check (#79).
+export const SU_FULL_ALIAS = "scaling-up-full";
+export const SU_FULL_BACKGROUND_SECTION = "S_BACKGROUND";
 
 export interface AssembleSurveyPagesOptions {
   /** Current answers — drives show-if visibility. Use `{}` for a static preview. */
