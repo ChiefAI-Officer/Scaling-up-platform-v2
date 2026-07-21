@@ -491,6 +491,10 @@ export const createRespondentSchema = z.object({
 });
 
 export const updateRespondentSchema = z.object({
+    // #60 — email is now editable. Same validation as createRespondentSchema's
+    // email; optional here since PATCH is partial. The route recomputes
+    // normalizedEmail (and, for email-sourced members, the dedupe key).
+    email: z.string().email("Valid email is required").max(320).transform(_trim).optional(),
     firstName: z.string().min(1).max(200).transform(_trim).optional(),
     lastName: z.string().min(1).max(200).transform(_trim).optional(),
     jobTitle: z.string().max(200).transform(_trim).nullable().optional(),

@@ -531,6 +531,108 @@ describe("PATCH /api/organizations/[id]/respondents/[respondentId]", () => {
     const updateCall = (db.orgRespondent.update as jest.Mock).mock.calls[0][0];
     expect(updateCall.data).not.toHaveProperty("roleType");
   });
+
+  // #60 — edit member email. Email drives the dedupe key ONLY for email-sourced
+  // members; the edit must recompute normalizedEmail always and dedupeValue only
+  // when dedupeSource === "email".
+  it("#60: email-sourced member — updating email recomputes normalizedEmail AND dedupeValue (lowercased)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findUnique as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      deletedAt: null,
+      dedupeSource: "email",
+      dedupeValue: "old@example.com",
+    });
+    (db.orgRespondent.update as jest.Mock).mockResolvedValue({ id: "r1" });
+
+    const res = await detailPatch(
+      jsonReq({ email: "New.Email@Example.COM" }, "PATCH") as never,
+      detailParams("o1", "r1")
+    );
+
+    expect(res.status).toBe(200);
+    expect(db.orgRespondent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "r1" },
+        data: expect.objectContaining({
+          email: "New.Email@Example.COM",
+          normalizedEmail: "new.email@example.com",
+          dedupeValue: "new.email@example.com",
+        }),
+      })
+    );
+  });
+
+  it("#60: external-sourced member — updating email recomputes normalizedEmail but NEVER touches dedupeValue", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findUnique as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      deletedAt: null,
+      dedupeSource: "external",
+      dedupeValue: "HR-123",
+    });
+    (db.orgRespondent.update as jest.Mock).mockResolvedValue({ id: "r1" });
+
+    await detailPatch(
+      jsonReq({ email: "new@example.com" }, "PATCH") as never,
+      detailParams("o1", "r1")
+    );
+
+    const updateCall = (db.orgRespondent.update as jest.Mock).mock.calls[0][0];
+    expect(updateCall.data.email).toBe("new@example.com");
+    expect(updateCall.data.normalizedEmail).toBe("new@example.com");
+    // The dedupe key stays externalId-based — an email change must not shift it.
+    expect(updateCall.data).not.toHaveProperty("dedupeValue");
+    expect(updateCall.data).not.toHaveProperty("dedupeSource");
+  });
+
+  it("#60: 409 when the new email collides with an existing member in the org (P2002)", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findUnique as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      deletedAt: null,
+      dedupeSource: "email",
+      dedupeValue: "old@example.com",
+    });
+    (db.orgRespondent.update as jest.Mock).mockRejectedValue({ code: "P2002" });
+    (db.orgRespondent.findFirst as jest.Mock).mockResolvedValue({ id: "other-r" });
+
+    const res = await detailPatch(
+      jsonReq({ email: "taken@example.com" }, "PATCH") as never,
+      detailParams("o1", "r1")
+    );
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.existingId).toBe("other-r");
+  });
+
+  it("#60: 400 when the new email is not a valid email", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findUnique as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      deletedAt: null,
+      dedupeSource: "email",
+      dedupeValue: "old@example.com",
+    });
+
+    const res = await detailPatch(
+      jsonReq({ email: "not-an-email" }, "PATCH") as never,
+      detailParams("o1", "r1")
+    );
+
+    expect(res.status).toBe(400);
+    expect(db.orgRespondent.update).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/organizations/[id]/respondents/[respondentId]", () => {
