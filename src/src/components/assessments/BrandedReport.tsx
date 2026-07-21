@@ -754,17 +754,21 @@ export function BrandedReport({
           90-day plan with your coach.
         </p>
         {/* CTA: link to the referring coach via mailto, or fall back to the
-            Scaling Up coaches directory. Never crashes when coach is absent. */}
-        <a
-          className="su-report-cta"
-          href={
-            report.referringCoachEmail
-              ? `mailto:${report.referringCoachEmail}`
-              : "https://scalingup.com/coaches"
-          }
-        >
-          Talk to your Scaling Up Certified Coach →
-        </a>
+            Scaling Up coaches directory. Never crashes when coach is absent.
+            #81: suppressed for templates whose report config sets
+            showCoachCta:false (Five Dysfunctions). */}
+        {reportConfigFor(report.templateAlias).showCoachCta !== false && (
+          <a
+            className="su-report-cta"
+            href={
+              report.referringCoachEmail
+                ? `mailto:${report.referringCoachEmail}`
+                : "https://scalingup.com/coaches"
+            }
+          >
+            Talk to your Scaling Up Certified Coach →
+          </a>
+        )}
       </section>
 
       {/* ── 8. Footer ───────────────────────────────────────────────────── */}

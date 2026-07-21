@@ -10,15 +10,45 @@
  *   - audit log written with action DELETE
  */
 
-jest.mock("next/server", () => ({
-  NextResponse: {
-    json: (body: unknown, init?: ResponseInit) =>
-      new Response(JSON.stringify(body), {
-        status: init?.status || 200,
-        headers: init?.headers,
-      }),
-  },
-}));
+// Faithful NextResponse mock: mirrors the real Response contract that a
+// null-body status (101/204/205/304) cannot carry a body. The previous lax
+// mock let `NextResponse.json(body, { status: 204 })` "succeed" in tests
+// while it threw in production (bug #59: false "could not remove" error even
+// though the row was deleted). This reproduces prod so the bug is catchable.
+jest.mock("next/server", () => {
+  const NULL_BODY_STATUS = [101, 204, 205, 304];
+  class MockNextResponse {
+    _body: unknown;
+    status: number;
+    headers: Map<string, string>;
+    constructor(
+      body?: unknown,
+      init?: { status?: number; headers?: Record<string, string> },
+    ) {
+      const status = init?.status ?? 200;
+      if (body != null && NULL_BODY_STATUS.includes(status)) {
+        throw new TypeError(
+          `Failed to construct 'Response': Response with null body status cannot have body (status ${status})`,
+        );
+      }
+      this._body = body;
+      this.status = status;
+      this.headers = new Map(Object.entries(init?.headers ?? {}));
+    }
+    async json() {
+      return typeof this._body === "string"
+        ? JSON.parse(this._body)
+        : this._body;
+    }
+    static json(
+      body: unknown,
+      init?: { status?: number; headers?: Record<string, string> },
+    ) {
+      return new MockNextResponse(JSON.stringify(body), init);
+    }
+  }
+  return { NextResponse: MockNextResponse };
+});
 
 const txMock = {
   assessmentInvitation: {

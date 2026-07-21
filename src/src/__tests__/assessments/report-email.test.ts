@@ -308,6 +308,26 @@ describe("buildReportEmailHtml — email safety", () => {
   });
 });
 
+describe("buildReportEmailHtml — coach CTA gating (#81)", () => {
+  const CTA = "Talk to your Scaling Up Certified Coach";
+
+  it("scored email shows the coach CTA by default", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport(),
+      recipientRole: "TAKER_COPY",
+    });
+    expect(bodyHtml).toContain(CTA);
+  });
+
+  it("five-dysfunctions scored email hides the coach CTA", () => {
+    const { bodyHtml } = buildReportEmailHtml({
+      report: fourDecisionsReport({ templateAlias: "five-dysfunctions" }),
+      recipientRole: "TAKER_COPY",
+    });
+    expect(bodyHtml).not.toContain(CTA);
+  });
+});
+
 describe("buildReportEmailHtml — subject by role", () => {
   it("taker subject is 'Your Scaling Up 4 Decisions results'", () => {
     const { subject } = buildReportEmailHtml({

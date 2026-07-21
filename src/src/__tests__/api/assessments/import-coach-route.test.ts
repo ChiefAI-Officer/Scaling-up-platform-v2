@@ -312,11 +312,17 @@ describe("POST /api/assessments/import — bounds & validation", () => {
     expect(res.status).toBe(400);
   });
 
-  it("400 for kind:results when the payload is NOT a report export", async () => {
+  it("400 for kind:results when the payload is NOT a report export, with an actionable message (#87)", async () => {
     const res = await POST(
       req({ mode: "preview", kind: "results", payload: membersPayload }),
     );
     expect(res.status).toBe(400);
+    const body = await res.json();
+    // The message must guide the operator to the right lane, not leak the
+    // internal classifier vocabulary ("got members").
+    expect(body.error).toMatch(/Members export/i);
+    expect(body.error).toMatch(/Roster \(people\)/i);
+    expect(body.error).not.toMatch(/got members/);
   });
 });
 

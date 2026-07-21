@@ -994,6 +994,10 @@ export function buildReportEmailHtml({
     ? `mailto:${encodeURIComponent(report.referringCoachEmail)}`
     : "https://scalingup.com/coaches";
   const ctaLabel = "Talk to your Scaling Up Certified Coach →";
+  // #81 — Five Dysfunctions suppresses the coach CTA (report-config), same as
+  // the on-screen BrandedReport. Omitted config = shown.
+  const showCoachCta =
+    reportConfigFor(report.templateAlias).showCoachCta !== false;
 
   const conclusion = `
   <tr>
@@ -1003,7 +1007,7 @@ export function buildReportEmailHtml({
           <td align="center" style="padding:20px;">
             <div style="font-size:16px;font-weight:800;color:${INK};margin-bottom:6px;">${conclusionTitle}</div>
             <div style="font-size:13px;color:${MUTED};line-height:1.5;margin-bottom:14px;">${conclusionBody}</div>
-            <a href="${ctaHref}" style="display:inline-block;background:${PURPLE};color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:11px;font-size:14px;">${ctaLabel}</a>
+            ${showCoachCta ? `<a href="${ctaHref}" style="display:inline-block;background:${PURPLE};color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:11px;font-size:14px;">${ctaLabel}</a>` : ""}
           </td>
         </tr>
       </table>

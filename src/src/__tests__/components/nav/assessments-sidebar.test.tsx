@@ -52,6 +52,17 @@ describe("AssessmentsSidebar", () => {
     expect(screen.getByText("Aggregate Report")).toBeInTheDocument();
   });
 
+  it("renders the Observability admin entry linking to the observability page (#85)", () => {
+    render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
+    const link = screen.getByText("Observability").closest("a");
+    expect(link).toHaveAttribute("href", "/admin/assessments/observability");
+  });
+
+  it("does NOT render Observability for COACH (admin-only surface)", () => {
+    render(<AssessmentsSidebar session={makeSession("COACH")} />);
+    expect(screen.queryByText("Observability")).not.toBeInTheDocument();
+  });
+
   it("hides Aggregate Report when canAccessAggregateReport returns false", () => {
     mockCanAccessAggregateReport.mockReturnValue(false);
     render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
