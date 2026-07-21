@@ -38,13 +38,21 @@ export default async function AdminAssessmentOrganizationsPage() {
   const organizations = await db.organization.findMany({
     where: { deletedAt: null },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, ownerCoachId: true, externalId: true },
+    select: {
+      id: true,
+      name: true,
+      ownerCoachId: true,
+      externalId: true,
+      // #86 — the owning coach's name drives the admin "by coach" grouping.
+      owner: { select: { firstName: true, lastName: true } },
+    },
   });
 
   const items: OrgSummary[] = organizations.map((o) => ({
     id: o.id,
     name: o.name,
     ownerCoachId: o.ownerCoachId,
+    ownerCoachName: `${o.owner.firstName} ${o.owner.lastName}`.trim() || null,
     externalId: o.externalId,
   }));
 
@@ -75,6 +83,7 @@ export default async function AdminAssessmentOrganizationsPage() {
         initialOrganizations={items}
         allowOrgCreate={false}
         hideEspertoImport
+        allowGroupByCoach
       />
     </div>
   );

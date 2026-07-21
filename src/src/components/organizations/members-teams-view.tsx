@@ -37,6 +37,12 @@ export interface OrgSummary {
   id: string;
   name: string;
   ownerCoachId: string;
+  /**
+   * #86 — owning coach's display name, for the admin "by coach" grouping.
+   * Optional: the coach portal never groups, so it needn't supply it; null
+   * when an org has no owning coach.
+   */
+  ownerCoachName?: string | null;
   externalId: string | null;
 }
 
@@ -95,6 +101,13 @@ export interface MembersTeamsViewProps {
    * `/admin/assessments/import`.
    */
   hideEspertoImport?: boolean;
+  /**
+   * #86 — enables the admin-only "Organizations by coach" view toggle. Default
+   * false (coach portal, which only ever shows one coach's orgs, so grouping is
+   * meaningless). When true, a small A–Z / By coach switch appears above the
+   * company list; "By coach" groups companies under their owning-coach header.
+   */
+  allowGroupByCoach?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -181,9 +194,13 @@ export function MembersTeamsView({
   initialOrganizations,
   allowOrgCreate = true,
   hideEspertoImport = false,
+  allowGroupByCoach = false,
 }: MembersTeamsViewProps) {
   // Companies list — may grow when a new Company is created via the modal
   const [organizations, setOrganizations] = useState<OrgSummary[]>(initialOrganizations);
+
+  // #86 — admin "by coach" grouping toggle (only offered when allowGroupByCoach).
+  const [groupByCoach, setGroupByCoach] = useState(false);
 
   // Per-org expansion + team data state
   const [orgStates, setOrgStates] = useState<Record<string, OrgState>>(() => {
@@ -415,6 +432,25 @@ export function MembersTeamsView({
   // --------------------------------------------------------------------------
 
   function renderLeftPanel() {
+    // #86 — when grouping by coach, order companies by owning-coach name
+    // ("No owning coach" last), then by company name; a header is injected
+    // before each coach's first company in the map below.
+    const NO_COACH_LABEL = "No owning coach";
+    // Grouped + headed by the coach's display NAME (spec: "by coach"). Two
+    // distinct coaches with an identical name would share one header — accepted
+    // for this display-only overview; every company row is still individually
+    // selectable, so no data is conflated, only the grouping label.
+    const coachLabelOf = (org: OrgSummary) =>
+      (org.ownerCoachName ?? "").trim() || NO_COACH_LABEL;
+    const displayOrgs = groupByCoach
+      ? [...organizations].sort((a, b) => {
+          const aNo = coachLabelOf(a) === NO_COACH_LABEL;
+          const bNo = coachLabelOf(b) === NO_COACH_LABEL;
+          if (aNo !== bNo) return aNo ? 1 : -1;
+          const byCoach = coachLabelOf(a).localeCompare(coachLabelOf(b));
+          return byCoach !== 0 ? byCoach : a.name.localeCompare(b.name);
+        })
+      : organizations;
     return (
       <div className="flex-none w-64 border-r border-border overflow-y-auto">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -434,6 +470,39 @@ export function MembersTeamsView({
           )}
         </div>
 
+        {/* #86 — admin-only A–Z / By coach view switch */}
+        {allowGroupByCoach && organizations.length > 0 && (
+          <div className="flex items-center gap-1 px-3 py-2 border-b border-border">
+            <span className="text-xs text-muted-foreground mr-1">View:</span>
+            <button
+              type="button"
+              aria-pressed={!groupByCoach}
+              onClick={() => setGroupByCoach(false)}
+              className={[
+                "px-2 py-0.5 rounded text-xs transition-colors",
+                !groupByCoach
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted-foreground hover:bg-muted",
+              ].join(" ")}
+            >
+              A–Z
+            </button>
+            <button
+              type="button"
+              aria-pressed={groupByCoach}
+              onClick={() => setGroupByCoach(true)}
+              className={[
+                "px-2 py-0.5 rounded text-xs transition-colors",
+                groupByCoach
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted-foreground hover:bg-muted",
+              ].join(" ")}
+            >
+              By coach
+            </button>
+          </div>
+        )}
+
         {organizations.length === 0 && (
           <p className="px-4 py-6 text-sm text-muted-foreground">
             No companies yet. Create one to get started.
@@ -441,13 +510,22 @@ export function MembersTeamsView({
         )}
 
         <div className="p-2 space-y-0.5">
-          {organizations.map((org) => {
+          {displayOrgs.map((org, i) => {
             const state = orgStates[org.id];
             const orgNode: TreeNode = { kind: "organization", id: org.id, name: org.name };
             const isSelected = isSameNode(selectedNode, orgNode);
+            // #86 — a coach header precedes the first company of each coach group.
+            const showCoachHeader =
+              groupByCoach &&
+              (i === 0 || coachLabelOf(displayOrgs[i - 1]) !== coachLabelOf(org));
 
             return (
               <div key={org.id}>
+                {showCoachHeader && (
+                  <div className="px-2 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {coachLabelOf(org)}
+                  </div>
+                )}
                 {/* Company root node — wrapped in group for Edit affordance */}
                 <div className="group relative flex items-center">
                   <button

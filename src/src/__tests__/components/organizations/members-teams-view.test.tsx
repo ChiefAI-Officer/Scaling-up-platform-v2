@@ -543,3 +543,52 @@ describe("MembersTeamsView — admin host props", () => {
     expect(portalLinks).toHaveLength(0);
   });
 });
+
+// #86 — admin "Organizations by coach" view. Only the admin host opts in via
+// allowGroupByCoach; the coach portal (which only ever shows one coach's orgs)
+// never sees the toggle.
+describe("MembersTeamsView — group by owning coach (#86)", () => {
+  const ORG_A = { id: "o1", name: "Acme Corp", ownerCoachId: "c1", ownerCoachName: "Jane Coach", externalId: null };
+  const ORG_B = { id: "o2", name: "Globex", ownerCoachId: "c1", ownerCoachName: "Jane Coach", externalId: null };
+  const ORG_C = { id: "o3", name: "Initech", ownerCoachId: "c2", ownerCoachName: "Bob Coach", externalId: null };
+
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: [] }),
+    }) as unknown as typeof fetch;
+  });
+
+  test("no 'By coach' toggle unless allowGroupByCoach is set (coach host default)", () => {
+    render(<MembersTeamsView initialOrganizations={[ORG_A]} />);
+    expect(screen.queryByRole("button", { name: /by coach/i })).toBeNull();
+  });
+
+  test("allowGroupByCoach shows the toggle; switching to 'By coach' groups orgs under coach headers", () => {
+    render(
+      <MembersTeamsView
+        initialOrganizations={[ORG_A, ORG_B, ORG_C]}
+        allowGroupByCoach
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /by coach/i }));
+    // One header per distinct owning coach.
+    expect(screen.getByText("Jane Coach")).toBeInTheDocument();
+    expect(screen.getByText("Bob Coach")).toBeInTheDocument();
+    // The org rows still render.
+    expect(screen.getByRole("button", { name: "Acme Corp" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Initech" })).toBeInTheDocument();
+  });
+
+  test("orgs with no owning coach group under a fallback header", () => {
+    const ORPHAN = { id: "o4", name: "Orphan Org", ownerCoachId: "", ownerCoachName: null, externalId: null };
+    render(
+      <MembersTeamsView
+        initialOrganizations={[ORG_A, ORPHAN]}
+        allowGroupByCoach
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /by coach/i }));
+    expect(screen.getByText(/no owning coach/i)).toBeInTheDocument();
+  });
+});
