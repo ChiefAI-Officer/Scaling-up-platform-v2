@@ -36,6 +36,7 @@ import {
 import {
   isGroupReportAlias,
   isGroupReportEnabled,
+  groupReportRequiresPublishedVersion,
 } from "@/lib/assessments/wave-f-flags";
 import { isPeerBenchmarksEnabled } from "@/lib/assessments/wave-s-flags";
 import { isPeerRenderEnabledAlias } from "@/lib/assessments/peer-benchmarks";
@@ -423,14 +424,16 @@ export async function getCampaignGroupReport(
         } as const;
       }
 
-      // Wave J (J-3) — ENFORCED PUBLISH GUARD, SU-Full-SCOPED (R3-H1). A DRAFT /
-      // unpublished SU-Full version (publishedAt == null) must NOT surface the
-      // group report — even when the flag is on. This is OBSERVABLE
-      // (notApplicable, not a 404): the page shows a panel + emits a metric. It
-      // is deliberately scoped to SU-Full so a legacy/imported LVA version with
-      // a null publishedAt is NEVER regressed (LVA stays byte-for-byte).
+      // Wave J (J-3) — ENFORCED PUBLISH GUARD (R3-H1), keyed on report TYPE.
+      // A DRAFT / unpublished *scored* version (publishedAt == null) must NOT
+      // surface its scored group report — even when the flag is on. This is
+      // OBSERVABLE (notApplicable, not a 404): the page shows a panel + emits a
+      // metric. Was SU-Full-only in Wave J; #72 (DT-5) generalized it to any
+      // scored surface so scored Rockefeller inherits the guard. Qualitative
+      // surfaces (LVA, QSP) are NEVER gated on publishedAt — a legacy/imported
+      // version with a null publishedAt stays byte-for-byte reachable.
       if (
-        campaign.template.alias === "scaling-up-full" &&
+        groupReportRequiresPublishedVersion(campaign.template.alias) &&
         campaign.version.publishedAt == null
       ) {
         return {

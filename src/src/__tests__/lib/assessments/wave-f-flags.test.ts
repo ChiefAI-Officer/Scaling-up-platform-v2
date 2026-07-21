@@ -16,6 +16,7 @@ import {
   isGroupReportEnabled,
   isGroupReportAlias,
   GROUP_REPORT_ALIASES,
+  groupReportRequiresPublishedVersion,
 } from "@/lib/assessments/wave-f-flags";
 
 const GLOBAL = "WAVE_F_GROUP_REPORT_ENABLED";
@@ -188,12 +189,43 @@ describe("null / undefined safety", () => {
   });
 });
 
-describe("isGroupReportAlias (allowlisted surfaces — LVA + SU-Full)", () => {
-  it("allowlist is exactly LVA + SU-Full (Wave J J-3)", () => {
+describe("isGroupReportAlias (allowlisted surfaces — LVA + SU-Full + QSP + Rockefeller)", () => {
+  it("allowlist is exactly the 4 types Jeff asked for (#72 / DT-5)", () => {
+    // LVA (Jeff 2026-06-18) + SU-Full (Wave J J-3) + QSP + Rockefeller (#72).
+    // Five Dysfunctions stays OUT — Jeff rejected the scored group report for
+    // it in 2026-06-18 ("over-showed, confused him").
     expect(GROUP_REPORT_ALIASES).toEqual([
       "leadership-vision-alignment",
       "scaling-up-full",
+      "qsp-v2",
+      "RockHabits",
     ]);
+  });
+
+  it("ship-dark drift guard: with WAVE_F ON, ONLY LVA rides it — every other surfaced alias must be gated by its own default-OFF flag", () => {
+    // Review finding (#72): WAVE_F_GROUP_REPORT_ENABLED is ON in prod. The
+    // routing Set and the allowlist array are two lists of aliases; if a future
+    // alias is added to the allowlist but its flag routing is forgotten, it
+    // falls through to the WAVE_F path and would surface the instant it merges —
+    // inverting the ship-dark intent. This couples the two: LVA is the ONLY
+    // allowlisted alias WAVE_F may enable; anything else must return false here.
+    process.env[GLOBAL] = "1"; // WAVE_F on
+    // type-specific flags explicitly OFF (order-independent)
+    delete process.env.WAVE_J_SUFULL_GROUP_ENABLED;
+    delete process.env.WAVE_J_SUFULL_GROUP_CANARY;
+    delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED;
+    delete process.env.WAVE_QSP_ROCK_GROUP_REPORT_CANARY;
+    for (const alias of GROUP_REPORT_ALIASES) {
+      const enabled = isGroupReportEnabled(null, {
+        id: "camp-drift",
+        template: { alias },
+      });
+      if (alias === "leadership-vision-alignment") {
+        expect(enabled).toBe(true);
+      } else {
+        expect(enabled).toBe(false);
+      }
+    }
   });
 
   it("returns true for the LVA alias", () => {
@@ -204,14 +236,20 @@ describe("isGroupReportAlias (allowlisted surfaces — LVA + SU-Full)", () => {
     expect(isGroupReportAlias("scaling-up-full")).toBe(true);
   });
 
-  it("returns false for the remaining scored templates (not surfaced)", () => {
-    expect(isGroupReportAlias("RockHabits")).toBe(false);
+  it("returns true for the QSP-v2 alias (#72 / DT-5)", () => {
+    expect(isGroupReportAlias("qsp-v2")).toBe(true);
+  });
+
+  it("returns true for the Rockefeller alias (#72 / DT-5)", () => {
+    expect(isGroupReportAlias("RockHabits")).toBe(true);
+  });
+
+  it("returns false for Five Dysfunctions (deliberately NOT surfaced — Jeff 2026-06-18)", () => {
     expect(isGroupReportAlias("five-dysfunctions")).toBe(false);
   });
 
-  it("returns false for other qualitative templates (LVA only for now)", () => {
+  it("returns false for the retired QSP-v1 alias (only v2 is surfaced)", () => {
     expect(isGroupReportAlias("qsp-v1")).toBe(false);
-    expect(isGroupReportAlias("qsp-v2")).toBe(false);
   });
 
   it("returns false for null/undefined/empty", () => {
@@ -301,10 +339,12 @@ describe("SU-Full independent flag (Task 1)", () => {
     expect(isGroupReportEnabled(null, suf)).toBe(false);
   });
 
-  it("non-SU-Full non-LVA alias still uses WAVE_F path", () => {
-    const rock = { id: "camp-r", template: { alias: "RockHabits" } };
+  it("a non-special alias (not SU-Full / QSP / Rockefeller) still uses the WAVE_F path", () => {
+    // qsp-v1 is retired and NOT one of the #72 surfaced aliases → falls through
+    // to the original Wave F behaviour.
+    const other = { id: "camp-r", template: { alias: "qsp-v1" } };
     process.env.WAVE_F_GROUP_REPORT_ENABLED = "1";
-    expect(isGroupReportEnabled(null, rock)).toBe(true);
+    expect(isGroupReportEnabled(null, other)).toBe(true);
   });
 
   it("null template alias falls through to WAVE_F path", () => {
@@ -313,5 +353,92 @@ describe("SU-Full independent flag (Task 1)", () => {
     expect(isGroupReportEnabled(null, noAlias)).toBe(true);
     process.env.WAVE_F_GROUP_REPORT_ENABLED = "0";
     expect(isGroupReportEnabled(null, noAlias)).toBe(false);
+  });
+});
+
+// ─── #72 / DT-5: QSP + Rockefeller independent flag (ships dark under WAVE_F-on) ───
+
+const DT5_GLOBAL = "WAVE_QSP_ROCK_GROUP_REPORT_ENABLED";
+const DT5_CANARY = "WAVE_QSP_ROCK_GROUP_REPORT_CANARY";
+const DT5_KILL = "WAVE_QSP_ROCK_GROUP_REPORT_KILL";
+
+describe("QSP + Rockefeller group-report expansion flag (#72 / DT-5)", () => {
+  afterEach(() => {
+    delete process.env[DT5_GLOBAL];
+    delete process.env[DT5_CANARY];
+    delete process.env[DT5_KILL];
+  });
+
+  const qsp = { id: "camp-q", template: { alias: "qsp-v2" } };
+  const rock = { id: "camp-r", template: { alias: "RockHabits" } };
+  const lva = { template: { alias: "leadership-vision-alignment" } };
+  const suf = { template: { alias: "scaling-up-full" } };
+
+  it("QSP + Rockefeller are default-OFF when no DT-5 env vars are set", () => {
+    expect(isGroupReportEnabled(null, qsp)).toBe(false);
+    expect(isGroupReportEnabled(null, rock)).toBe(false);
+  });
+
+  it("QSP + Rockefeller stay OFF even when WAVE_F is ON (they ship dark independently)", () => {
+    process.env.WAVE_F_GROUP_REPORT_ENABLED = "1";
+    try {
+      expect(isGroupReportEnabled(null, qsp)).toBe(false);
+      expect(isGroupReportEnabled(null, rock)).toBe(false);
+      // LVA (Wave F) is still ON — proving the split.
+      expect(isGroupReportEnabled(null, lva)).toBe(true);
+    } finally {
+      delete process.env.WAVE_F_GROUP_REPORT_ENABLED;
+    }
+  });
+
+  it("DT-5 global ON enables BOTH QSP and Rockefeller", () => {
+    process.env[DT5_GLOBAL] = "1";
+    expect(isGroupReportEnabled(null, qsp)).toBe(true);
+    expect(isGroupReportEnabled(null, rock)).toBe(true);
+  });
+
+  it("DT-5 canary matches campaign.id only (bulk-PII: not coach/org/createdBy)", () => {
+    process.env[DT5_CANARY] = "camp-r";
+    expect(isGroupReportEnabled(null, rock)).toBe(true);
+    // coach / org / createdBy identifiers must NOT match (campaign-id-only)
+    process.env[DT5_CANARY] = "coach-x";
+    expect(
+      isGroupReportEnabled(
+        { coachId: "coach-x" },
+        { id: "camp-r", createdByCoachId: "coach-x", organizationId: "coach-x", template: { alias: "RockHabits" } }
+      )
+    ).toBe(false);
+  });
+
+  it("DT-5 KILL hard-overrides a matching canary", () => {
+    process.env[DT5_CANARY] = "camp-q";
+    process.env[DT5_KILL] = "1";
+    expect(isGroupReportEnabled(null, qsp)).toBe(false);
+  });
+
+  it("DT-5 flags do NOT affect LVA (Wave F) or SU-Full (Wave J)", () => {
+    process.env[DT5_GLOBAL] = "1";
+    expect(isGroupReportEnabled(null, lva)).toBe(false); // WAVE_F still off
+    expect(isGroupReportEnabled(null, suf)).toBe(false); // WAVE_J still off
+  });
+});
+
+// ─── publish guard generalized to scored group reports (R3-H1) ─────────────────
+
+describe("groupReportRequiresPublishedVersion (scored → must be published)", () => {
+  it("qualitative surfaces (LVA, QSP) do NOT require a published version", () => {
+    expect(groupReportRequiresPublishedVersion("leadership-vision-alignment")).toBe(false);
+    expect(groupReportRequiresPublishedVersion("qsp-v2")).toBe(false);
+  });
+
+  it("scored surfaces (SU-Full, Rockefeller) DO require a published version", () => {
+    expect(groupReportRequiresPublishedVersion("scaling-up-full")).toBe(true);
+    expect(groupReportRequiresPublishedVersion("RockHabits")).toBe(true);
+  });
+
+  it("fails closed for null / unknown alias (default report config is scored)", () => {
+    expect(groupReportRequiresPublishedVersion(null)).toBe(true);
+    expect(groupReportRequiresPublishedVersion(undefined)).toBe(true);
+    expect(groupReportRequiresPublishedVersion("mystery-alias")).toBe(true);
   });
 });

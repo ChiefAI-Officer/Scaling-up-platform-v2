@@ -19,6 +19,8 @@
  * env entry from exposing many campaigns at once.
  */
 
+import { reportConfigFor } from "@/lib/assessments/report-config";
+
 function isOn(v: string | undefined): boolean {
   return v === "1" || v === "true" || v === "TRUE" || v === "yes";
 }
@@ -104,12 +106,40 @@ export function isGroupReportEnabled(
     );
   }
 
+  // #72 / DT-5 (2026-07-21): QSP + Rockefeller surface the group report behind
+  // their OWN independent flag set — NOT WAVE_F. WAVE_F is ON in prod (the Wave
+  // L LVA launch flipped it), so folding these onto WAVE_F would light them up
+  // the instant this merges; a separate default-OFF flag lets them ship dark
+  // and be flipped deliberately (matches Jeff's caution — the scored group
+  // report "over-showed" for him in 2026-06-18). Campaign-id-only canary +
+  // kill precedence, mirroring SU-Full (the set includes scored Rockefeller,
+  // a bulk-PII surface).
+  const alias = campaign?.template?.alias;
+  if (typeof alias === "string" && QSP_ROCK_GROUP_REPORT_ALIASES.has(alias)) {
+    if (isOn(process.env.WAVE_QSP_ROCK_GROUP_REPORT_KILL)) return false;
+    return (
+      isOn(process.env.WAVE_QSP_ROCK_GROUP_REPORT_ENABLED) ||
+      sufCanaryMatches(process.env.WAVE_QSP_ROCK_GROUP_REPORT_CANARY, campaign)
+    );
+  }
+
   // LVA and all other aliases: original Wave F behaviour, byte-for-byte.
   return (
     isOn(process.env.WAVE_F_GROUP_REPORT_ENABLED) ||
     canaryMatches(process.env.WAVE_F_GROUP_REPORT_CANARY, actor, campaign)
   );
 }
+
+/**
+ * #72 / DT-5 — aliases surfaced by the QSP + Rockefeller group-report
+ * expansion, gated by the independent `WAVE_QSP_ROCK_GROUP_REPORT_*` flag set.
+ * A Set (not the ordered GROUP_REPORT_ALIASES array) because this is a pure
+ * membership test in the flag router.
+ */
+const QSP_ROCK_GROUP_REPORT_ALIASES: ReadonlySet<string> = new Set([
+  "qsp-v2",
+  "RockHabits",
+]);
 
 /**
  * Template aliases the group report is surfaced for.
@@ -133,9 +163,33 @@ export const GROUP_REPORT_ALIASES: readonly string[] = [
   // the alias is allowlisted but a DRAFT/unpublished version could be reached.
   // Independently flag-gated by WAVE_J_SUFULL_GROUP_* (see isGroupReportEnabled).
   "scaling-up-full",
+  // #72 / DT-5 (2026-07-21): Jeff asked for group reports on "all 4 types".
+  // QSP (qualitative — reuses the LVA path) + Rockefeller (scored — reuses the
+  // SU-Full path). The generic engine dispatches scored|qualitative via
+  // reportConfigFor(alias), so no new engine work. Independently flag-gated by
+  // WAVE_QSP_ROCK_GROUP_REPORT_* (default-OFF → ships dark). Five Dysfunctions stays
+  // OUT: Jeff rejected its scored group report in 2026-06-18 ("over-showed").
+  "qsp-v2",
+  "RockHabits",
 ];
 
 /** Whether a campaign's template alias is surfaced for the group report. */
 export function isGroupReportAlias(alias: string | null | undefined): boolean {
   return typeof alias === "string" && GROUP_REPORT_ALIASES.includes(alias);
+}
+
+/**
+ * Whether a surfaced group report must be gated on a PUBLISHED template version
+ * (R3-H1). Keyed on the report TYPE, not the alias: a DRAFT / unpublished
+ * *scored* version must never surface its scored group report (was SU-Full-only
+ * in Wave J; generalized for #72 so scored Rockefeller inherits the guard).
+ * Qualitative surfaces (LVA, QSP) are NEVER gated on publishedAt — a legacy /
+ * imported version with a null publishedAt stays byte-for-byte reachable.
+ * Fails CLOSED: null / unknown aliases resolve to the scored DEFAULT config, so
+ * they require a published version.
+ */
+export function groupReportRequiresPublishedVersion(
+  alias: string | null | undefined
+): boolean {
+  return reportConfigFor(alias).reportType === "scored";
 }
