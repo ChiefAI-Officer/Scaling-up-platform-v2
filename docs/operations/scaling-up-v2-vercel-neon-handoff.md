@@ -1,8 +1,8 @@
 # Scaling Up Platform v2 — Vercel and Neon handoff runbook
 
-- **Prepared:** 2026-07-21
+- **Prepared:** 2026-07-21; refreshed 2026-07-23
 - **Linear:** CHI-17
-- **Source baseline:** `ChiefAI-Officer/Scaling-up-platform-v2` `main` at `2c15f6125007b1fedc3e5581e2c333bb23b2cd11`
+- **Source baseline:** `ChiefAI-Officer/Scaling-up-platform-v2` `main` at `38d9a0cd1c13fd7ffe4aae09ef6b0d6535b7e9e2`
 
 **Execution status:** packet only — no project transfer, deployment, environment edit, billing change, secret read, or database operation has been performed.
 
@@ -24,13 +24,13 @@ Gabriel does not need elevated Vercel access to finish this preparation. Elevati
 
 ## 2. Verified inventory and open evidence
 
-Evidence labels: **live** = read-only provider observation on 2026-07-21; **source** = repository configuration at the baseline above; **open** = the executing owner must verify without exposing values in the ticket or repository.
+Evidence labels: **live** = read-only provider observation refreshed on 2026-07-23; **source** = repository configuration at the baseline above; **open** = the executing owner must verify without exposing values in the ticket or repository.
 
 | Surface | Current evidence | Status / action |
 |---|---|---|
 | Vercel source team | `ChiefAIOfficer` / `chief-aio-fficer` | **live** |
 | Vercel project | `scaling-up-platform-v2`; ID `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo`; root `src` | **live** |
-| Production deployment | `dpl_9jmmxnbVXfFgDBVFn2zTaPFMgS8T`, Ready when observed | **live**; re-check immediately before the window |
+| Production deployment | `dpl_CY5LeQ6niNyn4GWYxKwdz8JniUeo`, Ready when observed; created 2026-07-22 22:26 PHT | **live**; re-check immediately before the window |
 | Production aliases | `platformtest.scalingup.com`, `scaling-up-platform-v2.vercel.app`, team and `git-main` aliases | **live** |
 | Function region | `iad1` | **source**, also visible in deployment outputs |
 | Node runtime | Vercel project reports `24.x`; repository `.nvmrc` pins `20` | **mismatch — decision required before any redeploy** |

@@ -1,6 +1,6 @@
 # Scaling Up Platform v2 — transfer approval packet
 
-- **Prepared:** 2026-07-21
+- **Prepared:** 2026-07-21; refreshed 2026-07-23
 - **Change request:** CHI-17
 
 **Requested decision:** approve preparation and name the people/targets below. This document does **not** authorize a live transfer, deployment, environment edit, secret retrieval, billing change, or database operation.
@@ -18,7 +18,7 @@ Approve two independent change windows:
 
 | Item | Fact |
 |---|---|
-| Source repo/baseline | `ChiefAI-Officer/Scaling-up-platform-v2` `main` at `2c15f6125007b1fedc3e5581e2c333bb23b2cd11` |
+| Source repo/baseline | `ChiefAI-Officer/Scaling-up-platform-v2` `main` at `38d9a0cd1c13fd7ffe4aae09ef6b0d6535b7e9e2` |
 | Source Vercel team/project | `chief-aio-fficer` / `scaling-up-platform-v2` |
 | Project ID/root | `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo` / `src` |
 | Primary production alias | `https://platformtest.scalingup.com` |
@@ -108,6 +108,6 @@ This packet was assembled from repository configuration, read-only Vercel observ
 
 Prepared by: Gabriel / Codex support
 
-Preparation date: 2026-07-21
+Preparation date: 2026-07-21; refreshed against current source/provider read-only evidence on 2026-07-23
 
 Review status: pending designated owner and client approvals
