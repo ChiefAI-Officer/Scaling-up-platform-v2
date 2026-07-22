@@ -12,12 +12,13 @@ This runbook prepares an owner-controlled separation of Scaling Up Platform v2 f
 
 | Role | Current person | Authority in this runbook |
 |---|---|---|
-| Source Vercel Owner / eligible executor | Josh (`josh-4119`, `josh@chiefaiofficer.com`) or Jeff Verdun (`jverdun@scalingup.com`) | Performs the approved Vercel transfer |
+| Source Vercel Owner / eligible executor | Josh (`josh-4119`, `josh@chiefaiofficer.com`) or Jeff Verdun (`jverdun-7897`, `jverdun@scalingup.com`) | Performs the approved Vercel transfer |
 | Preparation operator | Gabriel (`gabriel-3497`) | Inventory, packet preparation, validation evidence; currently a source-team Member and cannot transfer the project |
 | Destination Vercel Owner and billing owner | **TBD — approval required** | Creates/owns the destination Pro team, payment method, and accepts ongoing charges |
 | Post-handoff CAIO operator | **TBD — approval required; may be `none`** | Time-bounded operational access, with an explicit expiry or removal owner |
-| Source Neon Admin / eligible executor | **TBD — verify in Neon** | Selects transfer or migration only in the separately approved database window |
-| Destination Neon Admin and billing owner | **TBD — approval required** | Owns the paid destination organization/project and database charges |
+| Source Neon Admin / eligible executor | Josh or Jeff — both verified Admins in the `Jeff Verdun` Neon organization | Selects retain/transfer/migration only in the separately approved database window |
+| Current Neon billing owner | Jeff / Scaling Up client boundary | Current Launch plan has a client-held payment method; no payment details are recorded here |
+| Destination Neon Admin and billing owner | **Decision required** — retain the current client-billed org or name a dedicated destination | Owns the paid destination organization/project and database charges |
 | Rollback decision-maker | **TBD — approval required** | Calls rollback and has access in both source and destination boundaries |
 
 Gabriel does not need elevated Vercel access to finish this preparation. Elevating him would broaden standing privilege without removing the need for a named client owner and billing approver.
@@ -43,9 +44,11 @@ Evidence labels: **live** = read-only provider observation refreshed on 2026-07-
 | Environment variable names/scopes | Source-derived names are in the manifest; live target scopes were not read | **open**; compare names and targets, never paste values |
 | Integrations / Marketplace resources | HubSpot, Stripe, Circle, Inngest, SMTP/Teams, Typeform, Redis/KV and Blob are referenced by source | **source**; installation/resource ownership is **open** |
 | Edge Config, log drains, Secure Compute/static IP, Sandboxes | No source configuration found | **open**; explicitly record `none` or inventory before transfer |
-| Neon current plan | Repository history says Josh upgraded the production project to Launch on 2026-07-20 | **source history only**; verify live |
-| Neon org/project/ID/region/Postgres version/size | Not available without a Neon owner inventory | **open — required before database approval** |
-| Neon provisioning mode | Native Neon organization vs Vercel Marketplace integration not verified | **open — determines the legal execution path** |
+| Neon current organization/plan | `Jeff Verdun` (`org-withered-wildflower-24870377`), Launch; client-held billing is configured; spending limit is disabled | **live**; owner must decide whether this is the final isolated boundary |
+| Neon roles | Josh and Jeff: Admin; Gabriel: Member | **live** |
+| Neon project | `Scaling Up Platform` (`plain-term-58540461`), AWS US East 1, PostgreSQL 17, about 39 MB, one `production` branch | **live** |
+| Neon compute/recovery | Active primary `ep-falling-sound-aiilz991`; autoscaling 0.25–8 CU; 6-hour history retention; no snapshots shown | **live**; restore rehearsal and recovery objective remain open |
+| Neon provisioning/integration mode | Native Neon project; GitHub and Vercel integrations both show `Add` rather than installed | **live**; native retain/transfer is the relevant decision, not Marketplace transfer |
 
 ## 3. Current provider rules that shape the plan
 
@@ -70,7 +73,7 @@ The executor must stop unless every required field in the approval packet is sig
 7. Explicit `none` or an inventory for integrations, Marketplace resources, Blob stores, Edge Config, log drains, Secure Compute/static IPs, and sandboxes.
 8. Node runtime decision: align Vercel to the repo's Node 20 pin or approve/test Node 24 as the intended runtime.
 9. A no-deploy freeze covering the Vercel window. Because the build runs `prisma migrate deploy`, no verification step may create a deployment without database-change authorization.
-10. Neon source/destination org IDs, project ID, region, Postgres version, size, plan, billing owner, Admins, integration status, recovery objective, and chosen path recorded — but the database window remains separate.
+10. Neon source facts above are rechecked; the owner chooses whether the existing client-billed organization is the final boundary or a dedicated organization is required, then records the destination, recovery objective, restore evidence, access retention and chosen path — but the database window remains separate.
 
 ## 5. Window A — Vercel project ownership only
 
@@ -158,7 +161,7 @@ Stop and escalate if any of these is true:
 - A required Blob/Marketplace/Edge Config/log-drain/network dependency has no transfer plan.
 - The Node 20/24 mismatch is unresolved and any deploy would occur.
 - Any command or UI action would deploy the app or run `prisma migrate deploy` during Window A.
-- Neon provisioning mode, integration status, source Admin, destination org, plan compatibility, backup restore proof, or rollback policy is unknown.
+- The Neon retain-versus-dedicated-org decision, destination (if any), backup/restore proof, recovery objective, access-retention plan, or rollback policy is unknown.
 - Production health is already degraded or the observed deployment/Git SHA changed after approval without a new review.
 
 ## 9. Exit evidence

@@ -22,11 +22,14 @@ Approve two independent change windows:
 | Source Vercel team/project | `chief-aio-fficer` / `scaling-up-platform-v2` |
 | Project ID/root | `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo` / `src` |
 | Primary production alias | `https://platformtest.scalingup.com` |
-| Current source-team executor options | Josh (`josh-4119`) or Jeff Verdun — both observed as Owners |
+| Current source-team executor options | Josh (`josh-4119`) or Jeff Verdun (`jverdun-7897`) — both observed as Owners |
 | Preparation operator | Gabriel (`gabriel-3497`) — observed as Member; transfer permission unavailable by design |
 | Database coupling | Every production build runs `prisma migrate deploy`; Prisma requires pooled and direct URLs |
 | Known runtime discrepancy | Vercel reports Node 24.x; repository `.nvmrc` pins Node 20 |
-| Neon history | Repository history records a Launch upgrade on 2026-07-20; live org/project/provisioning mode remains unverified |
+| Neon ownership | Native Neon organization `Jeff Verdun` (`org-withered-wildflower-24870377`); Josh and Jeff are Admins, Gabriel is a Member |
+| Neon project | `Scaling Up Platform` (`plain-term-58540461`), AWS US East 1, PostgreSQL 17, one `production` branch |
+| Neon plan/billing | Launch; client-held payment method and billing identity are present; organization spending limit is not enabled |
+| Neon integration/scale | No GitHub or Vercel integration installed; about 39 MB stored; autoscaling is configured for 0.25–8 CU; history retention is 6 hours |
 
 ## Approval fields — required before scheduling
 
@@ -68,13 +71,13 @@ Approve two independent change windows:
 
 | Decision | Approved value / signature |
 |---|---|
-| Provisioning mode | ☐ native Neon org ☐ Vercel Marketplace ☐ other: __________ |
-| Source org/project IDs and source Admin | __________________________________ |
-| Destination org/project IDs | __________________________________ |
-| Destination plan, region, Postgres version | __________________________________ |
-| Destination Admin and billing owner | __________________________________ |
-| Integration status | ☐ none ☐ GitHub ☐ Vercel ☐ Marketplace-managed |
-| Selected path | ☐ native transfer ☐ Marketplace resource transfer ☐ migration |
+| Provisioning mode | ☑ native Neon organization; no Marketplace provisioning observed |
+| Source org/project IDs and source Admin | `org-withered-wildflower-24870377` / `plain-term-58540461`; Josh or Jeff (Admin) |
+| Destination org/project IDs | ☐ retain current client-billed org/project ☐ dedicated destination: __________________ |
+| Destination plan, region, Postgres version | Current: Launch / AWS US East 1 / PostgreSQL 17; approved destination: __________ |
+| Destination Admin and billing owner | Current Admins: Josh and Jeff; current billing is client-held; final owner decision: __________ |
+| Integration status | ☑ none installed ☐ GitHub ☐ Vercel ☐ Marketplace-managed |
+| Selected path | ☐ retain current client-billed project ☐ native transfer to dedicated org ☐ controlled migration |
 | Measured size / recovery objective / write downtime | __________________________________ |
 | Restore rehearsal evidence location | __________________________________ |
 | Credential rotation owner | __________________________________ |
