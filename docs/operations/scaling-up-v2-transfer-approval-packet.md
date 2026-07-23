@@ -37,22 +37,22 @@ Approve two independent change windows:
 
 | Decision | Approved value / signature |
 |---|---|
-| Destination team display name | __________________________________ |
-| Destination team slug | __________________________________ |
-| Destination plan and valid payment method confirmed by | __________________________________ |
-| Primary destination Owner | __________________________________ |
-| Backup destination Owner | __________________________________ |
-| Post-handoff CAIO operator (`none` allowed) | __________________________________ |
-| CAIO access roles, expiry and removal owner | __________________________________ |
-| Source Owner / transfer executor (Josh or Jeff) | __________________________________ |
-| Rollback decision-maker | __________________________________ |
-| Approved project name in destination | `scaling-up-platform-v2` / other: __________________ |
+| Destination team display name | **Proposed:** `Scaling Up`; owner acceptance: __________ |
+| Destination team slug | **Proposed:** `scaling-up-platform`; availability/acceptance: __________ |
+| Destination plan and valid payment method confirmed by | **Proposed:** Pro; Jeff / client billing owner: __________ |
+| Primary destination Owner | **Proposed:** Jeff Verdun (`jverdun-7897`); acceptance: __________ |
+| Backup destination Owner | **Proposed:** Josh (`josh-4119`); acceptance: __________ |
+| Post-handoff CAIO operator (`none` allowed) | **Proposed:** Gabriel as free Viewer Pro; elevated Member only under separate approval |
+| CAIO access roles, expiry and removal owner | Viewer by default; any temporary Member role expires 30 days after transfer; removal owner: Josh |
+| Source Owner / transfer executor (Josh or Jeff) | **Proposed:** Jeff; acceptance: __________ |
+| Rollback decision-maker | **Proposed:** Josh; acceptance: __________ |
+| Approved project name in destination | **Proposed:** retain `scaling-up-platform-v2`; acceptance: __________ |
 | Root-domain/DNS owner and domain billing accepted by | __________________________________ |
-| Paid Vercel feature/resource ceiling accepted by | __________________________________ |
-| Node runtime decision | ☐ align to 20 before next deploy ☐ retain/test 24; approver: __________ |
+| Paid Vercel feature/resource ceiling accepted by | **Proposed:** 2 Owner seats = $40 fixed monthly base; $50 metered-spend amount, notifications only, no automatic production pause; no add-ons; client acceptance: __________ |
+| Node runtime decision | **Proposed:** retain current 24.x during no-deploy transfer; reconcile `.nvmrc` separately before a later deploy; approver: __________ |
 | Change window (timezone included) | __________________________________ |
 | Rollback deadline / maximum window | __________________________________ |
-| No-deploy freeze owner | __________________________________ |
+| No-deploy freeze owner | **Proposed:** Josh; acceptance: __________ |
 | Live Vercel transfer authorized | ☐ yes ☐ no — approver/date: __________________ |
 
 ### Resource exceptions — each must be `none`, `defer with no impact`, or separately approved
@@ -73,18 +73,19 @@ Approve two independent change windows:
 |---|---|
 | Provisioning mode | ☑ native Neon organization; no Marketplace provisioning observed |
 | Source org/project IDs and source Admin | `org-withered-wildflower-24870377` / `plain-term-58540461`; Josh or Jeff (Admin) |
-| Destination org/project IDs | ☐ retain current client-billed org/project ☐ dedicated destination: __________________ |
-| Destination plan, region, Postgres version | Current: Launch / AWS US East 1 / PostgreSQL 17; approved destination: __________ |
-| Destination Admin and billing owner | Current Admins: Josh and Jeff; current billing is client-held; final owner decision: __________ |
+| Destination org/project IDs | **Proposed:** dedicated `Scaling Up` Neon organization; retain project ID `plain-term-58540461` through native transfer; destination org ID assigned after separately approved creation |
+| Destination plan, region, Postgres version | **Proposed:** Launch / AWS US East 1 / PostgreSQL 17; acceptance: __________ |
+| Destination Admin and billing owner | **Proposed:** Jeff primary Admin/billing owner; Josh backup Admin; acceptance: __________ |
+| Neon cost controls | **Proposed:** keep autoscaling at 0.25–8 CU; $50 monthly spending-limit alerts; no automatic compute suspension; acceptance: __________ |
 | Integration status | ☑ none installed ☐ GitHub ☐ Vercel ☐ Marketplace-managed |
-| Selected path | ☐ retain current client-billed project ☐ native transfer to dedicated org ☐ controlled migration |
-| Measured size / recovery objective / write downtime | __________________________________ |
+| Selected path | **Proposed:** native project transfer to the dedicated organization; no dump/restore migration |
+| Measured size / recovery objective / write downtime | About 39 MB; proposed 7-day restore window; no planned write downtime; stop if provider preview indicates endpoint or availability change |
 | Restore rehearsal evidence location | __________________________________ |
-| Credential rotation owner | __________________________________ |
-| Vercel env update + deploy executor | __________________________________ |
-| Data reconciliation owner after rollback | __________________________________ |
-| Source retention period and deletion approver | __________________________________ |
-| Post-handoff CAIO Neon role/expiry (`none` allowed) | __________________________________ |
+| Credential rotation owner | **Proposed:** Jeff; no rotation unless transfer preview requires it |
+| Vercel env update + deploy executor | **Proposed:** Josh; not expected for native transfer and separately approval-gated if required |
+| Data reconciliation owner after rollback | **Proposed:** Josh |
+| Source retention period and deletion approver | Not applicable to native same-project transfer; no deletion authorized |
+| Post-handoff CAIO Neon role/expiry (`none` allowed) | **Proposed:** Gabriel Member through 30 days after transfer, then remove unless renewed by Jeff |
 | Change window (timezone included) | __________________________________ |
 | Live Neon operation and resulting deploy authorized | ☐ yes ☐ no — approver/date: __________ |
 

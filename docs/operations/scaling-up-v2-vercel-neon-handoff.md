@@ -14,12 +14,13 @@ This runbook prepares an owner-controlled separation of Scaling Up Platform v2 f
 |---|---|---|
 | Source Vercel Owner / eligible executor | Josh (`josh-4119`, `josh@chiefaiofficer.com`) or Jeff Verdun (`jverdun-7897`, `jverdun@scalingup.com`) | Performs the approved Vercel transfer |
 | Preparation operator | Gabriel (`gabriel-3497`) | Inventory, packet preparation, validation evidence; currently a source-team Member and cannot transfer the project |
-| Destination Vercel Owner and billing owner | **TBD — approval required** | Creates/owns the destination Pro team, payment method, and accepts ongoing charges |
-| Post-handoff CAIO operator | **TBD — approval required; may be `none`** | Time-bounded operational access, with an explicit expiry or removal owner |
+| Destination Vercel Owner and billing owner | **Proposed:** Jeff Verdun | Creates/owns the destination `Scaling Up` Pro team, payment method, and accepts ongoing charges |
+| Backup Vercel Owner / rollback owner | **Proposed:** Josh | Provides one paid backup Owner seat and calls rollback if exit criteria fail |
+| Post-handoff CAIO operator | **Proposed:** Gabriel as free Viewer Pro; temporary Member only under separate approval, expiring after 30 days | Least-privilege validation access without a standing paid deployment seat |
 | Source Neon Admin / eligible executor | Josh or Jeff — both verified Admins in the `Jeff Verdun` Neon organization | Selects retain/transfer/migration only in the separately approved database window |
 | Current Neon billing owner | Jeff / Scaling Up client boundary | Current Launch plan has a client-held payment method; no payment details are recorded here |
-| Destination Neon Admin and billing owner | **Decision required** — retain the current client-billed org or name a dedicated destination | Owns the paid destination organization/project and database charges |
-| Rollback decision-maker | **TBD — approval required** | Calls rollback and has access in both source and destination boundaries |
+| Destination Neon Admin and billing owner | **Proposed:** Jeff in a dedicated `Scaling Up` Launch organization; Josh as backup Admin | Owns the paid destination organization/project and database charges |
+| Rollback decision-maker | **Proposed:** Josh | Calls rollback and has access in both source and destination boundaries |
 
 Gabriel does not need elevated Vercel access to finish this preparation. Elevating him would broaden standing privilege without removing the need for a named client owner and billing approver.
 
@@ -54,11 +55,15 @@ Evidence labels: **live** = read-only provider observation refreshed on 2026-07-
 
 Vercel requires the initiator to be an Owner of the source team and a Member of the destination team. The destination must have a valid payment method. Deployments, project environment variables, configuration, domains/aliases, builds, Git link, security settings, cron jobs, Web Analytics, Speed Insights and function region transfer with the project. Integrations, Edge Config, monitoring/log history, custom log drains, Blob, Secure Compute/static IPs, sandboxes/snapshots and Active Branches do not transfer with the project or need separate handling. See [Vercel — Transferring a project](https://vercel.com/docs/projects/transferring-projects).
 
+As of the 2026-07-23 packet refresh, Vercel documents a $20/month Pro platform fee with one deploying seat and $20 usage credit included; each additional Owner or Member seat is $20/month, while Viewer Pro seats are free. The proposed Jeff + Josh Owner model therefore has a $40 fixed monthly base before usage/add-ons. A proposed $50 metered-spend amount is notification-only and excludes seats, integrations and add-ons; it must not automatically pause production. See [Vercel — Pro plan](https://vercel.com/docs/plans/pro-plan) and [Vercel — Spend Management](https://vercel.com/docs/spend-management).
+
 Vercel Marketplace resources use a separate transfer operation. For supported database resources, including Neon, the destination team must first install the corresponding integration. See [Vercel — Transfer Marketplace resources between teams](https://vercel.com/changelog/transfer-marketplace-resources-between-teams).
 
 A native Neon organization transfer requires source-org Admin and destination-org Member access, compatible destination limits/plan, and membership in both organizations. Neon does not support transferring projects that have GitHub or Vercel integrations installed, Vercel-managed organizations, or transfers to personal Neon accounts. See [Neon — Transfer projects](https://neon.com/docs/manage/orgs-project-transfer).
 
 If direct transfer is ineligible, use a separately approved database migration. Neon advises using an unpooled connection for `pg_dump`; for larger datasets, use separate dump/restore files or logical replication rather than a fragile pipe. See [Neon — Migrate from another Neon project](https://neon.com/docs/import/migrate-from-neon).
+
+Neon Launch is usage-based; the published reference rate is $0.106 per CU-hour and $0.35 per GB-month, with a typical intermittent 1 GB workload around $15/month. The packet keeps the current 0.25–8 CU autoscaling range and proposes $50 monthly alerts without automatic compute suspension. See [Neon — Pricing](https://neon.com/pricing).
 
 ## 4. Phase 0 — approvals and immutable evidence
 
