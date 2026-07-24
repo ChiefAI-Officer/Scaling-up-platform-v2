@@ -1102,7 +1102,7 @@ export async function sendAssessmentInvitationEmail(data: {
     invitation: { id: string; expiresAt: Date };
     respondent: { id: string; firstName: string; lastName: string; email: string };
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
-    template: { alias?: string; invitationSubject: string; invitationBodyMarkdown: string };
+    template: { alias: string; invitationSubject: string; invitationBodyMarkdown: string };
     /**
      * Per-campaign full-HTML invitation override (#20). When non-empty AND
      * waveDCustomHtmlEmailEnabled(), this REPLACES the entire branded shell
