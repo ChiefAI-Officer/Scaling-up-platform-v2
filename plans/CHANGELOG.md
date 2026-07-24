@@ -6,6 +6,22 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-24 — Jeff July-10 #61: LVA invitation email — coach-forward copy + header company line removed <!-- ENTRY_ISO:2026-07-24 ENTRY_SLUG:jeff-jul10-61-lva-invite -->
+
+**Status: DONE (2026-07-24, PR #213).** First item in a one-item-at-a-time pass through Jeff's July-10 tracker (each item: thin-spec gate → TDD → PR → review-loop → merge → SoT). #61 is the LVA respondent invitation email; three changes, **scoped to LVA** (production state verified before building — none were already applied):
+
+1. **Body leads with the coach:** `{{coachName}} has invited you to complete the Leadership Vision Alignment assessment…` (was `{{organizationName}} has invited you…`).
+2. **Mid-email raw URL removed:** the standalone `{{invitationUrl}}` line is gone; the branded shell's Start button + bottom fallback URL already cover it ("Click the button below to begin.").
+3. **Header company line removed — LVA only:** the `[Company]`/`orgLine` under the coach logo is suppressed for LVA via a new optional `showOrgLine` flag on `InvitationVars`, derived in the send chokepoint from a **required** `template.alias` through `shouldShowOrgLine()` (+ `ORG_LINE_SUPPRESSED_ALIASES`). Every other template is byte-identical — including Rockefeller, whose header company line Jeff called "fine as-is" (#69).
+
+**How it reaches prod (two independent halves):** the invitation body is a **template-row field** (`AssessmentTemplate.invitationBodyMarkdown`) read live by every send path, so a deploy alone never rewrites it — the seed (`prisma/seed-lva-assessment.ts`) is updated as the factory default AND the existing prod row is corrected by `scripts/patch-lva-invitation-copy.ts` (guarded: only updates when the live body equals the known pre-patch text; idempotent). Run live 2026-07-24 and verified (coach-token on, org-token off, mid-URL gone). The `showOrgLine` header change ships as **code** on the merge deploy.
+
+**Threading:** `template.alias` is threaded to `sendAssessmentInvitationEmail` from all four send paths (initial invite → `sendInvitesBatch`, auto-send fanout → `sendInvitesBatch`, reminders, resend), each selecting `alias: true`. `alias` is **required** at every layer (review-loop round 1) so a future dropped thread is a compile error, not a silent LVA regression.
+
+**Verification:** TDD — renderer `showOrgLine` on/off (default byte-identical snapshot unchanged), `shouldShowOrgLine` rule, LVA seed drift-guard; all affected send-path suites green; Turbopack build gate green; ESLint clean. superpowers:code-reviewer → review-loop **5/5** (one minor finding fixed: alias tightened to required). No migrations. Notion task created + Done.
+
+**Discovered/confirmed:** the invitation subject/body are admin-editable in the template editor Settings tab (ADMIN/STAFF only), and coaches can override per-campaign in the wizard — but a template-wide default fix belongs in code (seed + patch), not a hand-edit (that seed-vs-prod drift is exactly why QSP's seed still reads `{{organizationName}}` while its prod row was hand-patched to `{{coachName}}`). Domain note parked for a future item: whether admin should retain Settings-tab control over send content vs coach-owned sending.
+
 ### 2026-07-22 — Prod feature-flag durability gap root-caused + 12 assessment wave-flags re-flipped live & verified <!-- ENTRY_ISO:2026-07-22 ENTRY_SLUG:prod-flag-reflip-live-verify -->
 
 **Status: DONE (2026-07-22).** A 2026-07-21 authenticated Vercel-CLI audit had flagged that many "launched" wave-flags read EMPTY (OFF) in Production; this session **root-caused it, fixed it, and live-verified the result**, then corrected the source-of-truth (the earlier note in `jeff-jul10-forks-72-64`/#210 recorded the wrong cause).
