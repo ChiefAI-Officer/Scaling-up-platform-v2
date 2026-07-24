@@ -17,6 +17,7 @@ import {
     renderTextBody,
     renderFullHtmlBody,
     renderFullTextBody,
+    shouldShowOrgLine,
     type InvitationVars,
 } from "@/lib/assessments/invitation-email";
 import {
@@ -1101,7 +1102,7 @@ export async function sendAssessmentInvitationEmail(data: {
     invitation: { id: string; expiresAt: Date };
     respondent: { id: string; firstName: string; lastName: string; email: string };
     campaign: { id: string; name: string; alias: string; closeAt: Date | null };
-    template: { invitationSubject: string; invitationBodyMarkdown: string };
+    template: { alias: string; invitationSubject: string; invitationBodyMarkdown: string };
     /**
      * Per-campaign full-HTML invitation override (#20). When non-empty AND
      * waveDCustomHtmlEmailEnabled(), this REPLACES the entire branded shell
@@ -1172,6 +1173,10 @@ export async function sendAssessmentInvitationEmail(data: {
         invitationUrl,
         closeAt: data.campaign.closeAt,
         coachLogoUrl: data.coachLogoUrl ?? null,
+        // Jeff #61 — omit the header org/company line for templates that lead
+        // with the coach (LVA). Alias is passed by every send path; an absent
+        // alias leaves the line shown (byte-identical to prior output).
+        showOrgLine: shouldShowOrgLine(data.template.alias),
     };
 
     // Subject ALWAYS comes from invitationSubject (token-allowlisted path) —

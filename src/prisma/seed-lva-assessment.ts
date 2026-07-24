@@ -75,11 +75,9 @@ const INVITATION_SUBJECT =
 
 const INVITATION_BODY_MARKDOWN = `Hi {{respondentFirstName}},
 
-{{organizationName}} has invited you to complete the Leadership Vision Alignment assessment. Your responses will help your coach understand the current state of your organization across financials, strategy, culture, and execution.
+{{coachName}} has invited you to complete the Leadership Vision Alignment assessment. Your responses will help your coach understand the current state of your organization across financials, strategy, culture, and execution.
 
-Click the link below to begin:
-
-{{invitationUrl}}
+Click the button below to begin.
 
 Your responses are confidential and shared only with your coach.`;
 

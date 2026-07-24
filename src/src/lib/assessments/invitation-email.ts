@@ -27,6 +27,32 @@ export interface InvitationVars {
    * the full-HTML override path.
    */
   coachLogoUrl?: string | null;
+  /**
+   * Jeff #61 — when false, the invitation-email header omits the org/company
+   * line so the email leads with the coach, not the company. Undefined/true
+   * renders the line (byte-identical to prior output). Derived per-template
+   * via `shouldShowOrgLine`.
+   */
+  showOrgLine?: boolean;
+}
+
+/**
+ * Template aliases whose invitation-email header omits the org/company line.
+ * Jeff #61: LVA leads with the coach, not the company. Other templates keep
+ * the line (e.g. Rockefeller's is "fine as-is" per Jeff #69). Add an alias
+ * here — one line — when a future template's item requests the same removal.
+ */
+export const ORG_LINE_SUPPRESSED_ALIASES: ReadonlySet<string> = new Set([
+  "leadership-vision-alignment",
+]);
+
+/**
+ * Whether the invitation-email header should render the org/company line for a
+ * given template alias. Unknown/null alias → shown (fail-open to prior output).
+ */
+export function shouldShowOrgLine(templateAlias: string | null | undefined): boolean {
+  if (!templateAlias) return true;
+  return !ORG_LINE_SUPPRESSED_ALIASES.has(templateAlias);
 }
 
 function formatCloseAt(d: Date): string {
@@ -281,7 +307,8 @@ export function buildInvitationEmailHtml(input: {
   const { bodyMarkdown, vars } = input;
   const waveP = (input.chrome ?? "legacy") === "waveP";
   const bodyHtml = renderHtmlBody(bodyMarkdown, vars);
-  const orgLine = vars.organizationName ? escapeHtml(vars.organizationName) : "";
+  const orgLine =
+    vars.organizationName && vars.showOrgLine !== false ? escapeHtml(vars.organizationName) : "";
   // Coach logo (waveP only): https-gated src, escaped; alt = coach name,
   // control-char-stripped + escaped (no attribute breakout). Fixed max sizes
   // so an oversized image cannot blow up the 560px layout. No logo URL or a

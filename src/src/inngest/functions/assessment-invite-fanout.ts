@@ -103,6 +103,7 @@ interface FanoutCampaignRow {
   invitationBodyMarkdown: string | null;
   invitationBodyHtml: string | null;
   template: {
+    alias: string;
     name: string;
     invitationSubject: string;
     invitationBodyMarkdown: string;
@@ -225,6 +226,7 @@ export async function runInviteFanout(
       include: {
         template: {
           select: {
+            alias: true,
             name: true,
             invitationSubject: true,
             invitationBodyMarkdown: true,
@@ -402,6 +404,7 @@ export async function runInviteFanout(
             invitationBodyMarkdown: campaign.invitationBodyMarkdown,
             invitationBodyHtml: campaign.invitationBodyHtml,
             template: {
+              alias: campaign.template.alias,
               invitationSubject: campaign.template.invitationSubject,
               invitationBodyMarkdown: campaign.template.invitationBodyMarkdown,
             },

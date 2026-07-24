@@ -140,7 +140,7 @@ describe("renderTextBody — plain text twin", () => {
   });
 });
 
-import { buildInvitationEmailHtml, resolveCoachName } from "@/lib/assessments/invitation-email";
+import { buildInvitationEmailHtml, resolveCoachName, shouldShowOrgLine } from "@/lib/assessments/invitation-email";
 
 describe("buildInvitationEmailHtml — branded shell", () => {
   it("wraps the body in the purple branded shell with CID logo + CTA", () => {
@@ -409,5 +409,44 @@ describe("resolveCoachLogo — mirrors resolveCoachName identity (creatorCoach ?
       coachLogoUrl: null,
       logoRejectedReason: "invalid-url",
     });
+  });
+});
+
+describe("showOrgLine — invitation header company-line suppression (Jeff #61)", () => {
+  it("renders the org/company line by default (showOrgLine undefined) — unchanged", () => {
+    const html = buildInvitationEmailHtml({ bodyMarkdown: "Hi", vars: baseVars });
+    expect(html).toContain("Acme Corp");
+  });
+
+  it("omits the org/company line when showOrgLine is false, even if organizationName is set", () => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: { ...baseVars, showOrgLine: false },
+    });
+    expect(html).not.toContain("Acme Corp");
+    // the faint org-line div is the only element using this style
+    expect(html).not.toContain("opacity:0.85");
+  });
+
+  it("still renders the org line when showOrgLine is explicitly true", () => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: { ...baseVars, showOrgLine: true },
+    });
+    expect(html).toContain("Acme Corp");
+  });
+});
+
+describe("shouldShowOrgLine — template alias suppress rule (Jeff #61)", () => {
+  it("suppresses the org line for the LVA template", () => {
+    expect(shouldShowOrgLine("leadership-vision-alignment")).toBe(false);
+  });
+
+  it("shows the org line for every other template and when the alias is unknown", () => {
+    expect(shouldShowOrgLine("qsp-v2")).toBe(true);
+    expect(shouldShowOrgLine("RockHabits")).toBe(true);
+    expect(shouldShowOrgLine("scaling-up-full")).toBe(true);
+    expect(shouldShowOrgLine(null)).toBe(true);
+    expect(shouldShowOrgLine(undefined)).toBe(true);
   });
 });
