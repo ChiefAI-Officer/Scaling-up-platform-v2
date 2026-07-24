@@ -100,6 +100,7 @@ export async function POST(
             invitationBodyHtml: true,
             template: {
               select: {
+                alias: true,
                 name: true,
                 invitationSubject: true,
                 invitationBodyMarkdown: true,
@@ -214,6 +215,7 @@ export async function POST(
           closeAt: c.closeAt,
         },
         template: {
+          alias: c.template.alias,
           invitationSubject:
             c.invitationSubject ?? c.template.invitationSubject,
           invitationBodyMarkdown:

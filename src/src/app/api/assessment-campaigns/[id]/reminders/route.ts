@@ -118,6 +118,7 @@ export async function POST(
       include: {
         template: {
           select: {
+            alias: true,
             name: true,
             invitationSubject: true,
             invitationBodyMarkdown: true,
@@ -331,6 +332,7 @@ export async function POST(
             closeAt: campaign.closeAt,
           },
           template: {
+            alias: campaign.template.alias,
             invitationSubject:
               campaign.invitationSubject ?? campaign.template.invitationSubject,
             invitationBodyMarkdown:
