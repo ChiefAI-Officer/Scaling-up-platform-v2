@@ -10,7 +10,7 @@
  * not reachable by a template-row patch. Evidenced, not inferred: prod
  * EMAIL_DELIVERY telemetry records 4 renderer="custom_html" invitation sends on
  * 2026-07-10 (the day of Jeff's report), all from that campaign. It was
- * soft-deleted 2026-07-24; the override-bypass gap is tracked as its own issue.
+ * soft-deleted 2026-07-24; the override-bypass gap is tracked in GH issue #220.
  *
  * So QSP gets NO prod write here. The only real defect was SEED DRIFT: the seed
  * still carried the pre-Wave-P copy ("{{organizationName}} has invited you..."

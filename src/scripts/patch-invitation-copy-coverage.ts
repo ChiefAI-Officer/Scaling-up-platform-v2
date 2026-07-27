@@ -26,6 +26,7 @@
  *     `renderer: "custom_html"` invitation sends on 2026-07-10 (the day of his
  *     report), all from campaign "2026 QSP Q2" (qsp-v2, HTML override set, since
  *     soft-deleted). The qsp-v2 template row was coach-forward throughout.
+ *     The bypass itself is tracked in GH issue #220.
  *
  * Read-only: this only ever queries. Extracted after the third copy (LVA #61,
  * Rockefeller #69, SU-Full/Five-Dysfunctions #76/#80), following the existing
