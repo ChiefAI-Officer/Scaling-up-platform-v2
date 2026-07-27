@@ -1,6 +1,6 @@
 # ADR-0025 — Live invitation-copy corrections patch the Template row via compare-and-swap; version hashes and coach overrides are left intact
 
-**Status:** Accepted (2026-07-27) — design-phase decision for Jeff July-10 tracker item #69 (Rockefeller invitation email), generalising the one-off pattern from #61 (LVA). Implementation gated (no build until user sayso).
+**Status:** Accepted (2026-07-27) — first implemented for Jeff July-10 tracker item #69 (Rockefeller invitation email) in PR #216 (`scripts/patch-rockefeller-invitation-copy.ts`), generalising the one-off pattern from #61 (LVA). Reused by the remaining invite-copy items (#76 SU-Full/QSP, #80 Five Dysfunctions).
 
 ## Context
 

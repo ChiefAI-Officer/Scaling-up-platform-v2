@@ -11,6 +11,7 @@
  * these assertions read the body (invitationBodyMarkdown) only.
  */
 import { buildRockefellerContent } from "../../../prisma/seed-rockefeller-assessment";
+import { NEW_BODY } from "../../../scripts/patch-rockefeller-invitation-copy";
 
 describe("Rockefeller seed — invitation email copy (Jeff #69)", () => {
   const body = buildRockefellerContent().invitationBodyMarkdown;
@@ -32,5 +33,11 @@ describe("Rockefeller seed — invitation email copy (Jeff #69)", () => {
   it("uses the button lead-in copy", () => {
     expect(body).toContain("Click the button below to begin.");
     expect(body).not.toContain("Click the link below to begin:");
+  });
+
+  it("the prod-row patch script's NEW_BODY stays byte-identical to the seed (no seed↔script drift)", () => {
+    // The live prod row is corrected by scripts/patch-rockefeller-invitation-copy.ts;
+    // if the seed and the script drift, the CAS would silently no-op in prod.
+    expect(NEW_BODY).toBe(body);
   });
 });
