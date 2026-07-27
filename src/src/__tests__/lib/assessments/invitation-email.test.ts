@@ -303,6 +303,18 @@ describe("buildInvitationEmailHtml — Wave P chrome", () => {
     expect(html).toContain("max-height:40px");
   });
 
+  it("renders the Scaling Up logo BEFORE the coach logo (Jeff #69 — coach logo stays below the SU logo)", () => {
+    const html = buildInvitationEmailHtml({
+      bodyMarkdown: "Hi",
+      vars: { ...baseVars, coachLogoUrl: HTTPS_LOGO },
+      chrome: "waveP",
+    });
+    const suIdx = html.indexOf('src="cid:sulogo"');
+    const coachIdx = html.indexOf(`src="${HTTPS_LOGO}"`);
+    expect(suIdx).toBeGreaterThanOrEqual(0);
+    expect(coachIdx).toBeGreaterThan(suIdx);
+  });
+
   it("waveP escapes a src that needs escaping (no attribute breakout)", () => {
     const url = 'https://x.example/a?b=1&c="onerror=alert(1)';
     const html = buildInvitationEmailHtml({

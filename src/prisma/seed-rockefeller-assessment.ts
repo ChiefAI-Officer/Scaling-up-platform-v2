@@ -43,11 +43,9 @@ const INVITATION_SUBJECT =
 
 const INVITATION_BODY_MARKDOWN = `Hi {{respondentFirstName}},
 
-{{organizationName}} invited you to complete the {{templateName}}. This 40-question checklist takes about 5 minutes. Your responses help your team identify which Rockefeller Habits are in place and where there's room to grow.
+{{coachName}} has invited you to complete the Rockefeller Habits. This 40-question checklist takes about 5 minutes. Your responses help your team identify which Rockefeller Habits are in place and where there's room to grow.
 
-Click the link below to begin:
-
-{{invitationUrl}}
+Click the button below to begin.
 
 Your coach will review the results with you afterward.`;
 
