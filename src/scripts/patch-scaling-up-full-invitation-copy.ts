@@ -9,13 +9,18 @@
  * (ensureTemplateVersionContent hashes STORED values for an already-seeded
  * template) — see ADR-0025.
  *
- * Change (Jeff #76): lead with the coach ({{coachName}}) instead of the company
- * ({{organizationName}}), and drop the duplicate above-button raw
- * {{invitationUrl}} line (the Start button + the shell's bottom fallback URL
- * already cover it). Unlike Rockefeller #69 the assessment name is NOT
- * hardcoded — {{templateName}} renders "Scaling Up Full Assessment". The
+ * Change (Jeff #76 ask 2): lead with the coach ({{coachName}}) instead of the
+ * company ({{organizationName}}). Unlike Rockefeller #69 the assessment name is
+ * NOT hardcoded — {{templateName}} renders "Scaling Up Full Assessment". The
  * purple-header company line and the subject line are deliberately unchanged
- * (Jeff #76 is body-only; only LVA suppresses the org line, per #61).
+ * (body-only scope; only LVA suppresses the org line, per #61).
+ *
+ * Dropping the duplicate above-button raw {{invitationUrl}} line is an
+ * EXTENSION of the #61/#69 pattern rather than a literal #76 ask (Jeff listed
+ * two asks here). It is a genuine rendered change, unlike Five Dysfunctions #80
+ * ask 3: a bare URL line is not a markdown link, so `dropRedundantCta` does not
+ * strip it — the OLD body put the URL in the body on top of the Start button
+ * and the shell's own bottom fallback URL.
  *
  * ATOMIC compare-and-swap (ADR-0025): a single conditional updateMany guarded on
  * the expected pre-patch body — no read-then-write TOCTOU window. `alias` is
@@ -57,6 +62,67 @@ Your coach will review the results with you afterward.`;
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 12);
 
+/**
+ * ADR-0025 receipt helpers — report what a template-row patch does NOT cover.
+ *
+ * - Version staleness: patching the row changes what `ensureTemplateVersionContent`
+ *   hashes (it hashes STORED invitation values), so the latest version's contentHash
+ *   goes stale. If that latest version is an unpublished DRAFT, the next re-seed
+ *   FAILS CLOSED unless the seed passes forceSupersedeDraft. Report it; don't rewrite
+ *   a published version's hash.
+ * - Override inventory: campaign-level invitationSubject / invitationBodyMarkdown /
+ *   invitationBodyHtml take precedence over the template row, so those campaigns keep
+ *   their own copy. A full-HTML override also bypasses the branded shell entirely.
+ */
+async function reportCoverage(db: PrismaClient, alias: string): Promise<void> {
+  const tpl = await db.assessmentTemplate.findUnique({
+    where: { alias },
+    select: { id: true },
+  });
+  if (!tpl) return;
+
+  const latest = await db.assessmentTemplateVersion.findFirst({
+    where: { templateId: tpl.id },
+    orderBy: { versionNumber: "desc" },
+    select: { versionNumber: true, publishedAt: true },
+  });
+  if (!latest) {
+    console.log("  versions: none");
+  } else if (latest.publishedAt === null) {
+    console.log(
+      `  versions: latest v${latest.versionNumber} is an UNPUBLISHED DRAFT — its contentHash goes stale on patch, so the next re-seed FAILS CLOSED unless the seed passes forceSupersedeDraft.`,
+    );
+  } else {
+    console.log(
+      `  versions: latest v${latest.versionNumber} published ${latest.publishedAt.toISOString()} — hash left stale-but-documented (ADR-0025); a later re-seed appends a new DRAFT.`,
+    );
+  }
+
+  const campaigns = await db.assessmentCampaign.findMany({
+    where: { templateId: tpl.id },
+    select: {
+      name: true,
+      deletedAt: true,
+      invitationSubject: true,
+      invitationBodyMarkdown: true,
+      invitationBodyHtml: true,
+    },
+  });
+  const overrides = campaigns.filter(
+    (c) =>
+      c.invitationSubject !== null || c.invitationBodyMarkdown !== null || c.invitationBodyHtml !== null,
+  );
+  const liveOverrides = overrides.filter((c) => c.deletedAt === null);
+  console.log(
+    `  campaigns: ${campaigns.length} total, ${overrides.length} with an invitation override (${liveOverrides.length} live) — overrides are NOT patched.`,
+  );
+  for (const o of liveOverrides) {
+    console.log(
+      `    ! live override kept: "${o.name}"${o.invitationBodyHtml !== null ? " (full HTML — bypasses the branded shell entirely)" : ""}`,
+    );
+  }
+}
+
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const db = new PrismaClient();
@@ -71,18 +137,24 @@ async function main() {
       });
       if (!tpl) {
         console.log(`⚠ No template found for alias '${ALIAS}'.`);
+        process.exitCode = 1;
         return;
       }
       // Mirror the live path's precedence: soft-delete excludes the row from the CAS.
       if (tpl.deletedAt) {
         console.log(`⚠ template is soft-deleted (deletedAt=${tpl.deletedAt.toISOString()}) — live run would HARD FAIL.`);
+        process.exitCode = 1;
         return;
       }
       const cur = sha(tpl.invitationBodyMarkdown);
       if (tpl.invitationBodyMarkdown === NEW_BODY) console.log(`✓ already patched (body=${cur}).`);
       else if (tpl.invitationBodyMarkdown === EXPECTED_CURRENT_BODY)
         console.log(`✓ would patch (body ${cur} → ${sha(NEW_BODY)}).`);
-      else console.log(`⚠ live body (${cur}) matches neither expected-old nor new — live run would HARD FAIL as drift.`);
+      else {
+        console.log(`⚠ live body (${cur}) matches neither expected-old nor new — live run would HARD FAIL as drift.`);
+        process.exitCode = 1;
+      }
+      await reportCoverage(db, ALIAS);
       return;
     }
 
@@ -95,6 +167,7 @@ async function main() {
 
     if (res.count === 1) {
       console.log(`✓ patched (${sha(EXPECTED_CURRENT_BODY)} → ${sha(NEW_BODY)}).`);
+      await reportCoverage(db, ALIAS);
       return;
     }
 
@@ -108,6 +181,7 @@ async function main() {
       throw new Error(`Template '${ALIAS}' is soft-deleted (deletedAt=${tpl.deletedAt.toISOString()}) — refusing to patch.`);
     if (tpl.invitationBodyMarkdown === NEW_BODY) {
       console.log(`✓ already patched (body=${sha(NEW_BODY)}) — idempotent no-op.`);
+      await reportCoverage(db, ALIAS);
       return;
     }
     throw new Error(

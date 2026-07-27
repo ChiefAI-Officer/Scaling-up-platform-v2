@@ -52,11 +52,23 @@ const INVITATION_SUBJECT =
   "Your Five Dysfunctions Team Assessment is ready";
 
 // Jeff #80: name the coach ({{coachName}}) instead of the generic "Your coach",
-// use Jeff's wording for the assessment ({{templateName}} would render the
-// clunky "The Five Dysfunctions of a Team — Team Assessment"), and drop the
-// inline [Take the Assessment] markdown link — it rendered ABOVE the shell's own
-// "Start the assessment" button, which together with the bottom fallback URL
-// gave the email three links (Jeff #80 ask 3, confirmed). Subject unchanged.
+// and use Jeff's wording for the assessment ({{templateName}} would render the
+// clunky "The Five Dysfunctions of a Team — Team Assessment"). Subject unchanged.
+//
+// Ask 3 (the suspected duplicate link) is a NO-OP guardrail, not a fix. Jeff
+// hedged it ("likely… worth confirming") and the answer is no: the inline
+// [Take the Assessment]({{assessmentUrl}}) line never reached the inbox, because
+// `dropRedundantCta` (lib/assessments/invitation-email.ts) strips any standalone
+// markdown-link line whose URL equals the invitation URL — and {{assessmentUrl}}
+// resolves to exactly that. Rendering the OLD body yields zero body anchors.
+// It is removed from source anyway so the intent is explicit rather than relying
+// on a renderer side-effect; the test asserts the guardrail directly.
+//
+// Known cosmetic edge, shared with LVA #61 and Rockefeller #69: when no coach
+// resolves, {{coachName}} falls back to the lowercase "your coach", so this
+// sentence would open lowercase. Unreachable on current data (every live
+// campaign resolves a coach) and Jeff's literal wording puts the coach first, so
+// the family stays consistent rather than diverging this one template.
 const INVITATION_BODY_MARKDOWN = `Hi {{firstName}},
 
 {{coachName}} has invited you to complete the Five Dysfunctions assessment.

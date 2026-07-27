@@ -16,6 +16,7 @@
  */
 import { buildScalingUpFullContent } from "../../../prisma/seed-scaling-up-full-assessment";
 import { NEW_BODY } from "../../../scripts/patch-scaling-up-full-invitation-copy";
+import { renderHtmlBody } from "../../lib/assessments/invitation-email";
 
 describe("Scaling Up Full seed — invitation email copy (Jeff #76)", () => {
   const content = buildScalingUpFullContent();
@@ -32,6 +33,34 @@ describe("Scaling Up Full seed — invitation email copy (Jeff #76)", () => {
 
   it("drops the duplicate above-button raw invitation URL (button + bottom fallback cover it)", () => {
     expect(body).not.toContain("{{invitationUrl}}");
+  });
+
+  it("that URL removal is a REAL rendered change (unlike Five Dysfunctions #80 ask 3)", () => {
+    // dropRedundantCta only strips standalone MARKDOWN-link lines. A bare
+    // {{invitationUrl}} line is not one, so the old body really did print the URL
+    // in the body — on top of the shell's Start button and bottom fallback URL.
+    const invitationUrl = "https://app.test/org-survey/abc#t=SECRET";
+    const vars = {
+      respondent: { firstName: "Ann", lastName: "Lee", email: "ann@example.com" },
+      organizationName: "Acme",
+      campaignName: "Acme 2026",
+      templateName: "Scaling Up Full Assessment",
+      coachName: "Jane Doe",
+      invitationUrl,
+      closeAt: null,
+    };
+    const OLD_BODY_WITH_RAW_URL = `Hi {{respondentFirstName}},
+
+{{organizationName}} invited you to complete the {{templateName}}.
+
+Click the link below to begin:
+
+{{invitationUrl}}
+
+Your coach will review the results with you afterward.`;
+
+    expect(renderHtmlBody(OLD_BODY_WITH_RAW_URL, vars)).toContain(invitationUrl);
+    expect(renderHtmlBody(body, vars)).not.toContain(invitationUrl);
   });
 
   it("uses the button lead-in copy", () => {
