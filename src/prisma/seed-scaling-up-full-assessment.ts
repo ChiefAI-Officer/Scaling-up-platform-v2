@@ -65,13 +65,16 @@ const ADVISORY_LOCK_KEY = "assessment-scaling-up-full-v1-seed";
 const INVITATION_SUBJECT =
   "You're invited to take the {{templateName}} survey for {{organizationName}}";
 
+// Jeff #76: lead with the coach ({{coachName}}) instead of the company, and
+// drop the duplicate above-button raw {{invitationUrl}} line (the Start button
+// plus the shell's bottom fallback URL already cover it). {{templateName}}
+// renders "Scaling Up Full Assessment", so — unlike Rockefeller #69 — the
+// assessment name needs no hardcoding. Subject deliberately unchanged.
 const INVITATION_BODY_MARKDOWN = `Hi {{respondentFirstName}},
 
-{{organizationName}} invited you to complete the {{templateName}}. This 61-question assessment takes about 10 minutes. Your responses help your team identify strengths and growth opportunities across People, Strategy, Execution, Cash, and You.
+{{coachName}} has invited you to complete the {{templateName}}. This 61-question assessment takes about 10 minutes. Your responses help your team identify strengths and growth opportunities across People, Strategy, Execution, Cash, and You.
 
-Click the link below to begin:
-
-{{invitationUrl}}
+Click the button below to begin.
 
 Your coach will review the results with you afterward.`;
 

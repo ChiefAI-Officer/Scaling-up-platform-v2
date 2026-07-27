@@ -14,7 +14,8 @@ import { buildRockefellerContent } from "../../../prisma/seed-rockefeller-assess
 import { NEW_BODY } from "../../../scripts/patch-rockefeller-invitation-copy";
 
 describe("Rockefeller seed — invitation email copy (Jeff #69)", () => {
-  const body = buildRockefellerContent().invitationBodyMarkdown;
+  const content = buildRockefellerContent();
+  const body = content.invitationBodyMarkdown;
 
   it("leads with the coach, not the company", () => {
     expect(body).toContain("{{coachName}} has invited you");
@@ -33,6 +34,13 @@ describe("Rockefeller seed — invitation email copy (Jeff #69)", () => {
   it("uses the button lead-in copy", () => {
     expect(body).toContain("Click the button below to begin.");
     expect(body).not.toContain("Click the link below to begin:");
+  });
+
+  it("leaves the invitation SUBJECT unchanged (Jeff #69 is body-only)", () => {
+    // Positive guard — body-only scope was previously proven only by omission.
+    expect(content.invitationSubject).toBe(
+      "You're invited to take the {{templateName}} survey for {{organizationName}}",
+    );
   });
 
   it("the prod-row patch script's NEW_BODY stays byte-identical to the seed (no seed↔script drift)", () => {

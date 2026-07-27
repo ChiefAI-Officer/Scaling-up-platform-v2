@@ -51,15 +51,20 @@ const TEMPLATE_DESCRIPTION =
 
 const INVITATION_SUBJECT = "Please complete your Quarterly Session Prep";
 
+// Jeff #76 (seed alignment only — NO prod write): the live qsp-v2 template row
+// has been coach-forward since the 2026-07-03 Wave-P fix, but this seed still
+// carried the pre-Wave-P copy, so re-seeding a fresh environment would have
+// reintroduced exactly the "[Company] has invited you..." wording Jeff
+// reported. Pinned byte-for-byte to the live prod row (read 2026-07-27).
+// (Jeff's actual #76 QSP sighting root-caused to a campaign-level
+// invitationBodyHtml override, which bypasses this copy entirely.)
 const INVITATION_BODY_MARKDOWN = `Hi {{respondentFirstName}},
 
-{{organizationName}} has invited you to complete the Quarterly Session Prep survey in preparation for the upcoming quarterly strategy session.
+You've been invited by {{coachName}} to complete the {{templateName}} for {{organizationName}}.
 
-Please take a few minutes to reflect on the past quarter and share your thoughts:
+It takes just a few minutes, and there are no right or wrong answers — your honest perspective is what makes the results useful. Your responses are confidential.
 
-{{invitationUrl}}
-
-Your responses will be aggregated and shared with your facilitator to prepare the session.`;
+Click the button below to begin.`;
 
 // ─── Scale constant (used by every SLIDER_LIKERT question) ───────────────
 //

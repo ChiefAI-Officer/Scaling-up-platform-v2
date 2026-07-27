@@ -51,14 +51,20 @@ const TEMPLATE_DESCRIPTION =
 const INVITATION_SUBJECT =
   "Your Five Dysfunctions Team Assessment is ready";
 
+// Jeff #80: name the coach ({{coachName}}) instead of the generic "Your coach",
+// use Jeff's wording for the assessment ({{templateName}} would render the
+// clunky "The Five Dysfunctions of a Team — Team Assessment"), and drop the
+// inline [Take the Assessment] markdown link — it rendered ABOVE the shell's own
+// "Start the assessment" button, which together with the bottom fallback URL
+// gave the email three links (Jeff #80 ask 3, confirmed). Subject unchanged.
 const INVITATION_BODY_MARKDOWN = `Hi {{firstName}},
 
-Your coach has invited you to complete the **Five Dysfunctions of a Team — Team Assessment**.
+{{coachName}} has invited you to complete the Five Dysfunctions assessment.
 
 This 38-statement assessment evaluates your team across five fundamentals:
 Trust, Conflict, Commitment, Accountability, and Results.
 
-[Take the Assessment]({{assessmentUrl}})
+Click the button below to begin.
 
 The assessment takes approximately 10–15 minutes to complete.
 
