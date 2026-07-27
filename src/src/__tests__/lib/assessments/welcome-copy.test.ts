@@ -54,6 +54,7 @@ describe("resolveWelcomeLede — per-template copy", () => {
   it.each([
     ["leadership-vision-alignment", "Leadership Vision Alignment Assessment", 1],
     ["qsp-v2", "Quarterly Session Preparation Assessment", 1],
+    ["five-dysfunctions", "five fundamentals of teamwork", 1],
     ["RockHabits", "Rockefeller Habits 2.0 methodology", 2],
     ["scaling-up-full", "Rockefeller Habits 2.0 methodology", 2],
   ] as const)("%s resolves to its own copy in %i paragraph(s)", (alias, phrase, paragraphs) => {

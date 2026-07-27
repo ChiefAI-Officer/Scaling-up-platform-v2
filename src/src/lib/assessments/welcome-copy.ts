@@ -81,6 +81,23 @@ export const WELCOME_LEDE_BY_ALIAS: Readonly<Record<string, readonly string[]>> 
       "We would highly recommend repeating this checklist annually, in order to keep track of your progress. In the questionnaire, each item is rated on a scale from 0 to 3, with four items in each habit.",
     ]),
 
+    // DRAFTED BY US, not dictated by Jeff — the one entry here with no
+    // client-supplied bytes. He asked for the other four the same day he sent
+    // Five Dysfunctions wording for the invitation email (#80), so the omission
+    // reads as an oversight rather than a decision; leaving this instrument on
+    // generic copy while its siblings describe themselves was the worse option.
+    // Every clause is traceable to prisma/seed-five-dysfunctions.ts: the five
+    // sections (:290-331), "five fundamentals" (:79), and "constructive
+    // conflict" (:304) — bare "conflict" reads to a cold respondent as something
+    // a team should avoid. Deliberately claims NOTHING the instrument cannot
+    // back: no duration (the stat chip derives its own), no "no right answers"
+    // (the seed states higher always = healthier, :348-350), no assertion about
+    // whole-team response, and no third-party attribution where the rest of the
+    // family names none. Swap wholesale if Jeff sends his own paragraph.
+    "five-dysfunctions": Object.freeze([
+      "This is your Five Dysfunctions assessment. It lists all the team members' views on the five fundamentals of teamwork: trust, constructive conflict, commitment, accountability and results. Great for preparing your next team session.",
+    ]),
+
     // #77 — "your report" (was "this report", which reads wrong on a screen shown
     // before question 1). Split into two paragraphs: 495 characters is a wall.
     "scaling-up-full": Object.freeze([
