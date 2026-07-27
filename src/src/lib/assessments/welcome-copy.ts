@@ -12,7 +12,7 @@
  * template row (the model invitation copy uses, ADR-0025) would buy a migration,
  * an editor field, an atomic-CAS patch script, seed drift-guards, and the
  * campaign-override precedence bypass tracked in GH #220 — for no gain nobody
- * asked for. Same shape as the per-alias maps at `report-config.ts:34-38` and
+ * asked for. Same shape as the per-alias maps at `report-config.ts:34-65` and
  * `invitation-email.ts:39-56`. `resolveWelcomeLede` is the seam: if a coach ever
  * genuinely needs to author this, it grows a data argument and the call site
  * never changes.
@@ -25,7 +25,8 @@
  *
  * INVITED SURFACE ONLY. `accessMode` is per-campaign, so a PUBLIC campaign on a
  * keyed template renders `public-quiz-client.tsx` instead and would NOT show
- * this copy. Every keyed template is invited-only today.
+ * this copy. As of 2026-07-28 every keyed template is invited-only in production;
+ * that is an observation, not a constraint.
  */
 
 /**
@@ -40,7 +41,9 @@ export const DEFAULT_WELCOME_LEDE: readonly string[] = Object.freeze([
 /**
  * The resume promise, relocated. It used to live in the sentence above, which
  * was the ONLY place the invited card told a respondent they could stop and come
- * back — and the promise is real (partial answers persist via `useAnswerDraft`).
+ * back. The promise holds: partial answers persist in `localStorage` via
+ * `useAnswerDraft` — same browser only, so a laptop-to-phone switch starts over,
+ * but the copy promises only that the link stays active, which is unconditional.
  * Jeff's replacement copy drops it, and he asked to ADD intro copy rather than
  * to remove that, so templates with bespoke copy carry it in the fine print.
  * Templates on the default already state it in the lede — see
@@ -115,7 +118,16 @@ export function resolveWelcomeLede(
   templateAlias: string | null | undefined,
 ): readonly string[] {
   if (!templateAlias) return DEFAULT_WELCOME_LEDE;
-  return WELCOME_LEDE_BY_ALIAS[templateAlias] ?? DEFAULT_WELCOME_LEDE;
+  // `Object.hasOwn`, not `map[alias] ?? DEFAULT`: an object literal inherits from
+  // Object.prototype, so `map["constructor"]` would return a *function* — `??`
+  // only fires on null/undefined — and the render site would call `.map()` on it
+  // and white-screen the Welcome screen. Not hypothetical: the admin
+  // create-template validator (`/^[a-z0-9][a-z0-9-]*$/`) admits "constructor",
+  // and seeds bypass that regex entirely (`RockHabits` has capitals).
+  // `Object.freeze` does not help — it blocks writes, not prototype reads.
+  return Object.hasOwn(WELCOME_LEDE_BY_ALIAS, templateAlias)
+    ? WELCOME_LEDE_BY_ALIAS[templateAlias]
+    : DEFAULT_WELCOME_LEDE;
 }
 
 /**

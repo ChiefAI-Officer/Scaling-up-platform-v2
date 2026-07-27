@@ -422,6 +422,10 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     // (actual counts + derived scale) + strong purple CTA. INVITED copy: team
     // framing, shared with the facilitator/coach.
     const orgName = phase.data.campaign.organizationName ?? undefined;
+    // Resolved once: `templateAlias` above is exactly this phase's
+    // `campaign.templateAlias`, and both helpers walk the same map.
+    const welcomeLede = resolveWelcomeLede(templateAlias);
+    const showResumeNote = shouldShowResumeNote(templateAlias);
     return (
       <div className="su-welcome-page">
         <WelcomeShellHeader caption={orgName ?? "Team Assessment"} />
@@ -431,7 +435,7 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             <h1 className="su-welcome-title" id="invite-title">
               {phase.data.campaign.name}
             </h1>
-            {resolveWelcomeLede(phase.data.campaign.templateAlias).map((para, i) => (
+            {welcomeLede.map((para, i) => (
               <p className="su-welcome-lede" key={i}>
                 {para}
               </p>
@@ -458,9 +462,14 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
               </button>
             </div>
             <p className="su-welcome-fine">
-              {shouldShowResumeNote(phase.data.campaign.templateAlias)
-                ? `${RESUME_NOTE} `
-                : ""}
+              {/* `{" "}` is structural: a trailing space inside a template
+                  literal is invisible and silently deletable, and both
+                  sentence-level assertions would still pass if it vanished. */}
+              {showResumeNote && (
+                <>
+                  {RESUME_NOTE}{" "}
+                </>
+              )}
               Shared with your facilitator or coach to discuss as a team.
             </p>
           </section>

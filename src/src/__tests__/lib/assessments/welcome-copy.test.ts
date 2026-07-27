@@ -19,6 +19,7 @@ import {
   DEFAULT_WELCOME_LEDE,
   WELCOME_LEDE_BY_ALIAS,
   resolveWelcomeLede,
+  shouldShowResumeNote,
 } from "@/lib/assessments/welcome-copy";
 
 /**
@@ -107,6 +108,23 @@ describe("resolveWelcomeLede — fail-open", () => {
   ] as const)("%s falls back to the default", (_label, alias) => {
     expect(resolveWelcomeLede(alias)).toEqual(DEFAULT_WELCOME_LEDE);
   });
+
+  // An object literal inherits from Object.prototype, so a plain
+  // `map[alias] ?? DEFAULT` would return a FUNCTION for "constructor" — `??`
+  // only fires on null/undefined — and the render site's `.map()` would throw,
+  // white-screening the Welcome screen. Reachable: the admin create-template
+  // validator (`/^[a-z0-9][a-z0-9-]*$/`) admits "constructor", and seeds bypass
+  // that regex entirely.
+  it.each(["constructor", "__proto__", "toString", "hasOwnProperty", "valueOf"])(
+    "the inherited key %p does not leak through the map",
+    (alias) => {
+      const resolved = resolveWelcomeLede(alias);
+
+      expect(Array.isArray(resolved)).toBe(true);
+      expect(resolved).toBe(DEFAULT_WELCOME_LEDE);
+      expect(shouldShowResumeNote(alias)).toBe(false);
+    },
+  );
 
   it.each([
     ["null", null],

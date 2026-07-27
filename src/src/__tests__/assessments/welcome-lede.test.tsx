@@ -16,12 +16,14 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { OrgSurveyClient } from "@/components/assessments/org-survey-client";
+import { DEFAULT_WELCOME_LEDE } from "@/lib/assessments/welcome-copy";
 
 /** A per-campaign slug — deliberately NOT any template alias. */
 const CAMPAIGN_ALIAS = "spectrum-welcome-lede-test";
 
-const LEGACY_LEDE =
-  "A quick, confidential check on how your team works together. You can answer in one sitting or come back later — your link stays active.";
+/* The byte-exact pin lives in welcome-copy.test.ts; transcribing it a second
+   time here would just be a second thing to keep in sync. */
+const LEGACY_LEDE = DEFAULT_WELCOME_LEDE[0];
 
 function surveyData(campaign: { alias: string; templateAlias: string | null }) {
   return {
@@ -173,5 +175,10 @@ describe("Welcome screen — the resume affordance survives the copy change", ()
     const { container } = await renderWelcome("scaling-up-full");
 
     expect(fineText(container)).toMatch(/facilitator or coach/i);
+    // Pin the junction: the space between the two sentences is structural, and
+    // both sentence-level assertions above would still pass without it.
+    expect(fineText(container)).toMatch(
+      /stays active\. Shared with your facilitator/,
+    );
   });
 });
