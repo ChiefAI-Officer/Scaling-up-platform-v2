@@ -1,5 +1,5 @@
 /**
- * One-off patch: update the Rockefeller invitation-email body to Jeff #69 copy.
+ * One-off patch: update the Scaling Up Full invitation-email body to Jeff #76 copy.
  *
  * The invitation body is a TEMPLATE-ROW field (assessment_templates), read live
  * by every send path (invite / reminder / resend / fan-out all resolve
@@ -9,12 +9,18 @@
  * (ensureTemplateVersionContent hashes STORED values for an already-seeded
  * template) — see ADR-0025.
  *
- * Change (Jeff #69): lead with the coach ({{coachName}}) instead of the company
- * ({{organizationName}}), hardcode "Rockefeller Habits" (was {{templateName}} →
- * "Rockefeller Habits Checklist"), and drop the duplicate above-button raw
- * {{invitationUrl}} line (the Start button + the shell's bottom fallback URL
- * already cover it). The purple-header company name and the subject line are
- * deliberately left unchanged (Jeff #69 (3) + body-only scope).
+ * Change (Jeff #76 ask 2): lead with the coach ({{coachName}}) instead of the
+ * company ({{organizationName}}). Unlike Rockefeller #69 the assessment name is
+ * NOT hardcoded — {{templateName}} renders "Scaling Up Full Assessment". The
+ * purple-header company line and the subject line are deliberately unchanged
+ * (body-only scope; only LVA suppresses the org line, per #61).
+ *
+ * Dropping the duplicate above-button raw {{invitationUrl}} line is an
+ * EXTENSION of the #61/#69 pattern rather than a literal #76 ask (Jeff listed
+ * two asks here). It is a genuine rendered change, unlike Five Dysfunctions #80
+ * ask 3: a bare URL line is not a markdown link, so `dropRedundantCta` does not
+ * strip it — the OLD body put the URL in the body on top of the Start button
+ * and the shell's own bottom fallback URL.
  *
  * ATOMIC compare-and-swap (ADR-0025): a single conditional updateMany guarded on
  * the expected pre-patch body — no read-then-write TOCTOU window. `alias` is
@@ -24,29 +30,24 @@
  *                 idempotent success; any other body = drift/conflict = HARD FAIL
  *                 (never silently no-op on drift).
  *
- * NEW_BODY is exported and import-safe (the run is guarded by require.main), so a
- * test can assert it stays byte-identical to the seed's factory default.
- *
- * AUDIT NOTE: the #69 production run (2026-07-27, b294ebd969b4 → b417f147939a)
- * predates the ADR-0025 coverage receipt and the non-zero exit on abort branches,
- * both retrofitted here with #76/#80. The copy constants and the CAS itself are
- * untouched, so a re-run still lands on the idempotent no-op path — it now just
- * also prints the receipt. The as-run version is `git show
- * 1d305fec:src/scripts/patch-rockefeller-invitation-copy.ts`.
+ * NEW_BODY and EXPECTED_CURRENT_BODY are both exported and import-safe (the run is
+ * guarded by require.main): a test asserts NEW_BODY stays byte-identical to the
+ * seed's factory default, and renders EXPECTED_CURRENT_BODY — the real pre-patch
+ * prod copy — rather than a hand-written stand-in.
  *
  * Run:
- *   npx tsx --env-file=.env scripts/patch-rockefeller-invitation-copy.ts --dry-run
- *   npx tsx --env-file=.env scripts/patch-rockefeller-invitation-copy.ts
+ *   npx tsx --env-file=.env scripts/patch-scaling-up-full-invitation-copy.ts --dry-run
+ *   npx tsx --env-file=.env scripts/patch-scaling-up-full-invitation-copy.ts
  */
 import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { reportCoverage } from "./patch-invitation-copy-coverage";
 
-const ALIAS = "RockHabits";
+const ALIAS = "scaling-up-full";
 
-const EXPECTED_CURRENT_BODY = `Hi {{respondentFirstName}},
+export const EXPECTED_CURRENT_BODY = `Hi {{respondentFirstName}},
 
-{{organizationName}} invited you to complete the {{templateName}}. This 40-question checklist takes about 5 minutes. Your responses help your team identify which Rockefeller Habits are in place and where there's room to grow.
+{{organizationName}} invited you to complete the {{templateName}}. This 61-question assessment takes about 10 minutes. Your responses help your team identify strengths and growth opportunities across People, Strategy, Execution, Cash, and You.
 
 Click the link below to begin:
 
@@ -56,7 +57,7 @@ Your coach will review the results with you afterward.`;
 
 export const NEW_BODY = `Hi {{respondentFirstName}},
 
-{{coachName}} has invited you to complete the Rockefeller Habits. This 40-question checklist takes about 5 minutes. Your responses help your team identify which Rockefeller Habits are in place and where there's room to grow.
+{{coachName}} has invited you to complete the {{templateName}}. This 61-question assessment takes about 10 minutes. Your responses help your team identify strengths and growth opportunities across People, Strategy, Execution, Cash, and You.
 
 Click the button below to begin.
 
@@ -95,7 +96,7 @@ async function main() {
         console.log(`⚠ live body (${cur}) matches neither expected-old nor new — live run would HARD FAIL as drift.`);
         process.exitCode = 1;
       }
-      await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: true });
       return;
     }
 
@@ -107,27 +108,26 @@ async function main() {
     });
 
     if (res.count === 1) {
-      console.log(`✓ Patched — Rockefeller invitation body updated (Jeff #69). old=${sha(EXPECTED_CURRENT_BODY)} → new=${sha(NEW_BODY)}`);
-      await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
+      console.log(`✓ patched (${sha(EXPECTED_CURRENT_BODY)} → ${sha(NEW_BODY)}).`);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: true });
       return;
     }
 
-    // count === 0 — reread + classify (soft-delete is surfaced before idempotency).
+    // count === 0 — classify why, never silently no-op.
     const tpl = await db.assessmentTemplate.findUnique({
       where: { alias: ALIAS },
       select: { invitationBodyMarkdown: true, deletedAt: true },
     });
-    if (!tpl) throw new Error(`No template found for alias '${ALIAS}' — nothing patched.`);
+    if (!tpl) throw new Error(`No template found for alias '${ALIAS}'.`);
     if (tpl.deletedAt)
       throw new Error(`Template '${ALIAS}' is soft-deleted (deletedAt=${tpl.deletedAt.toISOString()}) — refusing to patch.`);
     if (tpl.invitationBodyMarkdown === NEW_BODY) {
-      console.log(`✓ Idempotent: body already equals the new copy (${sha(NEW_BODY)}) — nothing to do.`);
-      await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
+      console.log(`✓ already patched (body=${sha(NEW_BODY)}) — idempotent no-op.`);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: true });
       return;
     }
     throw new Error(
-      `DRIFT: live body (${sha(tpl.invitationBodyMarkdown)}) matches neither expected-old (${sha(EXPECTED_CURRENT_BODY)}) nor new (${sha(NEW_BODY)}). ` +
-        `Refusing to clobber an unrelated edit.\n---- live body ----\n${tpl.invitationBodyMarkdown}`,
+      `DRIFT: '${ALIAS}' body is ${sha(tpl.invitationBodyMarkdown)}, expected ${sha(EXPECTED_CURRENT_BODY)} or ${sha(NEW_BODY)}. Refusing to overwrite an unrecognized body.`,
     );
   } finally {
     await db.$disconnect();
@@ -135,8 +135,8 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((err) => {
-    console.error("Fatal:", err instanceof Error ? err.message : err);
+  main().catch((e) => {
+    console.error(e);
     process.exit(1);
   });
 }
