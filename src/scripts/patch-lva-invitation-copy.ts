@@ -21,6 +21,10 @@
  * four invite-copy scripts behave alike: a non-zero exit on abort branches, and the
  * shared ADR-0025 coverage receipt.
  *
+ * NEW_BODY / EXPECTED_CURRENT_BODY are exported and the run is guarded by
+ * require.main, so the seed↔script parity test can import them without opening a
+ * live prod connection — matching the other three invite-copy scripts.
+ *
  * Run:
  *   npx tsx --env-file=.env scripts/patch-lva-invitation-copy.ts --dry-run
  *   npx tsx --env-file=.env scripts/patch-lva-invitation-copy.ts
@@ -34,7 +38,7 @@ const db = new PrismaClient();
 
 const ALIAS = "leadership-vision-alignment";
 
-const EXPECTED_CURRENT_BODY = `Hi {{respondentFirstName}},
+export const EXPECTED_CURRENT_BODY = `Hi {{respondentFirstName}},
 
 {{organizationName}} has invited you to complete the Leadership Vision Alignment assessment. Your responses will help your coach understand the current state of your organization across financials, strategy, culture, and execution.
 
@@ -44,7 +48,7 @@ Click the link below to begin:
 
 Your responses are confidential and shared only with your coach.`;
 
-const NEW_BODY = `Hi {{respondentFirstName}},
+export const NEW_BODY = `Hi {{respondentFirstName}},
 
 {{coachName}} has invited you to complete the Leadership Vision Alignment assessment. Your responses will help your coach understand the current state of your organization across financials, strategy, culture, and execution.
 
@@ -78,6 +82,7 @@ async function main() {
     );
     console.log("---- live body ----\n" + tpl.invitationBodyMarkdown);
     process.exitCode = 1;
+    await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
     return;
   }
 
@@ -99,9 +104,11 @@ async function main() {
   await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
 }
 
-main()
-  .catch((err) => {
-    console.error("Fatal:", err);
-    process.exit(1);
-  })
-  .finally(() => db.$disconnect());
+if (require.main === module) {
+  main()
+    .catch((err) => {
+      console.error("Fatal:", err);
+      process.exit(1);
+    })
+    .finally(() => db.$disconnect());
+}

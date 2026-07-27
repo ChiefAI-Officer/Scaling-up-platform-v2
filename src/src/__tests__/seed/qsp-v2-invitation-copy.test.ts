@@ -7,8 +7,10 @@
  * coach-forward (the 2026-07-03 Wave-P fix is intact). What Jeff saw was a
  * CAMPAIGN-level `invitationBodyHtml` override on "2026 QSP Q2" — that path
  * replaces the branded shell entirely (no coach logo, no coach name), and it is
- * not reachable by a template-row patch. That campaign was soft-deleted
- * 2026-07-24; the override-bypass gap is tracked as its own issue.
+ * not reachable by a template-row patch. Evidenced, not inferred: prod
+ * EMAIL_DELIVERY telemetry records 4 renderer="custom_html" invitation sends on
+ * 2026-07-10 (the day of Jeff's report), all from that campaign. It was
+ * soft-deleted 2026-07-24; the override-bypass gap is tracked as its own issue.
  *
  * So QSP gets NO prod write here. The only real defect was SEED DRIFT: the seed
  * still carried the pre-Wave-P copy ("{{organizationName}} has invited you..."

@@ -20,12 +20,23 @@
  *     `invitationBodyMarkdown` / `invitationBodyHtml` take precedence over the
  *     template row, so those campaigns keep their own copy and a template patch
  *     never reaches them. A full-HTML override additionally bypasses the branded
- *     shell entirely (no coach logo, no coach-forward body) — that is exactly how
- *     Jeff's #76 QSP sighting arose.
+ *     shell entirely (no coach logo, no coach-forward body) when
+ *     `WAVE_D_CUSTOM_HTML_EMAIL_ENABLED` is on — which is how Jeff's #76 QSP
+ *     sighting arose. Not inferred: prod `EMAIL_DELIVERY` telemetry records four
+ *     `renderer: "custom_html"` invitation sends on 2026-07-10 (the day of his
+ *     report), all from campaign "2026 QSP Q2" (qsp-v2, HTML override set, since
+ *     soft-deleted). The qsp-v2 template row was coach-forward throughout.
  *
  * Read-only: this only ever queries. Extracted after the third copy (LVA #61,
  * Rockefeller #69, SU-Full/Five-Dysfunctions #76/#80), following the existing
  * script-helper precedent (`scripts/snapshot-prod-helpers.mjs`).
+ *
+ * Scope note — the CAS control flow itself is deliberately NOT extracted here,
+ * though it is near-identical across the scripts. Each is a spent, one-shot
+ * production mutation whose audit value depends on being readable end-to-end in a
+ * single file (the Rockefeller header pins its as-run text via `git show`).
+ * Reporting behaviour is shared because it is the part that keeps changing;
+ * the mutation is not, because it must stay individually auditable.
  */
 import type { PrismaClient } from "@prisma/client";
 

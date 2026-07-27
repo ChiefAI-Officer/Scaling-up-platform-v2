@@ -57,7 +57,9 @@ const INVITATION_SUBJECT = "Please complete your Quarterly Session Prep";
 // reintroduced exactly the "[Company] has invited you..." wording Jeff
 // reported. Pinned byte-for-byte to the live prod row (read 2026-07-27).
 // (Jeff's actual #76 QSP sighting root-caused to a campaign-level
-// invitationBodyHtml override, which bypasses this copy entirely.)
+// invitationBodyHtml override, which bypasses this copy entirely: prod
+// EMAIL_DELIVERY telemetry shows 4 renderer="custom_html" invitation sends on
+// 2026-07-10 — the day of his report — all from campaign "2026 QSP Q2".)
 const INVITATION_BODY_MARKDOWN = `Hi {{respondentFirstName}},
 
 You've been invited by {{coachName}} to complete the {{templateName}} for {{organizationName}}.

@@ -7,6 +7,7 @@
  * re-seed can't regress it: lead with the coach, drop the mid-email raw URL.
  */
 import { buildLvaContent } from "../../../prisma/seed-lva-assessment";
+import { NEW_BODY } from "../../../scripts/patch-lva-invitation-copy";
 
 describe("LVA seed — invitation email copy (Jeff #61)", () => {
   const content = buildLvaContent();
@@ -29,5 +30,12 @@ describe("LVA seed — invitation email copy (Jeff #61)", () => {
   it("leaves the invitation SUBJECT unchanged (Jeff #61 is body-only)", () => {
     // Positive guard — body-only scope was previously proven only by omission.
     expect(content.invitationSubject).toBe("You're invited: Leadership Vision Alignment Assessment");
+  });
+
+  it("the prod-row patch script's NEW_BODY stays byte-identical to the seed (no seed↔script drift)", () => {
+    // LVA was the only invite-copy script without this guard; its constants were
+    // unexported, so nothing kept seed and script in step. Importing it also pulls
+    // the file into the tsc program (scripts/** is excluded from the app build).
+    expect(NEW_BODY).toBe(body);
   });
 });

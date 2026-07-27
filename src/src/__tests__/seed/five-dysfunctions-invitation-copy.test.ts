@@ -6,12 +6,15 @@
  * This asserts the seed's factory default matches Jeff's #80 asks so a future
  * re-seed can't regress it. Mirrors the LVA #61 / Rockefeller #69 drift-guards.
  *
- * Jeff #80 ask (3) — the suspected "duplicate link" — is a NO-OP guardrail, not
- * a fix. The old copy's `[Take the Assessment]({{assessmentUrl}})` line never
- * reached the inbox: `dropRedundantCta` strips any standalone markdown-link line
- * whose URL equals the invitation URL, and both {{assessmentUrl}} and
- * {{invitationUrl}} resolve to it. Removing it from source only makes the intent
- * explicit. The renderer test below proves the guardrail rather than assuming it.
+ * Jeff #80 ask (3) — the suspected "duplicate link" — is a NO-OP guardrail on the
+ * BRANDED renderer (the only path prod uses today): `dropRedundantCta` strips any
+ * standalone markdown-link line whose URL equals the invitation URL, and both
+ * {{assessmentUrl}} and {{invitationUrl}} resolve to it, so the old copy rendered
+ * zero body anchors there. It IS a real fix on the legacy renderer
+ * (`sendLegacyInvitationEmail`, reached only via the dormant
+ * ASSESSMENT_INVITE_BRANDED=0 kill switch), which has no `dropRedundantCta` and
+ * did print the URL — GH #217. The two renderer tests below pin both halves of
+ * that asymmetry rather than assuming either.
  *
  * Jeff #80 is body-only — the subject assertion is a POSITIVE guard.
  */
