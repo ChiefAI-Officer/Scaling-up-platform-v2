@@ -27,12 +27,20 @@
  * NEW_BODY is exported and import-safe (the run is guarded by require.main), so a
  * test can assert it stays byte-identical to the seed's factory default.
  *
+ * AUDIT NOTE: the #69 production run (2026-07-27, b294ebd969b4 → b417f147939a)
+ * predates the ADR-0025 coverage receipt and the non-zero exit on abort branches,
+ * both retrofitted here with #76/#80. The copy constants and the CAS itself are
+ * untouched, so a re-run still lands on the idempotent no-op path — it now just
+ * also prints the receipt. The as-run version is `git show
+ * 1d305fec:src/scripts/patch-rockefeller-invitation-copy.ts`.
+ *
  * Run:
  *   npx tsx --env-file=.env scripts/patch-rockefeller-invitation-copy.ts --dry-run
  *   npx tsx --env-file=.env scripts/patch-rockefeller-invitation-copy.ts
  */
 import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
+import { reportCoverage } from "./patch-invitation-copy-coverage";
 
 const ALIAS = "RockHabits";
 
@@ -55,67 +63,6 @@ Click the button below to begin.
 Your coach will review the results with you afterward.`;
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 12);
-
-/**
- * ADR-0025 receipt helpers — report what a template-row patch does NOT cover.
- *
- * - Version staleness: patching the row changes what `ensureTemplateVersionContent`
- *   hashes (it hashes STORED invitation values), so the latest version's contentHash
- *   goes stale. If that latest version is an unpublished DRAFT, the next re-seed
- *   FAILS CLOSED unless the seed passes forceSupersedeDraft. Report it; don't rewrite
- *   a published version's hash.
- * - Override inventory: campaign-level invitationSubject / invitationBodyMarkdown /
- *   invitationBodyHtml take precedence over the template row, so those campaigns keep
- *   their own copy. A full-HTML override also bypasses the branded shell entirely.
- */
-async function reportCoverage(db: PrismaClient, alias: string): Promise<void> {
-  const tpl = await db.assessmentTemplate.findUnique({
-    where: { alias },
-    select: { id: true },
-  });
-  if (!tpl) return;
-
-  const latest = await db.assessmentTemplateVersion.findFirst({
-    where: { templateId: tpl.id },
-    orderBy: { versionNumber: "desc" },
-    select: { versionNumber: true, publishedAt: true },
-  });
-  if (!latest) {
-    console.log("  versions: none");
-  } else if (latest.publishedAt === null) {
-    console.log(
-      `  versions: latest v${latest.versionNumber} is an UNPUBLISHED DRAFT — its contentHash goes stale on patch, so the next re-seed FAILS CLOSED unless the seed passes forceSupersedeDraft.`,
-    );
-  } else {
-    console.log(
-      `  versions: latest v${latest.versionNumber} published ${latest.publishedAt.toISOString()} — hash left stale-but-documented (ADR-0025); a later re-seed appends a new DRAFT.`,
-    );
-  }
-
-  const campaigns = await db.assessmentCampaign.findMany({
-    where: { templateId: tpl.id },
-    select: {
-      name: true,
-      deletedAt: true,
-      invitationSubject: true,
-      invitationBodyMarkdown: true,
-      invitationBodyHtml: true,
-    },
-  });
-  const overrides = campaigns.filter(
-    (c) =>
-      c.invitationSubject !== null || c.invitationBodyMarkdown !== null || c.invitationBodyHtml !== null,
-  );
-  const liveOverrides = overrides.filter((c) => c.deletedAt === null);
-  console.log(
-    `  campaigns: ${campaigns.length} total, ${overrides.length} with an invitation override (${liveOverrides.length} live) — overrides are NOT patched.`,
-  );
-  for (const o of liveOverrides) {
-    console.log(
-      `    ! live override kept: "${o.name}"${o.invitationBodyHtml !== null ? " (full HTML — bypasses the branded shell entirely)" : ""}`,
-    );
-  }
-}
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
@@ -148,7 +95,7 @@ async function main() {
         console.log(`⚠ live body (${cur}) matches neither expected-old nor new — live run would HARD FAIL as drift.`);
         process.exitCode = 1;
       }
-      await reportCoverage(db, ALIAS);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
       return;
     }
 
@@ -161,7 +108,7 @@ async function main() {
 
     if (res.count === 1) {
       console.log(`✓ Patched — Rockefeller invitation body updated (Jeff #69). old=${sha(EXPECTED_CURRENT_BODY)} → new=${sha(NEW_BODY)}`);
-      await reportCoverage(db, ALIAS);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
       return;
     }
 
@@ -175,7 +122,7 @@ async function main() {
       throw new Error(`Template '${ALIAS}' is soft-deleted (deletedAt=${tpl.deletedAt.toISOString()}) — refusing to patch.`);
     if (tpl.invitationBodyMarkdown === NEW_BODY) {
       console.log(`✓ Idempotent: body already equals the new copy (${sha(NEW_BODY)}) — nothing to do.`);
-      await reportCoverage(db, ALIAS);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
       return;
     }
     throw new Error(

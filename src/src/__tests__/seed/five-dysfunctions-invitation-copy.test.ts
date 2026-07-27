@@ -16,8 +16,26 @@
  * Jeff #80 is body-only — the subject assertion is a POSITIVE guard.
  */
 import { buildFiveDysfunctionsContent } from "../../../prisma/seed-five-dysfunctions";
-import { NEW_BODY } from "../../../scripts/patch-five-dysfunctions-invitation-copy";
-import { renderHtmlBody } from "../../lib/assessments/invitation-email";
+import {
+  EXPECTED_CURRENT_BODY,
+  NEW_BODY,
+} from "../../../scripts/patch-five-dysfunctions-invitation-copy";
+import {
+  buildTokenValues,
+  interpolateTokens,
+  renderHtmlBody,
+} from "../../lib/assessments/invitation-email";
+
+const INVITATION_URL = "https://app.test/org-survey/abc#t=SECRET";
+const vars = {
+  respondent: { firstName: "Ann", lastName: "Lee", email: "ann@example.com" },
+  organizationName: "Acme",
+  campaignName: "Acme 2026",
+  templateName: "The Five Dysfunctions of a Team — Team Assessment",
+  coachName: "Jane Doe",
+  invitationUrl: INVITATION_URL,
+  closeAt: null,
+};
 
 describe("Five Dysfunctions seed — invitation email copy (Jeff #80)", () => {
   const content = buildFiveDysfunctionsContent();
@@ -41,37 +59,32 @@ describe("Five Dysfunctions seed — invitation email copy (Jeff #80)", () => {
     expect(body).not.toContain("[Take the Assessment]");
   });
 
-  it("ask 3 was already a NO-OP at render — the old inline CTA produced no body link either", () => {
-    // Jeff #80 (3) was hedged ("likely… worth confirming"). It does not reproduce:
-    // dropRedundantCta strips a standalone markdown-link line pointing at the
-    // invitation URL, so the OLD body rendered zero body anchors — same as the new
-    // one. This pins that renderer behaviour so the claim can't silently rot.
-    const invitationUrl = "https://app.test/org-survey/abc#t=SECRET";
-    const vars = {
-      respondent: { firstName: "Ann", lastName: "Lee", email: "ann@example.com" },
-      organizationName: "Acme",
-      campaignName: "Acme 2026",
-      templateName: "The Five Dysfunctions of a Team — Team Assessment",
-      coachName: "Jane Doe",
-      invitationUrl,
-      closeAt: null,
-    };
-    const OLD_BODY_WITH_INLINE_CTA = `Hi {{firstName}},
-
-Your coach has invited you.
-
-[Take the Assessment]({{assessmentUrl}})
-
-Best,
-Scaling Up`;
-
-    const oldHtml = renderHtmlBody(OLD_BODY_WITH_INLINE_CTA, vars);
+  it("ask 3 was already a NO-OP on the BRANDED renderer — the old inline CTA produced no body link", () => {
+    // Jeff #80 (3) was hedged ("likely… worth confirming"). On the branded path —
+    // the only one prod uses — it does not reproduce: dropRedundantCta strips a
+    // standalone markdown-link line pointing at the invitation URL, so the real
+    // pre-patch prod body rendered zero body anchors, same as the new one.
+    // Rendering EXPECTED_CURRENT_BODY (not a hand-written stand-in) keeps this
+    // anchored to the copy that actually shipped.
+    const oldHtml = renderHtmlBody(EXPECTED_CURRENT_BODY, vars);
     const newHtml = renderHtmlBody(body, vars);
 
     expect(oldHtml).not.toContain("<a href=");
-    expect(oldHtml).not.toContain(invitationUrl);
+    expect(oldHtml).not.toContain(INVITATION_URL);
     expect(newHtml).not.toContain("<a href=");
-    expect(newHtml).not.toContain(invitationUrl);
+    expect(newHtml).not.toContain(INVITATION_URL);
+  });
+
+  it("…but NOT on the legacy renderer, which has no dropRedundantCta (GH #217)", () => {
+    // sendLegacyInvitationEmail (ASSESSMENT_INVITE_BRANDED=0, dormant in prod)
+    // pipes the body through interpolate → escape → paragraph-wrap only. The old
+    // copy really did print the URL there, so removing it from source is a real
+    // fix on that path — this pins the asymmetry the comments now claim.
+    const legacyOld = interpolateTokens(EXPECTED_CURRENT_BODY, buildTokenValues(vars));
+    const legacyNew = interpolateTokens(body, buildTokenValues(vars));
+
+    expect(legacyOld).toContain(INVITATION_URL);
+    expect(legacyNew).not.toContain(INVITATION_URL);
   });
 
   it("uses the button lead-in copy", () => {

@@ -16,21 +16,31 @@
  * and the subject line are deliberately unchanged (body-only scope; only LVA
  * suppresses the org line, per #61).
  *
- * Ask 3 (the suspected duplicate link) is a NO-OP guardrail, not a fix. Jeff
- * hedged it ("likely… worth confirming"); the answer is no. The inline
- * [Take the Assessment]({{assessmentUrl}}) line never reached the inbox —
- * `dropRedundantCta` (lib/assessments/invitation-email.ts) strips any standalone
- * markdown-link line whose URL equals the invitation URL, and {{assessmentUrl}}
- * resolves to exactly that. Rendering the OLD body produces zero body anchors.
- * It is dropped from the copy anyway so the intent is explicit rather than
- * resting on a renderer side-effect, but this patch changes nothing a
- * respondent would have seen on that line.
+ * Ask 3 (the suspected duplicate link) is a NO-OP guardrail on the BRANDED
+ * renderer — the only path prod uses today. Jeff hedged it ("likely… worth
+ * confirming"); on that path the answer is no: `dropRedundantCta`
+ * (lib/assessments/invitation-email.ts) strips any standalone markdown-link line
+ * whose URL equals the invitation URL, and {{assessmentUrl}} resolves to exactly
+ * that, so rendering the OLD body produces zero body anchors.
+ *
+ * It is NOT a no-op on the legacy renderer. `sendLegacyInvitationEmail`
+ * (services/notifications.ts, reached only via the dormant
+ * ASSESSMENT_INVITE_BRANDED=0 kill switch) pipes the body through
+ * interpolate → escapeHtml → paragraph-wrap with no `dropRedundantCta`, so the
+ * old copy really did print the URL there. Dropping the line from the source is
+ * therefore a real fix for that path as well as an explicit statement of intent.
+ * The legacy renderer is tracked for hardening in GH issue #217.
  *
  * Known cosmetic edge (shared with LVA #61 / Rockefeller #69): with no coach
  * resolvable, {{coachName}} falls back to the lowercase "your coach", opening
- * the sentence in lowercase. Unreachable on current data — every live campaign
- * on this template resolves a coach — and Jeff's wording puts the coach first,
- * so the four invite emails stay consistent rather than diverging this one.
+ * the sentence in lowercase. On the branded path that is unreachable with
+ * current data (every live campaign on this template resolves a coach); on the
+ * legacy path it fires ALWAYS, because `sendLegacyInvitationEmail` hardcodes
+ * `coachName: null` — also #217, and it affects all four coach-forward
+ * templates, not just this one. Left as-is deliberately: Jeff's wording puts
+ * the coach first and LVA #61 / Rockefeller #69 already shipped the identical
+ * sentence-initial shape, so diverging this one template would break the
+ * family for an edge whose real fix belongs in #217.
  *
  * ATOMIC compare-and-swap (ADR-0025): a single conditional updateMany guarded on
  * the expected pre-patch body — no read-then-write TOCTOU window. `alias` is
@@ -40,8 +50,10 @@
  *                 idempotent success; any other body = drift/conflict = HARD FAIL
  *                 (never silently no-op on drift).
  *
- * NEW_BODY is exported and import-safe (the run is guarded by require.main), so a
- * test can assert it stays byte-identical to the seed's factory default.
+ * NEW_BODY and EXPECTED_CURRENT_BODY are both exported and import-safe (the run is
+ * guarded by require.main): a test asserts NEW_BODY stays byte-identical to the
+ * seed's factory default, and renders EXPECTED_CURRENT_BODY — the real pre-patch
+ * prod copy — rather than a hand-written stand-in.
  *
  * Run:
  *   npx tsx --env-file=.env scripts/patch-five-dysfunctions-invitation-copy.ts --dry-run
@@ -49,10 +61,11 @@
  */
 import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
+import { reportCoverage } from "./patch-invitation-copy-coverage";
 
 const ALIAS = "five-dysfunctions";
 
-const EXPECTED_CURRENT_BODY = `Hi {{firstName}},
+export const EXPECTED_CURRENT_BODY = `Hi {{firstName}},
 
 Your coach has invited you to complete the **Five Dysfunctions of a Team — Team Assessment**.
 
@@ -81,67 +94,6 @@ Best,
 Scaling Up`;
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 12);
-
-/**
- * ADR-0025 receipt helpers — report what a template-row patch does NOT cover.
- *
- * - Version staleness: patching the row changes what `ensureTemplateVersionContent`
- *   hashes (it hashes STORED invitation values), so the latest version's contentHash
- *   goes stale. If that latest version is an unpublished DRAFT, the next re-seed
- *   FAILS CLOSED unless the seed passes forceSupersedeDraft. Report it; don't rewrite
- *   a published version's hash.
- * - Override inventory: campaign-level invitationSubject / invitationBodyMarkdown /
- *   invitationBodyHtml take precedence over the template row, so those campaigns keep
- *   their own copy. A full-HTML override also bypasses the branded shell entirely.
- */
-async function reportCoverage(db: PrismaClient, alias: string): Promise<void> {
-  const tpl = await db.assessmentTemplate.findUnique({
-    where: { alias },
-    select: { id: true },
-  });
-  if (!tpl) return;
-
-  const latest = await db.assessmentTemplateVersion.findFirst({
-    where: { templateId: tpl.id },
-    orderBy: { versionNumber: "desc" },
-    select: { versionNumber: true, publishedAt: true },
-  });
-  if (!latest) {
-    console.log("  versions: none");
-  } else if (latest.publishedAt === null) {
-    console.log(
-      `  versions: latest v${latest.versionNumber} is an UNPUBLISHED DRAFT — its contentHash goes stale on patch, so the next re-seed FAILS CLOSED unless the seed passes forceSupersedeDraft.`,
-    );
-  } else {
-    console.log(
-      `  versions: latest v${latest.versionNumber} published ${latest.publishedAt.toISOString()} — hash left stale-but-documented (ADR-0025); a later re-seed appends a new DRAFT.`,
-    );
-  }
-
-  const campaigns = await db.assessmentCampaign.findMany({
-    where: { templateId: tpl.id },
-    select: {
-      name: true,
-      deletedAt: true,
-      invitationSubject: true,
-      invitationBodyMarkdown: true,
-      invitationBodyHtml: true,
-    },
-  });
-  const overrides = campaigns.filter(
-    (c) =>
-      c.invitationSubject !== null || c.invitationBodyMarkdown !== null || c.invitationBodyHtml !== null,
-  );
-  const liveOverrides = overrides.filter((c) => c.deletedAt === null);
-  console.log(
-    `  campaigns: ${campaigns.length} total, ${overrides.length} with an invitation override (${liveOverrides.length} live) — overrides are NOT patched.`,
-  );
-  for (const o of liveOverrides) {
-    console.log(
-      `    ! live override kept: "${o.name}"${o.invitationBodyHtml !== null ? " (full HTML — bypasses the branded shell entirely)" : ""}`,
-    );
-  }
-}
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
@@ -174,7 +126,7 @@ async function main() {
         console.log(`⚠ live body (${cur}) matches neither expected-old nor new — live run would HARD FAIL as drift.`);
         process.exitCode = 1;
       }
-      await reportCoverage(db, ALIAS);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
       return;
     }
 
@@ -187,7 +139,7 @@ async function main() {
 
     if (res.count === 1) {
       console.log(`✓ patched (${sha(EXPECTED_CURRENT_BODY)} → ${sha(NEW_BODY)}).`);
-      await reportCoverage(db, ALIAS);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
       return;
     }
 
@@ -201,7 +153,7 @@ async function main() {
       throw new Error(`Template '${ALIAS}' is soft-deleted (deletedAt=${tpl.deletedAt.toISOString()}) — refusing to patch.`);
     if (tpl.invitationBodyMarkdown === NEW_BODY) {
       console.log(`✓ already patched (body=${sha(NEW_BODY)}) — idempotent no-op.`);
-      await reportCoverage(db, ALIAS);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: false });
       return;
     }
     throw new Error(

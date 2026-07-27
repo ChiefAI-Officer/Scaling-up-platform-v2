@@ -55,20 +55,23 @@ const INVITATION_SUBJECT =
 // and use Jeff's wording for the assessment ({{templateName}} would render the
 // clunky "The Five Dysfunctions of a Team — Team Assessment"). Subject unchanged.
 //
-// Ask 3 (the suspected duplicate link) is a NO-OP guardrail, not a fix. Jeff
-// hedged it ("likely… worth confirming") and the answer is no: the inline
-// [Take the Assessment]({{assessmentUrl}}) line never reached the inbox, because
-// `dropRedundantCta` (lib/assessments/invitation-email.ts) strips any standalone
-// markdown-link line whose URL equals the invitation URL — and {{assessmentUrl}}
-// resolves to exactly that. Rendering the OLD body yields zero body anchors.
-// It is removed from source anyway so the intent is explicit rather than relying
-// on a renderer side-effect; the test asserts the guardrail directly.
+// Ask 3 (the suspected duplicate link) is a NO-OP guardrail on the BRANDED
+// renderer — the only path prod uses today. Jeff hedged it ("likely… worth
+// confirming"); there, the answer is no: `dropRedundantCta`
+// (lib/assessments/invitation-email.ts) strips any standalone markdown-link line
+// whose URL equals the invitation URL, and {{assessmentUrl}} resolves to exactly
+// that, so the OLD body rendered zero body anchors. It IS a real fix on the
+// legacy renderer (`sendLegacyInvitationEmail`, reached only via the dormant
+// ASSESSMENT_INVITE_BRANDED=0 kill switch), which has no `dropRedundantCta` and
+// did print the URL. Legacy-path hardening is tracked in GH issue #217.
 //
 // Known cosmetic edge, shared with LVA #61 and Rockefeller #69: when no coach
-// resolves, {{coachName}} falls back to the lowercase "your coach", so this
-// sentence would open lowercase. Unreachable on current data (every live
-// campaign resolves a coach) and Jeff's literal wording puts the coach first, so
-// the family stays consistent rather than diverging this one template.
+// resolves, {{coachName}} falls back to the lowercase "your coach", opening this
+// sentence in lowercase. Unreachable on the branded path with current data
+// (every live campaign resolves a coach); on the legacy path it fires always,
+// since that renderer hardcodes `coachName: null` (#217, and it affects all four
+// coach-forward templates). Jeff's literal wording puts the coach first, so the
+// family stays consistent rather than diverging this one template.
 const INVITATION_BODY_MARKDOWN = `Hi {{firstName}},
 
 {{coachName}} has invited you to complete the Five Dysfunctions assessment.

@@ -15,7 +15,10 @@
  * the assessment name Jeff asked for.
  */
 import { buildScalingUpFullContent } from "../../../prisma/seed-scaling-up-full-assessment";
-import { NEW_BODY } from "../../../scripts/patch-scaling-up-full-invitation-copy";
+import {
+  EXPECTED_CURRENT_BODY,
+  NEW_BODY,
+} from "../../../scripts/patch-scaling-up-full-invitation-copy";
 import { renderHtmlBody } from "../../lib/assessments/invitation-email";
 
 describe("Scaling Up Full seed — invitation email copy (Jeff #76)", () => {
@@ -39,6 +42,8 @@ describe("Scaling Up Full seed — invitation email copy (Jeff #76)", () => {
     // dropRedundantCta only strips standalone MARKDOWN-link lines. A bare
     // {{invitationUrl}} line is not one, so the old body really did print the URL
     // in the body — on top of the shell's Start button and bottom fallback URL.
+    // Rendered from EXPECTED_CURRENT_BODY, i.e. the copy that was actually live,
+    // so this can't drift away from what shipped.
     const invitationUrl = "https://app.test/org-survey/abc#t=SECRET";
     const vars = {
       respondent: { firstName: "Ann", lastName: "Lee", email: "ann@example.com" },
@@ -49,17 +54,8 @@ describe("Scaling Up Full seed — invitation email copy (Jeff #76)", () => {
       invitationUrl,
       closeAt: null,
     };
-    const OLD_BODY_WITH_RAW_URL = `Hi {{respondentFirstName}},
 
-{{organizationName}} invited you to complete the {{templateName}}.
-
-Click the link below to begin:
-
-{{invitationUrl}}
-
-Your coach will review the results with you afterward.`;
-
-    expect(renderHtmlBody(OLD_BODY_WITH_RAW_URL, vars)).toContain(invitationUrl);
+    expect(renderHtmlBody(EXPECTED_CURRENT_BODY, vars)).toContain(invitationUrl);
     expect(renderHtmlBody(body, vars)).not.toContain(invitationUrl);
   });
 

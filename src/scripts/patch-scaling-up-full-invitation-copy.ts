@@ -30,8 +30,10 @@
  *                 idempotent success; any other body = drift/conflict = HARD FAIL
  *                 (never silently no-op on drift).
  *
- * NEW_BODY is exported and import-safe (the run is guarded by require.main), so a
- * test can assert it stays byte-identical to the seed's factory default.
+ * NEW_BODY and EXPECTED_CURRENT_BODY are both exported and import-safe (the run is
+ * guarded by require.main): a test asserts NEW_BODY stays byte-identical to the
+ * seed's factory default, and renders EXPECTED_CURRENT_BODY — the real pre-patch
+ * prod copy — rather than a hand-written stand-in.
  *
  * Run:
  *   npx tsx --env-file=.env scripts/patch-scaling-up-full-invitation-copy.ts --dry-run
@@ -39,10 +41,11 @@
  */
 import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
+import { reportCoverage } from "./patch-invitation-copy-coverage";
 
 const ALIAS = "scaling-up-full";
 
-const EXPECTED_CURRENT_BODY = `Hi {{respondentFirstName}},
+export const EXPECTED_CURRENT_BODY = `Hi {{respondentFirstName}},
 
 {{organizationName}} invited you to complete the {{templateName}}. This 61-question assessment takes about 10 minutes. Your responses help your team identify strengths and growth opportunities across People, Strategy, Execution, Cash, and You.
 
@@ -61,67 +64,6 @@ Click the button below to begin.
 Your coach will review the results with you afterward.`;
 
 const sha = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 12);
-
-/**
- * ADR-0025 receipt helpers — report what a template-row patch does NOT cover.
- *
- * - Version staleness: patching the row changes what `ensureTemplateVersionContent`
- *   hashes (it hashes STORED invitation values), so the latest version's contentHash
- *   goes stale. If that latest version is an unpublished DRAFT, the next re-seed
- *   FAILS CLOSED unless the seed passes forceSupersedeDraft. Report it; don't rewrite
- *   a published version's hash.
- * - Override inventory: campaign-level invitationSubject / invitationBodyMarkdown /
- *   invitationBodyHtml take precedence over the template row, so those campaigns keep
- *   their own copy. A full-HTML override also bypasses the branded shell entirely.
- */
-async function reportCoverage(db: PrismaClient, alias: string): Promise<void> {
-  const tpl = await db.assessmentTemplate.findUnique({
-    where: { alias },
-    select: { id: true },
-  });
-  if (!tpl) return;
-
-  const latest = await db.assessmentTemplateVersion.findFirst({
-    where: { templateId: tpl.id },
-    orderBy: { versionNumber: "desc" },
-    select: { versionNumber: true, publishedAt: true },
-  });
-  if (!latest) {
-    console.log("  versions: none");
-  } else if (latest.publishedAt === null) {
-    console.log(
-      `  versions: latest v${latest.versionNumber} is an UNPUBLISHED DRAFT — its contentHash goes stale on patch, so the next re-seed FAILS CLOSED unless the seed passes forceSupersedeDraft.`,
-    );
-  } else {
-    console.log(
-      `  versions: latest v${latest.versionNumber} published ${latest.publishedAt.toISOString()} — hash left stale-but-documented (ADR-0025); a later re-seed appends a new DRAFT.`,
-    );
-  }
-
-  const campaigns = await db.assessmentCampaign.findMany({
-    where: { templateId: tpl.id },
-    select: {
-      name: true,
-      deletedAt: true,
-      invitationSubject: true,
-      invitationBodyMarkdown: true,
-      invitationBodyHtml: true,
-    },
-  });
-  const overrides = campaigns.filter(
-    (c) =>
-      c.invitationSubject !== null || c.invitationBodyMarkdown !== null || c.invitationBodyHtml !== null,
-  );
-  const liveOverrides = overrides.filter((c) => c.deletedAt === null);
-  console.log(
-    `  campaigns: ${campaigns.length} total, ${overrides.length} with an invitation override (${liveOverrides.length} live) — overrides are NOT patched.`,
-  );
-  for (const o of liveOverrides) {
-    console.log(
-      `    ! live override kept: "${o.name}"${o.invitationBodyHtml !== null ? " (full HTML — bypasses the branded shell entirely)" : ""}`,
-    );
-  }
-}
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
@@ -154,7 +96,7 @@ async function main() {
         console.log(`⚠ live body (${cur}) matches neither expected-old nor new — live run would HARD FAIL as drift.`);
         process.exitCode = 1;
       }
-      await reportCoverage(db, ALIAS);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: true });
       return;
     }
 
@@ -167,7 +109,7 @@ async function main() {
 
     if (res.count === 1) {
       console.log(`✓ patched (${sha(EXPECTED_CURRENT_BODY)} → ${sha(NEW_BODY)}).`);
-      await reportCoverage(db, ALIAS);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: true });
       return;
     }
 
@@ -181,7 +123,7 @@ async function main() {
       throw new Error(`Template '${ALIAS}' is soft-deleted (deletedAt=${tpl.deletedAt.toISOString()}) — refusing to patch.`);
     if (tpl.invitationBodyMarkdown === NEW_BODY) {
       console.log(`✓ already patched (body=${sha(NEW_BODY)}) — idempotent no-op.`);
-      await reportCoverage(db, ALIAS);
+      await reportCoverage(db, ALIAS, { seedSupersedesDraft: true });
       return;
     }
     throw new Error(
