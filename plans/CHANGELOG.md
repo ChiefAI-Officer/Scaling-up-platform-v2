@@ -6,6 +6,35 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-29 — SoT RE-correction: yesterday's flag correction was itself wrong (an empty read is not an empty value) <!-- ENTRY_ISO:2026-07-29 ENTRY_SLUG:flag-state-recorrection -->
+
+**Status: DOCS-ONLY. Supersedes the entry immediately below (`flag-state-correction-ed1-ed8`), which was published earlier the same day and is now partly retracted.** No code. One prod env write (ED1/ED8 rewritten as `encrypted "1"`, not yet deployed). Two independent adversarial reviews — one against Vercel's primary docs, one against this repo — both returned **"NOT safe to publish as written"** on the draft correction, which is why this third version exists.
+
+**The mistake, in one line:** I inferred "the flag reads empty ⇒ the feature is dark" from a REST read, without establishing that the read could see the value at all. It could not. **8 of 29 prod `WAVE_*` vars are `type:"sensitive"`, whose values are never returned** — so "empty" was the *read*, never the *value*.
+
+**The decisive proof was already in our own CHANGELOG, and needs no Vercel knowledge.** ED10's `ed10Active` requires `activeAuthoringMode === "single"` (`TabbedShell.tsx:472-476`), and `"single"` is produced *only* by `singleColumnEnabled` (`:461-463`) ← `isOn(WAVE_ED6_SINGLE_COLUMN_ENABLED)` (`wave-ed6-flags.ts:16-18`, no KILL, no default-on); ED9's FormsBuilder swap has the same prerequisite (`:969`). The 2026-07-22 session **read ED6 as empty**, **excluded it from the re-set** (`CHANGELOG` 07-22 entry), and **live-verified ED9 and ED10 in that same session**. **ED6 was ON while being reported empty.** That entry contradicts itself, and the contradiction was visible without touching Vercel.
+
+**`sensitive` never meant dark.** Vercel documents that sensitive values are still resolved for builds and at runtime; only *read-back* is blocked. Local proof: `WAVE_O_ESPERTO_IMPORT_HASH_SALT` is one of the 8 unreadable vars, yet `resolveEspertoImportHashSalt()` (`esperto-import/restricted-route-helpers.ts:431`) **throws** whenever it is falsy under `VERCEL_ENV`, and it is called at request time by both import handlers — which ran clean through the Wave O (2026-07-02) and Wave X (2026-07-07) prod launch walks. A genuinely empty salt would have 500'd every one of those requests.
+
+**Four claims RETRACTED — do not restore:**
+
+| Claim | Where | Why it fails |
+|---|---|---|
+| `ED1`/`ED8` are "flagless" | 07-22 entry, CLAUDE.md | They are flag-gated. This part of yesterday's correction **stands**. |
+| `ED1`/`ED8` are **dark in prod** | yesterday's entry, CLAUDE.md | **Never measured.** And for **ED8 the evidence says it was ON**: the 07-22 sighting of "Roll back/Archive" matches labels existing only in the ED8 branch (`VersionsTab.tsx:371,416`), unreachable behind the early return at `:124`. My "the sighting was a misread" explanation is **refuted** — the sighting was correct. |
+| **ED10 does not depend on ED6** | yesterday's entry, CLAUDE.md | **It does**, via `activeAuthoringMode`. I rejected an audit agent's finding after reading only `isPreviewSettingsEnabled()` (which indeed reads only its own ENABLED/KILL) and never traced the *render* path. **The agent was right; the rejection was wrong.** |
+| 07-22 root cause: **"piped stdin stores an empty value"** | 07-22 entry | Not proven. **CLI 51.8.0 (2026-04-20) made `vercel env add` default to `sensitive`**, and the prompt is skipped on piped input — so `printf '1' \| vercel env add` creates a *set but unreadable* var. That explains the identical observation with **no value loss**. The 07-22 reproduction only ever compared read-backs; it never inspected the `type` field, so it could not discriminate between the two hypotheses. The operational advice it produced ("write via REST") remains correct for a different reason: REST forces `type:"encrypted"`, which stays readable. |
+
+**Also corrected:** `WAVE_S_PEER_BENCHMARKS_KILL` is itself one of the unreadable 8 — yesterday's "KILL empty, therefore peers are not killed" was unfounded, and if it *is* set then peers are dark irrespective of `_ENABLED` (**GH #233**). Citation drift introduced yesterday: ED8 has its **own** `isOn` (`wave-ed8-flags.ts:24-26`) plus an **unchecked KILL lever** (`:33`), so citing `wave-ed1-flags.ts:8-10` for it was wrong; and `VersionsTab.tsx:124` falls back to a **legacy Version History table**, not to nothing. Method note: the read used `/v9` while Vercel documents `/v10`. `vercel env pull` does **not** rescue this even at CLI 56.3.0 — its `[SENSITIVE]` placeholder is derived from *falsy value ∧ sensitive type*, so a genuinely-empty sensitive var renders identically.
+
+**What survives from yesterday, unchanged:** the **production Vercel project correction** — `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo` under team `scaling-up`, 77 env vars, owning `scaling-up-platform-v2.vercel.app` + `platformtest.scalingup.com`, deploys at 2026-07-28 12:26/12:34 UTC matching PRs #230/#231; the `chief-aio-fficer` project has 0 env vars. That rests on project/domain/deployment metadata, not on env values, so the confound does not touch it. **Sharpened:** `src/.vercel/project.json` pairs the **correct projectId with chief-aio-fficer's orgId** — a right-project/wrong-team mis-pairing, which is the precise cause of the "deleted or transferred" error, and means **`scripts/push-env-to-vercel.mjs` would target the wrong team if run today**.
+
+**Honest end position:** the *prior* values of `WAVE_ED1_TEST_MODE_ENABLED` and `WAVE_ED8_VERSION_LIFECYCLE_ENABLED` are **unknown and now unrecoverable** — they were overwritten on 2026-07-29 with `encrypted "1"`, which is at worst a no-op and does make them permanently verifiable. **Not live until the next production build.** The only way to know what any `sensitive` flag does is a live in-app check or a rewrite to `encrypted`.
+
+**Standing lesson, twice-earned and inverted from yesterday's:** *"I saw it render" beats "the flag reads empty."* The render is downstream of the real value; the read may be an artifact of how the row was written. When a sighting and a flag read disagree, **the sighting wins** unless you can name the gate that would have blocked it. Yesterday I wrote the opposite, and it was the more confident of the two errors.
+
+---
+
 ### 2026-07-29 — SoT correction: the prod Vercel project was mis-documented, and ED1/ED8 are DARK not "flagless" <!-- ENTRY_ISO:2026-07-29 ENTRY_SLUG:flag-state-correction-ed1-ed8 -->
 
 **Status: DOCS-ONLY correction (no code, no prod write).** Both defects were found while re-baselining the 23 unaccounted rows of Jeff's July-10 tracker — a sweep prompted by discovering that **#43 was a re-report of work already shipped 8 days before he wrote it** (Wave P, 2026-07-02). The sweep then found a second such row (**#40**, same commit, same version), which is what motivated verifying our own records rather than trusting them.
