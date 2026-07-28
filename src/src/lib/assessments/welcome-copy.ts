@@ -15,9 +15,12 @@
  * an editor field, an atomic-CAS patch script, seed drift-guards, and the
  * campaign-override precedence bypass tracked in GH #220 — for no gain nobody
  * asked for. Same shape as the per-alias maps at `report-config.ts:34-65` and
- * `invitation-email.ts:39-56`. `resolveWelcomeLede` is the seam: if a coach ever
- * genuinely needs to author this, it grows a data argument and the call site
- * never changes.
+ * `invitation-email.ts:39-56`. `resolveWelcomeLede` is the seam — it is where the
+ * lookup POLICY lives, so promoting this to data is bounded rather than a
+ * rewrite: the map becomes a data read, `shouldShowResumeNote` takes the same
+ * input, and the render site threads one extra value in from `/me`. Be precise
+ * about the limit: the resolver runs synchronously inside a client render body,
+ * so a DB read cannot hide behind today's signature (ADR-0026).
  *
  * Keyed by `AssessmentTemplate.alias`, which is stable across template versions,
  * so a copy change is intentionally RETROACTIVE — it reaches campaigns already
