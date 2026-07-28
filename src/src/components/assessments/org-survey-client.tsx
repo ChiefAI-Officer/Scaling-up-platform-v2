@@ -34,6 +34,11 @@ import {
 } from "@/lib/assessments/use-answer-draft";
 import { pruneAnswersToQuestions } from "@/lib/assessments/prune-answers";
 import {
+  RESUME_NOTE,
+  resolveWelcomeLede,
+  shouldShowResumeNote,
+} from "@/lib/assessments/welcome-copy";
+import {
   filterVisibleSurveyQuestions,
   visibleSurveyQuestionKeys,
 } from "@/lib/assessments/form-visibility";
@@ -417,6 +422,10 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
     // (actual counts + derived scale) + strong purple CTA. INVITED copy: team
     // framing, shared with the facilitator/coach.
     const orgName = phase.data.campaign.organizationName ?? undefined;
+    // Resolved once: `templateAlias` above is exactly this phase's
+    // `campaign.templateAlias`, and both helpers walk the same map.
+    const welcomeLede = resolveWelcomeLede(templateAlias);
+    const showResumeNote = shouldShowResumeNote(templateAlias);
     return (
       <div className="su-welcome-page">
         <WelcomeShellHeader caption={orgName ?? "Team Assessment"} />
@@ -426,11 +435,11 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             <h1 className="su-welcome-title" id="invite-title">
               {phase.data.campaign.name}
             </h1>
-            <p className="su-welcome-lede">
-              A quick, confidential check on how your team works together. You
-              can answer in one sitting or come back later — your link stays
-              active.
-            </p>
+            {welcomeLede.map((para, i) => (
+              <p className="su-welcome-lede" key={i}>
+                {para}
+              </p>
+            ))}
             <WelcomeExpectations
               timeLabel={timeEstimate}
               questionCount={sortedQuestions.length}
@@ -453,6 +462,14 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
               </button>
             </div>
             <p className="su-welcome-fine">
+              {/* `{" "}` is structural: a trailing space inside a template
+                  literal is invisible and silently deletable, and both
+                  sentence-level assertions would still pass if it vanished. */}
+              {showResumeNote && (
+                <>
+                  {RESUME_NOTE}{" "}
+                </>
+              )}
               Shared with your facilitator or coach to discuss as a team.
             </p>
           </section>

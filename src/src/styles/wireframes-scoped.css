@@ -1678,6 +1678,14 @@
   margin: 0;
   line-height: 1.55;
 }
+/* Per-template welcome copy (ADR-0026) can run to two paragraphs. The card is a
+   flex column with no `gap` and the lede is `margin: 0`, so consecutive
+   paragraphs would otherwise butt together and read as a broken wall. Scoped to
+   the participant lane per ADR-0005; the public quiz renders its lede in an
+   if/else, never as adjacent siblings, so this cannot fire there. */
+.su-assessment-brand .su-welcome-lede + .su-welcome-lede {
+  margin-top: 0.625rem;
+}
 
 /* value-prop "what to expect" list — icon + bold label + muted sub */
 .su-assessment-brand .su-welcome-expect {
