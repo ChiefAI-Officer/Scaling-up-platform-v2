@@ -130,8 +130,29 @@
   z-index: 0;
 }
 
+/* Cover masthead (Jeff July-10 #63/#67/#73/#78/#81).
+ *
+ * Stacks the coach byline BELOW the Scaling Up mark. The base rule in
+ * su-public-brand.css is a horizontal `display:flex; align-items:center` row
+ * shared with the thank-you hero + landing-page chrome — DO NOT edit that one;
+ * this report-scoped override is the correct seam (ADR-0005).
+ *
+ * The coach block is a subordinate provenance byline, not a co-brand peer:
+ * see the superseded-G7 note in
+ * docs/specs/v7.6/13-assessment-brand-and-results-report.md.
+ *
+ * position/z-index: `.su-report-cover-inner::after` (the decorative blob) is
+ * positioned with z-index 0 and therefore paints ABOVE non-positioned in-flow
+ * siblings in this stacking context. `.su-report-title` already carries the
+ * same guard; the brandbar needs it too now that it is taller.
+ */
 .su-public-brand .su-report-cover .su-brandbar {
   margin-bottom: 60px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
 /* Cover title — inherits .su-h1 from su-public-brand.css but overrides color */
@@ -782,10 +803,13 @@
   padding: 4px 8px;
 }
 
+/* Cover coach logo. 40px (matching the footer + the Jeff-approved invitation-
+ * email cap) so the coach reads as a byline UNDER the SU mark rather than a
+ * co-brand peer beside it — see #63/#67/#73/#78/#81. The old `margin-left:20px`
+ * was spacing for the superseded horizontal lockup; the stacked brandbar owns
+ * that spacing via `gap` now. */
 .su-public-brand .su-report-coach-logo-cover {
-  max-height: 56px;
-  margin-left: 20px;
-  vertical-align: middle;
+  max-height: 40px;
 }
 
 .su-public-brand .su-report-coach-logo-footer {
