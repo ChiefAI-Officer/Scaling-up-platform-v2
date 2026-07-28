@@ -133,6 +133,10 @@ An instrument with no real scoring — Quarterly Session Prep v1 and v2. Respons
 The branded, printable **per-respondent** document a coach/admin views for *one* completed submission — cover, overall result, per-section breakdown, scores table, recommendations (when present), conclusion. It is the human-readable view that **replaces the raw answer (`stableKey`) view**. It is per individual.
 _Avoid_: conflating the per-respondent **Results report** with a cohort **Aggregate report** (Esperto's "group" / "self-comparison" report — the facilitator's all-responses dashboard; shipped for LVA in Wave F).
 
+**Coach byline**:
+The creator coach's identity as it appears on a **Results report** / **Aggregate report** — an image plus "Coached by {name}", in the cover masthead and the page footer. It is an *acknowledgement*, deliberately subordinate to the Scaling Up mark, never a co-brand of equal weight: the report is a Scaling Up product artifact that names the coach who ran it.
+_Avoid_: "coach logo" as though it were always a firm's logo, and "coach photo" as though it were always a headshot — the same single image (`Coach.profileImage`) serves both, so neither word is safe as the general term; say **coach byline** for the whole unit (image + name) and "the coach's image" for the picture alone. Also avoid treating it as co-branding — that framing invites peer-weight sizing, which this deliberately is not.
+
 **Cohort trend** (a.k.a. longitudinal trend):
 The coach-facing view that charts an **Organization**'s *aggregate* results for one scored **Template** across its successive **Campaigns** over time (per-campaign means + per-question sparklines). It answers "is this whole team improving each quarter?" — every person is invisible inside the average. (Already shipped at `/portal/assessments/trends`.)
 

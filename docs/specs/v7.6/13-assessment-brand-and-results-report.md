@@ -43,8 +43,47 @@ So #2 = **build the branded, human-readable Results report** (the artifact Esper
 | G4 | **The Results report is the canonical results view; the raw inline `stableKey` view is retired.** The respondent-row results action opens the branded report (new tab, print-ready); `AssessmentResultView`'s raw per-question `stableKey` dump is removed/repointed. | Jeff's complaint is literally "stop showing me raw data" — adding a second door doesn't fix it. |
 | G5 | **Print fidelity = medium.** Cover on its own page (`break-after`), content flows with `break-inside: avoid` on cards/sections, a simple footer (logo + page number). **No** running header, **no** forced per-section pages. | Reads as a real "document" PDF without brittle running-header / per-section-page CSS. Esperto-pixel pagination is a fast follow if Jeff wants it. |
 | G6 | **App-shell on both participant flows; company optional.** Invited (`org-survey`) + public (`quiz`) both render `SectionPager`, so the shell/title-slides/slider-restyle cover both. Company name shows when present (invited); the public flow shows the assessment name only. | One consistent experience; degrades gracefully where there's no company. |
-| G7 | **Primary Scaling Up logo on product surfaces; coach-as-text in the CTA.** The white wordmark (`su-logo-white.svg`) goes on the cover/footer/quiz app-bar (these are SU *product* artifacts, à la Esperto). ADR-0005's "coaches use the Certified-Coach mark" rule governs coach-owned collateral, not the platform's assessment report. The coach is acknowledged as text ("Talk to your Scaling Up Certified Coach"). All logo placements stay on purple → existing white SVG suffices, **no new asset**. | Matches Esperto; sidesteps the missing coach-mark/dark-logo assets. |
+| G7 | ⚠️ **PARTLY SUPERSEDED — see the note below the table.** **Primary Scaling Up logo on product surfaces; coach-as-text in the CTA.** The white wordmark (`su-logo-white.svg`) goes on the cover/footer/quiz app-bar (these are SU *product* artifacts, à la Esperto). ADR-0005's "coaches use the Certified-Coach mark" rule governs coach-owned collateral, not the platform's assessment report. The coach is acknowledged as text ("Talk to your Scaling Up Certified Coach"). All logo placements stay on purple → existing white SVG suffices, **no new asset**. | Matches Esperto; sidesteps the missing coach-mark/dark-logo assets. |
 | G8 | **Skip the Verne preface for v1.** A one-line lede on the overall banner + the branded conclusion + coach CTA. | The full Verne preface/book-promo needs assets (photo, signature, book cover) + per-template copy we'd source from Jeff; not worth blocking v1. |
+
+### 2026-07-28 — G7 partly superseded: the coach is a masthead byline, not CTA text only
+
+G7 said the coach appears **as text in the CTA** and nowhere else, chiefly to avoid needing a
+coach-mark asset. Two later changes overtook that, and this note records the end state so the
+current layout doesn't read as drift:
+
+1. **Wave K** put the coach's own `Coach.profileImage` in the cover + footer brandbar (the `CoachLogo`
+   component) — a *logo*, which G7 had ruled out.
+2. **Jeff July-10 #63/#67/#73/#78/#81** asked for that logo to sit *below* the Scaling Up mark with the
+   coach name beside it, and (#81) **removed** the "Talk to your Scaling Up Certified Coach" CTA from
+   the Five Dysfunctions report — deleting, on that template, the very text G7 designated as the
+   coach's acknowledgement.
+
+**Current model:** the coach is a **subordinate provenance byline** in the report masthead and footer —
+acknowledged, never co-branded. Subordination is expressed by **position** on both surfaces: on the
+cover the coach block sits *beneath* the 180×24 wordmark (the brandbar stacks) rather than beside it,
+and in the footer the SU mark *precedes* the coach block in DOM order. On the cover it is additionally
+expressed by **size** — the coach image is capped at 40px under the wordmark.
+
+G7's *rationale* still holds — the report remains a Scaling Up **product** artifact and the SU wordmark
+still carries product weight; only its "text-only, no coach logo" mechanism is superseded. ADR-0005's
+"coaches use the Certified-Coach mark" rule is likewise unchanged: it governs coach-owned collateral,
+not this report.
+
+**Known inconsistency, deliberately left alone:** in the *footer* the coach image cap (40px,
+`.su-report-coach-logo-footer`) exceeds the footer SU mark's height (22px,
+`.su-report-footer .su-logo`). Both predate this change and neither was touched here — the footer's
+wordmark is 120px *wide*, so the wide-mark-vs-square-chip comparison is not a straight height ratio,
+and shrinking the coach image is a visual change nobody requested. Recorded so the next reader knows
+it was seen and judged, not missed. Revisit if the footer is ever redesigned.
+
+A future engineer should therefore **not** "restore" the coach logo to peer size beside the wordmark,
+and **not** re-add a coach CTA to `five-dysfunctions`.
+
+Implementation: `ReportFooter.tsx`, `CoachLogo.tsx`, and the `.su-report-cover .su-brandbar` /
+`.su-report-coach-logo-cover` rules in `su-report.css`. Order is guarded by
+`__tests__/components/assessments/report-footer-order.test.tsx`; the cover stack is CSS-only and is
+verified visually (jsdom cannot observe `flex-direction`).
 
 ## Deliverable 1 — Participant quiz: "application feel"
 
