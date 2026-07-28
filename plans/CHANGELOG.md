@@ -6,6 +6,53 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-29 — SoT correction: the prod Vercel project was mis-documented, and ED1/ED8 are DARK not "flagless" <!-- ENTRY_ISO:2026-07-29 ENTRY_SLUG:flag-state-correction-ed1-ed8 -->
+
+**Status: DOCS-ONLY correction (no code, no prod write).** Both defects were found while re-baselining the 23 unaccounted rows of Jeff's July-10 tracker — a sweep prompted by discovering that **#43 was a re-report of work already shipped 8 days before he wrote it** (Wave P, 2026-07-02). The sweep then found a second such row (**#40**, same commit, same version), which is what motivated verifying our own records rather than trusting them.
+
+**Correction 1 — the production Vercel project is under the `scaling-up` team, not `chief-aio-fficer`.**
+Two projects share the name `scaling-up-platform-v2`. The one this repo actually deploys to is
+`prj_xcAWuAmGZAU3DCHgAauRv2WPKneo` under `team_ek3PMuEYCgI0DKZ2EFexMgya` (`scaling-up`): it owns
+`scaling-up-platform-v2.vercel.app` **and** `platformtest.scalingup.com`, holds **77 env vars (29 wave flags)**,
+and its two most recent Production deploys — 2026-07-28 **12:26** and **12:34 UTC** — match PR #230 and PR #231
+exactly. The `chief-aio-fficer` project (`prj_5sLDrY9JRaCvSR3s8sqlXgepVWfh`) has **0 env vars** and only a
+`-dun` preview domain. CLAUDE.md's Known Quirks previously instructed `--scope chief-aio-fficer`, so **following
+our own documentation returned an empty env list and would support a false "no flags are set" conclusion.**
+The trap is that the GitHub repo lives in the `ChiefAI-Officer` org while the Vercel project lives in `scaling-up`.
+Also recorded: the local `.vercel` link is stale, `vercel link` writes into the repo (avoid), and the working
+read path is the REST API with the CLI's own token. **`decrypt=true` does not decrypt on this plan** — non-empty
+values return ~970-char ciphertext, so set-vs-empty is reliable but `"1"`-vs-`"0"` is not.
+
+**Correction 2 — `ED1` Test Mode and `ED8` version lifecycle are DARK in production; the "flagless" claim is retracted.**
+CLAUDE.md and the `prod-flag-reflip-live-verify` entry both stated that ED1/ED8 "render despite OFF flags → those
+waves are now flagless (an empty flag ≠ a dark feature; the live-check is truth)". **That is false.** Verified:
+- `isOn()` accepts only `"1"|"true"|"TRUE"|"yes"` (`wave-ed1-flags.ts:8-10`) — **no default-on path**, so empty is OFF.
+- **ED1**: `TabbedShell.tsx:574` computes `testModeAvailable = !isPublished && testModeEnabled`, gating the Test
+  Mode button (`:756`) and drawer (`:1117`) — both hidden with the flag empty.
+- **ED8**: `VersionsTab.tsx:124` early-returns, and the write APIs return an **opaque 404**
+  (`versions/[versionId]/route.ts:468`, `.../archive/route.ts:82`).
+- Prod (2026-07-29, correct project): `WAVE_ED1_TEST_MODE_ENABLED`, `WAVE_ED2/ED4/ED6/ED8` **empty**;
+  `WAVE_S_PEER_BENCHMARKS_ENABLED` set with `KILL` empty; `WAVE_Q_ADMIN_CONTROLS_ENABLED` set.
+
+**Root cause:** the 2026-07-22 re-flip excluded `ED1/2/4/6/8` as "superseded". Correct for the *presentation* waves
+(ED2/ED4/ED6 → superseded by ED10, ADR-0024) but **wrong for ED1 and ED8, which are distinct capabilities ED10 does
+not replace**. The "they render anyway" sighting that produced the flagless conclusion was a misread of something
+that renders regardless of the gate. **Consequence: two features recorded as launched have never been reachable in
+production.** Whether to flip them on is a separate ops decision (a prod env write + redeploy) and is NOT done here.
+
+**One reviewer claim REJECTED with evidence:** an audit agent argued the 07-22 exclusion of ED6 was "logically
+impossible" because `ed10Active` requires ED6. It does not — `isPreviewSettingsEnabled()` reads only its own
+`ENABLED`/`KILL` (`wave-ed10-flags.ts:30-33`), and the edit page threads `singleColumnEnabled` and
+`previewSettingsEnabled` as independent props (`edit/page.tsx:281,296`). ED6-empty with ED10-on is consistent.
+
+**Standing lesson (the reason both defects survived so long):** *a live sighting is only evidence if you can name
+the gate it passed through.* "I saw it render" is weaker than reading the gate in code plus the flag value. This
+is the same failure family as the two stale claims caught in the previous two items (`qsp-v1` "disabled" —
+prod says `disabledAt` NULL; the CHANGELOG's v3-vs-v4 explanation for the peer panel — refuted by identical
+`contentHash`). In this codebase the code is usually right and **the story about the code is where the defects live.**
+
+---
+
 ### 2026-07-28 — Jeff July-10 #63/#67/#73/#78/#81: coach byline below the SU mark on report cover + footer <!-- ENTRY_ISO:2026-07-28 ENTRY_SLUG:jeff-jul10-report-header-byline -->
 
 **Status: DONE (2026-07-28, PR #230, squash `febbdcc1`).** Fifth item in the one-item-at-a-time July-10 pass, after the invitation-email family (#61/#69/#76/#80) and the Welcome-screen copy (#62/#66/#70/#77). Full loop: state-check → grill (10 decisions) → **Codex co-validate (which reversed 3 of them)** → thin-spec gate → visual approval before code → TDD → PR → two-axis code review → merge → SoT. **Flagless. No migration, no feature flag, no prod write, no seed edit.** Rollback = revert. GH issue **#227**; follow-ons **#228**/**#229**.
