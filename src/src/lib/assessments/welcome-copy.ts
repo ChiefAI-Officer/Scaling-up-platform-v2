@@ -4,7 +4,9 @@
  * Jeff's July-10 tracker items #62 (LVA), #66 (QSP v2), #70 (Rockefeller) and
  * #77 (Scaling Up Full) each replace the single shared paragraph that used to be
  * hardcoded in the participant client. The copy is his, byte-for-byte except for
- * the deviations recorded in the PR body + CHANGELOG entry.
+ * the deviations recorded in the PR body and, once merged, the CHANGELOG entry
+ * anchored `jeff-jul10-welcome-lede-copy` (the SoT update ships as its own PR,
+ * per this repo's convention — see #219 -> #221). ADR-0026 is the durable record.
  *
  * WHY THIS IS CODE AND NOT DATA (ADR-0026): Jeff dictates fixed per-template
  * copy, not per-campaign copy, and this screen re-renders on every page load —

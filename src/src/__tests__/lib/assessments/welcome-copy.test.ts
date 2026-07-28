@@ -15,6 +15,8 @@
  *   - paragraph counts (guards the multi-paragraph render path)
  *   - fail-open for every out-of-scope, unknown, or empty alias
  */
+import fs from "node:fs";
+import path from "node:path";
 import {
   DEFAULT_WELCOME_LEDE,
   WELCOME_LEDE_BY_ALIAS,
@@ -93,6 +95,43 @@ describe("resolveWelcomeLede — per-template copy", () => {
       expect(text).not.toContain("this report");
       expect(text).not.toMatch(/\bwas rated\b/);
     }
+  });
+});
+
+describe("every map key is a REAL template alias", () => {
+  // The highest-probability silent failure in this design: a typo in a key, or
+  // an alias renamed in a seed, reverts that template to the default lede with
+  // a fully green suite and a green build. Nothing else catches it — the other
+  // resolver tests check keys against themselves, and the render tests use
+  // hand-written fixtures.
+  //
+  // Read as TEXT rather than imported: `prisma/seed-*.ts` pull in
+  // @prisma/client and are excluded from the tsconfig build, so importing them
+  // into a jsdom test would be both slow and fragile. Matching their own alias
+  // declaration keeps this rename-proof without that cost.
+  const seedDir = path.resolve(process.cwd(), "prisma");
+  const seedSource = fs
+    .readdirSync(seedDir)
+    .filter((f) => f.startsWith("seed-") && f.endsWith(".ts"))
+    .map((f) => fs.readFileSync(path.join(seedDir, f), "utf8"))
+    .join("\n");
+
+  it.each(Object.keys(WELCOME_LEDE_BY_ALIAS))(
+    "%s is declared by a seed",
+    (alias) => {
+      // Both forms in use: `export const ALIAS = "x"` (SU-Full, Five Dysf)
+      // and `const TEMPLATE_ALIAS = "x"` (LVA, Rockefeller, QSP v2).
+      const declared = new RegExp(
+        `const (?:ALIAS|TEMPLATE_ALIAS) = "${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`,
+      );
+
+      expect(seedSource).toMatch(declared);
+    },
+  );
+
+  it("finds the seed sources it is asserting against", () => {
+    // Guards the guard: an empty read would make every assertion above vacuous.
+    expect(seedSource.length).toBeGreaterThan(10_000);
   });
 });
 
