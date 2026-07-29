@@ -168,6 +168,10 @@ interface WizardState {
   sendResultsToRespondent: boolean;
   /** #16: Send coach a notification when a respondent completes. */
   notifyCoachOnCompletion: boolean;
+  /** Wave OSR (#71): show each respondent their own report on screen right
+   *  after they submit. Independent of sendResultsToRespondent (email) and of
+   *  the results-email approval gate — this render carries no authored copy. */
+  showResultsOnScreen: boolean;
   // Task 10 — #2/#3 timing radio.
   /** IMMEDIATELY: invitations send at creation (openAt forced to now by server).
    *  ON_OPEN: invitations send when campaign opens (openAt must be future). */
@@ -258,6 +262,7 @@ export function CampaignWizard({
   coachNotifyEnabled = false,
   customSlidesEnabled = false,
   waveQDefaultsEnabled = false,
+  onScreenResultsEnabled = false,
 }: {
   /** Wave D #20 — gate the full-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -304,6 +309,14 @@ export function CampaignWizard({
    * only a template-switch after resume re-derives.
    */
   waveQDefaultsEnabled?: boolean;
+  /**
+   * Wave OSR (#71) — mirrors `WAVE_OSR_RESPONDENT_RESULTS_ENABLED`, read
+   * server-side and passed down so the wizard can show/hide the on-screen
+   * results checkbox. UI-only: the flag is enforced again at disclosure time in
+   * the submit route (under the submission lock), and — unlike the two email
+   * toggles — a stored `showResultsOnScreen` is NEVER coerced when this is off.
+   */
+  onScreenResultsEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -328,6 +341,7 @@ export function CampaignWizard({
       templateResultsEmailApproved: false,
       sendResultsToRespondent: false,
       notifyCoachOnCompletion: false,
+      showResultsOnScreen: false,
       inviteTiming: "IMMEDIATELY" as const,
       customSlides: [],
       customSlidesVersionId: "",
@@ -408,6 +422,7 @@ export function CampaignWizard({
           templateResultsEmailApproved: false,
           sendResultsToRespondent: parsed.sendResultsToRespondent === true,
           notifyCoachOnCompletion: parsed.notifyCoachOnCompletion === true,
+          showResultsOnScreen: parsed.showResultsOnScreen === true,
           // Task 10 — inviteTiming defaults to IMMEDIATELY if not persisted.
           inviteTiming:
             parsed.inviteTiming === "ON_OPEN" ? "ON_OPEN" : "IMMEDIATELY",
@@ -644,6 +659,14 @@ export function CampaignWizard({
           notifyCoachOnCompletion: coachNotifyEnabled
             ? state.notifyCoachOnCompletion
             : false,
+          // Wave OSR (#71) — deliberately NOT coerced to false when the flag is
+          // off, unlike the two toggles above. Their coercion exists because a
+          // stale draft `true` would make the thank-you page promise an email
+          // the send path won't deliver — a user-visible lie. No such hazard
+          // here: the server re-reads this column UNDER the submission lock and
+          // decides disclosure itself, so a stored `true` with the flag off
+          // promises nobody anything. Flags gate capability, not data.
+          showResultsOnScreen: state.showResultsOnScreen,
           // Task 10 — #2/#3 timing radio: tell server when to send invitations.
           // Gated on the auto-send flag (dark-merge fix): when auto-send is OFF
           // we MUST NOT send inviteTiming — sending it marks the create as a
@@ -913,10 +936,12 @@ export function CampaignWizard({
             resultsEmailApproved={state.templateResultsEmailApproved}
             sendResultsToRespondent={state.sendResultsToRespondent}
             notifyCoachOnCompletion={state.notifyCoachOnCompletion}
+            showResultsOnScreen={state.showResultsOnScreen}
             inviteTiming={state.inviteTiming}
             autoSend={autoSend}
             resultsEmailEnabled={resultsEmailEnabled}
             coachNotifyEnabled={coachNotifyEnabled}
+            onScreenResultsEnabled={onScreenResultsEnabled}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             onBack={back}
             onNext={next}
@@ -1635,10 +1660,12 @@ function ScheduleStep({
   resultsEmailApproved,
   sendResultsToRespondent,
   notifyCoachOnCompletion,
+  showResultsOnScreen,
   inviteTiming,
   autoSend,
   resultsEmailEnabled,
   coachNotifyEnabled,
+  onScreenResultsEnabled,
   onChange,
   onBack,
   onNext,
@@ -1651,6 +1678,7 @@ function ScheduleStep({
   resultsEmailApproved: boolean;
   sendResultsToRespondent: boolean;
   notifyCoachOnCompletion: boolean;
+  showResultsOnScreen: boolean;
   inviteTiming: "IMMEDIATELY" | "ON_OPEN";
   /** Wave D auto-send flag — when false, hide the timing radio + show the
    *  legacy openAt picker (the inviteTiming state is ignored on the create). */
@@ -1659,6 +1687,8 @@ function ScheduleStep({
   resultsEmailEnabled: boolean;
   /** Wave D FIX 2 — gate the #16 coach-notify checkbox (mirrors server flag). */
   coachNotifyEnabled: boolean;
+  /** Wave OSR (#71) — gate the on-screen-results checkbox (mirrors server flag). */
+  onScreenResultsEnabled: boolean;
   onChange: (patch: Partial<WizardState>) => void;
   onBack: () => void;
   onNext: () => void;
@@ -1850,6 +1880,46 @@ function ScheduleStep({
           the create (in saveCampaign) — so the thank-you page can never promise
           a results email the (flag-gated) send path won't actually deliver.
           The whole panel is hidden when BOTH flags are off. */}
+      {/* Wave OSR (#71) — on-screen results. A separate panel from "Email
+          notifications" on purpose: this is not an email, and grouping it under
+          that heading would misdescribe it. */}
+      {onScreenResultsEnabled && (
+        <div className="space-y-3 border border-border rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-foreground">
+            Results on screen
+          </h3>
+          <div className="space-y-1">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                id="showResultsOnScreen"
+                type="checkbox"
+                checked={showResultsOnScreen}
+                onChange={(e) =>
+                  onChange({ showResultsOnScreen: e.target.checked })
+                }
+                className="accent-primary w-4 h-4"
+                aria-label="Show each respondent their results on screen after they submit"
+              />
+              <span className="text-sm text-foreground">
+                Show each respondent their results on screen after they submit
+              </span>
+            </label>
+            {/* The operator needs to know this is a ONE-LOOK experience whenever
+                the emailed copy isn't also going out — otherwise the tradeoff is
+                invisible at the moment they make it. */}
+            {showResultsOnScreen &&
+              !(resultsEmailEnabled && sendResultsToRespondent) && (
+                <p className="text-xs text-muted-foreground pl-7">
+                  Respondents will see their results once, right after
+                  submitting, and can print or download a copy. They are not
+                  emailed a copy, so they will not be able to return to it
+                  later.
+                </p>
+              )}
+          </div>
+        </div>
+      )}
+
       {(resultsEmailEnabled || coachNotifyEnabled) && (
         <div className="space-y-3 border border-border rounded-lg p-4">
           <h3 className="text-sm font-semibold text-foreground">Email notifications</h3>

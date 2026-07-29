@@ -50,6 +50,22 @@ import {
   deriveTimeEstimate,
 } from "@/components/assessments/assessment-welcome";
 import { formatTimestampDateTime } from "@/lib/utils";
+import { BrandedReport } from "@/components/assessments/BrandedReport";
+import { PrintReportButton } from "@/components/assessments/PrintReportButton";
+import type { RespondentReport } from "@/lib/assessments/respondent-report";
+import {
+  readOnScreenResult,
+  writeOnScreenResult,
+  clearOnScreenResult,
+} from "@/lib/assessments/onscreen-result-store";
+
+// Wave OSR (#71) — the in-place report needs the report stylesheets. This route
+// group has no (report) layout to supply them, so the client imports them the
+// same way public-quiz-client.tsx does. Without these the report renders
+// completely unstyled (ADR-0005 scopes both files under .su-public-brand, so
+// they cannot leak into the blue admin/coach UI).
+import "@/styles/su-public-brand.css";
+import "@/styles/su-report.css";
 
 // Wave J-1 — SU-Full CEO-only background section gating.
 const SU_FULL_ALIAS = "scaling-up-full";
@@ -119,6 +135,12 @@ type Phase =
   | { kind: "intro"; data: SurveyData }
   | { kind: "ready"; data: SurveyData }
   | { kind: "submitting"; data: SurveyData }
+  /**
+   * Wave OSR (#71): terminal in-place report. Reached either straight from a
+   * submit whose response carried a report, or rehydrated from sessionStorage on
+   * a refresh (spec 19an §4).
+   */
+  | { kind: "results"; report: RespondentReport }
   | { kind: "error"; message: string };
 
 export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
@@ -174,6 +196,14 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             return;
           }
 
+          // Wave OSR (#71): a fresh exchange means a (possibly different)
+          // respondent is starting this campaign in this tab. Purge any stored
+          // on-screen report FIRST — the slot is keyed by campaign alias (it has
+          // to be: on a refresh /me has 410'd, so respondentKey is unavailable),
+          // so this purge is what prevents one respondent ever being shown the
+          // previous one's report. See onscreen-result-store.ts.
+          clearOnScreenResult(campaignAlias);
+
           // Clear the fragment so reloads don't re-exchange.
           if (typeof window !== "undefined") {
             window.history.replaceState(
@@ -185,6 +215,18 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         }
 
         if (cancelled) return;
+
+        // Wave OSR (#71): rehydrate BEFORE /me. Once the invitation is SUBMITTED
+        // /me returns 410, which this client renders as "This survey has
+        // closed." — so a respondent refreshing the report they were just shown
+        // would be told the survey closed. Checking the store first turns that
+        // into the report re-rendering. Ordering is load-bearing.
+        const stored = readOnScreenResult(campaignAlias);
+        if (stored) {
+          setPhase({ kind: "results", report: stored });
+          return;
+        }
+
         setPhase({ kind: "loading" });
 
         const meRes = await fetch(`/org-survey/${campaignAlias}/me`, {
@@ -364,6 +406,22 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         return;
       }
       clearDraft();
+
+      // Wave OSR (#71): the server decides disclosure under the submission lock
+      // and returns the report ONLY when the campaign toggle + flag permit it —
+      // so the presence of `data.report` IS the signal. There is deliberately no
+      // client-visible flag to consult, which makes it impossible for client and
+      // server to disagree (spec 19an §6).
+      const submitBody = (await submitRes
+        .json()
+        .catch(() => null)) as { data?: { report?: RespondentReport } } | null;
+      const onScreenReport = submitBody?.data?.report;
+      if (onScreenReport) {
+        writeOnScreenResult(campaignAlias, onScreenReport);
+        setPhase({ kind: "results", report: onScreenReport });
+        return;
+      }
+
       // Task 6b: append ?results=1 so the thank-you page shows confirming copy
       // when the campaign is configured to email results to respondents.
       // `submittingData` is captured at the top of this function — use it
@@ -394,6 +452,39 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         </main>
         <footer className="ty-footer">Powered by Scaling Up</footer>
       </div>
+    );
+  }
+
+  // Wave OSR (#71) — terminal in-place report. Same artifact the coach/admin
+  // sees, shown to its subject (ADR-0027); BrandedReport dispatches
+  // scored-vs-qualitative itself off report.templateAlias, which the SERVER
+  // populated, so there is no branch to make here.
+  if (phase.kind === "results") {
+    return (
+      <main className="survey-body" data-testid="org-survey-results">
+        {/* Scope wrapper so su-report.css applies (ADR-0005) — the same wrapper
+            the invited (report) route layout provides. */}
+        <div className="su-public-brand su-report">
+          <div className="no-print" style={{ textAlign: "center" }}>
+            <PrintReportButton
+              fileName={`${phase.report.assessmentName} — ${phase.report.respondentName}`}
+            />
+            {/* The copy that used to live on the thank-you page: with the report
+                shown in place that page is bypassed entirely, so the "your coach
+                will review this with you" framing needs a home here. Print /
+                Download is the ONLY way to keep the report, so say so. */}
+            <p className="su-report-onscreen-note">
+              Your coach will review these results with you. Use Print or
+              Download PDF above if you would like to keep a copy.
+            </p>
+          </div>
+          <BrandedReport
+            report={phase.report}
+            assessmentName={phase.report.assessmentName}
+            campaignLabel={phase.report.campaignLabel ?? null}
+          />
+        </div>
+      </main>
     );
   }
 

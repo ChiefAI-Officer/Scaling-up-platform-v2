@@ -130,7 +130,9 @@ A checklist item counts as "passed" when rated **2 or 3** on its 0–3 scale (a 
 An instrument with no real scoring — Quarterly Session Prep v1 and v2. Responses are aggregated (means) for discussion, not banded. Represented internally by a single neutral tier (see ADR-0002).
 
 **Results report** (a.k.a. "the report", "the PDF"):
-The branded, printable **per-respondent** document a coach/admin views for *one* completed submission — cover, overall result, per-section breakdown, scores table, recommendations (when present), conclusion. It is the human-readable view that **replaces the raw answer (`stableKey`) view**. It is per individual.
+The branded, printable **per-respondent** document for *one* completed submission — cover, overall result, per-section breakdown, scores table, recommendations (when present), conclusion. It is the human-readable view that **replaces the raw answer (`stableKey`) view**. It is per individual.
+Its **audience is a property of where it is reached, not of the document**: a coach/admin views it through the **Report access gate**; when a **Campaign** opts in, the **Respondent** sees the *same* artifact rendered in place immediately after submitting (ADR-0027); and a public quiz taker sees it in place too (ADR-0008). One document, three readers — no reduced "respondent edition" exists.
+_Avoid_: calling it "the coach's view" — that was true only while the gated route was the only door.
 _Avoid_: conflating the per-respondent **Results report** with a cohort **Aggregate report** (Esperto's "group" / "self-comparison" report — the facilitator's all-responses dashboard; shipped for LVA in Wave F).
 
 **Coach byline**:

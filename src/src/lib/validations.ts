@@ -530,6 +530,11 @@ export const createAssessmentCampaignSchema = z
         // Task 6b — #15/#16 toggles
         sendResultsToRespondent: z.boolean().default(false),
         notifyCoachOnCompletion: z.boolean().default(false),
+        // Wave OSR (#71) — show the respondent their own report on screen at
+        // submit. Not flag-gated here: the flag is enforced server-side at
+        // disclosure time (submit route, under the lock), so a stored value with
+        // the flag off is inert rather than rejected.
+        showResultsOnScreen: z.boolean().default(false),
         // Task 9 (Wave D) — invite timing. Its PRESENCE (or `waveD: true`, or a
         // non-empty participantIds array) marks a Wave-D create (atomic create +
         // participant attach + lifecycle + auto-send). Absence = legacy create

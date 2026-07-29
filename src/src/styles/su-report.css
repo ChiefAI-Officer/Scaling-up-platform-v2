@@ -93,6 +93,21 @@
   border-radius: 8px;
 }
 
+/* Wave OSR (#71) — the respondent-facing note above their own in-place report.
+   Carries the "your coach will review this with you" framing that the bypassed
+   thank-you page used to own, plus the keep-a-copy hint (Print/Download is the
+   only way to retain a show-once report). Screen-only: it sits inside .no-print,
+   so it never reaches the PDF. The print-actions bar above is position:fixed, so
+   this note is the first thing in the normal flow. */
+.su-public-brand .su-report-onscreen-note {
+  max-width: 46em;
+  margin: 0 auto 18px;
+  padding: 0 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: rgba(58, 36, 0, 0.85);
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    1. COVER
    ══════════════════════════════════════════════════════════════════════════ */

@@ -40,11 +40,13 @@ import {
   assessmentSendsPaused,
 } from "@/lib/assessments/wave-d-feature-flags";
 import { isResultsEmailApproved } from "@/lib/assessments/results-email-approval";
+import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
   buildRespondentReportFromSubmission,
   buildReportEmailHtml,
 } from "@/lib/assessments/report-email";
+import type { RespondentReport } from "@/lib/assessments/respondent-report";
 import {
   buildResultsEmailHtml,
   buildCoachNotifyEmail,
@@ -101,13 +103,13 @@ interface EnqueueArgs {
   };
   respondent: { email: string; firstName: string; lastName: string } | null;
   respondentId: string;
-  scoreResult: unknown;
-  /** The submitted answers ({ stableKey, value }[]) — persisted to
-   *  submission.answers; the qualitative report renders them back. */
-  rawAnswers: unknown;
-  /** The submission's real timestamp (same instant the invitation flips to
-   *  SUBMITTED). NOT a placeholder new Date(). */
-  submittedAt: Date;
+  /**
+   * Wave OSR: the respondent report model, built ONCE by the caller (Phase 1,
+   * lock-free) and shared by the #15 results email and the on-screen payload.
+   * `null` when the build failed — the #15 row is then dropped, exactly as it
+   * was when the build lived inside this function.
+   */
+  report: RespondentReport | null;
 }
 
 /**
@@ -125,9 +127,7 @@ function buildWaveDOutboxRows({
   campaign,
   respondent,
   respondentId,
-  scoreResult,
-  rawAnswers,
-  submittedAt,
+  report,
 }: EnqueueArgs): PreparedOutboxRow[] {
   const rows: PreparedOutboxRow[] = [];
 
@@ -145,27 +145,12 @@ function buildWaveDOutboxRows({
     waveDResultsEmailEnabled() &&
     template !== null &&
     isResultsEmailApproved(template) &&
-    respondentEmail
+    respondentEmail &&
+    // Wave OSR: the model is now built once by the caller. A failed build
+    // drops this email exactly as the old in-place try/catch did.
+    report !== null
   ) {
     try {
-      const report = buildRespondentReportFromSubmission({
-        result: scoreResult as never,
-        publicTaker: {
-          firstName: respondent?.firstName ?? "",
-          lastName: respondent?.lastName ?? "",
-          email: respondentEmail,
-        },
-        assessmentName: template.name,
-        templateAlias: template.alias,
-        campaignLabel: null,
-        sections: campaign.version.sections,
-        questions: campaign.version.questions,
-        scoringConfig: campaign.version.scoringConfig,
-        rawAnswers,
-        submittedAt,
-        submissionId: "", // not interpolated into the body; FK set at INSERT
-        referringCoachEmail: null,
-      });
       const { bodyHtml: reportHtml, renderError } = buildReportEmailHtml({
         report,
         recipientRole: "TAKER_COPY",
@@ -262,11 +247,19 @@ interface EmailRenderFingerprint {
   results: string;
   /** Drives the #16 COACH_COMPLETION row render/gate. */
   coach: string;
+  /**
+   * Wave OSR (#71): drives the on-screen disclosure decision. Unlike the two
+   * email keys this gates a RESPONSE BODY rather than an outbox row, but the
+   * staleness hazard is identical — the Phase-1 read is unlocked, so an
+   * operator un-ticking the box mid-submit must suppress the payload.
+   */
+  onScreen: string;
 }
 
 function emailRenderFingerprint(campaign: {
   sendResultsToRespondent: boolean;
   notifyCoachOnCompletion: boolean;
+  showResultsOnScreen: boolean;
   createdByCoachId: string | null;
   creatorCoach: { email: string } | null;
   version: { id: string };
@@ -286,6 +279,11 @@ function emailRenderFingerprint(campaign: {
       campaign.notifyCoachOnCompletion,
       campaign.createdByCoachId,
       campaign.creatorCoach?.email ?? null,
+    ]),
+    onScreen: JSON.stringify([
+      campaign.showResultsOnScreen,
+      campaign.template?.alias ?? null,
+      campaign.version.id,
     ]),
   };
 }
@@ -466,14 +464,53 @@ export async function POST(
       // SUBMITTED stamp, so the emailed report date matches the DB row.
       const submittedAt = new Date();
 
+      // Wave OSR (#71): build the respondent report model ONCE, here in Phase 1
+      // (lock-free), and share it between the #15 results email and the
+      // on-screen payload. It is the SAME artifact for a new audience — see
+      // ADR-0027.
+      //
+      // The build is wrapped because a model failure must NEVER fail the
+      // submission. Throwing here would return 500 AFTER a later commit, and
+      // the client's retry would then hit the hard double-submit 409 above — an
+      // unrecoverable dead-end with the respondent's answers already saved.
+      // `null` degrades to: no #15 email row, no on-screen payload, normal
+      // thank-you. Mirrors buildWaveDOutboxRows' per-email swallow contract.
+      let respondentReport: RespondentReport | null = null;
+      try {
+        respondentReport = buildRespondentReportFromSubmission({
+          result: scoreResult as never,
+          publicTaker: {
+            firstName: invitation.respondent?.firstName ?? "",
+            lastName: invitation.respondent?.lastName ?? "",
+            email: invitation.respondent?.email ?? "",
+          },
+          assessmentName: invitation.campaign.template?.name ?? "an assessment",
+          // Load-bearing: BrandedReport dispatches scored-vs-qualitative on
+          // reportConfigFor(report.templateAlias). Because the SERVER builds
+          // the model, this can never be silently omitted by a caller.
+          templateAlias: invitation.campaign.template?.alias ?? "",
+          campaignLabel: null,
+          sections: invitation.campaign.version.sections,
+          questions: invitation.campaign.version.questions,
+          scoringConfig: invitation.campaign.version.scoringConfig,
+          rawAnswers,
+          submittedAt,
+          submissionId: "", // not interpolated into the body; FK set at INSERT
+          referringCoachEmail: null,
+        });
+      } catch (err) {
+        console.error(
+          "[assessment-submit] respondent report model build failed — submission unaffected:",
+          err
+        );
+      }
+
       // RENDER 0–2 outbox rows OUTSIDE the tx (the lock-free, CPU-heavy step).
       const preparedRows = buildWaveDOutboxRows({
         campaign: invitation.campaign,
         respondent: invitation.respondent,
         respondentId: invitation.respondentId,
-        scoreResult,
-        rawAnswers,
-        submittedAt,
+        report: respondentReport,
       });
 
       // C-M2: capture the render-input fingerprints these rows were prepared
@@ -511,6 +548,9 @@ export async function POST(
                 // the prepared #15/#16 rows can be re-validated before INSERT.
                 sendResultsToRespondent: true,
                 notifyCoachOnCompletion: true,
+                // Wave OSR (#71): the on-screen disclosure decision is made
+                // from THIS locked read, never from the Phase-1 read.
+                showResultsOnScreen: true,
                 createdByCoachId: true,
                 creatorCoach: { select: { email: true } },
                 version: { select: { id: true } },
@@ -624,11 +664,34 @@ export async function POST(
           data: { status: "SUBMITTED", submittedAt },
         });
 
+        // ── Wave OSR (#71): decide on-screen disclosure HERE, under the lock.
+        // Three independent conditions, all required:
+        //   1. the flag (server-side; there is no client-visible lever),
+        //   2. the LOCKED toggle value — not the Phase-1 read,
+        //   3. an unchanged fingerprint, so a flip inside the Phase-1 → Phase-2
+        //      window suppresses the payload just like a stale email row.
+        // The report is never returned "universally with the client hiding it".
+        const discloseOnScreen =
+          isOnScreenResultsEnabled() &&
+          locked.campaign.showResultsOnScreen === true &&
+          phase2Fingerprint.onScreen === phase1Fingerprint.onScreen;
+
+        if (
+          !discloseOnScreen &&
+          isOnScreenResultsEnabled() &&
+          phase2Fingerprint.onScreen !== phase1Fingerprint.onScreen
+        ) {
+          console.warn(
+            `[assessment-submit] on-screen report suppressed — disclosure inputs changed under lock (campaignId=${locked.campaignId})`
+          );
+        }
+
         return {
           kind: "ok" as const,
           submissionId: submission.id,
           invitationId,
           campaignId: locked.campaignId,
+          discloseOnScreen,
         };
       });
 
@@ -657,8 +720,40 @@ export async function POST(
         },
       });
 
+      // Wave OSR (#71): attach the respondent's OWN report for in-place
+      // rendering when the locked decision permitted it and the model built.
+      // Only ever this respondent's individual result — never cohort/aggregate
+      // data, which is why CEO_ONLY needs no check here (spec 19an §3).
+      //
+      // NO AuditLog row is written for this view: there is no report ROUTE, so
+      // the Report access gate (ADR-0012) was never in the path, and the viewer
+      // is the data subject reading their own data. The log below records that a
+      // payload was ISSUED — it is not, and must not be described as, proof the
+      // respondent VIEWED it.
+      const onScreenReport =
+        result.discloseOnScreen && respondentReport !== null
+          ? respondentReport
+          : undefined;
+
+      if (onScreenReport) {
+        console.info("[assessment-report] onscreen_report_payload_issued", {
+          templateAlias: invitation.campaign.template?.alias ?? null,
+          reportType: reportConfigFor(
+            invitation.campaign.template?.alias ?? null
+          ).reportType,
+          campaignId: result.campaignId,
+          versionId: invitation.campaign.version?.id ?? null,
+        });
+      }
+
       return NextResponse.json(
-        { success: true, data: { submissionId: result.submissionId } },
+        {
+          success: true,
+          data: {
+            submissionId: result.submissionId,
+            ...(onScreenReport ? { report: onScreenReport } : {}),
+          },
+        },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     } catch (err) {
