@@ -47,7 +47,7 @@ interface ReportDb {
 
 // ─── Raw shape returned from Prisma ──────────────────────────────────────
 
-interface RawVersion {
+export interface StoredReportVersion {
   id: string;
   contentHash: string;
   sections: unknown;
@@ -88,7 +88,7 @@ interface RawSubmission {
       firstName: string;
       lastName: string;
     } | null;
-    version: RawVersion;
+    version: StoredReportVersion;
   };
 }
 
@@ -177,12 +177,99 @@ export type RespondentReportOutcome =
   | { status: "forbidden" }
   | { status: "not-found" };
 
+export interface StoredRespondentReportInput {
+  submission: {
+    id: string;
+    submittedAt: Date;
+    answers: unknown;
+    result: unknown;
+  };
+  respondent: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    jobTitle?: string | null;
+  };
+  campaign: {
+    name: string | null;
+    organizationName: string;
+    template: {
+      id: string;
+      name: string;
+      alias: string;
+    };
+    creatorCoach: {
+      profileImage: string | null;
+      firstName: string;
+      lastName: string;
+    } | null;
+    version: StoredReportVersion;
+    importManifest?: unknown;
+  };
+}
+
 // ─── Guard helpers ────────────────────────────────────────────────────────
 
 export function isScoreResult(value: unknown): value is ScoreResult {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return Array.isArray(v.perSection) && Array.isArray(v.perQuestion);
+}
+
+/**
+ * Builds the canonical Results report model from a frozen stored submission.
+ *
+ * This function is deliberately pure: callers provide the submission's frozen
+ * result/answers and its pinned published Template Version. It never scores or
+ * loads mutable template content.
+ */
+export function buildStoredRespondentReport(
+  input: StoredRespondentReportInput,
+): RespondentReport {
+  const questionsByKey: Record<string, QuestionMeta> = buildQuestionMetaByKey(
+    input.campaign.version.questions,
+  );
+  const questionByKey: Record<string, string> = {};
+  for (const [key, meta] of Object.entries(questionsByKey)) {
+    questionByKey[key] = meta.label;
+  }
+
+  const creatorCoach = input.campaign.creatorCoach;
+
+  return {
+    respondentName: respondentDisplayName(
+      input.respondent.firstName,
+      input.respondent.lastName,
+      input.respondent.email,
+    ),
+    jobTitle: input.respondent.jobTitle ?? null,
+    companyName: input.campaign.organizationName,
+    assessmentName: input.campaign.template.name,
+    templateAlias: input.campaign.template.alias,
+    campaignLabel:
+      input.campaign.name && input.campaign.name.trim() !== ""
+        ? input.campaign.name
+        : null,
+    submittedAt: input.submission.submittedAt,
+    result: input.submission.result as ScoreResult,
+    sections: input.campaign.version.sections,
+    questionByKey,
+    questionsByKey,
+    rawAnswers: input.submission.answers,
+    scoringConfig: input.campaign.version.scoringConfig,
+    provenance: {
+      submissionId: input.submission.id,
+      versionId: input.campaign.version.id,
+      contentHash: input.campaign.version.contentHash,
+      templateName: input.campaign.template.name,
+    },
+    degraded: !isScoreResult(input.submission.result),
+    coachLogoUrl: creatorCoach?.profileImage ?? null,
+    coachName: creatorCoach
+      ? `${creatorCoach.firstName} ${creatorCoach.lastName}`
+      : null,
+    isImported: input.campaign.importManifest != null,
+  };
 }
 
 // ─── Main loader ──────────────────────────────────────────────────────────
@@ -278,69 +365,23 @@ export async function getRespondentReport(
       return { status: "not-found" } as const;
     }
 
-    // Build questionsByKey via the SHARED builder (type+label+section+scale+
-    // options, first-wins on duplicate — H10/C-M1/C-H1). questionByKey is the
-    // label-only projection kept for existing consumers.
-    const questionsByKey: Record<string, QuestionMeta> = buildQuestionMetaByKey(
-      submission.campaign.version.questions,
-    );
-    const questionByKey: Record<string, string> = {};
-    for (const [key, meta] of Object.entries(questionsByKey)) {
-      questionByKey[key] = meta.label;
-    }
-
-    // Guard the frozen result — degraded if it doesn't look like ScoreResult (H10)
-    const degraded = !isScoreResult(submission.result);
-    const result = submission.result as ScoreResult; // cast; caller checks degraded
-
-    // assessmentName = instrument name (template.name); campaignLabel = coach's label
-    const assessmentName = submission.campaign.template.name;
-    const campaignLabel =
-      submission.campaign.name && submission.campaign.name.trim() !== ""
-        ? submission.campaign.name
-        : null;
-
-    // Wave K: coach logo — reuse the existing Coach.profileImage. Null when
-    // there's no creator coach or no profileImage (admin PUBLIC campaigns) →
-    // the renderer shows SU-logo-only (graceful fallback, no broken image).
-    const creatorCoach = submission.campaign.creatorCoach;
-    const coachLogoUrl = creatorCoach?.profileImage ?? null;
-    const coachName = creatorCoach
-      ? `${creatorCoach.firstName} ${creatorCoach.lastName}`
-      : null;
-
-    const report: RespondentReport = {
-      // Wave P (Jeff #5): blank roster name → fall back to the respondent's
-      // email (trim-before-truthiness; never a truthy " " or a generic).
-      respondentName: respondentDisplayName(
-        submission.respondent.firstName,
-        submission.respondent.lastName,
-        submission.respondent.email,
-      ),
-      jobTitle: submission.respondent.jobTitle ?? null,
-      companyName: submission.campaign.organization.name,
-      assessmentName,
-      templateAlias: submission.campaign.template.alias,
-      campaignLabel,
-      submittedAt: submission.submittedAt,
-      result,
-      sections: submission.campaign.version.sections,
-      questionByKey,
-      questionsByKey,
-      rawAnswers: submission.answers,
-      scoringConfig: submission.campaign.version.scoringConfig,
-      provenance: {
-        submissionId: submission.id,
-        versionId: submission.campaign.version.id,
-        contentHash: submission.campaign.version.contentHash,
-        templateName: submission.campaign.template.name,
+    const report = buildStoredRespondentReport({
+      submission: {
+        id: submission.id,
+        submittedAt: submission.submittedAt,
+        answers: submission.answers,
+        result: submission.result,
       },
-      degraded,
-      coachLogoUrl,
-      coachName,
-      // Wave V (V-3): boolean only — the manifest payload stays server-side.
-      isImported: submission.campaign.importManifest != null,
-    };
+      respondent: submission.respondent,
+      campaign: {
+        name: submission.campaign.name,
+        organizationName: submission.campaign.organization.name,
+        template: submission.campaign.template,
+        creatorCoach: submission.campaign.creatorCoach,
+        version: submission.campaign.version,
+        importManifest: submission.campaign.importManifest,
+      },
+    });
 
     return { status: "ok", report } as const;
   },

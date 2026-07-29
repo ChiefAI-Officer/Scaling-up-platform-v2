@@ -1,0 +1,494 @@
+import {
+  isPrivilegedRole,
+  type ApiActor,
+} from "@/lib/auth/access-control";
+import { isCertified } from "@/lib/auth/coach-status";
+import { reportConfigFor } from "@/lib/assessments/report-config";
+import {
+  buildStoredRespondentReport,
+  isScoreResult,
+  type RespondentReport,
+  type StoredReportVersion,
+} from "@/lib/assessments/respondent-report";
+
+interface PublicSubmissionFindFirst {
+  findFirst: (args: {
+    where: {
+      id: string;
+      campaign: {
+        accessMode: "PUBLIC";
+        deletedAt: null;
+      };
+    };
+    select: Record<string, unknown>;
+  }) => Promise<RawPublicSubmission | null>;
+}
+
+interface PublicReferralReportDb {
+  $transaction: <T>(
+    callback: (tx: {
+      assessmentSubmission: PublicSubmissionFindFirst;
+    }) => Promise<T>,
+    options?: { maxWait?: number; timeout?: number },
+  ) => Promise<T>;
+}
+
+interface CoachFindUnique {
+  findUnique: (args: {
+    where: { id: string };
+    select: {
+      id: true;
+      certificationStatus: true;
+      certificationExpiry: true;
+    };
+  }) => Promise<{
+    id: string;
+    certificationStatus: string;
+    certificationExpiry: Date | null;
+  } | null>;
+}
+
+interface PublicSubmissionFindMany {
+  findMany: (args: {
+    where: Record<string, unknown>;
+    select: Record<string, unknown>;
+    orderBy: Array<Record<string, "desc">>;
+    cursor?: { id: string };
+    skip?: number;
+    take: number;
+  }) => Promise<RawPublicReferralListRow[]>;
+}
+
+interface PublicReferralListDb {
+  $transaction: <T>(
+    callback: (tx: {
+      coach: CoachFindUnique;
+      assessmentSubmission: PublicSubmissionFindMany;
+    }) => Promise<T>,
+    options?: { maxWait?: number; timeout?: number },
+  ) => Promise<T>;
+}
+
+interface RawPublicSubmission {
+  id: string;
+  submittedAt: Date;
+  answers: unknown;
+  result: unknown;
+  publicTaker: unknown;
+  referringCoachId: string | null;
+  referringCoach: {
+    id: string;
+    certificationStatus: string;
+    certificationExpiry: Date | null;
+  } | null;
+  campaign: {
+    name: string | null;
+    importManifest?: unknown;
+    template: {
+      id: string;
+      name: string;
+      alias: string;
+    };
+    organization: {
+      name: string;
+    };
+    creatorCoach: {
+      profileImage: string | null;
+      firstName: string;
+      lastName: string;
+    } | null;
+    version: StoredReportVersion & {
+      publishedAt: Date | null;
+    };
+  };
+}
+
+export type PublicReferralReportOutcome =
+  | { status: "ok"; report: RespondentReport }
+  | { status: "forbidden" }
+  | { status: "not-found" };
+
+export interface PublicReferralListInput {
+  query?: string;
+  templateId?: string;
+  cursor?: string;
+  take?: number;
+}
+
+export interface PublicScoredDomain {
+  key: string;
+  label: string;
+  score: number | null;
+}
+
+export type PublicResultSummary =
+  | {
+      kind: "scored";
+      overallScore: number;
+      tierLabel: string | null;
+      domains: PublicScoredDomain[];
+    }
+  | { kind: "qualitative"; label: "Completed" }
+  | { kind: "degraded"; label: "Result unavailable" };
+
+export interface PublicReferralListItem {
+  submissionId: string;
+  submittedAt: Date;
+  takerName: string;
+  takerEmail: string | null;
+  template: {
+    id: string;
+    name: string;
+    alias: string;
+  };
+  summary: PublicResultSummary;
+}
+
+export type PublicReferralListOutcome =
+  | {
+      status: "ok";
+      items: PublicReferralListItem[];
+      nextCursor: string | null;
+    }
+  | { status: "forbidden" };
+
+interface RawPublicReferralListRow {
+  id: string;
+  submittedAt: Date;
+  publicTaker: unknown;
+  result: unknown;
+  campaign: {
+    template: {
+      id: string;
+      name: string;
+      alias: string;
+    };
+  };
+}
+
+function stringField(
+  value: Record<string, unknown>,
+  key: string,
+): string {
+  return typeof value[key] === "string" ? value[key].trim() : "";
+}
+
+function publicTakerForReport(value: unknown): {
+  firstName: string;
+  lastName: string;
+  email: string;
+  jobTitle: string | null;
+} {
+  const taker =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+  const email = stringField(taker, "email");
+
+  return {
+    firstName: stringField(taker, "firstName"),
+    lastName: stringField(taker, "lastName"),
+    email: email || "Anonymous",
+    jobTitle: stringField(taker, "jobTitle") || null,
+  };
+}
+
+function isCurrentlyCertified(
+  coach: RawPublicSubmission["referringCoach"],
+  now: Date,
+): boolean {
+  return Boolean(
+    coach &&
+      isCertified(coach) &&
+      (coach.certificationExpiry === null ||
+        coach.certificationExpiry.getTime() > now.getTime()),
+  );
+}
+
+/**
+ * Shapes display-safe list metadata from the frozen result only.
+ */
+export function summarizePublicResult(
+  alias: string,
+  result: unknown,
+): PublicResultSummary {
+  if (reportConfigFor(alias).reportType === "qualitative") {
+    return { kind: "qualitative", label: "Completed" };
+  }
+
+  if (!isScoreResult(result)) {
+    return { kind: "degraded", label: "Result unavailable" };
+  }
+
+  const frozen = result as unknown as Record<string, unknown>;
+  if (
+    typeof frozen.overallAverage !== "number" ||
+    !Number.isFinite(frozen.overallAverage) ||
+    (frozen.perDomain !== undefined && !Array.isArray(frozen.perDomain))
+  ) {
+    return { kind: "degraded", label: "Result unavailable" };
+  }
+
+  const domains: PublicScoredDomain[] = [];
+  for (const value of (frozen.perDomain ?? []) as unknown[]) {
+    if (!value || typeof value !== "object") {
+      return { kind: "degraded", label: "Result unavailable" };
+    }
+    const domain = value as Record<string, unknown>;
+    const score = domain.averagePoints;
+    if (
+      typeof domain.key !== "string" ||
+      typeof domain.label !== "string" ||
+      !(
+        score === null ||
+        (typeof score === "number" && Number.isFinite(score))
+      )
+    ) {
+      return { kind: "degraded", label: "Result unavailable" };
+    }
+    domains.push({
+      key: domain.key,
+      label: domain.label,
+      score,
+    });
+  }
+
+  const tier =
+    frozen.tier && typeof frozen.tier === "object"
+      ? (frozen.tier as Record<string, unknown>)
+      : null;
+
+  return {
+    kind: "scored",
+    overallScore: frozen.overallAverage,
+    tierLabel:
+      tier && typeof tier.label === "string" && tier.label.trim() !== ""
+        ? tier.label
+        : null,
+    domains,
+  };
+}
+
+function normalizedTake(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return 25;
+  return Math.min(100, Math.max(1, Math.trunc(value)));
+}
+
+/**
+ * Lists display-safe public submissions owned by the signed-in active Coach.
+ */
+export async function listPublicReferrals(
+  db: PublicReferralListDb,
+  actor: ApiActor,
+  input: PublicReferralListInput,
+): Promise<PublicReferralListOutcome> {
+  if (actor.role !== "COACH" || !actor.coachId) {
+    return { status: "forbidden" };
+  }
+
+  const coachId = actor.coachId;
+  const take = normalizedTake(input.take);
+  const query = input.query?.trim() ?? "";
+  const templateId = input.templateId?.trim() ?? "";
+  const cursor = input.cursor?.trim() ?? "";
+
+  return db.$transaction(
+    async (tx) => {
+      const coach = await tx.coach.findUnique({
+        where: { id: coachId },
+        select: {
+          id: true,
+          certificationStatus: true,
+          certificationExpiry: true,
+        },
+      });
+      if (!isCurrentlyCertified(coach, new Date())) {
+        return { status: "forbidden" } as const;
+      }
+
+      const campaignWhere: Record<string, unknown> = {
+        accessMode: "PUBLIC",
+        deletedAt: null,
+      };
+      if (templateId) {
+        campaignWhere.templateId = templateId;
+      }
+
+      const where: Record<string, unknown> = {
+        referringCoachId: coachId,
+        campaign: campaignWhere,
+      };
+      if (query) {
+        where.OR = ["firstName", "lastName", "email"].map((key) => ({
+          publicTaker: {
+            path: [key],
+            string_contains: query,
+          },
+        }));
+      }
+
+      const rows = await tx.assessmentSubmission.findMany({
+        where,
+        select: {
+          id: true,
+          submittedAt: true,
+          publicTaker: true,
+          result: true,
+          campaign: {
+            select: {
+              template: {
+                select: {
+                  id: true,
+                  name: true,
+                  alias: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        take: take + 1,
+      });
+
+      const page = rows.slice(0, take);
+      const items = page.map((row): PublicReferralListItem => {
+        const taker = publicTakerForReport(row.publicTaker);
+        return {
+          submissionId: row.id,
+          submittedAt: row.submittedAt,
+          takerName:
+            `${taker.firstName} ${taker.lastName}`.trim() ||
+            taker.email,
+          takerEmail: taker.email === "Anonymous" ? null : taker.email,
+          template: row.campaign.template,
+          summary: summarizePublicResult(
+            row.campaign.template.alias,
+            row.result,
+          ),
+        };
+      });
+
+      return {
+        status: "ok",
+        items,
+        nextCursor:
+          rows.length > take && page.length > 0
+            ? page[page.length - 1].id
+            : null,
+      } as const;
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
+}
+
+/**
+ * Loads one frozen Results report for a public referral.
+ *
+ * The submission fetch and authorization decision share one transaction.
+ * Coach ownership comes only from the immutable Coach ID relation; the
+ * delivery email snapshot is intentionally not selected.
+ */
+export async function getPublicReferralReport(
+  db: PublicReferralReportDb,
+  actor: ApiActor,
+  submissionId: string,
+): Promise<PublicReferralReportOutcome> {
+  return db.$transaction(
+    async (tx) => {
+      const submission = await tx.assessmentSubmission.findFirst({
+        where: {
+          id: submissionId,
+          campaign: {
+            accessMode: "PUBLIC",
+            deletedAt: null,
+          },
+        },
+        select: {
+          id: true,
+          submittedAt: true,
+          answers: true,
+          result: true,
+          publicTaker: true,
+          referringCoachId: true,
+          referringCoach: {
+            select: {
+              id: true,
+              certificationStatus: true,
+              certificationExpiry: true,
+            },
+          },
+          campaign: {
+            select: {
+              name: true,
+              importManifest: true,
+              template: {
+                select: {
+                  id: true,
+                  name: true,
+                  alias: true,
+                },
+              },
+              organization: {
+                select: { name: true },
+              },
+              creatorCoach: {
+                select: {
+                  profileImage: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+              version: {
+                select: {
+                  id: true,
+                  contentHash: true,
+                  publishedAt: true,
+                  sections: true,
+                  questions: true,
+                  scoringConfig: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!submission) {
+        return { status: "not-found" } as const;
+      }
+
+      if (!isPrivilegedRole(actor.role)) {
+        if (
+          !actor.coachId ||
+          actor.coachId !== submission.referringCoachId ||
+          submission.referringCoach?.id !== actor.coachId ||
+          !isCurrentlyCertified(submission.referringCoach, new Date())
+        ) {
+          return { status: "forbidden" } as const;
+        }
+      }
+
+      const report = buildStoredRespondentReport({
+        submission: {
+          id: submission.id,
+          submittedAt: submission.submittedAt,
+          answers: submission.answers,
+          result: submission.result,
+        },
+        respondent: publicTakerForReport(submission.publicTaker),
+        campaign: {
+          name: submission.campaign.name,
+          organizationName: submission.campaign.organization.name,
+          template: submission.campaign.template,
+          creatorCoach: submission.campaign.creatorCoach,
+          version: submission.campaign.version,
+          importManifest: submission.campaign.importManifest,
+        },
+      });
+
+      return { status: "ok", report } as const;
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
+}

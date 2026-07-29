@@ -12,7 +12,10 @@
 
 import type { ApiActor } from "@/lib/auth/access-control";
 import type { ScoreResult } from "@/lib/assessments/scoring";
-import { getRespondentReport } from "@/lib/assessments/respondent-report";
+import {
+  buildStoredRespondentReport,
+  getRespondentReport,
+} from "@/lib/assessments/respondent-report";
 
 // ── Mock access-control so canManageCampaign is fully controllable ───────
 const mockCanManageCampaign = jest.fn<Promise<boolean>, [unknown, unknown, string, string]>();
@@ -134,6 +137,37 @@ function makeMockDb(submission: typeof GOOD_SUBMISSION | null) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+test("buildStoredRespondentReport exposes the shared pure frozen-report seam", () => {
+  const report = buildStoredRespondentReport({
+    submission: {
+      id: GOOD_SUBMISSION.id,
+      submittedAt: GOOD_SUBMISSION.submittedAt,
+      answers: GOOD_SUBMISSION.answers,
+      result: GOOD_SCORE_RESULT,
+    },
+    respondent: {
+      ...GOOD_SUBMISSION.respondent,
+      email: "alice@example.com",
+    },
+    campaign: {
+      name: GOOD_SUBMISSION.campaign.name,
+      organizationName: GOOD_SUBMISSION.campaign.organization.name,
+      template: GOOD_SUBMISSION.campaign.template,
+      creatorCoach: GOOD_SUBMISSION.campaign.creatorCoach,
+      version: GOOD_SUBMISSION.campaign.version,
+    },
+  });
+
+  expect(report.result).toBe(GOOD_SCORE_RESULT);
+  expect(report.rawAnswers).toBe(GOOD_SUBMISSION.answers);
+  expect(report.provenance).toEqual({
+    submissionId: "sub-1",
+    versionId: "ver-1",
+    contentHash: "abc123",
+    templateName: "Rockefeller",
+  });
 });
 
 test("1. owning coach + submission → status:ok, all fields populated, provenance correct", async () => {
