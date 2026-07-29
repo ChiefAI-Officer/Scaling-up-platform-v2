@@ -63,11 +63,18 @@ Three facts shaped the decision:
   server-side log cannot prove.
 - **Show-once, but not refresh-hostile.** `/me` returns 410 once the invitation is `SUBMITTED`, which the
   survey client renders as *"This survey has closed."* — so a state-only report would tell a respondent the
-  survey closed seconds after they finished. The report is therefore persisted to **`sessionStorage`** and read
-  **before** `/me` on mount. It survives refresh and Back; it dies with the tab. The slot is keyed by
+  survey closed seconds after they finished. The report is therefore persisted to **`sessionStorage`** and
+  re-read on mount. It survives refresh and Back; it dies with the tab. The slot is keyed by
   **campaign alias** (on the refresh being rehydrated, `/me` has already 410'd, so `respondentKey` is
-  unavailable), which makes one rule load-bearing: **a fresh token exchange purges the slot**, so one
-  respondent can never be shown the previous one's report in a shared tab.
+  unavailable).
+  ⚠️ **Corrected after review — the exchange purge is NOT the security boundary.** An earlier draft argued "a
+  second invitee can only reach the survey in the same tab by arriving with a new `#t=` link". That covers only
+  arrivals *with* a token, and the exchange **strips the fragment**, so a plain reload of
+  `/org-survey/{alias}` — the common case — never reaches the purge. Reading the slot before any server call
+  would therefore serve a full report to whoever next reloaded an abandoned tab, with no credential at all.
+  **The slot is not a credential.** The client now rehydrates **only after `/me` answers 410**, which requires a
+  live sealed invitation cookie; any other response purges the slot. The envelope also carries `issuedAt` and
+  expires on the invitation cookie's own clock (1740s) as defense in depth.
 - **A report-model failure never fails the submission.** The model is built in Phase 1, pre-commit and
   lock-free, and a throw degrades to no email row + no payload + the normal thank-you. This is not cosmetic: a
   throw *after* commit would return 500, and the client's retry would then hit the hard double-submit **409** —
@@ -77,10 +84,27 @@ Three facts shaped the decision:
   already gates on the respondent toggle without consulting it. A guard test enforces the absence.
 - **Print/Download is load-bearing, not cosmetic** — under show-once it is the only way the respondent keeps
   the report.
+- **"Same artifact" required widening the builder, and the first cut did not hold.** Review found that
+  `buildRespondentReportFromSubmission` exists for the *public quiz*, where org and coach are genuinely unknown:
+  it hardcoded `companyName: ""` (which the cover interpolates unconditionally, emitting an orphan `" · "`),
+  omitted `coachLogoUrl`/`coachName`, and hardcoded `degraded: false`. So the respondent's copy would have
+  carried **no coach byline** — the exact placement Jeff asked for in #63/#67/#73/#78/#81 and PR #230 shipped
+  days earlier. The builder now takes those as optional args (defaulting to the previous values, so public-quiz
+  callers are byte-unchanged) and the invited route populates them from data it already reads. The renderers
+  additionally guard the separator so an empty org name can never emit a naked `" · "`.
+- **A malformed frozen result now surfaces the degraded notice.** `ScoreResult` carries no `degraded` field —
+  only the authorized DB loader computes it — so the builder is passed `degraded: !isScoreResult(scoreResult)`.
+  Without that, a respondent with a malformed result would have seen a silently incomplete report.
 - **The flag gates capability, never data.** The wizard hides the checkbox when the flag is off but **does not**
-  coerce the stored column, deliberately unlike the `sendResultsToRespondent` precedent. That coercion exists
-  because a stale `true` would make the thank-you page promise an email the send path won't deliver — a
-  user-visible lie. No such hazard exists here, because the server decides.
+  coerce the stored column, deliberately unlike the `sendResultsToRespondent` precedent.
+  ⚠️ **Corrected after review:** an earlier draft of this ADR justified that by a "stale draft `true`" hazard.
+  **That hazard cannot occur** — `persistDraft` in `CampaignWizard.tsx` stores only org/template/respondents/
+  CEO/name/openAt/endMode/closeAt, never any of the three toggles, so no toggle can be rehydrated `true` from a
+  draft. (Which also means the *sibling* coercion defends against something unreachable today.) The decision
+  therefore rests only on the durable rule — flags gate capability, not data — plus the fact that the server
+  decides disclosure under the lock, so a stored `true` with the flag off promises nobody anything. It has **no
+  observable behavioural difference today**, and consequently no behavioural test; see the note in
+  `campaign-wizard-onscreen-results.test.tsx`.
 - **Imported campaigns are unaffected** — imported submissions never traverse the submit route (coach-operated
   recompute, ADR-0017), so there is no on-screen moment. A future reader should not look for one.
 - A future reader should **not** "restore" the rule that invited respondents never see their own report, nor

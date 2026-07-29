@@ -106,10 +106,17 @@ to `/org-survey/{alias}`, so it never reaches the report routes under `(report)/
 or Back after viewing results would tell someone who just completed the assessment that the survey is closed.
 That is a defect, not an accepted trade-off of show-once.
 
-So the client persists the server-built report to **`sessionStorage`**, keyed off `respondentKey` (already
-returned by `/me:127`), and checks it **before** calling `/me`. Survives refresh and Back; dies on tab close —
-which *is* show-once. Precedent: `useAnswerDraft` already persists **answers** to `localStorage` keyed per
-respondent, so `sessionStorage` here is strictly narrower exposure than what already ships.
+So the client persists the server-built report to **`sessionStorage`**. Survives refresh and Back; dies on tab
+close — which *is* show-once. Precedent: `useAnswerDraft` already persists **answers** to `localStorage` keyed
+per respondent, so `sessionStorage` here is strictly narrower exposure than what already ships.
+
+⚠️ **Revised after review — rehydrate requires proof of identity.** The slot is keyed by **campaign alias**
+(`respondentKey` is unavailable once `/me` has 410'd), and the first cut read it *before* any server call,
+relying on the token-exchange purge to keep respondents apart. That was wrong: the exchange **strips the
+fragment**, so a plain reload never hits the purge, and the slot would have rendered a full report — name,
+answers, scores — for whoever next reloaded an abandoned tab. The slot is **not a credential**. Rehydrate
+happens **only after `/me` answers 410** (which requires a live sealed cookie); any other response purges the
+slot; and the envelope expires on the cookie's own 1740s clock as defense in depth.
 
 ---
 

@@ -46,7 +46,10 @@ import {
   buildRespondentReportFromSubmission,
   buildReportEmailHtml,
 } from "@/lib/assessments/report-email";
-import type { RespondentReport } from "@/lib/assessments/respondent-report";
+import {
+  isScoreResult,
+  type RespondentReport,
+} from "@/lib/assessments/respondent-report";
 import {
   buildResultsEmailHtml,
   buildCoachNotifyEmail,
@@ -63,6 +66,21 @@ const AnswerInputSchema = z.object({
 const SubmitBodySchema = z.object({
   answers: z.array(AnswerInputSchema),
 });
+
+/**
+ * Wave OSR (#71) — the coach byline name for the report cover/footer, built the
+ * SAME way the authorized DB loader builds it (respondent-report.ts) so the
+ * respondent's copy and the coach/admin copy cannot drift. Null when there is no
+ * creator coach (admin-created campaigns) → the renderer falls back to
+ * SU-logo-only rather than a broken byline.
+ */
+function coachBylineName(
+  coach: { firstName: string; lastName: string } | null | undefined,
+): string | null {
+  if (!coach) return null;
+  const name = `${coach.firstName} ${coach.lastName}`.trim();
+  return name === "" ? null : name;
+}
 
 function gateFailed(): NextResponse {
   return NextResponse.json(
@@ -91,7 +109,9 @@ interface EnqueueArgs {
     notifyCoachOnCompletion: boolean;
     createdByCoachId: string | null;
     creatorCoach: { email: string } | null;
-    version: { sections: unknown; questions: unknown; scoringConfig: unknown };
+    // Wave OSR: version CONTENT is no longer read here — the report model that
+    // needed it is built by the caller. Only the id remains (fingerprinting).
+    version: { id: string };
     template: {
       name: string;
       alias: string;
@@ -342,12 +362,31 @@ export async function POST(
         include: {
           // Wave D #15: the respondent's email is the #15 recipient.
           respondent: {
-            select: { email: true, firstName: true, lastName: true },
+            // Wave OSR (#71): jobTitle joins the byline block on the report cover.
+            select: {
+              email: true,
+              firstName: true,
+              lastName: true,
+              jobTitle: true,
+            },
           },
           campaign: {
             include: {
+              // Wave OSR (#71): the org name fills the cover subtitle (an empty
+              // one renders an orphan " · ").
+              organization: { select: { name: true } },
               // Wave D: per-campaign send toggles + the owning coach (#16).
-              creatorCoach: { select: { email: true } },
+              // Wave OSR (#71): profileImage + names build the coach byline that
+              // PR #230 shipped on the coach/admin report (Jeff #63/#67/#73/#78/#81)
+              // — without them the respondent's copy is NOT the same artifact.
+              creatorCoach: {
+                select: {
+                  email: true,
+                  profileImage: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
               version: {
                 select: {
                   id: true,
@@ -475,34 +514,55 @@ export async function POST(
       // unrecoverable dead-end with the respondent's answers already saved.
       // `null` degrades to: no #15 email row, no on-screen payload, normal
       // thank-you. Mirrors buildWaveDOutboxRows' per-email swallow contract.
+      // #7: only build when some consumer could actually use it. Disclosure is
+      // still decided under the lock — a Phase-1-false / Phase-2-true flip is
+      // already suppressed by the fingerprint compare, so guarding on the
+      // (unlocked) Phase-1 read cannot leak a report that should be hidden. It
+      // only avoids building a model nobody reads, which today is every
+      // submission (no template has approved results-email copy).
+      const mayNeedReport =
+        (isOnScreenResultsEnabled() &&
+          invitation.campaign.showResultsOnScreen === true) ||
+        invitation.campaign.sendResultsToRespondent === true;
+
       let respondentReport: RespondentReport | null = null;
-      try {
-        respondentReport = buildRespondentReportFromSubmission({
-          result: scoreResult as never,
-          publicTaker: {
-            firstName: invitation.respondent?.firstName ?? "",
-            lastName: invitation.respondent?.lastName ?? "",
-            email: invitation.respondent?.email ?? "",
-          },
-          assessmentName: invitation.campaign.template?.name ?? "an assessment",
-          // Load-bearing: BrandedReport dispatches scored-vs-qualitative on
-          // reportConfigFor(report.templateAlias). Because the SERVER builds
-          // the model, this can never be silently omitted by a caller.
-          templateAlias: invitation.campaign.template?.alias ?? "",
-          campaignLabel: null,
-          sections: invitation.campaign.version.sections,
-          questions: invitation.campaign.version.questions,
-          scoringConfig: invitation.campaign.version.scoringConfig,
-          rawAnswers,
-          submittedAt,
-          submissionId: "", // not interpolated into the body; FK set at INSERT
-          referringCoachEmail: null,
-        });
-      } catch (err) {
-        console.error(
-          "[assessment-submit] respondent report model build failed — submission unaffected:",
-          err
-        );
+      if (mayNeedReport) {
+        try {
+          respondentReport = buildRespondentReportFromSubmission({
+            result: scoreResult as never,
+            publicTaker: {
+              firstName: invitation.respondent?.firstName ?? "",
+              lastName: invitation.respondent?.lastName ?? "",
+              email: invitation.respondent?.email ?? "",
+            },
+            assessmentName: invitation.campaign.template?.name ?? "an assessment",
+            // Load-bearing: BrandedReport dispatches scored-vs-qualitative on
+            // reportConfigFor(report.templateAlias). Because the SERVER builds
+            // the model, this can never be silently omitted by a caller.
+            templateAlias: invitation.campaign.template?.alias ?? "",
+            campaignLabel: null,
+            sections: invitation.campaign.version.sections,
+            questions: invitation.campaign.version.questions,
+            scoringConfig: invitation.campaign.version.scoringConfig,
+            rawAnswers,
+            submittedAt,
+            submissionId: "", // not interpolated into the body; FK set at INSERT
+            referringCoachEmail: null,
+            // Wave OSR (#71) — the invited path knows these; the public quiz does not.
+            companyName: invitation.campaign.organization?.name ?? "",
+            jobTitle: invitation.respondent?.jobTitle ?? null,
+            coachLogoUrl: invitation.campaign.creatorCoach?.profileImage ?? null,
+            coachName: coachBylineName(invitation.campaign.creatorCoach),
+            // #6: surface a malformed frozen result as the degraded notice rather
+            // than silently rendering an incomplete report.
+            degraded: !isScoreResult(scoreResult),
+          });
+        } catch (err) {
+          console.error(
+            "[assessment-submit] respondent report model build failed — submission unaffected:",
+            err
+          );
+        }
       }
 
       // RENDER 0–2 outbox rows OUTSIDE the tx (the lock-free, CPU-heavy step).
@@ -671,14 +731,15 @@ export async function POST(
         //   3. an unchanged fingerprint, so a flip inside the Phase-1 → Phase-2
         //      window suppresses the payload just like a stale email row.
         // The report is never returned "universally with the client hiding it".
+        const onScreenFlagOn = isOnScreenResultsEnabled();
         const discloseOnScreen =
-          isOnScreenResultsEnabled() &&
+          onScreenFlagOn &&
           locked.campaign.showResultsOnScreen === true &&
           phase2Fingerprint.onScreen === phase1Fingerprint.onScreen;
 
         if (
           !discloseOnScreen &&
-          isOnScreenResultsEnabled() &&
+          onScreenFlagOn &&
           phase2Fingerprint.onScreen !== phase1Fingerprint.onScreen
         ) {
           console.warn(

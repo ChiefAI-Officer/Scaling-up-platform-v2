@@ -30,6 +30,18 @@
  * with a new `#t=` link, so clearing on exchange is exactly the moment that
  * prevents them being shown the previous respondent's report.
  *
+ * AUTHORIZATION lives in the CALLER, not here
+ * ───────────────────────────────────────────
+ * A stored slot is NOT a credential. The client must only rehydrate from it after
+ * `/me` has answered **410** — which proves a live invitation cookie whose
+ * invitation is past its lifecycle gate. Reading the slot before that check would
+ * serve a full report (name, answers, scores) to whoever next reloads the tab,
+ * with no credential at all. See the review of PR #236.
+ *
+ * This module still defends in depth: the envelope is stamped with `issuedAt` and
+ * expires on the same clock as the invitation cookie (1740s), so an abandoned tab
+ * stops being able to re-render even if a caller forgets the `/me` gate.
+ *
  * Every function is defensive and never throws: Safari private mode can throw on
  * `setItem`, and a corrupt slot must degrade to "no stored report" rather than
  * white-screening a respondent who has already submitted.
@@ -42,8 +54,19 @@ const PREFIX = "su-onscreen-result:";
 /** Stored envelope. Versioned so a future shape change can be detected. */
 interface StoredEnvelope {
   v: 1;
+  /** Epoch ms at write time — drives the expiry below. */
+  issuedAt: number;
   report: unknown;
 }
+
+const ENVELOPE_VERSION = 1;
+
+/**
+ * Slot lifetime, matched to the invitation cookie's `maxAge`
+ * (invitation-cookie.ts COOKIE_MAX_AGE_SECONDS = 1740). Beyond it the respondent
+ * could not have re-authenticated anyway, so a readable report is pure exposure.
+ */
+const MAX_AGE_MS = 1_740_000;
 
 /**
  * sessionStorage key for a campaign's on-screen result. Namespaced so it can
@@ -75,7 +98,11 @@ export function writeOnScreenResult(
   const store = storage();
   if (!store) return;
   try {
-    const envelope: StoredEnvelope = { v: 1, report };
+    const envelope: StoredEnvelope = {
+      v: ENVELOPE_VERSION,
+      issuedAt: Date.now(),
+      report,
+    };
     store.setItem(onScreenResultKey(campaignAlias), JSON.stringify(envelope));
   } catch {
     // Private mode / quota exceeded. Non-fatal by design.
@@ -111,9 +138,40 @@ export function readOnScreenResult(
 
   if (typeof parsed !== "object" || parsed === null) return null;
   const envelope = parsed as Partial<StoredEnvelope>;
-  const report = envelope.report;
-  if (typeof report !== "object" || report === null) return null;
 
+  // A slot written by a future shape must never be handed to the renderer.
+  if (envelope.v !== ENVELOPE_VERSION) {
+    clearOnScreenResult(campaignAlias);
+    return null;
+  }
+
+  // Defense in depth behind the caller's /me 410 gate: an abandoned tab stops
+  // rendering once the respondent could no longer have re-authenticated.
+  if (
+    typeof envelope.issuedAt !== "number" ||
+    !Number.isFinite(envelope.issuedAt) ||
+    Date.now() - envelope.issuedAt > MAX_AGE_MS
+  ) {
+    clearOnScreenResult(campaignAlias);
+    return null;
+  }
+
+  return reviveOnScreenReport(envelope.report);
+}
+
+/**
+ * Revive a `RespondentReport` that has crossed a JSON boundary.
+ *
+ * `submittedAt` is typed as a `Date` but round-trips as an ISO string, and the
+ * report renderers hand it to `Intl.DateTimeFormat`, which throws `RangeError` on
+ * a string and falls back to printing the raw ISO text. BOTH boundaries need
+ * this: the submit response (server → client) and this sessionStorage slot.
+ * Returns null for anything that is not a report-shaped object.
+ */
+export function reviveOnScreenReport(
+  report: unknown,
+): RespondentReport | null {
+  if (typeof report !== "object" || report === null) return null;
   const revived = report as RespondentReport & { submittedAt?: unknown };
   if (typeof revived.submittedAt === "string") {
     const asDate = new Date(revived.submittedAt);

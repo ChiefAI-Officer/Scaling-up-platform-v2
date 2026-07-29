@@ -171,7 +171,7 @@ export type RespondentReportOutcome =
 
 // ─── Guard helpers ────────────────────────────────────────────────────────
 
-function isScoreResult(value: unknown): value is ScoreResult {
+export function isScoreResult(value: unknown): value is ScoreResult {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return Array.isArray(v.perSection) && Array.isArray(v.perQuestion);

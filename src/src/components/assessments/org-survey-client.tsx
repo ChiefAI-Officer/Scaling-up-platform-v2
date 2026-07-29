@@ -8,10 +8,14 @@
  *   2. POST { token } → ./exchange. Strip the fragment on success.
  *   3. GET ./me → fetch form data.
  *   4. Render SLIDER_LIKERT inputs; submit POST → ./submit.
- *   5. On 200, redirect to ./thank-you.
+ *   5. On 200: if the response carries a report (Wave OSR / #71 — the campaign
+ *      opted in AND the flag is on, both decided server-side), render it in
+ *      place as the terminal `results` phase; otherwise redirect to ./thank-you.
  *
  * Errors render inline. 410 ⇒ "This survey has closed.", 404 ⇒ "Invalid link.",
- * 401 ⇒ "Your session expired."
+ * 401 ⇒ "Your session expired." One exception (Wave OSR): a 410 from ./me with a
+ * stored on-screen report re-renders that report instead of the error — the 410
+ * is what proves a live invitation cookie. See onscreen-result-store.ts.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -57,6 +61,7 @@ import {
   readOnScreenResult,
   writeOnScreenResult,
   clearOnScreenResult,
+  reviveOnScreenReport,
 } from "@/lib/assessments/onscreen-result-store";
 
 // Wave OSR (#71) — the in-place report needs the report stylesheets. This route
@@ -197,11 +202,10 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
           }
 
           // Wave OSR (#71): a fresh exchange means a (possibly different)
-          // respondent is starting this campaign in this tab. Purge any stored
-          // on-screen report FIRST — the slot is keyed by campaign alias (it has
-          // to be: on a refresh /me has 410'd, so respondentKey is unavailable),
-          // so this purge is what prevents one respondent ever being shown the
-          // previous one's report. See onscreen-result-store.ts.
+          // respondent is starting this campaign in this tab — purge any stored
+          // report. This is a belt-and-braces cleanup, NOT the security boundary:
+          // the real guard is the /me 410 check below, because the tokenless
+          // reload never reaches this branch at all.
           clearOnScreenResult(campaignAlias);
 
           // Clear the fragment so reloads don't re-exchange.
@@ -215,18 +219,6 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         }
 
         if (cancelled) return;
-
-        // Wave OSR (#71): rehydrate BEFORE /me. Once the invitation is SUBMITTED
-        // /me returns 410, which this client renders as "This survey has
-        // closed." — so a respondent refreshing the report they were just shown
-        // would be told the survey closed. Checking the store first turns that
-        // into the report re-rendering. Ordering is load-bearing.
-        const stored = readOnScreenResult(campaignAlias);
-        if (stored) {
-          setPhase({ kind: "results", report: stored });
-          return;
-        }
-
         setPhase({ kind: "loading" });
 
         const meRes = await fetch(`/org-survey/${campaignAlias}/me`, {
@@ -235,6 +227,30 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
           cache: "no-store",
         });
         if (!meRes.ok) {
+          // Wave OSR (#71) — rehydrate the in-place report, but ONLY behind a
+          // proof of identity. /me answers 410 once the invitation is past its
+          // lifecycle gate (SUBMITTED is the case we care about) and that answer
+          // requires a live, sealed invitation cookie — so a 410 is evidence
+          // this browser holds THIS respondent's session.
+          //
+          // The stored slot is deliberately NOT treated as a credential. It is
+          // keyed by campaign alias (respondentKey is unavailable once /me has
+          // 410'd), so reading it before this check would serve a full report —
+          // name, answers, scores — to whoever next reloads an abandoned tab,
+          // with no token at all. The exchange purge does not cover that case:
+          // the exchange strips the fragment, so a tokenless reload is the
+          // COMMON path, not an exotic one.
+          if (meRes.status === 410) {
+            const stored = readOnScreenResult(campaignAlias);
+            if (stored) {
+              if (!cancelled) setPhase({ kind: "results", report: stored });
+              return;
+            }
+          } else {
+            // No live session (401/404/…): identity cannot be proven, so destroy
+            // the stored PII rather than leave it readable.
+            clearOnScreenResult(campaignAlias);
+          }
           const message = await readError(meRes, "Your session expired.");
           if (!cancelled) setPhase({ kind: "error", message });
           return;
@@ -414,8 +430,13 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
       // server to disagree (spec 19an §6).
       const submitBody = (await submitRes
         .json()
-        .catch(() => null)) as { data?: { report?: RespondentReport } } | null;
-      const onScreenReport = submitBody?.data?.report;
+        .catch(() => null)) as { data?: { report?: unknown } } | null;
+      // Revive across the JSON boundary: `submittedAt` is typed Date but arrives
+      // as an ISO string, and the renderers hand it to Intl.DateTimeFormat,
+      // which throws on a string and falls back to printing raw ISO text. The
+      // sessionStorage path revives too — both boundaries need it, or the same
+      // report shows two different date formats before vs after a refresh.
+      const onScreenReport = reviveOnScreenReport(submitBody?.data?.report);
       if (onScreenReport) {
         writeOnScreenResult(campaignAlias, onScreenReport);
         setPhase({ kind: "results", report: onScreenReport });

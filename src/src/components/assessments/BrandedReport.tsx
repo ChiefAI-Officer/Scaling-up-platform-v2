@@ -422,7 +422,10 @@ export function BrandedReport({
               {report.jobTitle ? ` · ${report.jobTitle}` : ""}
             </div>
             <div className="su-report-sub">
-              {report.companyName} · {formatSubmittedAt(report.submittedAt)}
+              {report.companyName
+                ? `${report.companyName} · `
+                : ""}
+              {formatSubmittedAt(report.submittedAt)}
             </div>
             {/* Wave V (V-3): provenance pill for Wave O historical imports. */}
             {report.isImported ? <ImportedBadge /> : null}
