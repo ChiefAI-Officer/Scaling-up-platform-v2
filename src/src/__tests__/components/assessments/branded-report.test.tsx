@@ -21,6 +21,10 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     jobTitle: "Chief Executive Officer",
     companyName: "Northwind Logistics",
     assessmentName: "Rockefeller Habits Checklist",
+    // Required on RespondentReport. "" resolves to DEFAULT_REPORT_CONFIG, which
+    // is exactly what omitting it used to do — so these fixtures are unchanged
+    // in behaviour. Cases that need a real instrument override it.
+    templateAlias: "",
     campaignLabel: null,
     submittedAt: new Date("2026-06-05T10:00:00Z"),
     result: {} as ScoreResult,

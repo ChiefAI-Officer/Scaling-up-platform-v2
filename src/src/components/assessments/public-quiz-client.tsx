@@ -395,6 +395,13 @@ export function PublicQuizClient({
       jobTitle: null,
       companyName: "",
       assessmentName: templateName,
+      // Was OMITTED here, which silently forced every public report through
+      // DEFAULT_REPORT_CONFIG regardless of the instrument (BrandedReport reads
+      // it at four sites). Harmless only because the one live public campaign is
+      // absent from REPORT_CONFIG; a mapped alias going public would have
+      // misrendered the report type outright. The field is now required on
+      // RespondentReport so this cannot recur.
+      templateAlias: templateAlias ?? "",
       campaignLabel: campaignName,
       submittedAt: new Date(),
       result: results,

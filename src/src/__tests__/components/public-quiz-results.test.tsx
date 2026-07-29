@@ -192,6 +192,47 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  // ── F4 (Wave OSR / Jeff #71 review): templateAlias must reach BrandedReport ─
+  //
+  // The hand-built RespondentReport here OMITTED templateAlias, so every public
+  // report silently resolved to DEFAULT_REPORT_CONFIG no matter the instrument.
+  // It was invisible only because the one live public campaign is absent from
+  // REPORT_CONFIG. These two tests make the wiring observable: RockHabits sets
+  // showScoreTable:false while DEFAULT sets true, so the score table's presence
+  // IS the signal that the alias flowed through. The pair is a positive/negative
+  // control — neither can pass vacuously.
+  async function submitAndRender(props: { templateAlias?: string } = {}) {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          scoreResult: scoreResultFixture,
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+    render(<PublicQuizClient {...baseProps} {...props} />);
+    reachFormStep();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("quiz-results")).toBeInTheDocument(),
+    );
+  }
+
+  it("honours a mapped templateAlias — RockHabits hides the score table", async () => {
+    await submitAndRender({ templateAlias: "RockHabits" });
+    expect(screen.queryByTestId("report-scores-table")).toBeNull();
+  });
+
+  it("positive control — with no alias the DEFAULT config still shows it", async () => {
+    await submitAndRender();
+    expect(screen.getByTestId("report-scores-table")).toBeInTheDocument();
+  });
+
   // ── T7-3: POST body includes idempotencyKey ──────────────────────────────
   it("sends idempotencyKey in the POST body", async () => {
     global.fetch = jest.fn().mockResolvedValue({

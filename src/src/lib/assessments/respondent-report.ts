@@ -111,11 +111,23 @@ export interface RespondentReport {
   assessmentName: string;
   /**
    * template.alias — the stable instrument slug (e.g. "leadership-vision-alignment").
-   * Optional on the shared type because the public-quiz submit path
-   * (buildRespondentReportFromSubmission) constructs this shape without a
-   * template-alias in hand; the authorized loader always populates it.
+   *
+   * REQUIRED, and deliberately so. Every renderer dispatches on it via
+   * `reportConfigFor(report.templateAlias)` — report type (scored vs
+   * qualitative), tier display, score table, coach CTA — so a construction site
+   * that forgets it silently renders the DEFAULT config instead of the
+   * instrument's own. That is exactly what happened: `public-quiz-client.tsx`
+   * hand-built this shape and omitted the field, which was invisible only
+   * because the one live public campaign is absent from REPORT_CONFIG and
+   * resolves to DEFAULT either way. It would have misrendered the moment a
+   * mapped alias (leadership-vision-alignment, qsp-v1, qsp-v2,
+   * five-dysfunctions) went public.
+   *
+   * Keeping it optional made the omission uncatchable by the compiler. Pass ""
+   * only when there is genuinely no alias in hand — `reportConfigFor` treats it
+   * the same as absent.
    */
-  templateAlias?: string;
+  templateAlias: string;
   /** campaign.name — the coach's label; null when absent or empty */
   campaignLabel: string | null;
   submittedAt: Date;
