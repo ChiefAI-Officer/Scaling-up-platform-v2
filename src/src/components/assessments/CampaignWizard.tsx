@@ -417,8 +417,16 @@ export function CampaignWizard({
             typeof parsed.invitationBodyHtml === "string"
               ? parsed.invitationBodyHtml
               : "",
-          // Task 6b — not persisted to draft (approved state is re-derived from template);
-          // toggles are persisted so a resumed draft keeps the user's choices.
+          // Task 6b — approved state is re-derived from the template, never stored.
+          //
+          // ⚠️ The rest of this comment used to claim "toggles are persisted so a
+          // resumed draft keeps the user's choices". That is FALSE: `persistDraft`
+          // below writes org/template/respondents/CEO/name/openAt/endMode/closeAt
+          // and no toggle at all, so these three reads are dead — a resumed draft
+          // always rehydrates them false. Established while proving that the
+          // "stale draft true" hazard ADR-0027 originally cited cannot occur.
+          // Left in place (harmless, and correct if persistDraft ever widens),
+          // but do not rely on the claim.
           templateResultsEmailApproved: false,
           sendResultsToRespondent: parsed.sendResultsToRespondent === true,
           notifyCoachOnCompletion: parsed.notifyCoachOnCompletion === true,

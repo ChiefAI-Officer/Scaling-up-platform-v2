@@ -227,29 +227,50 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
           cache: "no-store",
         });
         if (!meRes.ok) {
-          // Wave OSR (#71) — rehydrate the in-place report, but ONLY behind a
-          // proof of identity. /me answers 410 once the invitation is past its
-          // lifecycle gate (SUBMITTED is the case we care about) and that answer
-          // requires a live, sealed invitation cookie — so a 410 is evidence
-          // this browser holds THIS respondent's session.
+          // Wave OSR (#71) — rehydrate the in-place report, but only behind TWO
+          // checks, because neither is sufficient alone:
           //
-          // The stored slot is deliberately NOT treated as a credential. It is
-          // keyed by campaign alias (respondentKey is unavailable once /me has
-          // 410'd), so reading it before this check would serve a full report —
-          // name, answers, scores — to whoever next reloads an abandoned tab,
-          // with no token at all. The exchange purge does not cover that case:
-          // the exchange strips the fragment, so a tokenless reload is the
-          // COMMON path, not an exotic one.
+          //  1. AUTHORIZATION — /me must answer 410. It returns 401 for a
+          //     missing/mismatched cookie BEFORE evaluating any lifecycle gate,
+          //     so a 410 proves a live sealed invitation cookie. Reading the
+          //     slot before any server call (the first cut) would have served a
+          //     full report — name, answers, scores — to whoever next reloaded
+          //     an abandoned tab, with no token at all. The exchange purge does
+          //     NOT cover that: the exchange strips the fragment, so the
+          //     tokenless reload is the COMMON path.
+          //  2. OWNERSHIP — the 410 echoes `respondentKey`, and the stored
+          //     envelope records the key it was written for. They must match.
+          //     Check 1 alone only proves "some live invitation exists in this
+          //     browser": sessionStorage is per-TAB while cookies are
+          //     per-origin, so a co-invitee exchanging in another tab replaces
+          //     the shared cookie while THIS tab keeps the first respondent's
+          //     report. Without the key compare, their reload renders it.
+          //
+          // A 410 without a key fails closed (readOnScreenResult refuses "").
           if (meRes.status === 410) {
-            const stored = readOnScreenResult(campaignAlias);
+            // Safe to consume: readError returns a constant for 410.
+            const gateBody = (await meRes.json().catch(() => null)) as {
+              respondentKey?: unknown;
+            } | null;
+            const ownerKey =
+              typeof gateBody?.respondentKey === "string"
+                ? gateBody.respondentKey
+                : "";
+            const stored = readOnScreenResult(campaignAlias, ownerKey);
             if (stored) {
               if (!cancelled) setPhase({ kind: "results", report: stored });
               return;
             }
-          } else {
-            // No live session (401/404/…): identity cannot be proven, so destroy
-            // the stored PII rather than leave it readable.
-            clearOnScreenResult(campaignAlias);
+          } else if (meRes.status === 401 || meRes.status === 404) {
+            // These DISPROVE a live session, so destroy the stored PII.
+            //
+            // Deliberately NOT a blanket `else`: /me has a real 500 path, and
+            // this repo has documented Neon cold-start timeouts. Purging on 5xx
+            // meant a respondent who refreshed during a DB blip lost their
+            // report permanently — show-once, no results email, and the next
+            // reload 410s onto an empty slot. A transient server fault must
+            // never be the thing that destroys the artifact.
+            if (!cancelled) clearOnScreenResult(campaignAlias);
           }
           const message = await readError(meRes, "Your session expired.");
           if (!cancelled) setPhase({ kind: "error", message });
@@ -438,7 +459,16 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
       // report shows two different date formats before vs after a refresh.
       const onScreenReport = reviveOnScreenReport(submitBody?.data?.report);
       if (onScreenReport) {
-        writeOnScreenResult(campaignAlias, onScreenReport);
+        // Stamp the slot with THIS respondent's invitation key (from the /me 200
+        // that started this session) so a later rehydrate can prove the stored
+        // report belongs to whoever is asking. Storing is skipped when the key is
+        // somehow absent — the report still renders now, only refresh-survival is
+        // lost, which is the correct trade against showing it to the wrong person.
+        writeOnScreenResult(
+          campaignAlias,
+          onScreenReport,
+          submittingData.respondentKey ?? "",
+        );
         setPhase({ kind: "results", report: onScreenReport });
         return;
       }

@@ -397,10 +397,15 @@ export function PublicQuizClient({
       assessmentName: templateName,
       // Was OMITTED here, which silently forced every public report through
       // DEFAULT_REPORT_CONFIG regardless of the instrument (BrandedReport reads
-      // it at four sites). Harmless only because the one live public campaign is
-      // absent from REPORT_CONFIG; a mapped alias going public would have
-      // misrendered the report type outright. The field is now required on
-      // RespondentReport so this cannot recur.
+      // it at four sites). Now threaded, which ALIGNS this in-place render with
+      // the public quiz's own email twin — quiz/[campaignAlias]/submit already
+      // passes the real alias into the report model.
+      //
+      // ⚠️ This is a real dispatch change, not a no-op: for a PUBLIC campaign on
+      // a REPORT_CONFIG-mapped alias, the report type itself can change (qsp-v1 /
+      // qsp-v2 / leadership-vision-alignment are "qualitative"). It is inert for
+      // the campaign live at the time of writing, but that is a fact about DATA,
+      // not about this code — so do not treat it as a guarantee. See ADR-0008.
       templateAlias: templateAlias ?? "",
       campaignLabel: campaignName,
       submittedAt: new Date(),

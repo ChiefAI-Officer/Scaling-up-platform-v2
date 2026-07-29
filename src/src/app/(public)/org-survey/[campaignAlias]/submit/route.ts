@@ -68,11 +68,16 @@ const SubmitBodySchema = z.object({
 });
 
 /**
- * Wave OSR (#71) — the coach byline name for the report cover/footer, built the
- * SAME way the authorized DB loader builds it (respondent-report.ts) so the
- * respondent's copy and the coach/admin copy cannot drift. Null when there is no
- * creator coach (admin-created campaigns) → the renderer falls back to
- * SU-logo-only rather than a broken byline.
+ * Wave OSR (#71) — the coach byline name for the report cover/footer. Null when
+ * there is no creator coach (admin-created campaigns) → the renderer falls back
+ * to SU-logo-only rather than a broken byline.
+ *
+ * Intentionally NOT byte-identical to the authorized DB loader's version, which
+ * is `creatorCoach ? \`${firstName} ${lastName}\` : null` with no trim: for a
+ * coach row with blank names that yields " " (truthy), which `CoachLogo` then
+ * trims to empty and suppresses anyway. This helper collapses that to null up
+ * front. Same rendered outcome, one less way to be surprised — but do not claim
+ * the two functions are identical, because they are not.
  */
 function coachBylineName(
   coach: { firstName: string; lastName: string } | null | undefined,
@@ -520,6 +525,16 @@ export async function POST(
       // (unlocked) Phase-1 read cannot leak a report that should be hidden. It
       // only avoids building a model nobody reads, which today is every
       // submission (no template has approved results-email copy).
+      //
+      // 🔑 LOAD-BEARING INVARIANT, easy to break from a distance:
+      // `showResultsOnScreen` MUST remain part of `emailRenderFingerprint`'s
+      // `onScreen` value. That is the whole reason this unlocked read is safe —
+      // `discloseOnScreen` requires phase1.onScreen === phase2.onScreen, so
+      // fingerprint equality implies the Phase-1 read was also true, which
+      // implies `mayNeedReport` was true. Remove the toggle from the fingerprint
+      // (or add a disclosure condition that is not fingerprinted) and this
+      // becomes a SILENT missing-report bug: the respondent submits with the
+      // toggle on and gets the thank-you page, with no error logged anywhere.
       const mayNeedReport =
         (isOnScreenResultsEnabled() &&
           invitation.campaign.showResultsOnScreen === true) ||

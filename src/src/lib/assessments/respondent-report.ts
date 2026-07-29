@@ -116,16 +116,12 @@ export interface RespondentReport {
    * `reportConfigFor(report.templateAlias)` — report type (scored vs
    * qualitative), tier display, score table, coach CTA — so a construction site
    * that forgets it silently renders the DEFAULT config instead of the
-   * instrument's own. That is exactly what happened: `public-quiz-client.tsx`
-   * hand-built this shape and omitted the field, which was invisible only
-   * because the one live public campaign is absent from REPORT_CONFIG and
-   * resolves to DEFAULT either way. It would have misrendered the moment a
-   * mapped alias (leadership-vision-alignment, qsp-v1, qsp-v2,
-   * five-dysfunctions) went public.
+   * instrument's own, with no error anywhere. `public-quiz-client.tsx` did
+   * exactly that, and keeping this field optional is what made the omission
+   * invisible to the compiler.
    *
-   * Keeping it optional made the omission uncatchable by the compiler. Pass ""
-   * only when there is genuinely no alias in hand — `reportConfigFor` treats it
-   * the same as absent.
+   * Pass "" only when there is genuinely no alias in hand — `reportConfigFor`
+   * and `buildQualitativeModel` both treat "" the same as absent.
    */
   templateAlias: string;
   /** campaign.name — the coach's label; null when absent or empty */

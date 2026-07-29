@@ -424,3 +424,37 @@ describe("Wave OSR — the report response is never cached", () => {
     expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
 });
+
+// ─── PR #236 round-2 finding #6 — the build guard has a green->red signal ────
+//
+// `mayNeedReport` skips the model build when neither consumer wants it. That was
+// shipped with no test at all, so the guard could regress in either direction
+// unnoticed. These pin BOTH directions, and the second is the one that matters:
+// if the guard is ever tightened past the disclosure condition it becomes a
+// SILENT missing-report bug (respondent submits with the toggle on, gets the
+// thank-you page, nothing logged).
+describe("Wave OSR — the report model is built only when a consumer wants it", () => {
+  it("does NOT build when neither on-screen nor the results email is on", async () => {
+    mockInvitation({
+      showResultsOnScreen: false,
+      sendResultsToRespondent: false,
+    });
+    await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    expect(buildState.calls).toHaveLength(0);
+  });
+
+  it("DOES build when the on-screen toggle is on", async () => {
+    mockInvitation({ showResultsOnScreen: true });
+    await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    expect(buildState.calls).toHaveLength(1);
+  });
+
+  it("DOES build when only the #15 results email wants it", async () => {
+    mockInvitation({
+      showResultsOnScreen: false,
+      sendResultsToRespondent: true,
+    });
+    await POST(jsonReq(goodAnswers) as never, aliasParams("demo"));
+    expect(buildState.calls).toHaveLength(1);
+  });
+});

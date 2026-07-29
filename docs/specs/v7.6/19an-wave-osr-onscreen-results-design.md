@@ -110,13 +110,27 @@ So the client persists the server-built report to **`sessionStorage`**. Survives
 close — which *is* show-once. Precedent: `useAnswerDraft` already persists **answers** to `localStorage` keyed
 per respondent, so `sessionStorage` here is strictly narrower exposure than what already ships.
 
-⚠️ **Revised after review — rehydrate requires proof of identity.** The slot is keyed by **campaign alias**
-(`respondentKey` is unavailable once `/me` has 410'd), and the first cut read it *before* any server call,
-relying on the token-exchange purge to keep respondents apart. That was wrong: the exchange **strips the
-fragment**, so a plain reload never hits the purge, and the slot would have rendered a full report — name,
-answers, scores — for whoever next reloaded an abandoned tab. The slot is **not a credential**. Rehydrate
-happens **only after `/me` answers 410** (which requires a live sealed cookie); any other response purges the
-slot; and the envelope expires on the cookie's own 1740s clock as defense in depth.
+⚠️ **Revised TWICE under review — rehydrate needs authorization AND ownership.** The slot is keyed by
+**campaign alias** (the client has no `respondentKey` of its own on the refresh being rehydrated).
+
+*Round 1:* the first cut read the slot *before* any server call, relying on the token-exchange purge to keep
+respondents apart. Wrong — the exchange **strips the fragment**, so a plain reload never hits the purge, and the
+slot would have rendered a full report to whoever next reloaded an abandoned tab. **The slot is not a
+credential.**
+
+*Round 2:* gating on a `/me` **410** is necessary but **not sufficient**. The 410 genuinely proves a live sealed
+cookie (401 comes first for a missing/mismatched one), but **`sessionStorage` is per-tab while cookies are
+per-origin**, so it proves only that *some* live invitation exists in this browser — not that it owns this tab's
+slot. A co-invitee who exchanges in another tab replaces the shared cookie while this tab keeps the first
+respondent's report; their reload 410s legitimately and would have rendered it.
+
+**Final rule:** rehydrate only when (a) `/me` answers 410, and (b) the envelope's recorded `respondentKey`
+matches the one that 410 echoes. Blank or mismatched ⇒ refuse *and* purge; a pre-ownership `v1` envelope is
+discarded. Expiry stays as defence in depth, with the caveat that its epoch (submit) differs from the cookie's
+(exchange), so the cookie always lapses first.
+
+**Accepted residual:** an abandoned *own* browser still exposes the report until the cookie lapses (≤29 min).
+The attacker holds both cookie and slot, so this is bounded, not preventable server-side.
 
 ---
 

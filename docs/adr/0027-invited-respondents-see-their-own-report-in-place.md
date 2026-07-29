@@ -67,14 +67,28 @@ Three facts shaped the decision:
   re-read on mount. It survives refresh and Back; it dies with the tab. The slot is keyed by
   **campaign alias** (on the refresh being rehydrated, `/me` has already 410'd, so `respondentKey` is
   unavailable).
-  ⚠️ **Corrected after review — the exchange purge is NOT the security boundary.** An earlier draft argued "a
-  second invitee can only reach the survey in the same tab by arriving with a new `#t=` link". That covers only
-  arrivals *with* a token, and the exchange **strips the fragment**, so a plain reload of
-  `/org-survey/{alias}` — the common case — never reaches the purge. Reading the slot before any server call
-  would therefore serve a full report to whoever next reloaded an abandoned tab, with no credential at all.
-  **The slot is not a credential.** The client now rehydrates **only after `/me` answers 410**, which requires a
-  live sealed invitation cookie; any other response purges the slot. The envelope also carries `issuedAt` and
-  expires on the invitation cookie's own clock (1740s) as defense in depth.
+  ⚠️ **Corrected TWICE under review. Rehydrate needs two checks, and the first draft had neither.**
+  **Round 1 — the exchange purge is not the security boundary.** An earlier draft argued "a second invitee can
+  only reach the survey in the same tab by arriving with a new `#t=` link". That covers only arrivals *with* a
+  token, and the exchange **strips the fragment**, so a plain reload of `/org-survey/{alias}` — the common case
+  — never reaches the purge. **The slot is not a credential.**
+  **Round 2 — and a live cookie is not an identity.** The round-1 fix rehydrated on a `/me` **410**, on the
+  argument that 410 proves a live sealed invitation cookie. That argument is *correct* (the route answers 401
+  for a missing or mismatched cookie before it evaluates any lifecycle gate) but it proves the wrong thing:
+  **`sessionStorage` is per-TAB while cookies are per-origin**, so "a live invitation exists in this browser"
+  says nothing about *whose* report is in a given tab's slot. Two co-invitees on one browser: A submits in tab 1;
+  B exchanges in tab 2, replacing the shared cookie and purging only tab 2; B later reloads tab 1 and gets a
+  valid 410 on their own cookie — and would have been shown **A's** report.
+  **The rule, therefore:** authorization from the server (`/me` 410) **and** ownership from the data (the
+  envelope records the invitation it was written for; `/me`'s 410 echoes `respondentKey`; they must match, and
+  there is no skip-the-check path). A v1 envelope, which predates the owner field, is discarded rather than
+  trusted. `issuedAt` expiry remains as defense in depth — note its magnitude matches the invitation cookie's
+  1740s but its **epoch does not** (cookie from exchange, `issuedAt` from submit), so the cookie always lapses
+  first and this bound only binds if a caller skips the gate entirely.
+  ⚠️ **Residual risk, accepted and NOT closed:** a respondent who submits and walks away from their own unlocked
+  browser leaves a readable report until the cookie lapses (≤29 min from exchange). There the attacker holds
+  both the cookie and the slot, so no server-side check can tell them apart from the respondent. Bounded, not
+  prevented — the same exposure as any abandoned logged-in session.
 - **A report-model failure never fails the submission.** The model is built in Phase 1, pre-commit and
   lock-free, and a throw degrades to no email row + no payload + the normal thank-you. This is not cosmetic: a
   throw *after* commit would return 500, and the client's retry would then hit the hard double-submit **409** —
@@ -92,9 +106,22 @@ Three facts shaped the decision:
   days earlier. The builder now takes those as optional args (defaulting to the previous values, so public-quiz
   callers are byte-unchanged) and the invited route populates them from data it already reads. The renderers
   additionally guard the separator so an empty org name can never emit a naked `" · "`.
-- **A malformed frozen result now surfaces the degraded notice.** `ScoreResult` carries no `degraded` field —
+- **A malformed frozen result now propagates a degraded flag.** `ScoreResult` carries no `degraded` field —
   only the authorized DB loader computes it — so the builder is passed `degraded: !isScoreResult(scoreResult)`.
-  Without that, a respondent with a malformed result would have seen a silently incomplete report.
+  ⚠️ **Do not overstate this.** Round 2 established it is defence, not a bug fix with an observable victim:
+  `computeScoreResult` always constructs `perQuestion`/`perSection` as arrays, so on this path the flag is
+  always `false` and nothing changes today. And the *notice* it drives exists only in `BrandedReport` —
+  `QualitativeReport` ignores `degraded` entirely, so LVA/QSP respondents would still get no notice. Kept
+  because the frozen-result shape is not this route's to guarantee; recorded honestly because the earlier
+  wording claimed a fixed user-visible defect that never existed.
+- **⚠️ This change widens the audience of an unvalidated coach-controlled `<img src>`.** `coachLogoUrl` is
+  `creatorCoach.profileImage`, rendered by `CoachLogo` with no scheme or host validation (tracked in **GH
+  #229**). Before this wave that `<img>` appeared only on the authenticated `(report)/` route behind the Report
+  access gate; it now also renders to an **unauthenticated respondent** at submit. A coach who sets a remote
+  URL therefore causes every respondent on their campaigns to fetch it while their own report renders,
+  disclosing IP/UA/timing to that host — and a dead URL now shows a broken image to the client rather than to a
+  coach's inbox (the Jeff #69 red-X symptom, relocated). Not fixed here because validation is #229's scope and
+  this ships default-OFF, but it must be settled **before the flag is flipped**, not after.
 - **The flag gates capability, never data.** The wizard hides the checkbox when the flag is off but **does not**
   coerce the stored column, deliberately unlike the `sendResultsToRespondent` precedent.
   ⚠️ **Corrected after review:** an earlier draft of this ADR justified that by a "stale draft `true`" hazard.

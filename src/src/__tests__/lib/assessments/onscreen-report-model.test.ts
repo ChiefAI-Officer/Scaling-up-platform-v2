@@ -56,10 +56,20 @@ function build(overrides?: Record<string, unknown>) {
 
 // ─── anonymity, asserted against real output (was vacuous — review #4) ──────
 
-describe("the respondent's own result only — no cohort or aggregate data", () => {
-  it("emits no cohort/aggregate/peer keys anywhere in the model", () => {
-    const serialized = JSON.stringify(build());
-    for (const forbidden of [
+describe("the respondent's own result only — the builder ADDS no cohort data", () => {
+  // ⚠️ SCOPE, corrected in round 2. This proves the builder INTRODUCES no cohort
+  // keys; it cannot prove the model CONTAINS none, because `result`, `sections`
+  // and `rawAnswers` are copied through verbatim — feed it a ScoreResult carrying
+  // `peerAverage` and it would pass that straight out, and this test would still
+  // pass because the fixture has none. The real guarantee upstream is that only
+  // the respondent's own `scoreResult` is ever in scope on this path.
+  //
+  // Keys are matched against the model's OWN key names rather than a substring
+  // sweep of serialized JSON: the previous version searched for "peer" across a
+  // blob that includes question labels and free-text answers, so it would have
+  // failed spuriously the day an instrument asked about peers.
+  it("introduces no cohort/aggregate/peer keys of its own", () => {
+    const FORBIDDEN = [
       "cohort",
       "aggregate",
       "peer",
@@ -67,8 +77,22 @@ describe("the respondent's own result only — no cohort or aggregate data", () 
       "participants",
       "respondents",
       "peerComparison",
-    ]) {
-      expect(serialized).not.toContain(forbidden);
+    ];
+    const keys: string[] = [];
+    const walk = (node: unknown) => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (node && typeof node === "object") {
+        for (const [k, v] of Object.entries(node)) {
+          keys.push(k);
+          walk(v);
+        }
+      }
+    };
+    walk(build());
+    // Positive control: the walk really did see the model's structure.
+    expect(keys).toContain("respondentName");
+    for (const forbidden of FORBIDDEN) {
+      expect(keys).not.toContain(forbidden);
     }
   });
 

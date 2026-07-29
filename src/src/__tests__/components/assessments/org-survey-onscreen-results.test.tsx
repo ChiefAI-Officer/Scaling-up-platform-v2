@@ -26,6 +26,9 @@ jest.mock("next/navigation", () => ({
 
 const ALIAS = "demo-campaign";
 
+/** The invitation the stored report belongs to, and that /me's 410 echoes. */
+const KEY = "inv-1";
+
 const REPORT = {
   respondentName: "Resp Ondent",
   jobTitle: null,
@@ -79,7 +82,13 @@ function installFetch(meStatus: number) {
       return {
         ok: false,
         status: meStatus,
-        json: async () => ({ success: false, error: "gate" }),
+        json: async () => ({
+          success: false,
+          error: "gate",
+          // The real route echoes the owning invitation on its 410 so the client
+          // can prove the stored slot belongs to the cookie holder.
+          ...(meStatus === 410 ? { respondentKey: KEY } : {}),
+        }),
       } as unknown as Response;
     }
     return {
@@ -103,7 +112,7 @@ afterEach(() => {
 
 describe("rehydrate authorization (the /me 410 gate)", () => {
   it("RENDERS the stored report when /me answers 410 — a live cookie past its gate", async () => {
-    writeOnScreenResult(ALIAS, REPORT);
+    writeOnScreenResult(ALIAS, REPORT, KEY);
     installFetch(410);
 
     render(<OrgSurveyClient campaignAlias={ALIAS} />);
@@ -115,7 +124,7 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
   });
 
   it("does NOT render the stored report when /me answers 401 — no live session", async () => {
-    writeOnScreenResult(ALIAS, REPORT);
+    writeOnScreenResult(ALIAS, REPORT, KEY);
     installFetch(401);
 
     render(<OrgSurveyClient campaignAlias={ALIAS} />);
@@ -128,8 +137,8 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
   });
 
   it("PURGES the stored report when identity cannot be proven", async () => {
-    writeOnScreenResult(ALIAS, REPORT);
-    expect(readOnScreenResult(ALIAS)).not.toBeNull(); // precondition
+    writeOnScreenResult(ALIAS, REPORT, KEY);
+    expect(readOnScreenResult(ALIAS, KEY)).not.toBeNull(); // precondition
     installFetch(401);
 
     render(<OrgSurveyClient campaignAlias={ALIAS} />);
@@ -137,18 +146,18 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
     await waitFor(() => {
       expect(screen.getByText(/can't open this survey/i)).toBeInTheDocument();
     });
-    expect(readOnScreenResult(ALIAS)).toBeNull();
+    expect(readOnScreenResult(ALIAS, KEY)).toBeNull();
   });
 
   it("KEEPS the stored report after a 410 rehydrate, so a second refresh still works", async () => {
-    writeOnScreenResult(ALIAS, REPORT);
+    writeOnScreenResult(ALIAS, REPORT, KEY);
     installFetch(410);
 
     render(<OrgSurveyClient campaignAlias={ALIAS} />);
     await waitFor(() => {
       expect(screen.getByTestId("org-survey-results")).toBeInTheDocument();
     });
-    expect(readOnScreenResult(ALIAS)).not.toBeNull();
+    expect(readOnScreenResult(ALIAS, KEY)).not.toBeNull();
   });
 
   it("shows the closed-survey error on a 410 with NO stored report", async () => {
@@ -163,7 +172,7 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
   });
 
   it("does not rehydrate when /me succeeds — a live survey renders the survey", async () => {
-    writeOnScreenResult(ALIAS, REPORT);
+    writeOnScreenResult(ALIAS, REPORT, KEY);
     installFetch(200);
 
     render(<OrgSurveyClient campaignAlias={ALIAS} />);
@@ -177,7 +186,7 @@ describe("rehydrate authorization (the /me 410 gate)", () => {
 
 describe("the rendered report", () => {
   it("formats submittedAt rather than printing raw ISO text", async () => {
-    writeOnScreenResult(ALIAS, REPORT);
+    writeOnScreenResult(ALIAS, REPORT, KEY);
     installFetch(410);
 
     render(<OrgSurveyClient campaignAlias={ALIAS} />);
@@ -193,7 +202,7 @@ describe("the rendered report", () => {
   });
 
   it("offers Print and Download PDF — the only way to keep a show-once report", async () => {
-    writeOnScreenResult(ALIAS, REPORT);
+    writeOnScreenResult(ALIAS, REPORT, KEY);
     installFetch(410);
 
     render(<OrgSurveyClient campaignAlias={ALIAS} />);
@@ -207,7 +216,7 @@ describe("the rendered report", () => {
   });
 
   it("tells the respondent their coach will review the results with them", async () => {
-    writeOnScreenResult(ALIAS, REPORT);
+    writeOnScreenResult(ALIAS, REPORT, KEY);
     installFetch(410);
 
     render(<OrgSurveyClient campaignAlias={ALIAS} />);
@@ -217,5 +226,66 @@ describe("the rendered report", () => {
     expect(
       screen.getByText(/your coach will review these results with you/i),
     ).toBeInTheDocument();
+  });
+});
+
+// ─── PR #236 round-2 findings, at the client level ──────────────────────────
+
+describe("a transient /me failure must not destroy the report (finding #2)", () => {
+  it("KEEPS the stored report when /me answers 500 — a DB blip is not a disproof of identity", async () => {
+    writeOnScreenResult(ALIAS, REPORT, KEY);
+    installFetch(500);
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await waitFor(() =>
+      expect(screen.getByText(/can't open this survey/i)).toBeInTheDocument(),
+    );
+
+    // The earlier blanket `else` purged here. Under show-once with no results
+    // email that made the report permanently unrecoverable: the next reload
+    // 410s onto an empty slot and the respondent is told the survey closed.
+    expect(readOnScreenResult(ALIAS, KEY)).not.toBeNull();
+  });
+
+  it("still purges on 401, which genuinely disproves a live session", async () => {
+    writeOnScreenResult(ALIAS, REPORT, KEY);
+    expect(readOnScreenResult(ALIAS, KEY)).not.toBeNull(); // precondition
+    installFetch(401);
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await waitFor(() =>
+      expect(screen.getByText(/can't open this survey/i)).toBeInTheDocument(),
+    );
+
+    expect(readOnScreenResult(ALIAS, KEY)).toBeNull();
+  });
+});
+
+describe("one respondent's report never renders to another (finding #1)", () => {
+  it("does NOT render a slot owned by a different invitation, even on a valid 410", async () => {
+    // Respondent A's report is in this tab. The 410 arrives on B's cookie —
+    // which is a real, live session, so the authorization check alone passes.
+    writeOnScreenResult(ALIAS, REPORT, "inv-respondent-a");
+    installFetch(410); // echoes KEY ("inv-1"), i.e. NOT the slot's owner
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await waitFor(() =>
+      expect(screen.getByText(/can't open this survey/i)).toBeInTheDocument(),
+    );
+
+    // B sees the closed-survey message, never A's report.
+    expect(screen.queryByTestId("org-survey-results")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("branded-report")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Resp Ondent/)).not.toBeInTheDocument();
+  });
+
+  it("positive control — the SAME invitation still rehydrates", async () => {
+    writeOnScreenResult(ALIAS, REPORT, KEY);
+    installFetch(410);
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await waitFor(() =>
+      expect(screen.getByTestId("org-survey-results")).toBeInTheDocument(),
+    );
   });
 });

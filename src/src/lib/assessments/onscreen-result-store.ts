@@ -18,29 +18,49 @@
  * the answer draft already shipping in `use-answer-draft.ts`, which persists the
  * respondent's raw ANSWERS to `localStorage` (wider scope, longer life).
  *
- * KEYING — and why it is the campaign alias
- * ─────────────────────────────────────────
- * The answer draft keys off the opaque per-respondent `respondentKey` from
- * `/me`. This store CANNOT: on the refresh we are rehydrating for, `/me` has
- * already 410'd, so `respondentKey` is unavailable. The only identifier in hand
- * is the campaign alias from the URL.
+ * KEYING — campaign alias for the SLOT, respondentKey for the OWNER
+ * ─────────────────────────────────────────────────────────────────
+ * The slot is keyed by campaign alias, because on the refresh being rehydrated
+ * the client has not yet had a 200 from `/me` and so has no `respondentKey` of
+ * its own to key by. The owner is therefore carried INSIDE the envelope and
+ * checked on read (see `readOnScreenResult`).
  *
- * That makes one purge rule load-bearing: a fresh token exchange MUST clear the
- * slot. A second invitee can only reach the survey in the same tab by arriving
- * with a new `#t=` link, so clearing on exchange is exactly the moment that
- * prevents them being shown the previous respondent's report.
+ * ⚠️ AN EARLIER REVISION OF THIS COMMENT WAS WRONG — DO NOT RESTORE IT.
+ * It claimed "a fresh token exchange MUST clear the slot" was the load-bearing
+ * rule, reasoning that a second invitee can only reach the survey in the same
+ * tab by arriving with a new `#t=` link. Two independent holes:
+ *   1. The exchange STRIPS the fragment, so a plain reload of
+ *      `/org-survey/{alias}` never re-enters the exchange branch at all — the
+ *      tokenless reload is the COMMON path, not an exotic one.
+ *   2. `sessionStorage` is per-TAB while cookies are per-origin. A second
+ *      invitee exchanging in a DIFFERENT tab replaces the shared cookie but
+ *      purges only their own tab, leaving the first respondent's report intact
+ *      in the first tab.
+ * The exchange purge is now belt-and-braces cleanup only.
  *
- * AUTHORIZATION lives in the CALLER, not here
- * ───────────────────────────────────────────
- * A stored slot is NOT a credential. The client must only rehydrate from it after
- * `/me` has answered **410** — which proves a live invitation cookie whose
- * invitation is past its lifecycle gate. Reading the slot before that check would
- * serve a full report (name, answers, scores) to whoever next reloads the tab,
- * with no credential at all. See the review of PR #236.
+ * AUTHORIZATION lives in the CALLER; OWNERSHIP is enforced here
+ * ────────────────────────────────────────────────────────────
+ * A stored slot is NOT a credential. Two separate checks are required, and
+ * neither is sufficient alone:
+ *   • The CALLER must only rehydrate after `/me` answers **410**, which proves a
+ *     live sealed invitation cookie (that route returns 401 for a missing or
+ *     mismatched cookie BEFORE it evaluates any lifecycle gate).
+ *   • THIS MODULE must then confirm the stored report belongs to the invitation
+ *     that cookie identifies — `readOnScreenResult` takes the `respondentKey`
+ *     echoed by the 410 and refuses (and purges) on mismatch. Without it, "a
+ *     live invitation exists in this browser" would be silently accepted as
+ *     "this is the person the report is about".
  *
- * This module still defends in depth: the envelope is stamped with `issuedAt` and
- * expires on the same clock as the invitation cookie (1740s), so an abandoned tab
- * stops being able to re-render even if a caller forgets the `/me` gate.
+ * Defense in depth: the envelope is stamped with `issuedAt` and expires after
+ * `MAX_AGE_MS`, so an abandoned tab eventually stops re-rendering even if a
+ * caller forgets the `/me` gate entirely.
+ *
+ * ⚠️ RESIDUAL RISK, ACCEPTED AND NOT CLOSED BY THE ABOVE: a respondent who
+ * submits and then walks away from their OWN unlocked browser leaves a readable
+ * report until the invitation cookie lapses (≤29 min from exchange). The
+ * attacker there holds both the cookie and the slot, so no server-side check can
+ * distinguish them from the respondent. This is the same exposure as leaving any
+ * logged-in session open, and is bounded, not prevented.
  *
  * Every function is defensive and never throws: Safari private mode can throw on
  * `setItem`, and a corrupt slot must degrade to "no stored report" rather than
@@ -53,18 +73,34 @@ const PREFIX = "su-onscreen-result:";
 
 /** Stored envelope. Versioned so a future shape change can be detected. */
 interface StoredEnvelope {
-  v: 1;
+  v: 2;
   /** Epoch ms at write time — drives the expiry below. */
   issuedAt: number;
+  /**
+   * The opaque invitation cuid this report belongs to. Compared on read against
+   * the key echoed by `/me`'s 410 so one respondent's report can never render to
+   * a different invitation sharing the browser. Not PII.
+   */
+  respondentKey: string;
   report: unknown;
 }
 
-const ENVELOPE_VERSION = 1;
+/**
+ * Bumped 1 → 2 when `respondentKey` was added. A v1 envelope has no owner
+ * recorded, so it can never be proven to belong to the reader and is discarded
+ * on sight rather than trusted — which is also why the bump is required rather
+ * than optional.
+ */
+const ENVELOPE_VERSION = 2;
 
 /**
- * Slot lifetime, matched to the invitation cookie's `maxAge`
- * (invitation-cookie.ts COOKIE_MAX_AGE_SECONDS = 1740). Beyond it the respondent
- * could not have re-authenticated anyway, so a readable report is pure exposure.
+ * Slot lifetime. The MAGNITUDE matches the invitation cookie's `maxAge`
+ * (invitation-cookie.ts COOKIE_MAX_AGE_SECONDS = 1740) but the EPOCH does not:
+ * the cookie's clock starts at token exchange and is never re-saved, while
+ * `issuedAt` starts at submit, which is always later. So the cookie always
+ * lapses first, and in the `/me`-gated flow this bound is never the binding
+ * constraint — it exists for the "a caller forgot the gate" case, where it caps
+ * exposure instead of leaving it open for the tab's whole lifetime.
  */
 const MAX_AGE_MS = 1_740_000;
 
@@ -94,13 +130,18 @@ function storage(): Storage | null {
 export function writeOnScreenResult(
   campaignAlias: string,
   report: RespondentReport,
+  respondentKey: string,
 ): void {
   const store = storage();
   if (!store) return;
+  // An unattributable report cannot be safely re-read, so refuse to store one
+  // rather than write a slot that read() will always reject.
+  if (!respondentKey) return;
   try {
     const envelope: StoredEnvelope = {
       v: ENVELOPE_VERSION,
       issuedAt: Date.now(),
+      respondentKey,
       report,
     };
     store.setItem(onScreenResultKey(campaignAlias), JSON.stringify(envelope));
@@ -110,16 +151,26 @@ export function writeOnScreenResult(
 }
 
 /**
- * Read back a stored report, or `null` when absent, unreadable or malformed.
+ * Read back a stored report, or `null` when absent, unreadable, malformed,
+ * expired, or **owned by a different invitation**.
+ *
+ * `expectedRespondentKey` MUST be the key echoed by `/me`'s 410 — i.e. the
+ * invitation the caller's cookie actually identifies. A mismatch means the slot
+ * belongs to someone else who used this browser, and is both refused and purged.
+ * Passing a blank key refuses too; there is deliberately no "skip the check"
+ * path, because an optional ownership check is one careless caller away from
+ * being no check at all.
  *
  * `submittedAt` is revived to a real `Date`: it round-trips through JSON as an
  * ISO string, and the report renderers format it as a Date.
  */
 export function readOnScreenResult(
   campaignAlias: string,
+  expectedRespondentKey: string,
 ): RespondentReport | null {
   const store = storage();
   if (!store) return null;
+  if (!expectedRespondentKey) return null;
 
   let raw: string | null = null;
   try {
@@ -139,8 +190,22 @@ export function readOnScreenResult(
   if (typeof parsed !== "object" || parsed === null) return null;
   const envelope = parsed as Partial<StoredEnvelope>;
 
-  // A slot written by a future shape must never be handed to the renderer.
+  // A slot written by a different shape must never be handed to the renderer.
+  // This also discards pre-ownership (v1) envelopes, which carry no owner and
+  // therefore cannot be proven to belong to the reader.
   if (envelope.v !== ENVELOPE_VERSION) {
+    clearOnScreenResult(campaignAlias);
+    return null;
+  }
+
+  // OWNERSHIP. The caller's 410 proves a live invitation cookie in this browser;
+  // it does NOT prove that invitation owns this slot (sessionStorage is per-tab,
+  // cookies are per-origin). Refuse anything we cannot attribute to the reader.
+  if (
+    typeof envelope.respondentKey !== "string" ||
+    envelope.respondentKey === "" ||
+    envelope.respondentKey !== expectedRespondentKey
+  ) {
     clearOnScreenResult(campaignAlias);
     return null;
   }
@@ -181,9 +246,15 @@ export function reviveOnScreenReport(
 }
 
 /**
- * Drop any stored report for this campaign. Called on a fresh token exchange
- * (see the keying note above) — that purge is what keeps one respondent's
- * report from ever being shown to the next person in the same tab.
+ * Drop any stored report for this campaign.
+ *
+ * Called on a fresh token exchange, on a `/me` response that disproves a live
+ * session, and by `readOnScreenResult` whenever a slot fails validation.
+ *
+ * ⚠️ This purge is NOT the boundary that keeps respondents apart — an earlier
+ * comment here said it was. See the keying note at the top of this file for the
+ * two reasons that was wrong. Separation is enforced by the ownership check in
+ * `readOnScreenResult`; this is hygiene.
  */
 export function clearOnScreenResult(campaignAlias: string): void {
   const store = storage();
@@ -191,6 +262,7 @@ export function clearOnScreenResult(campaignAlias: string): void {
   try {
     store.removeItem(onScreenResultKey(campaignAlias));
   } catch {
-    // Nothing to do — an unremovable slot is still gated by the exchange purge.
+    // Nothing to do. An unremovable slot is still safe: it cannot render unless
+    // its recorded respondentKey matches the reader's own, freshly proven key.
   }
 }
