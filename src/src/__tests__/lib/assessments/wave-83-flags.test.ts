@@ -1,11 +1,27 @@
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 
+const ENABLED = "WAVE_83_REFERRED_RESULTS_ENABLED";
+const KILL = "WAVE_83_REFERRED_RESULTS_KILL";
+const saved: Record<string, string | undefined> = {};
+
+beforeEach(() => {
+  for (const key of [ENABLED, KILL]) {
+    saved[key] = process.env[key];
+    delete process.env[key];
+  }
+});
+
+afterEach(() => {
+  for (const key of [ENABLED, KILL]) {
+    if (saved[key] === undefined) delete process.env[key];
+    else process.env[key] = saved[key];
+  }
+});
+
 it("is default-off and the kill switch wins", () => {
-  delete process.env.WAVE_83_REFERRED_RESULTS_ENABLED;
-  delete process.env.WAVE_83_REFERRED_RESULTS_KILL;
   expect(isReferredResultsEnabled()).toBe(false);
-  process.env.WAVE_83_REFERRED_RESULTS_ENABLED = "1";
+  process.env[ENABLED] = "1";
   expect(isReferredResultsEnabled()).toBe(true);
-  process.env.WAVE_83_REFERRED_RESULTS_KILL = "1";
+  process.env[KILL] = "1";
   expect(isReferredResultsEnabled()).toBe(false);
 });
