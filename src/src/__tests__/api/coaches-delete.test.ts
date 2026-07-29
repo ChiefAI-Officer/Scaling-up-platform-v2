@@ -30,6 +30,9 @@ jest.mock("@/lib/db", () => ({
     assessmentCampaign: {
       updateMany: jest.fn(),
     },
+    assessmentSubmission: {
+      count: jest.fn(),
+    },
     approvalQueue: {
       count: jest.fn(),
     },
@@ -75,6 +78,7 @@ describe("DELETE /api/coaches/[id]", () => {
       async (fn: (...args: unknown[]) => unknown) => fn(db)
     );
     (db.organization.count as jest.Mock).mockResolvedValue(0);
+    (db.assessmentSubmission.count as jest.Mock).mockResolvedValue(0);
     (db.accessGroupCoach.deleteMany as jest.Mock).mockResolvedValue({ count: 0 });
     (db.organizationOwnershipEvent.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
     (db.assessmentCampaign.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
@@ -120,6 +124,21 @@ describe("DELETE /api/coaches/[id]", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toMatch(/organization/i);
+  });
+
+  it("returns 409 and directs deactivation when the coach has referred submissions", async () => {
+    (db.assessmentSubmission.count as jest.Mock).mockResolvedValue(2);
+
+    const res = await DELETE(makeRequest("coach-1"), routeParams("coach-1"));
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/deactivat/i);
+    expect(db.assessmentSubmission.count).toHaveBeenCalledWith({
+      where: { referringCoachId: "coach-1" },
+    });
+    expect(db.accessGroupCoach.deleteMany).not.toHaveBeenCalled();
+    expect(db.coach.delete).not.toHaveBeenCalled();
   });
 
   it("deletes accessGroupCoach entries before deleting coach (BUG-MAY25)", async () => {

@@ -73,7 +73,7 @@ const PublicSubmitBodySchema = z.object({
       }),
     )
     .min(1),
-  referringCoachEmail: z.string().email().max(320).optional().nullable(),
+  referringCoachEmail: z.string().trim().toLowerCase().email().max(320).optional().nullable(),
   // Task 6(b): client-supplied idempotency key (optional)
   idempotencyKey: z.string().min(1).max(200).optional(),
 });
@@ -224,6 +224,7 @@ export async function POST(
     // Pre-transaction read: active coach lookup (open-relay guard)
     // -----------------------------------------------------------------------
     const coach = await findActiveCoachByEmail(db, data.referringCoachEmail);
+    const canonicalCoachEmail = coach?.email.trim().toLowerCase() ?? null;
 
     // -----------------------------------------------------------------------
     // Build outbox payloads (pure helpers, no I/O)
@@ -268,7 +269,7 @@ export async function POST(
       // so the placeholder is benign here; the qualitative path only triggers
       // on the INVITED route, where the real id IS threaded.
       submissionId: "",
-      referringCoachEmail: data.referringCoachEmail ?? null,
+      referringCoachEmail: canonicalCoachEmail,
     });
 
     // Assemble the outbox payloads. Each entry carries the rendered subject +
@@ -298,14 +299,13 @@ export async function POST(
 
     // REFERRING_COACH — full report (upgrade from the old lead alert), only
     // when the open-relay guard resolved an active coach.
-    const activeCoachEmail = coach?.email?.trim().toLowerCase() ?? "";
-    if (activeCoachEmail.length > 0) {
+    if (canonicalCoachEmail) {
       const { subject, bodyHtml } = buildReportEmailHtml({
         report: respondentReport,
         recipientRole: "REFERRING_COACH",
       });
       outboxPayloads.push({
-        recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
+        recipient: { role: "REFERRING_COACH", email: canonicalCoachEmail },
         subject,
         bodyHtml,
       });
@@ -346,7 +346,8 @@ export async function POST(
               lastName: data.publicTaker.lastName,
               email: data.publicTaker.email,
             } as Prisma.InputJsonValue,
-            referringCoachEmail: data.referringCoachEmail ?? null,
+            referringCoachId: coach?.id ?? null,
+            referringCoachEmail: canonicalCoachEmail,
             idempotencyKey: data.idempotencyKey ?? null,
           },
           select: { id: true },

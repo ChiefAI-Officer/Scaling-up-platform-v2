@@ -125,6 +125,7 @@ const CAMPAIGN = {
   accessMode: "PUBLIC",
   openAt: new Date("2026-01-01T00:00:00Z"),
   closeAt: null as Date | null,
+  deletedAt: null as Date | null,
   templateId: "tmpl-1",
   versionId: "ver-1",
   template: { name: "Scaling Up Quick Assessment" },
@@ -461,6 +462,114 @@ describe("outbox enqueue", () => {
     const roles = enqueuedRoles();
     expect(roles).not.toContain("RESPONDENT");
     expect(roles).not.toContain("OWNING_COACH");
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Jeff #83: verified referring-coach ownership                              */
+/* -------------------------------------------------------------------------- */
+describe("verified referring-coach ownership", () => {
+  it("persists the resolved Coach identity and canonical email", async () => {
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: " Coach@Example.COM ",
+      firstName: "Bob",
+      lastName: "Coach",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    });
+
+    await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "  COACH@example.com  ",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(db.coach.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { email: "coach@example.com" },
+      }),
+    );
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: "coach-1",
+          referringCoachEmail: "coach@example.com",
+        }),
+      }),
+    );
+    const coachOutboxRow = txMock.assessmentEmailOutbox.create.mock.calls
+      .map((call: Array<{ data: { recipientRole: string; recipientEmail: string } }>) => call[0].data)
+      .find((row: { recipientRole: string }) => row.recipientRole === "REFERRING_COACH");
+    expect(coachOutboxRow?.recipientEmail).toBe("coach@example.com");
+  });
+
+  it("persists no ownership and sends no coach email when verification fails", async () => {
+    await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "unknown@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: null,
+          referringCoachEmail: null,
+        }),
+      }),
+    );
+    const enqueuedRoles = txMock.assessmentEmailOutbox.create.mock.calls.map(
+      (call: Array<{ data: { recipientRole: string } }>) => call[0].data.recipientRole,
+    );
+    expect(enqueuedRoles).not.toContain("REFERRING_COACH");
+  });
+
+  it.each([
+    {
+      label: "inactive",
+      certificationStatus: "INACTIVE",
+      certificationExpiry: null,
+    },
+    {
+      label: "expired",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: new Date("2020-01-01T00:00:00Z"),
+    },
+  ])("persists no ownership for a known $label Coach", async (coachState) => {
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: "coach@example.com",
+      firstName: "Bob",
+      lastName: "Coach",
+      certificationStatus: coachState.certificationStatus,
+      certificationExpiry: coachState.certificationExpiry,
+    });
+
+    await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "coach@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(txMock.assessmentSubmission.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          referringCoachId: null,
+          referringCoachEmail: null,
+        }),
+      }),
+    );
+    const enqueuedRoles = txMock.assessmentEmailOutbox.create.mock.calls.map(
+      (call: Array<{ data: { recipientRole: string } }>) => call[0].data.recipientRole,
+    );
+    expect(enqueuedRoles).not.toContain("REFERRING_COACH");
   });
 });
 
