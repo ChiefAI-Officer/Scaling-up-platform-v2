@@ -42,6 +42,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AssessmentResultView } from "./AssessmentResultView";
+import { formatTimestamp } from "@/lib/utils";
 import { CampaignStatusMetrics } from "./CampaignStatusMetrics";
 import {
   CustomSlidesPanel,
@@ -1118,6 +1119,37 @@ export function CampaignDetail({
             <div className="mt-1 font-medium text-foreground">
               {campaign.templateName}
             </div>
+            {/* Wave EV — which EDITION this campaign serves, and whether it has
+                fallen behind. A campaign pins a version at creation and can
+                never move off it, so without this the screen silently shows
+                frozen content — the cause of Jeff's #40/#43 being re-reports of
+                already-shipped work. Absent `edition` (unpublished pin, or a
+                degraded lookup) renders nothing, exactly as before.
+
+                NOTE the deliberate wording: "Edition", not "Version". The word
+                "version" is already spent on the instrument's own name in front
+                of coaches ("Quarterly Session Prep v2" is a different product
+                from v1, not a newer edition), and reusing it is precisely how
+                this got confusing. */}
+            {campaign.edition && (
+              <>
+                <div
+                  className="mt-1 text-xs text-muted-foreground tabular-nums"
+                  data-testid="campaign-edition-line"
+                >
+                  Edition {campaign.edition.versionNumber} &middot; published{" "}
+                  {formatTimestamp(campaign.edition.publishedAt)}
+                </div>
+                {campaign.edition.newerEditionAvailable && (
+                  <span
+                    className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[0.7rem] font-semibold text-warning"
+                    data-testid="campaign-edition-stale"
+                  >
+                    Newer edition available
+                  </span>
+                )}
+              </>
+            )}
           </div>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

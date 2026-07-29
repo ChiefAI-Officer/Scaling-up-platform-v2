@@ -61,6 +61,11 @@ export interface CampaignRespondentRow {
   submittedAt: Date | null;
 }
 
+import {
+  resolveEditionStanding,
+  type EditionStanding,
+} from "./edition-standing";
+
 export interface CampaignOverview {
   campaign: {
     id: string;
@@ -84,6 +89,16 @@ export interface CampaignOverview {
      * absent ⇒ no badge (fail-closed).
      */
     isImported?: boolean;
+    /**
+     * Wave EV — which EDITION of the template this campaign is serving, and
+     * whether a newer one has since been published. A campaign pins a version at
+     * creation and can never move off it, so without this the screen silently
+     * shows frozen content (the cause of Jeff's #40/#43 re-reports).
+     *
+     * Optional, and null when the pinned version is unpublished — older fixtures
+     * stay valid and the tile renders as it does today (fail-quiet).
+     */
+    edition?: EditionStanding | null;
   };
   stats: {
     totalParticipants: number;
@@ -124,6 +139,21 @@ export interface CampaignDetailDb {
       select?: Record<string, unknown>;
     }) => Promise<SubmissionRow[]>;
   };
+  /** Wave EV — sibling versions of the campaign's template, for the newer-edition check. */
+  assessmentTemplateVersion?: {
+    findMany: (args: {
+      where: Record<string, unknown>;
+      select?: Record<string, unknown>;
+    }) => Promise<TemplateVersionRow[]>;
+  };
+}
+
+/** Wave EV — the sibling-version shape the edition check reads. */
+interface TemplateVersionRow {
+  versionNumber: number;
+  language: string;
+  publishedAt: Date | null;
+  archivedAt: Date | null;
 }
 
 interface CampaignWithRels {
@@ -141,6 +171,12 @@ interface CampaignWithRels {
   importManifest?: unknown;
   template: { id: string; name: string };
   organization: { id: string; name: string };
+  /** Wave EV — the pinned version. Optional so older fixtures stay valid. */
+  version?: {
+    versionNumber: number;
+    publishedAt: Date | null;
+    language: string;
+  } | null;
 }
 
 interface ParticipantWithRespondent {
@@ -240,6 +276,10 @@ export async function getCampaignOverview(
     include: {
       template: { select: { id: true, name: true } },
       organization: { select: { id: true, name: true } },
+      // Wave EV — the pinned edition, so the screen can say which one it serves.
+      version: {
+        select: { versionNumber: true, publishedAt: true, language: true },
+      },
     },
   });
   if (!campaign) {
@@ -266,6 +306,39 @@ export async function getCampaignOverview(
 
   const stats = computeStats(participants, invitations);
 
+  // Wave EV — resolve the pinned edition + whether a newer one exists. Fully
+  // fail-quiet: no version on the row, no sibling query available, or a query
+  // failure all yield `null`, which renders the tile exactly as it did before.
+  // A campaign screen must never fail to load over a decorative badge.
+  let edition: EditionStanding | null = null;
+  if (campaign.version != null) {
+    let siblings: TemplateVersionRow[] = [];
+    try {
+      siblings =
+        (await db.assessmentTemplateVersion?.findMany({
+          where: {
+            templateId: campaign.template.id,
+            language: campaign.version.language,
+            versionNumber: { gt: campaign.version.versionNumber },
+            publishedAt: { not: null },
+            archivedAt: null,
+          },
+          select: {
+            versionNumber: true,
+            language: true,
+            publishedAt: true,
+            archivedAt: true,
+          },
+        })) ?? [];
+    } catch (err) {
+      console.error("[campaign-detail] edition sibling lookup failed:", err);
+    }
+    // The WHERE already narrows to genuinely-newer published, unarchived,
+    // same-language rows; resolveEditionStanding re-applies every one of those
+    // rules so the decision is correct even if the query is ever loosened.
+    edition = resolveEditionStanding(campaign.version, siblings);
+  }
+
   return {
     campaign: {
       id: campaign.id,
@@ -284,6 +357,8 @@ export async function getCampaignOverview(
       invitationBodyHtml: campaign.invitationBodyHtml,
       // Wave V (V-3): boolean only — the manifest payload stays server-side.
       isImported: campaign.importManifest != null,
+      // Wave EV — null ⇒ nothing rendered (unpublished pin, or lookup degraded).
+      edition,
     },
     stats,
   };
