@@ -131,7 +131,7 @@ An instrument with no real scoring — Quarterly Session Prep v1 and v2. Respons
 
 **Results report** (a.k.a. "the report", "the PDF"):
 The branded, printable **per-respondent** document for *one* completed submission — cover, overall result, per-section breakdown, scores table, recommendations (when present), conclusion. It is the human-readable view that **replaces the raw answer (`stableKey`) view**. It is per individual.
-Its **audience is a property of where it is reached, not of the document**: a coach/admin views it through the **Report access gate**; when a **Campaign** opts in, the **Respondent** sees the *same* artifact rendered in place immediately after submitting (ADR-0027); and a public quiz taker sees it in place too (ADR-0008). One document, three readers — no reduced "respondent edition" exists.
+Its **audience is a property of where it is reached, not of the document**: a coach/admin views it through the **Report access gate**; when a **Campaign** opts in, the **Respondent** sees the *same* artifact rendered in place immediately after submitting (ADR-0027); and a public quiz taker sees it in place too (ADR-0008). One document, three readers — no reduced "respondent edition" exists. (Precision: the same *component*, minus cohort sections a given reader is not entitled to — the coach/admin route can pass a Wave S `peerComparison` section that the respondent's copy structurally cannot receive. See ADR-0027.)
 _Avoid_: calling it "the coach's view" — that was true only while the gated route was the only door.
 _Avoid_: conflating the per-respondent **Results report** with a cohort **Aggregate report** (Esperto's "group" / "self-comparison" report — the facilitator's all-responses dashboard; shipped for LVA in Wave F).
 

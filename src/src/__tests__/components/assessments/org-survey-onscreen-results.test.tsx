@@ -289,3 +289,57 @@ describe("one respondent's report never renders to another (finding #1)", () => 
     );
   });
 });
+
+// ─── PR #236 round-3 finding: re-tapping the invite link stranded the report ──
+//
+// The fragment was stripped only on exchange SUCCESS. Since /exchange 410s a
+// SUBMITTED invitation, a respondent who re-tapped their email link after
+// finishing (the default gesture on mobile) got "no longer available" — and
+// every subsequent reload re-attempted the same doomed exchange, because `#t=`
+// was still in the URL. Their report sat intact in sessionStorage, unreachable.
+describe("re-tapping the invitation link after submitting (finding #3)", () => {
+  function installFetchWithExchange(exchangeStatus: number, meStatus: number) {
+    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : String(input);
+      if (url.includes("/exchange")) {
+        return {
+          ok: exchangeStatus >= 200 && exchangeStatus < 300,
+          status: exchangeStatus,
+          json: async () => ({ success: false, error: "gone" }),
+        } as unknown as Response;
+      }
+      if (url.includes("/me")) {
+        return {
+          ok: false,
+          status: meStatus,
+          json: async () => ({
+            success: false,
+            error: "gate",
+            ...(meStatus === 410 ? { respondentKey: KEY } : {}),
+          }),
+        } as unknown as Response;
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as unknown as Response;
+    }) as unknown as typeof fetch;
+  }
+
+  it("re-renders the stored report instead of a dead end", async () => {
+    writeOnScreenResult(ALIAS, REPORT, KEY);
+    window.history.replaceState(null, "", `/org-survey/${ALIAS}#t=already-used`);
+    installFetchWithExchange(410, 410);
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("org-survey-results")).toBeInTheDocument(),
+    );
+  });
+
+  it("strips the fragment even when the exchange fails, so a reload is not doomed", async () => {
+    window.history.replaceState(null, "", `/org-survey/${ALIAS}#t=already-used`);
+    installFetchWithExchange(410, 410);
+
+    render(<OrgSurveyClient campaignAlias={ALIAS} />);
+    await waitFor(() => expect(window.location.hash).toBe(""));
+  });
+});

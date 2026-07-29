@@ -15,7 +15,9 @@
  * capability, never persisted data):
  *   - the stored `AssessmentCampaign.showResultsOnScreen` value. The wizard
  *     hides the checkbox when the flag is off but NEVER coerces the column,
- *     unlike the sendResultsToRespondent precedent at CampaignWizard.tsx:641.
+ *     unlike the `sendResultsToRespondent` force-false precedent in CampaignWizard.
+ *     (Cited by symbol, not line: the old `CampaignWizard.tsx:641` citation was
+ *     already stale when written — it points into a different file's coordinates.)
  *     That coercion exists because a stale `true` would make the thank-you page
  *     promise an email the send path won't deliver — a user-visible lie. No
  *     such hazard exists here: with the server deciding, a stale `true`

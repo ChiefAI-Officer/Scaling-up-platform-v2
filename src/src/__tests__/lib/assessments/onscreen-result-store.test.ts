@@ -217,3 +217,60 @@ describe("ownership — a slot only renders to the invitation it was written for
     expect(readOnScreenResult(ALIAS, KEY)).toBeNull();
   });
 });
+
+// ─── EXPIRY (PR #236 round-3 finding #2) ────────────────────────────────────
+//
+// `MAX_AGE_MS` is the defence-in-depth bound for the one scenario that has
+// already gone wrong once: a caller that forgets the `/me` gate. Round 1 shipped
+// exactly that bug, and this backstop was the thing added to cap it — yet it had
+// no test at all. Fake timers rather than hand-built envelopes, so the real
+// write path is exercised.
+describe("expiry — an abandoned slot stops being readable", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("reads back inside the window", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-07-29T10:00:00.000Z"));
+    writeOnScreenResult(ALIAS, sampleReport as never, KEY);
+    jest.setSystemTime(new Date("2026-07-29T10:28:00.000Z")); // 28 min < 29
+    expect(readOnScreenResult(ALIAS, KEY)).not.toBeNull();
+  });
+
+  it("refuses once past the window, and purges", () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-07-29T10:00:00.000Z"));
+    writeOnScreenResult(ALIAS, sampleReport as never, KEY);
+    jest.setSystemTime(new Date("2026-07-29T10:31:00.000Z")); // 31 min > 29
+    expect(readOnScreenResult(ALIAS, KEY)).toBeNull();
+    // Purged, not merely refused — so it cannot be read even by rewinding.
+    jest.setSystemTime(new Date("2026-07-29T10:05:00.000Z"));
+    expect(readOnScreenResult(ALIAS, KEY)).toBeNull();
+  });
+
+  it("refuses an envelope whose issuedAt is not a finite number", () => {
+    for (const bad of [null, "nope", NaN, Infinity, undefined]) {
+      window.sessionStorage.setItem(
+        onScreenResultKey(ALIAS),
+        JSON.stringify({
+          v: 2,
+          issuedAt: bad,
+          respondentKey: KEY,
+          report: sampleReport,
+        }),
+      );
+      expect(readOnScreenResult(ALIAS, KEY)).toBeNull();
+    }
+    // Positive control: the same envelope shape with a real issuedAt DOES read,
+    // so the loop above is rejecting issuedAt and not the shape.
+    window.sessionStorage.setItem(
+      onScreenResultKey(ALIAS),
+      JSON.stringify({
+        v: 2,
+        issuedAt: Date.now(),
+        respondentKey: KEY,
+        report: sampleReport,
+      }),
+    );
+    expect(readOnScreenResult(ALIAS, KEY)).not.toBeNull();
+  });
+});

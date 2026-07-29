@@ -193,22 +193,18 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             body: JSON.stringify({ token }),
           });
 
-          if (!exchangeRes.ok) {
-            const message = await readError(exchangeRes, "Invalid link.");
-            if (!cancelled) {
-              setPhase({ kind: "error", message });
-            }
-            return;
-          }
+          const exchangeOk = exchangeRes.ok;
 
-          // Wave OSR (#71): a fresh exchange means a (possibly different)
-          // respondent is starting this campaign in this tab — purge any stored
-          // report. This is a belt-and-braces cleanup, NOT the security boundary:
-          // the real guard is the /me 410 check below, because the tokenless
-          // reload never reaches this branch at all.
-          clearOnScreenResult(campaignAlias);
-
-          // Clear the fragment so reloads don't re-exchange.
+          // Strip `#t=` on EVERY outcome, not just success.
+          //
+          // Wave OSR (#71), round-3 review: this used to sit after an early
+          // return on failure, which stranded the report. /exchange 410s a
+          // SUBMITTED invitation, so a respondent who re-tapped their email link
+          // after finishing — the default gesture on mobile — saw "no longer
+          // available", and because the fragment survived, every reload
+          // re-attempted the same doomed exchange. Their report was intact in
+          // sessionStorage the whole time and unreachable. Stripping first makes
+          // the worst case a clean tokenless load, which the /me path handles.
           if (typeof window !== "undefined") {
             window.history.replaceState(
               null,
@@ -216,6 +212,28 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
               window.location.pathname + window.location.search
             );
           }
+
+          if (exchangeOk) {
+            // A fresh exchange means a (possibly different) respondent is
+            // starting this campaign in this tab — purge any stored report.
+            // Belt-and-braces cleanup, NOT the security boundary: the real guard
+            // is the ownership check on the /me 410 path below, because a
+            // tokenless reload never reaches this branch at all.
+            clearOnScreenResult(campaignAlias);
+          } else if (exchangeRes.status !== 410) {
+            // A bad or unknown token (404/401/…). No session was established,
+            // so stop here — but the fragment is already gone, so a reload is a
+            // clean tokenless load rather than a permanent dead end.
+            const message = await readError(exchangeRes, "Invalid link.");
+            if (!cancelled) setPhase({ kind: "error", message });
+            return;
+          }
+          // Exchange 410 falls THROUGH to /me deliberately: the invitation is
+          // past its lifecycle gate, which is exactly the state where a stored
+          // report may be owed to this respondent. /me re-derives it from the
+          // cookie and the ownership check decides — we do not decide here, and
+          // we deliberately do not purge, because that would destroy the report
+          // we are about to try to hand back.
         }
 
         if (cancelled) return;

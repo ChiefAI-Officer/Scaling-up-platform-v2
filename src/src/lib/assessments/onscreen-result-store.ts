@@ -12,11 +12,16 @@
  * So without a rehydrate, a respondent who refreshes — or hits Back — is told
  * the survey closed seconds after they finished it.
  *
- * `sessionStorage` fixes that with no new route, no PII endpoint and no
- * authorization question: the data never leaves the respondent's own tab, and it
- * dies when that tab closes, which IS show-once. It is strictly narrower than
- * the answer draft already shipping in `use-answer-draft.ts`, which persists the
+ * `sessionStorage` fixes that with no new route and no PII endpoint: the data
+ * never leaves the respondent's own browser. It is strictly narrower than the
+ * answer draft already shipping in `use-answer-draft.ts`, which persists the
  * respondent's raw ANSWERS to `localStorage` (wider scope, longer life).
+ *
+ * ⚠️ Do NOT restore the claim that the slot "dies when the tab closes, which IS
+ * show-once". `sessionStorage` is **copied** into a duplicated tab (Duplicate
+ * Tab, `window.open` from the page) and **restored** by reopen-closed-tab and by
+ * crash/session restore — so tab lifetime is not a boundary anyone can rely on.
+ * The real bounds are the ownership check plus `MAX_AGE_MS` below.
  *
  * KEYING — campaign alias for the SLOT, respondentKey for the OWNER
  * ─────────────────────────────────────────────────────────────────

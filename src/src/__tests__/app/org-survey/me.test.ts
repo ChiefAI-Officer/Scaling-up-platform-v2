@@ -98,6 +98,45 @@ describe("GET me", () => {
     expect(res.status).toBe(410);
   });
 
+  // Wave OSR (#71) — the 410 body is LOAD-BEARING, not informational.
+  //
+  // The on-screen report is stored per-tab and stamped with the invitation it
+  // belongs to; the client will only re-render it when the key echoed here
+  // matches that stamp. `sessionStorage` is per-tab while cookies are
+  // per-origin, so without this key a co-invitee sharing the browser could be
+  // shown someone else's report.
+  //
+  // Regressing `gateFailed(invitation.id)` to `gateFailed()` used to break the
+  // feature SILENTLY — the client would get no key, refuse to rehydrate, and
+  // tell a respondent who had just finished that the survey had closed, with
+  // their only copy stranded in storage. Nothing in this suite caught it.
+  it("410 echoes respondentKey, so the client can prove it owns a stored report", async () => {
+    sessionState.invitationId = "inv-1";
+    sessionState.campaignAlias = "demo";
+    (db.assessmentInvitation.findUnique as jest.Mock).mockResolvedValue({
+      id: "inv-1",
+      status: "SUBMITTED", // the case the on-screen rehydrate depends on
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 86_400_000),
+      campaign: {
+        alias: "demo",
+        deletedAt: null,
+        status: "ACTIVE",
+        openAt: new Date(Date.now() - 86_400_000),
+        closeAt: null,
+        aggregationMode: "FULL_VISIBILITY",
+        sendResultsToRespondent: false,
+        template: { alias: "RockHabits" },
+        organization: { name: "Acme" },
+        version: { questions: [], sections: [] },
+      },
+    });
+    const res = await GET(req() as never, aliasParams("demo"));
+    expect(res.status).toBe(410);
+    const body = await res.json();
+    expect(body.respondentKey).toBe("inv-1");
+  });
+
   it("returns sections + questions when lifecycle passes", async () => {
     sessionState.invitationId = "inv-1";
     sessionState.campaignAlias = "demo";

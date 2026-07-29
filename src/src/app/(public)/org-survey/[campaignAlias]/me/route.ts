@@ -24,9 +24,17 @@ const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
  * the session checks above (missing/mismatched cookie → 401), so a 410 always
  * implies a live sealed invitation cookie for this campaign.
  *
- * Wave OSR (#71): the 410 now echoes `respondentKey` — the same opaque
- * invitation cuid the 200 path already returns, scoped to the holder's own
- * session, never PII. It is load-bearing, not informational.
+ * Wave OSR (#71): the 410 echoes `respondentKey` — the same opaque invitation
+ * cuid the 200 path already returns, scoped to the holder's own session, never
+ * PII. It is load-bearing, not informational.
+ *
+ * The parameter is REQUIRED on purpose. It was optional at first, which
+ * contradicted the rule `readOnScreenResult` enforces on itself — "an optional
+ * ownership check is one careless caller away from being no check at all". The
+ * failure was silent rather than loud: drop the argument and the client gets no
+ * key, refuses to rehydrate, and tells a respondent who just finished that the
+ * survey has closed, with their only copy stranded in sessionStorage. Requiring
+ * it makes that a compile error; `me.test.ts` asserts the body as a backstop.
  *
  * `sessionStorage` is per-TAB while cookies are per-origin, so "this browser
  * holds a live invitation" does NOT establish WHOSE report sits in a tab's
@@ -36,13 +44,9 @@ const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
  * B's cookie and render A's report to B. Echoing the key lets the client
  * require slot-owner == cookie-owner before rehydrating, which closes that.
  */
-function gateFailed(respondentKey?: string): NextResponse {
+function gateFailed(respondentKey: string): NextResponse {
   return NextResponse.json(
-    {
-      success: false,
-      error: "This survey is no longer available.",
-      ...(respondentKey ? { respondentKey } : {}),
-    },
+    { success: false, error: "This survey is no longer available.", respondentKey },
     { status: 410, headers: NO_STORE_HEADERS }
   );
 }
