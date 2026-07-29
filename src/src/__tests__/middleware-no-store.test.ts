@@ -18,9 +18,14 @@
  * in sync with REPORT_NO_STORE_REGEX in middleware.ts.
  */
 
+import { readFileSync } from "fs";
+import { join } from "path";
+
 // Extracted verbatim from middleware.ts (REPORT_NO_STORE_REGEX) — keep in sync.
 const REPORT_NO_STORE_REGEX =
   /^\/assessments\/[^/]+\/(respondents\/[^/]+\/)?report\/?$/;
+const PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX =
+  /^\/assessments\/public-submissions\/[^/]+\/report\/?$/;
 
 // The exact header value the per-respondent path already gets; the group report
 // must get the IDENTICAL value.
@@ -28,10 +33,41 @@ const NO_STORE_HEADER_VALUE = "no-store, private";
 
 /** Mirrors the middleware's no-store decision + header value for a given path. */
 function noStoreHeaderFor(pathname: string): string | undefined {
-  return REPORT_NO_STORE_REGEX.test(pathname) ? NO_STORE_HEADER_VALUE : undefined;
+  return REPORT_NO_STORE_REGEX.test(pathname) ||
+    PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX.test(pathname)
+    ? NO_STORE_HEADER_VALUE
+    : undefined;
 }
 
 describe("R2-LOW-1: assessment report no-store middleware", () => {
+  describe("public referral report gets no-store, private", () => {
+    it("keeps the behavioral mirror synchronized with middleware source", () => {
+      const source = readFileSync(
+        join(process.cwd(), "src/middleware.ts"),
+        "utf8",
+      );
+      expect(source).toContain(
+        "/^\\/assessments\\/public-submissions\\/[^/]+\\/report\\/?$/",
+      );
+    });
+
+    it("sets the header on the public submission report", () => {
+      expect(
+        noStoreHeaderFor(
+          "/assessments/public-submissions/sub_public-83/report",
+        ),
+      ).toBe("no-store, private");
+    });
+
+    it("sets the header with a trailing slash", () => {
+      expect(
+        noStoreHeaderFor(
+          "/assessments/public-submissions/sub-public-83/report/",
+        ),
+      ).toBe("no-store, private");
+    });
+  });
+
   describe("group report (campaign-level) gets no-store, private", () => {
     it("sets the header on /assessments/abc123/report", () => {
       expect(noStoreHeaderFor("/assessments/abc123/report")).toBe(
@@ -104,6 +140,11 @@ describe("R2-LOW-1: assessment report no-store middleware", () => {
     it("does not match a path with extra segments after /report", () => {
       expect(
         noStoreHeaderFor("/assessments/abc123/report/extra")
+      ).toBeUndefined();
+      expect(
+        noStoreHeaderFor(
+          "/assessments/public-submissions/sub-public-83/report/extra",
+        ),
       ).toBeUndefined();
     });
 

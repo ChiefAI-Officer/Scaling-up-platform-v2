@@ -13,6 +13,8 @@ import {
 // bare campaign page, the respondents listing, or API routes.
 export const REPORT_NO_STORE_REGEX =
   /^\/assessments\/[^/]+\/(respondents\/[^/]+\/)?report\/?$/;
+export const PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX =
+  /^\/assessments\/public-submissions\/[^/]+\/report\/?$/;
 
 function withRateLimitHeaders(
   response: NextResponse,
@@ -112,10 +114,14 @@ export default withAuth(
     }
 
     // H15 / R2-LOW-1: the branded results report pages render named PII (scores,
-    // answers). Force no-store on both the per-respondent and campaign-level group
-    // report so they aren't cached by the browser/proxies. See REPORT_NO_STORE_REGEX.
+    // answers). Force no-store on per-respondent, campaign-level group, and
+    // authenticated public-referral reports so they aren't cached by the
+    // browser/proxies.
     const passthrough = NextResponse.next();
-    if (REPORT_NO_STORE_REGEX.test(pathname)) {
+    if (
+      REPORT_NO_STORE_REGEX.test(pathname) ||
+      PUBLIC_REFERRAL_REPORT_NO_STORE_REGEX.test(pathname)
+    ) {
       passthrough.headers.set("Cache-Control", "no-store, private");
     }
     return withRateLimitHeaders(passthrough, rateLimitHeaders);

@@ -22,6 +22,12 @@ jest.mock("@/lib/rate-limit", () => ({
   RateLimits: { standard: { interval: 60000, maxRequests: 100 } },
 }));
 jest.mock("@/lib/assessments/respondent-report", () => ({ getRespondentReport: jest.fn() }));
+jest.mock("@/lib/assessments/public-referrals", () => ({
+  getPublicReferralReport: jest.fn(),
+}));
+jest.mock("@/lib/assessments/wave-83-flags", () => ({
+  isReferredResultsEnabled: jest.fn(() => true),
+}));
 jest.mock("@/lib/assessments/report-config", () => ({
   reportConfigFor: jest.fn(() => ({ reportType: "qualitative" })),
 }));
@@ -30,8 +36,11 @@ import { viewReport } from "@/lib/assessments/report-gate-core";
 import { getApiActor } from "@/lib/auth/authorization";
 import { headers } from "next/headers";
 import { isGroupReportEnabled } from "@/lib/assessments/wave-f-flags";
+import { getPublicReferralReport } from "@/lib/assessments/public-referrals";
+import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 import {
   viewGroupReport,
+  viewPublicReferralReport,
   viewRespondentReport,
   ipFromHeaders,
 } from "@/lib/assessments/report-access-gate";
@@ -40,6 +49,8 @@ const mockViewReport = viewReport as jest.Mock;
 const mockGetApiActor = getApiActor as jest.Mock;
 const mockHeaders = headers as jest.Mock;
 const mockIsEnabled = isGroupReportEnabled as jest.Mock;
+const mockGetPublicReferralReport = getPublicReferralReport as jest.Mock;
+const mockIsReferredResultsEnabled = isReferredResultsEnabled as jest.Mock;
 
 function fakeHeaders(map: Record<string, string>) {
   return { get: (k: string) => map[k] ?? null };
@@ -281,5 +292,115 @@ describe("viewRespondentReport adapter", () => {
     mockGetApiActor.mockResolvedValue({ userId: "u1", email: "a@x.com", role: "ADMIN", coachId: null });
     await viewRespondentReport({} as never, { campaignId: "c", respondentId: "r" });
     expect(lastOpts().auditFailureFields).toBeUndefined();
+  });
+});
+
+describe("viewPublicReferralReport adapter", () => {
+  it("requires an actor and rate-limits by actor, submission, and IP", async () => {
+    const actor = {
+      userId: "u-coach",
+      email: "coach@example.com",
+      role: "COACH",
+      coachId: "coach-9",
+    };
+    mockGetApiActor.mockResolvedValue(actor);
+
+    await viewPublicReferralReport(
+      {} as never,
+      { submissionId: "sub-public-1" },
+    );
+
+    const opts = lastOpts();
+    expect(opts.surface).toBe("respondent");
+    expect(opts.noActorPolicy).toBe("redirect-login");
+    expect(opts.rateLimitKey).toBe(
+      "public-referral-report:coach-9:sub-public-1:9.9.9.9",
+    );
+    expect(opts.metricRole).toBe("COACH");
+    expect(opts.userAgent).toBe("UA/1");
+
+    await opts.load();
+    expect(mockGetPublicReferralReport).toHaveBeenCalledWith(
+      expect.anything(),
+      actor,
+      "sub-public-1",
+    );
+  });
+
+  it("gates with the referred-results flag before any loader work", async () => {
+    mockGetApiActor.mockResolvedValue({
+      userId: "u-admin",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+    mockIsReferredResultsEnabled.mockReturnValue(false);
+
+    await viewPublicReferralReport(
+      {} as never,
+      { submissionId: "sub-public-2" },
+    );
+
+    const opts = lastOpts();
+    expect(opts.flagGate()).toBe(false);
+    expect(mockIsReferredResultsEnabled).toHaveBeenCalledTimes(1);
+    expect(mockGetPublicReferralReport).not.toHaveBeenCalled();
+  });
+
+  it("maps forbidden and missing submissions to enumeration-safe dispositions", async () => {
+    mockGetApiActor.mockResolvedValue({
+      userId: "u-admin",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+
+    await viewPublicReferralReport(
+      {} as never,
+      { submissionId: "sub-public-3" },
+    );
+
+    const { classify } = lastOpts();
+    expect(classify({ status: "ok" })).toBe("ok");
+    expect(classify({ status: "forbidden" })).toBe("forbidden");
+    expect(classify({ status: "not-found" })).toBe("not-found");
+  });
+
+  it("builds the exact public-referral VIEW_REPORT audit metadata", async () => {
+    mockGetApiActor.mockResolvedValue({
+      userId: "u-admin",
+      email: "admin@example.com",
+      role: "ADMIN",
+      coachId: null,
+    });
+
+    await viewPublicReferralReport(
+      {} as never,
+      { submissionId: "sub-public-4" },
+    );
+
+    const spec = lastOpts().auditOf({
+      status: "ok",
+      report: {
+        templateAlias: "RockHabits",
+        provenance: {
+          submissionId: "sub-public-4",
+          versionId: "version-4",
+          contentHash: "hash-4",
+        },
+      },
+    });
+    expect(spec).toEqual({
+      entityType: "AssessmentSubmission",
+      action: "VIEW_REPORT",
+      entityId: "sub-public-4",
+      changes: {
+        kind: "public-referral-report",
+        templateAlias: "RockHabits",
+        reportType: "qualitative",
+        versionId: "version-4",
+        contentHash: "hash-4",
+      },
+    });
   });
 });

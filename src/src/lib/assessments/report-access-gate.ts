@@ -31,11 +31,16 @@ import {
   getRespondentReport,
   type RespondentReportOutcome,
 } from "@/lib/assessments/respondent-report";
+import {
+  getPublicReferralReport,
+  type PublicReferralReportOutcome,
+} from "@/lib/assessments/public-referrals";
 import { reportConfigFor } from "@/lib/assessments/report-config";
 import {
   REPORT_FILTERS,
   REPORT_FILTER_VERSION,
 } from "@/lib/assessments/qualitative-report-model";
+import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
 
 /** First-hop client IP, mirroring the current report routes' extraction byte-for-byte. */
 export function ipFromHeaders(h: Headers): string {
@@ -207,6 +212,71 @@ export async function viewRespondentReport(
           ...(o.report.templateAlias && REPORT_FILTERS[o.report.templateAlias]
             ? { reportFilterId: REPORT_FILTER_VERSION }
             : {}),
+        },
+      };
+    },
+    metricRole,
+  });
+
+  return { outcome, metricRole };
+}
+
+/**
+ * Public Campaign referral Results report adapter. The shared report gate
+ * enforces authentication, flag gating, actor/submission/IP rate limiting, an
+ * enumeration-safe disposition, and a fail-closed VIEW_REPORT audit before the
+ * page can render the canonical frozen report.
+ */
+export async function viewPublicReferralReport(
+  deps: ReportGateDeps,
+  args: { submissionId: string },
+): Promise<{
+  outcome: PublicReferralReportOutcome;
+  metricRole: string | null;
+}> {
+  const actor = await getApiActor();
+  const h = await headers();
+  const ip = ipFromHeaders(h);
+  const userAgent = h.get("user-agent");
+  const actorKey = actor?.coachId ?? actor?.userId ?? "anon";
+  const metricRole = actor?.role ?? null;
+  const reportDb =
+    db as unknown as Parameters<typeof getPublicReferralReport>[0];
+
+  const outcome = await viewReport<PublicReferralReportOutcome>(deps, {
+    surface: "respondent",
+    actor,
+    noActorPolicy: "redirect-login",
+    flagGate: isReferredResultsEnabled,
+    ip,
+    userAgent,
+    rateLimitKey:
+      `public-referral-report:${actorKey}:${args.submissionId}:${ip}`,
+    rateLimitConfig: RateLimits.standard,
+    load: () =>
+      getPublicReferralReport(reportDb, actor!, args.submissionId),
+    classify: (o) =>
+      o.status === "ok"
+        ? "ok"
+        : o.status === "forbidden"
+          ? "forbidden"
+          : "not-found",
+    auditOf: (o) => {
+      if (o.status !== "ok") {
+        throw new Error(
+          "unreachable: auditOf on non-ok public referral outcome",
+        );
+      }
+      return {
+        entityType: "AssessmentSubmission",
+        action: "VIEW_REPORT",
+        entityId: o.report.provenance.submissionId,
+        changes: {
+          kind: "public-referral-report",
+          templateAlias: o.report.templateAlias,
+          reportType: reportConfigFor(o.report.templateAlias).reportType,
+          versionId: o.report.provenance.versionId,
+          contentHash: o.report.provenance.contentHash,
         },
       };
     },
