@@ -4,7 +4,7 @@ status: accepted
 
 # Public referral ownership is a frozen Coach identity
 
-A verified public-assessment referral is owned by the active Coach resolved when the taker submits, not by the Public Campaign creator and not by whichever Coach currently has the supplied email address. The submission therefore stores a nullable Coach relationship alongside the existing email snapshot; coach access requires that frozen identity plus current active status, while ADMIN/STAFF retain oversight. This prevents email changes from transferring or orphaning named assessment results and separates immutable ownership from revocable viewing eligibility.
+A verified public-assessment referral is owned by the active Coach resolved when the taker submits, not by the Public Campaign creator and not by whichever Coach currently has the supplied email address. The submission therefore stores a nullable Coach relationship alongside the existing email snapshot; coach access requires that frozen identity, an immutable User-to-Coach account binding, and current active status, while ADMIN/STAFF retain oversight. This prevents email changes from transferring or orphaning named assessment results and separates immutable ownership from revocable viewing eligibility.
 
 ## Considered options
 
@@ -14,6 +14,7 @@ A verified public-assessment referral is owned by the active Coach resolved when
 
 ## Consequences
 
-- Historical ownership is backfilled only when a `REFERRING_COACH` outbox row proves the active-coach guard succeeded and its canonical recipient matches an existing Coach. A raw taker-supplied email is insufficient.
+- Historical ownership is backfilled only from an explicitly reviewed submission-to-Coach mapping. A `REFERRING_COACH` outbox row proves the active-coach guard succeeded and may identify a candidate, but neither it nor a taker-supplied email can prove that the Coach holding that email today is the same historical person.
 - Deactivation or certification expiry suspends coach access; reactivation of the same Coach restores it.
 - A Coach referenced by a public submission cannot be hard-deleted. Deactivation is the offboarding path; privacy-driven taker-data deletion remains a separate explicit operation.
+- Closing a Public Campaign does not revoke historical access. Soft deletion does because it is the platform's explicit quarantine/recovery boundary for every campaign read path.

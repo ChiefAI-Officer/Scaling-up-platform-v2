@@ -1,6 +1,6 @@
 # Jeff #83 — Public Referred Results Design
 
-**Status:** Approved in `grill-with-docs` session on 2026-07-29
+**Status:** Approved in `grill-with-docs` and refined by `co-validate` on 2026-07-29
 
 **Scope:** Finish the partially shipped Jeff item #83
 
@@ -108,24 +108,26 @@ This intentionally changes today's behavior, which stores the unverified supplie
 
 ### Historical backfill
 
-Backfill only when all of the following agree:
+Do not automatically join a historical delivery email to whichever Coach owns that email today. An outbox row proves that *a* Coach passed verification at submission time, but it cannot rule out a later email change or reuse.
+
+Historical ownership requires an explicitly reviewed `submissionId -> coachId` mapping. Build the review candidate set only when:
 
 - the submission belongs to a Public Campaign;
-- the submission has a `REFERRING_COACH` outbox row;
-- the outbox recipient normalizes to one existing Coach email; and
-- there is no conflicting referring-coach evidence for that submission.
+- the submission has a `REFERRING_COACH` outbox row proving the active-coach guard succeeded;
+- the outbox and stored snapshot do not conflict; and
+- the candidate Coach still exists.
 
-Use the outbox row because it proves the active-coach guard succeeded at submission time. Do not infer ownership from `AssessmentSubmission.referringCoachEmail` alone.
+The reviewer confirms identity, not merely email equality. The backfill consumes the approved mapping idempotently. Any unreviewed, ambiguous, or unmatched row remains `referringCoachId = null`.
 
 Production read-only audit on 2026-07-29 found:
 
 - 7 public submissions across 1 campaign;
 - 3 submissions with referral emails;
 - all 3 have verification outbox evidence;
-- all 3 still match existing Coach records; and
+- all 3 currently have candidate matches to existing Coach records; and
 - those 3 submissions belong to 2 Coaches.
 
-Ambiguous or unmatched historical records remain `referringCoachId = null`.
+These counts make manual review practical; they do not themselves authorize automatic assignment.
 
 ### Coach deletion
 
@@ -139,10 +141,15 @@ Add one pure access policy for a public submission:
 
 - ADMIN/STAFF: allowed.
 - COACH: allowed only when:
+  - the authenticated User is immutably related through `Coach.userId`;
   - `actor.coachId` equals the frozen `referringCoachId`;
   - the Coach currently has active, unexpired certification; and
   - the submission belongs to a non-deleted Public Campaign.
 - everyone else: denied.
+
+This surface must use `getApiActor` (or an equivalently strict actor resolver) and its `User -> coachProfile` relation. It must never call the backwards-compatible email-fallback path in `getCoachForSession`.
+
+Campaign status does not affect historical access: closing a campaign stops new submissions but retains owned reports. `deletedAt`, however, remains a deny condition because soft deletion is the platform-wide quarantine/recovery boundary; recovering the campaign restores access.
 
 Add an authenticated submission-based report route, provisionally:
 
@@ -157,12 +164,15 @@ The route:
 - applies the public-submission access policy;
 - returns the same not-found response for missing and unauthorized IDs;
 - loads the frozen submission result and answers;
-- builds the existing `RespondentReport`;
+- loads the immutable published Template Version metadata referenced by the submission;
+- builds the existing `RespondentReport` through a shared pure builder extracted or reused by invited and public stored-submission loaders;
 - renders the existing `BrandedReport` and print action;
 - disables caching for named personal data; and
 - audits every successful and denied report-view attempt through the existing report-gate conventions.
 
 Do not add a bearer-token, public, or emailed results URL for coach access.
+
+The loader must never call scoring or findings computation. Historical score, tier, domain values, findings, and answers come only from the frozen submission plus its immutable Template Version. The HTML/PDF presentation is not persisted as a byte snapshot: the canonical renderer may receive deliberate presentation fixes over time, while the historical assessment result remains unchanged.
 
 ## Coach experience
 
@@ -182,7 +192,7 @@ Route, provisionally:
 
 Move the existing **Your Quick Assessment link** card from My Campaigns to this page. Do not duplicate it.
 
-The page is a flat, newest-first collection across all Public Campaigns. It includes:
+The target page is a flat, newest-first collection across all Public Campaigns. It includes:
 
 - taker name and email;
 - assessment name;
@@ -194,6 +204,8 @@ The page is a flat, newest-first collection across all Public Campaigns. It incl
 - server-side pagination, 25 per page;
 - search by normalized taker name or email; and
 - assessment filter.
+
+Result summaries are report-type aware. Scored instruments may show overall score/tier and available domain values. Qualitative instruments show completion and their supported summary metadata; they must not be forced through Four Decisions assumptions. The compact Four Decisions strip renders only when the frozen result actually provides that domain set.
 
 The page must have:
 
@@ -218,7 +230,7 @@ Keep the existing Public Campaigns page and lazy submissions expander. Enrich ea
 
 Do not add a second admin results page.
 
-The existing admin endpoint should adopt bounded server pagination rather than the current unpaged first-100 response.
+The existing admin endpoint should eventually adopt bounded server pagination rather than the current unpaged first-100 response. It is target-state polish, not a prerequisite for the privacy-sensitive ownership launch.
 
 ## API shape
 
@@ -233,7 +245,7 @@ GET /api/assessments/referred-results
   &templateId=<id>
 ```
 
-Returns only rows owned by the signed-in active Coach. The response carries display-ready result summaries, never raw answers.
+Returns only rows owned by the signed-in active Coach. The response carries discriminated, display-ready result summaries for scored and qualitative reports, never raw answers.
 
 ### Admin campaign submissions
 
@@ -275,16 +287,23 @@ WAVE_83_REFERRED_RESULTS_ENABLED
 WAVE_83_REFERRED_RESULTS_KILL
 ```
 
-Flag OFF preserves current navigation, admin result display, report access, and public copy. The nullable schema addition and verified-owner write may safely exist before UI launch, but no new result-reading surface is reachable until the flag is enabled.
+The ownership foundation is not feature-flagged: once the additive migration is present, every new verified submission immediately persists its canonical `referringCoachId`. Delaying that write would create permanently unowned submissions during rollout.
 
-Recommended delivery slices:
+The wave flag and kill switch gate only new read surfaces, navigation, expanded admin result display, and the matching public-copy clause. Flag OFF preserves current visible behavior while canonical ownership continues to accumulate safely.
 
-1. **Ownership foundation:** migration, relation, verified write path, historical backfill, coach-delete guard, access policy.
-2. **Canonical report access:** public-submission report loader, gate, route, audit, no-cache behavior.
-3. **Coach Referred Results:** navigation, moved link card, collection API, filters, pagination, responsive UI.
-4. **Admin completion + privacy:** enrich existing expander, approved disclosure copy, flag launch and production smoke.
+Use an expand-first deployment sequence so the database constraint cannot turn the existing coach-delete endpoint into an unexplained 500:
 
-Each slice remains behind the same wave flag and should be independently testable.
+1. add the nullable column/index and deploy compatible dual-write code plus an explicit coach-delete conflict guard;
+2. verify canonical owner writes in production;
+3. apply the reviewed historical mapping and add/enforce the restrictive Coach foreign key if it was not safe to add in step 1; and
+4. enable the read-surface flag only after authorization and privacy gates pass.
+
+Recommended delivery:
+
+1. **Core launch:** additive ownership migration, unflagged verified dual-write, immutable actor binding, reviewed backfill, coach-delete guard, access policy, canonical stored-submission report loader/gate, privacy copy, and a minimal Referred Results page with newest-first rows plus View report. The admin expander adds score summary and View report using the same gate.
+2. **Target-state polish:** taker search, assessment filter, inline domain expansion, dedicated mobile cards, and admin cursor pagination.
+
+Core read surfaces remain behind the same wave flag and should be independently testable. Search/filter/pagination polish must not alter the ownership or report authorization policy.
 
 ## Testing and verification
 
@@ -293,25 +312,30 @@ Each slice remains behind the same wave flag and should be independently testabl
 - Verified active Coach stores canonical ID and email.
 - Missing, malformed, unknown, inactive, or expired Coach stores no ownership and sends no coach email.
 - Submission owner and outbox recipient cannot diverge.
-- Migration backfills only verification-evidenced rows and is idempotent.
+- Migration/backfill consumes only explicitly reviewed submission-to-Coach mappings and is idempotent.
 - Coach hard deletion is blocked when referrals exist.
+- Ownership continues to persist while the read-surface flag is off.
 
 ### Authorization
 
 - Owning active Coach can list and view only their submissions.
+- An actor resolved only by the legacy email fallback cannot list or view referred results.
 - Another Coach receives enumeration-safe not-found.
 - Inactive or expired owner loses list and report access.
 - Reactivation restores access.
 - ADMIN/STAFF can view referred and unreferred public submissions.
 - Unauthenticated access redirects or returns 401 according to page/API convention.
 - Soft-deleted campaigns do not expose reports.
+- Closed, non-deleted campaigns retain historical report access.
 
 ### UI
 
 - Link card appears only on Referred Results when the flag is on.
 - Newest-first pagination, search, and assessment filter are server-backed.
 - Result summary and expanded Four Decisions values come from the frozen result.
+- Qualitative and non-Four-Decisions public results degrade to their supported summary instead of fabricated score/domain fields.
 - View report renders the canonical report and print action.
+- The public stored-submission loader never recomputes scoring or findings and shares the pure report-model builder.
 - Empty, loading, no-results, error, responsive, and keyboard states are covered.
 - Flag OFF is byte-identical on existing UI surfaces.
 
