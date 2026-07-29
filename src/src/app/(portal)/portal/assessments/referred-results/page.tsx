@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { ReferredResultsList } from "@/components/assessments/ReferredResultsList";
 import { FadeUp } from "@/components/ui/animated";
 import { isReferredResultsEnabled } from "@/lib/assessments/wave-83-flags";
-import { requireCoach } from "@/lib/auth/authorization";
+import { getApiActor } from "@/lib/auth/authorization";
+import { isCertified } from "@/lib/auth/coach-status";
 import { db } from "@/lib/db";
 
 const APP_URL =
@@ -19,6 +20,13 @@ function firstSearchValue(
   value: string | string[] | undefined,
 ): string {
   return typeof value === "string" ? value : "";
+}
+
+function allSearchValues(
+  value: string | string[] | undefined,
+): string[] {
+  if (Array.isArray(value)) return value;
+  return typeof value === "string" ? [value] : [];
 }
 
 async function resolvePublicQuickAlias(): Promise<string | null> {
@@ -42,7 +50,30 @@ export default async function ReferredResultsPage({
     notFound();
   }
 
-  const { coach } = await requireCoach();
+  const actor = await getApiActor();
+  if (actor?.role !== "COACH" || !actor.coachId) {
+    notFound();
+  }
+
+  const coach = await db.coach.findUnique({
+    where: { id: actor.coachId },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      certificationStatus: true,
+      certificationExpiry: true,
+    },
+  });
+  if (
+    !coach ||
+    !isCertified(coach) ||
+    (coach.certificationExpiry !== null &&
+      coach.certificationExpiry <= new Date())
+  ) {
+    notFound();
+  }
+
   const [publicQuickAlias, params] = await Promise.all([
     resolvePublicQuickAlias(),
     searchParams,
@@ -73,7 +104,7 @@ export default async function ReferredResultsPage({
           coachLink={coachLink}
           initialQuery={firstSearchValue(params.query)}
           initialTemplateId={firstSearchValue(params.templateId)}
-          initialCursor={firstSearchValue(params.cursor)}
+          initialCursorTrail={allSearchValues(params.cursor)}
         />
       </FadeUp>
     </div>

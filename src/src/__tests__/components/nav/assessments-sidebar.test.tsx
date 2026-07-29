@@ -5,7 +5,6 @@
  *   - 7 admin entries render for ADMIN role (with Aggregate Report visible)
  *   - Aggregate Report row hidden when canAccessAggregateReport returns false
  *   - Admin section hidden when role is COACH
- *   - Coach-lane section renders ONLY when role is COACH
  */
 
 jest.mock("next/navigation", () => ({
@@ -13,15 +12,10 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockCanAccessAggregateReport = jest.fn<boolean, [{ role: string }]>();
-const mockIsReferredResultsEnabled = jest.fn<boolean, []>();
 
 jest.mock("@/lib/assessments/access-control", () => ({
   canAccessAggregateReport: (actor: { role: string }) =>
     mockCanAccessAggregateReport(actor),
-}));
-
-jest.mock("@/lib/assessments/wave-83-flags", () => ({
-  isReferredResultsEnabled: () => mockIsReferredResultsEnabled(),
 }));
 
 import { render, screen } from "@testing-library/react";
@@ -43,7 +37,6 @@ function makeSession(role: "ADMIN" | "STAFF" | "COACH"): Session {
 beforeEach(() => {
   jest.clearAllMocks();
   mockCanAccessAggregateReport.mockReturnValue(true);
-  mockIsReferredResultsEnabled.mockReturnValue(false);
 });
 
 describe("AssessmentsSidebar", () => {
@@ -82,7 +75,7 @@ describe("AssessmentsSidebar", () => {
     render(<AssessmentsSidebar session={makeSession("COACH")} />);
     // Admin-only labels disappear (Organizations / Access Groups / Templates /
     // Campaigns / Public Campaigns / Aggregate Report). The "Dashboard" label
-    // is admin-only as well — coaches see "My Campaigns" / "Members".
+    // is admin-only as well.
     expect(screen.queryByText("Organizations")).not.toBeInTheDocument();
     expect(screen.queryByText("Access Groups")).not.toBeInTheDocument();
     expect(screen.queryByText("Templates")).not.toBeInTheDocument();
@@ -91,48 +84,18 @@ describe("AssessmentsSidebar", () => {
     expect(screen.queryByText("Aggregate Report")).not.toBeInTheDocument();
   });
 
-  it("renders the coach-lane section ONLY when role is COACH", () => {
-    render(<AssessmentsSidebar session={makeSession("COACH")} />);
-    expect(screen.getByText("My Campaigns")).toBeInTheDocument();
-    expect(screen.getByText("Members")).toBeInTheDocument();
-    expect(screen.getByText(/coach lane/i)).toBeInTheDocument();
-  });
-
-  it("keeps Referred Results dark for a Coach while the wave is off", () => {
-    render(<AssessmentsSidebar session={makeSession("COACH")} />);
-    expect(screen.queryByText("Referred Results")).not.toBeInTheDocument();
-  });
-
-  it("adds Referred Results between My Campaigns and Members for a Coach when enabled", () => {
-    mockIsReferredResultsEnabled.mockReturnValue(true);
-    render(<AssessmentsSidebar session={makeSession("COACH")} />);
-
-    const labels = screen
-      .getAllByRole("link")
-      .map((link) => link.textContent?.trim());
-    expect(labels).toEqual(["My Campaigns", "Referred Results", "Members"]);
-    expect(screen.getByText("Referred Results").closest("a")).toHaveAttribute(
-      "href",
-      "/portal/assessments/referred-results",
-    );
-  });
-
-  it("never adds Referred Results to the ADMIN lane", () => {
-    mockIsReferredResultsEnabled.mockReturnValue(true);
-    render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
-    expect(screen.queryByText("Referred Results")).not.toBeInTheDocument();
-  });
-
-  it("does NOT render the coach-lane section for ADMIN", () => {
+  it("does NOT render coach portal entries for ADMIN", () => {
     render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
     expect(screen.queryByText("My Campaigns")).not.toBeInTheDocument();
     expect(screen.queryByText("Members")).not.toBeInTheDocument();
+    expect(screen.queryByText("Referred Results")).not.toBeInTheDocument();
   });
 
-  it("does NOT render the coach-lane section for STAFF", () => {
+  it("does NOT render coach portal entries for STAFF", () => {
     render(<AssessmentsSidebar session={makeSession("STAFF")} />);
     expect(screen.queryByText("My Campaigns")).not.toBeInTheDocument();
     expect(screen.queryByText("Members")).not.toBeInTheDocument();
+    expect(screen.queryByText("Referred Results")).not.toBeInTheDocument();
   });
 
   it("renders 7 admin entries for STAFF role too", () => {
@@ -201,19 +164,5 @@ describe("AssessmentsSidebar", () => {
       );
     });
 
-    it("marks neither coach-lane entry as a placeholder (both are real routes)", () => {
-      render(<AssessmentsSidebar session={makeSession("COACH")} />);
-
-      const membersAnchor = anchorFor("Members");
-      expect(membersAnchor).not.toHaveAttribute("aria-disabled");
-      expect(membersAnchor.className).not.toMatch(/opacity-60/);
-
-      const campaignsAnchor = anchorFor("My Campaigns");
-      expect(campaignsAnchor).not.toHaveAttribute("aria-disabled");
-      expect(campaignsAnchor.className).not.toMatch(/opacity-60/);
-
-      // No "(coming soon)" markers on the coach lane (both entries are live).
-      expect(screen.queryAllByText(/coming soon/i).length).toBe(0);
-    });
   });
 });

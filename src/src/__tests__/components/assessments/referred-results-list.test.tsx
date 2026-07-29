@@ -7,8 +7,10 @@ import {
 } from "@testing-library/react";
 
 const mockRequireCoach = jest.fn();
+const mockGetApiActor = jest.fn();
 const mockCampaignFindFirst = jest.fn();
 const mockCampaignFindMany = jest.fn();
+const mockCoachFindUnique = jest.fn();
 const mockIsReferredResultsEnabled = jest.fn<boolean, []>();
 const mockNotFound = jest.fn(() => {
   throw new Error("NEXT_NOT_FOUND");
@@ -16,6 +18,7 @@ const mockNotFound = jest.fn(() => {
 
 jest.mock("@/lib/auth/authorization", () => ({
   requireCoach: () => mockRequireCoach(),
+  getApiActor: () => mockGetApiActor(),
 }));
 
 jest.mock("@/lib/db", () => ({
@@ -23,6 +26,9 @@ jest.mock("@/lib/db", () => ({
     assessmentCampaign: {
       findFirst: (...args: unknown[]) => mockCampaignFindFirst(...args),
       findMany: (...args: unknown[]) => mockCampaignFindMany(...args),
+    },
+    coach: {
+      findUnique: (...args: unknown[]) => mockCoachFindUnique(...args),
     },
   },
 }));
@@ -94,6 +100,15 @@ const degradedItem = {
   },
 };
 
+function scoredItemAt(index: number) {
+  return {
+    ...scoredItem,
+    submissionId: `sub-${index}`,
+    takerName: `Leader ${index}`,
+    takerEmail: `leader-${index}@example.com`,
+  };
+}
+
 function apiResponse(
   items: unknown[] = [scoredItem],
   nextCursor: string | null = null,
@@ -119,6 +134,7 @@ const mockFetch = jest.fn<Promise<Response>, [RequestInfo | URL, RequestInit?]>(
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockFetch.mockReset();
   mockFetch.mockResolvedValue(apiResponse());
   global.fetch = mockFetch;
   window.history.replaceState({}, "", "/portal/assessments/referred-results");
@@ -131,6 +147,19 @@ beforeEach(() => {
       lastName: "Morgan",
     },
     session: { user: { name: "Alex Morgan" } },
+  });
+  mockGetApiActor.mockResolvedValue({
+    userId: "user-1",
+    email: "session-address@example.com",
+    role: "COACH",
+    coachId: "coach-1",
+  });
+  mockCoachFindUnique.mockResolvedValue({
+    id: "coach-1",
+    email: "canonical-coach@example.com",
+    firstName: "Alex",
+    certificationStatus: "ACTIVE",
+    certificationExpiry: null,
   });
   mockCampaignFindFirst.mockResolvedValue({ alias: "scaling-up-quick" });
   mockCampaignFindMany.mockResolvedValue([]);
@@ -162,7 +191,61 @@ describe("Referred Results page ownership", () => {
       ReferredResultsPage({ searchParams: Promise.resolve({}) }),
     ).rejects.toThrow("NEXT_NOT_FOUND");
     expect(mockRequireCoach).not.toHaveBeenCalled();
+    expect(mockGetApiActor).not.toHaveBeenCalled();
+    expect(mockCoachFindUnique).not.toHaveBeenCalled();
     expect(mockCampaignFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("dark-404s a COACH without immutable coachId before Coach or campaign lookup", async () => {
+    mockIsReferredResultsEnabled.mockReturnValue(true);
+    mockGetApiActor.mockResolvedValue({
+      userId: "legacy-user",
+      email: "canonical-coach@example.com",
+      role: "COACH",
+      coachId: null,
+    });
+
+    await expect(
+      ReferredResultsPage({ searchParams: Promise.resolve({}) }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
+
+    expect(mockRequireCoach).not.toHaveBeenCalled();
+    expect(mockCoachFindUnique).not.toHaveBeenCalled();
+    expect(mockCampaignFindFirst).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing", null],
+    [
+      "inactive",
+      {
+        id: "coach-1",
+        email: "canonical-coach@example.com",
+        firstName: "Alex",
+        certificationStatus: "DEACTIVATED",
+        certificationExpiry: new Date("2027-07-30T00:00:00.000Z"),
+      },
+    ],
+    [
+      "expired",
+      {
+        id: "coach-1",
+        email: "canonical-coach@example.com",
+        firstName: "Alex",
+        certificationStatus: "ACTIVE",
+        certificationExpiry: new Date("2025-07-30T00:00:00.000Z"),
+      },
+    ],
+  ])("dark-404s when the canonical Coach row is %s", async (_case, coach) => {
+    mockIsReferredResultsEnabled.mockReturnValue(true);
+    mockCoachFindUnique.mockResolvedValue(coach);
+
+    await expect(
+      ReferredResultsPage({ searchParams: Promise.resolve({}) }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
+
+    expect(mockCampaignFindFirst).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("makes the enabled page the sole owner of the link card and forwards shareable filters", async () => {
@@ -173,7 +256,7 @@ describe("Referred Results page ownership", () => {
         searchParams: Promise.resolve({
           query: "jordan",
           templateId: "tpl-1",
-          cursor: "sub-9",
+          cursor: ["sub-4", "sub-9"],
         }),
       }),
     );
@@ -185,6 +268,22 @@ describe("Referred Results page ownership", () => {
       screen.getByRole("heading", { name: "Your Quick Assessment link" }),
     ).toBeInTheDocument();
     expect(
+      screen.getByTitle(
+        /coach=canonical-coach%40example\.com/,
+      ),
+    ).toBeInTheDocument();
+    expect(mockCoachFindUnique).toHaveBeenCalledWith({
+      where: { id: "coach-1" },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        certificationStatus: true,
+        certificationExpiry: true,
+      },
+    });
+    expect(mockRequireCoach).not.toHaveBeenCalled();
+    expect(
       screen.getByText(
         "See the Quick Assessment results attributed to your coach link.",
       ),
@@ -194,6 +293,9 @@ describe("Referred Results page ownership", () => {
         "/api/assessments/referred-results?query=jordan&templateId=tpl-1&cursor=sub-9&take=25",
         expect.objectContaining({ cache: "no-store" }),
       ),
+    );
+    expect(window.location.search).toBe(
+      "?query=jordan&templateId=tpl-1&cursor=sub-4&cursor=sub-9",
     );
   });
 });
@@ -216,6 +318,8 @@ describe("ReferredResultsList", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
     expect(await screen.findByText("18")).toBeInTheDocument();
+    expect(screen.getByText("18 results · newest first")).toBeInTheDocument();
+    expect(screen.getByText("Showing 1–1 of 18")).toBeInTheDocument();
 
     expect(screen.getAllByText("Jordan Lee")).not.toHaveLength(0);
     expect(screen.getAllByText("7.4").length).toBeGreaterThan(0);
@@ -295,9 +399,9 @@ describe("ReferredResultsList", () => {
   it("sends deterministic server-backed search, filter, and cursor pagination", async () => {
     mockFetch
       .mockResolvedValueOnce(apiResponse([scoredItem], "sub-1"))
-      .mockResolvedValueOnce(apiResponse([scoredItem], "sub-1"))
-      .mockResolvedValueOnce(apiResponse([scoredItem], "sub-1"))
-      .mockResolvedValueOnce(apiResponse([scoredItem], null));
+      .mockResolvedValueOnce(apiResponse([scoredItem], "sub-1", undefined, 1))
+      .mockResolvedValueOnce(apiResponse([scoredItem], "sub-1", undefined, 1))
+      .mockResolvedValueOnce(apiResponse([scoredItem], null, undefined, 1));
 
     render(<ReferredResultsList coachLink={null} />);
     await screen.findAllByText("Jordan Lee");
@@ -315,6 +419,9 @@ describe("ReferredResultsList", () => {
       ),
     );
     expect(window.location.search).toBe("?query=jordan");
+    expect(
+      await screen.findByText("1 results · newest first"),
+    ).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Assessment"), {
       target: { value: "tpl-1" },
@@ -325,6 +432,9 @@ describe("ReferredResultsList", () => {
         expect.objectContaining({ cache: "no-store" }),
       ),
     );
+    expect(
+      await screen.findByText("1 results · newest first"),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     await waitFor(() =>
@@ -333,6 +443,70 @@ describe("ReferredResultsList", () => {
         expect.objectContaining({ cache: "no-store" }),
       ),
     );
+    expect(
+      await screen.findByText("1 results · newest first"),
+    ).toBeInTheDocument();
+  });
+
+  it("reloads page three from a shareable cursor trail and walks back without skips or duplicate fetches", async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        apiResponse(
+          Array.from({ length: 10 }, (_, index) => scoredItemAt(index + 51)),
+          null,
+          undefined,
+          60,
+        ),
+      )
+      .mockResolvedValueOnce(
+        apiResponse(
+          Array.from({ length: 25 }, (_, index) => scoredItemAt(index + 26)),
+          "sub-50",
+          undefined,
+          60,
+        ),
+      )
+      .mockResolvedValueOnce(
+        apiResponse(
+          Array.from({ length: 25 }, (_, index) => scoredItemAt(index + 1)),
+          "sub-25",
+          undefined,
+          60,
+        ),
+      );
+
+    render(
+      <ReferredResultsList
+        coachLink={null}
+        initialCursorTrail={["sub-25", "sub-50"]}
+      />,
+    );
+
+    expect(await screen.findByText("Showing 51–60 of 60")).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      "/api/assessments/referred-results?cursor=sub-50&take=25",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(window.location.search).toBe("?cursor=sub-25&cursor=sub-50");
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(await screen.findByText("Showing 26–50 of 60")).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      "/api/assessments/referred-results?cursor=sub-25&take=25",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(window.location.search).toBe("?cursor=sub-25");
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(await screen.findByText("Showing 1–25 of 60")).toBeInTheDocument();
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      "/api/assessments/referred-results?take=25",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(window.location.search).toBe("");
   });
 
   it("provides desktop table and mobile card semantics without hiding content from assistive tech", async () => {

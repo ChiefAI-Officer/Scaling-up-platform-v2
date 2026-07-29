@@ -41,8 +41,6 @@ export async function GET(request: NextRequest) {
         { status: 403, headers: privateHeaders },
       );
     }
-    const coachId = actor.coachId;
-
     const validation = querySchema.safeParse(
       Object.fromEntries(request.nextUrl.searchParams.entries()),
     );
@@ -71,33 +69,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [assessmentOptions, totalCount] = await Promise.all([
-      db.assessmentTemplate.findMany({
-        where: {
-          deletedAt: null,
-          campaigns: {
-            some: {
-              accessMode: "PUBLIC",
-              deletedAt: null,
-              submissions: {
-                some: { referringCoachId: coachId },
-              },
+    const assessmentOptions = await db.assessmentTemplate.findMany({
+      where: {
+        deletedAt: null,
+        campaigns: {
+          some: {
+            accessMode: "PUBLIC",
+            deletedAt: null,
+            submissions: {
+              some: { referringCoachId: actor.coachId },
             },
           },
         },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      }),
-      db.assessmentSubmission.count({
-        where: {
-          referringCoachId: coachId,
-          campaign: {
-            accessMode: "PUBLIC",
-            deletedAt: null,
-          },
-        },
-      }),
-    ]);
+      },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
 
     return NextResponse.json(
       {
@@ -105,7 +92,7 @@ export async function GET(request: NextRequest) {
         items: outcome.items,
         nextCursor: outcome.nextCursor,
         assessmentOptions,
-        totalCount,
+        totalCount: outcome.totalCount,
       },
       { headers: privateHeaders },
     );

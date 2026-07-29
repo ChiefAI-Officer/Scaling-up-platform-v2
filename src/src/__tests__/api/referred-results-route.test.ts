@@ -14,7 +14,6 @@ const mockGetApiActor = jest.fn<Promise<ApiActor | null>, []>();
 const mockIsReferredResultsEnabled = jest.fn<boolean, []>();
 const mockListPublicReferrals = jest.fn();
 const mockAssessmentTemplateFindMany = jest.fn();
-const mockAssessmentSubmissionCount = jest.fn();
 
 jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: () => mockGetApiActor(),
@@ -34,9 +33,6 @@ jest.mock("@/lib/db", () => ({
     assessmentTemplate: {
       findMany: (...args: unknown[]) =>
         mockAssessmentTemplateFindMany(...args),
-    },
-    assessmentSubmission: {
-      count: (...args: unknown[]) => mockAssessmentSubmissionCount(...args),
     },
   },
 }));
@@ -66,12 +62,12 @@ beforeEach(() => {
     status: "ok",
     items: [],
     nextCursor: null,
+    totalCount: 18,
   });
   mockAssessmentTemplateFindMany.mockResolvedValue([
     { id: "tpl-1", name: "Scaling Up 4 Decisions" },
     { id: "tpl-2", name: "Leadership Qualitative Assessment" },
   ]);
-  mockAssessmentSubmissionCount.mockResolvedValue(18);
 });
 
 describe("GET /api/assessments/referred-results", () => {
@@ -144,6 +140,7 @@ describe("GET /api/assessments/referred-results", () => {
         },
       ],
       nextCursor: "sub-1",
+      totalCount: 7,
     });
 
     const response = await GET(request());
@@ -178,7 +175,7 @@ describe("GET /api/assessments/referred-results", () => {
         { id: "tpl-1", name: "Scaling Up 4 Decisions" },
         { id: "tpl-2", name: "Leadership Qualitative Assessment" },
       ],
-      totalCount: 18,
+      totalCount: 7,
     });
     expect(JSON.stringify(body)).not.toMatch(
       /answers|referringCoachEmail|rawResult/i,
@@ -231,15 +228,23 @@ describe("GET /api/assessments/referred-results", () => {
     );
   });
 
-  it("returns complete display-safe filter options and an unfiltered owned total", async () => {
-    const response = await GET(request());
+  it("returns complete display-safe options and the loader's exact filtered total", async () => {
+    mockListPublicReferrals.mockResolvedValue({
+      status: "ok",
+      items: [],
+      nextCursor: null,
+      totalCount: 3,
+    });
+    const response = await GET(
+      request("?query=avery&templateId=tpl-1"),
+    );
     const body = await response.json();
 
     expect(body.assessmentOptions).toEqual([
       { id: "tpl-1", name: "Scaling Up 4 Decisions" },
       { id: "tpl-2", name: "Leadership Qualitative Assessment" },
     ]);
-    expect(body.totalCount).toBe(18);
+    expect(body.totalCount).toBe(3);
     expect(mockAssessmentTemplateFindMany).toHaveBeenCalledWith({
       where: {
         deletedAt: null,
@@ -255,15 +260,6 @@ describe("GET /api/assessments/referred-results", () => {
       },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
-    });
-    expect(mockAssessmentSubmissionCount).toHaveBeenCalledWith({
-      where: {
-        referringCoachId: "coach-1",
-        campaign: {
-          accessMode: "PUBLIC",
-          deletedAt: null,
-        },
-      },
     });
   });
 });

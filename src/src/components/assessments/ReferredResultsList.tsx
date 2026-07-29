@@ -11,7 +11,7 @@ interface ReferredResultsListProps {
   coachLink: string | null;
   initialQuery?: string;
   initialTemplateId?: string;
-  initialCursor?: string;
+  initialCursorTrail?: string[];
 }
 
 interface DisplayReferral
@@ -81,12 +81,14 @@ function formatSubmitted(value: string): { date: string; time: string } {
 function updateBrowserQuery(input: {
   query: string;
   templateId: string;
-  cursor?: string;
+  cursorTrail: string[];
 }) {
   const params = new URLSearchParams();
   if (input.query) params.set("query", input.query);
   if (input.templateId) params.set("templateId", input.templateId);
-  if (input.cursor) params.set("cursor", input.cursor);
+  for (const cursor of input.cursorTrail) {
+    params.append("cursor", cursor);
+  }
   const suffix = params.toString();
   window.history.replaceState(
     {},
@@ -246,20 +248,23 @@ export function ReferredResultsList({
   coachLink,
   initialQuery = "",
   initialTemplateId = "",
-  initialCursor,
+  initialCursorTrail = [],
 }: ReferredResultsListProps) {
-  const normalizedInitialQuery = initialQuery.trim();
-  const normalizedInitialTemplate = initialTemplateId.trim();
+  const [initialState] = useState(() => ({
+    query: initialQuery.trim(),
+    templateId: initialTemplateId.trim(),
+    cursorTrail: initialCursorTrail
+      .map((cursor) => cursor.trim())
+      .filter(Boolean),
+  }));
   const [items, setItems] = useState<DisplayReferral[]>([]);
-  const [inputQuery, setInputQuery] = useState(normalizedInitialQuery);
-  const [appliedQuery, setAppliedQuery] = useState(normalizedInitialQuery);
-  const [templateId, setTemplateId] = useState(normalizedInitialTemplate);
+  const [inputQuery, setInputQuery] = useState(initialState.query);
+  const [appliedQuery, setAppliedQuery] = useState(initialState.query);
+  const [templateId, setTemplateId] = useState(initialState.templateId);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState<number | null>(null);
-  const [pageCursors, setPageCursors] = useState<Array<string | null>>([
-    initialCursor?.trim() || null,
-  ]);
-  const [pageIndex, setPageIndex] = useState(0);
+  const [cursorTrail, setCursorTrail] = useState(initialState.cursorTrail);
+  const pageIndex = cursorTrail.length;
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [templates, setTemplates] = useState<
     Map<string, { id: string; name: string }>
@@ -271,21 +276,21 @@ export function ReferredResultsList({
     async ({
       query,
       filter,
-      cursor,
-      index,
+      trail,
     }: {
       query: string;
       filter: string;
-      cursor?: string;
-      index: number;
+      trail: string[];
     }) => {
       setLoading(true);
       setError(false);
       setExpandedIds(new Set());
+      setCursorTrail(trail);
 
       const params = new URLSearchParams();
       if (query) params.set("query", query);
       if (filter) params.set("templateId", filter);
+      const cursor = trail.at(-1);
       if (cursor) params.set("cursor", cursor);
       params.set("take", "25");
 
@@ -311,7 +316,6 @@ export function ReferredResultsList({
             ? payload.totalCount
             : null,
         );
-        setPageIndex(index);
         setTemplates((current) => {
           const updated = new Map(current);
           const options =
@@ -325,7 +329,11 @@ export function ReferredResultsList({
           }
           return updated;
         });
-        updateBrowserQuery({ query, templateId: filter, cursor });
+        updateBrowserQuery({
+          query,
+          templateId: filter,
+          cursorTrail: trail,
+        });
       } catch {
         setItems([]);
         setNextCursor(null);
@@ -339,17 +347,11 @@ export function ReferredResultsList({
 
   useEffect(() => {
     void loadPage({
-      query: normalizedInitialQuery,
-      filter: normalizedInitialTemplate,
-      cursor: initialCursor?.trim() || undefined,
-      index: 0,
+      query: initialState.query,
+      filter: initialState.templateId,
+      trail: initialState.cursorTrail,
     });
-  }, [
-    initialCursor,
-    loadPage,
-    normalizedInitialQuery,
-    normalizedInitialTemplate,
-  ]);
+  }, [initialState, loadPage]);
 
   const assessmentOptions = useMemo(
     () =>
@@ -364,17 +366,15 @@ export function ReferredResultsList({
     const query = inputQuery.trim().replace(/\s+/g, " ");
     setInputQuery(query);
     setAppliedQuery(query);
-    setPageCursors([null]);
-    void loadPage({ query, filter: templateId, index: 0 });
+    void loadPage({ query, filter: templateId, trail: [] });
   }
 
   function changeAssessment(nextTemplateId: string) {
     setTemplateId(nextTemplateId);
-    setPageCursors([null]);
     void loadPage({
       query: appliedQuery,
       filter: nextTemplateId,
-      index: 0,
+      trail: [],
     });
   }
 
@@ -389,27 +389,20 @@ export function ReferredResultsList({
 
   function nextPage() {
     if (!nextCursor) return;
-    const cursor = nextCursor;
-    setPageCursors((current) => [
-      ...current.slice(0, pageIndex + 1),
-      cursor,
-    ]);
+    const trail = [...cursorTrail, nextCursor];
     void loadPage({
       query: appliedQuery,
       filter: templateId,
-      cursor,
-      index: pageIndex + 1,
+      trail,
     });
   }
 
   function previousPage() {
     if (pageIndex === 0) return;
-    const cursor = pageCursors[pageIndex - 1] ?? undefined;
     void loadPage({
       query: appliedQuery,
       filter: templateId,
-      cursor,
-      index: pageIndex - 1,
+      trail: cursorTrail.slice(0, -1),
     });
   }
 
@@ -493,7 +486,9 @@ export function ReferredResultsList({
           </select>
         </div>
         <p className="pb-2 text-xs text-muted-foreground md:ml-auto">
-          {loading ? "Loading…" : `${items.length} results · newest first`}
+          {loading
+            ? "Loading…"
+            : `${totalCount ?? "—"} results · newest first`}
         </p>
       </div>
 
@@ -518,8 +513,7 @@ export function ReferredResultsList({
               void loadPage({
                 query: appliedQuery,
                 filter: templateId,
-                cursor: pageCursors[pageIndex] ?? undefined,
-                index: pageIndex,
+                trail: cursorTrail,
               })
             }
             className="mt-3 rounded-md border border-border px-3 py-1.5 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -678,7 +672,9 @@ export function ReferredResultsList({
 
           <div className="flex items-center justify-between border-t border-border bg-muted/30 px-4 py-3">
             <span className="text-xs text-muted-foreground">
-              Page {pageIndex + 1} · up to 25 results
+              Showing {pageIndex * 25 + 1}–
+              {Math.min(pageIndex * 25 + items.length, totalCount ?? Infinity)}{" "}
+              of {totalCount ?? "—"}
             </span>
             <div className="flex gap-2">
               <button

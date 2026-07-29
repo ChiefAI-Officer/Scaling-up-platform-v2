@@ -51,6 +51,9 @@ interface CoachFindUnique {
 }
 
 interface PublicSubmissionFindMany {
+  count: (args: {
+    where: Record<string, unknown>;
+  }) => Promise<number>;
   findMany: (args: {
     where: Record<string, unknown>;
     select: Record<string, unknown>;
@@ -152,6 +155,7 @@ export type PublicReferralListOutcome =
       status: "ok";
       items: PublicReferralListItem[];
       nextCursor: string | null;
+      totalCount: number;
     }
   | { status: "forbidden" };
 
@@ -289,6 +293,47 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
+function publicReferralSearchScope(input: {
+  coachId: string;
+  templateId: string;
+  pattern: string;
+  extraJoin?: Prisma.Sql;
+  cursorBoundary?: Prisma.Sql;
+}): Prisma.Sql {
+  const templateConstraint = input.templateId
+    ? Prisma.sql`AND c."templateId" = ${input.templateId}`
+    : Prisma.empty;
+
+  return Prisma.sql`
+    FROM "assessment_submissions" AS s
+    INNER JOIN "assessment_campaigns" AS c
+      ON c."id" = s."campaignId"
+    ${input.extraJoin ?? Prisma.empty}
+    WHERE s."referringCoachId" = ${input.coachId}
+      AND c."accessMode" = 'PUBLIC'
+      AND c."deletedAt" IS NULL
+      ${templateConstraint}
+      ${input.cursorBoundary ?? Prisma.empty}
+      AND (
+        LOWER(
+          REGEXP_REPLACE(
+            CONCAT_WS(
+              ' ',
+              NULLIF(BTRIM(COALESCE(s."publicTaker"->>'firstName', '')), ''),
+              NULLIF(BTRIM(COALESCE(s."publicTaker"->>'lastName', '')), '')
+            ),
+            '[[:space:]]+',
+            ' ',
+            'g'
+          )
+        ) LIKE ${input.pattern} ESCAPE E'\\\\'
+        OR LOWER(
+          BTRIM(COALESCE(s."publicTaker"->>'email', ''))
+        ) LIKE ${input.pattern} ESCAPE E'\\\\'
+      )
+  `;
+}
+
 /**
  * Lists display-safe public submissions owned by the signed-in active Coach.
  */
@@ -333,14 +378,12 @@ export async function listPublicReferrals(
         referringCoachId: coachId,
         campaign: campaignWhere,
       };
+      let totalCount: number;
       if (query) {
         // Prisma's PostgreSQL JSON filter has no case-insensitive mode and
         // cannot compare a concatenated first+last name. Resolve owned match
         // IDs with parameterized SQL, then re-apply every security constraint
         // in the canonical Prisma list query below.
-        const templateConstraint = templateId
-          ? Prisma.sql`AND c."templateId" = ${templateId}`
-          : Prisma.empty;
         const cursorTemplateConstraint = templateId
           ? Prisma.sql`AND cursor_campaign."templateId" = ${templateId}`
           : Prisma.empty;
@@ -376,41 +419,35 @@ export async function listPublicReferrals(
             `
           : Prisma.empty;
         const pattern = `%${escapeLikePattern(query)}%`;
+        const countRows = await tx.$queryRaw<Array<{ count: number }>>(
+          Prisma.sql`
+            SELECT COUNT(*)::int AS "count"
+            ${publicReferralSearchScope({
+              coachId,
+              templateId,
+              pattern,
+            })}
+          `,
+        );
+        totalCount = countRows[0]?.count ?? 0;
         const matchingRows = await tx.$queryRaw<Array<{ id: string }>>(
           Prisma.sql`
             ${cursorCte}
             SELECT s."id"
-            FROM "assessment_submissions" AS s
-            INNER JOIN "assessment_campaigns" AS c
-              ON c."id" = s."campaignId"
-            ${cursorJoin}
-            WHERE s."referringCoachId" = ${coachId}
-              AND c."accessMode" = 'PUBLIC'
-              AND c."deletedAt" IS NULL
-              ${templateConstraint}
-              ${cursorBoundary}
-              AND (
-                LOWER(
-                  REGEXP_REPLACE(
-                    CONCAT_WS(
-                      ' ',
-                      NULLIF(BTRIM(COALESCE(s."publicTaker"->>'firstName', '')), ''),
-                      NULLIF(BTRIM(COALESCE(s."publicTaker"->>'lastName', '')), '')
-                    ),
-                    '[[:space:]]+',
-                    ' ',
-                    'g'
-                  )
-                ) LIKE ${pattern} ESCAPE E'\\\\'
-                OR LOWER(
-                  BTRIM(COALESCE(s."publicTaker"->>'email', ''))
-                ) LIKE ${pattern} ESCAPE E'\\\\'
-              )
+            ${publicReferralSearchScope({
+              coachId,
+              templateId,
+              pattern,
+              extraJoin: cursorJoin,
+              cursorBoundary,
+            })}
             ORDER BY s."submittedAt" DESC, s."id" DESC
             LIMIT ${take + 1}
           `,
         );
         where.id = { in: matchingRows.map((row) => row.id) };
+      } else {
+        totalCount = await tx.assessmentSubmission.count({ where });
       }
 
       const rows = await tx.assessmentSubmission.findMany({
@@ -462,6 +499,7 @@ export async function listPublicReferrals(
           rows.length > take && page.length > 0
             ? page[page.length - 1].id
             : null,
+        totalCount,
       } as const;
     },
     { maxWait: 10_000, timeout: 15_000 },

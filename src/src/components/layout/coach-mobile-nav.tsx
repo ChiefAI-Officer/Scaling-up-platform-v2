@@ -7,15 +7,20 @@ import { signOut } from "next-auth/react";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNavLinkActive } from "@/lib/nav-utils";
-import { coachPrimaryNavItems } from "@/lib/coach-nav";
+import { getCoachPrimaryNavItems } from "@/lib/coach-nav";
 
 interface CoachMobileNavProps {
   coachName: string;
+  referredResultsEnabled: boolean;
 }
 
-export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
+export function CoachMobileNav({
+  coachName,
+  referredResultsEnabled,
+}: CoachMobileNavProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const primaryNavItems = getCoachPrimaryNavItems({ referredResultsEnabled });
 
   return (
     <div className="md:hidden">
@@ -43,7 +48,7 @@ export function CoachMobileNav({ coachName }: CoachMobileNavProps) {
             </div>
 
             <nav className="flex-1 py-4 px-3 space-y-1">
-              {coachPrimaryNavItems.map((link) => {
+              {primaryNavItems.map((link) => {
                 const Icon = link.icon;
                 const isActive = isNavLinkActive(pathname, link.href);
                 return (

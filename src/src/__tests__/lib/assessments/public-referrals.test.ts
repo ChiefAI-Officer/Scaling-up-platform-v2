@@ -304,12 +304,19 @@ describe("listPublicReferrals", () => {
       };
     }>,
     matchingIds: string[] = rows.map((row) => row.id),
+    totalCount = matchingIds.length,
   ) {
     const findUnique = jest.fn().mockResolvedValue(coach);
     const $queryRaw = jest
       .fn()
       .mockImplementation(
         async (searchSql: { values?: unknown[] }) => {
+          if (
+            typeof (searchSql as { sql?: string }).sql === "string" &&
+            (searchSql as { sql: string }).sql.includes("COUNT(")
+          ) {
+            return [{ count: totalCount }];
+          }
           const limit = [...(searchSql.values ?? [])]
             .reverse()
             .find((value): value is number => typeof value === "number");
@@ -318,6 +325,7 @@ describe("listPublicReferrals", () => {
             .map((id) => ({ id }));
         },
       );
+    const count = jest.fn().mockResolvedValue(totalCount);
     const findMany = jest.fn().mockImplementation(
       async (args: { where: Record<string, unknown> }) => {
         const idFilter = args.where.id as { in?: string[] } | undefined;
@@ -329,7 +337,7 @@ describe("listPublicReferrals", () => {
     const tx = {
       $queryRaw,
       coach: { findUnique },
-      assessmentSubmission: { findMany },
+      assessmentSubmission: { findMany, count },
     };
     const $transaction = jest
       .fn()
@@ -337,7 +345,7 @@ describe("listPublicReferrals", () => {
         async (callback: (value: typeof tx) => Promise<unknown>) =>
           callback(tx),
       );
-    return { $transaction, $queryRaw, findUnique, findMany };
+    return { $transaction, $queryRaw, findUnique, findMany, count };
   }
 
   const listRows = [
@@ -377,7 +385,12 @@ describe("listPublicReferrals", () => {
   ];
 
   it("pins active Coach ownership, filters server-side, and paginates newest-first", async () => {
-    const db = makeListDb(PUBLIC_SUBMISSION.referringCoach, listRows);
+    const db = makeListDb(
+      PUBLIC_SUBMISSION.referringCoach,
+      listRows,
+      undefined,
+      47,
+    );
 
     const outcome = await listPublicReferrals(
       db as never,
@@ -424,6 +437,7 @@ describe("listPublicReferrals", () => {
         },
       ],
       nextCursor: "sub-older",
+      totalCount: 47,
     });
 
     expect(db.findUnique).toHaveBeenCalledWith({
@@ -450,6 +464,16 @@ describe("listPublicReferrals", () => {
         take: 3,
       }),
     );
+    expect(db.count).toHaveBeenCalledWith({
+      where: {
+        referringCoachId: "coach-owner",
+        campaign: {
+          accessMode: "PUBLIC",
+          deletedAt: null,
+          templateId: "template-four-decisions",
+        },
+      },
+    });
   });
 
   it("normalizes mixed-case full-name search in SQL before applying the Prisma list filter", async () => {
@@ -474,26 +498,33 @@ describe("listPublicReferrals", () => {
       "sub-newest",
     ]);
 
-    expect(db.$queryRaw).toHaveBeenCalledTimes(1);
-    const searchSql = db.$queryRaw.mock.calls[0][0] as {
-      sql: string;
-      values: unknown[];
-    };
-    expect(searchSql.sql).toMatch(/REGEXP_REPLACE/);
-    expect(searchSql.sql).toMatch(/LOWER/);
-    expect(searchSql.sql).toMatch(/firstName/);
-    expect(searchSql.sql).toMatch(/lastName/);
-    expect(searchSql.sql).toMatch(/email/);
-    expect(searchSql.sql).toMatch(/referringCoachId/);
-    expect(searchSql.sql).toMatch(/accessMode/);
-    expect(searchSql.sql).toMatch(/deletedAt/);
-    expect(searchSql.values).toEqual(
-      expect.arrayContaining([
-        "coach-owner",
-        "template-four-decisions",
-        "%avery leader%",
-      ]),
+    expect(db.$queryRaw).toHaveBeenCalledTimes(2);
+    const sqlCalls = db.$queryRaw.mock.calls.map(
+      (call) => call[0] as { sql: string; values: unknown[] },
     );
+    const countSql = sqlCalls.find((sql) => /COUNT\(/.test(sql.sql));
+    const searchSql = sqlCalls.find((sql) => /SELECT s\."id"/.test(sql.sql));
+    expect(countSql).toBeDefined();
+    expect(searchSql).toBeDefined();
+    if (!countSql || !searchSql) return;
+    expect(outcome.totalCount).toBe(1);
+    for (const constrainedSql of [countSql, searchSql]) {
+      expect(constrainedSql.sql).toMatch(/REGEXP_REPLACE/);
+      expect(constrainedSql.sql).toMatch(/LOWER/);
+      expect(constrainedSql.sql).toMatch(/firstName/);
+      expect(constrainedSql.sql).toMatch(/lastName/);
+      expect(constrainedSql.sql).toMatch(/email/);
+      expect(constrainedSql.sql).toMatch(/referringCoachId/);
+      expect(constrainedSql.sql).toMatch(/accessMode/);
+      expect(constrainedSql.sql).toMatch(/deletedAt/);
+      expect(constrainedSql.values).toEqual(
+        expect.arrayContaining([
+          "coach-owner",
+          "template-four-decisions",
+          "%avery leader%",
+        ]),
+      );
+    }
 
     expect(db.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -542,10 +573,11 @@ describe("listPublicReferrals", () => {
     ]);
     expect(outcome.nextCursor).toBe("sub-older");
 
-    const searchSql = db.$queryRaw.mock.calls[0][0] as {
-      sql: string;
-      values: unknown[];
-    };
+    const searchSql = db.$queryRaw.mock.calls
+      .map((call) => call[0] as { sql: string; values: unknown[] })
+      .find((sql) => /SELECT s\."id"/.test(sql.sql));
+    expect(searchSql).toBeDefined();
+    if (!searchSql) return;
     expect(searchSql.sql).toMatch(
       /ORDER BY\s+s\."submittedAt" DESC,\s+s\."id" DESC/,
     );
@@ -588,10 +620,11 @@ describe("listPublicReferrals", () => {
       query: "  %_' OR 1=1 --  ",
     });
 
-    const searchSql = db.$queryRaw.mock.calls[0][0] as {
-      sql: string;
-      values: unknown[];
-    };
+    const searchSql = db.$queryRaw.mock.calls
+      .map((call) => call[0] as { sql: string; values: unknown[] })
+      .find((sql) => /SELECT s\."id"/.test(sql.sql));
+    expect(searchSql).toBeDefined();
+    if (!searchSql) return;
     expect(searchSql.sql).not.toContain("1=1");
     expect(searchSql.values).toContain("%\\%\\_' or 1=1 --%");
   });
