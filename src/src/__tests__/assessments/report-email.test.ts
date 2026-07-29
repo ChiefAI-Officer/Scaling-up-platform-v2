@@ -30,6 +30,8 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     jobTitle: null,
     companyName: "Acme Corp",
     assessmentName: "Scaling Up 4 Decisions Assessment",
+    // Required on RespondentReport; "" == DEFAULT_REPORT_CONFIG, as before.
+    templateAlias: "",
     campaignLabel: null,
     submittedAt: new Date("2026-06-11T10:00:00Z"),
     result: {} as ScoreResult,

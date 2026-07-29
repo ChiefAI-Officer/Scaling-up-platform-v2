@@ -19,9 +19,30 @@ import { loadSafeSlides } from "@/lib/assessments/load-safe-slides";
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store" } as const;
 
-function gateFailed(): NextResponse {
+/**
+ * 410 — a lifecycle gate refused. Every call site below is reached only AFTER
+ * the session checks above (missing/mismatched cookie → 401), so a 410 always
+ * implies a live sealed invitation cookie for this campaign.
+ *
+ * Wave OSR (#71): the 410 now echoes `respondentKey` — the same opaque
+ * invitation cuid the 200 path already returns, scoped to the holder's own
+ * session, never PII. It is load-bearing, not informational.
+ *
+ * `sessionStorage` is per-TAB while cookies are per-origin, so "this browser
+ * holds a live invitation" does NOT establish WHOSE report sits in a tab's
+ * stored slot. Two co-invitees on one browser: A submits in tab 1 (A's report
+ * lands in tab 1's slot); B exchanges in tab 2, which replaces the shared
+ * cookie and purges only TAB 2's storage; a later reload of tab 1 would 410 on
+ * B's cookie and render A's report to B. Echoing the key lets the client
+ * require slot-owner == cookie-owner before rehydrating, which closes that.
+ */
+function gateFailed(respondentKey?: string): NextResponse {
   return NextResponse.json(
-    { success: false, error: "This survey is no longer available." },
+    {
+      success: false,
+      error: "This survey is no longer available.",
+      ...(respondentKey ? { respondentKey } : {}),
+    },
     { status: 410, headers: NO_STORE_HEADERS }
   );
 }
@@ -70,17 +91,17 @@ export async function GET(
 
     const now = new Date();
     // SEC-M6: a soft-deleted campaign is no longer available.
-    if (invitation.campaign.deletedAt !== null) return gateFailed();
-    if (invitation.revokedAt !== null) return gateFailed();
-    if (now >= invitation.expiresAt) return gateFailed();
-    if (invitation.status === "SUBMITTED") return gateFailed();
-    if (invitation.campaign.status !== "ACTIVE") return gateFailed();
-    if (now < invitation.campaign.openAt) return gateFailed();
+    if (invitation.campaign.deletedAt !== null) return gateFailed(invitation.id);
+    if (invitation.revokedAt !== null) return gateFailed(invitation.id);
+    if (now >= invitation.expiresAt) return gateFailed(invitation.id);
+    if (invitation.status === "SUBMITTED") return gateFailed(invitation.id);
+    if (invitation.campaign.status !== "ACTIVE") return gateFailed(invitation.id);
+    if (now < invitation.campaign.openAt) return gateFailed(invitation.id);
     if (
       invitation.campaign.closeAt !== null &&
       now >= invitation.campaign.closeAt
     ) {
-      return gateFailed();
+      return gateFailed(invitation.id);
     }
 
     // Return ALL question types — the client's QuestionInput component

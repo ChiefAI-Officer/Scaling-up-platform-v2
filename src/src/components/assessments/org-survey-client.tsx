@@ -8,10 +8,14 @@
  *   2. POST { token } → ./exchange. Strip the fragment on success.
  *   3. GET ./me → fetch form data.
  *   4. Render SLIDER_LIKERT inputs; submit POST → ./submit.
- *   5. On 200, redirect to ./thank-you.
+ *   5. On 200: if the response carries a report (Wave OSR / #71 — the campaign
+ *      opted in AND the flag is on, both decided server-side), render it in
+ *      place as the terminal `results` phase; otherwise redirect to ./thank-you.
  *
  * Errors render inline. 410 ⇒ "This survey has closed.", 404 ⇒ "Invalid link.",
- * 401 ⇒ "Your session expired."
+ * 401 ⇒ "Your session expired." One exception (Wave OSR): a 410 from ./me with a
+ * stored on-screen report re-renders that report instead of the error — the 410
+ * is what proves a live invitation cookie. See onscreen-result-store.ts.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -50,6 +54,23 @@ import {
   deriveTimeEstimate,
 } from "@/components/assessments/assessment-welcome";
 import { formatTimestampDateTime } from "@/lib/utils";
+import { BrandedReport } from "@/components/assessments/BrandedReport";
+import { PrintReportButton } from "@/components/assessments/PrintReportButton";
+import type { RespondentReport } from "@/lib/assessments/respondent-report";
+import {
+  readOnScreenResult,
+  writeOnScreenResult,
+  clearOnScreenResult,
+  reviveOnScreenReport,
+} from "@/lib/assessments/onscreen-result-store";
+
+// Wave OSR (#71) — the in-place report needs the report stylesheets. This route
+// group has no (report) layout to supply them, so the client imports them the
+// same way public-quiz-client.tsx does. Without these the report renders
+// completely unstyled (ADR-0005 scopes both files under .su-public-brand, so
+// they cannot leak into the blue admin/coach UI).
+import "@/styles/su-public-brand.css";
+import "@/styles/su-report.css";
 
 // Wave J-1 — SU-Full CEO-only background section gating.
 const SU_FULL_ALIAS = "scaling-up-full";
@@ -119,6 +140,12 @@ type Phase =
   | { kind: "intro"; data: SurveyData }
   | { kind: "ready"; data: SurveyData }
   | { kind: "submitting"; data: SurveyData }
+  /**
+   * Wave OSR (#71): terminal in-place report. Reached either straight from a
+   * submit whose response carried a report, or rehydrated from sessionStorage on
+   * a refresh (spec 19an §4).
+   */
+  | { kind: "results"; report: RespondentReport }
   | { kind: "error"; message: string };
 
 export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
@@ -174,6 +201,13 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
             return;
           }
 
+          // Wave OSR (#71): a fresh exchange means a (possibly different)
+          // respondent is starting this campaign in this tab — purge any stored
+          // report. This is a belt-and-braces cleanup, NOT the security boundary:
+          // the real guard is the /me 410 check below, because the tokenless
+          // reload never reaches this branch at all.
+          clearOnScreenResult(campaignAlias);
+
           // Clear the fragment so reloads don't re-exchange.
           if (typeof window !== "undefined") {
             window.history.replaceState(
@@ -193,6 +227,51 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
           cache: "no-store",
         });
         if (!meRes.ok) {
+          // Wave OSR (#71) — rehydrate the in-place report, but only behind TWO
+          // checks, because neither is sufficient alone:
+          //
+          //  1. AUTHORIZATION — /me must answer 410. It returns 401 for a
+          //     missing/mismatched cookie BEFORE evaluating any lifecycle gate,
+          //     so a 410 proves a live sealed invitation cookie. Reading the
+          //     slot before any server call (the first cut) would have served a
+          //     full report — name, answers, scores — to whoever next reloaded
+          //     an abandoned tab, with no token at all. The exchange purge does
+          //     NOT cover that: the exchange strips the fragment, so the
+          //     tokenless reload is the COMMON path.
+          //  2. OWNERSHIP — the 410 echoes `respondentKey`, and the stored
+          //     envelope records the key it was written for. They must match.
+          //     Check 1 alone only proves "some live invitation exists in this
+          //     browser": sessionStorage is per-TAB while cookies are
+          //     per-origin, so a co-invitee exchanging in another tab replaces
+          //     the shared cookie while THIS tab keeps the first respondent's
+          //     report. Without the key compare, their reload renders it.
+          //
+          // A 410 without a key fails closed (readOnScreenResult refuses "").
+          if (meRes.status === 410) {
+            // Safe to consume: readError returns a constant for 410.
+            const gateBody = (await meRes.json().catch(() => null)) as {
+              respondentKey?: unknown;
+            } | null;
+            const ownerKey =
+              typeof gateBody?.respondentKey === "string"
+                ? gateBody.respondentKey
+                : "";
+            const stored = readOnScreenResult(campaignAlias, ownerKey);
+            if (stored) {
+              if (!cancelled) setPhase({ kind: "results", report: stored });
+              return;
+            }
+          } else if (meRes.status === 401 || meRes.status === 404) {
+            // These DISPROVE a live session, so destroy the stored PII.
+            //
+            // Deliberately NOT a blanket `else`: /me has a real 500 path, and
+            // this repo has documented Neon cold-start timeouts. Purging on 5xx
+            // meant a respondent who refreshed during a DB blip lost their
+            // report permanently — show-once, no results email, and the next
+            // reload 410s onto an empty slot. A transient server fault must
+            // never be the thing that destroys the artifact.
+            if (!cancelled) clearOnScreenResult(campaignAlias);
+          }
           const message = await readError(meRes, "Your session expired.");
           if (!cancelled) setPhase({ kind: "error", message });
           return;
@@ -364,6 +443,36 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         return;
       }
       clearDraft();
+
+      // Wave OSR (#71): the server decides disclosure under the submission lock
+      // and returns the report ONLY when the campaign toggle + flag permit it —
+      // so the presence of `data.report` IS the signal. There is deliberately no
+      // client-visible flag to consult, which makes it impossible for client and
+      // server to disagree (spec 19an §6).
+      const submitBody = (await submitRes
+        .json()
+        .catch(() => null)) as { data?: { report?: unknown } } | null;
+      // Revive across the JSON boundary: `submittedAt` is typed Date but arrives
+      // as an ISO string, and the renderers hand it to Intl.DateTimeFormat,
+      // which throws on a string and falls back to printing raw ISO text. The
+      // sessionStorage path revives too — both boundaries need it, or the same
+      // report shows two different date formats before vs after a refresh.
+      const onScreenReport = reviveOnScreenReport(submitBody?.data?.report);
+      if (onScreenReport) {
+        // Stamp the slot with THIS respondent's invitation key (from the /me 200
+        // that started this session) so a later rehydrate can prove the stored
+        // report belongs to whoever is asking. Storing is skipped when the key is
+        // somehow absent — the report still renders now, only refresh-survival is
+        // lost, which is the correct trade against showing it to the wrong person.
+        writeOnScreenResult(
+          campaignAlias,
+          onScreenReport,
+          submittingData.respondentKey ?? "",
+        );
+        setPhase({ kind: "results", report: onScreenReport });
+        return;
+      }
+
       // Task 6b: append ?results=1 so the thank-you page shows confirming copy
       // when the campaign is configured to email results to respondents.
       // `submittingData` is captured at the top of this function — use it
@@ -394,6 +503,39 @@ export function OrgSurveyClient({ campaignAlias }: { campaignAlias: string }) {
         </main>
         <footer className="ty-footer">Powered by Scaling Up</footer>
       </div>
+    );
+  }
+
+  // Wave OSR (#71) — terminal in-place report. Same artifact the coach/admin
+  // sees, shown to its subject (ADR-0027); BrandedReport dispatches
+  // scored-vs-qualitative itself off report.templateAlias, which the SERVER
+  // populated, so there is no branch to make here.
+  if (phase.kind === "results") {
+    return (
+      <main className="survey-body" data-testid="org-survey-results">
+        {/* Scope wrapper so su-report.css applies (ADR-0005) — the same wrapper
+            the invited (report) route layout provides. */}
+        <div className="su-public-brand su-report">
+          <div className="no-print" style={{ textAlign: "center" }}>
+            <PrintReportButton
+              fileName={`${phase.report.assessmentName} — ${phase.report.respondentName}`}
+            />
+            {/* The copy that used to live on the thank-you page: with the report
+                shown in place that page is bypassed entirely, so the "your coach
+                will review this with you" framing needs a home here. Print /
+                Download is the ONLY way to keep the report, so say so. */}
+            <p className="su-report-onscreen-note">
+              Your coach will review these results with you. Use Print or
+              Download PDF above if you would like to keep a copy.
+            </p>
+          </div>
+          <BrandedReport
+            report={phase.report}
+            assessmentName={phase.report.assessmentName}
+            campaignLabel={phase.report.campaignLabel ?? null}
+          />
+        </div>
+      </main>
     );
   }
 

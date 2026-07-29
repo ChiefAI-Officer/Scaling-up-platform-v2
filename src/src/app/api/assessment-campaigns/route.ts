@@ -464,6 +464,7 @@ export async function POST(request: NextRequest) {
         invitationBodyHtml: invitationBodyHtmlToStore,
         sendResultsToRespondent: data.sendResultsToRespondent,
         notifyCoachOnCompletion: data.notifyCoachOnCompletion,
+        showResultsOnScreen: data.showResultsOnScreen,
         // Wave M (#19): sanitized slides (flag-gated) or null. `Prisma.JsonNull`
         // is required for a nullable `Json?` column (plain `null` is rejected);
         // the persisted shape is the sanitized PersistedSlide[] (sanitize-on-save).

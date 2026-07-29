@@ -480,7 +480,8 @@ export function QualitativeReport({
               {report.jobTitle ? ` · ${report.jobTitle}` : ""}
             </div>
             <div className="su-report-sub">
-              {report.companyName} · {submitted}
+              {report.companyName ? `${report.companyName} · ` : ""}
+              {submitted}
             </div>
             {/* Wave V (V-3): provenance pill for Wave O historical imports. */}
             {report.isImported ? <ImportedBadge /> : null}

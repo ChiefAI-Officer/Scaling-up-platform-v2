@@ -111,11 +111,19 @@ export interface RespondentReport {
   assessmentName: string;
   /**
    * template.alias — the stable instrument slug (e.g. "leadership-vision-alignment").
-   * Optional on the shared type because the public-quiz submit path
-   * (buildRespondentReportFromSubmission) constructs this shape without a
-   * template-alias in hand; the authorized loader always populates it.
+   *
+   * REQUIRED, and deliberately so. Every renderer dispatches on it via
+   * `reportConfigFor(report.templateAlias)` — report type (scored vs
+   * qualitative), tier display, score table, coach CTA — so a construction site
+   * that forgets it silently renders the DEFAULT config instead of the
+   * instrument's own, with no error anywhere. `public-quiz-client.tsx` did
+   * exactly that, and keeping this field optional is what made the omission
+   * invisible to the compiler.
+   *
+   * Pass "" only when there is genuinely no alias in hand — `reportConfigFor`
+   * and `buildQualitativeModel` both treat "" the same as absent.
    */
-  templateAlias?: string;
+  templateAlias: string;
   /** campaign.name — the coach's label; null when absent or empty */
   campaignLabel: string | null;
   submittedAt: Date;
@@ -171,7 +179,7 @@ export type RespondentReportOutcome =
 
 // ─── Guard helpers ────────────────────────────────────────────────────────
 
-function isScoreResult(value: unknown): value is ScoreResult {
+export function isScoreResult(value: unknown): value is ScoreResult {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return Array.isArray(v.perSection) && Array.isArray(v.perQuestion);

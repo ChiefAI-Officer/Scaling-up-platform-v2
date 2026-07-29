@@ -44,6 +44,8 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     jobTitle: "Chief Executive Officer",
     companyName: "Northwind Logistics",
     assessmentName: "Rockefeller Habits Checklist",
+    // Required on RespondentReport; "" == DEFAULT_REPORT_CONFIG, as before.
+    templateAlias: "",
     campaignLabel: null,
     submittedAt: new Date("2026-05-01T12:00:00Z"),
     result,

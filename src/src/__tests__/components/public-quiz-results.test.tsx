@@ -192,6 +192,60 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
     expect(mockPush).not.toHaveBeenCalled();
   });
 
+  // ── F4 (Wave OSR / Jeff #71 review): templateAlias must reach BrandedReport ─
+  //
+  // The hand-built RespondentReport here OMITTED templateAlias, so every public
+  // report silently resolved to DEFAULT_REPORT_CONFIG no matter the instrument.
+  // These tests make the wiring observable: RockHabits sets showScoreTable:false
+  // while DEFAULT sets true, so the score table's presence IS the signal that
+  // the alias flowed through. Positive/negative control — neither can pass
+  // vacuously. The third test covers the qualitative dispatch, which is the
+  // starkest consequence (a wholly different renderer) and was otherwise
+  // exercised by nothing.
+  async function submitAndRender(props: { templateAlias?: string } = {}) {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        data: {
+          submissionId: "sub_1",
+          scoreResult: scoreResultFixture,
+          redirectUrl: `/quiz/${ALIAS}/thank-you`,
+        },
+      }),
+    });
+    render(<PublicQuizClient {...baseProps} {...props} />);
+    reachFormStep();
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("quiz-results")).toBeInTheDocument(),
+    );
+  }
+
+  it("honours a mapped templateAlias — RockHabits hides the score table", async () => {
+    await submitAndRender({ templateAlias: "RockHabits" });
+    expect(screen.queryByTestId("report-scores-table")).toBeNull();
+  });
+
+  it("positive control — with no alias the DEFAULT config still shows it", async () => {
+    await submitAndRender();
+    expect(screen.getByTestId("report-scores-table")).toBeInTheDocument();
+  });
+
+  it("a qualitative alias swaps the renderer without crashing on the public payload", async () => {
+    // The public payload is thinner than the authorized one — scoringConfig is
+    // undefined and provenance.versionId is "" — so the qualitative path had to
+    // be proven to render rather than throw. qsp-v2 is reportType "qualitative".
+    await submitAndRender({ templateAlias: "qsp-v2" });
+    const results = screen.getByTestId("quiz-results");
+    expect(results).toBeInTheDocument();
+    // Scored chrome must be gone: no score table, no "/ 100" ScaleUp headline.
+    expect(screen.queryByTestId("report-scores-table")).toBeNull();
+    expect(screen.queryByText(/60\s*\/\s*100/)).toBeNull();
+  });
+
   // ── T7-3: POST body includes idempotencyKey ──────────────────────────────
   it("sends idempotencyKey in the POST body", async () => {
     global.fetch = jest.fn().mockResolvedValue({

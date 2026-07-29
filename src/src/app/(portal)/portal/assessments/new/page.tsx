@@ -14,6 +14,7 @@ import {
 } from "@/lib/assessments/wave-d-feature-flags";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
 import { isWaveQAdminControlsEnabled } from "@/lib/assessments/wave-q-flags";
+import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 
 export default async function NewCampaignPage() {
   await requireCoach();
@@ -28,6 +29,10 @@ export default async function NewCampaignPage() {
   // prop (mirroring resultsEmailEnabled) and derives the #15 checkbox default
   // from the picked template's sendResultsDefault when on.
   const waveQDefaultsEnabled = isWaveQAdminControlsEnabled();
+  // Wave OSR (#71) — server-only env read, handed to the wizard as a prop so it
+  // can show/hide the checkbox. The flag is ALSO enforced at disclosure time in
+  // the submit route; this prop only governs the UI.
+  const onScreenResultsEnabled = isOnScreenResultsEnabled();
   return (
     <div className="wf-scope max-w-3xl mx-auto">
       <CampaignWizard
@@ -37,6 +42,7 @@ export default async function NewCampaignPage() {
         coachNotifyEnabled={coachNotifyEnabled}
         customSlidesEnabled={customSlidesEnabled}
         waveQDefaultsEnabled={waveQDefaultsEnabled}
+        onScreenResultsEnabled={onScreenResultsEnabled}
       />
     </div>
   );

@@ -21,6 +21,10 @@ function baseReport(overrides: Partial<RespondentReport> = {}): RespondentReport
     jobTitle: "Chief Executive Officer",
     companyName: "Northwind Logistics",
     assessmentName: "Rockefeller Habits Checklist",
+    // Required on RespondentReport. "" resolves to DEFAULT_REPORT_CONFIG, which
+    // is exactly what omitting it used to do — so these fixtures are unchanged
+    // in behaviour. Cases that need a real instrument override it.
+    templateAlias: "",
     campaignLabel: null,
     submittedAt: new Date("2026-06-05T10:00:00Z"),
     result: {} as ScoreResult,
@@ -796,5 +800,32 @@ describe("BrandedReport — conclusion greeting guard (Wave P)", () => {
     expect(screen.getByTestId("report-conclusion").textContent).toContain(
       "Keep Scaling, Sarah.",
     );
+  });
+});
+
+// ─── PR #236 round-2 finding #10 — the orphan-separator guard was untested ────
+//
+// The cover subtitle used to interpolate `{companyName} · {date}` unconditionally,
+// so an empty company name rendered a naked leading " · ". Wave OSR added the
+// guard but nothing pinned it: reverting either renderer failed no test. The one
+// live surface that exercises it is the PUBLIC quiz, which hardcodes
+// `companyName: ""` (the invited path always has an org, since
+// AssessmentCampaign.organizationId is NOT NULL).
+describe("cover subtitle separator (empty companyName)", () => {
+  function subtitleText(companyName: string): string {
+    const { container } = render(
+      <BrandedReport report={baseReport({ companyName })} />,
+    );
+    return container.querySelector(".su-report-sub")?.textContent ?? "";
+  }
+
+  it("emits no leading separator when there is no company name", () => {
+    const text = subtitleText("");
+    expect(text).not.toMatch(/^\s*·/);
+    expect(text).not.toContain("·");
+  });
+
+  it("positive control — still separates the company name from the date", () => {
+    expect(subtitleText("Northwind Logistics")).toContain("Northwind Logistics ·");
   });
 });

@@ -130,6 +130,22 @@ export interface BuildRespondentReportArgs {
   submissionId: string;
   /** Optional: the coach who referred this taker. Wired into the CTA mailto link. */
   referringCoachEmail?: string | null;
+  /**
+   * Wave OSR (#71) — fields the INVITED path knows but a PUBLIC quiz taker does
+   * not. All optional and all defaulting to the previous hardcoded values, so
+   * the public-quiz callers are byte-unchanged.
+   *
+   * Without these the invited respondent's report would render an orphan " · "
+   * where the org name belongs, and would carry NO coach byline — contradicting
+   * the byline placement Jeff asked for in #63/#67/#73/#78/#81 (PR #230) and the
+   * "same artifact" claim in ADR-0027.
+   */
+  companyName?: string;
+  jobTitle?: string | null;
+  coachLogoUrl?: string | null;
+  coachName?: string | null;
+  /** True when the frozen result is not ScoreResult-shaped → renders the notice. */
+  degraded?: boolean;
 }
 
 /**
@@ -162,8 +178,8 @@ export function buildRespondentReportFromSubmission(
 
   return {
     respondentName: name,
-    jobTitle: null,
-    companyName: "",
+    jobTitle: args.jobTitle ?? null,
+    companyName: args.companyName ?? "",
     assessmentName: args.assessmentName,
     templateAlias: args.templateAlias,
     campaignLabel: args.campaignLabel,
@@ -180,7 +196,9 @@ export function buildRespondentReportFromSubmission(
       contentHash: "",
       templateName: args.assessmentName,
     },
-    degraded: false,
+    degraded: args.degraded ?? false,
+    coachLogoUrl: args.coachLogoUrl ?? null,
+    coachName: args.coachName ?? null,
     referringCoachEmail: args.referringCoachEmail ?? null,
   };
 }
