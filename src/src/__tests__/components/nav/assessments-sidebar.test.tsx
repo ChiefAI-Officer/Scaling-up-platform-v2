@@ -13,10 +13,15 @@ jest.mock("next/navigation", () => ({
 }));
 
 const mockCanAccessAggregateReport = jest.fn<boolean, [{ role: string }]>();
+const mockIsReferredResultsEnabled = jest.fn<boolean, []>();
 
 jest.mock("@/lib/assessments/access-control", () => ({
   canAccessAggregateReport: (actor: { role: string }) =>
     mockCanAccessAggregateReport(actor),
+}));
+
+jest.mock("@/lib/assessments/wave-83-flags", () => ({
+  isReferredResultsEnabled: () => mockIsReferredResultsEnabled(),
 }));
 
 import { render, screen } from "@testing-library/react";
@@ -27,9 +32,9 @@ function makeSession(role: "ADMIN" | "STAFF" | "COACH"): Session {
   return {
     expires: "9999-01-01",
     user: {
+      id: "user-1",
       name: "Test",
       email: "test@example.com",
-      // @ts-expect-error — extended session shape in NextAuth typing
       role,
     },
   };
@@ -38,6 +43,7 @@ function makeSession(role: "ADMIN" | "STAFF" | "COACH"): Session {
 beforeEach(() => {
   jest.clearAllMocks();
   mockCanAccessAggregateReport.mockReturnValue(true);
+  mockIsReferredResultsEnabled.mockReturnValue(false);
 });
 
 describe("AssessmentsSidebar", () => {
@@ -90,6 +96,31 @@ describe("AssessmentsSidebar", () => {
     expect(screen.getByText("My Campaigns")).toBeInTheDocument();
     expect(screen.getByText("Members")).toBeInTheDocument();
     expect(screen.getByText(/coach lane/i)).toBeInTheDocument();
+  });
+
+  it("keeps Referred Results dark for a Coach while the wave is off", () => {
+    render(<AssessmentsSidebar session={makeSession("COACH")} />);
+    expect(screen.queryByText("Referred Results")).not.toBeInTheDocument();
+  });
+
+  it("adds Referred Results between My Campaigns and Members for a Coach when enabled", () => {
+    mockIsReferredResultsEnabled.mockReturnValue(true);
+    render(<AssessmentsSidebar session={makeSession("COACH")} />);
+
+    const labels = screen
+      .getAllByRole("link")
+      .map((link) => link.textContent?.trim());
+    expect(labels).toEqual(["My Campaigns", "Referred Results", "Members"]);
+    expect(screen.getByText("Referred Results").closest("a")).toHaveAttribute(
+      "href",
+      "/portal/assessments/referred-results",
+    );
+  });
+
+  it("never adds Referred Results to the ADMIN lane", () => {
+    mockIsReferredResultsEnabled.mockReturnValue(true);
+    render(<AssessmentsSidebar session={makeSession("ADMIN")} />);
+    expect(screen.queryByText("Referred Results")).not.toBeInTheDocument();
   });
 
   it("does NOT render the coach-lane section for ADMIN", () => {
