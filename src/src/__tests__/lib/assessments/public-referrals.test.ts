@@ -308,7 +308,16 @@ describe("listPublicReferrals", () => {
     const findUnique = jest.fn().mockResolvedValue(coach);
     const $queryRaw = jest
       .fn()
-      .mockResolvedValue(matchingIds.map((id) => ({ id })));
+      .mockImplementation(
+        async (searchSql: { values?: unknown[] }) => {
+          const limit = [...(searchSql.values ?? [])]
+            .reverse()
+            .find((value): value is number => typeof value === "number");
+          return matchingIds
+            .slice(0, limit ?? matchingIds.length)
+            .map((id) => ({ id }));
+        },
+      );
     const findMany = jest.fn().mockImplementation(
       async (args: { where: Record<string, unknown> }) => {
         const idFilter = args.where.id as { in?: string[] } | undefined;
@@ -499,6 +508,92 @@ describe("listPublicReferrals", () => {
         },
       }),
     );
+  });
+
+  it("bounds searched cursor pages in SQL and does not skip again in Prisma", async () => {
+    const broadMatchIds = [
+      "sub-newest",
+      "sub-older",
+      "sub-overflow",
+      ...Array.from({ length: 100 }, (_, index) => `match-${index}`),
+    ];
+    const db = makeListDb(
+      PUBLIC_SUBMISSION.referringCoach,
+      listRows,
+      broadMatchIds,
+    );
+
+    const outcome = await listPublicReferrals(
+      db as never,
+      actor(),
+      {
+        query: "leader",
+        templateId: "template-four-decisions",
+        cursor: "sub-cursor",
+        take: 2,
+      },
+    );
+
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") return;
+    expect(outcome.items.map((item) => item.submissionId)).toEqual([
+      "sub-newest",
+      "sub-older",
+    ]);
+    expect(outcome.nextCursor).toBe("sub-older");
+
+    const searchSql = db.$queryRaw.mock.calls[0][0] as {
+      sql: string;
+      values: unknown[];
+    };
+    expect(searchSql.sql).toMatch(
+      /ORDER BY\s+s\."submittedAt" DESC,\s+s\."id" DESC/,
+    );
+    expect(searchSql.sql).toMatch(/LIMIT/);
+    expect(searchSql.sql).toMatch(/cursor/i);
+    expect(searchSql.sql).toMatch(
+      /s\."submittedAt" < search_cursor\."submittedAt"/,
+    );
+    expect(searchSql.sql).toMatch(
+      /s\."submittedAt" = search_cursor\."submittedAt"[\s\S]*s\."id" < search_cursor\."id"/,
+    );
+    expect(searchSql.sql.match(/referringCoachId/g)).toHaveLength(2);
+    expect(searchSql.sql.match(/accessMode/g)).toHaveLength(2);
+    expect(searchSql.sql.match(/deletedAt/g)).toHaveLength(2);
+    expect(searchSql.sql.match(/templateId/g)).toHaveLength(2);
+    expect(searchSql.sql).not.toContain("sub-cursor");
+    expect(searchSql.values).toEqual(
+      expect.arrayContaining(["sub-cursor", 3]),
+    );
+
+    const findManyArgs = db.findMany.mock.calls[0][0];
+    expect(findManyArgs.where.id).toEqual({
+      in: ["sub-newest", "sub-older", "sub-overflow"],
+    });
+    expect(findManyArgs.where.id.in).toHaveLength(3);
+    expect(findManyArgs.take).toBe(3);
+    expect(findManyArgs).not.toHaveProperty("cursor");
+    expect(findManyArgs).not.toHaveProperty("skip");
+    expect(findManyArgs.select).not.toHaveProperty("answers");
+  });
+
+  it("keeps wildcard and injection-like search text parameterized and escaped", async () => {
+    const db = makeListDb(
+      PUBLIC_SUBMISSION.referringCoach,
+      listRows,
+      ["sub-newest"],
+    );
+
+    await listPublicReferrals(db as never, actor(), {
+      query: "  %_' OR 1=1 --  ",
+    });
+
+    const searchSql = db.$queryRaw.mock.calls[0][0] as {
+      sql: string;
+      values: unknown[];
+    };
+    expect(searchSql.sql).not.toContain("1=1");
+    expect(searchSql.values).toContain("%\\%\\_' or 1=1 --%");
   });
 
   it("returns no raw answers or frozen result in display-safe list rows", async () => {

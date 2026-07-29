@@ -341,17 +341,54 @@ export async function listPublicReferrals(
         const templateConstraint = templateId
           ? Prisma.sql`AND c."templateId" = ${templateId}`
           : Prisma.empty;
+        const cursorTemplateConstraint = templateId
+          ? Prisma.sql`AND cursor_campaign."templateId" = ${templateId}`
+          : Prisma.empty;
+        const cursorCte = cursor
+          ? Prisma.sql`
+              WITH search_cursor AS (
+                SELECT
+                  cursor_submission."submittedAt",
+                  cursor_submission."id"
+                FROM "assessment_submissions" AS cursor_submission
+                INNER JOIN "assessment_campaigns" AS cursor_campaign
+                  ON cursor_campaign."id" = cursor_submission."campaignId"
+                WHERE cursor_submission."id" = ${cursor}
+                  AND cursor_submission."referringCoachId" = ${coachId}
+                  AND cursor_campaign."accessMode" = 'PUBLIC'
+                  AND cursor_campaign."deletedAt" IS NULL
+                  ${cursorTemplateConstraint}
+              )
+            `
+          : Prisma.empty;
+        const cursorJoin = cursor
+          ? Prisma.sql`CROSS JOIN search_cursor`
+          : Prisma.empty;
+        const cursorBoundary = cursor
+          ? Prisma.sql`
+              AND (
+                s."submittedAt" < search_cursor."submittedAt"
+                OR (
+                  s."submittedAt" = search_cursor."submittedAt"
+                  AND s."id" < search_cursor."id"
+                )
+              )
+            `
+          : Prisma.empty;
         const pattern = `%${escapeLikePattern(query)}%`;
         const matchingRows = await tx.$queryRaw<Array<{ id: string }>>(
           Prisma.sql`
+            ${cursorCte}
             SELECT s."id"
             FROM "assessment_submissions" AS s
             INNER JOIN "assessment_campaigns" AS c
               ON c."id" = s."campaignId"
+            ${cursorJoin}
             WHERE s."referringCoachId" = ${coachId}
               AND c."accessMode" = 'PUBLIC'
               AND c."deletedAt" IS NULL
               ${templateConstraint}
+              ${cursorBoundary}
               AND (
                 LOWER(
                   REGEXP_REPLACE(
@@ -369,6 +406,8 @@ export async function listPublicReferrals(
                   BTRIM(COALESCE(s."publicTaker"->>'email', ''))
                 ) LIKE ${pattern} ESCAPE E'\\\\'
               )
+            ORDER BY s."submittedAt" DESC, s."id" DESC
+            LIMIT ${take + 1}
           `,
         );
         where.id = { in: matchingRows.map((row) => row.id) };
@@ -394,7 +433,7 @@ export async function listPublicReferrals(
           },
         },
         orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
-        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        ...(!query && cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         take: take + 1,
       });
 
