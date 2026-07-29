@@ -9,6 +9,7 @@ import {
   getCampaignOverview,
   getCampaignRespondents,
   type CampaignDetailDb,
+  type TemplateVersionRow,
 } from "@/lib/assessments/campaign-detail";
 import { activePublishedWhere } from "@/lib/assessments/active-version";
 
@@ -80,8 +81,10 @@ function buildDb(opts: {
   participants?: ReturnType<typeof participant>[];
   invitations?: ReturnType<typeof invitation>[];
   submissions?: Array<{ id: string; respondentId: string | null; submittedAt: Date }>;
-  /** Wave EV — sibling versions for the newer-edition check. */
-  versions?: unknown[];
+  /** Wave EV — sibling versions for the newer-edition check. Typed, so a
+   *  malformed fixture cannot compile silently (the hole the required-delegate
+   *  change was justified by). */
+  versions?: TemplateVersionRow[];
   /** Wave EV — make the sibling lookup reject, to exercise the degraded path. */
   versionsThrow?: boolean;
 }): CampaignDetailDb {
@@ -398,7 +401,9 @@ describe("getCampaignRespondents", () => {
 function campaignOnVersion(versionNumber: number, publishedAt: Date | null) {
   return {
     ...baseCampaign(),
-    version: { versionNumber, publishedAt, language: "enUS" },
+    // templateId is sourced from the VERSION in prod (the two FKs are
+    // independent), so the fixture must carry it here too.
+    version: { templateId: "tpl-1", versionNumber, publishedAt, language: "enUS" },
   };
 }
 

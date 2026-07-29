@@ -32,7 +32,7 @@ import {
   resolveEditionStanding,
   type EditionStanding,
 } from "./edition-standing";
-import type { AssessmentInvitationStatus } from "@prisma/client";
+import type { AssessmentInvitationStatus, PrismaClient } from "@prisma/client";
 
 // ────────────────────────────────────────────────────────────────────────
 // Public types (consumed by the API route + UI client component).
@@ -157,7 +157,7 @@ export interface CampaignDetailDb {
 }
 
 /** Wave EV — the sibling-version shape the edition check reads. */
-interface TemplateVersionRow {
+export interface TemplateVersionRow {
   templateId: string;
   versionNumber: number;
   language: string;
@@ -182,6 +182,7 @@ interface CampaignWithRels {
   organization: { id: string; name: string };
   /** Wave EV — the pinned version. Optional so older fixtures stay valid. */
   version?: {
+    templateId: string;
     versionNumber: number;
     publishedAt: Date | null;
     language: string;
@@ -287,7 +288,17 @@ export async function getCampaignOverview(
       organization: { select: { id: true, name: true } },
       // Wave EV — the pinned edition, so the screen can say which one it serves.
       version: {
-        select: { versionNumber: true, publishedAt: true, language: true },
+        // templateId comes from the VERSION, not the campaign: the two are
+        // independent FKs with no composite constraint tying them together, so
+        // sourcing it here is what makes the guard in resolveEditionStanding
+        // able to catch a mis-pinned campaign instead of comparing it against
+        // another instrument's numbering.
+        select: {
+          templateId: true,
+          versionNumber: true,
+          publishedAt: true,
+          language: true,
+        },
       },
     },
   });
@@ -322,7 +333,7 @@ export async function getCampaignOverview(
   let edition: EditionStanding | null = null;
   if (campaign.version != null) {
     const pinned = {
-      templateId: campaign.template.id,
+      templateId: campaign.version.templateId,
       versionNumber: campaign.version.versionNumber,
       publishedAt: campaign.version.publishedAt,
       language: campaign.version.language,
@@ -335,11 +346,11 @@ export async function getCampaignOverview(
             language: pinned.language,
             versionNumber: { gt: pinned.versionNumber },
             // The ONE definition of published-and-not-retired lives in
-            // active-version.ts. "Newer edition available" must mean "available
-            // to campaign-create", so this filter has to be the same object
-            // create resolves through — otherwise a future ED8 predicate would
-            // stop create offering a version while this badge kept advertising
-            // it, pointing a coach at an edition they cannot get.
+            // active-version.ts. A sibling counts as newer only if it is what
+            // campaign-create would actually offer, so this filter has to be the
+            // same object create resolves through — otherwise a future ED8
+            // predicate would stop create offering a version while this badge
+            // kept pointing a coach at an edition they cannot get.
             ...activePublishedWhere,
           },
           select: {
@@ -470,6 +481,29 @@ export async function getCampaignRespondents(
 // asCampaignDetailDb — bridge the real Prisma client to the narrow type.
 // ────────────────────────────────────────────────────────────────────────
 
-export function asCampaignDetailDb(prisma: unknown): CampaignDetailDb {
-  return prisma as CampaignDetailDb;
+/**
+ * Compile-time check that the REAL Prisma client carries every delegate this
+ * module names.
+ *
+ * Why this exists: the cast below cannot be checked. `CampaignDetailDb`'s methods
+ * deliberately return our own narrow row shapes, which do not overlap Prisma's
+ * generic delegate signatures, so `prisma as CampaignDetailDb` is rejected and a
+ * double cast is unavoidable. That means declaring a delegate REQUIRED on the
+ * interface constrains test mocks only — it buys nothing at the three production
+ * call sites, all of which go through the bridge.
+ *
+ * `Pick` closes the half that actually matters: a typo'd or removed delegate
+ * NAME fails the build here. Signatures stay intentionally unchecked.
+ */
+type RequiredDelegates = keyof CampaignDetailDb;
+// The type's EXISTENCE is the assertion: `Pick` fails to compile if any delegate
+// name is missing from PrismaClient. Nothing consumes it at runtime, by design —
+// hence the disable directive on the declaration itself.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type _DelegatesExistOnPrismaClient = Pick<PrismaClient, RequiredDelegates>;
+
+export function asCampaignDetailDb(prisma: PrismaClient): CampaignDetailDb {
+  // Double cast is required — see the note above. The parameter type is what
+  // stops an arbitrary object being passed in place of the client.
+  return prisma as unknown as CampaignDetailDb;
 }

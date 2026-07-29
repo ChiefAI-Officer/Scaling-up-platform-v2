@@ -12,7 +12,10 @@
  * behind one?
  */
 
-import { resolveEditionStanding } from "@/lib/assessments/edition-standing";
+import {
+  resolveEditionStanding,
+  type SiblingVersion,
+} from "@/lib/assessments/edition-standing";
 
 const TPL = "tpl-1";
 
@@ -136,6 +139,18 @@ describe("degrades rather than lying when the pinned edition is unknowable", () 
       language: "enUS",
     };
     expect(resolveEditionStanding(unpublished, [published(4)])).toBeNull();
+  });
+
+  it("never throws on a NULL sibling — the docblock promises never-throwing", () => {
+    // The previous version of this test passed a well-formed row with
+    // versionNumber: NaN, so it never exercised the promise it was named for.
+    expect(() =>
+      resolveEditionStanding(pinned, [null as unknown as SiblingVersion]),
+    ).not.toThrow();
+    expect(
+      resolveEditionStanding(pinned, [null as unknown as SiblingVersion])
+        ?.newerEditionAvailable,
+    ).toBe(false);
   });
 
   it("never throws on a malformed sibling list", () => {

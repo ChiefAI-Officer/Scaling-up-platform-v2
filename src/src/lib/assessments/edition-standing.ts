@@ -57,7 +57,7 @@ export interface EditionStanding {
   /** The edition this campaign is ACTUALLY serving — never the newest one. */
   versionNumber: number;
   publishedAt: Date;
-  /** True ⇒ show the "Newer edition available" chip. */
+  /** True ⇒ show the "Not the latest edition" chip. */
   newerEditionAvailable: boolean;
 }
 
@@ -85,8 +85,15 @@ export interface EditionStanding {
  * candidate set (a `findFirst` would return an arbitrary row, so a loosened
  * query could hand back an archived one and this check would compute `false`).
  *
- * Pure and never-throwing: a malformed sibling is skipped rather than crashing
- * the campaign screen, which must keep rendering whatever else it knows.
+ * Pure and never-throwing: a malformed or null sibling is skipped rather than
+ * crashing the campaign screen, which must keep rendering whatever else it knows.
+ *
+ * KNOWN ASYMMETRY, deliberate and scoped out: a sibling is disqualified when it
+ * is archived, but the PINNED version's own `archivedAt` is never consulted. So a
+ * campaign serving an ED8-retired edition, with no newer published sibling,
+ * renders an unqualified "Edition 3 · published …" and no chip — reassuring-
+ * looking text about content an admin explicitly retired. Arguably more urgent
+ * than "not the latest"; it needs its own copy and is tracked separately.
  */
 export function resolveEditionStanding(
   pinned: PinnedVersion,
@@ -97,6 +104,9 @@ export function resolveEditionStanding(
 
   const newerEditionAvailable = siblings.some(
     (s) =>
+      // Null-guard first: the docblock promises never-throwing, and a null
+      // element would otherwise TypeError on the first property access.
+      s != null &&
       s.templateId === pinned.templateId &&
       s.publishedAt != null &&
       s.archivedAt == null &&
