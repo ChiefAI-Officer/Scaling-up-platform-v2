@@ -1,7 +1,8 @@
 # Invited respondents may see their own Results report in place at submit; there is still no durable per-respondent results URL
 
 A **Campaign** may opt in (`AssessmentCampaign.showResultsOnScreen`) to showing an invited **Respondent** their
-own **Results report** — the same `BrandedReport` a coach/admin sees — rendered **in place** immediately after
+own **Results report** — the same `BrandedReport` component a coach/admin sees (see the precision note below) —
+rendered **in place** immediately after
 they submit, instead of the text-only thank-you page. The decision to disclose is made **server-side, under the
 submission lock**, and the report travels in the submit response. There is still **no durable, revisitable
 per-respondent results URL** for a respondent.
@@ -51,6 +52,15 @@ Three facts shaped the decision:
 
 ## Consequences
 
+⚠️ **Precision note on "the same report" (round-3 correction).** The *component* is the same and there is no
+reduced "respondent edition" — that part holds, and it is the point of decision 1. But the two readers are not
+byte-identical: the coach/admin route can pass a Wave S **`peerComparison`** section, which the respondent's copy
+structurally cannot receive (it is a separate prop supplied only by the authorized respondent-report page). That
+difference is *intended* — peers are cohort data and CEO_ONLY/anonymity rules live upstream of it — but earlier
+wording here and in `CONTEXT.md` asserted plain identity, which overstates it. Say "the same report component,
+minus cohort sections the respondent is not entitled to".
+
+
 - The report is returned **only** when the flag `WAVE_OSR_RESPONDENT_RESULTS_ENABLED` is on **and** the
   campaign's `showResultsOnScreen`, **re-read inside the Phase-2 locked transaction**, is true, **and** the
   disclosure fingerprint is unchanged across the Phase-1 → Phase-2 window. It is never returned unconditionally
@@ -64,7 +74,10 @@ Three facts shaped the decision:
 - **Show-once, but not refresh-hostile.** `/me` returns 410 once the invitation is `SUBMITTED`, which the
   survey client renders as *"This survey has closed."* — so a state-only report would tell a respondent the
   survey closed seconds after they finished. The report is therefore persisted to **`sessionStorage`** and
-  re-read on mount. It survives refresh and Back; it dies with the tab. The slot is keyed by
+  re-read on mount. It survives refresh and Back. ⚠️ **It does NOT reliably "die with the tab"** — an
+  earlier draft said so, but `sessionStorage` is copied into a duplicated tab and restored by
+  reopen-closed-tab and crash/session restore, so tab lifetime is not a boundary. Show-once is enforced by
+  the ownership check plus the `issuedAt` bound, not by the tab. The slot is keyed by
   **campaign alias** (on the refresh being rehydrated, `/me` has already 410'd, so `respondentKey` is
   unavailable).
   ⚠️ **Corrected TWICE under review. Rehydrate needs two checks, and the first draft had neither.**
@@ -86,7 +99,10 @@ Three facts shaped the decision:
   1740s but its **epoch does not** (cookie from exchange, `issuedAt` from submit), so the cookie always lapses
   first and this bound only binds if a caller skips the gate entirely.
   ⚠️ **Residual risk, accepted and NOT closed:** a respondent who submits and walks away from their own unlocked
-  browser leaves a readable report until the cookie lapses (≤29 min from exchange). There the attacker holds
+  browser leaves a readable report until the cookie lapses (≤29 min from the **last** token exchange — and
+  `/exchange` is replayable by anyone holding the raw `#t=` token, so that window can be *renewed* rather than
+  being an absolute deadline. This does not widen the hole in practice, since holding the raw token already
+  grants the invitation outright, but do not state the bound as absolute). There the attacker holds
   both the cookie and the slot, so no server-side check can tell them apart from the respondent. Bounded, not
   prevented — the same exposure as any abandoned logged-in session.
 - **A report-model failure never fails the submission.** The model is built in Phase 1, pre-commit and
@@ -122,6 +138,19 @@ Three facts shaped the decision:
   disclosing IP/UA/timing to that host — and a dead URL now shows a broken image to the client rather than to a
   coach's inbox (the Jeff #69 red-X symptom, relocated). Not fixed here because validation is #229's scope and
   this ships default-OFF, but it must be settled **before the flag is flipped**, not after.
+  📌 **STATUS at the flag flip (2026-07-29) — this precondition is being WAIVED, deliberately and on the record,
+  not quietly met.** Two facts narrowed it after the paragraph above was written:
+  (a) **the threat model is a trusted admin, not a hostile coach.** An earlier version of this bullet said "a
+  coach who sets `profileImage` to `https://attacker.example/px.gif`" — **that is wrong.** Coach self-serve goes
+  through `/api/portal/profile/image`, which validates MIME type and size and stores a **Vercel Blob** URL. The
+  only unvalidated write is `createCoachSchema`/`updateCoachSchema` (`profileImage: z.string().optional()`), and
+  both `/api/coaches` and `/api/coaches/[id]` are gated by `isPrivilegedRole` — **ADMIN/STAFF only.**
+  (b) What genuinely remains is therefore robustness and privacy hygiene, not a hostile-input hole: an admin typo
+  or stale external URL shows a **broken image to a respondent**, and an externally-hosted logo leaks respondent
+  IP/UA/timing to that host.
+  **Cheapest real mitigation, for whoever picks up #229:** the CSP already carries
+  `img-src 'self' data: blob: https://*.vercel-storage.com` — it is merely `Content-Security-Policy-Report-Only`.
+  Enforcing it blocks a remote coach logo outright, with a broken image as the visible cost.
 - **The flag gates capability, never data.** The wizard hides the checkbox when the flag is off but **does not**
   coerce the stored column, deliberately unlike the `sendResultsToRespondent` precedent.
   ⚠️ **Corrected after review:** an earlier draft of this ADR justified that by a "stale draft `true`" hazard.

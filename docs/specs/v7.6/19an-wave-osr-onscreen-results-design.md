@@ -1,6 +1,14 @@
 # 19an — Wave OSR: on-screen respondent results (Jeff July-10 #71)
 
-**Status:** design, gated → approved 2026-07-29 after `/grill-with-docs` + `/co-validate`.
+**Status:** design, gated → approved 2026-07-29, then shipped (PR #236, squash `26f18701`).
+⚠️ **Provenance correction (2026-07-29).** This line originally read "approved … after `/grill-with-docs` +
+`/co-validate`". **`/co-validate` never ran on this item** — there is no Codex record for it at any stage, and
+the same was true of #225. A gate with a grilling pass did happen (12 decisions settled, four findings F1–F4
+that reshaped the plan). What followed was **three `superpowers:code-reviewer` rounds**, not a Codex
+second opinion. Do not cite this spec as Codex-validated.
+**Why it matters rather than being pedantry:** round 1's own security fix was **wrong** — it proved "a live
+cookie exists" and treated that as "this is whose report this is" — and round 2 caught it only after it was
+committed and merged. That is precisely the class of error a second opinion is for.
 **Tracker row:** Jeff July-10 **#71** — "Campaign Setup – option to show results on-screen immediately after
 completion".
 **Jeff's ask, verbatim:** "On assessment setup, want an option for results to display on-screen immediately
@@ -26,8 +34,8 @@ reachable through.
 ### Answering Jeff's own caveat
 
 It **partly exists already**. Public 4-Decisions quiz takers DO see their report on screen today
-(`public-quiz-client.tsx:392-428`, `BrandedReport`, per ADR-0008). Invited respondents do not — their submit
-route computes the score (`submit/route.ts:459`) and **discards it**, returning only `{ submissionId }` (`:661`).
+(`public-quiz-client.tsx`'s `results` step → `BrandedReport`, per ADR-0008). Invited respondents do not — their submit
+route computes `scoreResult` and **discards it**, returning only `{ submissionId }`.
 So the renderer, the report model, and both report types are already in production; they were simply never
 wired to the invited flow, and never exposed as a setup option.
 
@@ -69,9 +77,9 @@ their own result**.
 | 1 | **Same artifact, new audience.** Not a new narrower "respondent view" — that would put two names on one component and invite a second renderer to drift (the smell that forced the `ReportFooter` / `CoachLogo` extractions). |
 | 2 | **Show-once at submit, plus `sessionStorage` rehydrate.** See §4. |
 | 3 | **No `AuditLog` row.** There is no report *route*, so the Report access gate (ADR-0012) was never in the path. The viewer is the data subject reading their own data; the audit exists to track *third parties* touching PII; the submission row already timestamps the instant. Ledgered, not silent. |
-| 4 | **Own individual result only; no `aggregationMode` check.** Satisfied *by construction* — only the respondent's own `scoreResult` is in scope, no cohort data exists on this path. Precedent is explicit: `buildWaveDOutboxRows` (`submit/route.ts:141-150`) gates the results email without ever reading `aggregationMode`, and `aggregate-report.ts:6-9` scopes that mode to *aggregation*. Guard test enforces it. |
+| 4 | **Own individual result only; no `aggregationMode` check.** Satisfied *by construction* — only the respondent's own `scoreResult` is in scope, no cohort data exists on this path. Precedent is explicit: `buildWaveDOutboxRows` (`submit/route.ts`) gates the results email without ever reading `aggregationMode`, and `aggregate-report.ts` scopes that mode to *aggregation*. Guard test enforces it. |
 | 5 | **Campaign column only.** |
-| 6 | **No qualitative branch.** `BrandedReport` self-dispatches on `reportConfigFor(report.templateAlias).reportType` (`:189`). Guaranteed correct structurally by decision 11 — the server builds the model, so `templateAlias` is never hand-set. |
+| 6 | **No qualitative branch.** `BrandedReport` self-dispatches on `reportConfigFor(report.templateAlias).reportType`. Guaranteed correct structurally by decision 11 — the server builds the model, so `templateAlias` is never hand-set. |
 | 7 | **Independent of the results-email approval hash.** `isResultsEmailApproved` gates the *email* because the email carries operator-authored copy needing approval; this render carries none. Coupling them would ship the feature permanently dark, since no template is approved. |
 | 8 | **Flagged, with a KILL lever** — respondent-facing *and* it reverses an ADR. Flags gate **capability, never persisted data**: a killed flag stops the render, the stored toggle keeps its value. |
 | 9 | **Print/Download included, and load-bearing** — under show-once it is the only way the respondent keeps the report. Reuse `PrintReportButton` (#64). Print geometry must be **visually verified**: A4 at 14mm ≈ 688 CSS px, below the 720px breakpoint, and that media block is not `screen`-qualified (the #230 lesson). |
@@ -86,7 +94,7 @@ their own result**.
 | Option | Cost | Verdict |
 |---|---|---|
 | **(i) In place at submit** | The score is already computed. Return it; render it. No route, no authz, no durable URL. | **Chosen** |
-| (ii) A `/org-survey/{alias}/results` route | The existing invitation cookie *is* path-scoped to `/org-survey/{alias}`, so it would be sent — one route. But the cookie's `maxAge` is **1740s ≈ 29 min** (`invitation-cookie.ts:23-24`). | Rejected |
+| (ii) A `/org-survey/{alias}/results` route | The existing invitation cookie *is* path-scoped to `/org-survey/{alias}`, so it would be sent — one route. But the cookie's `maxAge` is **1740s ≈ 29 min** (`invitation-cookie.ts` (`COOKIE_MAX_AGE_SECONDS`)). | Rejected |
 | (iii) A durable "view my result" link | New respondent token, lifetime, revocation, enumeration safety. | Deferred — a wave |
 
 **(ii) is rejected** because a 29-minute window is worse than either neighbour: it *presents* as durable, so it
@@ -101,14 +109,19 @@ to `/org-survey/{alias}`, so it never reaches the report routes under `(report)/
 
 ### Refresh must not dead-end (the reason for `sessionStorage`)
 
-`/me` returns 410 once `invitation.status === "SUBMITTED"` (`me/route.ts:78`), and the client renders 410 as
-**"This survey has closed."** (`org-survey-client.tsx:561`). If the report lived only in React state, a refresh
+`/me` returns 410 once `invitation.status === "SUBMITTED"` (`me/route.ts` (the `SUBMITTED` lifecycle gate)), and the client renders 410 as
+**"This survey has closed."** (`org-survey-client.tsx` (the error phase)). If the report lived only in React state, a refresh
 or Back after viewing results would tell someone who just completed the assessment that the survey is closed.
 That is a defect, not an accepted trade-off of show-once.
 
-So the client persists the server-built report to **`sessionStorage`**. Survives refresh and Back; dies on tab
-close — which *is* show-once. Precedent: `useAnswerDraft` already persists **answers** to `localStorage` keyed
-per respondent, so `sessionStorage` here is strictly narrower exposure than what already ships.
+So the client persists the server-built report to **`sessionStorage`**. Survives refresh and Back. Precedent:
+`useAnswerDraft` already persists **answers** to `localStorage` keyed per respondent, so `sessionStorage` here
+is strictly narrower exposure than what already ships.
+
+⚠️ **Corrected:** this line previously read "dies on tab close — which *is* show-once". That is wrong, and it
+was doing rhetorical work it could not support: `sessionStorage` is **copied** into a duplicated tab and
+**restored** by reopen-closed-tab and by crash/session restore. Show-once is enforced by the ownership check
+plus the `issuedAt` bound — never by tab lifetime.
 
 ⚠️ **Revised TWICE under review — rehydrate needs authorization AND ownership.** The slot is keyed by
 **campaign alias** (the client has no `respondentKey` of its own on the refresh being rehydrated).
@@ -139,18 +152,18 @@ The attacker holds both cookie and slot, so this is bounded, not preventable ser
 | Mode | Submission | Behaviour |
 |---|---|---|
 | **Scoring throws** (`ScoringValidationError`) | never commits | The **existing submit-failure path**: inline error, back to the pager (the R2-M1 recovery). **Not** thank-you, **not** a report. There is nothing to thank them for. |
-| **`result.degraded === true`** | committed | Render the report **with** its existing degraded notice (`BrandedReport.tsx:379-388`). Falling back to thank-you would be *worse* than the graceful path that already ships. |
+| **`result.degraded === true`** | committed | Render the report **with** its degraded notice. Falling back to thank-you would be *worse* than the graceful path that already ships. ⚠️ **Precision (round-3 correction):** the notice exists only in `BrandedReport`. `QualitativeReport` ignores `degraded` entirely, so LVA/QSP respondents get the report with **no** notice. Do not read this row as a guarantee across both renderers — see ADR-0027. |
 | **Report-model build fails** | must still succeed | Build in **Phase 1 (pre-commit, lock-free)** and swallow the failure into "no payload → normal thank-you", mirroring `buildWaveDOutboxRows`' contract that a render failure never affects the submission. |
 
 **Why the third is severe if done wrong:** a throw *after* commit returns 500; the client's retry path then hits
-the **hard 409** double-submit guard (`submit/route.ts:19`, `:395`, `:542`, `:645`) — the respondent is
+the **hard 409** double-submit guard (`submit/route.ts`, `:395`, `:542`, `:645`) — the respondent is
 dead-ended while their submission is actually saved.
 
 ---
 
 ## 6. The disclosure decision is made under the lock
 
-The route already has the exact machinery. `emailRenderFingerprint` (`submit/route.ts:267-285`) fingerprints the
+The route already has the exact machinery. `emailRenderFingerprint` (`emailRenderFingerprint` in `submit/route.ts`) fingerprints the
 Phase-1 *unlocked* read of the toggle-shaped fields; Phase 2 re-reads them under
 `SELECT id FROM assessment_invitations … FOR UPDATE` and drops any prepared row whose inputs changed in the
 Phase-1 → Phase-2 window (approval revoked, toggle flipped, version swapped).
@@ -169,7 +182,7 @@ Two consequences:
 
 One checkbox, hidden when the flag is off. **The stored value is never coerced.**
 
-This deliberately does *not* copy the `sendResultsToRespondent` precedent at `CampaignWizard.tsx:641-646`, which
+This deliberately does *not* copy the `sendResultsToRespondent` precedent at `CampaignWizard`'s `sendResultsToRespondent` force-false, which
 force-`false`s on flag-off. That coercion exists for a specific reason — otherwise the thank-you page would
 **promise an email the send path will not deliver**, a user-visible lie. That hazard does not exist here:
 under §6 the server decides and payload-presence is the only signal, so a stale `true` in a draft promises
@@ -190,7 +203,7 @@ respondent gets exactly one look at their result. This turns an invisible conseq
    report only when permitted; keep `NO_STORE_HEADERS`.
 4. `org-survey-client` — `results` step + `sessionStorage` + `PrintReportButton`.
    **Must `import "@/styles/su-public-brand.css"` and `"@/styles/su-report.css"`.** These are imported in only
-   two places today (`(report)/layout.tsx:19`, `public-quiz-client.tsx:34`) and this client has neither, so the
+   two places today (`(report)/layout.tsx:19`, `public-quiz-client.tsx`) and this client has neither, so the
    report would otherwise render **completely unstyled**.
 5. Wizard checkbox + operator warning.
 6. ADR + `CONTEXT.md`.
@@ -211,7 +224,7 @@ results with you" loses its home. It needs a place on the report screen.
 4. Toggle flipped off between Phase 1 and Phase 2 → **no payload** (the locked re-read).
 5. Report-model build failure → submission still succeeds, response carries no payload, client shows thank-you.
 6. Scoring throws → submit-failure path; not thank-you, not a report.
-7. `result.degraded` → report renders **with** the degraded notice.
+7. `result.degraded` → report renders **with** the degraded notice *on the scored renderer only* (`QualitativeReport` has none).
 8. Qualitative alias → qualitative render (via the server-built `templateAlias`).
 9. Cohort/aggregate data can never reach this render.
 10. `sessionStorage` rehydrate survives refresh; absent/corrupt ⇒ no crash.
