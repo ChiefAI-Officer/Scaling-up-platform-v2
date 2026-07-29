@@ -14,8 +14,15 @@
  * instrument's name, a different product from v1, NOT an edition) and nothing
  * about which edition of it is being served. So a tester opens a campaign
  * created before a fix published, reads the old wording, and reports it as
- * broken — correctly, from what is on screen. That is the documented cause of
- * two of Jeff's July-10 rows (#40, #43) being re-reports of shipped work.
+ * broken — correctly, from what is on screen.
+ *
+ * That is the most likely MECHANISM behind two of Jeff's July-10 rows (#40, #43)
+ * being re-reports of already-shipped work. Precision on the citation: the
+ * CHANGELOG records that those rows re-reported work shipped 8 days earlier — it
+ * does NOT record invisible pinning as the cause. The inference is ours, and it
+ * rests on both rows being LVA wording asks while Wave P published LVA v3 on
+ * 2026-07-02, so a campaign pinned to LVA v2 would still serve pre-Wave-P
+ * wording.
  *
  * This module is the pure decision behind the fix; the query lives in
  * `campaign-detail.ts` and the rendering in `CampaignDetail.tsx`.
@@ -27,14 +34,18 @@
 
 /** The version a campaign is pinned to. */
 export interface PinnedVersion {
+  templateId: string;
   versionNumber: number;
   /** Null ⇒ the campaign is pinned to a draft (an anomaly — see below). */
   publishedAt: Date | null;
   language: string;
 }
 
-/** A sibling version of the same template, for the newer-edition comparison. */
+/** A sibling version, for the newer-edition comparison. */
 export interface SiblingVersion {
+  /** Checked here too — template scoping is the predicate that decides WHICH
+   *  instrument we are comparing, so it must not be query-only. */
+  templateId: string;
   versionNumber: number;
   language: string;
   publishedAt: Date | null;
@@ -59,12 +70,20 @@ export interface EditionStanding {
  * leaving the tile exactly as it is today.
  *
  * A sibling only counts as a newer edition when ALL of these hold:
+ *  - it belongs to the SAME TEMPLATE — otherwise a different instrument's newer
+ *    version would advertise itself here;
  *  - it is PUBLISHED — a draft is available to nobody;
  *  - it is NOT archived — Wave ED8 retirement means "do not use this";
  *  - it is the SAME language — versions are unique per
  *    `[templateId, versionNumber, language]`, so a Spanish edition 5 must never
  *    make an English edition 3 look behind;
  *  - its `versionNumber` is strictly greater than the pinned one.
+ *
+ * Every one of those predicates is ALSO applied by the caller's query. The
+ * duplication is deliberate: it keeps the decision correct if the query is ever
+ * loosened, and it is only sound because the caller passes the COMPLETE
+ * candidate set (a `findFirst` would return an arbitrary row, so a loosened
+ * query could hand back an archived one and this check would compute `false`).
  *
  * Pure and never-throwing: a malformed sibling is skipped rather than crashing
  * the campaign screen, which must keep rendering whatever else it knows.
@@ -78,6 +97,7 @@ export function resolveEditionStanding(
 
   const newerEditionAvailable = siblings.some(
     (s) =>
+      s.templateId === pinned.templateId &&
       s.publishedAt != null &&
       s.archivedAt == null &&
       s.language === pinned.language &&

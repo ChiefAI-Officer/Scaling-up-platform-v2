@@ -10,6 +10,7 @@ import {
   getCampaignRespondents,
   type CampaignDetailDb,
 } from "@/lib/assessments/campaign-detail";
+import { activePublishedWhere } from "@/lib/assessments/active-version";
 
 function baseCampaign() {
   return {
@@ -79,6 +80,10 @@ function buildDb(opts: {
   participants?: ReturnType<typeof participant>[];
   invitations?: ReturnType<typeof invitation>[];
   submissions?: Array<{ id: string; respondentId: string | null; submittedAt: Date }>;
+  /** Wave EV — sibling versions for the newer-edition check. */
+  versions?: unknown[];
+  /** Wave EV — make the sibling lookup reject, to exercise the degraded path. */
+  versionsThrow?: boolean;
 }): CampaignDetailDb {
   return {
     assessmentCampaign: {
@@ -94,6 +99,11 @@ function buildDb(opts: {
     },
     assessmentSubmission: {
       findMany: jest.fn().mockResolvedValue(opts.submissions ?? []),
+    },
+    assessmentTemplateVersion: {
+      findMany: opts.versionsThrow
+        ? jest.fn().mockRejectedValue(new Error("connection terminated"))
+        : jest.fn().mockResolvedValue(opts.versions ?? []),
     },
   };
 }
@@ -371,5 +381,121 @@ describe("getCampaignRespondents", () => {
       pathIds: ["t1", "t2", "t3"],
       pathLabels: ["ABC Corp", "Engineering", "Backend"],
     });
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// Wave EV — the edition-standing seam inside getCampaignOverview()
+//
+// The pure decision is covered in edition-standing.test.ts and the render in
+// campaign-edition-tile.test.tsx. This block covers the MIDDLE — the query
+// shape and the degraded paths — because that is where the review of PR #241
+// found a real defect: a failed sibling lookup used to fall back to `[]`, which
+// made the tile assert "you are on the newest edition" after a transient read
+// failure. Precisely the falsehood this feature exists to prevent.
+// ────────────────────────────────────────────────────────────────────────
+
+function campaignOnVersion(versionNumber: number, publishedAt: Date | null) {
+  return {
+    ...baseCampaign(),
+    version: { versionNumber, publishedAt, language: "enUS" },
+  };
+}
+
+const siblingVersion = (versionNumber: number) => ({
+  templateId: "tpl-1",
+  versionNumber,
+  language: "enUS",
+  publishedAt: new Date("2026-07-27T09:00:00Z"),
+  archivedAt: null,
+});
+
+describe("getCampaignOverview — Wave EV edition standing", () => {
+  it("reports the pinned edition and no warning when nothing newer exists", async () => {
+    const db = buildDb({
+      campaign: campaignOnVersion(3, new Date("2026-07-02T09:00:00Z")),
+      versions: [],
+    });
+    const { campaign } = await getCampaignOverview(db, "c1");
+    expect(campaign.edition).toEqual({
+      versionNumber: 3,
+      publishedAt: new Date("2026-07-02T09:00:00Z"),
+      newerEditionAvailable: false,
+    });
+  });
+
+  it("warns when a newer published edition exists", async () => {
+    const db = buildDb({
+      campaign: campaignOnVersion(3, new Date("2026-07-02T09:00:00Z")),
+      versions: [siblingVersion(4)],
+    });
+    const { campaign } = await getCampaignOverview(db, "c1");
+    expect(campaign.edition?.newerEditionAvailable).toBe(true);
+    // Still the edition actually being served — never the newer one.
+    expect(campaign.edition?.versionNumber).toBe(3);
+  });
+
+  it("scopes the lookup to this template, this language, and strictly newer rows", async () => {
+    const db = buildDb({
+      campaign: campaignOnVersion(3, new Date("2026-07-02T09:00:00Z")),
+    });
+    await getCampaignOverview(db, "c1");
+    const where = (
+      db.assessmentTemplateVersion.findMany as jest.Mock
+    ).mock.calls[0][0].where;
+    expect(where.templateId).toBe("tpl-1");
+    expect(where.language).toBe("enUS");
+    expect(where.versionNumber).toEqual({ gt: 3 });
+  });
+
+  it("filters to published, non-archived rows via the canonical Active filter", async () => {
+    // "Newer edition available" must mean "available to campaign-create", so the
+    // filter has to be the shared one from active-version.ts — not a hand-rolled
+    // copy that could drift from what create actually offers.
+    const db = buildDb({
+      campaign: campaignOnVersion(3, new Date("2026-07-02T09:00:00Z")),
+    });
+    await getCampaignOverview(db, "c1");
+    const where = (
+      db.assessmentTemplateVersion.findMany as jest.Mock
+    ).mock.calls[0][0].where;
+    expect(where).toMatchObject(activePublishedWhere);
+  });
+
+  it("returns NULL — never a false 'you are current' — when the lookup fails", async () => {
+    // Regression guard for the PR #241 review finding. A transient read failure
+    // (Neon cold start, dropped connection) must not be reported as currency.
+    const db = buildDb({
+      campaign: campaignOnVersion(3, new Date("2026-07-02T09:00:00Z")),
+      versionsThrow: true,
+    });
+    const { campaign } = await getCampaignOverview(db, "c1");
+    expect(campaign.edition).toBeNull();
+  });
+
+  it("still returns the rest of the overview when the lookup fails", async () => {
+    const db = buildDb({
+      campaign: campaignOnVersion(3, new Date("2026-07-02T09:00:00Z")),
+      versionsThrow: true,
+    });
+    const { campaign, stats } = await getCampaignOverview(db, "c1");
+    expect(campaign.templateName).toBe("Rockefeller Habits");
+    expect(stats).toBeDefined();
+  });
+
+  it("returns null and never queries when the campaign has no pinned version", async () => {
+    const db = buildDb({ campaign: baseCampaign() });
+    const { campaign } = await getCampaignOverview(db, "c1");
+    expect(campaign.edition).toBeNull();
+    expect(db.assessmentTemplateVersion.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns null when the pinned version is an unpublished draft", async () => {
+    const db = buildDb({
+      campaign: campaignOnVersion(3, null),
+      versions: [siblingVersion(4)],
+    });
+    const { campaign } = await getCampaignOverview(db, "c1");
+    expect(campaign.edition).toBeNull();
   });
 });

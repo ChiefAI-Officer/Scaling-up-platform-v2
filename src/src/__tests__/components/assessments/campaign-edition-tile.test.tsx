@@ -1,5 +1,5 @@
 /**
- * Wave EV — the Edition line + "Newer edition available" chip on the campaign
+ * Wave EV — the Edition line + "Not the latest edition" chip on the campaign
  * screen's Template tile.
  *
  * This is the customer-visible half of the #40/#43 fix: a campaign pins a
@@ -12,6 +12,14 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { CampaignDetail } from "@/components/assessments/CampaignDetail";
 import type { CampaignOverview } from "@/lib/assessments/campaign-detail";
+import { formatTimestamp } from "@/lib/utils";
+
+// formatTimestamp renders in the VIEWER's timezone, so a hardcoded "Jul 2, 2026"
+// fails under TZ=Pacific/Honolulu (verified: 3 failures). Derive the expectation
+// through the same helper the component uses, so these assert the WIRING rather
+// than one machine's clock.
+const CURRENT_PUBLISHED = new Date("2026-07-27T09:00:00.000Z");
+const BEHIND_PUBLISHED = new Date("2026-07-02T09:00:00.000Z");
 
 jest.mock("@/components/ui/use-toast", () => ({
   useToast: () => ({ toast: jest.fn() }),
@@ -72,7 +80,7 @@ afterEach(() => {
 describe("on the newest edition", () => {
   const current = {
     versionNumber: 4,
-    publishedAt: new Date("2026-07-27T09:00:00.000Z"),
+    publishedAt: CURRENT_PUBLISHED,
     newerEditionAvailable: false,
   };
 
@@ -80,7 +88,7 @@ describe("on the newest edition", () => {
     renderDetail(current);
     const line = screen.getByTestId("campaign-edition-line");
     expect(line).toHaveTextContent("Edition 4");
-    expect(line).toHaveTextContent("Jul 27, 2026");
+    expect(line).toHaveTextContent(formatTimestamp(CURRENT_PUBLISHED));
   });
 
   it("stays quiet — no stale chip when nothing is wrong", () => {
@@ -94,15 +102,20 @@ describe("on the newest edition", () => {
 describe("behind a newer edition", () => {
   const behind = {
     versionNumber: 3,
-    publishedAt: new Date("2026-07-02T09:00:00.000Z"),
+    publishedAt: BEHIND_PUBLISHED,
     newerEditionAvailable: true,
   };
 
   it("warns that a newer edition exists", () => {
     renderDetail(behind);
+    // NOT "available" — a campaign cannot move editions, so "available" would
+    // promise an upgrade button that does not exist. State the frozen fact.
     expect(screen.getByTestId("campaign-edition-stale")).toHaveTextContent(
-      "Newer edition available",
+      "Not the latest edition",
     );
+    expect(
+      screen.getByTestId("campaign-edition-stale").textContent,
+    ).not.toMatch(/available/i);
   });
 
   it("still dates the edition ACTUALLY being served, not the newer one", () => {
@@ -112,7 +125,7 @@ describe("behind a newer edition", () => {
     renderDetail(behind);
     const line = screen.getByTestId("campaign-edition-line");
     expect(line).toHaveTextContent("Edition 3");
-    expect(line).toHaveTextContent("Jul 2, 2026");
+    expect(line).toHaveTextContent(formatTimestamp(BEHIND_PUBLISHED));
   });
 
   it("shows exactly ONE date — the chip states existence, not a second timestamp", () => {
@@ -126,7 +139,7 @@ describe("behind a newer edition", () => {
       " " +
       screen.getByTestId("campaign-edition-stale").textContent;
     const dates = text.match(/\w{3} \d{1,2}, \d{4}/g) ?? [];
-    expect(dates).toEqual(["Jul 2, 2026"]);
+    expect(dates).toEqual([formatTimestamp(BEHIND_PUBLISHED)]);
   });
 });
 
@@ -158,7 +171,7 @@ describe("wording", () => {
   it('says "Edition", never "Version" — "version" is spent on the instrument name', () => {
     renderDetail({
       versionNumber: 3,
-      publishedAt: new Date("2026-07-02T09:00:00.000Z"),
+      publishedAt: BEHIND_PUBLISHED,
       newerEditionAvailable: true,
     });
     const line = screen.getByTestId("campaign-edition-line");

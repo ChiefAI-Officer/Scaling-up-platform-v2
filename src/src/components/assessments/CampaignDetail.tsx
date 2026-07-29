@@ -1130,7 +1130,13 @@ export function CampaignDetail({
                 "version" is already spent on the instrument's own name in front
                 of coaches ("Quarterly Session Prep v2" is a different product
                 from v1, not a newer edition), and reusing it is precisely how
-                this got confusing. */}
+                this got confusing.
+
+                The chip deliberately does NOT say "Newer edition available":
+                a campaign cannot move editions (there is no write path for
+                versionId), so "available" would promise an upgrade button that
+                does not exist. It states the frozen fact instead, which is what
+                a tester actually needs. */}
             {campaign.edition && (
               <>
                 <div
@@ -1142,10 +1148,10 @@ export function CampaignDetail({
                 </div>
                 {campaign.edition.newerEditionAvailable && (
                   <span
-                    className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[0.7rem] font-semibold text-warning"
+                    className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-xs font-semibold text-warning"
                     data-testid="campaign-edition-stale"
                   >
-                    Newer edition available
+                    Not the latest edition
                   </span>
                 )}
               </>

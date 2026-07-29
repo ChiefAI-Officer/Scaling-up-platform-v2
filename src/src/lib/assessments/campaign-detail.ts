@@ -27,6 +27,11 @@
  *   → 0% (not NaN).
  */
 
+import { activePublishedWhere } from "./active-version";
+import {
+  resolveEditionStanding,
+  type EditionStanding,
+} from "./edition-standing";
 import type { AssessmentInvitationStatus } from "@prisma/client";
 
 // ────────────────────────────────────────────────────────────────────────
@@ -60,11 +65,6 @@ export interface CampaignRespondentRow {
   submissionId: string | null;
   submittedAt: Date | null;
 }
-
-import {
-  resolveEditionStanding,
-  type EditionStanding,
-} from "./edition-standing";
 
 export interface CampaignOverview {
   campaign: {
@@ -139,8 +139,16 @@ export interface CampaignDetailDb {
       select?: Record<string, unknown>;
     }) => Promise<SubmissionRow[]>;
   };
-  /** Wave EV — sibling versions of the campaign's template, for the newer-edition check. */
-  assessmentTemplateVersion?: {
+  /**
+   * Wave EV — sibling versions, for the newer-edition check.
+   *
+   * REQUIRED, not optional. An optional delegate would make the hole silent for
+   * the next author: add `version` to a mock and you'd get a confident, wrong
+   * "no newer edition" with no compiler complaint. Same reasoning as Wave OSR's
+   * F4, where making `RespondentReport.templateAlias` required was itself the fix
+   * — requiring the field is what lets the compiler find the omission.
+   */
+  assessmentTemplateVersion: {
     findMany: (args: {
       where: Record<string, unknown>;
       select?: Record<string, unknown>;
@@ -150,6 +158,7 @@ export interface CampaignDetailDb {
 
 /** Wave EV — the sibling-version shape the edition check reads. */
 interface TemplateVersionRow {
+  templateId: string;
   versionNumber: number;
   language: string;
   publishedAt: Date | null;
@@ -312,31 +321,46 @@ export async function getCampaignOverview(
   // A campaign screen must never fail to load over a decorative badge.
   let edition: EditionStanding | null = null;
   if (campaign.version != null) {
-    let siblings: TemplateVersionRow[] = [];
+    const pinned = {
+      templateId: campaign.template.id,
+      versionNumber: campaign.version.versionNumber,
+      publishedAt: campaign.version.publishedAt,
+      language: campaign.version.language,
+    };
     try {
-      siblings =
-        (await db.assessmentTemplateVersion?.findMany({
+      const siblings: TemplateVersionRow[] =
+        await db.assessmentTemplateVersion.findMany({
           where: {
-            templateId: campaign.template.id,
-            language: campaign.version.language,
-            versionNumber: { gt: campaign.version.versionNumber },
-            publishedAt: { not: null },
-            archivedAt: null,
+            templateId: pinned.templateId,
+            language: pinned.language,
+            versionNumber: { gt: pinned.versionNumber },
+            // The ONE definition of published-and-not-retired lives in
+            // active-version.ts. "Newer edition available" must mean "available
+            // to campaign-create", so this filter has to be the same object
+            // create resolves through — otherwise a future ED8 predicate would
+            // stop create offering a version while this badge kept advertising
+            // it, pointing a coach at an edition they cannot get.
+            ...activePublishedWhere,
           },
           select: {
+            templateId: true,
             versionNumber: true,
             language: true,
             publishedAt: true,
             archivedAt: true,
           },
-        })) ?? [];
+        });
+      edition = resolveEditionStanding(pinned, siblings);
     } catch (err) {
+      // Leave `edition` NULL — never claim currency we did not verify.
+      //
+      // The tempting shape here is `siblings = []` on failure, but that makes
+      // resolveEditionStanding return `newerEditionAvailable: false`, which the
+      // tile renders as an affirmative "you are on the newest edition". A
+      // transient read failure would then tell a tester exactly the falsehood
+      // this feature exists to prevent. Null renders no edition info at all.
       console.error("[campaign-detail] edition sibling lookup failed:", err);
     }
-    // The WHERE already narrows to genuinely-newer published, unarchived,
-    // same-language rows; resolveEditionStanding re-applies every one of those
-    // rules so the decision is correct even if the query is ever loosened.
-    edition = resolveEditionStanding(campaign.version, siblings);
   }
 
   return {
