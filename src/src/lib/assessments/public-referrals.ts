@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+
 import {
   isPrivilegedRole,
   type ApiActor,
@@ -62,6 +64,7 @@ interface PublicSubmissionFindMany {
 interface PublicReferralListDb {
   $transaction: <T>(
     callback: (tx: {
+      $queryRaw: <R>(query: unknown) => Promise<R>;
       coach: CoachFindUnique;
       assessmentSubmission: PublicSubmissionFindMany;
     }) => Promise<T>,
@@ -212,7 +215,8 @@ export function summarizePublicResult(
   alias: string,
   result: unknown,
 ): PublicResultSummary {
-  if (reportConfigFor(alias).reportType === "qualitative") {
+  const reportConfig = reportConfigFor(alias);
+  if (reportConfig.reportType === "qualitative") {
     return { kind: "qualitative", label: "Completed" };
   }
 
@@ -262,7 +266,10 @@ export function summarizePublicResult(
     kind: "scored",
     overallScore: frozen.overallAverage,
     tierLabel:
-      tier && typeof tier.label === "string" && tier.label.trim() !== ""
+      reportConfig.showTier &&
+      tier &&
+      typeof tier.label === "string" &&
+      tier.label.trim() !== ""
         ? tier.label
         : null,
     domains,
@@ -272,6 +279,14 @@ export function summarizePublicResult(
 function normalizedTake(value: number | undefined): number {
   if (value === undefined || !Number.isFinite(value)) return 25;
   return Math.min(100, Math.max(1, Math.trunc(value)));
+}
+
+function normalizeSearchQuery(value: string | undefined): string {
+  return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
 }
 
 /**
@@ -288,7 +303,7 @@ export async function listPublicReferrals(
 
   const coachId = actor.coachId;
   const take = normalizedTake(input.take);
-  const query = input.query?.trim() ?? "";
+  const query = normalizeSearchQuery(input.query);
   const templateId = input.templateId?.trim() ?? "";
   const cursor = input.cursor?.trim() ?? "";
 
@@ -319,12 +334,44 @@ export async function listPublicReferrals(
         campaign: campaignWhere,
       };
       if (query) {
-        where.OR = ["firstName", "lastName", "email"].map((key) => ({
-          publicTaker: {
-            path: [key],
-            string_contains: query,
-          },
-        }));
+        // Prisma's PostgreSQL JSON filter has no case-insensitive mode and
+        // cannot compare a concatenated first+last name. Resolve owned match
+        // IDs with parameterized SQL, then re-apply every security constraint
+        // in the canonical Prisma list query below.
+        const templateConstraint = templateId
+          ? Prisma.sql`AND c."templateId" = ${templateId}`
+          : Prisma.empty;
+        const pattern = `%${escapeLikePattern(query)}%`;
+        const matchingRows = await tx.$queryRaw<Array<{ id: string }>>(
+          Prisma.sql`
+            SELECT s."id"
+            FROM "assessment_submissions" AS s
+            INNER JOIN "assessment_campaigns" AS c
+              ON c."id" = s."campaignId"
+            WHERE s."referringCoachId" = ${coachId}
+              AND c."accessMode" = 'PUBLIC'
+              AND c."deletedAt" IS NULL
+              ${templateConstraint}
+              AND (
+                LOWER(
+                  REGEXP_REPLACE(
+                    CONCAT_WS(
+                      ' ',
+                      NULLIF(BTRIM(COALESCE(s."publicTaker"->>'firstName', '')), ''),
+                      NULLIF(BTRIM(COALESCE(s."publicTaker"->>'lastName', '')), '')
+                    ),
+                    '[[:space:]]+',
+                    ' ',
+                    'g'
+                  )
+                ) LIKE ${pattern} ESCAPE E'\\\\'
+                OR LOWER(
+                  BTRIM(COALESCE(s."publicTaker"->>'email', ''))
+                ) LIKE ${pattern} ESCAPE E'\\\\'
+              )
+          `,
+        );
+        where.id = { in: matchingRows.map((row) => row.id) };
       }
 
       const rows = await tx.assessmentSubmission.findMany({

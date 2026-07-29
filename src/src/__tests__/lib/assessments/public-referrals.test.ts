@@ -217,8 +217,8 @@ describe("getPublicReferralReport", () => {
     );
 
     expect(outcome.status).toBe("ok");
-    expect(db.findFirst.mock.calls[0][0].where).not.toHaveProperty(
-      "campaign.status",
+    expect(db.findFirst.mock.calls[0][0].where.campaign).not.toHaveProperty(
+      "status",
     );
   });
 
@@ -243,13 +243,13 @@ describe("getPublicReferralReport", () => {
 });
 
 describe("summarizePublicResult", () => {
-  it("summarizes a frozen Four Decisions result without recomputing it", () => {
+  it("suppresses the frozen tier when the scored report policy hides tiers", () => {
     expect(
       summarizePublicResult("scaling-up-full", FROZEN_RESULT),
     ).toEqual({
       kind: "scored",
       overallScore: 7.4,
-      tierLabel: "On the way",
+      tierLabel: null,
       domains: [
         {
           key: "people",
@@ -257,6 +257,14 @@ describe("summarizePublicResult", () => {
           score: 7.4,
         },
       ],
+    });
+  });
+
+  it("shows the frozen tier when the scored report policy enables tiers", () => {
+    expect(summarizePublicResult("RockHabits", FROZEN_RESULT)).toMatchObject({
+      kind: "scored",
+      overallScore: 7.4,
+      tierLabel: "On the way",
     });
   });
 
@@ -295,10 +303,22 @@ describe("listPublicReferrals", () => {
         template: { id: string; name: string; alias: string };
       };
     }>,
+    matchingIds: string[] = rows.map((row) => row.id),
   ) {
     const findUnique = jest.fn().mockResolvedValue(coach);
-    const findMany = jest.fn().mockResolvedValue(rows);
+    const $queryRaw = jest
+      .fn()
+      .mockResolvedValue(matchingIds.map((id) => ({ id })));
+    const findMany = jest.fn().mockImplementation(
+      async (args: { where: Record<string, unknown> }) => {
+        const idFilter = args.where.id as { in?: string[] } | undefined;
+        return idFilter?.in
+          ? rows.filter((row) => idFilter.in?.includes(row.id))
+          : rows;
+      },
+    );
     const tx = {
+      $queryRaw,
       coach: { findUnique },
       assessmentSubmission: { findMany },
     };
@@ -308,7 +328,7 @@ describe("listPublicReferrals", () => {
         async (callback: (value: typeof tx) => Promise<unknown>) =>
           callback(tx),
       );
-    return { $transaction, findUnique, findMany };
+    return { $transaction, $queryRaw, findUnique, findMany };
   }
 
   const listRows = [
@@ -354,7 +374,6 @@ describe("listPublicReferrals", () => {
       db as never,
       actor(),
       {
-        query: "avery",
         templateId: "template-four-decisions",
         cursor: "sub-cursor",
         take: 2,
@@ -373,7 +392,7 @@ describe("listPublicReferrals", () => {
           summary: {
             kind: "scored",
             overallScore: 7.4,
-            tierLabel: "On the way",
+            tierLabel: null,
             domains: [
               { key: "people", label: "People", score: 7.4 },
             ],
@@ -388,7 +407,7 @@ describe("listPublicReferrals", () => {
           summary: {
             kind: "scored",
             overallScore: 7.4,
-            tierLabel: "On the way",
+            tierLabel: null,
             domains: [
               { key: "people", label: "People", score: 7.4 },
             ],
@@ -415,12 +434,69 @@ describe("listPublicReferrals", () => {
             deletedAt: null,
             templateId: "template-four-decisions",
           }),
-          OR: expect.any(Array),
         }),
         orderBy: [{ submittedAt: "desc" }, { id: "desc" }],
         cursor: { id: "sub-cursor" },
         skip: 1,
         take: 3,
+      }),
+    );
+  });
+
+  it("normalizes mixed-case full-name search in SQL before applying the Prisma list filter", async () => {
+    const db = makeListDb(
+      PUBLIC_SUBMISSION.referringCoach,
+      listRows,
+      ["sub-newest"],
+    );
+
+    const outcome = await listPublicReferrals(
+      db as never,
+      actor(),
+      {
+        query: "  aVeRy   LEADER ",
+        templateId: "template-four-decisions",
+      },
+    );
+
+    expect(outcome.status).toBe("ok");
+    if (outcome.status !== "ok") return;
+    expect(outcome.items.map((item) => item.submissionId)).toEqual([
+      "sub-newest",
+    ]);
+
+    expect(db.$queryRaw).toHaveBeenCalledTimes(1);
+    const searchSql = db.$queryRaw.mock.calls[0][0] as {
+      sql: string;
+      values: unknown[];
+    };
+    expect(searchSql.sql).toMatch(/REGEXP_REPLACE/);
+    expect(searchSql.sql).toMatch(/LOWER/);
+    expect(searchSql.sql).toMatch(/firstName/);
+    expect(searchSql.sql).toMatch(/lastName/);
+    expect(searchSql.sql).toMatch(/email/);
+    expect(searchSql.sql).toMatch(/referringCoachId/);
+    expect(searchSql.sql).toMatch(/accessMode/);
+    expect(searchSql.sql).toMatch(/deletedAt/);
+    expect(searchSql.values).toEqual(
+      expect.arrayContaining([
+        "coach-owner",
+        "template-four-decisions",
+        "%avery leader%",
+      ]),
+    );
+
+    expect(db.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          referringCoachId: "coach-owner",
+          campaign: {
+            accessMode: "PUBLIC",
+            deletedAt: null,
+            templateId: "template-four-decisions",
+          },
+          id: { in: ["sub-newest"] },
+        },
       }),
     );
   });
