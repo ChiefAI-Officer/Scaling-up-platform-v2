@@ -129,7 +129,7 @@ describe("DELETE /api/coaches/[id]", () => {
   it("returns 409 and directs deactivation when the coach has referred submissions", async () => {
     (db.assessmentSubmission.count as jest.Mock).mockResolvedValue(2);
 
-    const res = await DELETE(makeRequest("coach-1"), routeParams("coach-1"));
+    const res = await DELETE(makeRequest("coach-1") as never, routeParams("coach-1"));
 
     expect(res.status).toBe(409);
     const body = await res.json();
