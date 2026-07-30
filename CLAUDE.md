@@ -439,6 +439,12 @@ Security improvements ship with every sprint — no separate security sprint nee
 
 ## Agent skills
 
+### 🔴 Several agent threads ship to `main` at once — claim before you build
+
+**Claim board: pinned issue #261.** Read it, and `docs/agents/parallel-threads.md`, before scoping any tracker row — then re-check right before you write code. `main` moved six times during one session on 2026-07-30, and two planned items were shipped by another thread mid-task (Jeff #48 as pager grouping in #251/#253, and #71's production launch walk). Per-thread memory cannot prevent this: two ledgers were each internally consistent and neither could see the other.
+
+Three rules travel with it: **never merge a PR while its review loop is running** (#249 merged 52 min before its fixes existed, forcing the corrections into a second PR, #252); **put the SoT update in the same PR as the code** (standalone SoT PRs keep colliding on this file and `plans/CHANGELOG.md` — #244 was discarded for it); and **verify the production deployment after every merge** (see the `git information` Known Quirks bullet).
+
 ### Issue tracker
 
 Issues live as GitHub Issues on `ChiefAI-Officer/Scaling-up-platform-v2`. See `docs/agents/issue-tracker.md`.
