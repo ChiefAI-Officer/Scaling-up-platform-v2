@@ -1293,10 +1293,10 @@ case "$QSP48_ACTION" in
   *) echo "QSP48_ACTION must be launch or rollback" >&2; exit 2 ;;
 esac
 
-git fetch origin main
-export QSP48_MERGED_SHA
-QSP48_MERGED_SHA=$(git rev-parse origin/main)
-test -n "$QSP48_MERGED_SHA"
+git fetch origin refs/heads/main:refs/remotes/origin/main
+export QSP48_LAUNCH_SHA="d676aa77caf328afd113f297d90ca8d41d036caf"
+git cat-file -e "${QSP48_LAUNCH_SHA}^{commit}"
+git merge-base --is-ancestor "$QSP48_LAUNCH_SHA" origin/main
 
 export QSP48_VERCEL_DIR
 QSP48_VERCEL_DIR=$(mktemp -d "${TMPDIR:-/tmp}/qsp48-vercel.XXXXXX")
@@ -1457,11 +1457,11 @@ async function exactFlagEntries(key) {
   return Promise.all(summaries.map(readExactFlagEntry));
 }
 
-function flagReceipt(entry) {
+function redactedFlagReceipt(entry) {
   return {
     id: entry.id,
     key: entry.key,
-    value: Object.hasOwn(entry, "value") ? entry.value : "[unreadable]",
+    value: Object.hasOwn(entry, "value") ? "[redacted]" : "[unavailable]",
     type: entry.type,
     target: entry.target,
     customEnvironmentIds: entry.customEnvironmentIds ?? [],
@@ -1482,14 +1482,28 @@ function partitionExactFlagEntries(entries) {
   return { productionOnly, nonProduction };
 }
 
-function receiptSet(entries) {
+function internalFlagComparison(entry) {
+  return {
+    id: entry.id,
+    key: entry.key,
+    value: entry.value,
+    type: entry.type,
+    target: entry.target,
+    customEnvironmentIds: entry.customEnvironmentIds ?? [],
+  };
+}
+
+function internalComparisonSet(entries) {
   return entries
-    .map((entry) => JSON.stringify(flagReceipt(entry)))
+    .map((entry) => JSON.stringify(internalFlagComparison(entry)))
     .sort();
 }
 
-function sameReceiptSet(left, right) {
-  return JSON.stringify(receiptSet(left)) === JSON.stringify(receiptSet(right));
+function sameInternalComparisonSet(left, right) {
+  return (
+    JSON.stringify(internalComparisonSet(left)) ===
+    JSON.stringify(internalComparisonSet(right))
+  );
 }
 
 async function waitForFlag(key, predicate, description) {
@@ -1508,7 +1522,9 @@ async function replaceFlag(key, value) {
   }
 
   const before = await exactFlagEntries(key);
-  console.error(`Exact entries before ${key}: ${JSON.stringify(before.map(flagReceipt))}`);
+  console.error(
+    `Exact entries before ${key}: ${JSON.stringify(before.map(redactedFlagReceipt))}`,
+  );
   const {
     productionOnly: beforeProduction,
     nonProduction: preservedNonProduction,
@@ -1526,7 +1542,7 @@ async function replaceFlag(key, value) {
       const { productionOnly, nonProduction } = partitionExactFlagEntries(entries);
       return (
         productionOnly.length === 0 &&
-        sameReceiptSet(nonProduction, preservedNonProduction)
+        sameInternalComparisonSet(nonProduction, preservedNonProduction)
       );
     },
     "have no production-targeting entry while preserving non-production entries",
@@ -1550,13 +1566,15 @@ async function replaceFlag(key, value) {
         productionOnly.length === 1 &&
         productionOnly[0].value === value &&
         productionOnly[0].type === "encrypted" &&
-        sameReceiptSet(nonProduction, preservedNonProduction)
+        sameInternalComparisonSet(nonProduction, preservedNonProduction)
       );
     },
-    `be exactly one readable encrypted production entry with value ${value}`,
+    "be exactly one readable encrypted production entry with the requested value",
   );
   const { productionOnly } = partitionExactFlagEntries(after);
-  console.error(`Verified ${key}: ${JSON.stringify(flagReceipt(productionOnly[0]))}`);
+  console.error(
+    `Verified ${key}: ${JSON.stringify(redactedFlagReceipt(productionOnly[0]))}`,
+  );
 }
 
 function deploymentProjectId(deployment) {
@@ -1660,7 +1678,7 @@ async function listProductionDeployments() {
   return payload.deployments;
 }
 
-async function resolveReadyMergedDeployment(sha) {
+async function resolveReadyLaunchDeployment(sha) {
   const summaries = (await listProductionDeployments()).sort(
     (a, b) => Number(b.createdAt) - Number(a.createdAt),
   );
@@ -1682,7 +1700,7 @@ async function resolveReadyMergedDeployment(sha) {
       // Keep looking; a Ready deployment for another SHA/ref is not the launch source.
     }
   }
-  throw new Error(`No exact Ready production deployment found for merged main SHA ${sha}`);
+  throw new Error(`No exact Ready production deployment found for pinned launch SHA ${sha}`);
 }
 
 function parseRedeployOutput(output) {
@@ -1738,7 +1756,7 @@ async function main() {
   } else if (command === "resolve-ready") {
     const [sha] = args;
     if (!/^[0-9a-f]{40}$/i.test(sha ?? "")) throw new Error("Expected a full Git SHA");
-    await resolveReadyMergedDeployment(sha);
+    await resolveReadyLaunchDeployment(sha);
   } else if (command === "parse-redeploy-output") {
     process.stdout.write(parseRedeployOutput(await readStdin()));
   } else if (command === "wait-exact-ready") {
@@ -1764,7 +1782,7 @@ NODE
 
 export QSP48_READY_HOST
 QSP48_READY_HOST=$(
-  node "$QSP48_VERCEL_HELPER" resolve-ready "$QSP48_MERGED_SHA"
+  node "$QSP48_VERCEL_HELPER" resolve-ready "$QSP48_LAUNCH_SHA"
 )
 test -n "$QSP48_READY_HOST"
 curl -fsS https://scaling-up-platform-v2.vercel.app/api/health
@@ -1799,7 +1817,7 @@ test -n "$QSP48_NEW_DEPLOYMENT_HOST"
 export QSP48_READY_RECEIPT
 QSP48_READY_RECEIPT=$(
   node "$QSP48_VERCEL_HELPER" \
-    wait-exact-ready "$QSP48_MERGED_SHA" "$QSP48_NEW_DEPLOYMENT_HOST"
+    wait-exact-ready "$QSP48_LAUNCH_SHA" "$QSP48_NEW_DEPLOYMENT_HOST"
 )
 test "$QSP48_READY_RECEIPT" = "$QSP48_NEW_DEPLOYMENT_HOST"
 curl -fsS https://scaling-up-platform-v2.vercel.app/api/health
@@ -1808,10 +1826,12 @@ printf 'QSP48 %s Ready: %s\n' "$QSP48_ACTION" "$QSP48_READY_RECEIPT"
 
 Expected: the helper resolves a Ready production deployment in project
 `prj_xcAWuAmGZAU3DCHgAauRv2WPKneo`, team
-`team_ek3PMuEYCgI0DKZ2EFexMgya`, whose Git metadata matches the merged `main`
-SHA. If there is no exact match, or the API does not expose enough metadata to
-prove the match, the runner stops before any flag mutation. Health must return
-success. `set -euo pipefail` also guarantees that a failed flag write/readback
+`team_ek3PMuEYCgI0DKZ2EFexMgya`, whose Git metadata matches the pinned launch
+SHA `d676aa77caf328afd113f297d90ca8d41d036caf`. The preflight also requires that
+commit to exist locally and remain an ancestor of fetched `origin/main`. If
+there is no exact Ready deployment for that SHA, or the API does not expose
+enough metadata to prove the match, the runner stops before any flag mutation.
+Health must return success. `set -euo pipefail` also guarantees that a failed flag write/readback
 stops before the next flag or redeploy, a failed redeploy stops before parsing
 or polling, and a malformed CLI URL stops before the exact-deployment poll.
 
@@ -1844,7 +1864,9 @@ manually and are never deleted by this runner.
 
 After deletion it proves that no production-targeting entry remains and that
 the non-production receipt is unchanged by relisting and repeating the per-ID
-reads. It then creates one entry through
+reads. Logged receipts always replace readable values or ciphertext with
+`[redacted]`; raw values exist only in an internal comparison record that is
+never logged or returned. It then creates one entry through
 `POST /v10/projects/prj_xcAWuAmGZAU3DCHgAauRv2WPKneo/env?teamId=team_ek3PMuEYCgI0DKZ2EFexMgya`
 with `type:"encrypted"` and `target:["production"]`, then reads the exact key back
 by ID, relists, and requires exactly one readable value `0`, encrypted type,
@@ -1854,8 +1876,10 @@ the launch branch proceed to enablement.
 The rollback command is the entire Step 1 block with
 `QSP48_ACTION="rollback"`. That self-contained branch deterministically replaces
 the production-only kill entry with readable encrypted value `1`; any set or
-readback failure stops before redeploy. It then redeploys only the resolved
-merged source and polls only the exact hostname captured from that redeploy.
+readback failure stops before redeploy. It then redeploys only the pinned launch
+source `d676aa77caf328afd113f297d90ca8d41d036caf` and polls only the exact
+hostname captured from that redeploy. A newer `origin/main` cannot silently
+change the rollback source.
 
 > **Completion receipt (2026-07-30):** encrypted Production-only entries were
 > verified by per-ID decrypted GET and subsequent relist. Kill was proven `0`

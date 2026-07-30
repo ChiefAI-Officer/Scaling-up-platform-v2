@@ -203,7 +203,10 @@ WAVE_48_QSP_STORY_GROUP_KILL
 
 The kill switch overrides enablement. Flag off renders the current three ordinary questions and uses current question-based progress counting. The gate is presentation-only; answer writes and imports do not depend on it.
 
-Merge dark, visually test both respondent lanes and Preview mode, then enable in production. Rollback is the kill switch plus redeploy; no data cleanup is needed.
+Merge dark, visually test both respondent lanes and Preview mode, then enable
+in production. Rollback is the kill switch plus a redeploy pinned to launch
+commit `d676aa77caf328afd113f297d90ca8d41d036caf`; a newer `main` tip must not
+silently change that source. No data cleanup is needed.
 
 ## Component boundary
 
