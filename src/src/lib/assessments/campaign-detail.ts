@@ -289,10 +289,15 @@ export async function getCampaignOverview(
       // Wave EV — the pinned edition, so the screen can say which one it serves.
       version: {
         // templateId comes from the VERSION, not the campaign: the two are
-        // independent FKs with no composite constraint tying them together, so
-        // sourcing it here is what makes the guard in resolveEditionStanding
-        // able to catch a mis-pinned campaign instead of comparing it against
-        // another instrument's numbering.
+        // independent FKs with no composite constraint tying them together.
+        // Sourcing it here gives the sibling QUERY the right comparison SCOPE —
+        // a mis-pinned campaign's served edition is compared against its own
+        // template's lineage, not another instrument's numbering.
+        //
+        // It does NOT make the templateId re-check in resolveEditionStanding
+        // able to fire: the query filters on this same value, so that check is
+        // tautological in production and is defense-in-depth against a future
+        // loosening of the query only.
         select: {
           templateId: true,
           versionNumber: true,

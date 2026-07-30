@@ -480,13 +480,17 @@ describe("getCampaignOverview — Wave EV edition standing", () => {
     const { select } = (
       db.assessmentTemplateVersion.findMany as jest.Mock
     ).mock.calls[0][0];
-    expect(Object.keys(select).sort()).toEqual([
-      "archivedAt",
-      "language",
-      "publishedAt",
-      "templateId",
-      "versionNumber",
-    ]);
+    // toEqual on VALUES, not Object.keys: Prisma reads `select: { f: false }` as
+    // an exclusion, so a truthiness flip would slip past a key-presence check and
+    // reopen the same reassuring-answer failure. Exact match also catches an
+    // extra key or a nested-select rewrite.
+    expect(select).toEqual({
+      templateId: true,
+      versionNumber: true,
+      language: true,
+      publishedAt: true,
+      archivedAt: true,
+    });
   });
 
   it("returns NULL — never a false 'you are current' — when the lookup fails", async () => {
