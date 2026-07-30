@@ -73,3 +73,35 @@ jobs:
         with:
           node-version-file: src/.nvmrc
       - run: node scripts/check-migration-safety.mjs
+
+  assessment-email-lease-postgres:
+    name: Assessment Email Lease (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: lease_test
+          POSTGRES_PASSWORD: lease_test
+          POSTGRES_DB: assessment_email_lease_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lease_test -d assessment_email_lease_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: src/.nvmrc
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Prove lease safety under mixed-row contention
+        env:
+          TEST_DATABASE_URL: "postgresql://lease_test:lease_test@localhost:5432/assessment_email_lease_test?schema=public"
+          ASSESSMENT_EMAIL_LEASE_TEST_ALLOW: "isolated-schema"
+        run: npm run test:assessment-email-lease-pg

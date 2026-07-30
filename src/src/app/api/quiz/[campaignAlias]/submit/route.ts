@@ -45,6 +45,7 @@ import {
   findActiveCoachByEmail,
   buildLeadEmail,
   lowestDecision,
+  normalizeMailbox,
   type RecipientRole,
 } from "@/lib/assessments/quick-assessment-lead";
 import {
@@ -308,6 +309,9 @@ export async function POST(
       };
       subject: string;
       bodyHtml: string;
+      status?: "CANCELLED";
+      cancelledAt?: Date;
+      cancelReason?: "SAME_MAILBOX_AS_TAKER";
     }> = [];
 
     // TAKER_COPY — always (the taker submitted their own email + consented).
@@ -323,18 +327,44 @@ export async function POST(
       });
     }
 
-    // REFERRING_COACH — full report (upgrade from the old lead alert), only
-    // when the open-relay guard resolved an active coach.
-    if (canonicalCoachEmail) {
-      const { subject, bodyHtml } = buildReportEmailHtml({
-        report: respondentReport,
-        recipientRole: "REFERRING_COACH",
+    // When the taker is the referring Coach (common during self-tests), their
+    // taker copy already contains the full report. Avoid a redundant second
+    // copy to the same mailbox.
+    const activeCoachEmail = normalizeMailbox(canonicalCoachEmail);
+    const takerEmail = normalizeMailbox(data.publicTaker.email);
+    const suppressCoachSelfNotification =
+      activeCoachEmail.length > 0 && activeCoachEmail === takerEmail;
+    if (suppressCoachSelfNotification) {
+      console.info("[assessment-email] coach self-notification suppressed", {
+        submissionScope: "public-quiz",
+        coachId: coach?.id ?? null,
       });
-      outboxPayloads.push({
-        recipient: { role: "REFERRING_COACH", email: canonicalCoachEmail },
-        subject,
-        bodyHtml,
-      });
+    }
+
+    // REFERRING_COACH — keep an explicit role row whenever an active coach
+    // resolved. Same-mailbox self-tests are retained as CANCELLED evidence
+    // instead of silently erasing the coach recipient role.
+    if (activeCoachEmail.length > 0) {
+      if (suppressCoachSelfNotification) {
+        outboxPayloads.push({
+          recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
+          subject: "",
+          bodyHtml: "",
+          status: "CANCELLED",
+          cancelledAt: now,
+          cancelReason: "SAME_MAILBOX_AS_TAKER",
+        });
+      } else {
+        const { subject, bodyHtml } = buildReportEmailHtml({
+          report: respondentReport,
+          recipientRole: "REFERRING_COACH",
+        });
+        outboxPayloads.push({
+          recipient: { role: "REFERRING_COACH", email: activeCoachEmail },
+          subject,
+          bodyHtml,
+        });
+      }
     }
 
     // SU_TEAM — unchanged lead-alert summary, only when an SU address is set.
@@ -390,6 +420,9 @@ export async function POST(
               emailType: "QUICK_ASSESSMENT_LEAD",
               subject: payload.subject,
               bodyHtml: payload.bodyHtml,
+              status: payload.status,
+              cancelledAt: payload.cancelledAt,
+              cancelReason: payload.cancelReason,
             },
           });
         }

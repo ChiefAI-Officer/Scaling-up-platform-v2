@@ -2,6 +2,11 @@
 
 > Status: APPROVED (brainstorm + frontend-design mockup approved by the user 2026-06-11). Build target.
 > Builds on Spec 15 (Quick Assessment) + ADR-0008 (public self-assessments show the taker their results in-place).
+>
+> Same-mailbox exception: Spec 19ao supersedes §3 when the taker and verified
+> Referring coach normalize to the same mailbox. That case sends the taker copy
+> only and retains a cancelled coach-role decision rather than sending two
+> copies to one inbox.
 
 ## Problem (from live testing)
 

@@ -30,6 +30,68 @@ Tracker item **#48 is complete and launched** within the explicit no-production-
 
 ---
 
+### 2026-07-30 — Assessment email duplicate-delivery hotfix implemented, cutover pending <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:assessment-email-lease-hotfix-implemented -->
+
+**Status: IMPLEMENTED on `codex/assessment-email-outbox-lease`; NOT LAUNCHED.**
+This is a narrow replacement for broad draft PR #248. It does not rebuild Jeff
+#83 Referred Results, add CSV export, enable a feature flag, merge, deploy, or
+cut over the production workers.
+
+The reported three-message mailbox had two causes: the taker and verified
+Referring coach normalized to one mailbox, creating two legitimate role rows,
+and the event/cron workers could race the same coach row. The approved Spec
+19ao behavior sends the taker copy only for a same-mailbox collision while
+retaining an empty `CANCELLED` coach-role row with reason
+`SAME_MAILBOX_AS_TAKER`.
+
+All assessment-email roles now use one atomic PostgreSQL claim. A
+`FOR UPDATE SKIP LOCKED` CTE selects a due row and, in the same statement,
+moves it to `SENDING`, increments attempts, and installs a unique lease token.
+Eligibility and expiry use PostgreSQL's clock. Completion, requeue, and
+terminal failure require the token; terminal failure and dead-letter audit are
+one transaction. SMTP delivery remains at-least-once: a crash after provider
+acceptance but before `SENT` persistence can still duplicate. The worker retries
+the `SENT` write without resending and emits a structured uncertainty signal
+even when the audit database path is unavailable.
+
+Event and cron share an environment-scoped Inngest concurrency key. The default
+cap is four and can be reduced with `ASSESSMENT_SMTP_CONCURRENCY`. The provider
+is Azure Communication Services over SMTP. Microsoft's documented ceiling of
+250 authenticated connections makes four connection-safe, but the initial
+custom-domain send quota is only 30 messages/minute and 100/hour unless the
+resource has an approved increase; Inngest concurrency is not rate limiting.
+The account-specific Azure quota and provider-backed load exercise remain
+follow-up capacity work, not launch blockers for this hotfix: it keeps the
+existing provider and email categories, constrains the previously unshared
+event/cron workers, and removes a known duplicate send path rather than adding
+intended volume.
+The PostgreSQL CI exercise now also races four workers over mixed
+`QUICK_ASSESSMENT_LEAD`, `ASSESSMENT_RESULTS`, and `COACH_COMPLETION` rows and
+fails on duplicates or an undrained row type. Because it uses a fake SMTP sink
+and calls the worker seam directly, provider throttling, Inngest scheduling, and
+the 30-minute pending-age budget remain explicit follow-up risks. The launch
+gate is the quiesced handoff: the cutover runbook requires both old workers to
+be paused and drained before the lease worker starts. Rolling deployment or a
+flag flip is not sufficient.
+
+The additive migration
+`20260730040000_add_assessment_outbox_leases` was already applied to production
+by PR #248's Vercel preview because that preview was connected to the shared
+database. Its checksum is therefore frozen. The overlapping later migration
+failed before applying any step, was marked rolled back, and Prisma subsequently
+reported the production ledger healthy. Reserved provenance/generation columns
+remain inert; removing the redundant index is deferred until measured rather
+than rewriting an applied migration.
+
+A focused CI job now races independent Prisma/PostgreSQL connections inside a
+random isolated schema and requires exactly one lease. Local mock-seam coverage
+also pins same-mailbox suppression, token-guarded transitions, no deliberate
+requeue after SMTP success, terminal audit atomicity, and original-error
+preservation. Final validation receipts and the replacement draft PR are added
+only after they actually pass.
+
+---
+
 ### 2026-07-30 — July-10 session closeouts: #59, #67, #70, and #71 <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:jeff-jul10-session-closeouts-59-67-70-71 -->
 
 Four July-10 assessment rows were closed from shipped code plus fresh production evidence; none required a new feature implementation in this branch.

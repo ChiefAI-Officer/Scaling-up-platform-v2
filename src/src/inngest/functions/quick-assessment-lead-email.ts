@@ -1,44 +1,120 @@
 /**
- * Inngest Function: Quick Assessment Lead Email Worker
+ * Shared assessment-email outbox worker.
  *
- * Drains the AssessmentEmailOutbox for a submission, sending each PENDING row
- * via SMTP with exponential-backoff retries and idempotency.
- *
- * Design for testability: the drain logic lives in `drainLeadOutbox` (pure of
- * globals, injected deps), and the Inngest fn is a thin wrapper — mirroring
- * the landing-page runner pattern used across this codebase.
+ * Event and cron invocations both claim one row at a time through a database
+ * lease. The claim is the only transition that increments attempts, so two
+ * overlapping invocations cannot both hand the same row to SMTP.
  */
 
+import { randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { inngest } from "@/inngest/client";
 import { db } from "@/lib/db";
 import { sendEmailViaSMTP } from "@/lib/smtp-transport";
 
-// ---------------------------------------------------------------------------
-// Interfaces
-// ---------------------------------------------------------------------------
+const DEFAULT_LEASE_MS = 600_000;
+const DEFAULT_INVOCATION_BUDGET_MS = 45_000;
+const DEFAULT_EVENT_ROWS = 10;
+const DEFAULT_CRON_ROWS = 50;
+const DEFAULT_MAX_ATTEMPTS = 5;
+const DEFAULT_COMPLETION_RETRIES = 3;
+const DEFAULT_SMTP_CONCURRENCY = 4;
 
-export interface OutboxDb {
+const ASSESSMENT_SMTP_CONCURRENCY = {
+  scope: "env" as const,
+  key: '"assessment-email-smtp"',
+  limit: assessmentSmtpConcurrencyLimit(),
+};
+
+export function assessmentSmtpConcurrencyLimit(
+  configuredValue = process.env.ASSESSMENT_SMTP_CONCURRENCY,
+): number {
+  if (configuredValue === undefined) return DEFAULT_SMTP_CONCURRENCY;
+  const parsed = Number(configuredValue);
+  return Number.isSafeInteger(parsed) && parsed > 0
+    ? parsed
+    : DEFAULT_SMTP_CONCURRENCY;
+}
+
+export interface ClaimedOutboxRow {
+  id: string;
+  submissionId: string;
+  recipientEmail: string;
+  recipientRole: string;
+  emailType: string;
+  subject: string;
+  bodyHtml: string;
+  status: "SENDING";
+  attempts: number;
+  leaseToken: string;
+  leaseExpiresAt: Date;
+  recoveredExpiredLease: boolean;
+}
+
+interface UpdateManyResult {
+  count: number;
+}
+
+export interface OutboxTransactionDb {
   assessmentEmailOutbox: {
-    findMany(args: unknown): Promise<
-      Array<{
-        id: string;
-        recipientEmail: string;
-        recipientRole: string;
-        subject: string;
-        bodyHtml: string;
-        status: string;
-        attempts: number;
-      }>
-    >;
-    update(args: unknown): Promise<unknown>;
+    updateMany(args: unknown): Promise<UpdateManyResult>;
   };
+  auditLog: {
+    create(args: unknown): Promise<unknown>;
+  };
+}
+
+export interface OutboxDb extends OutboxTransactionDb {
+  $queryRaw<T>(query: Prisma.Sql): Promise<T>;
+  $transaction<T>(
+    callback: (tx: OutboxTransactionDb) => Promise<T>,
+  ): Promise<T>;
+}
+
+export interface ClaimInput {
+  submissionId: string | null;
+  leaseToken: string;
+  leaseMs: number;
+}
+
+export interface DeadLetterInput {
+  submissionId: string;
+  outboxId: string;
+  recipientRole: string;
+  attempts: number;
+  errorClass: string;
+}
+
+export interface TerminalFailureInput extends DeadLetterInput {
+  leaseToken: string;
+  lastError: string;
+  nextAttemptAt: Date;
+}
+
+export interface DeliveryUncertainInput extends DeadLetterInput {
+  reason:
+    | "EXPIRED_LEASE_RECOVERED"
+    | "LEASE_COMPLETION_LOST"
+    | "SENT_STATE_PERSISTENCE_FAILED";
 }
 
 export interface DrainDeps {
   db: OutboxDb;
   sendEmail: (o: { to: string; subject: string; html: string }) => Promise<void>;
+  claimNext?: (input: ClaimInput) => Promise<ClaimedOutboxRow | null>;
+  finalizeTerminalFailure?: (
+    input: TerminalFailureInput,
+  ) => Promise<boolean>;
+  recordDeliveryUncertain?: (
+    input: DeliveryUncertainInput,
+  ) => Promise<void>;
   now?: () => Date;
+  makeLeaseToken?: () => string;
   maxAttempts?: number;
+  maxRows?: number;
+  leaseMs?: number;
+  invocationBudgetMs?: number;
+  completionRetries?: number;
 }
 
 export interface DrainResult {
@@ -47,180 +123,407 @@ export interface DrainResult {
   skipped: number;
 }
 
-// ---------------------------------------------------------------------------
-// Pure drain logic (fully injectable, no global DB/SMTP references)
-// ---------------------------------------------------------------------------
+/**
+ * Atomically claims the oldest due row. Expired SENDING leases are reclaimable;
+ * FOR UPDATE SKIP LOCKED prevents a competing worker from selecting the same
+ * candidate before the UPDATE installs its token.
+ */
+export async function claimNextOutboxRow(
+  claimDb: Pick<OutboxDb, "$queryRaw">,
+  input: ClaimInput,
+): Promise<ClaimedOutboxRow | null> {
+  const submissionClause = input.submissionId
+    ? Prisma.sql`AND "submissionId" = ${input.submissionId}`
+    : Prisma.empty;
+
+  const rows = await claimDb.$queryRaw<ClaimedOutboxRow[]>(Prisma.sql`
+    WITH candidate AS (
+      SELECT "id", ("status" = 'SENDING') AS "recoveredExpiredLease"
+      FROM "assessment_email_outbox"
+      WHERE "cancelledAt" IS NULL
+      AND (
+        (
+          "status" = 'PENDING'
+          AND "nextAttemptAt" <= (statement_timestamp() AT TIME ZONE 'UTC')
+        )
+        OR (
+          "status" = 'SENDING'
+          AND "leaseExpiresAt" <= (statement_timestamp() AT TIME ZONE 'UTC')
+        )
+      )
+      ${submissionClause}
+      ORDER BY "nextAttemptAt" ASC, "createdAt" ASC, "id" ASC
+      FOR UPDATE SKIP LOCKED
+      LIMIT 1
+    )
+    UPDATE "assessment_email_outbox" AS outbox
+    SET
+      "status" = 'SENDING',
+      "leaseToken" = ${input.leaseToken},
+      "leaseExpiresAt" =
+        (statement_timestamp() AT TIME ZONE 'UTC')
+        + (${input.leaseMs} * INTERVAL '1 millisecond'),
+      "attempts" = outbox."attempts" + 1,
+      "updatedAt" = (statement_timestamp() AT TIME ZONE 'UTC')
+    FROM candidate
+    WHERE outbox."id" = candidate."id"
+    RETURNING
+      outbox."id",
+      outbox."submissionId",
+      outbox."recipientEmail",
+      outbox."recipientRole",
+      outbox."emailType",
+      outbox."subject",
+      outbox."bodyHtml",
+      outbox."status",
+      outbox."attempts",
+      outbox."leaseToken",
+      outbox."leaseExpiresAt",
+      candidate."recoveredExpiredLease"
+  `);
+
+  return rows[0] ?? null;
+}
+
+function errorClassOf(error: unknown): string {
+  if (error instanceof Error && error.name.trim()) return error.name;
+  return typeof error;
+}
+
+function errorMessageOf(error: unknown): string {
+  const value = error instanceof Error ? error.message : String(error);
+  return value.slice(0, 2_000);
+}
+
+async function defaultRecordDeliveryUncertain(
+  auditDb: Pick<OutboxTransactionDb, "auditLog">,
+  input: DeliveryUncertainInput,
+): Promise<void> {
+  await auditDb.auditLog.create({
+    data: {
+      entityType: "AssessmentEmailOutbox",
+      entityId: input.outboxId,
+      action: "ASSESSMENT_EMAIL_DELIVERY_UNCERTAIN",
+      performedBy: "assessment-email-worker",
+      changes: JSON.stringify({
+        submissionId: input.submissionId,
+        recipientRole: input.recipientRole,
+        attempts: input.attempts,
+        errorClass: input.errorClass,
+        reason: input.reason,
+      }),
+    },
+  });
+}
+
+async function recordDeliveryUncertainty(
+  recorder: (input: DeliveryUncertainInput) => Promise<void>,
+  input: DeliveryUncertainInput,
+): Promise<void> {
+  const signal = {
+    submissionId: input.submissionId,
+    outboxId: input.outboxId,
+    recipientRole: input.recipientRole,
+    attempts: input.attempts,
+    errorClass: input.errorClass,
+    reason: input.reason,
+  };
+  console.error("[assessment-email] delivery outcome uncertain", signal);
+  try {
+    await recorder(input);
+  } catch (auditError) {
+    console.error("[assessment-email] uncertainty audit persistence failed", {
+      ...signal,
+      auditErrorClass: errorClassOf(auditError),
+    });
+    throw auditError;
+  }
+}
 
 /**
- * Drains the AssessmentEmailOutbox for a given submission.
- *
- * - Loads PENDING rows where nextAttemptAt <= now.
- * - For each row calls sendEmail; on success marks SENT + sentAt.
- * - On throw: increments attempts + records lastError; if attempts+1 >= maxAttempts
- *   marks FAILED, otherwise stays PENDING with exponential nextAttemptAt backoff
- *   (2^attempts minutes).
- * - Re-runs are idempotent: no SENT rows are returned by findMany so they are
- *   never re-sent.
+ * Token-guards the terminal transition and writes its audit in the same
+ * transaction. A stale worker that lost its lease writes neither.
+ */
+export async function finalizeTerminalFailure(
+  outboxDb: Pick<OutboxDb, "$transaction">,
+  input: TerminalFailureInput,
+): Promise<boolean> {
+  return outboxDb.$transaction(async (tx) => {
+    const completion = await tx.assessmentEmailOutbox.updateMany({
+      where: {
+        id: input.outboxId,
+        status: "SENDING",
+        leaseToken: input.leaseToken,
+      },
+      data: {
+        status: "FAILED",
+        lastError: input.lastError,
+        nextAttemptAt: input.nextAttemptAt,
+        leaseToken: null,
+        leaseExpiresAt: null,
+        bodyHtml: "",
+      },
+    });
+    if (completion.count !== 1) return false;
+
+    await tx.auditLog.create({
+      data: {
+        entityType: "AssessmentEmailOutbox",
+        entityId: input.outboxId,
+        action: "ASSESSMENT_EMAIL_DEAD_LETTER",
+        performedBy: "assessment-email-worker",
+        changes: JSON.stringify({
+          submissionId: input.submissionId,
+          recipientRole: input.recipientRole,
+          attempts: input.attempts,
+          errorClass: input.errorClass,
+        }),
+      },
+    });
+    return true;
+  });
+}
+
+async function completeSentWithRetry(
+  outboxDb: Pick<OutboxTransactionDb, "assessmentEmailOutbox">,
+  row: ClaimedOutboxRow,
+  sentAt: Date,
+  maxAttempts: number,
+): Promise<UpdateManyResult> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await outboxDb.assessmentEmailOutbox.updateMany({
+        where: {
+          id: row.id,
+          status: "SENDING",
+          leaseToken: row.leaseToken,
+        },
+        data: {
+          status: "SENT",
+          sentAt,
+          bodyHtml: "",
+          leaseToken: null,
+          leaseExpiresAt: null,
+          lastError: null,
+        },
+      });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Drains either one submission (event path) or the global oldest-due queue
+ * (cron path). Claims happen only inside the sequential send slot and before
+ * the invocation budget is exhausted.
  */
 export async function drainLeadOutbox(
   deps: DrainDeps,
-  submissionId: string
+  submissionId: string | null,
 ): Promise<DrainResult> {
-  const now = deps.now ? deps.now() : new Date();
-  const maxAttempts = deps.maxAttempts ?? 5;
+  const currentTime = deps.now ?? (() => new Date());
+  const makeLeaseToken = deps.makeLeaseToken ?? randomUUID;
+  const maxAttempts = deps.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  const maxRows =
+    deps.maxRows ??
+    (submissionId === null ? DEFAULT_CRON_ROWS : DEFAULT_EVENT_ROWS);
+  const leaseMs = deps.leaseMs ?? DEFAULT_LEASE_MS;
+  const invocationBudgetMs =
+    deps.invocationBudgetMs ?? DEFAULT_INVOCATION_BUDGET_MS;
+  const completionRetries = Math.max(
+    1,
+    deps.completionRetries ?? DEFAULT_COMPLETION_RETRIES,
+  );
+  const claimNext =
+    deps.claimNext ??
+    ((input: ClaimInput) => claimNextOutboxRow(deps.db, input));
+  const finalizeFailure =
+    deps.finalizeTerminalFailure ??
+    ((input: TerminalFailureInput) =>
+      finalizeTerminalFailure(deps.db, input));
+  const recordDeliveryUncertain =
+    deps.recordDeliveryUncertain ??
+    ((input: DeliveryUncertainInput) =>
+      defaultRecordDeliveryUncertain(deps.db, input));
 
-  // TODO(wave-e follow-up): the drain does not re-check results-email approval at SEND time; an approval revoked AFTER enqueue but before drain still sends. Broader Wave-D outbox concern (see co-validate C-M2 / R2-H2).
-  const rows = await deps.db.assessmentEmailOutbox.findMany({
-    where: {
-      submissionId,
-      status: "PENDING",
-      nextAttemptAt: { lte: now },
-    },
-  });
-
+  const startedAt = currentTime().getTime();
   let sent = 0;
   let failed = 0;
-  const skipped = 0;
+  let skipped = 0;
 
-  for (const row of rows) {
+  for (let index = 0; index < maxRows; index += 1) {
+    const claimNow = currentTime();
+    if (claimNow.getTime() - startedAt >= invocationBudgetMs) break;
+
+    const leaseToken = makeLeaseToken();
+    const row = await claimNext({
+      submissionId,
+      leaseToken,
+      leaseMs,
+    });
+    if (!row) break;
+
+    if (row.recoveredExpiredLease) {
+      // A prior worker may have reached SMTP before losing its lease. Persist
+      // the duplicate-risk signal before attempting another delivery.
+      await recordDeliveryUncertainty(recordDeliveryUncertain, {
+        submissionId: row.submissionId,
+        outboxId: row.id,
+        recipientRole: row.recipientRole,
+        attempts: row.attempts,
+        errorClass: "ExpiredLease",
+        reason: "EXPIRED_LEASE_RECOVERED",
+      });
+    }
+
+    let sendError: unknown;
     try {
       await deps.sendEmail({
         to: row.recipientEmail,
         subject: row.subject,
         html: row.bodyHtml,
       });
+    } catch (error) {
+      sendError = error;
+    }
 
-      await deps.db.assessmentEmailOutbox.update({
-        where: { id: row.id },
-        data: {
-          status: "SENT",
-          sentAt: now,
-          // SEC-M4: bodyHtml holds rendered PII (the respondent's full report).
-          // Purge it once the row is terminal — the column is NOT NULL, so we
-          // clear to "" rather than null.
-          bodyHtml: "",
-        },
+    if (sendError === undefined) {
+      try {
+        const completion = await completeSentWithRetry(
+          deps.db,
+          row,
+          currentTime(),
+          completionRetries,
+        );
+        if (completion.count === 1) {
+          sent += 1;
+        } else {
+          await recordDeliveryUncertainty(recordDeliveryUncertain, {
+            submissionId: row.submissionId,
+            outboxId: row.id,
+            recipientRole: row.recipientRole,
+            attempts: row.attempts,
+            errorClass: "LeaseOwnershipLost",
+            reason: "LEASE_COMPLETION_LOST",
+          });
+          skipped += 1;
+        }
+      } catch (persistenceError) {
+        // SMTP accepted the message. Never reclassify this as a transport
+        // failure or requeue it deliberately. Keep the token-owned lease/body
+        // intact and surface the unavoidable at-least-once uncertainty.
+        try {
+          await recordDeliveryUncertainty(recordDeliveryUncertain, {
+            submissionId: row.submissionId,
+            outboxId: row.id,
+            recipientRole: row.recipientRole,
+            attempts: row.attempts,
+            errorClass: errorClassOf(persistenceError),
+            reason: "SENT_STATE_PERSISTENCE_FAILED",
+          });
+        } catch {
+          // The structured fallback above is durable outside the failing DB
+          // path. Preserve the original SENT-state persistence error.
+        }
+        throw persistenceError;
+      }
+      continue;
+    }
+
+    const failureNow = currentTime();
+    const backoffMs = Math.pow(2, row.attempts) * 60_000;
+    const nextAttemptAt = new Date(failureNow.getTime() + backoffMs);
+    const terminal = row.attempts >= maxAttempts;
+    if (terminal) {
+      const finalized = await finalizeFailure({
+        submissionId: row.submissionId,
+        outboxId: row.id,
+        recipientRole: row.recipientRole,
+        attempts: row.attempts,
+        errorClass: errorClassOf(sendError),
+        leaseToken: row.leaseToken,
+        lastError: errorMessageOf(sendError),
+        nextAttemptAt,
       });
+      if (finalized) {
+        failed += 1;
+      } else {
+        skipped += 1;
+      }
+      continue;
+    }
 
-      sent++;
-    } catch (err) {
-      const newAttempts = row.attempts + 1;
-      const lastError =
-        err instanceof Error ? err.message : String(err);
+    const completion = await deps.db.assessmentEmailOutbox.updateMany({
+      where: {
+        id: row.id,
+        status: "SENDING",
+        leaseToken: row.leaseToken,
+      },
+      data: {
+        status: "PENDING",
+        lastError: errorMessageOf(sendError),
+        nextAttemptAt,
+        leaseToken: null,
+        leaseExpiresAt: null,
+      },
+    });
 
-      // Exponential backoff: 2^attempts minutes
-      const backoffMs = Math.pow(2, row.attempts) * 60 * 1000;
-      const nextAttemptAt = new Date(now.getTime() + backoffMs);
-
-      const newStatus = newAttempts >= maxAttempts ? "FAILED" : "PENDING";
-
-      await deps.db.assessmentEmailOutbox.update({
-        where: { id: row.id },
-        data: {
-          attempts: newAttempts,
-          lastError,
-          status: newStatus,
-          nextAttemptAt,
-          // SEC-M4: on a TERMINAL failure the row is never re-sent, so purge the
-          // rendered-PII body. A still-PENDING row keeps its body for retry.
-          ...(newStatus === "FAILED" ? { bodyHtml: "" } : {}),
-        },
+    if (completion.count === 1) {
+      failed += 1;
+    } else {
+      await recordDeliveryUncertainty(recordDeliveryUncertain, {
+        submissionId: row.submissionId,
+        outboxId: row.id,
+        recipientRole: row.recipientRole,
+        attempts: row.attempts,
+        errorClass: "LeaseOwnershipLost",
+        reason: "LEASE_COMPLETION_LOST",
       });
-
-      failed++;
+      skipped += 1;
     }
   }
 
   return { sent, failed, skipped };
 }
 
-// ---------------------------------------------------------------------------
-// Inngest function — thin wrapper around drainLeadOutbox
-// ---------------------------------------------------------------------------
-
 export const quickAssessmentLeadEmail = inngest.createFunction(
-  { id: "quick-assessment-lead-email", retries: 3 },
+  {
+    id: "quick-assessment-lead-email",
+    retries: 3,
+    concurrency: ASSESSMENT_SMTP_CONCURRENCY,
+  },
   { event: "assessment/quick-lead.enqueued" },
-  async ({ event, step }) => {
-    const { submissionId } = event.data;
-
-    const result = await step.run("drain-lead-outbox", () =>
+  async ({ event, step }) =>
+    step.run("drain-lead-outbox", () =>
       drainLeadOutbox(
         {
           db: db as unknown as OutboxDb,
           sendEmail: ({ to, subject, html }) =>
             sendEmailViaSMTP({ to, subject, html }),
         },
-        submissionId
-      )
-    );
-
-    return result;
-  }
+        event.data.submissionId,
+      ),
+    ),
 );
 
-// ---------------------------------------------------------------------------
-// Scheduled cron drain — the durable retry driver
-// ---------------------------------------------------------------------------
-//
-// The event-triggered fn above handles the immediate first attempt. But a row
-// left PENDING (transient SMTP failure, or an inngest.send that never fired
-// because of an outage) would otherwise never be re-attempted — drainLeadOutbox
-// swallows send errors so the step.run succeeds and Inngest's own retries never
-// engage. This cron is what makes the per-row exponential backoff + maxAttempts
-// bookkeeping actually live: every few minutes it finds submissions with PENDING
-// rows that are now due (nextAttemptAt <= now) and re-drains them.
-
-export interface DueScanDb {
-  assessmentEmailOutbox: {
-    findMany(args: unknown): Promise<Array<{ submissionId: string }>>;
-  };
-}
-
-/**
- * Returns the distinct submissionIds that have at least one PENDING outbox row
- * due for a (re)send (nextAttemptAt <= now). Bounded by `limit` so a backlog
- * can't blow up a single cron tick.
- */
-export async function listSubmissionsWithDueOutbox(
-  db: DueScanDb,
-  now: Date,
-  limit = 200,
-): Promise<string[]> {
-  const rows = await db.assessmentEmailOutbox.findMany({
-    where: { status: "PENDING", nextAttemptAt: { lte: now } },
-    select: { submissionId: true },
-    distinct: ["submissionId"],
-    take: limit,
-  });
-  return rows.map((r) => r.submissionId);
-}
-
 export const quickAssessmentLeadEmailCron = inngest.createFunction(
-  { id: "quick-assessment-lead-email-cron" },
-  { cron: "*/3 * * * *" },
-  async ({ step }) => {
-    const submissionIds = await step.run("scan-due-outbox", () =>
-      listSubmissionsWithDueOutbox(db as unknown as DueScanDb, new Date()),
-    );
-
-    let totalSent = 0;
-    let totalFailed = 0;
-    for (const submissionId of submissionIds) {
-      const r = await step.run(`drain-${submissionId}`, () =>
-        drainLeadOutbox(
-          {
-            db: db as unknown as OutboxDb,
-            sendEmail: ({ to, subject, html }) =>
-              sendEmailViaSMTP({ to, subject, html }),
-          },
-          submissionId,
-        ),
-      );
-      totalSent += r.sent;
-      totalFailed += r.failed;
-    }
-
-    return { submissions: submissionIds.length, totalSent, totalFailed };
+  {
+    id: "quick-assessment-lead-email-cron",
+    concurrency: ASSESSMENT_SMTP_CONCURRENCY,
   },
+  { cron: "*/3 * * * *" },
+  async ({ step }) =>
+    step.run("drain-global-assessment-outbox", () =>
+      drainLeadOutbox(
+        {
+          db: db as unknown as OutboxDb,
+          sendEmail: ({ to, subject, html }) =>
+            sendEmailViaSMTP({ to, subject, html }),
+        },
+        null,
+      ),
+    ),
 );
