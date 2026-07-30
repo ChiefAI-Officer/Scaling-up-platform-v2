@@ -1395,6 +1395,28 @@ function validateExactFlagEntry(entry) {
   if (new Set(entry.target).size !== entry.target.length) {
     throw new Error(`Malformed exact-key entry for ${entry.key}: duplicate targets`);
   }
+  if (
+    Object.hasOwn(entry, "customEnvironmentIds") &&
+    (
+      !Array.isArray(entry.customEnvironmentIds) ||
+      entry.customEnvironmentIds.some(
+        (id) => typeof id !== "string" || id.length === 0,
+      ) ||
+      new Set(entry.customEnvironmentIds).size !== entry.customEnvironmentIds.length
+    )
+  ) {
+    throw new Error(
+      `Malformed exact-key entry for ${entry.key}: invalid customEnvironmentIds[]`,
+    );
+  }
+  if (
+    Array.isArray(entry.customEnvironmentIds) &&
+    entry.customEnvironmentIds.length > 0
+  ) {
+    throw new Error(
+      `Refusing custom-environment entry for ${entry.key}; resolve it manually`,
+    );
+  }
   const knownTargets = new Set(["production", "preview", "development"]);
   if (entry.target.some((target) => !knownTargets.has(target))) {
     throw new Error(`Refusing custom target shape for ${entry.key}`);
@@ -1411,6 +1433,7 @@ function flagReceipt(entry) {
     value: Object.hasOwn(entry, "value") ? entry.value : "[unreadable]",
     type: entry.type,
     target: entry.target,
+    customEnvironmentIds: entry.customEnvironmentIds ?? [],
   };
 }
 
@@ -1768,7 +1791,9 @@ or unreadable value. It validates the environment response object, `envs[]`, and
 every exact-key entry before any mutation. It preserves exact-key entries whose
 validated targets are disjoint from production, deletes only entries targeted
 exactly to `["production"]`, and fails before any delete if an entry mixes
-production with Preview/Development or has an ambiguous/custom target shape.
+production with Preview/Development, has an ambiguous/custom target shape, or
+has any nonempty `customEnvironmentIds` attachment. Custom-environment entries
+must be resolved manually and are never deleted by this runner.
 
 After deletion it proves that no production-targeting entry remains and that
 the non-production receipt is unchanged. It then creates one entry through
