@@ -6,9 +6,25 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+### 2026-07-30 — Consolidated mapping correction: GH #238 is a Jeff #64 follow-up, not a new PDF item <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:issue-238-jeff-number-mapping-corrected -->
+
+**Status: SOURCE-OF-TRUTH CORRECTED; no runtime change.** The July-10 feedback report and GitHub use independent number spaces. The work launched in PR [#255](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/255) closed **GitHub issue #238**, but there is no numbered “#238” item in `Scaling-Up-Assessment-Feedback-Report-2026-07-10.pdf`.
+
+The correct consolidated mapping is:
+
+- **July-10 PDF item #64 — Complete before this work.** Item #64 asks to split the combined LVA report action into separate **Print** and **Download** buttons. That original request shipped in PR #208 and is recorded below in `jeff-jul10-forks-72-64`.
+- **GitHub #238 — Complete follow-up to PDF #64.** PR #255 reused the already-shipped Print/Download control on the public quiz's one-time result screen. The PDF does not list this public-quiz retention gap as its own numbered item. In Jeff-facing reporting, label it **“#64 follow-up — Public Quiz Print/Download”** rather than claiming a newly completed PDF item.
+- **July-10 PDF item #83 — Not completed by GitHub #238.** PDF #83 asks whether public-quiz submissions/results are recorded and visible to the coach associated with the link. PR #205 surfaced public submissions to admins but not result/score detail or coach-facing access, so the existing SoT classification remains **partial**.
+
+**Consolidated progress statement:** PDF #64 remains complete; its unnumbered public-quiz follow-up is also complete; PDF #83 remains a separate partial item. This correction changes reporting only—no code, schema, flag, deployment behavior, or production data.
+
+---
+
 ### 2026-07-30 — Issue #238: public quiz takers can keep their one-time report <!-- ENTRY_ISO:2026-07-30 ENTRY_SLUG:issue-238-public-quiz-print-download-launched -->
 
 **Status: LAUNCHED on production (PR [#255](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/255), merged 2026-07-30 13:40:41 UTC as `15cfdd5cc5bd0cd38b5c47f35ca7dbb525d9e692`; deployment `dpl_AoW4aC4XL2qZ5LB6pFnm8BztoS12`, `scaling-up-platform-v2-h05onegdc-scaling-up.vercel.app`).** GitHub issue [#238](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/issues/238) is closed. The exact merged-source deployment reached Ready and owns both production aliases, `platformtest.scalingup.com` and `scaling-up-platform-v2.vercel.app`.
+
+**Jeff tracker mapping:** this is an unnumbered follow-up to July-10 PDF item #64, not a new numbered PDF item. The original #64 Print/Download split had already shipped in PR #208. This public-quiz extension does not complete PDF item #83.
 
 The public quiz already rendered the full branded report immediately after submission, but unlike the authenticated report surfaces it omitted the shared `PrintReportButton`. That was a retention defect because the public result is deliberately one-time: a taker who navigated away had no supported way to keep it.
 
