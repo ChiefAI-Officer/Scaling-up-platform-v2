@@ -1150,23 +1150,38 @@ Compare the flag-on screen with `docs/specs/v7.6/mockups/48-qsp-core-values-prog
 > exercise Add/focus/restore because Preview is read-only and ED1 Test Mode is
 > draft-only. The canonical local environment may target shared production
 > data, and this workspace had no isolated Postgres path, so no shared-data
-> draft was created. Instead, a temporary uncommitted DB-free Next route
-> mounted the real production `QspStoryGroup`, canonical three-question
-> fixture, local React answer state, and `wireframes-scoped.css`. Direct browser
-> review proved Add once reveals slot 2 and focuses
+> draft was created. The first temporary harness was insufficient for styling:
+> it used the nonexistent `wireframe-scope` class, so its interactive state
+> proof survived but its production-CSS claim and screenshots did not. A fresh
+> temporary uncommitted DB-free Next route corrected that mistake by mounting
+> the real production `QspStoryGroup`, canonical three-question fixture, local
+> React answer state, and `wireframes-scoped.css` inside the exact relevant
+> `SectionPager` ancestry: `main.wf-scope`,
+> `.su-assessment-brand.survey-section`, `ul.survey-question-list`, and
+> `li.survey-question.qsp-story-question`. Direct browser review proved the
+> initial one-field state; Add once reveals slot 2 and focuses
 > `q-P1_core_values_story_2`; Add twice reveals slot 3, focuses
 > `q-P1_core_values_story_3`, and removes Add; and a fresh restored-slot-3
-> initial state renders all three fields with the slot-3 value. Three
-> screenshots were saved outside git, and the temporary route was removed
-> completely. This harness evidence is not represented as editor Preview or
-> Test Mode evidence.
+> initial state renders all three fields with the slot-3 value. Computed styles
+> confirmed the production purple token, white 14px-radius/28px-padding
+> question card, purple focus-within border/shadow, grid prompt row, purple
+> 48px Q mark, and tinted 12px-radius story entries. Corrected browser DOM and
+> computed-style receipts were saved outside git. The connected Chrome adapter
+> did not support screenshot capture, so the superseded harness PNGs are not
+> claimed as production-styling evidence; the real editor Preview screenshots
+> remain the desktop/mobile visual evidence. After the source route was
+> removed, a clean production build passed. Its retained `.next/dev` cache was
+> moved recoverably to `/tmp/qsp48-next-dev-cache-add882f5`; exact searches
+> found no route path, source name, file path, or manifest entry in the
+> remaining `.next`. This harness evidence is not represented as editor
+> Preview or Test Mode evidence.
 
 - [x] **Step 4: Update implementation status**
 
 In the design, set:
 
 ```md
-**Status:** BUILT behind a default-off flag; visual validation complete via published Preview plus a temporary DB-free real-component harness; pending PR review and production launch
+**Status:** BUILT behind a default-off flag; visual validation complete via published Preview plus a corrected DB-free production-context component harness; pending PR review and production launch
 ```
 
 Check every completed implementation step in this plan. In `CLAUDE.md`, advance `LAST_UPDATED_ISO` and `LAST_UPDATED_SLUG` to a `jeff-48-qsp-story-group-built` entry. Prepend a detailed `plans/CHANGELOG.md` entry recording:
