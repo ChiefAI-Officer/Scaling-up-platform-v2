@@ -10,6 +10,7 @@
     "lint:fix": "eslint --fix",
     "type-check": "tsc --noEmit",
     "test": "jest",
+    "test:assessment-email-lease-pg": "jest --config jest.pg.config.js --runInBand",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",

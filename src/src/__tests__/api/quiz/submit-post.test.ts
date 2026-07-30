@@ -19,12 +19,37 @@ jest.mock("next/server", () => ({
   },
 }));
 
-jest.mock("@/lib/db", () => ({
-  db: {
-    assessmentCampaign: { findUnique: jest.fn() },
-    assessmentTemplateVersion: { findUnique: jest.fn() },
-    assessmentSubmission: { create: jest.fn() },
-  },
+jest.mock("@/lib/db", () => {
+  const assessmentSubmission = { create: jest.fn() };
+  const assessmentEmailOutbox = { create: jest.fn() };
+  return {
+    db: {
+      assessmentCampaign: { findUnique: jest.fn() },
+      assessmentTemplateVersion: { findUnique: jest.fn() },
+      assessmentSubmission,
+      assessmentEmailOutbox,
+      $transaction: jest.fn(
+        (
+          callback: (tx: {
+            assessmentSubmission: { create: jest.Mock };
+            assessmentEmailOutbox: { create: jest.Mock };
+          }) => Promise<unknown>,
+        ) =>
+          callback({
+            assessmentSubmission,
+            assessmentEmailOutbox,
+          }),
+      ),
+    },
+  };
+});
+
+jest.mock("@/inngest/client", () => ({
+  inngest: { send: jest.fn().mockResolvedValue(undefined) },
+}));
+
+jest.mock("@/lib/audit", () => ({
+  logAudit: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("@/lib/rate-limit", () => ({

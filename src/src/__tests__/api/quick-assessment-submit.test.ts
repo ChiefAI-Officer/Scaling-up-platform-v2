@@ -437,6 +437,58 @@ describe("outbox enqueue", () => {
     expect(roles).not.toContain("REFERRING_COACH");
   });
 
+  it("retains a cancelled coach row when taker and coach normalize to the same mailbox", async () => {
+    process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
+    (db.coach.findUnique as jest.Mock).mockResolvedValue({
+      id: "coach-1",
+      email: " JANE@EXAMPLE.COM ",
+      firstName: "Jane",
+      lastName: "Coach",
+      certificationStatus: "ACTIVE",
+      certificationExpiry: null,
+    });
+    const info = jest.spyOn(console, "info").mockImplementation(() => undefined);
+
+    await POST(
+      makeRequest({
+        ...VALID_BODY,
+        referringCoachEmail: "jane@example.com",
+      }) as never,
+      makeParams() as never,
+    );
+
+    expect(enqueuedRoles()).toEqual([
+      "TAKER_COPY",
+      "REFERRING_COACH",
+      "SU_TEAM",
+    ]);
+    const coachRow = txMock.assessmentEmailOutbox.create.mock.calls
+      .map(
+        (call: Array<{ data: Record<string, unknown> }>) =>
+          call[0].data,
+      )
+      .find((row) => row.recipientRole === "REFERRING_COACH");
+    expect(coachRow).toEqual(
+      expect.objectContaining({
+        recipientEmail: "jane@example.com",
+        recipientRole: "REFERRING_COACH",
+        subject: "",
+        bodyHtml: "",
+        status: "CANCELLED",
+        cancelReason: "SAME_MAILBOX_AS_TAKER",
+        cancelledAt: expect.any(Date),
+      }),
+    );
+    expect(info).toHaveBeenCalledWith(
+      "[assessment-email] coach self-notification suppressed",
+      expect.objectContaining({
+        submissionScope: "public-quiz",
+        coachId: "coach-1",
+      }),
+    );
+    info.mockRestore();
+  });
+
   it("outbox rows are created inside the transaction (via txMock)", async () => {
     process.env.QUICK_ASSESSMENT_TEAM_EMAIL = "team@scalingup.com";
     // Verify it's txMock.assessmentEmailOutbox.create being called (not db.assessmentEmailOutbox)
