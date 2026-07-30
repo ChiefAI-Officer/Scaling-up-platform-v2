@@ -489,8 +489,9 @@ export async function getCampaignRespondents(
  * deliberately return our own narrow row shapes, which do not overlap Prisma's
  * generic delegate signatures, so `prisma as CampaignDetailDb` is rejected and a
  * double cast is unavoidable. That means declaring a delegate REQUIRED on the
- * interface constrains test mocks only — it buys nothing at the three production
- * call sites, all of which go through the bridge.
+ * interface constrains test mocks only — it buys nothing at the four call sites
+ * that go through the bridge (three reach getCampaignOverview; export.csv uses
+ * getCampaignRespondents).
  *
  * `Pick` closes the half that actually matters: a typo'd or removed delegate
  * NAME fails the build here. Signatures stay intentionally unchecked.

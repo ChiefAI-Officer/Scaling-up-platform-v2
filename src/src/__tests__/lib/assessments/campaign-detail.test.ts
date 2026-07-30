@@ -467,6 +467,28 @@ describe("getCampaignOverview — Wave EV edition standing", () => {
     expect(where).toMatchObject(activePublishedWhere);
   });
 
+  it("projects every field the edition decision re-checks", async () => {
+    // resolveEditionStanding re-applies each predicate on the returned rows, so a
+    // NARROWED projection is silently dangerous in a way a loosened WHERE is not:
+    // without `versionNumber`, Number.isFinite(undefined) is false, every sibling
+    // is rejected, and the tile asserts "you are on the newest edition" — round
+    // 1's exact defect reached through the select instead of the fallback.
+    const db = buildDb({
+      campaign: campaignOnVersion(3, new Date("2026-07-02T09:00:00Z")),
+    });
+    await getCampaignOverview(db, "c1");
+    const { select } = (
+      db.assessmentTemplateVersion.findMany as jest.Mock
+    ).mock.calls[0][0];
+    expect(Object.keys(select).sort()).toEqual([
+      "archivedAt",
+      "language",
+      "publishedAt",
+      "templateId",
+      "versionNumber",
+    ]);
+  });
+
   it("returns NULL — never a false 'you are current' — when the lookup fails", async () => {
     // Regression guard for the PR #241 review finding. A transient read failure
     // (Neon cold start, dropped connection) must not be reported as currency.

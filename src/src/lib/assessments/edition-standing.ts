@@ -85,6 +85,15 @@ export interface EditionStanding {
  * candidate set (a `findFirst` would return an arbitrary row, so a loosened
  * query could hand back an archived one and this check would compute `false`).
  *
+ * ⚠️ The duplication cuts BOTH ways, and the second direction is the dangerous
+ * one. A loosened WHERE fails safe — this function rejects the extra rows. But a
+ * narrowed SELECT fails toward the REASSURING answer: drop `versionNumber` from
+ * the caller's projection and `Number.isFinite(undefined)` is false, so every
+ * sibling is rejected, `newerEditionAvailable` computes `false`, and the tile
+ * makes an affirmative "you are on the newest edition" claim. That is the same
+ * failure mode as returning an empty sibling list on error, reached by a
+ * different route. The caller's projection is therefore pinned by a test.
+ *
  * Pure and never-throwing: a malformed or null sibling is skipped rather than
  * crashing the campaign screen, which must keep rendering whatever else it knows.
  *
