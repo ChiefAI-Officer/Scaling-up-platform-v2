@@ -1,10 +1,26 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+
 const {
+  applyReviewedMappings,
   buildReviewCandidates,
   parseReviewedMappings,
   validateReviewedMappings,
 } = require("../../../scripts/public-referral-backfill-core.cjs") as {
+  applyReviewedMappings: (
+    db: unknown,
+    value: unknown,
+    bulkApplyNullOwners: (
+      tx: { pendingWrites: unknown[] },
+      rows: unknown[],
+    ) => Promise<number>,
+  ) => Promise<{
+    reviewed: number;
+    updated: number;
+    alreadyApplied: number;
+  }>;
   buildReviewCandidates: (
     submissions: unknown[],
     coaches: unknown[],
@@ -239,5 +255,175 @@ describe("buildReviewCandidates", () => {
         reason: "COACH_NOT_FOUND",
       }),
     ]);
+  });
+
+  it("excludes ambiguous current Coach identities", () => {
+    const result = buildReviewCandidates(
+      [publicSubmission()],
+      [
+        ...COACHES,
+        {
+          id: "coach-2",
+          firstName: "Other",
+          lastName: "Coach",
+          email: "COACH@example.com",
+        },
+      ],
+    );
+
+    expect(result.candidates).toEqual([]);
+    expect(result.excluded).toEqual([
+      {
+        submissionId: "submission-1",
+        reason: "COACH_AMBIGUOUS",
+      },
+    ]);
+  });
+});
+
+describe("applyReviewedMappings transaction orchestration", () => {
+  function makeDb(submissions: unknown[], coaches: unknown[] = COACHES) {
+    const committedWrites: unknown[] = [];
+    const transaction = jest.fn(
+      async (
+        callback: (tx: Record<string, unknown>) => Promise<unknown>,
+        options: unknown,
+      ) => {
+        void options;
+        const pendingWrites: unknown[] = [];
+        const tx = {
+          assessmentSubmission: {
+            findMany: jest.fn().mockResolvedValue(submissions),
+          },
+          coach: {
+            findMany: jest.fn().mockResolvedValue(coaches),
+          },
+          pendingWrites,
+        };
+        try {
+          const result = await callback(tx);
+          committedWrites.push(...pendingWrites);
+          return result;
+        } catch (error) {
+          throw error;
+        }
+      },
+    );
+    return {
+      db: { $transaction: transaction },
+      transaction,
+      committedWrites,
+    };
+  }
+
+  it("applies a multi-row batch through one bulk CAS inside a bounded transaction", async () => {
+    const submissions = [
+      publicSubmission(),
+      publicSubmission({ id: "submission-2" }),
+    ];
+    const harness = makeDb(submissions);
+    const bulkApply = jest.fn(
+      async (tx: { pendingWrites: unknown[] }, rows: unknown[]) => {
+        tx.pendingWrites.push(...rows);
+        return rows.length;
+      },
+    );
+
+    await expect(
+      applyReviewedMappings(
+        harness.db,
+        [
+          { submissionId: "submission-1", coachId: "coach-1" },
+          { submissionId: "submission-2", coachId: "coach-1" },
+        ],
+        bulkApply,
+      ),
+    ).resolves.toEqual({
+      reviewed: 2,
+      updated: 2,
+      alreadyApplied: 0,
+    });
+    expect(harness.transaction).toHaveBeenCalledTimes(1);
+    expect(harness.transaction.mock.calls[0][1]).toEqual({
+      maxWait: 10_000,
+      timeout: 30_000,
+    });
+    expect(bulkApply).toHaveBeenCalledTimes(1);
+    expect(harness.committedWrites).toHaveLength(2);
+  });
+
+  it("rolls the whole simulated batch back when the bulk CAS count mismatches", async () => {
+    const submissions = [
+      publicSubmission(),
+      publicSubmission({ id: "submission-2" }),
+    ];
+    const harness = makeDb(submissions);
+    const bulkApply = jest.fn(
+      async (tx: { pendingWrites: unknown[] }, rows: unknown[]) => {
+        tx.pendingWrites.push(rows[0]);
+        return 1;
+      },
+    );
+
+    await expect(
+      applyReviewedMappings(
+        harness.db,
+        [
+          { submissionId: "submission-1", coachId: "coach-1" },
+          { submissionId: "submission-2", coachId: "coach-1" },
+        ],
+        bulkApply,
+      ),
+    ).rejects.toThrow(/compare-and-set conflict/i);
+    expect(harness.committedWrites).toEqual([]);
+  });
+
+  it("does not call the writer for an entirely idempotent batch", async () => {
+    const harness = makeDb([
+      publicSubmission({ referringCoachId: "coach-1" }),
+    ]);
+    const bulkApply = jest.fn();
+
+    await expect(
+      applyReviewedMappings(
+        harness.db,
+        [{ submissionId: "submission-1", coachId: "coach-1" }],
+        bulkApply,
+      ),
+    ).resolves.toEqual({
+      reviewed: 1,
+      updated: 0,
+      alreadyApplied: 1,
+    });
+    expect(bulkApply).not.toHaveBeenCalled();
+  });
+
+  it("rejects validation failures before the writer and commits nothing", async () => {
+    const harness = makeDb([]);
+    const bulkApply = jest.fn();
+
+    await expect(
+      applyReviewedMappings(
+        harness.db,
+        [{ submissionId: "submission-1", coachId: "coach-1" }],
+        bulkApply,
+      ),
+    ).rejects.toThrow(/submission does not exist/i);
+    expect(bulkApply).not.toHaveBeenCalled();
+    expect(harness.committedWrites).toEqual([]);
+  });
+});
+
+describe("apply CLI failure behavior", () => {
+  it("exits nonzero before connecting when the explicit mapping argument is missing", () => {
+    const result = spawnSync(
+      process.execPath,
+      [resolve(process.cwd(), "scripts/apply-public-referral-backfill.mjs")],
+      { encoding: "utf8" },
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/no batch writes applied/i);
+    expect(result.stderr).toMatch(/--mapping/i);
   });
 });

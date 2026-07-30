@@ -123,6 +123,81 @@ function validateReviewedMappings(value, submissions, coaches) {
   });
 }
 
+async function applyReviewedMappings(db, value, bulkApplyNullOwners) {
+  if (
+    !db ||
+    typeof db.$transaction !== "function" ||
+    typeof bulkApplyNullOwners !== "function"
+  ) {
+    throw new Error("Backfill apply dependencies are invalid");
+  }
+
+  const mappings = parseReviewedMappings(value);
+  const submissionIds = mappings.map((row) => row.submissionId);
+  const coachIds = [...new Set(mappings.map((row) => row.coachId))];
+
+  return db.$transaction(
+    async (tx) => {
+      const submissions = await tx.assessmentSubmission.findMany({
+        where: { id: { in: submissionIds } },
+        select: {
+          id: true,
+          referringCoachId: true,
+          referringCoachEmail: true,
+          campaign: {
+            select: {
+              accessMode: true,
+            },
+          },
+          outboxEmails: {
+            where: { recipientRole: "REFERRING_COACH" },
+            select: {
+              recipientRole: true,
+              recipientEmail: true,
+            },
+          },
+        },
+      });
+      const coaches = await tx.coach.findMany({
+        where: { id: { in: coachIds } },
+        select: { id: true },
+      });
+      const plan = validateReviewedMappings(
+        mappings,
+        submissions,
+        coaches,
+      );
+      const updates = plan
+        .filter((row) => row.action === "update")
+        .map(({ submissionId, coachId }) => ({ submissionId, coachId }));
+
+      if (updates.length > 0) {
+        const updated = Number(
+          await bulkApplyNullOwners(tx, updates),
+        );
+        if (updated !== updates.length) {
+          throw new Error(
+            `Ownership compare-and-set conflict: expected ${updates.length} updates, wrote ${updated}`,
+          );
+        }
+      }
+
+      return {
+        reviewed: plan.length,
+        updated: updates.length,
+        alreadyApplied: plan.length - updates.length,
+      };
+    },
+    {
+      // The write is one bulk CAS round trip. This explicit ceiling covers the
+      // two validation reads plus up to 1,000 VALUES rows without leaving a
+      // transaction open indefinitely during a database incident.
+      maxWait: 10_000,
+      timeout: 30_000,
+    },
+  );
+}
+
 function candidateExclusion(submissionId, reason) {
   return { submissionId, reason };
 }
@@ -207,6 +282,7 @@ function buildReviewCandidates(submissions, coaches) {
 
 module.exports = {
   MAX_MAPPING_ROWS,
+  applyReviewedMappings,
   buildReviewCandidates,
   normalizedEmail,
   parseReviewedMappings,

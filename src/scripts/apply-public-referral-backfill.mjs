@@ -14,10 +14,10 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import core from "./public-referral-backfill-core.cjs";
 
-const { parseReviewedMappings, validateReviewedMappings } = core;
+const { applyReviewedMappings } = core;
 const db = new PrismaClient();
 
 function mappingPathFrom(argv) {
@@ -37,86 +37,57 @@ async function main() {
 
   const mappingPath = resolve(rawPath);
   const input = JSON.parse(readFileSync(mappingPath, "utf8"));
-  const mappings = parseReviewedMappings(input);
-  const submissionIds = mappings.map((row) => row.submissionId);
-  const coachIds = [...new Set(mappings.map((row) => row.coachId))];
-
-  const result = await db.$transaction(async (tx) => {
-    const submissions = await tx.assessmentSubmission.findMany({
-      where: { id: { in: submissionIds } },
-      select: {
-        id: true,
-        referringCoachId: true,
-        referringCoachEmail: true,
-        campaign: {
-          select: {
-            accessMode: true,
-          },
-        },
-        outboxEmails: {
-          where: { recipientRole: "REFERRING_COACH" },
-          select: {
-            recipientRole: true,
-            recipientEmail: true,
-          },
-        },
-      },
-    });
-    const coaches = await tx.coach.findMany({
-      where: { id: { in: coachIds } },
-      select: { id: true },
-    });
-
-    const plan = validateReviewedMappings(
-      mappings,
-      submissions,
-      coaches,
-    );
-    let updated = 0;
-    let alreadyApplied = 0;
-
-    for (const row of plan) {
-      if (row.action === "already-applied") {
-        alreadyApplied += 1;
-        continue;
-      }
-      const write = await tx.assessmentSubmission.updateMany({
-        where: {
-          id: row.submissionId,
-          referringCoachId: null,
-        },
-        data: { referringCoachId: row.coachId },
-      });
-      if (write.count !== 1) {
-        throw new Error(
-          `Concurrent ownership conflict for submission ${row.submissionId}`,
-        );
-      }
-      updated += 1;
-    }
-
-    return { reviewed: plan.length, updated, alreadyApplied };
-  });
-
-  process.stdout.write(
-    `${JSON.stringify(
-      {
-        success: true,
-        mappingPath,
-        ...result,
-      },
-      null,
-      2,
-    )}\n`,
+  const result = await applyReviewedMappings(
+    db,
+    input,
+    async (tx, rows) => {
+      const values = Prisma.join(
+        rows.map(
+          (row) => Prisma.sql`(${row.submissionId}, ${row.coachId})`,
+        ),
+      );
+      return tx.$executeRaw(Prisma.sql`
+        UPDATE "assessment_submissions" AS submission
+        SET "referringCoachId" = mapping."coachId"
+        FROM (VALUES ${values}) AS mapping("submissionId", "coachId")
+        WHERE submission."id" = mapping."submissionId"
+          AND submission."referringCoachId" IS NULL
+      `);
+    },
   );
+
+  return { mappingPath, ...result };
 }
 
-main()
-  .catch((error) => {
-    console.error("Public referral backfill aborted; no batch writes applied:");
-    console.error(error);
+let committed = false;
+try {
+  const result = await main();
+  committed = true;
+  try {
+    process.stdout.write(
+      `${JSON.stringify({ success: true, ...result }, null, 2)}\n`,
+    );
+  } catch (error) {
+    console.error(
+      "Public referral backfill COMMITTED, but writing the success receipt failed:",
+      error,
+    );
     process.exitCode = 1;
-  })
-  .finally(async () => {
-    await db.$disconnect();
-  });
+  }
+} catch (error) {
+  console.error("Public referral backfill aborted; no batch writes applied:");
+  console.error(error);
+  process.exitCode = 1;
+}
+
+try {
+  await db.$disconnect();
+} catch (error) {
+  console.error(
+    committed
+      ? "Public referral backfill COMMITTED, but database disconnect failed:"
+      : "Public referral backfill did not commit, and database disconnect also failed:",
+  );
+  console.error(error);
+  process.exitCode = 1;
+}
