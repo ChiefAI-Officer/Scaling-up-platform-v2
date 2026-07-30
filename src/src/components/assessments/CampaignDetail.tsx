@@ -92,6 +92,15 @@ export interface CampaignDetailProps {
    */
   customSlidesEnabled?: boolean;
   /**
+   * Wave OSR (#71) — gates the "Results on screen" control. Computed SERVER-side
+   * from the same flag the PATCH route enforces; the client receives ONLY the
+   * boolean and never recomputes the gate. Fail-closed: absent/false → no control.
+   *
+   * Why this control exists: the toggle shipped create-only, so campaigns that
+   * already existed could never opt in and the production flag surfaced nothing.
+   */
+  onScreenResultsEnabled?: boolean;
+  /**
    * Wave M (#19) — the campaign's stored (already-sanitized) slides. Both the
    * editor's initial value AND the PATCH CAS sentinel `expectedCustomSlides`
    * derive from this exact value, so it must be the faithful stored value.
@@ -213,6 +222,7 @@ export function CampaignDetail({
   canViewGroupReport = false,
   groupReportHref,
   customSlidesEnabled = false,
+  onScreenResultsEnabled = false,
   initialCustomSlides = [],
   customSlidesSections = [],
   longitudinalRespondentIds = [],
@@ -270,6 +280,12 @@ export function CampaignDetail({
 
   // Task O UI follow-on — email overrides post-create edit panel.
   const [emailOpen, setEmailOpen] = useState(false);
+  // Wave OSR (#71) — optimistic local mirror of the stored toggle. Reverted on a
+  // failed PATCH so the checkbox can never sit in a state the server rejected.
+  const [onScreenResults, setOnScreenResults] = useState(
+    initialOverview.campaign.showResultsOnScreen === true,
+  );
+  const [onScreenSaving, setOnScreenSaving] = useState(false);
   const [emailSubject, setEmailSubject] = useState<string>(
     overview.campaign.invitationSubject ?? "",
   );
@@ -713,6 +729,48 @@ export function CampaignDetail({
       });
     } finally {
       setOpenAtSaving(false);
+    }
+  }
+
+  // Wave OSR (#71) — persist the on-screen-results toggle via PATCH. Optimistic:
+  // the checkbox moves immediately and is REVERTED if the server refuses, because
+  // a checkbox that disagrees with the stored value would misdescribe what
+  // respondents are about to see.
+  async function handleToggleOnScreenResults(next: boolean) {
+    if (onScreenSaving) return;
+    const previous = onScreenResults;
+    setOnScreenResults(next);
+    setOnScreenSaving(true);
+    try {
+      const res = await fetch(`/api/assessment-campaigns/${campaign.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showResultsOnScreen: next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.success === false) {
+        throw new Error(
+          typeof body.error === "string"
+            ? body.error
+            : "The change was not saved.",
+        );
+      }
+      toast({
+        title: next
+          ? "Respondents will see their results on screen"
+          : "Respondents will not see their results on screen",
+      });
+      router.refresh();
+    } catch (err) {
+      setOnScreenResults(previous);
+      toast({
+        title: "Could not change the results setting",
+        description:
+          err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setOnScreenSaving(false);
     }
   }
 
@@ -1257,6 +1315,45 @@ export function CampaignDetail({
           />
         </div>
       </div>
+
+      {/* Wave OSR (#71) — "Results on screen" for an EXISTING campaign.
+          Hidden when CLOSED (the PATCH route 409s a closed campaign, so offering
+          the control there would promise an edit the server refuses) and when the
+          flag is off (server-computed; the client never recomputes the gate).
+
+          A separate card from "Invitation email" on purpose: this is not an email,
+          and it changes what the respondent sees at submit. */}
+      {onScreenResultsEnabled && !isClosed && (
+        <div
+          className="bg-card border border-border rounded-xl p-4"
+          data-testid="campaign-onscreen-results-card"
+        >
+          <h2 className="text-sm font-semibold text-foreground">
+            Results on screen
+          </h2>
+          <label className="mt-3 flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="accent-primary w-4 h-4 mt-0.5"
+              checked={onScreenResults}
+              disabled={onScreenSaving}
+              onChange={(e) => handleToggleOnScreenResults(e.target.checked)}
+              data-testid="campaign-onscreen-results-toggle"
+              aria-label="Show each respondent their results on screen after they submit"
+            />
+            <span className="text-sm text-foreground">
+              Show each respondent their results on screen after they submit
+              {/* The operator is choosing this AFTER the campaign exists, so say
+                  plainly which respondents it can still reach — anyone who has
+                  already submitted will never see it. */}
+              <span className="block text-xs text-muted-foreground mt-1">
+                Applies to respondents who submit from now on. People who have
+                already submitted are unaffected.
+              </span>
+            </span>
+          </label>
+        </div>
+      )}
 
       {/* Task O UI follow-on — invitation email overrides edit panel.
           Hidden when campaign is CLOSED (no further sends to customize). */}

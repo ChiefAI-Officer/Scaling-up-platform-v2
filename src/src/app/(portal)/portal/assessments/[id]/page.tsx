@@ -29,6 +29,7 @@ import {
   groupReportRequiresPublishedVersion,
 } from "@/lib/assessments/wave-f-flags";
 import { isCustomSlidesEnabled } from "@/lib/assessments/wave-m-flags";
+import { isOnScreenResultsEnabled } from "@/lib/assessments/wave-osr-flags";
 import {
   hasComparableLongitudinal,
   asLongitudinalEligibilityDb,
@@ -180,6 +181,10 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       canViewGroupReport={canShowGroupReport}
       groupReportHref={`/assessments/${id}/report`}
       customSlidesEnabled={customSlidesEnabled}
+      // Wave OSR (#71) — gate computed here, server-side, from the same flag the
+      // PATCH route enforces. CLOSED is excluded inside the component (the route
+      // 409s it), so this is the flag check only.
+      onScreenResultsEnabled={isOnScreenResultsEnabled()}
       initialCustomSlides={initialCustomSlides}
       customSlidesSections={customSlidesSections}
       longitudinalRespondentIds={longitudinalRespondentIds}
