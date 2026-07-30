@@ -178,9 +178,27 @@ describe("PublicQuizClient — in-place results + consent + idempotency (Task 7)
 
     // The report MUST be wrapped in `.su-public-brand .su-report` so the scoped
     // su-report.css applies on-screen (else it renders bare — the in-place CSS bug).
-    expect(
-      screen.getByTestId("quiz-results").querySelector(".su-public-brand.su-report"),
-    ).not.toBeNull();
+    const reportWrapper = screen
+      .getByTestId("quiz-results")
+      .querySelector(".su-public-brand.su-report");
+    expect(reportWrapper).not.toBeNull();
+
+    const printButton = screen.getByRole("button", { name: "Print" });
+    const downloadButton = screen.getByRole("button", { name: "Download PDF" });
+    expect(reportWrapper).toContainElement(printButton);
+    expect(reportWrapper).toContainElement(downloadButton);
+    expect(screen.getAllByRole("button", { name: "Print" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Download PDF" })).toHaveLength(1);
+
+    const originalTitle = document.title;
+    Object.defineProperty(window, "print", {
+      value: jest.fn(),
+      configurable: true,
+    });
+    fireEvent.click(downloadButton);
+    expect(document.title).toBe("Scaling Up Full — Jane Doe");
+    window.dispatchEvent(new Event("afterprint"));
+    expect(document.title).toBe(originalTitle);
 
     // BrandedReport renders the assessment name.
     expect(screen.getByText("Scaling Up Full")).toBeInTheDocument();
