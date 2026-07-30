@@ -355,9 +355,12 @@ export async function listPublicReferrals(
         return { status: "forbidden" } as const;
       }
 
-      const campaignWhere: Record<string, unknown> = {
+      const publicCampaignWhere: Record<string, unknown> = {
         accessMode: "PUBLIC",
         deletedAt: null,
+      };
+      const campaignWhere: Record<string, unknown> = {
+        ...publicCampaignWhere,
       };
       if (templateId) {
         campaignWhere.templateId = templateId;
@@ -369,10 +372,7 @@ export async function listPublicReferrals(
       };
       const ownedWhere: Record<string, unknown> = {
         referringCoachId: coachId,
-        campaign: {
-          accessMode: "PUBLIC",
-          deletedAt: null,
-        },
+        campaign: publicCampaignWhere,
       };
       let totalCount: number;
       if (query) {

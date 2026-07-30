@@ -19,9 +19,7 @@ export function CoachNavLink({
   exact = false,
 }: CoachNavLinkProps) {
   const pathname = usePathname();
-  const isActive = exact
-    ? pathname === href
-    : isNavLinkActive(pathname, href);
+  const isActive = isNavLinkActive(pathname, href, exact);
 
   return (
     <Link

@@ -40,7 +40,7 @@ export default async function PortalLayout({ children }: PortalLayoutProps) {
                                 key={item.href}
                                 href={item.href}
                                 icon={<Icon className="w-5 h-5" />}
-                                exact={item.exact}
+                                {...(item.exact ? { exact: true } : {})}
                             >
                                 {item.label}
                             </CoachNavLink>

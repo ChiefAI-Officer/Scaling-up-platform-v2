@@ -6,7 +6,12 @@
  * - For non-exact: pathname starts with href + "/" (nested routes)
  * - The "/" guard prevents "/bio" matching "/biotech"
  */
-export function isNavLinkActive(pathname: string, href: string): boolean {
+export function isNavLinkActive(
+  pathname: string,
+  href: string,
+  exact = false,
+): boolean {
   if (pathname === href) return true;
+  if (exact) return false;
   return pathname.startsWith(href + "/");
 }

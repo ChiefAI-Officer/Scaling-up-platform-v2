@@ -52,9 +52,11 @@ export function CoachMobileNav({
             <nav className="flex-1 py-4 px-3 space-y-1">
               {primaryNavItems.map((link) => {
                 const Icon = link.icon;
-                const isActive = link.exact
-                  ? pathname === link.href
-                  : isNavLinkActive(pathname, link.href);
+                const isActive = isNavLinkActive(
+                  pathname,
+                  link.href,
+                  link.exact,
+                );
                 return (
                   <Link
                     key={link.href}
