@@ -3,7 +3,11 @@ import type { ApiActor } from "@/lib/auth/access-control";
 import { isPrivilegedRole } from "@/lib/auth/access-control";
 import { buildRespondentReportFromSubmission } from "@/lib/assessments/report-email";
 import { isScoreResult, type RespondentReport } from "@/lib/assessments/respondent-report";
-import { resolvePublicLeadsState, type PublicLeadsEnv } from "@/lib/assessments/public-leads-state";
+import {
+  publicLeadRetentionCutoff,
+  resolvePublicLeadsState,
+  type PublicLeadsEnv,
+} from "@/lib/assessments/public-leads-state";
 
 export type PublicLeadReportOutcome =
   | {
@@ -89,7 +93,14 @@ export async function getPublicLeadReport(
     const state = resolvePublicLeadsState(env, {
       coachId: submission.referringCoachId,
     });
-    if (!state.presentationEnabled) return { status: "not-found" } as const;
+    const retentionCutoff = publicLeadRetentionCutoff(state);
+    if (
+      !state.presentationEnabled ||
+      retentionCutoff === null ||
+      submission.submittedAt < retentionCutoff
+    ) {
+      return { status: "not-found" } as const;
+    }
 
     const privileged = isPrivilegedRole(actor.role);
     if (!privileged && actor.coachId !== submission.referringCoachId) {

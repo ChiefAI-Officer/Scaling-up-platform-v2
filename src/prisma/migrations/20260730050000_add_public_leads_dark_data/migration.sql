@@ -3,7 +3,8 @@
 -- public idempotency index with the campaign-scoped equivalent.
 
 ALTER TABLE "coaches"
-  ADD COLUMN "deletedAt" TIMESTAMP(3);
+  ADD COLUMN "deletedAt" TIMESTAMP(3),
+  ADD COLUMN "publicLeadMailQuiescedAt" TIMESTAMP(3);
 
 CREATE INDEX "coaches_deletedAt_idx" ON "coaches" ("deletedAt");
 
@@ -176,6 +177,7 @@ CREATE TABLE "public_lead_exports" (
   "completedAt" TIMESTAMP(3),
   "abortedAt" TIMESTAMP(3),
   "errorClass" TEXT,
+  "nextSortOrder" INTEGER NOT NULL DEFAULT 0,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "public_lead_exports_pkey" PRIMARY KEY ("id")
@@ -220,3 +222,23 @@ CREATE TABLE "public_lead_export_exclusions" (
 
 CREATE UNIQUE INDEX "public_lead_export_exclusions_exportItemId_key"
   ON "public_lead_export_exclusions" ("exportItemId");
+
+CREATE TABLE "public_lead_export_chunks" (
+  "id" TEXT NOT NULL,
+  "exportId" TEXT NOT NULL,
+  "batchIndex" INTEGER NOT NULL,
+  "ciphertext" BYTEA NOT NULL,
+  "nonce" BYTEA NOT NULL,
+  "authTag" BYTEA NOT NULL,
+  "rowCount" INTEGER NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "public_lead_export_chunks_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "public_lead_export_chunks_exportId_fkey"
+    FOREIGN KEY ("exportId") REFERENCES "public_lead_exports"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE UNIQUE INDEX "public_lead_export_chunks_exportId_batchIndex_key"
+  ON "public_lead_export_chunks" ("exportId", "batchIndex");
+CREATE INDEX "public_lead_export_chunks_exportId_batchIndex_idx"
+  ON "public_lead_export_chunks" ("exportId", "batchIndex");

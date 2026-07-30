@@ -299,8 +299,11 @@ export async function POST(
     let initialPublicLeadsState = resolvePublicLeadsState(publicLeadsEnv, {
       coachId: null,
     });
+    const canaryConfigured = Boolean(
+      process.env.WAVE_PUBLIC_LEADS_CANARY_COACH_IDS?.trim(),
+    );
     if (
-      !initialPublicLeadsState.legacyDelivery &&
+      (!initialPublicLeadsState.legacyDelivery || canaryConfigured) &&
       initialPublicLeadsState.mode !== "POLICY_UNAVAILABLE"
     ) {
       const limiterSecret =
@@ -347,9 +350,6 @@ export async function POST(
         });
       }
     }
-    const canaryConfigured = Boolean(
-      process.env.WAVE_PUBLIC_LEADS_CANARY_COACH_IDS?.trim(),
-    );
     const fingerprintSecret =
       process.env.PUBLIC_LEADS_IDEMPOTENCY_SECRET?.trim() ?? "";
     if (

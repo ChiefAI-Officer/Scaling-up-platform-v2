@@ -33,6 +33,8 @@ export interface ClaimedOutboxRow {
   leaseToken: string;
   leaseExpiresAt: Date;
   featureKey?: string | null;
+  previousStatus?: string;
+  sendFenceGeneration: number;
 }
 
 interface UpdateManyResult {
@@ -54,6 +56,7 @@ export interface ClaimInput {
   now: Date;
   leaseToken: string;
   leaseExpiresAt: Date;
+  releaseHeld: boolean;
 }
 
 export interface DeadLetterInput {
@@ -71,7 +74,7 @@ export interface DrainDeps {
   recordDeadLetter?: (input: DeadLetterInput) => Promise<void>;
   authorizeBeforeSend?: (
     row: ClaimedOutboxRow,
-  ) => Promise<{ allowed: boolean; reason?: string }>;
+  ) => Promise<{ allowed: boolean; reason?: string; bodyHtml?: string }>;
   now?: () => Date;
   makeLeaseToken?: () => string;
   maxAttempts?: number;
@@ -98,10 +101,13 @@ export async function claimNextOutboxRow(
   const submissionClause = input.submissionId
     ? Prisma.sql`AND "submissionId" = ${input.submissionId}`
     : Prisma.empty;
+  const heldClause = input.releaseHeld
+    ? Prisma.sql`OR "status" = 'HELD'`
+    : Prisma.empty;
 
   const rows = await claimDb.$queryRaw<ClaimedOutboxRow[]>(Prisma.sql`
     WITH candidate AS (
-      SELECT "id"
+      SELECT "id", "status" AS "previousStatus"
       FROM "assessment_email_outbox"
       WHERE (
         (
@@ -112,6 +118,7 @@ export async function claimNextOutboxRow(
           "status" = 'SENDING'
           AND "leaseExpiresAt" <= ${input.now}
         )
+        ${heldClause}
       )
       ${submissionClause}
       ORDER BY "nextAttemptAt" ASC, "createdAt" ASC, "id" ASC
@@ -139,7 +146,9 @@ export async function claimNextOutboxRow(
       outbox."attempts",
       outbox."leaseToken",
       outbox."leaseExpiresAt",
-      outbox."featureKey"
+      outbox."featureKey",
+      outbox."sendFenceGeneration",
+      candidate."previousStatus"
   `);
 
   return rows[0] ?? null;
@@ -178,11 +187,8 @@ async function defaultRecordDeadLetter(
 async function defaultAuthorizeBeforeSend(
   authorizationDb: Pick<OutboxDb, "$queryRaw">,
   row: ClaimedOutboxRow,
-): Promise<{ allowed: boolean; reason?: string }> {
-  if (
-    row.featureKey !== "PUBLIC_LEADS" ||
-    row.recipientRole !== "REFERRING_COACH"
-  ) {
+): Promise<{ allowed: boolean; reason?: string; bodyHtml?: string }> {
+  if (row.featureKey !== "PUBLIC_LEADS") {
     return { allowed: true };
   }
   const candidates = await authorizationDb.$queryRaw<
@@ -203,7 +209,7 @@ async function defaultAuthorizeBeforeSend(
       coach."certificationExpiry",
       submission."publicLeadDeletedAt"
     FROM "assessment_submissions" AS submission
-    INNER JOIN "coaches" AS coach
+    LEFT JOIN "coaches" AS coach
       ON coach."id" = submission."referringCoachId"
     WHERE submission."id" = ${row.submissionId}
     LIMIT 1
@@ -221,9 +227,23 @@ async function defaultAuthorizeBeforeSend(
       candidate.certificationExpiry > new Date()) &&
     normalizeMailbox(candidate.email) ===
       normalizeMailbox(row.recipientEmail);
-  return state.sendCoachNotification && eligible
-    ? { allowed: true }
-    : { allowed: false, reason: "PUBLIC_LEAD_AUTHORIZATION_REVOKED" };
+  if (row.recipientRole === "REFERRING_COACH") {
+    return state.sendCoachNotification && eligible
+      ? { allowed: true }
+      : { allowed: false, reason: "PUBLIC_LEAD_AUTHORIZATION_REVOKED" };
+  }
+  if (row.recipientRole === "TAKER_COPY" && !state.presentationEnabled) {
+    return {
+      allowed: true,
+      bodyHtml: row.bodyHtml
+        .replace(
+          /href="mailto:[^"]*"/g,
+          'href="https://scalingup.com/coaches"',
+        )
+        .replaceAll("Talk to your coach →", "Find a coach →"),
+    };
+  }
+  return { allowed: true };
 }
 
 /**
@@ -253,6 +273,12 @@ export async function drainLeadOutbox(
   const authorizeBeforeSend =
     deps.authorizeBeforeSend ??
     ((row: ClaimedOutboxRow) => defaultAuthorizeBeforeSend(deps.db, row));
+  const releaseHeld =
+    (process.env.PUBLIC_LEADS_POLICY_APPROVED === "1" ||
+      process.env.PUBLIC_LEADS_POLICY_APPROVED?.toLowerCase() === "true") &&
+    (process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY === "1" ||
+      process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY?.toLowerCase() ===
+        "true");
 
   const startedAt = currentTime().getTime();
   let sent = 0;
@@ -269,10 +295,25 @@ export async function drainLeadOutbox(
       now: claimNow,
       leaseToken,
       leaseExpiresAt: new Date(claimNow.getTime() + leaseMs),
+      releaseHeld,
     });
     if (!row) break;
 
     try {
+      if (row.previousStatus === "HELD") {
+        await deps.db.auditLog.create({
+          data: {
+            entityType: "AssessmentEmailOutbox",
+            entityId: row.id,
+            action: "PUBLIC_LEAD_HELD_RELEASE",
+            performedBy: "assessment-email-worker",
+            changes: JSON.stringify({
+              submissionId: row.submissionId,
+              recipientRole: row.recipientRole,
+            }),
+          },
+        });
+      }
       const authorization = await authorizeBeforeSend(row);
       if (!authorization.allowed) {
         const cancellation =
@@ -296,10 +337,23 @@ export async function drainLeadOutbox(
         skipped += cancellation.count;
         continue;
       }
+      const fenced = await deps.db.assessmentEmailOutbox.updateMany({
+        where: {
+          id: row.id,
+          status: "SENDING",
+          leaseToken: row.leaseToken,
+          sendFenceGeneration: row.sendFenceGeneration,
+        },
+        data: {},
+      });
+      if (fenced.count !== 1) {
+        skipped += 1;
+        continue;
+      }
       await deps.sendEmail({
         to: row.recipientEmail,
         subject: row.subject,
-        html: row.bodyHtml,
+        html: authorization.bodyHtml ?? row.bodyHtml,
       });
 
       const completion = await deps.db.assessmentEmailOutbox.updateMany({
@@ -399,4 +453,66 @@ export const quickAssessmentLeadEmailCron = inngest.createFunction(
         null,
       ),
     ),
+);
+
+/**
+ * A Coach tombstone is intentionally reported as pending until the maximum
+ * transport-bound lease window has elapsed. This reconciler records the
+ * durable quiescence receipt; a transport call already in flight at deletion
+ * remains an explicitly acknowledged possible exposure.
+ */
+export const publicLeadMailFenceReconciler = inngest.createFunction(
+  {
+    id: "assessment-public-lead-mail-fence-reconciler",
+    retries: 3,
+    concurrency: { limit: 1 },
+  },
+  { cron: "*/2 * * * *" },
+  async ({ step }) =>
+    step.run("reconcile-public-lead-mail-fences", async () => {
+      const now = new Date();
+      const transportBound = new Date(now.getTime() - DEFAULT_LEASE_MS);
+      const coaches = await db.coach.findMany({
+        where: {
+          deletedAt: { lte: transportBound },
+          publicLeadMailQuiescedAt: null,
+        },
+        take: 100,
+        select: { id: true, deletedAt: true },
+      });
+      for (const coach of coaches) {
+        await db.$transaction(async (tx) => {
+          const activeLeases = await tx.assessmentEmailOutbox.count({
+            where: {
+              featureKey: "PUBLIC_LEADS",
+              recipientRole: "REFERRING_COACH",
+              status: "SENDING",
+              leaseExpiresAt: { gt: now },
+              submission: { referringCoachId: coach.id },
+            },
+          });
+          if (activeLeases > 0) return;
+          const updated = await tx.coach.updateMany({
+            where: { id: coach.id, publicLeadMailQuiescedAt: null },
+            data: { publicLeadMailQuiescedAt: now },
+          });
+          if (updated.count !== 1) return;
+          await tx.auditLog.create({
+            data: {
+              entityType: "Coach",
+              entityId: coach.id,
+              action: "PUBLIC_LEAD_MAIL_QUIESCED",
+              performedBy: "assessment-email-worker",
+              changes: JSON.stringify({
+                deletedAt: coach.deletedAt,
+                quiescedAt: now,
+                transportBoundElapsed: true,
+                possibleInFlightExposure: true,
+              }),
+            },
+          });
+        });
+      }
+      return { reconciled: coaches.length };
+    }),
 );

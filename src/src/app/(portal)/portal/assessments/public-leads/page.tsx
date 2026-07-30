@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, Search } from "lucide-react";
 import { db } from "@/lib/db";
 import { requireCoach } from "@/lib/auth/authorization";
-import { resolvePublicLeadsState } from "@/lib/assessments/public-leads-state";
+import {
+  publicLeadRetentionCutoff,
+  resolvePublicLeadsState,
+} from "@/lib/assessments/public-leads-state";
 import { PublicLeadExportButton } from "@/components/assessments/PublicLeadExportButton";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +67,10 @@ export default async function PublicLeadsPage({
     typeof raw.to === "string" ? raw.to : undefined,
     true,
   );
+  const retentionCutoff = publicLeadRetentionCutoff(state);
+  if (retentionCutoff === null) notFound();
+  const effectiveFrom =
+    from && from > retentionCutoff ? from : retentionCutoff;
 
   const where = {
     referringCoachId: coach.id,
@@ -72,14 +79,10 @@ export default async function PublicLeadsPage({
     ...(assessment
       ? { campaign: { templateId: assessment, deletedAt: null } }
       : { campaign: { deletedAt: null } }),
-    ...(from || to
-      ? {
-          submittedAt: {
-            ...(from ? { gte: from } : {}),
-            ...(to ? { lt: to } : {}),
-          },
-        }
-      : {}),
+    submittedAt: {
+      gte: effectiveFrom,
+      ...(to ? { lt: to } : {}),
+    },
     ...(search
       ? {
           OR: [

@@ -3,7 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
-import { resolvePublicLeadsState } from "@/lib/assessments/public-leads-state";
+import {
+  publicLeadRetentionCutoff,
+  resolvePublicLeadsState,
+} from "@/lib/assessments/public-leads-state";
 import { inngest } from "@/inngest/client";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
 
@@ -59,6 +62,15 @@ export async function POST(request: NextRequest) {
   const search = filter.search.toLowerCase();
   const from = boundary(filter.from, false);
   const to = boundary(filter.to, true);
+  const retentionCutoff = publicLeadRetentionCutoff(state);
+  if (retentionCutoff === null) {
+    return NextResponse.json(
+      { success: false, error: "Not found" },
+      { status: 404 },
+    );
+  }
+  const effectiveFrom =
+    from && from > retentionCutoff ? from : retentionCutoff;
 
   const exportId = await db.$transaction(async (tx) => {
     const submissions = await tx.assessmentSubmission.findMany({
@@ -72,14 +84,10 @@ export async function POST(request: NextRequest) {
             ? { templateId: filter.assessment }
             : {}),
         },
-        ...(from || to
-          ? {
-              submittedAt: {
-                ...(from ? { gte: from } : {}),
-                ...(to ? { lt: to } : {}),
-              },
-            }
-          : {}),
+        submittedAt: {
+          gte: effectiveFrom,
+          ...(to ? { lt: to } : {}),
+        },
         ...(search
           ? {
               OR: [
@@ -102,6 +110,7 @@ export async function POST(request: NextRequest) {
         filter,
         manifestDigest,
         manifestRowCount: submissions.length,
+        emittedRowCount: 0,
         items: {
           create: submissions.map((submission, sortOrder) => ({
             submissionId: submission.id,

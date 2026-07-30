@@ -12,11 +12,13 @@ import { handleRegistrationCreatedFree } from "@/inngest/functions/handle-regist
 import {
   quickAssessmentLeadEmail,
   quickAssessmentLeadEmailCron,
+  publicLeadMailFenceReconciler,
 } from "@/inngest/functions/quick-assessment-lead-email";
 import { assessmentInviteFanout } from "@/inngest/functions/assessment-invite-fanout";
 import { assessmentScheduledSendCron } from "@/inngest/functions/assessment-scheduled-send-cron";
 import { espertoImportAlertCron } from "@/inngest/functions/esperto-import-alert-cron";
 import { publicLeadExport } from "@/inngest/functions/public-lead-export";
+import { publicLeadRetention } from "@/inngest/functions/public-lead-retention";
 
 export const { GET, POST, PUT } = serve({
     client: inngest,
@@ -32,9 +34,11 @@ export const { GET, POST, PUT } = serve({
         handleRegistrationCreatedFree,
         quickAssessmentLeadEmail,
         quickAssessmentLeadEmailCron,
+        publicLeadMailFenceReconciler,
         assessmentInviteFanout,
         assessmentScheduledSendCron,
         espertoImportAlertCron,
         publicLeadExport,
+        publicLeadRetention,
     ],
 });

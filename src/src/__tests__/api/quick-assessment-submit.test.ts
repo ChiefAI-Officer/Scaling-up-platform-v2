@@ -120,7 +120,10 @@ jest.mock("@/lib/assessments/scoring", () => {
 import { POST } from "@/app/api/quiz/[campaignAlias]/submit/route";
 import { db } from "@/lib/db";
 import { inngest } from "@/inngest/client";
-import { withRateLimit } from "@/lib/rate-limit";
+import {
+  checkDistributedDualRateLimit,
+  withRateLimit,
+} from "@/lib/rate-limit";
 import { Prisma } from "@prisma/client";
 
 /* -------------------------------------------------------------------------- */
@@ -215,6 +218,20 @@ beforeEach(() => {
 /*  Preserved behavior: 429 / 403 / 410 / 400                                */
 /* -------------------------------------------------------------------------- */
 describe("preserved behavior", () => {
+  it("applies the distributed limiter before resolving a configured canary", async () => {
+    process.env.WAVE_PUBLIC_LEADS_CANARY_COACH_IDS = "coach-canary";
+    process.env.PUBLIC_LEADS_LIMITER_SECRET = "limiter-secret";
+    process.env.PUBLIC_LEADS_IDEMPOTENCY_SECRET = "fingerprint-secret";
+
+    const res = await POST(
+      makeRequest(VALID_BODY) as never,
+      makeParams() as never,
+    );
+
+    expect(res.status).toBe(200);
+    expect(checkDistributedDualRateLimit).toHaveBeenCalledTimes(1);
+  });
+
   it("429 when rate-limited", async () => {
     (withRateLimit as jest.Mock).mockResolvedValue({
       allowed: false,

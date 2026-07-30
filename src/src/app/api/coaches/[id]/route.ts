@@ -231,7 +231,7 @@ export async function DELETE(
           }),
           tx.coach.update({
             where: { id },
-            data: { deletedAt },
+            data: { deletedAt, publicLeadMailQuiescedAt: null },
           }),
           ...(existing.userId
             ? [

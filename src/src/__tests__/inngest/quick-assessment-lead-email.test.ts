@@ -28,6 +28,8 @@ function makeRow(
     leaseToken: overrides.leaseToken ?? "lease-1",
     leaseExpiresAt:
       overrides.leaseExpiresAt ?? new Date("2026-07-30T03:02:00.000Z"),
+    sendFenceGeneration: overrides.sendFenceGeneration ?? 0,
+    previousStatus: overrides.previousStatus,
   };
 }
 
@@ -181,8 +183,12 @@ describe("drainLeadOutbox atomic leases", () => {
         errorClass: "Error",
       }),
     );
+    const terminalUpdateIndex = deps.updateMany.mock.calls.findIndex(
+      ([call]) => call.data.status === "FAILED",
+    );
+    expect(terminalUpdateIndex).toBeGreaterThanOrEqual(0);
     expect(deps.recordDeadLetter.mock.invocationCallOrder[0]).toBeLessThan(
-      deps.updateMany.mock.invocationCallOrder[0],
+      deps.updateMany.mock.invocationCallOrder[terminalUpdateIndex],
     );
     expect(deps.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -203,7 +209,12 @@ describe("drainLeadOutbox atomic leases", () => {
     await expect(drainLeadOutbox(deps, "sub-1")).rejects.toThrow(
       "audit unavailable",
     );
-    expect(deps.updateMany).not.toHaveBeenCalled();
+    expect(deps.updateMany).toHaveBeenCalledTimes(1);
+    expect(deps.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "FAILED", bodyHtml: "" }),
+      }),
+    );
   });
 
   it("treats a lost lease-token completion as skipped", async () => {
@@ -275,5 +286,46 @@ describe("drainLeadOutbox atomic leases", () => {
         leaseToken: null,
       }),
     });
+  });
+
+  it("uses send-time re-rendered taker content after coach provenance is revoked", async () => {
+    const deps = makeDeps([
+      makeRow({
+        featureKey: "PUBLIC_LEADS",
+        recipientRole: "TAKER_COPY",
+        recipientEmail: "taker@example.com",
+      }),
+    ]);
+    deps.authorizeBeforeSend = jest.fn().mockResolvedValue({
+      allowed: true,
+      bodyHtml: "<p>Find a coach →</p>",
+    });
+
+    await drainLeadOutbox(deps, "sub-1");
+
+    expect(deps.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ html: "<p>Find a coach →</p>" }),
+    );
+  });
+
+  it("audits a bounded HELD release before sending", async () => {
+    process.env.PUBLIC_LEADS_POLICY_APPROVED = "1";
+    process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY = "1";
+    const row = makeRow({
+      featureKey: "PUBLIC_LEADS",
+      previousStatus: "HELD",
+    });
+    const deps = makeDeps([row]);
+
+    await drainLeadOutbox(deps, "sub-1");
+
+    expect(deps.claimNext).toHaveBeenCalledWith(
+      expect.objectContaining({ releaseHeld: true }),
+    );
+    expect(deps.db.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "PUBLIC_LEAD_HELD_RELEASE" }),
+    });
+    delete process.env.PUBLIC_LEADS_POLICY_APPROVED;
+    delete process.env.PUBLIC_LEADS_DISTRIBUTED_LIMITER_READY;
   });
 });

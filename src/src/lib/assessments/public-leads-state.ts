@@ -33,6 +33,16 @@ export interface PublicLeadsState {
   deletionMode: "ANONYMIZE" | "DELETE" | null;
 }
 
+export function publicLeadRetentionCutoff(
+  state: Pick<PublicLeadsState, "retentionDays">,
+  now = new Date(),
+): Date | null {
+  if (state.retentionDays === null) return null;
+  return new Date(
+    now.getTime() - state.retentionDays * 24 * 60 * 60 * 1_000,
+  );
+}
+
 function enabled(value: string | undefined): boolean {
   return value === "1" || value?.toLowerCase() === "true";
 }

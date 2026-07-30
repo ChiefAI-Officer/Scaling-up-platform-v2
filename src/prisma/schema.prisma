@@ -80,30 +80,31 @@ model Session {
 // ============================================
 
 model Coach {
-  id                  String    @id @default(cuid())
-  userId              String?   @unique // Sprint 1: Link to User for auth
-  hubspotId           String?   @unique
-  circleId            String?   @unique
-  email               String    @unique
-  firstName           String
-  lastName            String
-  phone               String?
-  company             String?
-  title               String? // Professional title/credentials, e.g., "Scaling Up Certified Coach"
-  bio                 String?
-  profileImage        String?
-  linkedinUrl         String?
-  showBookCallCta     Boolean   @default(true)
-  bookCallUrl         String?
-  certificationStatus String    @default("PENDING")
-  certificationExpiry DateTime?
-  paymentStatus       String    @default("PENDING")
-  territory           String?
-  performanceMetrics  String?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  syncedAt            DateTime?
-  deletedAt           DateTime?
+  id                       String    @id @default(cuid())
+  userId                   String?   @unique // Sprint 1: Link to User for auth
+  hubspotId                String?   @unique
+  circleId                 String?   @unique
+  email                    String    @unique
+  firstName                String
+  lastName                 String
+  phone                    String?
+  company                  String?
+  title                    String? // Professional title/credentials, e.g., "Scaling Up Certified Coach"
+  bio                      String?
+  profileImage             String?
+  linkedinUrl              String?
+  showBookCallCta          Boolean   @default(true)
+  bookCallUrl              String?
+  certificationStatus      String    @default("PENDING")
+  certificationExpiry      DateTime?
+  paymentStatus            String    @default("PENDING")
+  territory                String?
+  performanceMetrics       String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  syncedAt                 DateTime?
+  deletedAt                DateTime?
+  publicLeadMailQuiescedAt DateTime?
 
   user            User?                @relation(fields: [userId], references: [id]) // Sprint 1: User relation
   workshops       Workshop[]
@@ -120,7 +121,7 @@ model Coach {
   campaignWizardDraft         CampaignWizardDraft?
   referralKeys                CoachReferralKey[]
   emailIdentities             CoachEmailIdentity[]
-  publicLeads                 AssessmentSubmission[] @relation("PublicLeadOwner")
+  publicLeads                 AssessmentSubmission[]       @relation("PublicLeadOwner")
 
   @@index([deletedAt])
   @@map("coaches")
@@ -141,12 +142,12 @@ model CoachReferralKey {
 }
 
 model CoachEmailIdentity {
-  normalizedEmail String   @id
+  normalizedEmail String    @id
   coachId         String
   kind            String // CURRENT | LEGACY
   revokedAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   coach Coach @relation(fields: [coachId], references: [id], onDelete: Restrict)
 
@@ -1394,36 +1395,36 @@ model AssessmentInvitation {
 }
 
 model AssessmentSubmission {
-  id                    String    @id @default(cuid())
-  campaignId            String
-  respondentId          String? // nullable for PUBLIC submissions
-  invitationId          String?   @unique // nullable for PUBLIC submissions; Postgres treats nullable @unique as effectively partial
-  submittedAt           DateTime  @default(now())
-  answers               Json // truth — [{stableKey, value} | {stableKey, textValue} | {stableKey, selectedKeys}]
-  result                Json // frozen ScoreResult cache
-  publicTaker           Json? // {email, firstName, lastName, ...} for PUBLIC
-  referringCoachEmail   String?
-  referringCoachId      String?
+  id                          String    @id @default(cuid())
+  campaignId                  String
+  respondentId                String? // nullable for PUBLIC submissions
+  invitationId                String?   @unique // nullable for PUBLIC submissions; Postgres treats nullable @unique as effectively partial
+  submittedAt                 DateTime  @default(now())
+  answers                     Json // truth — [{stableKey, value} | {stableKey, textValue} | {stableKey, selectedKeys}]
+  result                      Json // frozen ScoreResult cache
+  publicTaker                 Json? // {email, firstName, lastName, ...} for PUBLIC
+  referringCoachEmail         String?
+  referringCoachId            String?
   referringCoachEmailSnapshot String?
-  attributionSource     String?
-  publicLeadPolicyVersion String?
-  publicLeadDeletedAt   DateTime?
-  publicTakerNameNormalized String?
-  publicTakerEmailNormalized String?
-  idempotencyKey        String? // PUBLIC submit idempotency; partial-unique via raw SQL
-  requestFingerprint    String?
-  requestFingerprintVersion Int?
-  resultsTokenHash      String?
-  resultsTokenIssuedAt  DateTime?
-  resultsTokenExpiresAt DateTime?
-  resultsTokenRevokedAt DateTime?
-  resultsTokenViewedAt  DateTime?
+  attributionSource           String?
+  publicLeadPolicyVersion     String?
+  publicLeadDeletedAt         DateTime?
+  publicTakerNameNormalized   String?
+  publicTakerEmailNormalized  String?
+  idempotencyKey              String? // PUBLIC submit idempotency; partial-unique via raw SQL
+  requestFingerprint          String?
+  requestFingerprintVersion   Int?
+  resultsTokenHash            String?
+  resultsTokenIssuedAt        DateTime?
+  resultsTokenExpiresAt       DateTime?
+  resultsTokenRevokedAt       DateTime?
+  resultsTokenViewedAt        DateTime?
 
-  campaign     AssessmentCampaign      @relation(fields: [campaignId], references: [id])
-  respondent   OrgRespondent?          @relation(fields: [respondentId], references: [id])
-  invitation   AssessmentInvitation?   @relation(fields: [invitationId], references: [id])
-  outboxEmails AssessmentEmailOutbox[]
-  referringCoach Coach? @relation("PublicLeadOwner", fields: [referringCoachId], references: [id], onDelete: Restrict)
+  campaign              AssessmentCampaign      @relation(fields: [campaignId], references: [id])
+  respondent            OrgRespondent?          @relation(fields: [respondentId], references: [id])
+  invitation            AssessmentInvitation?   @relation(fields: [invitationId], references: [id])
+  outboxEmails          AssessmentEmailOutbox[]
+  referringCoach        Coach?                  @relation("PublicLeadOwner", fields: [referringCoachId], references: [id], onDelete: Restrict)
   publicLeadExportItems PublicLeadExportItem[]
 
   @@index([campaignId])
@@ -1475,33 +1476,52 @@ model AssessmentEmailOutbox {
 }
 
 model PublicLeadExport {
-  id                   String    @id @default(cuid())
-  requestedByUserId    String
-  ownerCoachId         String?
-  status               String    @default("PENDING") // PENDING | RUNNING | COMPLETED | ABORTED
-  filter               Json
-  authorizationGeneration Int   @default(0)
-  manifestDigest       String?
-  manifestRowCount     Int?
-  emittedDigest        String?
-  emittedRowCount      Int?
-  artifactCiphertext   Bytes?
-  artifactNonce        Bytes?
-  artifactAuthTag      Bytes?
-  artifactKeyVersion   String?
-  expiresAt            DateTime?
-  startedAt            DateTime?
-  completedAt          DateTime?
-  abortedAt            DateTime?
-  errorClass           String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id                      String    @id @default(cuid())
+  requestedByUserId       String
+  ownerCoachId            String?
+  status                  String    @default("PENDING") // PENDING | RUNNING | COMPLETED | ABORTED
+  filter                  Json
+  authorizationGeneration Int       @default(0)
+  manifestDigest          String?
+  manifestRowCount        Int?
+  emittedDigest           String?
+  emittedRowCount         Int?
+  artifactCiphertext      Bytes?
+  artifactNonce           Bytes?
+  artifactAuthTag         Bytes?
+  artifactKeyVersion      String?
+  expiresAt               DateTime?
+  startedAt               DateTime?
+  completedAt             DateTime?
+  abortedAt               DateTime?
+  errorClass              String?
+  nextSortOrder           Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
-  items PublicLeadExportItem[]
+  items  PublicLeadExportItem[]
+  chunks PublicLeadExportChunk[]
 
   @@index([requestedByUserId, createdAt])
   @@index([status, createdAt])
   @@map("public_lead_exports")
+}
+
+model PublicLeadExportChunk {
+  id         String   @id @default(cuid())
+  exportId   String
+  batchIndex Int
+  ciphertext Bytes
+  nonce      Bytes
+  authTag    Bytes
+  rowCount   Int
+  createdAt  DateTime @default(now())
+
+  export PublicLeadExport @relation(fields: [exportId], references: [id], onDelete: Cascade)
+
+  @@unique([exportId, batchIndex])
+  @@index([exportId, batchIndex])
+  @@map("public_lead_export_chunks")
 }
 
 model PublicLeadExportItem {
@@ -1510,9 +1530,9 @@ model PublicLeadExportItem {
   submissionId String
   sortOrder    Int
 
-  export      PublicLeadExport           @relation(fields: [exportId], references: [id], onDelete: Cascade)
-  submission  AssessmentSubmission       @relation(fields: [submissionId], references: [id], onDelete: Restrict)
-  exclusion   PublicLeadExportExclusion?
+  export     PublicLeadExport           @relation(fields: [exportId], references: [id], onDelete: Cascade)
+  submission AssessmentSubmission       @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  exclusion  PublicLeadExportExclusion?
 
   @@unique([exportId, submissionId])
   @@unique([exportId, sortOrder])

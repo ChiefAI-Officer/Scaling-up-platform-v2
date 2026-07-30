@@ -37,6 +37,13 @@ floor.
    delivery, list/search/date filter, exact-owner report denial, export
    generation/download, admin ownership, deactivation, and kill.
 
+The daily retention worker applies the approved cutoff in bounded batches,
+first overlays any immutable export-manifest rows, cancels and fences pending
+mail, then removes the retained contact/answer/result payload while preserving
+the non-PII submission tombstone and audit receipt. List, report, and export
+queries independently enforce the same cutoff so an overdue row is not exposed
+while waiting for the worker.
+
 ## Abort and kill
 
 Set `WAVE_PUBLIC_LEADS_KILL=1` and redeploy. Post-issuance parsing remains on,
@@ -56,6 +63,23 @@ incrementing `PUBLIC_LEADS_EXPORT_KEY_VERSION` while retaining the preceding key
 outside the app until every artifact using it has expired. On actor, Coach,
 policy, or retention revocation, abort active jobs and deny downloads. Never
 serve an artifact when its key version, expiry, owner, or policy check fails.
+Generation checkpoints each encrypted batch and rechecks actor, Coach, policy,
+and retention before continuing; a transient retry resumes at the durable
+`nextSortOrder` rather than rebuilding from row zero.
+
+## Historical backfill
+
+Create the frozen evidence artifact, have its digest approved out of band, then
+apply that exact artifact:
+
+```bash
+node scripts/public-leads-backfill.mjs mappings.json --manifest-out=approved.json
+node scripts/public-leads-backfill.mjs approved.json --apply --approved-digest=<digest>
+```
+
+The digest includes the observed Coach email/status/expiry and submission
+eligibility, not just operator-supplied IDs. Apply revalidates that evidence
+and writes one idempotent audit checkpoint per 100-row batch.
 
 ## Required launch evidence
 
