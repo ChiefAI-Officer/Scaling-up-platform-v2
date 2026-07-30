@@ -34,7 +34,9 @@ export function QspStoryGroup({
   React.useEffect(() => {
     // Draft hydration may arrive after mount. Visibility grows monotonically
     // for this mount, so clearing a restored field never collapses the UI.
-    setVisibleCount((current) => Math.max(current, restoredCount));
+    setVisibleCount((current) =>
+      current >= restoredCount ? current : restoredCount,
+    );
   }, [restoredCount]);
 
   function revealNext() {
